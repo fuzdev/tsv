@@ -1,0 +1,721 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 656,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Block body: empty statement dropped among real statements (comment preserved)",
+			"start": 20,
+			"end": 100,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " keep me",
+			"start": 127,
+			"end": 137,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Bare block body: only empty statements collapses like a genuinely empty block",
+			"start": 150,
+			"end": 230,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Static block: empty statement dropped among real statements",
+			"start": 239,
+			"end": 301,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 63
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Static block: only empty statements collapses like a genuinely empty static block",
+			"start": 341,
+			"end": 425,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Namespace body: empty statement dropped among real statements",
+			"start": 454,
+			"end": 518,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Namespace body: only empty statements collapses like a genuinely empty namespace",
+			"start": 546,
+			"end": 629,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 1
+				},
+				"end": {
+					"line": 30,
+					"column": 84
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 655,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 646,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 32,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 102,
+					"end": 147,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 111,
+						"end": 113,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 10
+							},
+							"end": {
+								"line": 3,
+								"column": 12
+							}
+						},
+						"name": "fn"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 116,
+						"end": 147,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 15
+							},
+							"end": {
+								"line": 7,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 120,
+								"end": 124,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 120,
+									"end": 123,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 120,
+										"end": 121,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 2
+											},
+											"end": {
+												"line": 4,
+												"column": 3
+											}
+										},
+										"name": "a"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 140,
+								"end": 144,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 140,
+									"end": 143,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 2
+										},
+										"end": {
+											"line": 6,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 140,
+										"end": 141,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 2
+											},
+											"end": {
+												"line": 6,
+												"column": 3
+											}
+										},
+										"name": "b"
+									},
+									"arguments": [],
+									"optional": false
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " keep me",
+										"start": 127,
+										"end": 137
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Block body: empty statement dropped among real statements (comment preserved)",
+							"start": 20,
+							"end": 100
+						}
+					]
+				},
+				{
+					"type": "BlockStatement",
+					"start": 232,
+					"end": 236,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 2
+						}
+					},
+					"body": [],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Bare block body: only empty statements collapses like a genuinely empty block",
+							"start": 150,
+							"end": 230
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 303,
+					"end": 338,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 309,
+						"end": 310,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 7
+							},
+							"end": {
+								"line": 14,
+								"column": 8
+							}
+						},
+						"name": "C"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 311,
+						"end": 338,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 9
+							},
+							"end": {
+								"line": 18,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "StaticBlock",
+								"start": 315,
+								"end": 335,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 3
+									}
+								},
+								"body": [
+									{
+										"type": "ExpressionStatement",
+										"start": 327,
+										"end": 331,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 3
+											},
+											"end": {
+												"line": 16,
+												"column": 7
+											}
+										},
+										"expression": {
+											"type": "CallExpression",
+											"start": 327,
+											"end": 330,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 3
+												},
+												"end": {
+													"line": 16,
+													"column": 6
+												}
+											},
+											"callee": {
+												"type": "Identifier",
+												"start": 327,
+												"end": 328,
+												"loc": {
+													"start": {
+														"line": 16,
+														"column": 3
+													},
+													"end": {
+														"line": 16,
+														"column": 4
+													}
+												},
+												"name": "a"
+											},
+											"arguments": [],
+											"optional": false
+										}
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Static block: empty statement dropped among real statements",
+							"start": 239,
+							"end": 301
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 427,
+					"end": 451,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 433,
+						"end": 434,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 7
+							},
+							"end": {
+								"line": 21,
+								"column": 8
+							}
+						},
+						"name": "D"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 435,
+						"end": 451,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 9
+							},
+							"end": {
+								"line": 23,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "StaticBlock",
+								"start": 439,
+								"end": 448,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 2
+									},
+									"end": {
+										"line": 22,
+										"column": 11
+									}
+								},
+								"body": []
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Static block: only empty statements collapses like a genuinely empty static block",
+							"start": 341,
+							"end": 425
+						}
+					]
+				},
+				{
+					"type": "TSModuleDeclaration",
+					"start": 520,
+					"end": 543,
+					"loc": {
+						"start": {
+							"line": 26,
+							"column": 1
+						},
+						"end": {
+							"line": 28,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 530,
+						"end": 531,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 11
+							},
+							"end": {
+								"line": 26,
+								"column": 12
+							}
+						},
+						"name": "N"
+					},
+					"body": {
+						"type": "TSModuleBlock",
+						"start": 532,
+						"end": 543,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 13
+							},
+							"end": {
+								"line": 28,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 536,
+								"end": 540,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 2
+									},
+									"end": {
+										"line": 27,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 536,
+									"end": 539,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 2
+										},
+										"end": {
+											"line": 27,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 536,
+										"end": 537,
+										"loc": {
+											"start": {
+												"line": 27,
+												"column": 2
+											},
+											"end": {
+												"line": 27,
+												"column": 3
+											}
+										},
+										"name": "a"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Namespace body: empty statement dropped among real statements",
+							"start": 454,
+							"end": 518
+						}
+					]
+				},
+				{
+					"type": "TSModuleDeclaration",
+					"start": 631,
+					"end": 645,
+					"loc": {
+						"start": {
+							"line": 31,
+							"column": 1
+						},
+						"end": {
+							"line": 31,
+							"column": 15
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 641,
+						"end": 642,
+						"loc": {
+							"start": {
+								"line": 31,
+								"column": 11
+							},
+							"end": {
+								"line": 31,
+								"column": 12
+							}
+						},
+						"name": "M"
+					},
+					"body": {
+						"type": "TSModuleBlock",
+						"start": 643,
+						"end": 645,
+						"loc": {
+							"start": {
+								"line": 31,
+								"column": 13
+							},
+							"end": {
+								"line": 31,
+								"column": 15
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Namespace body: only empty statements collapses like a genuinely empty namespace",
+							"start": 546,
+							"end": 629
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

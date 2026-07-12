@@ -292,8 +292,11 @@ impl<'a> Printer<'a> {
             }
 
             // Process comments before this member (with blank line preservation)
-            member_parts
-                .extend(self.build_leading_comments_with_blank_lines(&comments, member_start));
+            member_parts.extend(self.build_leading_comments_with_blank_lines(
+                &comments,
+                member_start,
+                false,
+            ));
 
             // A preceding format-ignore directive keeps the member's source verbatim.
             // The member span includes its trailing `;`.

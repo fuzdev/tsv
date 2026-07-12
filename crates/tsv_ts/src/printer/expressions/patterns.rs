@@ -605,9 +605,11 @@ impl<'a> Printer<'a> {
                 CommentVec::new()
             };
 
-            prop_parts.extend(
-                self.build_leading_comments_with_blank_lines(&leading_comments, prop_start),
-            );
+            prop_parts.extend(self.build_leading_comments_with_blank_lines(
+                &leading_comments,
+                prop_start,
+                false,
+            ));
 
             // A preceding format-ignore directive keeps the property's source verbatim
             // (trailing comment/comma handled normally)
@@ -937,9 +939,11 @@ impl<'a> Printer<'a> {
                                     .is_some_and(|dpos| self.comment_on_delimiter_line(dpos, c)))
                         })
                         .collect();
-                parts.extend(
-                    self.build_leading_comments_with_blank_lines(&leading_comments, elem_start),
-                );
+                parts.extend(self.build_leading_comments_with_blank_lines(
+                    &leading_comments,
+                    elem_start,
+                    false,
+                ));
 
                 parts.push(self.build_expression_doc(e));
 

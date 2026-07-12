@@ -113,8 +113,15 @@ impl<'a> Printer<'a> {
                     handler.body.span.start,
                 );
             }
-            // Catch block stays inline: `catch (e) {}`
-            parts.push(self.build_block_statement_doc(&handler.body));
+            // Catch block stays inline (`catch (e) {}`) UNLESS a `finally`
+            // follows, in which case it expands empty like `try`/`finally` do
+            // (Prettier's `block.js`: `parent.type === "CatchClause" &&
+            // !parentParent.finalizer` is the only case that stays collapsed).
+            if stmt.finalizer.is_some() {
+                parts.push(self.build_block_statement_expand_empty_doc(&handler.body));
+            } else {
+                parts.push(self.build_block_statement_doc(&handler.body));
+            }
         }
         if let Some(finalizer) = &stmt.finalizer {
             // Check for comments before finally (after catch block or try block)

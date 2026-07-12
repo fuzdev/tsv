@@ -173,6 +173,28 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Collect leading comments for a case-consequent statement (or a dropped
+    /// `EmptyStatement` standing in for one), filtering out whatever's already
+    /// claimed: a trailing same-line comment of the previous statement, or —
+    /// for the first statement, which has no previous statement — an inline
+    /// comment on the case label's own line (already handled by the caller).
+    fn collect_case_leading_comments(
+        &self,
+        prev_end: u32,
+        boundary: u32,
+        prev_stmt_end: Option<u32>,
+        case_label_end: u32,
+    ) -> CommentVec<'_> {
+        let comments: CommentVec<'_> =
+            comments_in_range(self.comments, prev_end, boundary).collect();
+        let anchor = prev_stmt_end.unwrap_or(case_label_end);
+        comments
+            .iter()
+            .filter(|c| !self.is_same_line(anchor, c.span.start))
+            .copied()
+            .collect()
+    }
+
     /// Build a doc for a switch case (without outer indent - that's handled by switch)
     ///
     /// `inline_comment_boundary` is the position up to which we should look for inline comments
@@ -251,27 +273,60 @@ impl<'a> Printer<'a> {
         for (i, stmt) in case.consequent.iter().enumerate() {
             let stmt_start = stmt.span().start;
 
-            // Check for comments between previous position and this statement
-            let comments: CommentVec<'_> =
-                comments_in_range(self.comments, prev_end, stmt_start).collect();
+            // Standalone EmptyStatements are dropped entirely (Prettier's
+            // `printStatementSequence` never prints them), but any comments
+            // attached to one must survive — printed as orphaned comments with
+            // nothing following them in this iteration to glue to. The next
+            // iteration's own unconditional leading hardline supplies the
+            // separator (mirroring `build_statement_list_docs_into`).
+            if matches!(stmt, Statement::EmptyStatement(_)) {
+                let stmt_end = stmt.span().end;
+                let next_bound = case
+                    .consequent
+                    .get(i + 1)
+                    .map_or(inline_comment_boundary, |s| s.span().start);
+                let search_end = self
+                    .find_end_with_trailing_comments(stmt_end)
+                    .min(next_bound);
 
-            // Filter out:
-            // 1. Trailing same-line comments from the previous statement
-            // 2. Inline comments after the case label (already handled above)
-            let leading_comments: CommentVec<'_> = if let Some(prev_stmt) = prev_stmt_end {
-                comments
-                    .iter()
-                    .filter(|c| !self.is_same_line(prev_stmt, c.span.start))
-                    .copied()
-                    .collect()
-            } else {
-                // For first statement, filter out inline comments after case label
-                comments
-                    .iter()
-                    .filter(|c| !self.is_same_line(case_label_end, c.span.start))
-                    .copied()
-                    .collect()
-            };
+                let leading_comments = self.collect_case_leading_comments(
+                    prev_end,
+                    search_end,
+                    prev_stmt_end,
+                    case_label_end,
+                );
+
+                if !leading_comments.is_empty() {
+                    let mut stmt_parts: DocBuf = smallvec![d.hardline()];
+                    if prev_stmt_end.is_some() {
+                        let check_end = leading_comments[0].span.start;
+                        if self.has_blank_line_between(prev_end, check_end) {
+                            stmt_parts.push(d.hardline());
+                        }
+                    }
+                    stmt_parts.extend(self.build_leading_comments_with_blank_lines(
+                        &leading_comments,
+                        search_end,
+                        true,
+                    ));
+                    parts.push(d.indent(d.concat(&stmt_parts)));
+                    prev_stmt_end = Some(stmt_end);
+                }
+
+                prev_end = search_end;
+                continue;
+            }
+
+            // Comments between the previous position and this statement, minus
+            // whatever's already claimed (a trailing same-line comment of the
+            // previous statement, or — for the first statement — an inline
+            // comment on the case label's own line, handled above).
+            let leading_comments = self.collect_case_leading_comments(
+                prev_end,
+                stmt_start,
+                prev_stmt_end,
+                case_label_end,
+            );
 
             // Trailing same-line comments on THIS statement (mirrors the block
             // statement joiner `build_statement_list_docs_into`). Without this the

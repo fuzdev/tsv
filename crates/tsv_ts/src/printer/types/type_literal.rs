@@ -76,7 +76,11 @@ impl<'a> Printer<'a> {
             docs.push(d.literalline());
         }
         docs.push(d.hardline());
-        docs.extend(self.build_leading_comments_with_blank_lines(&leading_comments, member_start));
+        docs.extend(self.build_leading_comments_with_blank_lines(
+            &leading_comments,
+            member_start,
+            false,
+        ));
         docs
     }
 
