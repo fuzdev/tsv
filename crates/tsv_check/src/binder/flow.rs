@@ -2084,23 +2084,27 @@ impl<'a> FlowBuilder<'a> {
     }
 
     fn visit_class_decl(&mut self, c: &ClassDeclaration<'_>) {
-        self.visit_class_common(c.id.as_ref(), c.decorators, c.super_class, c.body.body);
+        self.visit_class_common(c.id.as_ref(), c.decorators, c.super_class, c.body.body, false);
     }
 
     fn visit_class_expr(&mut self, c: &ClassExpression<'_>) {
-        self.visit_class_common(c.id.as_ref(), c.decorators, c.super_class, c.body.body);
+        self.visit_class_common(c.id.as_ref(), c.decorators, c.super_class, c.body.body, true);
     }
 
     /// The value-flow class descent shared by the declaration and expression forms
     /// (distinct types with the same field shape): the name binding, decorators, and
     /// the `extends` expression, then each member. Type positions (type params /
-    /// super type args / `implements`) are skipped.
+    /// super type args / `implements`) are skipped. `is_class_expression` threads
+    /// the parent-kind half of tsgo's
+    /// `IsObjectLiteralOrClassExpressionMethodOrAccessor` gate (utilities.go:566)
+    /// down to `visit_method` — tsv expressions carry no parent pointer.
     fn visit_class_common(
         &mut self,
         name: Option<&Identifier<'_>>,
         decorators: Option<&[Decorator<'_>]>,
         super_class: Option<&Expression<'_>>,
         members: &[ClassMember<'_>],
+        is_class_expression: bool,
     ) {
         if let Some(name) = name {
             self.visit_identifier(name);
@@ -2110,13 +2114,13 @@ impl<'a> FlowBuilder<'a> {
             self.visit_expression(sc);
         }
         for member in members {
-            self.visit_class_member(member);
+            self.visit_class_member(member, is_class_expression);
         }
     }
 
-    fn visit_class_member(&mut self, member: &ClassMember<'_>) {
+    fn visit_class_member(&mut self, member: &ClassMember<'_>, is_class_expression: bool) {
         match member {
-            ClassMember::MethodDefinition(m) => self.visit_method(m),
+            ClassMember::MethodDefinition(m) => self.visit_method(m, is_class_expression),
             ClassMember::PropertyDefinition(p) => {
                 self.visit_decorators(p.decorators);
                 self.visit_expression(&p.key);
@@ -2143,7 +2147,7 @@ impl<'a> FlowBuilder<'a> {
         }
     }
 
-    fn visit_method(&mut self, m: &MethodDefinition<'_>) {
+    fn visit_method(&mut self, m: &MethodDefinition<'_>, is_class_expression: bool) {
         self.visit_decorators(m.decorators);
         let is_ctor = m.kind == MethodKind::Constructor;
         self.visit_expression(&m.key);
@@ -2153,12 +2157,23 @@ impl<'a> FlowBuilder<'a> {
         // where tsc's method node holds the body directly). The `MethodDefinition`
         // and its inline `value` share an address (a repr reorder puts `value` at
         // offset 0), so the address map keys on `(address, NodeKind)`; anchoring
-        // here resolves the FunctionExpression id via its kind (the method itself
-        // is now separately resolvable by `NodeKind::MethodDefinition`). The
-        // obj-literal/class-expression method flow-write + Start.Node subject
-        // (binder.go:982, 1534) is a P3 narrowing hint, deferred to F1b.
+        // here resolves the FunctionExpression id via its kind, and the method
+        // itself resolves separately by `NodeKind::MethodDefinition`.
         let anchor = self.require(addr_of(&m.value), NodeKind::FunctionExpression);
-        let saved = self.enter_container(None, false, is_ctor);
+        // A **class-expression** method/accessor (never a constructor, never a
+        // class-declaration member) gets the outer-flow write on the METHOD node
+        // (bindPropertyOrMethodOrAccessor, binder.go:981) and becomes the body
+        // Start's subject (binder.go:1534) — the P3 narrowing hint
+        // (`IsObjectLiteralOrClassExpressionMethodOrAccessor`, utilities.go:566;
+        // the object-literal half lives in `visit_object_expr_property`).
+        let start_subject = if is_class_expression && !is_ctor {
+            let method_id = self.require(addr_of(m), NodeKind::MethodDefinition);
+            self.set_flow_leaf(method_id);
+            Some(method_id)
+        } else {
+            None
+        };
+        let saved = self.enter_container(start_subject, false, is_ctor);
         self.bind_params(m.value.params);
         self.visit_statement_list(m.value.body.body);
         self.exit_container(saved, false, true, true, anchor, is_ctor);
@@ -2461,11 +2476,17 @@ impl<'a> FlowBuilder<'a> {
             // anchored on its value FunctionExpression — the body-bearing node
             // (unlike `MethodDefinition`, a `Property` does NOT share its value's
             // address, so this is a consistency choice with `visit_method`, not a
-            // collision workaround). The obj-literal method flow-write
-            // (binder.go:982) is a P3 narrowing hint, deferred.
+            // collision workaround). The PROPERTY node — tsv's analog of tsgo's
+            // object-literal MethodDeclaration — gets the outer-flow write
+            // (bindPropertyOrMethodOrAccessor, binder.go:981) and becomes the
+            // body Start's subject (binder.go:1534) — the P3 narrowing hint
+            // (`IsObjectLiteralOrClassExpressionMethodOrAccessor`,
+            // utilities.go:566; the class-expression half lives in `visit_method`).
             self.visit_expression(&pr.key);
             let anchor = self.require(addr_of(f), NodeKind::FunctionExpression);
-            let saved = self.enter_container(None, false, false);
+            let prop_id = self.require(addr_of(pr), NodeKind::Property);
+            self.set_flow_leaf(prop_id);
+            let saved = self.enter_container(Some(prop_id), false, false);
             self.bind_params(f.params);
             self.visit_statement_list(f.body.body);
             self.exit_container(saved, false, true, true, anchor, false);
@@ -3201,6 +3222,83 @@ mod tests {
         // Both antecedents were referenced; a1 twice would be Shared, but the dup
         // was a no-op, so a1 is Referenced-once here.
         assert!(product.graph.flags(a1).contains(FlowFlags::REFERENCED));
+    }
+
+    /// Find the first node of `kind`, with its body-`Start` flow node (the START
+    /// whose subject is that node), if any.
+    fn start_subject_of(
+        product: &FlowProduct,
+        bound: &BoundFile,
+        kind: NodeKind,
+    ) -> (NodeId, Option<FlowNodeId>) {
+        let node = NodeId::from_index(
+            bound
+                .kinds
+                .iter()
+                .position(|&k| k == kind)
+                .expect("node of kind"),
+        );
+        let g = &product.graph;
+        let start = (1..=g.node_count())
+            .filter_map(FlowNodeId::from_raw)
+            .find(|&f| g.flags(f).contains(FlowFlags::START) && g.subject(f) == Some(node));
+        (node, start)
+    }
+
+    #[test]
+    fn class_expression_method_gets_flow_write_and_start_subject() {
+        // tsgo binder.go:981 (outer-flow write on the method node) + :1534
+        // (Start.Node = the method) — class-EXPRESSION methods only.
+        let (product, bound) =
+            build_with_bound("const C = class { m() { return 1; } get g() { return 2; } };");
+        let (method, start) = start_subject_of(&product, &bound, NodeKind::MethodDefinition);
+        assert!(start.is_some(), "class-expression method Start carries the method subject");
+        assert!(
+            product.flow_of_node[method.index()].is_some(),
+            "class-expression method node gets the outer-flow write"
+        );
+    }
+
+    #[test]
+    fn class_declaration_method_stays_unstamped() {
+        // The Parent.Kind gate (utilities.go:566): a class-DECLARATION method gets
+        // neither the flow write nor a Start subject.
+        let (product, bound) = build_with_bound("class D { m() { return 1; } }");
+        let (method, start) = start_subject_of(&product, &bound, NodeKind::MethodDefinition);
+        assert!(start.is_none(), "class-declaration method Start has no subject");
+        assert!(product.flow_of_node[method.index()].is_none());
+    }
+
+    #[test]
+    fn class_expression_constructor_excluded_from_method_gate() {
+        // A constructor is not a MethodDeclaration/accessor kind — excluded even
+        // inside a class expression.
+        let (product, bound) = build_with_bound("const C = class { constructor() { this.x = 1; } };");
+        let (ctor, start) = start_subject_of(&product, &bound, NodeKind::MethodDefinition);
+        assert!(start.is_none(), "constructor Start has no subject");
+        assert!(product.flow_of_node[ctor.index()].is_none());
+    }
+
+    #[test]
+    fn object_literal_method_gets_flow_write_and_start_subject() {
+        // The object-literal half of the gate: the Property node (tsv's analog of
+        // tsgo's object-literal MethodDeclaration) is stamped and made the subject.
+        let (product, bound) = build_with_bound("const o = { m() { return 1; } };");
+        let (prop, start) = start_subject_of(&product, &bound, NodeKind::Property);
+        assert!(start.is_some(), "object-literal method Start carries the Property subject");
+        assert!(product.flow_of_node[prop.index()].is_some());
+    }
+
+    #[test]
+    fn object_literal_plain_property_stays_unstamped() {
+        // A function-VALUED plain property is not a method: the FunctionExpression
+        // itself is the Start subject (the fn-expr rule), the Property is not.
+        let (product, bound) = build_with_bound("const o = { m: function () { return 1; } };");
+        let (prop, prop_start) = start_subject_of(&product, &bound, NodeKind::Property);
+        assert!(prop_start.is_none(), "plain property Start has no Property subject");
+        assert!(product.flow_of_node[prop.index()].is_none());
+        let (_f, f_start) = start_subject_of(&product, &bound, NodeKind::FunctionExpression);
+        assert!(f_start.is_some(), "the function expression keeps its own subject");
     }
 
     #[test]
