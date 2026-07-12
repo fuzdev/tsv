@@ -176,8 +176,8 @@ if (exists('../prettier')) {
 	} else ok(`../prettier checkout (v${v ?? '?'})`);
 } else warn('../prettier checkout missing — the corpus prettier suites + layout-reference reading need it');
 
-if (exists('../test262/test')) ok('../test262 checkout');
-else warn('../test262 checkout missing — tsv_debug test262 + bench:harvest:test262 unavailable (manual-cadence tools)');
+if (exists('../test262/test')) ok('../test262 checkout (conformance:test262 release gate)');
+else warn('../test262 checkout missing — conformance:test262 (the release gate, publish Step 3b) + bench:harvest:test262 need it');
 
 if (exists('../wpt/css')) ok('../wpt/css checkout (sparse)');
 else warn('../wpt/css checkout missing — bench:harvest:wpt unavailable (manual-cadence tool)');

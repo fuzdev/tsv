@@ -101,8 +101,9 @@ cargo run -p tsv_debug test262 language/expressions/arrow --list
 
 ### Interpret Results
 
-Example output (numbers illustrative — current full-suite results are in
-[conformance_test262.md §Current Results](./conformance_test262.md#current-results)):
+Example output (numbers illustrative — positive conformance is currently 100%, so
+this shows the *shape* when positive failures exist; current full-suite results are
+in [conformance_test262.md §Current Results](./conformance_test262.md#current-results)):
 
 ```
 Results:

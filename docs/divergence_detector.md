@@ -20,6 +20,7 @@ benches/js/
 │       ├── mod.ts             # Main exports
 │       ├── safety.ts          # Safety check (differential char-frequency vs prettier)
 │       ├── patterns.ts        # Hunk-aware pattern detectors (PATTERNS), with traceability
+│       ├── expected_errors.ts # Expected-error fixtures (parse-rejection cases)
 │       └── validation.ts      # Audit: cross-ref patterns vs conformance_prettier.md
 ```
 
