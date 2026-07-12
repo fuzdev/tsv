@@ -332,12 +332,15 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
             // base/callee whose parens are structurally mandatory. A sequence
             // self-parenthesizes via `build_sequence_doc`.
             let raw_inner = printer.print_expression(expr);
-            let inner =
-                if needs_parens(expr, ParenContext::ComputedPropertyKey, printer.in_for_init()) {
-                    d.parens(raw_inner)
-                } else {
-                    raw_inner
-                };
+            let inner = if needs_parens(
+                expr,
+                ParenContext::ComputedPropertyKey,
+                printer.in_for_init(),
+            ) {
+                d.parens(raw_inner)
+            } else {
+                raw_inner
+            };
             let prop_span = printer.get_property_span(expr);
 
             // Find the opening bracket position by scanning from object_end,
