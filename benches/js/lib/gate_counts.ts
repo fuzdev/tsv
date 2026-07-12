@@ -153,14 +153,25 @@ export const CORPUS_PARSE_TSV_ERRORS_PIN: Record<Language, number> = {
  * corpus:compare:format --all — MINIMUM per-language exact `match` count (same
  * live-corpus semantics as `CORPUS_PARSE_COMPARED_MIN`): a shrink fails (a regression
  * or a gutted corpus), a rise passes (re-pin to keep the floor tight). Measured
- * 2026-07-08 against ../svelte 8fb7ceeba, ../kit 1b4adccf7, ../svelte.dev fb5a4e2,
- * oracle @sveltejs/acorn-typescript 1.0.11; SAFETY 0. When a fix moves a file or the
- * live corpus grows, re-pin deliberately and put the why in the commit.
+ * 2026-07-12 against ../svelte 8fb7ceeba, ../kit 1b4adccf7, ../svelte.dev fb5a4e2,
+ * ../prettier 1dcd0b0, oracle @sveltejs/acorn-typescript 1.0.11 (../acorn-typescript
+ * 312d079); SAFETY 0. When a fix moves a file or the live corpus grows, re-pin
+ * deliberately and put the why in the commit.
+ *
+ * svelte 1111→1114, typescript 4085→4151 (both rose — re-pinned UP to keep the floor
+ * tight): the pinned framework/prettier checkouts are UNCHANGED from the 2026-07-08 pin,
+ * so the prettier-suite share of each rise is deterministic tsv behavior — the landed
+ * #409–#422 fixes plus this branch's two formatter fixes (empty statement-position blocks
+ * expand `{}`→`{\n}`; a `for` init-only header keeps its `; ;` spacing, not `;;`); the
+ * remainder is live dev-repo growth. css 126→125: a pre-existing live-dev-repo churn drop
+ * first observed 2026-07-11 (not re-pinned then). No CSS formatter change since (the last
+ * CSS-crate touch, #401, was a parse over-rejection fix), css unknown/partial both unchanged
+ * at their pins and SAFETY 0 — so the dropped file is benign corpus churn, not a regression.
  */
 export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
-	svelte: 1111,
-	typescript: 4085,
-	css: 126,
+	svelte: 1114,
+	typescript: 4151,
+	css: 125,
 };
 
 /**
@@ -176,9 +187,23 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	svelte: 7,
-	typescript: 173,
+	typescript: 151,
 	css: 22,
 };
+// typescript 173→151 (2026-07-12, ../prettier 1dcd0b0, ../svelte 8fb7ceeba, ../kit
+// 1b4adccf7, ../svelte.dev fb5a4e2, ../prettier-plugin-svelte 7809486, oracle
+// acorn-typescript 1.0.11): the un-triaged divergence backlog shrank. The pinned prettier
+// suite + framework checkouts are UNCHANGED, so every prettier-suite move is deterministic
+// tsv behavior, in two waves. (1) 173→154 — the already-landed #414/#415/#417 numeric-literal
+// strictness rejects sloppy-mode files (js/non-strict/octal-number.js,
+// js/numeric-separators/number.js) unknown→error (tsv is strict-mode-only by design), and
+// #418–#422 fixes moved others unknown→match. (2) 154→151 — this branch's two formatter fixes
+// moved three more unknown→match: the `for` init-only spacing fix (js/for/in.js) and the
+// empty-statement-position-block expand fix (js/module-blocks/non-module-blocks.js,
+// typescript/nosemi/functions.ts). A before/after --all path-diff confirmed exactly these
+// moved, 0 files ENTERED unknown, SAFETY 0. The remaining 151 unknowns are all
+// line-break/wrap style divergences (no data loss). (Files that moved to `error` are
+// tsv-correct strict-mode rejects; the format `error`/`expected_errors` buckets are unpinned.)
 // typescript 177→173 (2026-07-11, ../prettier 1dcd0b0, oracle acorn-typescript 1.0.11): the
 // unary/update-argument parenthesization fix (a `+`/`-` operand that would re-tokenize — `+(+x)`,
 // `-(--x)` — and a type-assertion operand of an update — `(a as T)++` — now keep their parens;
@@ -234,6 +259,12 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	typescript: 63,
 	css: 9,
 };
+// typescript 63 (net unchanged 2026-07-12, composition shifted): on main the #422
+// consecutive-line-comment break added two comment_position partials (63→65), and this
+// branch's two formatter fixes resolved two others back to match — js/for/parentheses.js
+// (the `for` init-only spacing fix) and js/switch/comments.js (the empty-statement-position
+// block expand fix). Net 63 (same value, two-in/two-out); a before/after --all path-diff
+// confirmed 0 files ENTERED partial, SAFETY 0.
 // css 8→9 (2026-07-10): `prettier/tests/format/css/url/url.css` moved unknown→partial after the
 // value-parser escaped-paren fix (see the css 23→22 unknown-pin note above) — its `background:`
 // url list now formats cleanly and reads as fill_101_boundary, with the escaped-paren
