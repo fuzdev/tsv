@@ -1,7 +1,7 @@
 use super::{CssParser, is_boolean_operator_keyword};
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
-use crate::parser::selectors::parse_complex_selector_list;
+use crate::parser::selectors::parse_forgiving_selector_list;
 use tsv_lang::{ParseError, Span};
 
 /// Parse a condition query — `(prop: val)` parts connected by `and`/`or`, with
@@ -329,7 +329,38 @@ pub(super) fn parse_container_prelude<'arena>(
     Ok((container_name, condition, span))
 }
 
-/// Parse @scope prelude into structured selector lists.
+/// Parse one `@scope` clause — `(<forgiving-selector-list>)` — with the in-paren
+/// leading/trailing gap comments registered (the printer re-emits them from the AST via
+/// `comments_in_range`, the same wrapping `:is()` args use). Assumes the current token
+/// is `(`. The list is **forgiving** (css-cascade-6 makes `<scope-start>`/`<scope-end>`
+/// `<forgiving-selector-list>`s, the same production `:is()`/`:where()` use), so an empty
+/// or invalid list — `@scope ()`, `@scope (.a, , .b)`, `@scope (.)` — parses (each is
+/// kept verbatim), matching parseCss (which captures the prelude raw) and prettier.
+/// `what` names the clause for the unterminated-`)` error.
+fn parse_scope_clause<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+    what: &str,
+) -> Result<ScopeClause<'arena>, ParseError> {
+    let paren_start = parser.span_pos(parser.current_start);
+    parser.advance()?; // consume '('
+    parser.skip_whitespace_registering_comments()?; // leading comment
+    let list = parse_forgiving_selector_list(parser)?;
+    parser.skip_whitespace_registering_comments()?; // trailing comment
+    if !parser.check(TokenKind::RightParen) {
+        return Err(parser.error_expected_after("')'", what));
+    }
+    let paren_end = parser.span_pos(parser.current_end);
+    parser.advance()?; // consume ')'
+    Ok(ScopeClause {
+        list,
+        paren: Span {
+            start: paren_start,
+            end: paren_end,
+        },
+    })
+}
+
+/// Parse an @scope prelude into a `PreludeValue::Selectors`.
 ///
 /// CSS Syntax (css-cascade-6): `@scope [(<scope-start>)]? [to (<scope-end>)]?` —
 /// **both clauses are independently optional**, so all four combinations are valid
@@ -347,62 +378,56 @@ pub(super) fn parse_container_prelude<'arena>(
 /// `prelude` string extracts to `""` (matching parseCss).
 pub(super) fn parse_scope_prelude<'arena>(
     parser: &mut CssParser<'_, 'arena>,
-) -> Result<
-    (
-        Option<SelectorList<'arena>>,
-        Option<SelectorList<'arena>>,
-        Span,
-    ),
-    ParseError,
-> {
+) -> Result<PreludeValue<'arena>, ParseError> {
+    // Leading gap comments (`@scope /* c */ …`) register here: the shared at-rule
+    // name skip in `parse_atrule` is a plain skip that stops at a comment, so a leading
+    // comment is the current token on entry. Capturing `start` *after* this keeps it out
+    // of the wire prelude (extracted from `span`), matching parseCss, which drops it.
+    parser.skip_whitespace_registering_comments()?;
     let start = parser.span_pos(parser.current_start);
     // Widens to each clause's closing `)`; stays at `start` when no clause is present.
     let mut end = start;
 
-    // Optional root clause: `(<scope-start>)`.
+    // Optional root clause `(<scope-start>)`. After it, the between-clause (`) /* c */ to`)
+    // and pre-`{` gaps register their comments so the printer can re-emit them.
     let root = if parser.check(TokenKind::LeftParen) {
-        parser.advance()?; // consume '('
-        parser.skip_whitespace()?;
-        let root_selectors = parse_complex_selector_list(parser)?;
-        parser.skip_whitespace()?;
-        if !parser.check(TokenKind::RightParen) {
-            return Err(parser.error_expected_after("')'", "@scope root selectors"));
-        }
-        end = parser.span_pos(parser.current_end);
-        parser.advance()?; // consume ')'
-        parser.skip_whitespace()?;
-        Some(root_selectors)
+        let clause = parse_scope_clause(parser, "@scope root selectors")?;
+        end = clause.paren.end;
+        parser.skip_whitespace_registering_comments()?; // between-clause / pre-`{` comment
+        Some(clause)
     } else {
         None
     };
 
-    // Optional limit clause: `to (<scope-end>)` — valid with or without a root.
-    // `to` is a case-insensitive grammar keyword; canonicalized to lowercase at the
-    // printer (the `" to ("` literal in `print_css_atrule`).
+    // Optional limit clause `to (<scope-end>)` — valid with or without a root. `to` is a
+    // case-insensitive grammar keyword (lowercased at the printer's ` to ` literal); its
+    // span lets the printer tell a between-clause comment (before `to`) from an after-`to`
+    // one. The after-`to` and pre-`{` gaps register comments the same way.
     let limit = if parser.check(TokenKind::Identifier)
         && parser.current_identifier().eq_ignore_ascii_case("to")
     {
+        let to_span = Span {
+            start: parser.span_pos(parser.current_start),
+            end: parser.span_pos(parser.current_end),
+        };
         parser.advance()?; // consume "to"
-        parser.skip_whitespace()?;
+        parser.skip_whitespace_registering_comments()?; // after-`to` comment
         if !parser.check(TokenKind::LeftParen) {
             return Err(parser.error_expected_after("'('", "'to' in @scope prelude"));
         }
-        parser.advance()?; // consume '('
-        parser.skip_whitespace()?;
-        let limit_selectors = parse_complex_selector_list(parser)?;
-        parser.skip_whitespace()?;
-        if !parser.check(TokenKind::RightParen) {
-            return Err(parser.error_expected_after("')'", "@scope limit selectors"));
-        }
-        end = parser.span_pos(parser.current_end);
-        parser.advance()?; // consume ')'
-        parser.skip_whitespace()?;
-        Some(limit_selectors)
+        let clause = parse_scope_clause(parser, "@scope limit selectors")?;
+        end = clause.paren.end;
+        parser.skip_whitespace_registering_comments()?; // pre-`{` comment
+        Some(ScopeLimit { to_span, clause })
     } else {
         None
     };
 
-    Ok((root, limit, Span { start, end }))
+    Ok(PreludeValue::Selectors {
+        root,
+        limit,
+        span: Span { start, end },
+    })
 }
 
 /// Parse @import prelude into structured values
@@ -447,12 +472,21 @@ pub(super) fn parse_import_prelude<'arena>(
             },
         });
         parser.advance()?;
-    } else if matches!(parser.current_kind, TokenKind::Url) {
+    } else if matches!(parser.current_kind, TokenKind::Url)
+        && !url_token_has_unclosed_paren(&parser.source()[parser.current_start..parser.current_end])
+    {
         // Unquoted `url(...)` — the lexer consumed it as one opaque `<url-token>`. Mirror
         // `parse_function_value`'s empty-args url shape (name + span): the printer and the
         // public-AST conversion reconstruct the verbatim, inner-ws-trimmed `url(...)` from
         // the function span, so structured `@import url(…) layer/supports/media` wrapping
         // still works (unlike a raw fallback, which would drop that structure).
+        //
+        // A url-token with a *nested* `(` (e.g. `url(a(b))`) is excluded above: the lexer
+        // stops the url scan at the first unescaped `)` (css-syntax §4.3.6), truncating the
+        // token to `url(a(b)` and leaving a dangling `)`, so the structured split would
+        // reject at the trailing `)`. parseCss reads such a prelude raw to `;` (and prettier
+        // prints it verbatim), so fall through to the raw path below — the same one
+        // `@namespace url(a(b))` already takes.
         let value_start = parser.span_pos(parser.current_start);
         let value_end = parser.span_pos(parser.current_end);
         values.push(CssValue::Function {
@@ -542,6 +576,27 @@ pub(super) fn parse_import_prelude<'arena>(
         values: values.into_bump_slice(),
         span: Span { start, end },
     })
+}
+
+/// Whether an unquoted `<url-token>`'s text has an unclosed `(` — i.e. the lexer stopped
+/// the url scan at the first unescaped `)` (css-syntax §4.3.6) *inside* a nested group, so
+/// the token is a truncated `url(a(b)` rather than a balanced `url(...)`. Escape-aware: a
+/// `\(` / `\)` is literal url content, not a paren delimiter (matching the lexer's own
+/// scan), so `url(a\(b)` (balanced) and `url(a\)b)` (escaped close) both read as closed.
+fn url_token_has_unclosed_paren(text: &str) -> bool {
+    let mut depth: u32 = 0;
+    let mut chars = text.chars();
+    while let Some(c) = chars.next() {
+        match c {
+            '\\' => {
+                chars.next(); // the escaped code point is content, never a delimiter
+            }
+            '(' => depth += 1,
+            ')' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+    }
+    depth > 0
 }
 
 /// Parse a function value (e.g., url(), layer(), supports())

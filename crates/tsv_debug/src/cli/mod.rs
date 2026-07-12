@@ -14,8 +14,8 @@ use commands::{
     fixtures_update_parsed::FixturesUpdateParsedCommand,
     fixtures_validate::FixturesValidateCommand, format_prettier::FormatPrettierCommand,
     json_profile::JsonProfileCommand, lex_diff::LexDiffCommand, line_width::LineWidthCommand,
-    metrics::MetricsCommand, profile::ProfileCommand, scan_audit::ScanAuditCommand,
-    test262::Test262Command, ts_fixture_audit::TsFixtureAuditCommand,
+    metrics::MetricsCommand, profile::ProfileCommand, roundtrip_audit::RoundtripAuditCommand,
+    scan_audit::ScanAuditCommand, test262::Test262Command, ts_fixture_audit::TsFixtureAuditCommand,
     tsc_conformance::TscConformanceCommand,
 };
 
@@ -78,6 +78,7 @@ pub enum Subcommand {
     JsonProfile(JsonProfileCommand),
     LexDiff(LexDiffCommand),
     Metrics(MetricsCommand),
+    RoundtripAudit(RoundtripAuditCommand),
     ScanAudit(ScanAuditCommand),
     // Requires the `swallow_check` feature so default builds keep the
     // render-time swallow instrumentation compiled out (production-shaped
@@ -119,6 +120,7 @@ impl TopLevel {
             Subcommand::JsonProfile(c) => c.run(),
             Subcommand::LexDiff(c) => c.run(),
             Subcommand::Metrics(c) => c.run(),
+            Subcommand::RoundtripAudit(c) => c.run(),
             Subcommand::ScanAudit(c) => c.run(),
             #[cfg(feature = "swallow_check")]
             Subcommand::SwallowAudit(c) => c.run(),

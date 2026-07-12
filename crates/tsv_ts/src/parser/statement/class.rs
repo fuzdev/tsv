@@ -523,8 +523,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // diagnostics rather than failing to parse/format).
         if is_static && matches!(self.current_kind(), TokenKind::BraceOpen) {
             // Parse the block body. A class static initialization block is a
-            // `[+Await]` context (`await` is allowed inside it).
-            let block = self.with_in_await(true, Self::parse_block_statement)?;
+            // `[+Await]` context (`await` is allowed inside it) but `[~Yield]`
+            // (`yield` is not the enclosing generator's yield here).
+            let block = self.with_fn_context(true, false, Self::parse_block_statement)?;
             let end = block.span.end;
 
             return Ok(ClassMember::StaticBlock(StaticBlock {
@@ -851,9 +852,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let (params_start, _) = self.current_pos();
 
         // Parse parameter list and block body (like a function), in the method's
-        // own `[Await]` context (async method → `[+Await]`, else `[~Await]`).
+        // own `[Await]`/`[Yield]` context (async/generator method → `[+Await]`/`[+Yield]`).
         let params = self
-            .with_in_await(is_async, Self::parse_parameter_list)?
+            .with_fn_context(is_async, is_generator, Self::parse_parameter_list)?
             .into_bump_slice();
 
         // A `get`/`set` accessor must obey the accessor arity grammar (getter: no
@@ -904,7 +905,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 end,
             )
         } else {
-            let body_block = self.with_in_await(is_async, Self::parse_function_body)?;
+            let body_block =
+                self.with_fn_context(is_async, is_generator, Self::parse_function_body)?;
             let end = body_block.span.end;
             (body_block, end)
         };
@@ -988,7 +990,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // await-expression there, only an identifier under Script goal), unlike
         // a computed key, which inherits.
         let value: Option<Expression<'arena>> = if self.eat(TokenKind::Equals) {
-            Some(self.with_in_await(false, Self::parse_assignment_expression)?)
+            Some(self.with_fn_context(false, false, Self::parse_assignment_expression)?)
         } else {
             None
         };

@@ -369,6 +369,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::Keyword(KeywordKind::Typeof) => self.parse_type_query(),
             // Constructor type: new () => T or new <T>() => T
             TokenKind::Keyword(KeywordKind::New) => self.parse_constructor_type(false),
+            // Any remaining reserved keyword is a type-reference NAME: TS's type
+            // space is a separate `IdentifierName` namespace, so reserved statement
+            // keywords (`break`, `default`, `function`, `case`, …) are valid type
+            // names (tsc + prettier accept; acorn-typescript is over-strict here).
+            // The primitive keywords, `this`/`const`/`import`/`typeof`/`new`, and
+            // the contextual type operators (which lex as `Identifier`) all match
+            // above, so only the reserved keywords reach this arm — the entity-name
+            // head reads a keyword token via `current_raw_ident_name` (keywords are
+            // never escaped), mirroring the `Const` arm.
+            TokenKind::Keyword(_) => self.parse_type_reference(),
             _ => Err(self.error_expected_found("type")),
         }
     }

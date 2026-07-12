@@ -88,10 +88,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Capture paren position before parsing params (for comment detection)
         let (params_start, _) = self.current_pos();
 
-        // Parse parameter list (in the function's own `[Await]` context — async
-        // params are `[+Await]`, non-async `[~Await]`).
+        // Parse parameter list (in the function's own `[Await]`/`[Yield]` context —
+        // async/generator params are `[+Await]`/`[+Yield]`).
         let params: &'arena [Expression<'arena>] = self
-            .with_in_await(is_async, Self::parse_parameter_list)?
+            .with_fn_context(is_async, is_generator, Self::parse_parameter_list)?
             .into_bump_slice();
 
         // Check for return type annotation
@@ -114,8 +114,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 span: Span::new(start as u32, end),
             }))
         } else {
-            // Function implementation - parse body (the function's `[Await]` context).
-            let body = self.with_in_await(is_async, Self::parse_function_body)?;
+            // Function implementation - parse body (the function's `[Await]`/`[Yield]` context).
+            let body = self.with_fn_context(is_async, is_generator, Self::parse_function_body)?;
             let end = body.span.end;
 
             Ok(Statement::FunctionDeclaration(FunctionDeclaration {
@@ -208,9 +208,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Capture paren position before parsing params (for comment detection)
         let (params_start, _) = self.current_pos();
 
-        // Parse parameter list (in the function's own `[Await]` context).
+        // Parse parameter list (in the function's own `[Await]`/`[Yield]` context).
         let params: &'arena [Expression<'arena>] = self
-            .with_in_await(is_async, Self::parse_parameter_list)?
+            .with_fn_context(is_async, is_generator, Self::parse_parameter_list)?
             .into_bump_slice();
 
         // Check for return type annotation
@@ -241,8 +241,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 span: Span::new(start as u32, end),
             }))
         } else {
-            // Has body - regular function declaration (the function's `[Await]` context).
-            let body = self.with_in_await(is_async, Self::parse_function_body)?;
+            // Has body - regular function declaration (the function's `[Await]`/`[Yield]` context).
+            let body = self.with_fn_context(is_async, is_generator, Self::parse_function_body)?;
             let end = body.span.end;
 
             Ok(ExportFunctionDeclaration::Declaration(
@@ -307,7 +307,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // `[+Await]` (async), so `await` is a valid name in a non-async function
         // expression even inside a `[+Await]` enclosing scope (e.g. a static
         // block), but not in an async one.
-        let id = self.with_in_await(is_async, |p| {
+        let id = self.with_fn_context(is_async, is_generator, |p| {
             if matches!(p.current_kind(), TokenKind::Identifier) || p.at_await_identifier() {
                 let (id_start, id_end) = p.current_pos();
                 let name = p.current_ident_name_or_await();
@@ -330,7 +330,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Param defaults (`[+In]`) and the function body are a fresh `[+In]`
         // context, so `in` is the binary operator even when this function
         // expression sits in a for-header init.
-        let (params, return_type, body) = self.with_in_await(is_async, |p| {
+        let (params, return_type, body) = self.with_fn_context(is_async, is_generator, |p| {
             p.with_allow_in(|p| {
                 let params: &'arena [Expression<'arena>] =
                     p.parse_parameter_list()?.into_bump_slice();

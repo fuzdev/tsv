@@ -2,8 +2,7 @@ use crate::cli::CliError;
 use crate::deno;
 use crate::diff::{DiffOptions, diff_to_string};
 use crate::error;
-use crate::fixtures;
-use crate::render_normalize::render_normalize;
+use crate::render_normalize::normalize_pair;
 use argh::FromArgs;
 use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::{Input, InputArgs, ParserType};
@@ -178,7 +177,7 @@ fn format_content(content: &str, parser_type: ParserType) -> error::Result<Strin
 /// Compare two ASTs (ignoring spans/locations).
 ///
 /// With `render`, both ASTs are first normalized per Svelte 5 render-time
-/// whitespace rules ([`render_normalize`]) so render-equivalent forms — e.g.
+/// whitespace rules (via [`normalize_pair`]) so render-equivalent forms — e.g.
 /// `<small>text</small>` vs block-style `<small>⏎\ttext⏎</small>` — compare
 /// equal even though the parser keeps the boundary whitespace verbatim.
 fn compare_asts(
@@ -186,15 +185,7 @@ fn compare_asts(
     ast2: serde_json::Value,
     render: bool,
 ) -> error::Result<bool> {
-    let (ast1, ast2) = if render {
-        (render_normalize(ast1), render_normalize(ast2))
-    } else {
-        (ast1, ast2)
-    };
-
-    // Remove locations from both
-    let ast1_clean = fixtures::remove_locations(ast1);
-    let ast2_clean = fixtures::remove_locations(ast2);
+    let (ast1_clean, ast2_clean) = normalize_pair(ast1, ast2, render);
 
     if ast1_clean == ast2_clean {
         return Ok(true);

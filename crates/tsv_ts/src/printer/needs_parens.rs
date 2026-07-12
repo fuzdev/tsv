@@ -16,7 +16,10 @@
 // - prettier/src/language-js/needs-parens.js
 // - prettier/src/language-js/print/index.js (application layer)
 
-use crate::ast::internal::{BinaryOperator, Expression, LiteralValue};
+use crate::ast::internal::{
+    BinaryOperator, Expression, LiteralValue, UnaryOperator, UpdateOperator,
+};
+use crate::printer::class_expr_has_decorators;
 
 /// Context for parenthesization decisions
 ///
@@ -66,8 +69,15 @@ pub enum ParenContext {
     /// Expression in TSInstantiationExpression: `<expr><T>`
     InstantiationExpression,
 
-    /// Argument of unary operator: `!<expr>`, `typeof <expr>`
-    UnaryArgument,
+    /// Argument of a unary operator: `!<expr>`, `typeof <expr>`, `-<expr>`.
+    /// Carries the parent operator so a `+`/`-` operand that would re-tokenize
+    /// (`+(+x)` → `++x`, `-(--x)` → `---x`) gets parenthesized.
+    UnaryArgument { parent_op: UnaryOperator },
+
+    /// Argument of an update operator: `<expr>++`, `++<expr>`.
+    /// A type-assertion operand keeps its parens — bare `a as T++` binds `++`
+    /// to `T`.
+    UpdateArgument,
 
     /// Argument of await: `await <expr>`
     AwaitArgument,
@@ -227,8 +237,16 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
 
         // Non-null: `(a + b)!`, `(!x)!`, `(a ? b : c)!`, `(yield x)!`, `(++x)!`, etc.
         // UpdateExpression needs parens too: `(++x)!` is `NonNull(++x)`, but `++x!`
-        // parses as `++(x!)` (`Update(NonNull)`) — a different AST.
-        ParenContext::NonNull => is_lower_precedence(expr) || is_unary_or_update(expr),
+        // parses as `++(x!)` (`Update(NonNull)`) — a different AST. An arrow function
+        // needs parens as well (`((a) => a)!` — bare `(a) => a!` is `(a) => (a!)`, and
+        // a block-body `(a) => {}!` can't postfix the arrow at all → unreparseable).
+        // Function/class expressions don't: their brace-delimited bodies make the
+        // parens redundant, and prettier strips them.
+        ParenContext::NonNull => {
+            is_lower_precedence(expr)
+                || is_unary_or_update(expr)
+                || matches!(expr, Expression::ArrowFunctionExpression(_))
+        }
 
         // Type assertion (as/satisfies): `(a + b) as T`, `(await x) as T`, `(<U>x) as T`
         // Arrow functions need parens because `(...args) => x as T` parses as `(...args) => (x as T)`
@@ -247,19 +265,22 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
         }
 
         // Angle-bracket assertion: `<T>(a + b)`, `<T>(<U>x)`, `<T>(x as U)`, `<T>(a ? b : c)`
-        // Unary argument: `!(a + b)`, `!(await x)`, `!(<T>x)`, `typeof (a ? b : c)`
         // Both need parens for: await/yield, all type assertions, binary, conditional, assignment, arrow
-        ParenContext::AngleBracketAssertion | ParenContext::UnaryArgument => {
-            is_await_or_yield(expr)
-                || is_type_assertion(expr)
-                || matches!(
-                    expr,
-                    Expression::BinaryExpression(_)
-                        | Expression::ConditionalExpression(_)
-                        | Expression::AssignmentExpression(_)
-                        | Expression::ArrowFunctionExpression(_)
-                )
+        ParenContext::AngleBracketAssertion => needs_parens_unary_arg_common(expr),
+
+        // Unary argument: `!(a + b)`, `!(await x)`, `!(<T>x)`, `typeof (a ? b : c)`.
+        // The shared rule, plus the `+`/`-` same-sign guard so an operand that
+        // would re-tokenize with the parent (`+(+x)`, `-(--x)`, `+(++x)`) is
+        // parenthesized (prettier's UnaryExpression/UpdateExpression cases).
+        ParenContext::UnaryArgument { parent_op } => {
+            needs_parens_unary_arg_common(expr) || needs_parens_unary_same_sign(expr, parent_op)
         }
+
+        // Update argument: a type-assertion operand keeps its parens
+        // (`(a as T)++` — bare `a as T++` binds `++` to `T`). Other operands are
+        // either plain references (redundant parens stripped) or not valid update
+        // targets, so no further wrapping applies.
+        ParenContext::UpdateArgument => is_type_assertion(expr),
 
         // Instantiation: `(<T>() => {})<U>`, `(x as A)<T>`, `(<T>x)<U>`, `(await x)<T>`, `(a = b)<T>`
         // Ternary/binary/assignment need parens to preserve semantics:
@@ -279,6 +300,9 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
         // Await argument: `await (a + b)`, `await (x as T)`, `await (<T>x)`, `await (a ? b : c)`
         // Parens needed for precedence/semantics - await has higher precedence than ?:
         // Assignment: `await (x ??= y)` — without parens, parses as `(await x) ??= y` (syntax error)
+        // `await` takes a UnaryExpression operand, so the lower-precedence yield and
+        // arrow forms need parens too: `await (yield x)` (bare `await yield x` is a
+        // syntax error), `await (() => {})` (bare `await () => {}` is invalid).
         ParenContext::AwaitArgument => {
             is_type_assertion(expr)
                 || matches!(
@@ -286,6 +310,8 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
                     Expression::BinaryExpression(_)
                         | Expression::ConditionalExpression(_)
                         | Expression::AssignmentExpression(_)
+                        | Expression::YieldExpression(_)
+                        | Expression::ArrowFunctionExpression(_)
                 )
         }
 
@@ -348,6 +374,15 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
                         | Expression::NewExpression(_)
                         | Expression::TaggedTemplateExpression(_)
                         | Expression::ObjectExpression(_)
+                )
+                // A *decorated* class expression must be parenthesized —
+                // `extends @deco class {}` reads the `@deco` as decorating the
+                // enclosing class and the inner `class {}` as the heritage body,
+                // producing unreparseable output. A bare (undecorated) class
+                // expression stays unwrapped (prettier keeps `extends class {}`).
+                || matches!(
+                    stripped,
+                    Expression::ClassExpression(c) if class_expr_has_decorators(c)
                 )
         }
 
@@ -414,6 +449,42 @@ fn is_type_assertion(expr: &Expression<'_>) -> bool {
             | Expression::TSSatisfiesExpression(_)
             | Expression::TSTypeAssertion(_)
     )
+}
+
+/// The rule shared by a unary operator's argument and an angle-bracket
+/// assertion's operand: await/yield, any type assertion, and the
+/// lower-precedence binary / conditional / assignment / arrow forms all need
+/// parens.
+fn needs_parens_unary_arg_common(expr: &Expression<'_>) -> bool {
+    is_await_or_yield(expr)
+        || is_type_assertion(expr)
+        || matches!(
+            expr,
+            Expression::BinaryExpression(_)
+                | Expression::ConditionalExpression(_)
+                | Expression::AssignmentExpression(_)
+                | Expression::ArrowFunctionExpression(_)
+        )
+}
+
+/// Prettier's UnaryExpression/UpdateExpression-under-UnaryExpression rule: a
+/// `+`/`-` operand that would re-tokenize with the parent operator needs parens
+/// — a same-operator unary (`+(+x)`, `-(-x)`) or a matching-sign *prefix* update
+/// (`+(++x)`, `-(--x)`). Otherwise `+ +` / `- -` / `+ ++` / `- --` glue into
+/// `++` / `--` / `+++` / `---`. Postfix updates (`+(x++)` → `+x++`) bind tightly
+/// and never merge, so they're excluded; `!`/`~`/`typeof`/`void`/`delete` never
+/// form a longer token, so only `+`/`-` parents apply.
+fn needs_parens_unary_same_sign(expr: &Expression<'_>, parent_op: UnaryOperator) -> bool {
+    let (unary_sign, update_sign) = match parent_op {
+        UnaryOperator::Plus => (UnaryOperator::Plus, UpdateOperator::Increment),
+        UnaryOperator::Minus => (UnaryOperator::Minus, UpdateOperator::Decrement),
+        _ => return false,
+    };
+    match expr {
+        Expression::UnaryExpression(u) => u.operator == unary_sign,
+        Expression::UpdateExpression(u) => u.prefix && u.operator == update_sign,
+        _ => false,
+    }
 }
 
 /// Arrow function or function expression
@@ -535,6 +606,61 @@ pub(crate) fn leftmost_no_lookahead<'a>(expr: &'a Expression<'a>) -> &'a Express
         Expression::TSSatisfiesExpression(e) => leftmost_no_lookahead(e.expression),
         Expression::TSNonNullExpression(e) => leftmost_no_lookahead(e.expression),
         Expression::TSInstantiationExpression(e) => leftmost_no_lookahead(e.expression),
+        _ => expr,
+    }
+}
+
+/// Whether `export default <expr>;` must wrap the expression in parens — true iff
+/// its first *printed* token would be a bare `function`/`class` keyword, which the
+/// grammar reads as a (hoisted) declaration, leaving the rest of the expression
+/// (`.m()`, `= 1`, `as T`) dangling and unreparseable. Mirrors prettier's
+/// `startsWithNoLookaheadToken(expr, isFunctionOrClass)` (parentheses/needs-parentheses.js).
+///
+/// Unlike the shared `leftmost_no_lookahead`, the callee/tag/object descent is
+/// **paren-aware**: it stops when that child is itself parenthesized (a binary
+/// tag `(f(){}+x)`, a lower-precedence callee, …), because the printed form then
+/// starts with `(` and needs no outer paren. That avoids the double-wrap the raw
+/// walk hits — prettier's own util docstring flags it as "overzealous if there
+/// already are necessary grouping parentheses". The other descents (binary left,
+/// conditional test, cast operand, …) print the keyword bare, so they recurse
+/// unconditionally like `leftmost_no_lookahead`.
+pub(crate) fn export_default_needs_parens(expr: &Expression<'_>) -> bool {
+    matches!(
+        export_default_leftmost(expr),
+        Expression::FunctionExpression(_) | Expression::ClassExpression(_)
+    )
+}
+
+fn export_default_leftmost<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
+    match expr {
+        Expression::BinaryExpression(b) => export_default_leftmost(b.left),
+        Expression::AssignmentExpression(a) => export_default_leftmost(a.left),
+        Expression::ConditionalExpression(c) => export_default_leftmost(c.test),
+        Expression::SequenceExpression(s) => {
+            s.expressions.first().map_or(expr, export_default_leftmost)
+        }
+        Expression::UpdateExpression(u) if !u.prefix => export_default_leftmost(u.argument),
+        Expression::TSAsExpression(e) => export_default_leftmost(e.expression),
+        Expression::TSSatisfiesExpression(e) => export_default_leftmost(e.expression),
+        Expression::TSNonNullExpression(e) => export_default_leftmost(e.expression),
+        Expression::TSInstantiationExpression(e) => export_default_leftmost(e.expression),
+        // Descents that cross a would-be-parenthesized child: stop there, since its
+        // leading `(` already guards any inner keyword.
+        Expression::MemberExpression(m)
+            if !needs_parens(m.object, ParenContext::ChainBase, false) =>
+        {
+            export_default_leftmost(m.object)
+        }
+        Expression::CallExpression(call)
+            if !needs_parens(call.callee, ParenContext::Callee, false) =>
+        {
+            export_default_leftmost(call.callee)
+        }
+        Expression::TaggedTemplateExpression(t)
+            if !needs_parens(t.tag, ParenContext::TaggedTemplateTag, false) =>
+        {
+            export_default_leftmost(t.tag)
+        }
         _ => expr,
     }
 }

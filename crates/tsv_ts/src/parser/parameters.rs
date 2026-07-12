@@ -180,20 +180,45 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Consume the contextual keyword `kw` as a parameter-property modifier iff
     /// the current token is the identifier `kw` and the next token begins a
-    /// parameter binding — otherwise `kw` is itself the parameter name
-    /// (`constructor(readonly)`, `f(override: T)`, `constructor(public readonly)`).
-    /// The parameter-list analog of `class.rs`'s `eat_modifier_keyword` (which
-    /// keys on a class-member-name lookahead). Returns whether it was consumed.
+    /// parameter binding **on the same line** — otherwise `kw` is itself the
+    /// parameter name (`constructor(readonly)`, `f(override: T)`,
+    /// `constructor(public readonly)`). The same-line requirement is a
+    /// `[no LineTerminator here]` rule mirroring tsc's `nextTokenCanFollowModifier`
+    /// (`nextTokenIsOnSameLineAndCanFollowModifier` → `!hasPrecedingLineBreak`) and
+    /// `class.rs`'s `eat_modifier_keyword` twin: a break between the modifier and
+    /// the binding demotes the keyword, so `constructor(readonly⏎x)` rejects (the
+    /// keyword becomes the binding, the next-line token is then unexpected). The
+    /// parameter-list analog of `eat_modifier_keyword` (which keys on a
+    /// class-member-name lookahead). Returns whether it was consumed.
     fn eat_param_modifier_keyword(&mut self, kw: &str) -> Result<bool, ParseError> {
         if matches!(self.current_kind(), TokenKind::Identifier)
             && self.current_value() == kw
             && self.peek_starts_parameter_binding()
+            && !self.peek_preceded_by_line_terminator()
         {
             self.advance()?; // consume the modifier keyword
             Ok(true)
         } else {
             Ok(false)
         }
+    }
+
+    /// Consume an accessibility keyword (`public`/`private`/`protected`) as a
+    /// parameter-property modifier iff it is on the same line as the binding that
+    /// follows. Unlike `override`/`readonly`, accessibility keywords are
+    /// strict-mode reserved words that cannot be parameter names, so no
+    /// binding-lookahead is needed — but the same `[no LineTerminator here]` rule
+    /// applies (tsc's `nextTokenCanFollowModifier`): a break demotes the keyword,
+    /// so `constructor(public⏎x)` rejects. The greedy `eat_contextual_keyword` has
+    /// no line-break guard, so the accessibility call sites use this instead. When
+    /// the guard fails the keyword falls through to be parsed as the binding and
+    /// the next-line token is then unexpected → tsv rejects (the reserved-word
+    /// early-error on the keyword itself stays deferred).
+    fn eat_param_accessibility_keyword(&mut self, kw: &str) -> bool {
+        matches!(self.current_kind(), TokenKind::Identifier)
+            && self.current_value() == kw
+            && !self.peek_preceded_by_line_terminator()
+            && self.try_advance()
     }
 
     /// Parse a parenthesized parameter list: `(a, b, c)`, **allowing** parameter
@@ -269,14 +294,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         // Check for parameter property modifiers: public, private, protected, readonly.
                         // Accessibility keywords are strict-mode reserved words, so they cannot be
                         // ordinary parameter names (acorn rejects bare `public`/`private`/`protected`
-                        // here too) — eating them greedily is correct. `override` and `readonly`,
-                        // by contrast, are contextual keywords that ARE valid parameter names, so
-                        // each is treated as a modifier only when a binding follows it (see below).
-                        let accessibility = if self.eat_contextual_keyword("public") {
+                        // here too) — eating them is correct, but only on the same line as the
+                        // binding (`[no LineTerminator here]`; see `eat_param_accessibility_keyword`).
+                        // `override` and `readonly`, by contrast, are contextual keywords that ARE
+                        // valid parameter names, so each is treated as a modifier only when a binding
+                        // follows it on the same line (see below).
+                        let accessibility = if self.eat_param_accessibility_keyword("public") {
                             Some(Accessibility::Public)
-                        } else if self.eat_contextual_keyword("private") {
+                        } else if self.eat_param_accessibility_keyword("private") {
                             Some(Accessibility::Private)
-                        } else if self.eat_contextual_keyword("protected") {
+                        } else if self.eat_param_accessibility_keyword("protected") {
                             Some(Accessibility::Protected)
                         } else {
                             None

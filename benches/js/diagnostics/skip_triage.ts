@@ -90,16 +90,72 @@ const KNOWN_GAPS: KnownGap[] = [
 		category: 'css-error-recovery',
 		reason: 'invalid attr case-flag `[type=a x]` — selectors-4 <attr-modifier> is `i`|`s` only; recovery drops the rule',
 	},
+	// wpt-css harvest (benches/js/.cache/wpt_css) — surfaced by the MANUAL wpt-css
+	// differential (`skip_triage.ts benches/js/.cache/wpt_css`, a publish ship-gate step,
+	// not in `deno task conformance`). All are malformed CSS the spec/parseCss recovers
+	// from and tsv grammar-correctly rejects — the same error-recovery class as the
+	// prettier-corpus entries above, verified file-by-file. The cache is derived +
+	// gitignored, so a re-harvest that drops/renames a file just leaves the entry
+	// unmatched (skip_triage does not stale-fail KNOWN_GAPS).
 	{
-		pattern: 'tests/format/css/loose/loose.css',
+		pattern: 'wpt_css/css-contain/content-visibility/content-visibility-015__0.css',
 		category: 'css-error-recovery',
-		reason: 'whitespace before `(` in `calc (…)` / split calc() — invalid function-token grammar (ident + `(` must be adjacent); parseCss+prettier lenient, recovery drops the rule',
+		reason: 'missing colon in declaration (`background lightgreen`) — recovery drops it; tsv reparses as a selector and hard-fails',
 	},
-	// A REAL tsv CSS bug (not error recovery): valid CSS both oracles accept, tsv wrongly rejects.
 	{
-		pattern: 'tests/format/css/inline-url/inline_url.css',
-		category: 'css-url-string',
-		reason: 'quoted `url(\'…{}…\')` with special chars inside the string — VALID CSS (parseCss + prettier accept); tsv over-rejects with `Expected }` (treats the `{` inside the string as a block open)',
+		pattern: 'wpt_css/css-contain/content-visibility/content-visibility-016__0.css',
+		category: 'css-error-recovery',
+		reason: 'missing colon in declaration (`background lightgreen`) — recovery drops it; tsv reparses as a selector and hard-fails',
+	},
+	{
+		pattern: 'wpt_css/css-contain/content-visibility/content-visibility-017__0.css',
+		category: 'css-error-recovery',
+		reason: 'missing colon in declaration (`background lightgreen`) — recovery drops it; tsv reparses as a selector and hard-fails',
+	},
+	{
+		pattern: 'wpt_css/css-contain/content-visibility/content-visibility-018__0.css',
+		category: 'css-error-recovery',
+		reason: 'missing colon in declaration (`background lightgreen`) — recovery drops it; tsv reparses as a selector and hard-fails',
+	},
+	{
+		pattern: 'wpt_css/css-gaps/multicol/multicol-gap-decorations-005-ref__0.css',
+		category: 'css-error-recovery',
+		reason: 'missing colon in declaration (`height 50px`) — recovery drops it; tsv reparses as a selector and hard-fails',
+	},
+	{
+		pattern: 'wpt_css/css-fonts/variations/variable-gpos-m2b__0.css',
+		category: 'css-error-recovery',
+		reason: 'bare token as declaration (`sans-serif;`, no property/colon) — recovery drops it; tsv hard-fails',
+	},
+	{
+		pattern: 'wpt_css/css-fonts/variations/variable-gsub-ref__0.css',
+		category: 'css-error-recovery',
+		reason: 'bare token as declaration (`sans-serif;`, no property/colon) — recovery drops it; tsv hard-fails',
+	},
+	{
+		pattern: 'wpt_css/css-fonts/variations/variable-gsub__0.css',
+		category: 'css-error-recovery',
+		reason: 'bare token as declaration (`sans-serif;`, no property/colon) — recovery drops it; tsv hard-fails',
+	},
+	{
+		pattern: 'wpt_css/css-transitions/animations/transition-end-event-shorthands__0.css',
+		category: 'css-error-recovery',
+		reason: '`//` line comment (not valid CSS — only `/* */`) — parseCss lenient/recovers; tsv hard-fails',
+	},
+	{
+		pattern: 'wpt_css/css-animations/missing-values-middle-keyframe__0.css',
+		category: 'css-error-recovery',
+		reason: '`//` line comment inside a keyframe block (not valid CSS) — parseCss lenient/recovers; tsv hard-fails',
+	},
+	{
+		pattern: 'wpt_css/css-variables/variable-declaration-59__0.css',
+		category: 'css-error-recovery',
+		reason: 'unbalanced `)` in a custom-property value (`--a: red)`) — <declaration-value> disallows an unmatched `)`; parseCss lenient',
+	},
+	{
+		pattern: 'wpt_css/css-conditional/at-supports-030__0.css',
+		category: 'css-error-recovery',
+		reason: 'malformed `@supports` prelude (`((margin: 0) and ;`) — invalid <supports-condition>; parseCss consumes the prelude (condition=false)',
 	},
 ];
 

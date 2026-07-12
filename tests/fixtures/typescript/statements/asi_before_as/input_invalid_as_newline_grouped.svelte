@@ -1,3 +1,4 @@
 <script lang="ts">
-	([a, b] as T) = c;
+	(a
+	as B);
 </script>

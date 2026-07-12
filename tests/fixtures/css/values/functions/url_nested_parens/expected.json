@@ -1,0 +1,94 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 298,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 10,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 10,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										}
+									],
+									"start": 9,
+									"end": 10
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 11,
+					"end": 289,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 78,
+							"end": 99,
+							"property": "background",
+							"value": "url(a(b))"
+						},
+						{
+							"type": "Declaration",
+							"start": 126,
+							"end": 150,
+							"property": "background",
+							"value": "url(a(b(c)))"
+						},
+						{
+							"type": "Declaration",
+							"start": 197,
+							"end": 221,
+							"property": "background",
+							"value": "url(a(b, c))"
+						},
+						{
+							"type": "Declaration",
+							"start": 263,
+							"end": 285,
+							"property": "background",
+							"value": "url(a(b)c)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 289
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 290,
+			"styles": "\n\ta {\n\t\t/* nested parens in unquoted url() are preserved verbatim */\n\t\tbackground: url(a(b));\n\t\t/* deeper nesting */\n\t\tbackground: url(a(b(c)));\n\t\t/* inner group with a comma and space */\n\t\tbackground: url(a(b, c));\n\t\t/* content after the inner group */\n\t\tbackground: url(a(b)c);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 299,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

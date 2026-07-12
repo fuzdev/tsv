@@ -505,6 +505,52 @@ const self_closing_nonvoid: DivergencePattern = {
 	},
 };
 
+const attr_value_single_quote: DivergencePattern = {
+	id: 'attr_value_single_quote',
+	description: 'Attribute / style: / this= value with a literal " kept single-quoted',
+	languages: ['svelte'],
+	conformance_sections: ['Svelte: Attributes'],
+	fixtures: [
+		'svelte/attributes/value_double_quote_prettier_divergence',
+		'svelte/directives/style/value_double_quote_prettier_divergence',
+		'svelte/special_elements/svelte_element_this_double_quote_prettier_divergence',
+	],
+	detect(ctx) {
+		if (ctx.language !== 'svelte') return null;
+
+		// tsv emits a quoted attribute / `style:` / `this=` value with SINGLE-quote
+		// delimiters exactly when the value contains a literal `"` (double quotes
+		// cannot hold it — HTML §13.1.2.3); prettier-plugin-svelte re-quotes with `"`
+		// and corrupts. The unique fingerprint on OURS is a single-quoted value
+		// carrying a `"` — every other value is double-quoted, so this shape appears
+		// only for this divergence. Pair it with prettier's double-quoted form of the
+		// same attribute name to stay airtight (a JS string in `<script>` never
+		// produces the paired prettier form, since prettier also single-quotes it).
+		const ours_single_dq = /(?:^|\s)([\w:@.-]+)='[^']*"[^']*'/;
+
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
+			for (const line of hunk.added_lines) {
+				const m = ours_single_dq.exec(line);
+				if (!m) continue;
+				const name = m[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+				const prettier_dq = new RegExp(`${name}="[^"]*"`);
+				if (hunk.removed_lines.some((l) => prettier_dq.test(l))) return true;
+			}
+			return false;
+		});
+
+		if (hunk_indices.length > 0) {
+			return {
+				pattern: 'attr_value_single_quote',
+				confidence: 'certain',
+				hunk_indices,
+				reason: 'Value with a literal " kept single-quoted (prettier corrupts to double quotes)',
+			};
+		}
+		return null;
+	},
+};
+
 const empty_statement_removal: DivergencePattern = {
 	id: 'empty_statement_removal',
 	description: 'Standalone empty statement (;) removed',
@@ -1679,6 +1725,62 @@ const inline_content_block_style: DivergencePattern = {
 
 // ─── Broad patterns (run last) ──────────────────────────────────────────────
 
+const css_url_opaque: DivergencePattern = {
+	id: 'css_url_opaque',
+	description: 'Unquoted url() content kept verbatim; prettier reformats inside nested parens',
+	languages: ['css', 'svelte'],
+	conformance_sections: ['CSS: Values'],
+	fixtures: [
+		'css/values/functions/url_nested_reformat_prettier_divergence',
+	],
+	detect(ctx) {
+		// A nested `(...)` inside an unquoted `url(...)` — the only place url content
+		// (opaque per css-syntax §4.3.6, never re-parsed) and prettier's value
+		// reformatter interact. `[^)'"]*` excludes quotes so a quoted `url("…")` — a
+		// string, not opaque url content — never matches.
+		const nested_url = /\burl\(\s*[^)'"]*\([^)]*\)/i;
+		// Collapse whitespace immediately inside a `url(` open and before a `)` close —
+		// the padding the url-token tokenizer trims (§4.3.6). A pair that becomes EQUAL
+		// after this differs only in that outer padding (tsv trims it, prettier keeps
+		// it — a *distinct* divergence, e.g. prettier's `url/url.css`), so it is NOT the
+		// interior reformat this pattern documents; only a pair that still differs after
+		// the strip (a comma/space change *inside* the nested group) is claimed.
+		const strip_outer = (l: string) => l.replace(/\burl\(\s+/gi, 'url(').replace(/\s+\)/g, ')');
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
+			if (!is_in_css_context(hunk, ctx)) return false;
+			const { removed_lines: removed, added_lines: added } = hunk;
+			// Interior reformatting is a line-for-line rewrite: the line count never
+			// changes (only whitespace *inside* the url token moves). Requiring equal
+			// counts + a per-line whitespace-only match excludes value-list re-wraps
+			// (a line-count change — those are css_value_wrap / fill_101_boundary),
+			// so this never claims a hunk whose real divergence is the wrap.
+			if (removed.length === 0 || removed.length !== added.length) return false;
+			let saw_interior_reformat = false;
+			for (let i = 0; i < removed.length; i++) {
+				// content-preservation gate: a single non-whitespace difference on any
+				// line disables the detector, so it can never mask a real content change.
+				if (strip_all_ws(removed[i]) !== strip_all_ws(added[i])) return false;
+				if (
+					nested_url.test(removed[i]) && nested_url.test(added[i]) &&
+					strip_outer(removed[i]) !== strip_outer(added[i])
+				) {
+					saw_interior_reformat = true;
+				}
+			}
+			return saw_interior_reformat;
+		});
+		if (hunk_indices.length > 0) {
+			return {
+				pattern: 'css_url_opaque',
+				confidence: 'likely',
+				hunk_indices,
+				reason: 'unquoted url() content kept verbatim; prettier reformats inside the nested parens',
+			};
+		}
+		return null;
+	},
+};
+
 const css_value_wrap: DivergencePattern = {
 	id: 'css_value_wrap',
 	description: 'CSS property value wraps at print width',
@@ -2292,10 +2394,12 @@ export const PATTERNS: DivergencePattern[] = [
 	// 1. Language-specific narrow patterns (certain or rare)
 	bom_strip,
 	self_closing_nonvoid,
+	attr_value_single_quote,
 	empty_statement_removal,
 	css_value_ratio,
 
 	// 2. CSS-specific patterns
+	css_url_opaque,
 	css_unit_serialize_case,
 	css_atrule_spec_spacing,
 	css_atrule_long_wrap,

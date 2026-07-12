@@ -1,3 +1,3 @@
 <script lang="ts">
-	({ a: (b as T) } = obj);
+	let x = () => {} || a;
 </script>

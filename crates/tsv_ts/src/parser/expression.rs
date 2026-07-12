@@ -29,8 +29,18 @@ use super::scan::{parse_number_literal, skip_whitespace_and_comments};
 const BP_COMMA: u8 = 0;
 /// Assignment operators (=, +=, etc.) and ternary conditional
 const BP_ASSIGNMENT: u8 = 1;
-/// TypeScript `as` and `satisfies` operators
-const BP_TS_TYPE_ASSERTION: u8 = 2;
+/// TypeScript `as` / `satisfies` bind at RELATIONAL precedence — tsc's
+/// `getBinaryOperatorPrecedence` returns `OperatorPrecedence.Relational` for both
+/// (the same tier as `<` / `>` / `instanceof` / `in`), and acorn-typescript gates
+/// them on `tt._in.binop` (relational) in its `parseExprOp` override. This equals
+/// the relational `left_bp` in `infix_operator_info`, so `x === y as T` parses
+/// `x === (y as T)` (tighter than equality / logical / bitwise / `??`) while
+/// `a + b as T` stays `(a + b) as T` (looser than additive / shift /
+/// multiplicative). Left-associative — `a as T as U` is `(a as T) as U`, and
+/// `a < b as T` is `(a < b) as T` (breaks as the right operand of a same-tier
+/// relational operator) — with the right-hand side consumed as a *type* by
+/// `parse_type`, not an expression.
+const BP_AS: u8 = 19;
 /// Yield expression (same as assignment — yield takes AssignmentExpression per spec)
 const BP_YIELD: u8 = 1;
 /// Unary operators (!, -, +, ~, typeof, void, delete, await, ++, --, new)
@@ -134,6 +144,30 @@ impl<'arena> ParsedExpr<'arena> {
             actual_end: actual_end as u32,
         }
     }
+
+    /// Whether this is a leading *unparenthesized* expression that is itself a
+    /// complete `AssignmentExpression` no subscript or operator may extend — a
+    /// bare arrow function (always), or a bare `yield` expression when parsing
+    /// inside a generator (`in_yield`). Both are top-level `AssignmentExpression`
+    /// alternatives (ecma262 §13.15 — `ArrowFunction` / `YieldExpression`), not a
+    /// `ConditionalExpression`, binary operand, or `LeftHandSideExpression`, so
+    /// both `parse_prefix_expression` (call / member / postfix) and
+    /// `parse_expression_bp` (binary / `as` / assignment / ternary) must stop when
+    /// this holds. The check is span-anchored: a bare head's own span starts
+    /// exactly at `actual_start`, but parenthesizing (`(() => {})` / `(yield)`)
+    /// shifts `actual_start` to the outer `(` while the inner span starts later,
+    /// so the two diverge — a parenthesized arrow/yield is a primary that CAN be
+    /// an operand and is (correctly) not flagged.
+    ///
+    /// `yield` is only a `YieldExpression` in `[+Yield]`; outside a generator it
+    /// is a (deferred) reserved-word identifier that prettier accepts as an
+    /// operand, so the guard must not fire there — hence the `in_yield` gate. See
+    /// the parser's `in_yield` field.
+    fn is_bare_assignment_head(&self, in_yield: bool) -> bool {
+        let is_head = matches!(self.expr, Expression::ArrowFunctionExpression(_))
+            || (in_yield && matches!(self.expr, Expression::YieldExpression(_)));
+        is_head && self.actual_start == self.expr.span().start
+    }
 }
 
 /// How `parse_postfix_expression` should treat the subscript chain.
@@ -192,8 +226,12 @@ fn contains_type_or_satisfies_tag(value: &str) -> bool {
 /// Uses standard JS operator precedence.
 fn infix_operator_info(kind: &TokenKind) -> Option<(u8, u8, BinaryOperator)> {
     match kind {
-        // Nullish coalescing: lowest binary precedence
-        TokenKind::QuestionQuestion => Some((5, 6, BinaryOperator::QuestionQuestion)),
+        // Nullish coalescing: same precedence as `||` (tsc's `Coalesce = LogicalOR`),
+        // left-associative — so the (ungrammatical) `a ?? b || c` mix groups as
+        // `(a ?? b) || c` like tsc/prettier, not `a ?? (b || c)`. Valid code never
+        // mixes `??` with `||`/`&&` unparenthesized (the grammar forbids it), so this
+        // shared level only decides error-recovery grouping.
+        TokenKind::QuestionQuestion => Some((7, 8, BinaryOperator::QuestionQuestion)),
         // Logical OR
         TokenKind::PipePipe => Some((7, 8, BinaryOperator::PipePipe)),
         // Logical AND
@@ -318,6 +356,71 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.with_context_flag(|p| &mut p.allow_in, true, f)
     }
 
+    /// Fold a trailing TypeScript `as` / `satisfies` type assertion at the current
+    /// token into `left`, returning `true` if one was consumed (the infix loop should
+    /// `continue`) or `false` if the current token isn't a type assertion to take here
+    /// (the loop should stop).
+    ///
+    /// `as` / `satisfies` bind at the RELATIONAL tier (`BP_AS`), left-associative, with
+    /// a *type* (via `parse_type`) on the right — so `x === y as T` is `x === (y as T)`
+    /// while `a + b as T` stays `(a + b) as T`. Three conditions leave the keyword
+    /// unconsumed (each returns `false`) — ASI on a preceding line break, the Svelte
+    /// `#each` binding-separator gate, and relational precedence; see the guards.
+    fn try_parse_type_assertion(
+        &mut self,
+        min_bp: u8,
+        expr_start: usize,
+        left: &mut ParsedExpr<'arena>,
+    ) -> Result<bool, Box<ParseError>> {
+        let is_as = match self.current_kind() {
+            TokenKind::Keyword(KeywordKind::As) => true,
+            TokenKind::Keyword(KeywordKind::Satisfies) => false,
+            _ => return Ok(false),
+        };
+        // ASI: a preceding line terminator ends the expression, so the keyword starts a
+        // fresh statement (tsc's `parseBinaryExpressionRest` / acorn-typescript both
+        // break on `hasPrecedingLineBreak`). Unconditional — it holds inside grouping
+        // too (`(a⏎as B)` can't close), so it precedes the `#each` gate.
+        if self.had_line_terminator {
+            return Ok(false);
+        }
+        // `as` is the Svelte `#each … as pattern` binding separator when type assertions
+        // are disabled and we're outside grouping — leave it for the `#each` parser.
+        // Inside grouping (`(x as T)`) it is always a type assertion.
+        if !self.allow_ts_type_assertions && self.grouping_depth == 0 {
+            return Ok(false);
+        }
+        // Relational binding power: looser than the caller's minimum (e.g. as the right
+        // operand of a same-tier relational operator — `a < b as T` is `(a < b) as T`).
+        if BP_AS < min_bp {
+            return Ok(false);
+        }
+
+        let arena = self.arena;
+        self.advance()?; // consume `as` / `satisfies`
+        let type_annotation = arena.alloc(self.parse_type()?);
+        let span = Span::new(expr_start as u32, type_annotation.span().end);
+        let expr = if is_as {
+            Expression::TSAsExpression(TSAsExpression {
+                expression: left.expr,
+                type_annotation,
+                span,
+            })
+        } else {
+            Expression::TSSatisfiesExpression(TSSatisfiesExpression {
+                expression: left.expr,
+                type_annotation,
+                span,
+            })
+        };
+        *left = ParsedExpr {
+            expr: arena.alloc(expr),
+            actual_start: expr_start as u32,
+            actual_end: span.end,
+        };
+        Ok(true)
+    }
+
     /// Pratt parser: parse expression with minimum binding power
     ///
     /// Returns ParsedExpr with actual end position tracking for parentheses
@@ -331,123 +434,102 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Parse prefix expression (primary or unary)
         let mut left = self.parse_prefix_expression()?;
 
-        // Parse infix operators and TypeScript type assertions (as/satisfies)
-        // Binary operators have higher precedence than as/satisfies, so we check binary first.
-        // After parsing as/satisfies, we loop back to check for more binary operators.
-        // Example: `a + b as T` → `(a + b) as T` (binary first)
-        // Example: `a as T + b` → `(a as T) + b` (as first, then binary)
-        'infix: loop {
-            // First, try to parse binary operators (higher precedence)
-            loop {
-                let kind = self.current_kind();
+        // A leading *unparenthesized* arrow function — or a bare `yield` inside a
+        // generator — is a complete `AssignmentExpression` (see
+        // `is_bare_assignment_head`), so no operator may extend it: a trailing
+        // binary/logical operator, `as` / `satisfies` assertion, assignment target,
+        // or ternary `?` is a syntax error (tsc TS1005 / prettier reject; acorn's
+        // `parseExprOps` and `parseMaybeAssign`-above-`parseMaybeConditional`
+        // enforce the same). Only a sequence `,` or a statement terminator may
+        // follow. An operator that can *start* an expression is absorbed first — a
+        // concise arrow body (`() => x || a`) or the yield argument
+        // (`yield a || b`, `yield +c`) — so this fires only for a truly complete
+        // head with no argument/body to absorb it.
+        let leading_bare_head = left.is_bare_assignment_head(self.in_yield);
 
-                // Check if this is an infix operator
-                let Some((left_bp, right_bp, operator)) = infix_operator_info(kind) else {
-                    break;
-                };
-
-                // Skip `in` operator when allow_in is false (parsing for-loop headers),
-                // unless inside grouping delimiters where `in` is always a binary operator
-                if matches!(operator, BinaryOperator::In)
-                    && !self.allow_in
-                    && self.grouping_depth == 0
-                {
-                    break;
-                }
-
-                // Check if operator binds tighter than minimum
-                if left_bp < min_bp {
-                    break;
-                }
-
-                // ES2016+: Unary expression as left operand of ** without parens is a syntax error
-                // `-2 ** 3` is ambiguous - must be `(-2) ** 3` or `-(2 ** 3)`
-                // Detect unparenthesized unary: actual_start equals expression span start
-                if operator == BinaryOperator::StarStar
-                    && matches!(left.expr, Expression::UnaryExpression(_))
-                    && left.actual_start == left.expr.span().start
-                {
-                    return Err(Box::new(ParseError::InvalidSyntax {
-                        message: "Unary expression cannot be the left operand of ** without parentheses. Use (-x) ** y or -(x ** y).".to_string(),
-                        position: left.expr.span().start as usize,
-                        context: None,
-                    }));
-                }
-
-                self.advance()?; // consume operator
-
-                // Parse right-hand side with right binding power
-                let right = self.parse_expression_bp(right_bp)?;
-
-                // Create binary expression
-                // Use expr_start (which includes any opening paren) instead of left.actual_start
-                // Use right.actual_end (position after parsing) to include closing parens
-                let span = Span::new(expr_start as u32, right.actual_end);
-                left = ParsedExpr {
-                    expr: arena.alloc(Expression::BinaryExpression(BinaryExpression {
-                        left: left.expr,
-                        operator,
-                        right: right.expr,
-                        span,
-                    })),
-                    actual_start: expr_start as u32,
-                    actual_end: right.actual_end,
-                };
+        // Parse infix binary operators and TypeScript `as` / `satisfies` type
+        // assertions in one precedence-climbing loop. `as` / `satisfies` bind at
+        // the RELATIONAL tier (`BP_AS`), left-associative, consuming a *type* on the
+        // right — so `x === y as T` is `x === (y as T)` while `a + b as T` stays
+        // `(a + b) as T`. (They were previously a second phase below every binary
+        // operator, which mis-grouped `(x === y) as T`.)
+        loop {
+            // A leading bare arrow / bare yield takes no infix operator or `as` /
+            // `satisfies` assertion — it is already a complete assignment expression.
+            if leading_bare_head {
+                break;
             }
+            let kind = self.current_kind();
 
-            // Then, try TypeScript `as` and `satisfies` operators (lower precedence than binary)
-            // Enabled when: explicitly allowed (normal TS context), OR inside grouping
-            // delimiters where `as` can never be the Svelte `#each` binding separator
-            if min_bp <= BP_TS_TYPE_ASSERTION
-                && (self.allow_ts_type_assertions || self.grouping_depth > 0)
+            let Some((left_bp, right_bp, operator)) = infix_operator_info(kind) else {
+                // Not a binary operator — the only remaining infix forms are the
+                // TypeScript `as` / `satisfies` type assertions.
+                if self.try_parse_type_assertion(min_bp, expr_start, &mut left)? {
+                    continue;
+                }
+                break;
+            };
+
+            // Skip `in` operator when allow_in is false (parsing for-loop headers),
+            // unless inside grouping delimiters where `in` is always a binary operator
+            if matches!(operator, BinaryOperator::In) && !self.allow_in && self.grouping_depth == 0
             {
-                match self.current_kind() {
-                    TokenKind::Keyword(KeywordKind::As) => {
-                        self.advance()?; // consume 'as'
-                        let type_annotation = arena.alloc(self.parse_type()?);
-                        let span = Span::new(expr_start as u32, type_annotation.span().end);
-                        left = ParsedExpr {
-                            expr: arena.alloc(Expression::TSAsExpression(TSAsExpression {
-                                expression: left.expr,
-                                type_annotation,
-                                span,
-                            })),
-                            actual_start: expr_start as u32,
-                            actual_end: span.end,
-                        };
-                        // After parsing as, loop back to check for more binary operators
-                        continue 'infix;
-                    }
-                    TokenKind::Keyword(KeywordKind::Satisfies) => {
-                        self.advance()?; // consume 'satisfies'
-                        let type_annotation = arena.alloc(self.parse_type()?);
-                        let span = Span::new(expr_start as u32, type_annotation.span().end);
-                        left = ParsedExpr {
-                            expr: arena.alloc(Expression::TSSatisfiesExpression(
-                                TSSatisfiesExpression {
-                                    expression: left.expr,
-                                    type_annotation,
-                                    span,
-                                },
-                            )),
-                            actual_start: expr_start as u32,
-                            actual_end: span.end,
-                        };
-                        // After parsing satisfies, loop back to check for more binary operators
-                        continue 'infix;
-                    }
-                    _ => {}
-                }
+                break;
             }
 
-            // No more infix operators or type assertions
-            break;
+            // Check if operator binds tighter than minimum
+            if left_bp < min_bp {
+                break;
+            }
+
+            // ES2016+: Unary expression as left operand of ** without parens is a syntax error
+            // `-2 ** 3` is ambiguous - must be `(-2) ** 3` or `-(2 ** 3)`. An `await`
+            // operand is a UnaryExpression per the grammar (`await UnaryExpression`), so
+            // `await b ** 2` is the same error — must be `(await b) ** 2` or `await (b ** 2)`.
+            // Detect unparenthesized unary: actual_start equals expression span start
+            if operator == BinaryOperator::StarStar
+                && matches!(
+                    left.expr,
+                    Expression::UnaryExpression(_) | Expression::AwaitExpression(_)
+                )
+                && left.actual_start == left.expr.span().start
+            {
+                return Err(Box::new(ParseError::InvalidSyntax {
+                    message: "Unary expression cannot be the left operand of ** without parentheses. Use (-x) ** y or -(x ** y).".to_string(),
+                    position: left.expr.span().start as usize,
+                    context: None,
+                }));
+            }
+
+            self.advance()?; // consume operator
+
+            // Parse right-hand side with right binding power
+            let right = self.parse_expression_bp(right_bp)?;
+
+            // Create binary expression
+            // Use expr_start (which includes any opening paren) instead of left.actual_start
+            // Use right.actual_end (position after parsing) to include closing parens
+            let span = Span::new(expr_start as u32, right.actual_end);
+            left = ParsedExpr {
+                expr: arena.alloc(Expression::BinaryExpression(BinaryExpression {
+                    left: left.expr,
+                    operator,
+                    right: right.expr,
+                    span,
+                })),
+                actual_start: expr_start as u32,
+                actual_end: right.actual_end,
+            };
         }
 
         // Handle assignment operator (after binary ops, before ternary)
         // Assignment is right-associative and has low precedence
         // Check for simple `=` and compound assignment operators (+=, -=, etc.)
-        if min_bp <= BP_ASSIGNMENT
+        // A leading bare arrow / bare yield is not a `LeftHandSideExpression`, so it
+        // cannot be an assignment target (`() => {} = a` / `yield = a` are syntax
+        // errors).
+        if !leading_bare_head
+            && min_bp <= BP_ASSIGNMENT
             && let Some(operator) = self.try_assignment_operator()
         {
             self.advance()?; // consume assignment operator
@@ -477,7 +559,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Handle ternary operator (lowest precedence among binary-like ops, above comma)
         // Handle at BP_ASSIGNMENT to include in assignment expressions but not in binary ops
-        if min_bp <= BP_ASSIGNMENT && self.eat(TokenKind::Question) {
+        // A leading bare arrow / bare yield cannot be a `ConditionalExpression`
+        // test — the ternary's test is a `ShortCircuitExpression`, which never
+        // derives `ArrowFunction` / `YieldExpression`, so `() => {} ? b : c` and
+        // `yield ? b : c` are syntax errors. (Both parsers reject the yield form;
+        // for the arrow form acorn over-leniently accepts it — a cataloged
+        // `tsv_rejects` divergence, see conformance_svelte.md.)
+        if !leading_bare_head && min_bp <= BP_ASSIGNMENT && self.eat(TokenKind::Question) {
             // Parse consequent (then branch) - use BP_ASSIGNMENT to exclude comma operator
             // This ensures (a ? b : c, d) parses as ((a ? b : c), d) not (a ? b : (c, d))
             // The consequent is `AssignmentExpression[+In]` — `in` is always the
@@ -691,13 +779,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             _ => self.parse_primary_expression()?,
         };
 
-        // An unparenthesized arrow function is a complete AssignmentExpression —
-        // no subscripts can follow (`() => {}()` is invalid JS; a `(` on the next
-        // line starts a new statement via ASI). A parenthesized arrow
-        // (`(() => {})()`, detected by the span gap) is a callable primary.
-        if matches!(parsed.expr, Expression::ArrowFunctionExpression(_))
-            && parsed.actual_start == parsed.expr.span().start
-        {
+        // An unparenthesized arrow function — or a bare `yield` inside a generator
+        // — is a complete AssignmentExpression, so no `.`-member subscript can
+        // follow (`() => {}()` is invalid JS; `yield.a` is too — the `.` doesn't
+        // extend the head). A parenthesized head (`(() => {})()` / `(yield).a`,
+        // detected by the span gap) is a callable primary. A subscript token that
+        // *starts* an expression is instead absorbed earlier as the yield argument
+        // (`yield [x]` is `yield` of an array; `yield (e)` its parenthesized arg),
+        // so only the no-argument bare head reaches here.
+        if parsed.is_bare_assignment_head(self.in_yield) {
             return Ok(parsed);
         }
 
@@ -1892,6 +1982,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             | TokenKind::NoSubstitutionTemplate
             | TokenKind::TemplateHead
             | TokenKind::RegexLiteral
+            // `/` / `/=` after `yield` is a regex-literal argument, not division:
+            // the lexer emits `Slash`/`SlashEquals` by default (the parser re-lexes
+            // it as a regex only in primary position), and a bare `yield` can't be
+            // the left operand of division without parens, so `yield /a/g` is
+            // `yield (/a/g)` (matching acorn). The primary parser resyncs the regex.
+            | TokenKind::Slash
+            | TokenKind::SlashEquals
             | TokenKind::LessThan
             | TokenKind::Hash => true,
             // Most keywords can start expressions (as primaries, unary ops, or contextual identifiers).

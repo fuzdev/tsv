@@ -188,6 +188,7 @@ deno task conformance:audit          # doc/fixture integrity: divergence fixture
 deno task pins:audit                 # canonical-oracle version sync (gated in `deno task check`): (1) pin agreement — sidecar.ts VERSIONS + npm: imports, benches/js/package.json, actor.rs acorn import-map must be identical; (2) checkout alignment — a PRESENT ../svelte or ../acorn-typescript checkout must match its pin (absent → skipped, so clean machines pass)
 deno task scan:audit                 # guard against new raw find/rfind/match_indices substring scans over source (gated in `deno task check`); see Debug Tooling
 deno task fanout:audit               # guard against super-linear doc-node fanout (the per-layout-candidate rebuild blowup); gated in `deno task check`; see Debug Tooling
+deno task roundtrip:audit            # cheap tripwire that format(tests/fixtures) reparses (pure-Rust phase 1, no *_unreparseable output; gated in `deno task check`) — real yield is external corpora; see Debug Tooling
 ```
 
 For direct `cargo run -p tsv_debug` usage, see [Debug Tooling](#debug-tooling).
@@ -1027,6 +1028,40 @@ cargo run -p tsv_debug authoring_audit ~/dev/zzz/src    # audit a real codebase
 # ftry2) for each hard finding — the basis for a fixtures-first fix.
 # Also: --json, --verbose, --limit N (sites/file), --examples N.
 cargo run -p tsv_debug authoring_audit ~/dev/zzz/src --prettier --dump-dir /tmp/audit
+```
+
+**Format→Reparse Round-Trip Audit (delimiter/structure-corruption gate):**
+
+```bash
+# roundtrip_audit - corpus-scale "does format(src) reparse to the SAME document?".
+# Catches the class the other gates can't see: output that mis-delimits but loses
+# no characters (a re-quoted attr='a"b' → attr="a"b", `+(+x)` → `++x`, `(a as T)++`
+# → `a as T++`). corpus:compare:format's SAFETY is char-frequency — BLIND to
+# delimiter/structure corruption; this fills that gap. Two phases (tsv-self
+# pre-filter → canonical confirm): parse input and formatted output, reduce each to
+# a STRUCTURAL SKELETON (node-tree shape + `type`, erasing reformattable leaf
+# scalars + acorn `extra`), and compare — so legit reformatting (CSS value spacing,
+# `<style>` raw blob, quote/trailing-comma normalization) doesn't read as
+# corruption. Buckets: {tsv,canonical}_unreparseable (the prize — output the parser
+# rejects), {tsv,canonical}_divergent (structural change). Pure-Rust tsv-self runs
+# over every file; canonical (Svelte/acorn/parseCss via sidecar) confirms suspects,
+# or every file with --canonical-all. Zero false positives on real formatted code;
+# point it at the delimiter-dense prettier suites for the work-list.
+cargo run -p tsv_debug roundtrip_audit                              # audit tests/fixtures
+cargo run -p tsv_debug roundtrip_audit ../prettier/tests/format/js ../zzz/src
+# --gate mode fails ONLY on the {tsv,canonical}_unreparseable buckets (the reliable
+# half — divergent is render-model noise over tests/fixtures). Bare --gate runs phase
+# 1 only via a reparse-only fast path (pure Rust, no sidecar) — the
+# `deno task roundtrip:audit` check gate. Over tests/fixtures that's a cheap tripwire
+# (fixture F1/N invariants already make outputs reparse); the real yield is external
+# corpora. Add --canonical-all for the thorough form that also guards
+# canonical_unreparseable (tsv's parser accepting output the real parser rejects).
+cargo run -p tsv_debug roundtrip_audit --gate                       # the check gate (pure Rust, tests/fixtures)
+cargo run -p tsv_debug roundtrip_audit --gate --canonical-all ../prettier/tests/format  # thorough
+# Also: --no-render, --verbose (AST diff per finding), --limit N, --json. The full
+# (non-gate) run is a diagnostic — the divergent bucket over tests/fixtures is still
+# Svelte-reflow-noisy vs render_normalize's simpler whitespace model.
+cargo run -p tsv_debug roundtrip_audit --canonical-all --verbose ../prettier/tests/format/typescript
 ```
 
 ## Architectural Notes

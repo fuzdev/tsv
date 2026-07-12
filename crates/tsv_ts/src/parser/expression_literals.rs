@@ -118,12 +118,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
             // Parse property key
             // Supports: identifiers, keywords (as identifiers), string literals, number literals, computed keys
-            // Track if key is a restricted keyword (can't be used in shorthand)
-            let (key, computed, is_restricted_keyword) = match self.current_kind() {
-                // Computed property: { [expr]: value }
+            // Track whether the key is ineligible as a bare shorthand / `= default`
+            // target: a shorthand property (and the `CoverInitializedName` `{ x = 1 }`
+            // form) is an `IdentifierReference`, so a string/number literal, a computed
+            // key, or a keyword that isn't a valid identifier reference all require the
+            // `PropertyName : AssignmentExpression` form (a `:` value) — ecma262
+            // §PropertyDefinition. acorn rejects the bare forms; tsc reports TS1005.
+            let (key, computed, shorthand_ineligible) = match self.current_kind() {
+                // Computed property: { [expr]: value } — a computed key is never a
+                // valid bare shorthand (`{ [e] }` requires `: value`).
                 TokenKind::BracketOpen => {
                     self.advance()?; // consume '['
-                    (self.parse_computed_member_key()?, true, false)
+                    (self.parse_computed_member_key()?, true, true)
                 }
                 // Both identifiers and keywords can be property keys: { foo: 1, object: 2, in: 3 }
                 TokenKind::Identifier => {
@@ -142,13 +148,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 TokenKind::Keyword(kw) => {
                     let (key_start, key_end) = self.current_pos();
                     let name = self.current_raw_ident_name();
-                    // Track if this keyword cannot be used as identifier reference
-                    // in shorthand. `await` is allowed at Script `[~Await]` (a
-                    // valid `IdentifierReference`), like any other identifier.
+                    // A keyword is a valid bare shorthand only when it is a valid
+                    // `IdentifierReference`. `await` is allowed at Script `[~Await]`;
+                    // otherwise the reference set is `can_be_binding_name()` — the
+                    // contextual/type keywords (`async`, `string`, …). This rejects
+                    // the strict-reserved (`yield`, `let`) AND the always-reserved
+                    // keywords (`class`, `true`, `void`, …) as shorthand — while
+                    // `{ public }` (only strict-reserved) stays deferred: `public`
+                    // lexes as an identifier, not a `KeywordKind`.
                     let restricted = match kw {
                         KeywordKind::Await => !self.await_is_identifier(),
-                        KeywordKind::Yield | KeywordKind::Let => true,
-                        _ => false,
+                        _ => !kw.can_be_binding_name(),
                     };
                     self.advance()?;
                     (
@@ -160,6 +170,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         restricted,
                     )
                 }
+                // Literal keys ({"prop-name": value}, {0: value}): a `LiteralPropertyName`,
+                // valid only with a `:` value — never a bare shorthand (`{ '' }`, `{ 0 }`).
                 TokenKind::String => {
                     // String literal key: {"prop-name": value}
                     let (key_start, key_end) = self.current_pos();
@@ -171,7 +183,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             span: Span::new(key_start as u32, key_end as u32),
                         }),
                         false,
-                        false,
+                        true,
                     )
                 }
                 TokenKind::Number => {
@@ -179,7 +191,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // shares the full numeric decode (radix, separators, bigint)
                     let literal = self.parse_number_or_bigint_literal()?;
                     self.advance()?;
-                    (Expression::Literal(literal), false, false)
+                    (Expression::Literal(literal), false, true)
                 }
                 _ => {
                     return Err(self.error_expected_found_at("property key", prop_start));
@@ -227,42 +239,42 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     false,
                     false,
                 )
-            } else if self.check(&TokenKind::Equals) && !computed {
-                // Shorthand with default value: `{a = 1}` (only for simple identifiers)
-                // This parses as an AssignmentExpression, which gets converted to
-                // AssignmentPattern by to_assignable() when used in destructuring context
-                // Restricted keywords (await, yield, let) can't be used as shorthand identifiers
-                if is_restricted_keyword {
-                    return Err(self.error_msg_at(
-                        "Cannot use restricted keyword as shorthand property",
-                        key.span().start_usize(),
-                    ));
-                }
-                self.advance()?; // consume '='
-                let default_value = self.parse_assignment_expression()?;
-                // prev_token_end covers a parenthesized default's closing `)`
-                let assign_end = self.prev_token_end() as u32;
-                (
-                    PropertyKind::Init,
-                    Expression::AssignmentExpression(AssignmentExpression {
-                        left: arena.alloc(key.clone()),
-                        operator: AssignmentOperator::Assign,
-                        right: arena.alloc(default_value),
-                        span: Span::new(key.span().start, assign_end),
-                    }),
-                    true,
-                    false,
-                )
             } else {
-                // Shorthand: key is duplicated as value
-                // Restricted keywords (await, yield, let) can't be used as shorthand identifiers
-                if is_restricted_keyword {
+                // Not `key: value`, a method, or an accessor — so this property is a
+                // bare shorthand `{ key }` or the `{ key = default }` CoverInitializedName
+                // (a destructuring cover, deferred here and converted to an
+                // AssignmentPattern by to_assignable() in pattern context). Both forms
+                // are an `IdentifierReference` (ecma262 §PropertyDefinition), so a
+                // string/number literal, computed key, or non-reference keyword — which
+                // needs the `PropertyName : AssignmentExpression` (`:` value) form — is
+                // rejected here (acorn rejects; tsc reports TS1005). This subsumes the
+                // computed case, so the `= default` split below needs no `!computed`.
+                if shorthand_ineligible {
                     return Err(self.error_msg_at(
-                        "Cannot use restricted keyword as shorthand property",
+                        "Object literal shorthand property must be an identifier reference",
                         key.span().start_usize(),
                     ));
                 }
-                (PropertyKind::Init, key.clone(), true, false)
+                if self.eat(TokenKind::Equals) {
+                    // `{ a = 1 }`: parsed as an AssignmentExpression.
+                    let default_value = self.parse_assignment_expression()?;
+                    // prev_token_end covers a parenthesized default's closing `)`
+                    let assign_end = self.prev_token_end() as u32;
+                    (
+                        PropertyKind::Init,
+                        Expression::AssignmentExpression(AssignmentExpression {
+                            left: arena.alloc(key.clone()),
+                            operator: AssignmentOperator::Assign,
+                            right: arena.alloc(default_value),
+                            span: Span::new(key.span().start, assign_end),
+                        }),
+                        true,
+                        false,
+                    )
+                } else {
+                    // Plain shorthand `{ key }`: key is duplicated as value.
+                    (PropertyKind::Init, key.clone(), true, false)
+                }
             };
 
             // Use prev_token_end() to include closing paren when value is parenthesized
@@ -394,15 +406,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Capture paren position before parsing params (for comment detection)
         let (params_start, _) = self.current_pos();
-        // Params + body in the method's `[Await]` context (async → `[+Await]`).
+        // Params + body in the method's `[Await]`/`[Yield]` context (async → `[+Await]`,
+        // generator → `[+Yield]`).
         let params = self
-            .with_in_await(is_async, Self::parse_parameter_list)?
+            .with_fn_context(is_async, is_generator, Self::parse_parameter_list)?
             .into_bump_slice();
 
         // Check for return type annotation: (): type or type predicate
         let return_type = self.parse_optional_return_type()?;
 
-        let body = self.with_in_await(is_async, Self::parse_function_body)?;
+        let body = self.with_fn_context(is_async, is_generator, Self::parse_function_body)?;
         let end = body.span.end;
 
         Ok(FunctionExpression {

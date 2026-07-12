@@ -8,8 +8,9 @@
 use super::super::comments_in_range;
 use super::helpers::{
     find_separator_position, intersection_has_expanding_first_type,
-    intersection_has_huggable_last_type, is_hugging_union_type_arg, should_hug_union_type,
-    type_needs_parens_in_union_or_intersection, type_never_needs_parens, unwrap_parenthesized,
+    intersection_has_huggable_last_type, is_huggable_type, is_hugging_union_type_arg,
+    should_hug_union_type, type_needs_parens_in_union_or_intersection, type_never_needs_parens,
+    unwrap_parenthesized,
 };
 use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{TSIntersectionType, TSParenthesizedType, TSType, TSUnionType};
@@ -197,6 +198,26 @@ impl<'a> Printer<'a> {
             return self.build_union_type_doc_with_line_comments(union);
         }
 
+        // A single-member union has no `|` of its own: prettier drops single-element
+        // `TSUnionType` nodes in postprocess, so the lone member prints in the union's
+        // position with NO leading pipe and NO per-member offset. Rendering it
+        // transparently collapses a nested `| (| (| A | B))` to the innermost
+        // multi-member union (`| A | B`) instead of stacking a leading `|` per level —
+        // the flat form already collapses, but the loop below emits each level's
+        // `if_break("| ")` + offset once a nested comment forces the union multiline.
+        // Placed after the hug/line-comment paths so a leading line comment (which the
+        // block-only comment helper can't carry) still routes there. A block comment
+        // between the dropped `|` and the member is preserved. `member_parens` here is
+        // `type_never_needs_parens`, so any required parens come from the parent one
+        // level up.
+        if union.types.len() == 1 {
+            let member = &union.types[0];
+            let leading =
+                self.build_member_leading_block_comments(union.span.start, member.span().start);
+            let member_doc = self.build_type_doc_maybe_parens(member, member_parens);
+            return d.concat(&[leading, member_doc]);
+        }
+
         // Build parts: each type prefixed conditionally with `| ` or nothing
         // Flat: T1 | T2 | T3
         // Break: | T1
@@ -311,24 +332,18 @@ impl<'a> Printer<'a> {
     /// The intersection counterpart to a hanging operator layout: the first member
     /// hugs the operator and continuation members wrap one level in
     /// (`A &\n\tB &\n\tC`). Shared by the type-alias RHS and `as`/`satisfies` cast
-    /// intersection arms. The `group(indent(...))` wrapper is skipped when a
-    /// boundary type owns its own expansion (TypeLiteral/Mapped at the first or
-    /// last position) — indenting it again would double-indent the object body.
+    /// intersection arms. The bare printer owns both the continuation indent (the
+    /// first member stays at base — a first member that breaks internally is not
+    /// double-indented) and, via its `needs_group` flag, the group. A boundary type
+    /// that owns its own expansion (TypeLiteral/Mapped at the first or last position)
+    /// opts out of the group (`wrap_in_group = false`) so it isn't re-wrapped.
     pub(in crate::printer) fn intersection_hanging_with_indent(
         &self,
         intersection: &TSIntersectionType<'_>,
     ) -> DocId {
-        let d = self.d();
-        let type_doc = self.build_intersection_type_doc(intersection, false);
-        if intersection_has_huggable_last_type(intersection)
-            || intersection_has_expanding_first_type(intersection)
-        {
-            type_doc
-        } else {
-            // The bare printer owns the continuation indent; the first member stays at
-            // base (a first member that breaks internally is no longer double-indented).
-            d.group(type_doc)
-        }
+        let boundary_owns_expansion = intersection_has_huggable_last_type(intersection)
+            || intersection_has_expanding_first_type(intersection);
+        self.build_intersection_type_doc(intersection, !boundary_owns_expansion)
     }
 
     /// Build a Doc for a union type with line comments between members.
@@ -646,6 +661,33 @@ impl<'a> Printer<'a> {
         })
     }
 
+    /// True when the intersection must use the multiline, comment-aware layout
+    /// (`build_intersection_type_doc_with_line_comments`) rather than the inline form —
+    /// because a comment can't be inline. Two triggers:
+    ///
+    /// - an **isolated** comment between two members (any line comment, or an own-line
+    ///   block — see `intersection_has_isolated_member_comment`); a block inline-adjacent
+    ///   to either member stays inline (unlike the union path, which expands it);
+    /// - a **non-first** parenthesized *union* member with a leading line comment inside
+    ///   its parens (`(a | b) & (// c⏎ c | d)`) — a line comment can't be inline, and tsv
+    ///   preserves it inside the parens (the member breaks open). The *first*-member case
+    ///   is hoisted out by `build_intersection_type_doc`; this catches the rest, which the
+    ///   inline form would otherwise drop. Restricted to a union inner — the only shape
+    ///   the multiline path renders comment-aware (`build_parenthesized_union_doc`). A
+    ///   paren-intersection / paren-function member with a leading line comment still
+    ///   drops it — extend when a real case appears.
+    fn intersection_needs_line_comment_layout(
+        &self,
+        intersection: &TSIntersectionType<'_>,
+    ) -> bool {
+        self.intersection_has_isolated_member_comment(intersection)
+            || intersection.types.iter().skip(1).any(|t| {
+                matches!(t, TSType::Parenthesized(p)
+                    if matches!(p.type_annotation, TSType::Union(_))
+                        && self.paren_has_leading_line_comment(p))
+            })
+    }
+
     //
     // Intersection Types
     //
@@ -677,16 +719,6 @@ impl<'a> Printer<'a> {
         // below still preserve comments around the `&`/parens.
         let member_parens = union_member_parens(intersection.types.len());
 
-        // A huggable/expanding boundary type (TypeLiteral/Mapped at the first or last
-        // position) owns its own expansion, so the hanging callers keep it un-indented.
-        // Every other layout owns its continuation indent here (the first member stays
-        // at base, only the `&`-continuations indent) — mirroring Prettier's
-        // `printIntersectionType` and the `: Type` annotation printer — so a first
-        // member that breaks internally is not swept into an outer `indent(...)`.
-        let last_is_huggable = intersection_has_huggable_last_type(intersection);
-        let first_is_expanding = intersection_has_expanding_first_type(intersection);
-        let boundary_owns_expansion = last_is_huggable || first_is_expanding;
-
         // Hoist leading line comments inside the first member's stripped parens
         // OUT of the intersection (e.g., `(// c\n a) & b` → `// c\n a & b`).
         // The comment goes on its own line BEFORE the intersection so the
@@ -694,10 +726,19 @@ impl<'a> Printer<'a> {
         if let Some(TSType::Parenthesized(first_paren)) = intersection.types.first() {
             let first_paren_leading = self.paren_leading_line_comments(first_paren);
             if !first_paren_leading.is_empty() {
-                let inner = self.build_intersection_type_doc_with_first_paren_leading_stripped(
-                    intersection,
-                    first_paren,
-                );
+                // The compact inline body can't represent an *isolated* between-member
+                // comment (a line/own-line comment forces multiline); route those through
+                // the line-comment path with the first member's (now-hoisted) paren-leading
+                // stripped, so the other comments aren't dropped. Otherwise stay compact
+                // inline (block comments emitted in place).
+                let inner = if self.intersection_needs_line_comment_layout(intersection) {
+                    self.build_intersection_type_doc_with_line_comments(intersection, true)
+                } else {
+                    self.build_intersection_type_doc_with_first_paren_leading_stripped(
+                        intersection,
+                        first_paren,
+                    )
+                };
                 let mut parts = DocBuf::new();
                 for comment in &first_paren_leading {
                     parts.push(self.build_comment_doc(comment));
@@ -708,42 +749,14 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Check for isolated comments between intersection members (force multiline).
-        // Only the gaps between member types, not inside them. A block comment on its
-        // own line between the members counts (`X &⏎/* c */⏎Y`), as does any line
-        // comment — but a block inline-adjacent to either member stays inline (unlike
-        // the union path, which expands an adjacent block).
-        let has_isolated_comment_between_members =
-            self.intersection_has_isolated_member_comment(intersection);
-        // A non-first parenthesized **union** member with a leading line comment
-        // inside its parens (`(a | b) & (// c⏎ a | b)`) also forces the multiline
-        // layout: a line comment can't be inline, and tsv preserves it inside the
-        // parens (the paren member breaks open). The *first*-member case is already
-        // hoisted out above; this catches the rest, which would otherwise drop the
-        // comment. Restricted to a union inner because that is the only shape the
-        // multiline path renders comment-aware (`build_parenthesized_union_doc`).
-        // TODO: a paren-intersection / paren-function member with a leading line
-        // comment still drops it — extend when a real case appears.
-        let has_nonfirst_paren_leading_line_comment = intersection.types.iter().skip(1).any(|t| {
-            matches!(t, TSType::Parenthesized(p)
-                if matches!(p.type_annotation, TSType::Union(_))
-                    && self.paren_has_leading_line_comment(p))
-        });
-        if has_isolated_comment_between_members || has_nonfirst_paren_leading_line_comment {
-            let doc = self.build_intersection_type_doc_with_line_comments(intersection);
-            // The line-comment layout emits members with a bare hardline and no
-            // indent. Own the continuation indent here — mirroring Prettier's
-            // `printIntersectionType` — except when a huggable/expanding boundary owns
-            // its own expansion (the hanging caller keeps that un-indented). The
-            // `wrap_in_group` path (type arguments, tuple elements, mapped-type values,
-            // conditional branches) also groups it; the hanging callers add the group.
-            return if wrap_in_group {
-                d.group(d.indent(doc))
-            } else if boundary_owns_expansion {
-                doc
-            } else {
-                d.indent(doc)
-            };
+        if self.intersection_needs_line_comment_layout(intersection) {
+            let doc = self.build_intersection_type_doc_with_line_comments(intersection, false);
+            // The line-comment layout self-indents per member (mirroring the no-comment
+            // loop and Prettier's `printIntersectionType`), so no outer indent is added.
+            // The `wrap_in_group` path (type arguments, tuple elements, mapped-type
+            // values, conditional branches) still groups it; the hanging callers add the
+            // group.
+            return if wrap_in_group { d.group(doc) } else { doc };
         }
 
         // For intersection types, prettier uses trailing `&` when breaking,
@@ -752,13 +765,9 @@ impl<'a> Printer<'a> {
         // Break: A &
         //            B &
         //            C
-        //
-        // Special case: when a boundary type is huggable (TypeLiteral/MappedType at first
-        // or last position in a 2-type intersection), use a space instead of line() to
-        // keep `& {` or `} &` hugged. The TypeLiteral handles its own expansion.
-        let last_idx = intersection.types.len() - 1;
-        let is_huggable_pair =
-            intersection.types.len() == 2 && (last_is_huggable || first_is_expanding);
+        // The per-member separator/indent below (object-adjacency + `was_indented`)
+        // keeps a huggable boundary (`& {` / `} &`) space-hugged and un-indented —
+        // uniformly, whether the object is first, middle, or last.
 
         // Build first type separately (not indented)
         let mut first_parts = DocBuf::new();
@@ -812,73 +821,78 @@ impl<'a> Printer<'a> {
         //       a: A;
         //   } & B &
         //       C;
-        let first_expanding_multi =
-            first_is_expanding && !is_huggable_pair && intersection.types.len() > 2;
-        if first_expanding_multi {
-            let mut parts = first_parts;
-
-            for (i, _) in intersection.types.iter().enumerate().skip(1) {
-                let body = self.build_intersection_member_body_doc(intersection, i);
-                let sep = if i == 1 { d.text(" ") } else { d.line() };
-                let mut member: DocBuf = smallvec![sep];
-                member.extend(body);
-
-                if i == 1 {
-                    // Hugged to first type: no indent
-                    parts.extend(member);
-                } else {
-                    // Per-member indent
-                    parts.push(d.indent(d.concat(&member)));
-                }
-            }
-
-            // Always need a group for line() in index 2+ members
-            return d.group(d.concat(&parts));
-        }
-
-        // Build continuation types (indented when breaking)
-        let mut continuation_parts = DocBuf::new();
-
-        for (i, _) in intersection.types.iter().enumerate().skip(1) {
-            let is_last = i == last_idx;
-
-            // Huggable pair: always space (TypeLiteral handles its own expansion)
-            // Multi-type with huggable last: space only for the last type
-            if is_huggable_pair || (is_last && last_is_huggable) {
-                continuation_parts.push(d.text(" "));
-            } else {
-                continuation_parts.push(d.line());
-            }
-
-            continuation_parts.extend(self.build_intersection_member_body_doc(intersection, i));
-        }
-
-        // Combine: first_parts + continuation
+        // Continuation members follow Prettier's `printIntersectionType`
+        // (`intersection-type.js`) per boundary between member `i - 1` and `i`:
         //
-        // Indentation logic — the first member always stays at base (on the `=`/opening
-        // line); only the `&`-continuations indent, matching Prettier's
-        // `printIntersectionType`. Every layout owns this indent EXCEPT a 2-type huggable
-        // pair (`A & {b}`), which space-hugs and lets the boundary object expand itself.
-        // Owning the indent here — rather than letting the hanging callers wrap the whole
-        // doc in `indent(...)` — keeps a first member that breaks internally at base
-        // instead of double-indenting it.
+        // - **neither is an object** — a breakable `line` and the member indented
+        //   (`indent([" &", line, doc])`); this is the only spot the intersection
+        //   itself breaks.
+        // - **object-adjacent** (a transition object↔non-object, or object↔object)
+        //   — a hard `& ` (never breaks; the object owns its own expansion), and the
+        //   member indented only once the `was_indented` latch is set.
+        //
+        // `was_indented` mirrors Prettier's flag: it flips on the first *transition
+        // past index 1*, and gates the indent of every object-adjacent member. So an
+        // object hugging the first member (`A & { … }`) — or a run of objects
+        // starting at index 1 (`A & { … } & { … }`) — stays at base and its body
+        // indents just one level, while a `}`→non-object tail and every later member
+        // carry the continuation indent. `is_huggable_type` is Prettier's
+        // `isObjectType` (`TSTypeLiteral`/`TSMappedType`), read on the raw member (no
+        // paren-unwrap) to match Prettier's node check.
+        //
+        // This subsumes the old huggable-pair / last-huggable separator special-cases
+        // and the blanket `indent(continuations)`; the first member always stays at
+        // base (built into `first_parts`), so a first member that breaks internally
+        // is never double-indented.
+        //
+        // `build_intersection_type_doc_with_line_comments` ports the same per-boundary
+        // object-adjacency + `was_indented` rule for the forced-multiline line-comment
+        // case — keep the two in sync. They stay separate because the comment path
+        // forces `hardline` (not the group-decided `line`) and emits the `&` *before*
+        // the gap comments (this loop emits it after, which would swallow a line
+        // comment), so a merge is not byte-identical.
         let mut parts = first_parts;
-        let has_non_huggable_continuations = last_is_huggable && intersection.types.len() > 2;
-        let indent_continuations = !is_huggable_pair;
-        if !continuation_parts.is_empty() {
-            if indent_continuations {
-                parts.push(d.indent(d.concat(&continuation_parts)));
+        let mut was_indented = false;
+        let mut needs_group = wrap_in_group;
+        for i in 1..intersection.types.len() {
+            let prev_is_object = is_huggable_type(&intersection.types[i - 1]);
+            let cur_is_object = is_huggable_type(&intersection.types[i]);
+            let neither_is_object = !prev_is_object && !cur_is_object;
+
+            let sep = if neither_is_object {
+                // A breakable line is the only thing that needs the group to choose
+                // between flat and broken.
+                needs_group = true;
+                d.line()
             } else {
-                // Huggable-only pair (`A & {b}`) or a caller-indented context - no internal indent
-                parts.extend(continuation_parts);
+                d.text(" ")
+            };
+
+            let indent_member = if neither_is_object {
+                true
+            } else if prev_is_object && cur_is_object {
+                was_indented
+            } else {
+                // object↔non-object transition: indented (and opens the latch) only
+                // past index 1; the index-1 transition hugs the first member at base.
+                if i > 1 {
+                    was_indented = true;
+                    true
+                } else {
+                    false
+                }
+            };
+
+            let mut member: DocBuf = smallvec![sep];
+            member.extend(self.build_intersection_member_body_doc(intersection, i));
+            if indent_member {
+                parts.push(d.indent(d.concat(&member)));
+            } else {
+                parts.extend(member);
             }
         }
 
-        // Need a group when:
-        // - wrap_in_group requested by caller, OR
-        // - non-huggable continuations exist (line() between them needs a group
-        //   to go flat when content fits on one line)
-        if wrap_in_group || has_non_huggable_continuations {
+        if needs_group {
             d.group(d.concat(&parts))
         } else {
             d.concat(&parts)
@@ -887,132 +901,208 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for an intersection type with line comments between members.
     ///
-    /// Line comments force the intersection to be multiline because a line comment
-    /// cannot be followed by content on the same line.
+    /// A line comment (or an own-line block comment) between two members forces the
+    /// intersection multiline. Within that forced-multiline layout the per-member
+    /// separator and indent follow Prettier's `printIntersectionType`
+    /// (`intersection-type.js`), exactly as the no-comment loop in
+    /// `build_intersection_type_doc` does: object-adjacent members stay space-hugged
+    /// (`} & B` / `A & {`) and only a neither-object boundary — or a member with a
+    /// leading own-line comment (`hasLeadingOwnLineComment`) — breaks, with
+    /// continuation members indented once the `was_indented` latch is set.
     ///
-    /// Structure (intersection uses trailing `&`):
-    /// ```text
-    /// A &
-    /// // comment before B
-    /// B
-    /// ```
+    /// The one intersection-specific rule is comment **preservation**: a line comment
+    /// in a member gap can never share a line with the next member, so its boundary
+    /// always breaks — even where object-adjacency would otherwise glue
+    /// (`{ c } // c⏎& D`, `B // c⏎& { c }`). Prettier instead `lineSuffix`-relocates
+    /// that comment past the glued members to the end of the visual line (across a
+    /// member boundary, even past `;`); tsv keeps it on its member's line. See
+    /// conformance_prettier.md §Comment relocation.
     ///
-    /// Note: The caller (type alias printer) handles the outer indent, so this function
-    /// does not add internal indentation.
+    /// The doc self-indents per member (mirroring `build_intersection_type_doc`), so
+    /// the caller adds no outer indent.
+    ///
+    /// `strip_first_paren_leading` is set by the hoist path: the first member's
+    /// parenthesized leading line comment has already been emitted before the
+    /// intersection, so the first member is built with it stripped (otherwise a
+    /// paren-union first member would re-emit it inside the parens).
     fn build_intersection_type_doc_with_line_comments(
         &self,
         intersection: &TSIntersectionType<'_>,
+        strip_first_paren_leading: bool,
     ) -> DocId {
         let d = self.d();
-        let mut parts = DocBuf::new();
         let member_parens = union_member_parens(intersection.types.len());
+        let types = &intersection.types;
+        let last = types.len() - 1;
 
-        for (i, t) in intersection.types.iter().enumerate() {
-            let type_start = t.span().start;
-            let type_end = t.span().end;
+        // First member: leading block comments (`& /* c */ A`) + its type. Its
+        // trailing `&` is emitted by the next member's iteration (it sits on this line).
+        let mut parts = DocBuf::new();
+        let first = &types[0];
+        parts.push(self.build_comments_between_filtered(
+            intersection.span.start,
+            first.span().start,
+            CommentSpacing::Trailing,
+            CommentFilter::BlockOnly,
+        ));
+        let first_doc = match first {
+            TSType::Parenthesized(fp) if strip_first_paren_leading => {
+                self.build_intersection_first_member_stripped(fp, member_parens)
+            }
+            _ => self.build_intersection_line_comment_member_doc(first, member_parens),
+        };
+        parts.push(first_doc);
 
-            if i > 0 {
-                // Get previous type end and find the ampersand position
-                let prev_type_end = intersection.types[i - 1].span().end;
+        let mut was_indented = false;
+        for i in 1..types.len() {
+            let prev = &types[i - 1];
+            let cur = &types[i];
+            let prev_end = prev.span().end;
+            let cur_start = cur.span().start;
+            let is_last = i == last;
 
-                if let Some(amp_pos) =
-                    find_separator_position(self.source, prev_type_end, type_start, b'&')
-                {
-                    // Comments before the ampersand (trailing on previous type's line or on own lines)
-                    parts.extend(self.build_trailing_comments_multiline(prev_type_end, amp_pos));
+            let amp = find_separator_position(self.source, prev_end, cur_start, b'&');
 
-                    // Comments after the ampersand - split into trailing (same line as &) and leading (own line)
-                    let comments_after_amp: CommentVec<'_> =
-                        comments_in_range(self.comments, amp_pos + 1, type_start).collect();
+            // After-`&` comments on their own line lead the member — Prettier's
+            // `hasLeadingOwnLineComment`, which forces the boundary to break. (Same-line
+            // ones trail the `&` inline and are emitted below.)
+            let own_line_leading: CommentVec<'_> = match amp {
+                Some(amp_pos) => comments_in_range(self.comments, amp_pos + 1, cur_start)
+                    .filter(|c| !self.is_same_line(amp_pos, c.span.start))
+                    .collect(),
+                None => smallvec![],
+            };
 
-                    // Trailing comments on same line as & (come before hardline)
-                    for comment in comments_after_amp
-                        .iter()
-                        .filter(|c| self.is_same_line(amp_pos, c.span.start))
-                    {
-                        parts.push(d.text(" "));
-                        parts.push(self.build_comment_doc(comment));
-                    }
-
-                    // Newline for continuation
-                    parts.push(d.hardline());
-
-                    // Leading comments on their own line (come after hardline). A
-                    // block comment inline-adjacent to the member it leads hugs it
-                    // with a space (`/* c */ Y`); an own-line block (separated from
-                    // the member by a newline) and every line comment take a hardline
-                    // so the member drops to its own line — the same split the union
-                    // renderer applies after `| ` (keyed on the *following* member,
-                    // not on block-vs-line alone). A blank line the author left between
-                    // an own-line comment and what follows it (the next own-line comment
-                    // or the member) is preserved (`literalline`), matching prettier.
-                    let own_line: CommentVec<'_> = comments_after_amp
-                        .iter()
-                        .copied()
-                        .filter(|c| !self.is_same_line(amp_pos, c.span.start))
-                        .collect();
-                    self.emit_member_leading_comments(&mut parts, &own_line, type_start);
-                } else {
-                    // No ampersand found, just add newline
-                    parts.push(d.hardline());
+            // Per Prettier's `printIntersectionType` per-boundary branch, on the raw
+            // members' `isObjectType` (matching the no-comment loop):
+            // - both objects → space-hug, indent only once `was_indented` is latched;
+            // - neither object, or a leading own-line comment → break + indent;
+            // - object↔non-object transition → space-hug, indent (and latch) past index 1.
+            let prev_obj = is_huggable_type(prev);
+            let cur_obj = is_huggable_type(cur);
+            let (mut should_break, indent_member) = if prev_obj && cur_obj {
+                (false, was_indented)
+            } else if (!prev_obj && !cur_obj) || !own_line_leading.is_empty() {
+                (true, true)
+            } else {
+                let ind = i > 1;
+                if ind {
+                    was_indented = true;
                 }
-            }
-
-            // For the first type, extract leading block comments
-            // (e.g., `& /* c */ A & B` — comment between leading `&` and first member)
-            if i == 0 {
-                parts.push(self.build_comments_between_filtered(
-                    intersection.span.start,
-                    type_start,
-                    CommentSpacing::Trailing,
-                    CommentFilter::BlockOnly,
-                ));
-            }
-
-            // Add the type. A parenthesized-union member whose parens hold a
-            // leading line comment (`(// c⏎ a | b)`) is built through
-            // `build_parenthesized_union_doc` with the inner leading line comment
-            // emitted (it breaks the paren open, keeping the comment in place);
-            // `build_type_doc_maybe_parens` would re-wrap the parens but drop that
-            // comment. Block-only / non-union parens fall through to the default.
-            if let TSType::Parenthesized(p) = t
-                && let TSType::Union(inner_union) = p.type_annotation
-                && self.paren_has_leading_line_comment(p)
+                (false, ind)
+            };
+            // Preserve: an isolated comment (any line comment, or an own-line block) in
+            // the gap can't be inline, so its boundary breaks even where object-adjacency
+            // would glue — the tsv/Prettier divergence this path exists for.
+            if !should_break
+                && comments_in_range(self.comments, prev_end, cur_start)
+                    .any(|c| self.comment_isolated_from_neighbors(prev_end, c, cur_start))
             {
-                parts.push(self.build_parenthesized_union_doc(inner_union, Some(p), true));
-            } else {
-                parts.push(self.build_type_doc_maybe_parens(t, member_parens));
+                should_break = true;
             }
 
-            // Add trailing `&` for all but last type
-            if i < intersection.types.len() - 1 {
-                parts.push(d.text(" &"));
-            } else {
-                // Trailing comments on last type
-                for comment in comments_in_range(self.comments, type_end, intersection.span.end) {
+            // A same-line block comment authored *before* the `&` trails the previous
+            // member and stays on its side of the operator (`prev /* b */ &`) — matching
+            // the no-comment loop and Prettier. Emit those first, on the previous
+            // member's line (indent-agnostic — no preceding newline), before the `&`.
+            if let Some(amp_pos) = amp {
+                for comment in comments_in_range(self.comments, prev_end, amp_pos)
+                    .filter(|c| c.is_block && self.is_same_line(prev_end, c.span.start))
+                {
                     parts.push(d.text(" "));
                     parts.push(self.build_comment_doc(comment));
                 }
+            }
+            parts.push(d.text(" &"));
+
+            let mut unit = DocBuf::new();
+            if let Some(amp_pos) = amp {
+                // The remaining before-`&` comments follow the operator: a same-line
+                // *line* comment trails it inline (a `//` can't precede the `&` without
+                // commenting it out — a lossless separator-trail), and an own-line
+                // comment drops to its own line (blank-preserving). Mirrors
+                // `build_trailing_comments_multiline` minus the same-line blocks handled
+                // above. Then the same-line-after-`&` comments trail the operator inline.
+                let mut run_end = prev_end;
+                for comment in comments_in_range(self.comments, prev_end, amp_pos) {
+                    if self.is_same_line(prev_end, comment.span.start) {
+                        if !comment.is_block {
+                            unit.push(d.text(" "));
+                            unit.push(self.build_comment_doc(comment));
+                        }
+                    } else {
+                        self.push_blank_preserving_hardline(&mut unit, run_end, comment.span.start);
+                        unit.push(self.build_comment_doc(comment));
+                    }
+                    run_end = comment.span.end;
+                }
+                for comment in comments_in_range(self.comments, amp_pos + 1, cur_start)
+                    .filter(|c| self.is_same_line(amp_pos, c.span.start))
+                {
+                    unit.push(d.text(" "));
+                    unit.push(self.build_comment_doc(comment));
+                }
+            }
+            if should_break {
+                unit.push(d.hardline());
+                self.emit_member_leading_comments(&mut unit, &own_line_leading, cur_start);
+            } else {
+                unit.push(d.text(" "));
+            }
+            unit.push(self.build_intersection_line_comment_member_doc(cur, member_parens));
+            if is_last {
+                for comment in
+                    comments_in_range(self.comments, cur.span().end, intersection.span.end)
+                {
+                    unit.push(d.text(" "));
+                    unit.push(self.build_comment_doc(comment));
+                }
+            }
+
+            if indent_member {
+                parts.push(d.indent(d.concat(&unit)));
+            } else {
+                parts.extend(unit);
             }
         }
 
         d.concat(&parts)
     }
 
-    /// Build an intersection type's doc with the first member's stripped-paren
-    /// leading line comments excluded from the output. Used by the hoisting
-    /// path in `build_intersection_type_doc` — the caller emits the hoisted
-    /// comment before this doc, and passes the first member's `TSParenthesizedType`
-    /// directly so we can strip its parens without re-matching.
-    fn build_intersection_type_doc_with_first_paren_leading_stripped(
+    /// Build a single intersection member's type doc for the line-comment path. A
+    /// parenthesized-**union** member whose parens hold a leading line comment
+    /// (`(// c⏎ a | b)`) is built through `build_parenthesized_union_doc` with the
+    /// inner leading line comment emitted (it breaks the paren open, keeping the
+    /// comment in place); `build_type_doc_maybe_parens` would re-wrap the parens but
+    /// drop that comment. Every other member (block-only / non-union parens) uses the
+    /// default.
+    fn build_intersection_line_comment_member_doc(
         &self,
-        intersection: &TSIntersectionType<'_>,
+        t: &TSType<'_>,
+        member_parens: fn(&TSType<'_>) -> bool,
+    ) -> DocId {
+        if let TSType::Parenthesized(p) = t
+            && let TSType::Union(inner_union) = p.type_annotation
+            && self.paren_has_leading_line_comment(p)
+        {
+            self.build_parenthesized_union_doc(inner_union, Some(p), true)
+        } else {
+            self.build_type_doc_maybe_parens(t, member_parens)
+        }
+    }
+
+    /// Build the first intersection member's type doc with its parenthesized leading
+    /// line comment excluded (the caller — the hoist path — emits that comment before
+    /// the intersection). Precedence parens are kept where the member needs them
+    /// (`(A | B) & C`) and dropped where redundant (`(a) & b` → `a & b`).
+    fn build_intersection_first_member_stripped(
+        &self,
         first_paren: &TSParenthesizedType<'_>,
+        member_parens: fn(&TSType<'_>) -> bool,
     ) -> DocId {
         let d = self.d();
-        let member_parens = union_member_parens(intersection.types.len());
         let inner = first_paren.type_annotation;
-        let first_doc = if member_parens(inner) {
+        if member_parens(inner) {
             // Re-wrap inner in parens (e.g., union in intersection: `(A | B) & C`).
             if let TSType::Union(union) = inner {
                 // The hoisted leading line comment is emitted by the caller, so pass
@@ -1029,14 +1119,57 @@ impl<'a> Printer<'a> {
             }
         } else {
             self.build_type_doc(inner)
-        };
+        }
+    }
 
-        // Build the rest as `first & second & third...` inline (the hoisted
-        // comment forces a hardline before; we want the intersection itself
-        // to remain compact when possible).
+    /// Build an intersection type's doc with the first member's stripped-paren
+    /// leading line comments excluded from the output — the compact **inline** form
+    /// (`a & b & c`) used by the hoisting path in `build_intersection_type_doc` when the
+    /// intersection has no *isolated* between-member comment. The caller emits the
+    /// hoisted comment before this doc, and passes the first member's
+    /// `TSParenthesizedType` directly so we can strip its parens without re-matching.
+    ///
+    /// Block comments between members are emitted in place — a before-`&` block trails
+    /// the previous member, an after-`&` block leads the next — so they aren't dropped.
+    /// This inline form is what the re-formatted (hoisted, no-longer-parenthesized)
+    /// intersection settles to via the no-comment loop, so it stays idempotent; a
+    /// line/own-line comment routes to `build_intersection_type_doc_with_line_comments`
+    /// instead (which this compact form can't represent).
+    fn build_intersection_type_doc_with_first_paren_leading_stripped(
+        &self,
+        intersection: &TSIntersectionType<'_>,
+        first_paren: &TSParenthesizedType<'_>,
+    ) -> DocId {
+        let d = self.d();
+        let member_parens = union_member_parens(intersection.types.len());
+        let first_doc = self.build_intersection_first_member_stripped(first_paren, member_parens);
+
+        // Build the rest as `first & second & third...` inline, preserving any block
+        // comment on its authored side of each `&` (`prev /* c */ & /* c */ next`).
         let mut parts: DocBuf = smallvec![first_doc];
-        for t in intersection.types.iter().skip(1) {
-            parts.push(d.text(" & "));
+        for i in 1..intersection.types.len() {
+            let t = &intersection.types[i];
+            let prev_end = intersection.types[i - 1].span().end;
+            let cur_start = t.span().start;
+            let amp = find_separator_position(self.source, prev_end, cur_start, b'&');
+            if let Some(amp_pos) = amp {
+                parts.push(self.build_comments_between_filtered(
+                    prev_end,
+                    amp_pos,
+                    CommentSpacing::Leading,
+                    CommentFilter::BlockOnly,
+                ));
+            }
+            parts.push(d.text(" &"));
+            if let Some(amp_pos) = amp {
+                parts.push(self.build_comments_between_filtered(
+                    amp_pos + 1,
+                    cur_start,
+                    CommentSpacing::Leading,
+                    CommentFilter::BlockOnly,
+                ));
+            }
+            parts.push(d.text(" "));
             parts.push(self.build_type_doc_maybe_parens(t, member_parens));
         }
         d.concat(&parts)

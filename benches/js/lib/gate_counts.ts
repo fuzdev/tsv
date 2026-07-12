@@ -98,8 +98,16 @@ export const TS_FIXTURES_PINS: GatePins = { scanned: 207, both_accept: 186 };
  * matches, moving it accept-parity → gap-beyond-acorn (case ii: tsv+acorn correctly reject at parse
  * what tsc flags later as a semantic error). over-acceptance unchanged (the corpus has no tsc-TS1xxx
  * form of these rules).
+ * accept_parity 423→429 (2026-07-11, branch bug77): recording the over-rejection fixes landed since
+ * bug3 (the triage-batch non-simple-assignment target + keyword-as-type accepts, the #406 type-args
+ * follow-token disambiguation) — the only parser-accept-widening changes in that window — which moved
+ * 6 tsc-valid files gap-beyond-acorn → accept-parity. Checkout UNCHANGED at 637d5746b (still the
+ * 2026-07-06 measurement point), so a rise on a pinned corpus is pure parity gain, not a suite
+ * refresh; gap_unexpected/gap_known both 0. gap-beyond-acorn now 7, all correctly rejected (the 3
+ * param-property-in-signature cases above + the for-in-LHS `for(foo() in b)` / numeric-enum-member
+ * quartet, which prettier ALSO rejects — so tsv siding with acorn is right there too).
  */
-export const TS_REPO_PINS = { scanned: 768, accept_parity: 423 };
+export const TS_REPO_PINS = { scanned: 768, accept_parity: 429 };
 
 /**
  * corpus:compare:parse --all — MINIMUM per-language `compared` (both sides
@@ -125,11 +133,20 @@ export const CORPUS_PARSE_COMPARED_MIN: Record<Language, number> = {
  * typescript 16→9 as parser over-rejections closed. svelte 1→0: the merged
  * css-cdo-cdc / svelte-block-ws / svelte-attr-name parser fixes moved the last
  * over-rejected corpus file to both-accept.
+ *
+ * css 5→3 (2026-07-10): the nested-paren unquoted-url parse fix closed TWO files.
+ * An unquoted `url()` whose content contains a nested `(` (e.g.
+ * `url(--var(foo-bar,#dadce0))`, `url( var(x) )`) truncates to the first unescaped
+ * `)` (css-syntax §4.3.6), leaving a dangling `)` that drove the declaration-value
+ * loop's paren depth negative and over-rejected with `Expected }`. Fixing the depth
+ * clamp closed `inline-url/inline_url.css` and `loose/loose.css` (the latter's
+ * `url( var(…) )` hit the same bug — it was mislabeled a `calc (…)` error-recovery
+ * gap). Both oracles accept both files.
  */
 export const CORPUS_PARSE_TSV_ERRORS_PIN: Record<Language, number> = {
 	svelte: 0,
 	typescript: 9,
-	css: 5,
+	css: 3,
 };
 
 /**
@@ -159,9 +176,35 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	svelte: 7,
-	typescript: 177,
-	css: 23,
+	typescript: 173,
+	css: 22,
 };
+// typescript 177→173 (2026-07-11, ../prettier 1dcd0b0, oracle acorn-typescript 1.0.11): the
+// unary/update-argument parenthesization fix (a `+`/`-` operand that would re-tokenize — `+(+x)`,
+// `-(--x)` — and a type-assertion operand of an update — `(a as T)++` — now keep their parens;
+// needs_parens.rs UnaryArgument same-sign rule + a new UpdateArgument context) resolved four
+// prettier-suite files that previously emitted invalid, non-reparseable output (unknown→match):
+// js/unary/series.js, js/unary-expression/urnary_expression.js, typescript/as/as.ts,
+// typescript/update-expression/update-expressions.ts. A before/after --all diff on the identical
+// corpus confirmed exactly those four moved (0 new unknowns, 0 new errors, SAFETY 0). The pinned
+// svelte/css match minimums (1108<1111, 125<126) are pre-existing live-repo churn, NOT re-pinned.
+// css 23→22 (2026-07-10): `prettier/tests/format/css/url/url.css` moved unknown→partial.
+// The value-parser escaped-paren fix (an escaped `\(`/`\)` is content per css-syntax §4.3.7,
+// not a nesting delimiter — value/parser.rs fast_scan + its ValueCursor/classify_separators
+// twins) stopped mis-counting the escaped `)` in this file's `url(  …\)\).jpg  )` tokens: they
+// now trim cleanly (§4.3.6) and its multi-`url()` `background:` list wraps with consistent tabs
+// instead of the prior mixed-indent garble. The wrap is now a plain fill_101_boundary divergence
+// (→ partial); the residual unexplained hunks are the escaped-paren url outer-whitespace
+// divergence (tsv trims, prettier keeps — url_escaped_paren_ws_prettier_divergence), which is
+// variant-only so it has no corpus detector. SAFETY 0. See the partial-pin note below.
+// css 24→23 (2026-07-10): `prettier/tests/format/css/loose/loose.css` moved
+// unknown→known. The new `css_url_opaque` divergence detector
+// (lib/divergence/patterns.ts) now explains its sole hunk —
+// `url(var( x ))` → prettier `url(var(x))`: tsv keeps unquoted-url content
+// VERBATIM (opaque <url-token>, css-syntax §4.3.6) where prettier reformats
+// inside the nested parens (conformance_prettier.md §CSS: Values, fixture
+// url_nested_reformat_prettier_divergence). SAFETY 0. Pairs with the
+// `inline_url.css` partial→known move below.
 // typescript 181→177 (2026-07-09): the class-member modifier line-break fix (a contextual
 // TS modifier / `accessor` / `async` separated from its member by a line break is the member,
 // not a modifier — the `[no LineTerminator here]` guard in parser/statement/class.rs) resolved
@@ -189,8 +232,18 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	svelte: 4,
 	typescript: 63,
-	css: 8,
+	css: 9,
 };
+// css 8→9 (2026-07-10): `prettier/tests/format/css/url/url.css` moved unknown→partial after the
+// value-parser escaped-paren fix (see the css 23→22 unknown-pin note above) — its `background:`
+// url list now formats cleanly and reads as fill_101_boundary, with the escaped-paren
+// outer-whitespace hunks (url_escaped_paren_ws) unexplained. SAFETY 0. (Net for the day: 9→8→9 —
+// inline_url.css left partial for known, url.css joined.)
+// css 9→8 (2026-07-10): `prettier/tests/format/css/inline-url/inline_url.css` moved
+// partial→known. The new `css_url_opaque` detector now explains its remaining hunk —
+// `url(--var(foo-bar,#dadce0))` → prettier `url(--var(foo-bar, #dadce0))` (same
+// opaque-url class as the `loose.css` unknown→known move above; its css_value_wrap /
+// fill_101_boundary hunks were already detected). SAFETY 0.
 
 /**
  * bench:harvest:svelte-styles — MINIMUM extracted `<style>` block count. Live
