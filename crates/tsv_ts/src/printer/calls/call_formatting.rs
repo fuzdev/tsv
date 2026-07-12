@@ -5,9 +5,9 @@
 
 use super::super::{ParenContext, Printer, has_multiline_content};
 use super::arg_comments::{
-    PartitionedComments, any_comment_forces_expansion, first_arg_has_any_comments,
-    has_blank_line_between_args, has_inter_argument_comments, has_trailing_comments_on_args,
-    last_arg_has_comments, should_force_expansion_for_comments,
+    PartitionedComments, any_comment_forces_expansion, build_after_comma_leading_comments,
+    first_arg_has_any_comments, has_blank_line_between_args, has_inter_argument_comments,
+    has_trailing_comments_on_args, last_arg_has_comments, should_force_expansion_for_comments,
 };
 use super::arg_predicates::{
     arrow_body_is_call_through_non_null, arrow_has_trailing_param_comments,
@@ -271,11 +271,20 @@ pub(super) fn build_call_doc_with_wrapping(
     {
         let first_arg_doc = printer.build_expression_doc(&call.arguments[0]);
 
-        // Build tail args (everything after first)
+        // Build tail args (everything after first), carrying any inline block comment
+        // that leads a tail arg after its comma (`}, /* c */ arg`) so it isn't dropped —
+        // matching prettier's expand-first, which keeps the comment inline.
         let mut tail_parts = DocBuf::new();
+        let mut prev_end = call.arguments[0].span().end;
         for arg in call.arguments.iter().skip(1) {
             tail_parts.push(d.text(", "));
+            if let Some(leading) =
+                build_after_comma_leading_comments(printer, prev_end, arg.span().start)
+            {
+                tail_parts.push(leading);
+            }
             tail_parts.push(printer.build_expression_doc(arg));
+            prev_end = arg.span().end;
         }
 
         // Prettier: if (tailArgs.some(willBreak)) return allArgsBrokenOut()
