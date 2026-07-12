@@ -1,0 +1,995 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 715,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A block-body first callback expands \"first\" and keeps a SHORT tail arg inline",
+			"start": 20,
+			"end": 100,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " after `}`. A call/new tail with more than one argument is not \"hopefully short\"",
+			"start": 102,
+			"end": 184,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " (isHopefullyShortCallArgument), so all args break instead.",
+			"start": 186,
+			"end": 247,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 62
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " tail is a call with 1 arg — short, so expand-first keeps it inline",
+			"start": 250,
+			"end": 319,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 70
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " tail is a call with 2 args — not short, so all args break",
+			"start": 361,
+			"end": 421,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " tail is a `new` with 1 arg — short, expand-first keeps it inline",
+			"start": 475,
+			"end": 542,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " tail is a `new` with 2 args — not short, so all args break",
+			"start": 588,
+			"end": 649,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 62
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 714,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 705,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 31,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 321,
+					"end": 358,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 12
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 321,
+						"end": 357,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 1
+							},
+							"end": {
+								"line": 9,
+								"column": 11
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 321,
+							"end": 324,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 1
+								},
+								"end": {
+									"line": 7,
+									"column": 4
+								}
+							},
+							"name": "foo"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 325,
+								"end": 348,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 5
+									},
+									"end": {
+										"line": 9,
+										"column": 2
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 331,
+									"end": 348,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 11
+										},
+										"end": {
+											"line": 9,
+											"column": 2
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 335,
+											"end": 345,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 2
+												},
+												"end": {
+													"line": 8,
+													"column": 12
+												}
+											},
+											"expression": {
+												"type": "CallExpression",
+												"start": 335,
+												"end": 344,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 2
+													},
+													"end": {
+														"line": 8,
+														"column": 11
+													}
+												},
+												"callee": {
+													"type": "Identifier",
+													"start": 335,
+													"end": 342,
+													"loc": {
+														"start": {
+															"line": 8,
+															"column": 2
+														},
+														"end": {
+															"line": 8,
+															"column": 9
+														}
+													},
+													"name": "doThing"
+												},
+												"arguments": [],
+												"optional": false
+											}
+										}
+									]
+								}
+							},
+							{
+								"type": "CallExpression",
+								"start": 350,
+								"end": 356,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 4
+									},
+									"end": {
+										"line": 9,
+										"column": 10
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 350,
+									"end": 353,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 4
+										},
+										"end": {
+											"line": 9,
+											"column": 7
+										}
+									},
+									"name": "bar"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 354,
+										"end": 355,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 8
+											},
+											"end": {
+												"line": 9,
+												"column": 9
+											}
+										},
+										"name": "x"
+									}
+								],
+								"optional": false
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block-body first callback expands \"first\" and keeps a SHORT tail arg inline",
+							"start": 20,
+							"end": 100
+						},
+						{
+							"type": "Line",
+							"value": " after `}`. A call/new tail with more than one argument is not \"hopefully short\"",
+							"start": 102,
+							"end": 184
+						},
+						{
+							"type": "Line",
+							"value": " (isHopefullyShortCallArgument), so all args break instead.",
+							"start": 186,
+							"end": 247
+						},
+						{
+							"type": "Line",
+							"value": " tail is a call with 1 arg — short, so expand-first keeps it inline",
+							"start": 250,
+							"end": 319
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 423,
+					"end": 472,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 423,
+						"end": 471,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 1
+							},
+							"end": {
+								"line": 17,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 423,
+							"end": 426,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 1
+								},
+								"end": {
+									"line": 12,
+									"column": 4
+								}
+							},
+							"name": "foo"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 430,
+								"end": 455,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 15,
+										"column": 3
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 436,
+									"end": 455,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 8
+										},
+										"end": {
+											"line": 15,
+											"column": 3
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 441,
+											"end": 451,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 3
+												},
+												"end": {
+													"line": 14,
+													"column": 13
+												}
+											},
+											"expression": {
+												"type": "CallExpression",
+												"start": 441,
+												"end": 450,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 3
+													},
+													"end": {
+														"line": 14,
+														"column": 12
+													}
+												},
+												"callee": {
+													"type": "Identifier",
+													"start": 441,
+													"end": 448,
+													"loc": {
+														"start": {
+															"line": 14,
+															"column": 3
+														},
+														"end": {
+															"line": 14,
+															"column": 10
+														}
+													},
+													"name": "doThing"
+												},
+												"arguments": [],
+												"optional": false
+											}
+										}
+									]
+								}
+							},
+							{
+								"type": "CallExpression",
+								"start": 459,
+								"end": 468,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 16,
+										"column": 11
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 459,
+									"end": 462,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 2
+										},
+										"end": {
+											"line": 16,
+											"column": 5
+										}
+									},
+									"name": "bar"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 463,
+										"end": 464,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 6
+											},
+											"end": {
+												"line": 16,
+												"column": 7
+											}
+										},
+										"name": "x"
+									},
+									{
+										"type": "Identifier",
+										"start": 466,
+										"end": 467,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 9
+											},
+											"end": {
+												"line": 16,
+												"column": 10
+											}
+										},
+										"name": "y"
+									}
+								],
+								"optional": false
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " tail is a call with 2 args — not short, so all args break",
+							"start": 361,
+							"end": 421
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 544,
+					"end": 585,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 16
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 544,
+						"end": 584,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 1
+							},
+							"end": {
+								"line": 22,
+								"column": 15
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 544,
+							"end": 547,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 1
+								},
+								"end": {
+									"line": 20,
+									"column": 4
+								}
+							},
+							"name": "foo"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 548,
+								"end": 571,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 5
+									},
+									"end": {
+										"line": 22,
+										"column": 2
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 554,
+									"end": 571,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 11
+										},
+										"end": {
+											"line": 22,
+											"column": 2
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 558,
+											"end": 568,
+											"loc": {
+												"start": {
+													"line": 21,
+													"column": 2
+												},
+												"end": {
+													"line": 21,
+													"column": 12
+												}
+											},
+											"expression": {
+												"type": "CallExpression",
+												"start": 558,
+												"end": 567,
+												"loc": {
+													"start": {
+														"line": 21,
+														"column": 2
+													},
+													"end": {
+														"line": 21,
+														"column": 11
+													}
+												},
+												"callee": {
+													"type": "Identifier",
+													"start": 558,
+													"end": 565,
+													"loc": {
+														"start": {
+															"line": 21,
+															"column": 2
+														},
+														"end": {
+															"line": 21,
+															"column": 9
+														}
+													},
+													"name": "doThing"
+												},
+												"arguments": [],
+												"optional": false
+											}
+										}
+									]
+								}
+							},
+							{
+								"type": "NewExpression",
+								"start": 573,
+								"end": 583,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 4
+									},
+									"end": {
+										"line": 22,
+										"column": 14
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 577,
+									"end": 580,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 8
+										},
+										"end": {
+											"line": 22,
+											"column": 11
+										}
+									},
+									"name": "Bar"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 581,
+										"end": 582,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 12
+											},
+											"end": {
+												"line": 22,
+												"column": 13
+											}
+										},
+										"name": "x"
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " tail is a `new` with 1 arg — short, expand-first keeps it inline",
+							"start": 475,
+							"end": 542
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 651,
+					"end": 704,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 1
+						},
+						"end": {
+							"line": 30,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 651,
+						"end": 703,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 1
+							},
+							"end": {
+								"line": 30,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 651,
+							"end": 654,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 1
+								},
+								"end": {
+									"line": 25,
+									"column": 4
+								}
+							},
+							"name": "foo"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 658,
+								"end": 683,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 2
+									},
+									"end": {
+										"line": 28,
+										"column": 3
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 664,
+									"end": 683,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 8
+										},
+										"end": {
+											"line": 28,
+											"column": 3
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 669,
+											"end": 679,
+											"loc": {
+												"start": {
+													"line": 27,
+													"column": 3
+												},
+												"end": {
+													"line": 27,
+													"column": 13
+												}
+											},
+											"expression": {
+												"type": "CallExpression",
+												"start": 669,
+												"end": 678,
+												"loc": {
+													"start": {
+														"line": 27,
+														"column": 3
+													},
+													"end": {
+														"line": 27,
+														"column": 12
+													}
+												},
+												"callee": {
+													"type": "Identifier",
+													"start": 669,
+													"end": 676,
+													"loc": {
+														"start": {
+															"line": 27,
+															"column": 3
+														},
+														"end": {
+															"line": 27,
+															"column": 10
+														}
+													},
+													"name": "doThing"
+												},
+												"arguments": [],
+												"optional": false
+											}
+										}
+									]
+								}
+							},
+							{
+								"type": "NewExpression",
+								"start": 687,
+								"end": 700,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 2
+									},
+									"end": {
+										"line": 29,
+										"column": 15
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 691,
+									"end": 694,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 6
+										},
+										"end": {
+											"line": 29,
+											"column": 9
+										}
+									},
+									"name": "Bar"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 695,
+										"end": 696,
+										"loc": {
+											"start": {
+												"line": 29,
+												"column": 10
+											},
+											"end": {
+												"line": 29,
+												"column": 11
+											}
+										},
+										"name": "x"
+									},
+									{
+										"type": "Identifier",
+										"start": 698,
+										"end": 699,
+										"loc": {
+											"start": {
+												"line": 29,
+												"column": 13
+											},
+											"end": {
+												"line": 29,
+												"column": 14
+											}
+										},
+										"name": "y"
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " tail is a `new` with 2 args — not short, so all args break",
+							"start": 588,
+							"end": 649
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

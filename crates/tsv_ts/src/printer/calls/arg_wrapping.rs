@@ -226,12 +226,13 @@ pub(super) fn classify_chain_arg(arg: &internal::Expression<'_>) -> ChainArgKind
         | internal::Expression::ArrayExpression(_)
         | internal::Expression::FunctionExpression(_)
         | internal::Expression::ClassExpression(_) => ChainArgKind::HugsNaturally,
-        // TS type wrappers: classify based on the inner expression
-        // e.g., `{...} as any` hugs, `longExpr as T` soft-wraps
+        // TS cast wrappers: classify based on the inner expression
+        // e.g., `{...} as any` hugs, `longExpr as T` soft-wraps. Mirrors prettier's
+        // couldExpandArg, which looks through `as`/`satisfies`/`<T>` but NOT a
+        // non-null assertion, so `{...}!` / `[...]!` soft-wraps rather than hugging.
         internal::Expression::TSAsExpression(e) => classify_chain_arg(e.expression),
         internal::Expression::TSSatisfiesExpression(e) => classify_chain_arg(e.expression),
         internal::Expression::TSTypeAssertion(e) => classify_chain_arg(e.expression),
-        internal::Expression::TSNonNullExpression(e) => classify_chain_arg(e.expression),
         // Arrow functions: prettier's couldExpandArg keys on the body type and
         // looks through the return-type annotation, so arrows are classified by
         // their body regardless of any return type.
