@@ -253,10 +253,19 @@ impl<'a> Printer<'a> {
     /// to append directly before the target node.
     ///
     /// Used by: class body members, block statement bodies, interface members, type literals.
+    ///
+    /// `force_non_inline`: when true, the *last* comment never glues to
+    /// `target_start` (no trailing space, no trailing hardline) — used when
+    /// `target_start` doesn't correspond to a node that will actually be
+    /// printed next (e.g. comments orphaned by a dropped `EmptyStatement`).
+    /// The caller's own next emission supplies the separator hardline; only a
+    /// blank line, which that caller can't rediscover on its own, is still
+    /// recorded here (as a bare `literalline`, so the caller's hardline completes it).
     pub(crate) fn build_leading_comments_with_blank_lines(
         &self,
         comments: &[&internal::Comment],
         target_start: u32,
+        force_non_inline: bool,
     ) -> DocBuf {
         if comments.is_empty() {
             return DocBuf::new();
@@ -306,7 +315,15 @@ impl<'a> Printer<'a> {
 
             docs.push(self.build_comment_doc(comment));
 
-            if !comment.is_block {
+            if force_non_inline && is_last_comment {
+                // Nothing glues to `target_start` here — defer the separator
+                // to the caller's next emission. Only a blank line needs
+                // recording (the caller's own gap check starts later in the
+                // source and can't see it).
+                if has_blank_after {
+                    docs.push(d.literalline());
+                }
+            } else if !comment.is_block {
                 // Line comment: add hardline after unless there's a blank line after
                 // (the blank line separator will handle it)
                 if !has_blank_after {
@@ -323,7 +340,7 @@ impl<'a> Printer<'a> {
         }
 
         // Add blank line after last comment if present
-        if has_blank_after_last_comment {
+        if has_blank_after_last_comment && !force_non_inline {
             docs.push(d.literalline());
             docs.push(d.hardline());
         }

@@ -11,7 +11,7 @@
 // expressions/ and statements/ modules.
 
 use crate::ast::internal;
-use crate::printer::{CommentVec, Printer};
+use crate::printer::{CommentVec, Printer, is_effectively_empty_body};
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -98,7 +98,11 @@ impl<'a> Printer<'a> {
         let block_start = block.span.start + 1; // After '{'
         let block_end = block.span.end - 1; // Before '}'
 
-        if block.body.is_empty() {
+        // Comments attached to a body whose only statements are dropped
+        // `EmptyStatement`s are still picked up by
+        // `build_inner_comments_for_empty_block`, which scans the full brace
+        // range rather than the statement list.
+        if is_effectively_empty_body(block.body) {
             let inner_comments = self.build_inner_comments_for_empty_block(block);
             let has_inner_comments = !inner_comments.is_empty();
 
@@ -234,6 +238,51 @@ impl<'a> Printer<'a> {
             let stmt_start = stmt.span().start;
             let is_first = i == 0;
 
+            // Standalone EmptyStatements are dropped entirely (Prettier's
+            // `printStatementSequence` never prints them), but any comments
+            // attached to one must survive — printed as orphaned comments
+            // with nothing following them in this iteration to glue to.
+            if matches!(stmt, internal::Statement::EmptyStatement(_)) {
+                let stmt_end = stmt.span().end;
+                let next_start = body.get(i + 1).map_or(body_end, |s| s.span().start);
+                let search_end = if body_has_comments {
+                    self.find_end_with_trailing_comments(stmt_end)
+                        .min(next_start)
+                } else {
+                    stmt_end
+                };
+
+                let mut leading_comments = if body_has_comments {
+                    self.collect_leading_comments(prev_end, search_end, prev_stmt_end)
+                } else {
+                    CommentVec::new()
+                };
+                if is_first && let Some(dpos) = delimiter_pull_pos {
+                    leading_comments.retain(|c| !self.comment_on_delimiter_line(dpos, c));
+                }
+
+                if !leading_comments.is_empty() {
+                    if prev_stmt_end.is_some() {
+                        let blank_line_check_end = leading_comments[0].span.start;
+                        if self.has_blank_line_between(prev_end, blank_line_check_end) {
+                            body_parts.push(d.literalline());
+                        }
+                        body_parts.push(d.hardline());
+                    } else if has_leading {
+                        body_parts.push(d.hardline());
+                    }
+                    body_parts.extend(self.build_leading_comments_with_blank_lines(
+                        &leading_comments,
+                        search_end,
+                        true,
+                    ));
+                    prev_stmt_end = Some(stmt_end);
+                }
+
+                prev_end = search_end;
+                continue;
+            }
+
             // Collect leading comments (skip trailing same-line from previous
             // statement). Skipped entirely on a comment-free block.
             let mut leading_comments = if body_has_comments {
@@ -249,10 +298,14 @@ impl<'a> Printer<'a> {
             }
 
             // Handle blank lines and separators (comment-independent)
-            if is_first && has_leading {
-                // First statement after leading content - always need separator
-                body_parts.push(d.hardline());
-            } else if !is_first {
+            if prev_stmt_end.is_none() {
+                // First visible content after (optional) hoisted leading content —
+                // always need a separator if there was hoisted content, never
+                // check for a blank line (matches the historical `is_first` behavior).
+                if has_leading {
+                    body_parts.push(d.hardline());
+                }
+            } else {
                 // Check for blank lines between statements
                 let blank_line_check_end = if !leading_comments.is_empty() {
                     leading_comments[0].span.start
@@ -266,9 +319,11 @@ impl<'a> Printer<'a> {
             }
 
             // Print leading comments before this statement (with blank line preservation)
-            body_parts.extend(
-                self.build_leading_comments_with_blank_lines(&leading_comments, stmt_start),
-            );
+            body_parts.extend(self.build_leading_comments_with_blank_lines(
+                &leading_comments,
+                stmt_start,
+                false,
+            ));
 
             // format-ignore: emit raw source instead of formatting
             if body_has_comments && self.has_format_ignore_in_range(prev_end, stmt_start) {
