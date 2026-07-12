@@ -11,7 +11,7 @@ use tsv_svelte_compile::{CompileError, CompileOptions, Generate, canonicalize_js
 /// Both sides' compiled JS is canonicalized (an intent-erased reprint) before
 /// comparison, so a diff reflects a real code difference, not incidental
 /// whitespace. Exit codes: 0 = parity, 1 = a real difference, 2 = an error
-/// (which currently includes the still-unimplemented tsv compile side).
+/// (including a component shape tsv's compiler doesn't cover yet).
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "compile_compare")]
 pub struct CompileCompareCommand {
@@ -41,9 +41,9 @@ pub struct CompileCompareCommand {
 struct CompareReport {
     /// The compile target ("server" | "client").
     target: &'static str,
-    /// Whether the two canonical forms match (`false` while tsv compile is unimplemented).
+    /// Whether the two canonical forms match.
     parity: bool,
-    /// The tsv side's outcome ("ok" | "unimplemented").
+    /// The tsv side's outcome ("ok" | "unsupported").
     ours_status: &'static str,
     /// The unified diff of the two canonical forms, when both sides exist and differ.
     hunks: Option<String>,
@@ -100,7 +100,7 @@ impl CompileCompareCommand {
             }
         }
 
-        // Ours side: compile with tsv (a walking skeleton for now).
+        // Ours side: compile with tsv.
         let options = CompileOptions {
             generate: to_generate(target),
             dev: false,
@@ -113,7 +113,9 @@ impl CompileCompareCommand {
                     Err(CliError::Errored)
                 }
             },
-            Err(CompileError::Codegen) => report_unimplemented(target, &oracle_canonical, json),
+            Err(err @ CompileError::Unsupported(_)) => {
+                report_unsupported(target, &err, &oracle_canonical, json)
+            }
             Err(err) => {
                 eprintln!("Error: tsv compile failed: {err}");
                 Err(CliError::Errored)
@@ -166,20 +168,25 @@ fn report_both(
     }
 }
 
-/// Report the walking-skeleton state: tsv compile is unimplemented (exit 2). The
-/// oracle canonical form is shown so it's visible what tsv must reproduce.
-fn report_unimplemented(target: SvelteGenerate, oracle: &str, json: bool) -> Result<(), CliError> {
+/// Report a shape tsv's compiler doesn't cover yet (exit 2). The oracle
+/// canonical form is shown so it's visible what tsv must reproduce.
+fn report_unsupported(
+    target: SvelteGenerate,
+    err: &CompileError,
+    oracle: &str,
+    json: bool,
+) -> Result<(), CliError> {
     if json {
         let report = CompareReport {
             target: target_name(target),
             parity: false,
-            ours_status: "unimplemented",
+            ours_status: "unsupported",
             hunks: None,
         };
         print_json(&report)?;
     } else {
         println!(
-            "compile_compare [{}] tsv compile unimplemented — oracle canonical form:",
+            "compile_compare [{}] {err} — oracle canonical form:",
             target_name(target)
         );
         print_block(oracle);

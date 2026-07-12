@@ -1,5 +1,6 @@
 //! Pure-Rust compile fixture validation — the sidecar-free slice of the compile
-//! fixture contract, so it runs in every `cargo test --workspace`.
+//! fixture contract, so it runs in every `cargo test --workspace`. This is the
+//! offline parity gate: `compile()` needs no Deno.
 //!
 //! Per fixture in `tests/fixtures_compile/`:
 //!
@@ -8,14 +9,19 @@
 //!   point (idempotent; it reparses by construction — the canonicalizer
 //!   self-validates its output).
 //! - `expected.css`, when present, is non-empty.
+//! - **Ours-vs-expected parity**: `tsv_svelte_compile::compile` succeeds, its
+//!   canonicalized JS equals the committed `expected_server.js`, and its CSS
+//!   matches `expected.css`.
 //!
 //! Oracle freshness (does the canonical Svelte compiler still produce these
 //! expectations?) is sidecar-dependent and lives in the
 //! `compile_fixtures_validate` command instead.
 
 use std::path::Path;
-use tsv_debug::compile_fixtures::{COMPILE_FIXTURES_DIR, walk_compile_fixtures};
-use tsv_svelte_compile::canonicalize_js;
+use tsv_debug::compile_fixtures::{
+    COMPILE_FIXTURES_DIR, walk_compile_fixtures, with_trailing_newline,
+};
+use tsv_svelte_compile::{CompileOptions, canonicalize_js, compile};
 
 #[test]
 fn test_all_compile_fixtures() {
@@ -36,18 +42,22 @@ fn test_all_compile_fixtures() {
         let name = &fixture.relative_path;
 
         // input.svelte must parse (the compiler front end accepts it).
-        match std::fs::read_to_string(fixture.input_path()) {
+        let input = match std::fs::read_to_string(fixture.input_path()) {
             Ok(input) => {
                 let arena = bumpalo::Bump::new();
                 if let Err(e) = tsv_svelte::parse(&input, &arena) {
                     failures.push(format!("{name}: input.svelte fails to parse: {e}"));
                 }
+                Some(input)
             }
-            Err(e) => failures.push(format!("{name}: cannot read input.svelte: {e}")),
-        }
+            Err(e) => {
+                failures.push(format!("{name}: cannot read input.svelte: {e}"));
+                None
+            }
+        };
 
         // expected_server.js must be a canonicalize fixed point.
-        match std::fs::read_to_string(fixture.expected_server_js_path()) {
+        let expected_js = match std::fs::read_to_string(fixture.expected_server_js_path()) {
             Ok(expected) => {
                 if expected.is_empty() {
                     failures.push(format!("{name}: expected_server.js is empty"));
@@ -63,25 +73,57 @@ fn test_all_compile_fixtures() {
                         )),
                     }
                 }
+                Some(expected)
             }
-            Err(e) => failures.push(format!("{name}: cannot read expected_server.js: {e}")),
-        }
+            Err(e) => {
+                failures.push(format!("{name}: cannot read expected_server.js: {e}"));
+                None
+            }
+        };
 
         // expected.css, when present, must be non-empty.
         let css_path = fixture.expected_css_path();
-        if css_path.exists() {
+        let expected_css = if css_path.exists() {
             match std::fs::read_to_string(&css_path) {
                 Ok(css) if css.trim().is_empty() => {
                     failures.push(format!("{name}: expected.css is empty"));
+                    None
                 }
-                Ok(_) => {}
-                Err(e) => failures.push(format!("{name}: cannot read expected.css: {e}")),
+                Ok(css) => Some(css),
+                Err(e) => {
+                    failures.push(format!("{name}: cannot read expected.css: {e}"));
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
+        // Ours-vs-expected parity — the offline compiler gate.
+        if let (Some(input), Some(expected_js)) = (&input, &expected_js) {
+            match compile(input, &CompileOptions::default()) {
+                Ok(ours) => {
+                    match canonicalize_js(&ours.js) {
+                        Ok(canonical) if &canonical == expected_js => {}
+                        Ok(canonical) => failures.push(format!(
+                            "{name}: compiled js differs from expected_server.js\n\
+                             --- ours ---\n{canonical}--- expected ---\n{expected_js}"
+                        )),
+                        Err(e) => failures.push(format!(
+                            "{name}: compiled js fails to canonicalize: {e}"
+                        )),
+                    }
+                    let ours_css = ours.css.as_deref().map(with_trailing_newline);
+                    if ours_css != expected_css {
+                        failures.push(format!(
+                            "{name}: compiled css differs from expected.css\n\
+                             --- ours ---\n{ours_css:?}\n--- expected ---\n{expected_css:?}"
+                        ));
+                    }
+                }
+                Err(e) => failures.push(format!("{name}: compile failed: {e}")),
             }
         }
-
-        // TODO: once compile() produces output, assert here that
-        // `canonicalize_js(tsv_svelte_compile::compile(input).js) == expected` —
-        // the pure-Rust ours-vs-expected parity gate.
     }
 
     assert!(

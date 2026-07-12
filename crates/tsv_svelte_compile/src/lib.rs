@@ -7,10 +7,16 @@
 //! diff between two canonical forms reflects only a real code difference, never
 //! incidental whitespace.
 //!
-//! The compiler itself is a walking skeleton for this slice: [`compile`] parses
-//! the component (so genuine parse errors surface) and then reports that code
-//! generation is not yet implemented. The canonicalizer is complete and is the
-//! comparison substrate the compiler will be measured against.
+//! [`compile`] generates server (SSR) output by constructing a synthetic
+//! `tsv_ts` AST over the hybrid appendix buffer (`build`) and printing it
+//! through `tsv_ts::format_canonical` — generated JS is canonical-form by
+//! construction, so the parity comparison verifies rather than transforms it.
+//! The server transform (`transform_server`) covers a deliberately small
+//! language subset today; unhandled shapes surface as
+//! [`CompileError::Unsupported`] rather than guessed output.
+
+mod build;
+mod transform_server;
 
 use tsv_ts::Goal;
 
@@ -68,9 +74,10 @@ pub enum CompileError {
     /// source, its `<script>`, or its `<style>`).
     #[error("failed to parse Svelte component: {0}")]
     Parse(#[from] tsv_lang::ParseError),
-    /// The component parsed, but code generation is not yet implemented.
-    #[error("Svelte code generation is not yet implemented")]
-    Codegen,
+    /// The component parsed, but uses a shape the compiler does not cover yet.
+    /// Always a clear refusal — never guessed output.
+    #[error("not yet supported by the Svelte compiler: {0}")]
+    Unsupported(String),
 }
 
 /// An error from [`canonicalize_js`].
@@ -89,16 +96,21 @@ pub enum CanonicalizeError {
 
 /// Compile a Svelte component to JavaScript.
 ///
-/// Parses `source` (surfacing any real parse error as [`CompileError::Parse`]);
-/// code generation is not yet implemented, so a well-formed component currently
-/// returns [`CompileError::Codegen`]. The walking skeleton makes this real.
+/// Parses `source` (surfacing any real parse error as [`CompileError::Parse`])
+/// and runs the server transform. The generated JS is already in canonical form
+/// (it prints through `tsv_ts::format_canonical`), so
+/// `canonicalize_js(output.js)` is a fixed point. Client generation and dev
+/// mode are not implemented yet ([`CompileError::Unsupported`]).
 pub fn compile(source: &str, options: &CompileOptions) -> Result<CompileOutput, CompileError> {
-    // Reserved for the code-generation phase; validated here so the signature is
-    // stable while the skeleton fills in.
-    let _ = options;
+    if options.generate == Generate::Client {
+        return Err(CompileError::Unsupported("client generation".to_string()));
+    }
+    if options.dev {
+        return Err(CompileError::Unsupported("dev mode output".to_string()));
+    }
     let arena = bumpalo::Bump::new();
-    let _root = tsv_svelte::parse(source, &arena)?;
-    Err(CompileError::Codegen)
+    let root = tsv_svelte::parse(source, &arena)?;
+    transform_server::compile_server(&root, source, &arena)
 }
 
 /// Reprint JavaScript with newline-derived authoring intent erased — the
@@ -325,11 +337,85 @@ mod tests {
     }
 
     #[test]
-    fn compile_reports_unimplemented_codegen() {
-        let err = compile("<div>hi</div>", &CompileOptions::default()).unwrap_err();
+    fn compile_static_element() {
+        let out = compile("<p>text</p>", &CompileOptions::default()).unwrap();
+        assert_eq!(
+            out.js,
+            "import * as $ from 'svelte/internal/server';\n\
+             export default function Input($$renderer) {\n\
+             \t$$renderer.push(`<p>text</p>`);\n\
+             }\n"
+        );
+        assert!(out.css.is_none(), "unstyled component has no css");
+        // Generated output is canonical-form by construction (a fixed point).
+        assert_eq!(canonicalize_js(&out.js).unwrap(), out.js);
+    }
+
+    #[test]
+    fn compile_props_and_interpolation() {
+        let out = compile(
+            "<script>\n\tlet { prop } = $props();\n</script>\n\n<p>{prop}</p>\n",
+            &CompileOptions::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            out.js,
+            "import * as $ from 'svelte/internal/server';\n\
+             export default function Input($$renderer, $$props) {\n\
+             \tlet { prop } = $$props;\n\
+             \t$$renderer.push(`<p>${$.escape(prop)}</p>`);\n\
+             }\n"
+        );
+        assert_eq!(canonicalize_js(&out.js).unwrap(), out.js);
+    }
+
+    #[test]
+    fn compile_template_escapes_backtick_and_backslash() {
+        // Static text containing template-literal metacharacters must be escaped
+        // in the minted quasi so the output reparses to the same text. (`${` can't
+        // appear as static Svelte text — `{` opens an expression tag — so the
+        // template-escape cases reachable from a component are backtick/backslash.)
+        let out = compile("<p>a`b\\c</p>", &CompileOptions::default()).unwrap();
         assert!(
-            matches!(err, CompileError::Codegen),
-            "expected Codegen, got {err:?}"
+            out.js.contains("`<p>a\\`b\\\\c</p>`"),
+            "template metachars must be escaped: {}",
+            out.js
+        );
+        assert_eq!(canonicalize_js(&out.js).unwrap(), out.js);
+    }
+
+    #[test]
+    fn compile_rejects_unsupported_block() {
+        let err = compile("{#if a}<p>text</p>{/if}", &CompileOptions::default()).unwrap_err();
+        assert!(
+            matches!(&err, CompileError::Unsupported(what) if what.contains("{#if}")),
+            "expected Unsupported({{#if}}), got {err:?}"
+        );
+    }
+
+    #[test]
+    fn compile_rejects_unsupported_rune() {
+        let err = compile(
+            "<script>let a = $state(0);</script>\n<p>{a}</p>",
+            &CompileOptions::default(),
+        )
+        .unwrap_err();
+        assert!(
+            matches!(&err, CompileError::Unsupported(what) if what.contains("$state")),
+            "expected Unsupported($state), got {err:?}"
+        );
+    }
+
+    #[test]
+    fn compile_rejects_client_generation() {
+        let options = CompileOptions {
+            generate: Generate::Client,
+            dev: false,
+        };
+        let err = compile("<p>text</p>", &options).unwrap_err();
+        assert!(
+            matches!(err, CompileError::Unsupported(_)),
+            "expected Unsupported, got {err:?}"
         );
     }
 

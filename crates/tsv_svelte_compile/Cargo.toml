@@ -6,6 +6,7 @@ description = "Svelte-to-JS compiler (pinned to Svelte's compile() as oracle) an
 
 [dependencies]
 tsv_lang.workspace = true
+tsv_html.workspace = true
 tsv_ts.workspace = true
 tsv_svelte.workspace = true
 tsv_css.workspace = true

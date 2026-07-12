@@ -8,24 +8,22 @@ use crate::diff::{DiffOptions, diff_to_string};
 use argh::FromArgs;
 use std::path::Path;
 use tsv_cli::json_utils::to_json_with_tabs;
-use tsv_svelte_compile::{CompileError, CompileOptions, canonicalize_js, compile};
+use tsv_svelte_compile::{CompileOptions, canonicalize_js, compile};
 
 /// Validate compile fixtures against the canonical Svelte compiler.
 ///
-/// Per fixture, three checks:
+/// Per fixture, three checks — all gating:
 ///
 /// (a) **Oracle freshness** — `canonicalize_js(oracle(input.svelte).js)` must equal
 ///     the committed `expected_server.js`, and the oracle CSS must match
 ///     `expected.css` (both absent counts as a match). Catches a stale expectation
 ///     after an oracle (Svelte pin) or canonicalizer change.
-/// (b) **Ours** — `tsv_svelte_compile::compile` → canonicalize vs expected. Today
-///     every fixture reports `unimplemented` (the walking skeleton) — a distinct,
-///     expected status, NOT a failure; the gate flips when codegen lands.
+/// (b) **Ours** — `tsv_svelte_compile::compile` must succeed and its canonicalized
+///     JS + CSS must equal the committed expectations (`parity`; anything else —
+///     `mismatch` / `error` — fails the run).
 /// (c) **Expected idempotence** — the committed `expected_server.js` must be a
 ///     `canonicalize_js` fixed point (it reparses by construction — canonicalize
 ///     self-validates).
-///
-/// Exits non-zero on (a)/(c) failures only, for now.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "compile_fixtures_validate")]
 pub struct CompileFixturesValidateCommand {
@@ -50,7 +48,7 @@ struct FixtureReport {
     oracle_fresh: bool,
     /// Check (c): the committed expected_server.js is a canonicalize fixed point.
     expected_idempotent: bool,
-    /// Check (b): "unimplemented" | "parity" | "mismatch" | "error".
+    /// Check (b): "parity" | "mismatch" | "error".
     ours_status: &'static str,
     /// Human-readable failure details (empty when everything passed).
     errors: Vec<String>,
@@ -107,13 +105,11 @@ impl CompileFixturesValidateCommand {
             reports.push(validate_fixture(fixture).await);
         }
 
+        // All three checks gate: oracle freshness, expected idempotence, AND
+        // ours parity (the compiler must reproduce every fixture).
         let gating_failures = reports
             .iter()
-            .filter(|r| !r.oracle_fresh || !r.expected_idempotent)
-            .count();
-        let unimplemented = reports
-            .iter()
-            .filter(|r| r.ours_status == "unimplemented")
+            .filter(|r| !r.oracle_fresh || !r.expected_idempotent || r.ours_status != "parity")
             .count();
         let parity = reports.iter().filter(|r| r.ours_status == "parity").count();
 
@@ -123,14 +119,12 @@ impl CompileFixturesValidateCommand {
                 total: usize,
                 gating_failures: usize,
                 ours_parity: usize,
-                ours_unimplemented: usize,
                 fixtures: Vec<FixtureReport>,
             }
             let summary = Summary {
                 total: reports.len(),
                 gating_failures,
                 ours_parity: parity,
-                ours_unimplemented: unimplemented,
                 fixtures: reports,
             };
             match to_json_with_tabs(&summary) {
@@ -142,7 +136,9 @@ impl CompileFixturesValidateCommand {
             }
         } else {
             for report in &reports {
-                let ok = report.oracle_fresh && report.expected_idempotent;
+                let ok = report.oracle_fresh
+                    && report.expected_idempotent
+                    && report.ours_status == "parity";
                 let mark = if ok { "✓" } else { "✗" };
                 println!("{mark} {} [ours: {}]", report.fixture, report.ours_status);
                 for error in &report.errors {
@@ -150,7 +146,7 @@ impl CompileFixturesValidateCommand {
                 }
             }
             println!(
-                "\n{} fixtures: {} gating failure(s), ours: {parity} parity / {unimplemented} unimplemented",
+                "\n{} fixtures: {} gating failure(s), {parity} ours-parity",
                 reports.len(),
                 gating_failures
             );
@@ -255,25 +251,37 @@ async fn validate_fixture(fixture: &CompileFixture) -> FixtureReport {
         }
     };
 
-    // (b) Ours — reported, not gating, until codegen lands.
-    // TODO: flip to gating once compile() produces output — "mismatch"/"error"
-    // become gating failures, and so does "unimplemented" (every fixture must
-    // compile).
+    // (b) Ours — the compiler must reproduce the expectations (gating): the
+    // canonicalized JS must equal expected_server.js and the CSS must match
+    // expected.css.
     let ours_status = match compile(&input, &CompileOptions::default()) {
         Ok(ours) => match canonicalize_js(&ours.js) {
-            Ok(canonical) if canonical == expected_js => "parity",
-            Ok(_) => {
-                errors.push(
-                    "ours differs from expected (non-gating until codegen lands)".to_string(),
-                );
-                "mismatch"
+            Ok(canonical) => {
+                let js_parity = canonical == expected_js;
+                if !js_parity {
+                    errors.push("ours differs from expected_server.js".to_string());
+                    errors.push(diff_to_string(
+                        &canonical,
+                        &expected_js,
+                        &DiffOptions::compile_compare(),
+                    ));
+                }
+                let ours_css = ours.css.as_deref().map(with_trailing_newline);
+                let css_parity = ours_css == expected_css;
+                if !css_parity {
+                    errors.push("ours css differs from expected.css".to_string());
+                }
+                if js_parity && css_parity {
+                    "parity"
+                } else {
+                    "mismatch"
+                }
             }
             Err(e) => {
                 errors.push(format!("could not canonicalize our output: {e}"));
                 "error"
             }
         },
-        Err(CompileError::Codegen) => "unimplemented",
         Err(e) => {
             errors.push(format!("tsv compile failed: {e}"));
             "error"
