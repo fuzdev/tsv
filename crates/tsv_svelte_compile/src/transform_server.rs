@@ -53,12 +53,13 @@ use bumpalo::collections::Vec as BumpVec;
 use tsv_css::ast::internal::{CssBlockChild, CssNode, SimpleSelector};
 use tsv_lang::{InfallibleResolve, Span};
 use tsv_svelte::ast::internal::{
-    Attribute, AttributeNode, AttributeValue, Element, ExpressionTag, Fragment, FragmentNode,
-    HtmlTag, Root, Style,
+    Attribute, AttributeNode, AttributeValue, AwaitBlock, ConstTag, EachBlock, Element,
+    ExpressionTag, Fragment, FragmentNode, HtmlTag, IfBlock, KeyBlock, Root, Style,
 };
 use tsv_ts::ast::internal::{
-    BlockStatement, ExportDefaultDeclaration, ExportDefaultValue, Expression, ExpressionStatement,
-    FunctionDeclaration, Statement, VariableDeclaration, VariableDeclarator,
+    BinaryOperator, BlockStatement, ExportDefaultDeclaration, ExportDefaultValue, Expression,
+    ExpressionStatement, ForInit, ForStatement, FunctionDeclaration, IfStatement, Statement,
+    UpdateOperator, VariableDeclaration, VariableDeclarationKind, VariableDeclarator,
 };
 
 use std::collections::HashMap;
@@ -136,14 +137,11 @@ struct EmitEnv<'arena, 's> {
     overlays: Vec<HashMap<String, ScopeEntry<'arena>>>,
     /// Inside an `{#each}` body — a nested each would need the oracle's
     /// unique-name allocation order, which is not confidently reproducible.
-    // TODO: read by the {#each} emitter (block emission in progress).
-    #[allow(dead_code)]
     in_each: bool,
-    /// Source-order counters for the oracle's unique names.
-    // TODO: read by the {#each} emitter (block emission in progress).
-    #[allow(dead_code)]
+    /// Source-order counters for the oracle's per-each unique names
+    /// (`each_array`/`each_array_1`, `$$index`/`$$index_1`), advanced once per
+    /// each block regardless of an authored index.
     each_array_count: usize,
-    #[allow(dead_code)]
     index_count: usize,
 }
 
@@ -157,8 +155,6 @@ impl<'arena> EmitEnv<'arena, '_> {
 
     /// Push a block-scope overlay; refuses names that shadow a derived binding
     /// (the guard's derived-read refusal is name-based and can't see scopes).
-    // TODO: called by the block emitters (block emission in progress).
-    #[allow(dead_code)]
     fn push_overlay(
         &mut self,
         entries: HashMap<String, ScopeEntry<'arena>>,
@@ -174,15 +170,11 @@ impl<'arena> EmitEnv<'arena, '_> {
         Ok(())
     }
 
-    // TODO: called by the block emitters (block emission in progress).
-    #[allow(dead_code)]
     fn pop_overlay(&mut self) {
         self.overlays.pop();
     }
 
     /// The `each_array` unique name for the next `{#each}` (source order).
-    // TODO: called by the {#each} emitter (block emission in progress).
-    #[allow(dead_code)]
     fn next_each_array_name(&mut self) -> String {
         let n = self.each_array_count;
         self.each_array_count += 1;
@@ -194,8 +186,6 @@ impl<'arena> EmitEnv<'arena, '_> {
     }
 
     /// The `$$index` unique name for the next index-less `{#each}`.
-    // TODO: called by the {#each} emitter (block emission in progress).
-    #[allow(dead_code)]
     fn next_index_name(&mut self) -> String {
         let n = self.index_count;
         self.index_count += 1;
@@ -238,6 +228,15 @@ pub(crate) fn compile_server<'arena>(
     // converge refuse — see `collect_script_comments`.
     let script_comments = collect_script_comments(root, source)?;
     let has_comments = !script_comments.is_empty();
+    // Comments alongside template blocks refuse: a block splits the template
+    // into multiple pushes and moves content into branch bodies, and the
+    // resulting comment-window placement is unprobed — refuse rather than risk a
+    // misplaced comment.
+    if has_comments && fragment_contains_block(&root.fragment) {
+        return Err(unsupported(
+            "comments in a script alongside template blocks (placement not carried through yet)",
+        ));
+    }
 
     // 3. Script analysis pass: the top-level binding table (evaluator input)
     // and the derived-name set (read rewriting / refusal).
@@ -353,6 +352,7 @@ pub(crate) fn compile_server<'arena>(
         &root.fragment,
         &mut out,
         FragmentCtx {
+            mark_text_first: true,
             is_component_root: true,
             preserve_whitespace: false,
             parent_name: None,
@@ -376,7 +376,12 @@ pub(crate) fn compile_server<'arena>(
     // wrapper around the whole body (the effects themselves are dropped).
     let body = if has_effects {
         let inner_span = Span::new(block_start, env.b.buffer.len() as u32);
-        let arrow = env.b.arrow_block("$$renderer", body, inner_span);
+        let wrapper_renderer = env.b.ident("$$renderer");
+        let mut wrapper_params: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
+        wrapper_params.push(Expression::Identifier(wrapper_renderer));
+        let arrow = env
+            .b
+            .arrow_block(wrapper_params.into_bump_slice(), body, inner_span);
         let arrow_alloc = env.b.arena.alloc(arrow);
         let call = env
             .b
@@ -943,8 +948,6 @@ impl<'arena> BodyBuilder<'arena> {
     }
 
     /// Flush the pending template, then append a statement.
-    // TODO: called by the block emitters (block emission in progress).
-    #[allow(dead_code)]
     fn push_statement(
         &mut self,
         b: &mut Builder<'arena>,
@@ -1024,13 +1027,18 @@ fn escape_html_attr(s: &str) -> String {
     out
 }
 
-/// A fragment child after comment-dropping and text decoding, mutable for the
-/// whitespace normalization pass.
+/// A fragment child after comment-dropping, const-tag hoisting, and text
+/// decoding, mutable for the whitespace normalization pass. Blocks are non-text
+/// nodes for whitespace purposes (`is_expr` is false).
 enum CleanNode<'arena> {
     Text(String),
     Expr(&'arena ExpressionTag<'arena>),
     Html(&'arena HtmlTag<'arena>),
     Element(&'arena Element<'arena>),
+    If(&'arena IfBlock<'arena>),
+    Each(&'arena EachBlock<'arena>),
+    Await(&'arena AwaitBlock<'arena>),
+    Key(&'arena KeyBlock<'arena>),
 }
 
 impl CleanNode<'_> {
@@ -1044,7 +1052,13 @@ impl CleanNode<'_> {
 
 /// Per-fragment emission context.
 struct FragmentCtx<'p> {
-    /// The component's root fragment (drives the `<!---->` text-first marker).
+    /// Whether a text-first fragment gets the leading `<!---->` anchor. True for
+    /// the component root and `{#each}` bodies (the oracle's `is_text_first`:
+    /// parent ∈ {Fragment, SnippetBlock, EachBlock, Component, …}); false for
+    /// element children and `{#if}`/`{#key}`/`{#await}` bodies.
+    mark_text_first: bool,
+    /// Whether this is the component's root fragment (a `{@const}` here refuses —
+    /// grammatically block-only, and its component-scope placement is unprobed).
     is_component_root: bool,
     /// Inside `<pre>`/`<textarea>`: no whitespace normalization.
     preserve_whitespace: bool,
@@ -1063,9 +1077,11 @@ fn emit_fragment<'arena>(
     let nodes: &'arena [FragmentNode<'arena>] = fragment.nodes;
     let source = env.source;
 
-    // Decode and filter into the working list (comments are dropped — the
-    // oracle compiles with preserveComments off).
+    // Decode and filter into the working list. Comments are dropped (the oracle
+    // compiles with preserveComments off); `{@const}` tags are hoisted out of the
+    // whitespace list and emitted first (the oracle's `clean_nodes` hoisting).
     let mut list: Vec<CleanNode<'arena>> = Vec::with_capacity(nodes.len());
+    let mut const_tags: Vec<&'arena ConstTag<'arena>> = Vec::new();
     for node in nodes {
         match node {
             FragmentNode::Text(text) => {
@@ -1074,6 +1090,18 @@ fn emit_fragment<'arena>(
             FragmentNode::Element(element) => list.push(CleanNode::Element(element)),
             FragmentNode::ExpressionTag(tag) => list.push(CleanNode::Expr(tag)),
             FragmentNode::HtmlTag(tag) => list.push(CleanNode::Html(tag)),
+            FragmentNode::IfBlock(block) => list.push(CleanNode::If(block)),
+            FragmentNode::EachBlock(block) => list.push(CleanNode::Each(block)),
+            FragmentNode::AwaitBlock(block) => list.push(CleanNode::Await(block)),
+            FragmentNode::KeyBlock(block) => list.push(CleanNode::Key(block)),
+            FragmentNode::ConstTag(tag) => {
+                if ctx.is_component_root {
+                    return Err(unsupported(
+                        "{@const} at the component root (only valid inside a block)",
+                    ));
+                }
+                const_tags.push(tag);
+            }
             FragmentNode::Comment(_) => {}
             other => {
                 return Err(unsupported(format!(
@@ -1082,6 +1110,13 @@ fn emit_fragment<'arena>(
                 )));
             }
         }
+    }
+
+    // Emit hoisted `{@const}` declarations first — they precede the anchor's
+    // following content and enter the evaluator's innermost overlay so later
+    // reads in this fragment fold.
+    for tag in &const_tags {
+        emit_const_tag(env, tag, out)?;
     }
 
     if !ctx.preserve_whitespace {
@@ -1097,10 +1132,9 @@ fn emit_fragment<'arena>(
         list.remove(0);
     }
 
-    // Component fragment starting with text/{expr}: `<!---->` keeps it from
-    // gluing to the previous SSR fragment.
-    if ctx.is_component_root
-        && matches!(list.first(), Some(CleanNode::Text(_) | CleanNode::Expr(_)))
+    // A text-first fragment gets a leading `<!---->` so its text doesn't glue to
+    // the surrounding SSR fragment (component root and `{#each}` bodies only).
+    if ctx.mark_text_first && matches!(list.first(), Some(CleanNode::Text(_) | CleanNode::Expr(_)))
     {
         out.push_text("<!---->");
     }
@@ -1119,8 +1153,543 @@ fn emit_fragment<'arena>(
             CleanNode::Html(tag) => {
                 emit_expression_tag(env, &tag.expression, out, false)?;
             }
+            CleanNode::If(block) => emit_if_block(env, block, out, &ctx)?,
+            CleanNode::Each(block) => emit_each_block(env, block, out, &ctx)?,
+            CleanNode::Await(block) => emit_await_block(env, block, out, &ctx)?,
+            CleanNode::Key(block) => emit_key_block(env, block, out, &ctx)?,
         }
     }
+    Ok(())
+}
+
+/// Recursively test whether a fragment contains any control-flow block or
+/// `{@const}` tag (the comments+blocks refusal gate).
+fn fragment_contains_block(fragment: &Fragment<'_>) -> bool {
+    fragment.nodes.iter().any(|node| match node {
+        FragmentNode::IfBlock(_)
+        | FragmentNode::EachBlock(_)
+        | FragmentNode::AwaitBlock(_)
+        | FragmentNode::KeyBlock(_)
+        | FragmentNode::ConstTag(_) => true,
+        FragmentNode::Element(element) => fragment_contains_block(&element.fragment),
+        _ => false,
+    })
+}
+
+/// Emit a block body fragment into a fresh child body builder, prepending `pre`
+/// statements (block anchor pushes, an `{#each}` binding) and pushing a
+/// block-scope `overlay` (empty for `{#if}`/`{#key}`, seeded with masked locals
+/// for `{#each}`/`{#await}`), and return the finished statement slice. The
+/// overlay gives any `{@const}` in the body a scope to enter.
+fn emit_child_body<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    fragment: &Fragment<'arena>,
+    pre: &[Statement<'arena>],
+    mark_text_first: bool,
+    preserve_whitespace: bool,
+    overlay: HashMap<String, ScopeEntry<'arena>>,
+) -> Result<&'arena [Statement<'arena>], CompileError> {
+    let arena = env.b.arena;
+    env.push_overlay(overlay)?;
+    let mut child = BodyBuilder::new_in(arena);
+    for stmt in pre {
+        child.stmts.push(stmt.clone());
+    }
+    let result = emit_fragment(
+        env,
+        fragment,
+        &mut child,
+        FragmentCtx {
+            mark_text_first,
+            is_component_root: false,
+            preserve_whitespace,
+            parent_name: None,
+        },
+    );
+    env.pop_overlay();
+    result?;
+    Ok(child.finish(&mut env.b, arena))
+}
+
+/// Prepare a single borrowed value expression for a read position (`{#if}` test,
+/// `{#each}` collection, `{#await}` promise): a bare derived read becomes `d()`,
+/// everything else is guarded and passed through borrowed.
+fn wrap_single<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    expr: &'arena Expression<'arena>,
+) -> Result<Expression<'arena>, CompileError> {
+    let wrapped = wrap_value_expr(env, expr)?;
+    Ok(wrapped[0].clone())
+}
+
+/// Guard-walk a dropped expression (a `{#key}` / `{#each (key)}` expression the
+/// SSR output ignores) so stray runes / derived reads inside still refuse.
+fn guard_dropped<'arena>(
+    env: &EmitEnv<'arena, '_>,
+    expr: &'arena Expression<'arena>,
+) -> Result<(), CompileError> {
+    let mut updated = NameSet::default();
+    let mut nested = NameSet::default();
+    let mut ctx = WalkCtx::new(env.source, &mut updated, &mut nested, &env.derived_names);
+    walk_expression_guarded(expr, &mut ctx)
+}
+
+/// Refuse if a generated block name (`each_array`, `$$index`, `$$length`) would
+/// collide with a user binding — the oracle's component-scope name generation
+/// would then pick a different suffix, which this port doesn't replicate.
+fn check_name_free(env: &EmitEnv<'_, '_>, name: &str) -> Result<(), CompileError> {
+    if env.bindings.contains(name) {
+        return Err(unsupported(format!(
+            "generated name {name} collides with a user binding"
+        )));
+    }
+    Ok(())
+}
+
+/// A single-declarator `let`/`const` declaration statement.
+fn declaration_stmt<'arena>(
+    b: &Builder<'arena>,
+    kind: VariableDeclarationKind,
+    id: Expression<'arena>,
+    init: Expression<'arena>,
+) -> Statement<'arena> {
+    let span = Span::new(id.span().start, init.span().end);
+    let declarator = VariableDeclarator {
+        id,
+        init: Some(init),
+        definite: false,
+        span,
+    };
+    let decls = std::slice::from_ref(b.arena.alloc(declarator));
+    Statement::VariableDeclaration(VariableDeclaration {
+        kind,
+        declarations: decls,
+        declare: false,
+        span,
+    })
+}
+
+/// Wrap a finished statement slice in a `Statement::BlockStatement` (`{ … }`).
+fn block_stmt<'arena>(
+    b: &Builder<'arena>,
+    body: &'arena [Statement<'arena>],
+) -> &'arena Statement<'arena> {
+    let span = b.here();
+    b.arena
+        .alloc(Statement::BlockStatement(BlockStatement { body, span }))
+}
+
+/// Emit `{@const name = init}` into the current fragment: a hoisted `const`
+/// declaration plus an evaluator overlay entry so later reads fold.
+fn emit_const_tag<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    tag: &'arena ConstTag<'arena>,
+    out: &mut BodyBuilder<'arena>,
+) -> Result<(), CompileError> {
+    // Only a plain-identifier binding is modeled: a destructured `{@const}`
+    // whose init folds would have the oracle fold each read, which this port
+    // can't reproduce per-binding — refuse rather than risk a silent mismatch.
+    let Expression::Identifier(id) = &tag.id else {
+        return Err(unsupported(
+            "destructured {@const} (only `{@const name = …}`)",
+        ));
+    };
+    let Some(name) = plain_identifier_name(id, env.source) else {
+        return Err(unsupported("{@const} with a non-plain binding name"));
+    };
+    // Guard + wrap the init (bare derived → d(), refuse runes/mutations).
+    let init = wrap_single(env, &tag.init)?;
+    let id_expr = tag.id.clone();
+    let arena = env.b.arena;
+    let stmt = declaration_stmt(&env.b, VariableDeclarationKind::Const, id_expr, init);
+    out.push_statement(&mut env.b, arena, stmt);
+
+    // Enter the innermost overlay so `{name}` reads fold through its init.
+    let binding = Binding {
+        kind: BindingKind::Normal,
+        initial: Initial::Expr(&tag.init),
+        updated: false,
+    };
+    match env.overlays.last_mut() {
+        Some(overlay) => {
+            overlay.insert(name, ScopeEntry::Const(binding));
+        }
+        None => {
+            // Unreachable: root-level `{@const}` already refused in emit_fragment.
+            return Err(unsupported("{@const} outside a block scope"));
+        }
+    }
+    Ok(())
+}
+
+/// Emit `{#if}` / `{:else if}` / `{:else}`: a flat `if … else if … else` chain
+/// with per-branch hydration anchors (`<!--[N-->`, terminal `<!--[-1-->`) and a
+/// merge-forward `<!--]-->` closer. A missing `{:else}` synthesizes the
+/// anchor-only terminal branch.
+fn emit_if_block<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    if_block: &'arena IfBlock<'arena>,
+    out: &mut BodyBuilder<'arena>,
+    ctx: &FragmentCtx<'_>,
+) -> Result<(), CompileError> {
+    let arena = env.b.arena;
+    let preserve = ctx.preserve_whitespace;
+
+    // Flatten the else-if chain into (test, consequent) branches + terminal else
+    // (an `{:else if}` nests as an alternate fragment of one `IfBlock{elseif}`).
+    let mut branches: Vec<(&'arena Expression<'arena>, &'arena Fragment<'arena>)> = Vec::new();
+    let mut current = if_block;
+    let final_else: Option<&'arena Fragment<'arena>>;
+    loop {
+        branches.push((&current.test, &current.consequent));
+        match &current.alternate {
+            Some(alt) => {
+                if let [FragmentNode::IfBlock(inner)] = alt.nodes
+                    && inner.elseif
+                {
+                    current = inner;
+                    continue;
+                }
+                final_else = Some(alt);
+                break;
+            }
+            None => {
+                final_else = None;
+                break;
+            }
+        }
+    }
+
+    // Build branch bodies in document order (anchors 0,1,2,…) so nested-block
+    // name counters advance in the oracle's order.
+    let mut cons_blocks: Vec<(Expression<'arena>, &'arena Statement<'arena>)> = Vec::new();
+    for (i, &(test, frag)) in branches.iter().enumerate() {
+        let test_expr = wrap_single(env, test)?;
+        let anchor = env.b.push_string_stmt(&format!("<!--[{i}-->"));
+        let body = emit_child_body(
+            env,
+            frag,
+            std::slice::from_ref(&anchor),
+            false,
+            preserve,
+            HashMap::new(),
+        )?;
+        let block = block_stmt(&env.b, body);
+        cons_blocks.push((test_expr, block));
+    }
+
+    // Terminal else (document order: after every consequent).
+    let else_anchor = env.b.push_string_stmt("<!--[-1-->");
+    let else_body = match final_else {
+        Some(frag) => emit_child_body(
+            env,
+            frag,
+            std::slice::from_ref(&else_anchor),
+            false,
+            preserve,
+            HashMap::new(),
+        )?,
+        None => {
+            let mut v: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
+            v.push(else_anchor);
+            v.into_bump_slice()
+        }
+    };
+    let mut alternate: &'arena Statement<'arena> = block_stmt(&env.b, else_body);
+
+    // Assemble the chain inner-to-outer.
+    for (test, cons) in cons_blocks.into_iter().rev() {
+        let here = env.b.here();
+        let if_stmt = IfStatement {
+            test,
+            consequent: cons,
+            alternate: Some(alternate),
+            span: here,
+        };
+        alternate = arena.alloc(Statement::IfStatement(if_stmt));
+    }
+
+    out.push_statement(&mut env.b, arena, (*alternate).clone());
+    out.push_text("<!--]-->");
+    Ok(())
+}
+
+/// Emit `{#each}`: `const each_array = $.ensure_array_like(expr)` + a `for` loop
+/// binding `let CTX = each_array[IDX]`. Without `{:else}` the opener `<!--[-->`
+/// merges into the preceding template; with it, `each_array` hoists before an
+/// `if (each_array.length !== 0) { … } else { … }` whose openers are string
+/// pushes. Nested `{#each}` refuses (unique-name order not reproducible).
+fn emit_each_block<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    each: &'arena EachBlock<'arena>,
+    out: &mut BodyBuilder<'arena>,
+    ctx: &FragmentCtx<'_>,
+) -> Result<(), CompileError> {
+    if env.in_each {
+        return Err(unsupported(
+            "nested {#each} (the oracle's unique-name allocation order is not reproducible)",
+        ));
+    }
+    let arena = env.b.arena;
+    let preserve = ctx.preserve_whitespace;
+
+    // The key `(key)` and the context pattern are guard-walked (a rune could hide
+    // in either); the key is then dropped — SSR ignores it.
+    if let Some(key) = &each.key {
+        guard_dropped(env, key)?;
+    }
+    if let Some(context) = &each.context {
+        guard_dropped(env, context)?;
+    }
+
+    // Collection (guard + bare-derived rewrite).
+    let collection = wrap_single(env, &each.expression)?;
+
+    // Unique names: both counters advance once per each block (lockstep with the
+    // oracle's per-each `scope.generate`, so `$$index` advances even when the
+    // index is authored). `$$length` is a fixed block-scoped name.
+    let array_name = env.next_each_array_name();
+    let generated_index = env.next_index_name();
+    let index_name = match each.index {
+        Some(i) => i.to_string(),
+        None => generated_index,
+    };
+    check_name_free(env, &array_name)?;
+    check_name_free(env, &index_name)?;
+    check_name_free(env, "$$length")?;
+
+    // const each_array = $.ensure_array_like(collection);
+    // Mint the `each_array` id BEFORE the call so the declaration span runs
+    // forward (id.start < init.end) — the printer's call-head width math
+    // subtracts the two and would underflow on an inverted span.
+    let array_id = Expression::Identifier(env.b.ident(&array_name));
+    let coll_alloc = arena.alloc(collection);
+    let ensure = env
+        .b
+        .member_call("$", "ensure_array_like", std::slice::from_ref(coll_alloc));
+    let const_each = declaration_stmt(&env.b, VariableDeclarationKind::Const, array_id, ensure);
+
+    // for-loop init: `let IDX = 0, $$length = each_array.length`.
+    let index_id = Expression::Identifier(env.b.ident(&index_name));
+    let zero = env.b.number(0.0);
+    let index_span = Span::new(index_id.span().start, zero.span().end);
+    let index_declarator = VariableDeclarator {
+        id: index_id,
+        init: Some(zero),
+        definite: false,
+        span: index_span,
+    };
+    let length_id = Expression::Identifier(env.b.ident("$$length"));
+    let arr_for_length = env.b.ident_expr(&array_name);
+    let length_member = env.b.member_prop(arr_for_length, "length");
+    let length_span = Span::new(length_id.span().start, length_member.span().end);
+    let length_declarator = VariableDeclarator {
+        id: length_id,
+        init: Some(length_member),
+        definite: false,
+        span: length_span,
+    };
+    let mut init_decls: BumpVec<'arena, VariableDeclarator<'arena>> = BumpVec::new_in(arena);
+    init_decls.push(index_declarator);
+    init_decls.push(length_declarator);
+    let init_here = env.b.here();
+    let init_decl = VariableDeclaration {
+        kind: VariableDeclarationKind::Let,
+        declarations: init_decls.into_bump_slice(),
+        declare: false,
+        span: init_here,
+    };
+
+    // test: `IDX < $$length`; update: `IDX++`.
+    let idx_test = env.b.ident_expr(&index_name);
+    let len_test = env.b.ident_expr("$$length");
+    let test = env.b.binary(idx_test, BinaryOperator::LessThan, len_test);
+    let idx_update = env.b.ident_expr(&index_name);
+    let update = env.b.update(idx_update, UpdateOperator::Increment);
+
+    // Body: `let CTX = each_array[IDX]` + the body fragment (text-first marker),
+    // with context/index names masked to UNKNOWN in the evaluator.
+    let mut overlay: HashMap<String, ScopeEntry<'arena>> = HashMap::new();
+    if let Some(context) = &each.context {
+        let mut names = Vec::new();
+        pattern_binding_names(context, env.source, &mut names)?;
+        for name in names {
+            overlay.insert(name, ScopeEntry::Masked);
+        }
+    }
+    overlay.insert(index_name.clone(), ScopeEntry::Masked);
+    env.in_each = true;
+    let body_result = emit_each_body(env, each, &array_name, &index_name, preserve, overlay);
+    env.in_each = false;
+    let body_stmts = body_result?;
+
+    let for_body = block_stmt(&env.b, body_stmts);
+    let for_here = env.b.here();
+    let for_loop = Statement::ForStatement(ForStatement {
+        init: Some(ForInit::VariableDeclaration(init_decl)),
+        test: Some(test),
+        update: Some(update),
+        body: for_body,
+        span: for_here,
+    });
+
+    if let Some(fallback) = &each.fallback {
+        out.push_statement(&mut env.b, arena, const_each);
+        // if branch: `{ $$renderer.push('<!--[-->'); for_loop }`.
+        let open_anchor = env.b.push_string_stmt("<!--[-->");
+        let mut if_body: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
+        if_body.push(open_anchor);
+        if_body.push(for_loop);
+        let if_branch = block_stmt(&env.b, if_body.into_bump_slice());
+        // else branch: `{ $$renderer.push('<!--[!-->'); …fallback… }`. The
+        // fallback's parent is the each block, so it is text-first-eligible.
+        let else_anchor = env.b.push_string_stmt("<!--[!-->");
+        let fallback_stmts = emit_child_body(
+            env,
+            fallback,
+            std::slice::from_ref(&else_anchor),
+            true,
+            preserve,
+            HashMap::new(),
+        )?;
+        let else_branch = block_stmt(&env.b, fallback_stmts);
+        // condition: `each_array.length !== 0`.
+        let arr_cond = env.b.ident_expr(&array_name);
+        let len_cond = arena.alloc(env.b.member_prop(arr_cond, "length"));
+        let zero_cond = arena.alloc(env.b.number(0.0));
+        let cond = env
+            .b
+            .binary(len_cond, BinaryOperator::BangEqualsEquals, zero_cond);
+        let if_here = env.b.here();
+        let if_stmt = Statement::IfStatement(IfStatement {
+            test: cond,
+            consequent: if_branch,
+            alternate: Some(else_branch),
+            span: if_here,
+        });
+        out.push_statement(&mut env.b, arena, if_stmt);
+    } else {
+        // Opener merges into the preceding template; then const + for loop.
+        out.push_text("<!--[-->");
+        out.push_statement(&mut env.b, arena, const_each);
+        out.push_statement(&mut env.b, arena, for_loop);
+    }
+    out.push_text("<!--]-->");
+    Ok(())
+}
+
+/// The `{#each}` body: `let CTX = each_array[IDX]` (when `as` is present) then
+/// the body fragment (which gets the text-first `<!---->` marker).
+fn emit_each_body<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    each: &'arena EachBlock<'arena>,
+    array_name: &str,
+    index_name: &str,
+    preserve: bool,
+    overlay: HashMap<String, ScopeEntry<'arena>>,
+) -> Result<&'arena [Statement<'arena>], CompileError> {
+    let arena = env.b.arena;
+    let mut pre: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
+    if let Some(context) = &each.context {
+        let arr = env.b.ident_expr(array_name);
+        let idx = env.b.ident_expr(index_name);
+        let member = env.b.member_computed(arr, idx);
+        let let_stmt = declaration_stmt(
+            &env.b,
+            VariableDeclarationKind::Let,
+            context.clone(),
+            member,
+        );
+        pre.push(let_stmt);
+    }
+    emit_child_body(env, &each.body, &pre, true, preserve, overlay)
+}
+
+/// Emit `{#await}`: `$.await($$renderer, expr, () => {pending}, (value?) => {then})`
+/// followed by a merge-forward `<!--]-->` closer. The `{:catch}` branch is
+/// dropped (the oracle omits it from SSR); empty callbacks are `() => {}`.
+fn emit_await_block<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    await_block: &'arena AwaitBlock<'arena>,
+    out: &mut BodyBuilder<'arena>,
+    ctx: &FragmentCtx<'_>,
+) -> Result<(), CompileError> {
+    let arena = env.b.arena;
+    let preserve = ctx.preserve_whitespace;
+
+    let expr = wrap_single(env, &await_block.expression)?;
+
+    // Pending arrow: `() => { pending }` (empty when there is no pending content).
+    let empty: &'arena [Statement<'arena>] = &[];
+    let pending_stmts = match &await_block.pending {
+        Some(frag) => emit_child_body(env, frag, &[], false, preserve, HashMap::new())?,
+        None => empty,
+    };
+    let pending_here = env.b.here();
+    let no_params: &'arena [Expression<'arena>] = &[];
+    let pending_arrow = env.b.arrow_block(no_params, pending_stmts, pending_here);
+
+    // Then arrow: `(value?) => { then }`. The `{:then value}` pattern binds one
+    // param; its names mask to UNKNOWN in the then body.
+    let then_params: &'arena [Expression<'arena>] = match &await_block.value {
+        Some(value) => {
+            guard_dropped(env, value)?;
+            std::slice::from_ref(arena.alloc(value.clone()))
+        }
+        None => &[],
+    };
+    let then_stmts = match &await_block.then {
+        Some(frag) => {
+            let mut overlay: HashMap<String, ScopeEntry<'arena>> = HashMap::new();
+            if let Some(value) = &await_block.value {
+                let mut names = Vec::new();
+                pattern_binding_names(value, env.source, &mut names)?;
+                for name in names {
+                    overlay.insert(name, ScopeEntry::Masked);
+                }
+            }
+            emit_child_body(env, frag, &[], false, preserve, overlay)?
+        }
+        None => empty,
+    };
+    let then_here = env.b.here();
+    let then_arrow = env.b.arrow_block(then_params, then_stmts, then_here);
+
+    // `$.await($$renderer, expr, pending, then)`.
+    let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
+    args.push(Expression::Identifier(env.b.ident("$$renderer")));
+    args.push(expr);
+    args.push(pending_arrow);
+    args.push(then_arrow);
+    let call = env.b.member_call("$", "await", args.into_bump_slice());
+    let span = call.span();
+    let stmt = Statement::ExpressionStatement(ExpressionStatement {
+        expression: call,
+        span,
+        is_directive: false,
+    });
+    out.push_statement(&mut env.b, arena, stmt);
+    out.push_text("<!--]-->");
+    Ok(())
+}
+
+/// Emit `{#key}`: a `<!---->` marker, a bare `{ … }` block wrapping the body,
+/// and a closing `<!---->`. The key expression is SSR-ignored (guard-walked,
+/// then dropped).
+fn emit_key_block<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    key: &'arena KeyBlock<'arena>,
+    out: &mut BodyBuilder<'arena>,
+    ctx: &FragmentCtx<'_>,
+) -> Result<(), CompileError> {
+    let arena = env.b.arena;
+    let preserve = ctx.preserve_whitespace;
+    guard_dropped(env, &key.expression)?;
+    out.push_text("<!---->");
+    let body = emit_child_body(env, &key.fragment, &[], false, preserve, HashMap::new())?;
+    let block = block_stmt(&env.b, body);
+    out.push_statement(&mut env.b, arena, (*block).clone());
+    out.push_text("<!---->");
     Ok(())
 }
 
@@ -1308,6 +1877,7 @@ fn emit_element<'arena>(
         &element.fragment,
         out,
         FragmentCtx {
+            mark_text_first: false,
             is_component_root: false,
             preserve_whitespace: parent_ctx.preserve_whitespace
                 || name == "pre"

@@ -81,6 +81,12 @@ impl<'arena> Bindings<'arena> {
         self.map.get(name)
     }
 
+    /// Whether a top-level binding by this name exists (block-name collision
+    /// guard).
+    pub fn contains(&self, name: &str) -> bool {
+        self.map.contains_key(name)
+    }
+
     pub fn insert(&mut self, name: String, binding: Binding<'arena>) {
         self.map.insert(name, binding);
     }
@@ -837,9 +843,6 @@ fn callee_keypath(callee: &Expression<'_>, source: &str) -> Option<String> {
 pub(crate) type NameSet = HashSet<String>;
 
 /// A block-scope overlay entry (each item/index, `{:then}` value, `{@const}`).
-// TODO: constructed by the {#if}/{#each}/{#await}/{@const} emitters (block
-// emission in progress — the resolution side below is already live).
-#[allow(dead_code)]
 pub(crate) enum ScopeEntry<'arena> {
     /// Masked to UNKNOWN: the binding exists but is never statically known to
     /// this port (each items/indexes, await values). Behaviorally equivalent to

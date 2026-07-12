@@ -25,14 +25,18 @@ project-wide conventions.
   - `compile(source, &CompileOptions) -> Result<CompileOutput, CompileError>` —
     parses the component and runs the server transform. Generated JS prints
     through `format_canonical`, so it is canonical-form by construction
-    (`canonicalize_js(output.js)` is a fixed point). Shapes the transform does
-    not cover yet — client generation, dev mode, blocks (and `{@const}`, which
-    is grammatically reachable only inside them), directives/spread, top-level
-    `await`, `<option>` / populated `<select>`/`<optgroup>` (the oracle emits
-    closure calls / `<!>` anchors there), template-expression comments, and
-    every `$`-prefixed identifier reference or call outside the sanctioned
-    rewrites below — return `CompileError::Unsupported` with a clear
-    description, never guessed output.
+    (`canonicalize_js(output.js)` is a fixed point). The control-flow blocks
+    `{#if}`/`{#each}`/`{#await}`/`{#key}` and `{@const}` are covered (see the
+    transform_server block emitters below). Shapes the transform does not cover
+    yet — client generation, dev mode, `{#snippet}`/`{@render}`/`{@debug}`,
+    directives/spread, top-level `await`, `<option>` / populated
+    `<select>`/`<optgroup>` (the oracle emits closure calls / `<!>` anchors
+    there), template-expression comments, and every `$`-prefixed identifier
+    reference or call outside the sanctioned rewrites below — return
+    `CompileError::Unsupported` with a clear description, never guessed output.
+    Within the supported blocks, nested `{#each}` (unreproducible unique-name
+    order), a root-level `{@const}`, a destructured `{@const}`, and any block
+    alongside carried script comments also refuse.
   - `canonicalize_js(source) -> Result<String, CanonicalizeError>` — the
     canonicalizer (below). Lives here because the compiler's own output
     idempotence checks and the oracle comparison both consume it.
@@ -84,8 +88,28 @@ project-wide conventions.
   interior whitespace is verbatim; `<pre>`/`<textarea>` preserve everything;
   entities decode then re-escape (`[&<]` in text, `[&"<]` in static
   attributes); boolean attributes emit `name=""`; `class`/`style` values
-  collapse+trim; void elements close `/>`; a text-first component fragment
-  gets a `<!---->` prefix. Instance-script comments carry through into the
+  collapse+trim; void elements close `/>`; a text-first fragment (component
+  root or `{#each}` body — the oracle's `is_text_first` parent set) gets a
+  `<!---->` prefix. **Control-flow blocks** split the single template into
+  multiple `$$renderer.push(…)` statements, each block emitting its own
+  statements between flushes and merging its closer/opener into the adjacent
+  template: `{#if}` is a flat `if … else if … else` chain with per-branch
+  single-quote-string anchor pushes (`<!--[N-->`, terminal `<!--[-1-->`,
+  synthesized when `{:else}` is absent) and a merge-forward `<!--]-->` closer;
+  `{#each}` is `const each_array = $.ensure_array_like(expr)` + a `for` loop
+  binding `let CTX = each_array[IDX]` (both `each_array`/`$$index` names
+  advance once per each block in source order, `$$length` fixed), the opener
+  `<!--[-->` merging backward without `{:else}` or, with it, `each_array`
+  hoisting before an `if (each_array.length !== 0) { … } else { … }` whose
+  openers are string pushes; `{#await}` is a 4-arg
+  `$.await($$renderer, expr, () => {pending}, (value?) => {then})` (empty
+  `() => {}` fallbacks; `{:catch}` dropped) + a merge-forward closer; `{#key}`
+  is a `<!---->` marker, a bare `{ … }` block, and a closing `<!---->` (key
+  expression guard-walked then dropped, like an each key); `{@const}` hoists a
+  `const` declaration to the top of its branch body and enters the evaluator's
+  innermost block-scope overlay so later reads fold. Each/await locals and the
+  `{:then}` value mask to UNKNOWN in that overlay; a block body that shadows a
+  `$derived` name refuses. Instance-script comments carry through into the
   synthetic program (host-absolute spans; the import prints as a separate
   comment-free program so no window bridges a low anchor to its appendix
   source literal); divergent placement classes refuse — comments after the

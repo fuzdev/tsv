@@ -386,12 +386,244 @@ mod tests {
         assert_eq!(canonicalize_js(&out.js).unwrap(), out.js);
     }
 
+    /// Compile `source` and return the generated JS, asserting it is a
+    /// canonicalize fixed point (every block emitter prints through
+    /// `format_canonical`, so this must hold).
+    fn compile_js(source: &str) -> String {
+        let out = compile(source, &CompileOptions::default())
+            .unwrap_or_else(|e| panic!("compile failed for {source:?}: {e:?}"));
+        assert_eq!(
+            canonicalize_js(&out.js).unwrap(),
+            out.js,
+            "block output must be a canonicalize fixed point:\n{}",
+            out.js
+        );
+        out.js
+    }
+
     #[test]
-    fn compile_rejects_unsupported_block() {
-        let err = compile("{#if a}<p>text</p>{/if}", &CompileOptions::default()).unwrap_err();
+    fn compile_if_else_block() {
+        // Branch anchors are single-quoted string pushes; the closer `<!--]-->`
+        // is its own template push. A missing branch synthesizes nothing here.
+        let js = compile_js("{#if a}<p>1</p>{:else}<p>2</p>{/if}");
+        assert_eq!(
+            js,
+            "import * as $ from 'svelte/internal/server';\n\
+             export default function Input($$renderer) {\n\
+             \tif (a) {\n\
+             \t\t$$renderer.push('<!--[0-->');\n\
+             \t\t$$renderer.push(`<p>1</p>`);\n\
+             \t} else {\n\
+             \t\t$$renderer.push('<!--[-1-->');\n\
+             \t\t$$renderer.push(`<p>2</p>`);\n\
+             \t}\n\
+             \t$$renderer.push(`<!--]-->`);\n\
+             }\n"
+        );
+    }
+
+    #[test]
+    fn compile_if_synthesizes_missing_else() {
+        // No `{:else}` → an anchor-only `else` branch with `<!--[-1-->`.
+        let js = compile_js("{#if a}<p>1</p>{/if}");
         assert!(
-            matches!(&err, CompileError::Unsupported(what) if what.contains("{#if}")),
-            "expected Unsupported({{#if}}), got {err:?}"
+            js.contains("} else {\n\t\t$$renderer.push('<!--[-1-->');\n\t}"),
+            "missing else must be synthesized: {js}"
+        );
+    }
+
+    #[test]
+    fn compile_else_if_chain_numbers_branches() {
+        // Consequents number 0,1,…; the terminal else is -1; `else if` nests.
+        let js = compile_js("{#if a}<p>1</p>{:else if b}<p>2</p>{:else}<p>3</p>{/if}");
+        assert!(js.contains("if (a) {"), "{js}");
+        assert!(js.contains("} else if (b) {"), "{js}");
+        assert!(js.contains("$$renderer.push('<!--[0-->');"), "{js}");
+        assert!(js.contains("$$renderer.push('<!--[1-->');"), "{js}");
+        assert!(js.contains("$$renderer.push('<!--[-1-->');"), "{js}");
+    }
+
+    #[test]
+    fn compile_each_block() {
+        let js = compile_js(
+            "<script>let { items } = $props();</script>\n{#each items as item}<li>{item}</li>{/each}",
+        );
+        assert_eq!(
+            js,
+            "import * as $ from 'svelte/internal/server';\n\
+             export default function Input($$renderer, $$props) {\n\
+             \tlet { items } = $$props;\n\
+             \t$$renderer.push(`<!--[-->`);\n\
+             \tconst each_array = $.ensure_array_like(items);\n\
+             \tfor (let $$index = 0, $$length = each_array.length; $$index < $$length; $$index++) {\n\
+             \t\tlet item = each_array[$$index];\n\
+             \t\t$$renderer.push(`<li>${$.escape(item)}</li>`);\n\
+             \t}\n\
+             \t$$renderer.push(`<!--]-->`);\n\
+             }\n"
+        );
+    }
+
+    #[test]
+    fn compile_each_with_else_hoists_and_uses_authored_index() {
+        // `{:else}` hoists `each_array` before an `if (…length !== 0)`; the
+        // authored index name replaces `$$index` everywhere.
+        let js = compile_js(
+            "<script>let { items } = $props();</script>\n{#each items as item, i}<li>{i}</li>{:else}<p>none</p>{/each}",
+        );
+        assert!(
+            js.contains(
+                "const each_array = $.ensure_array_like(items);\n\tif (each_array.length !== 0) {"
+            ),
+            "each_array must hoist before the if: {js}"
+        );
+        assert!(js.contains("$$renderer.push('<!--[-->');"), "{js}");
+        assert!(js.contains("$$renderer.push('<!--[!-->');"), "{js}");
+        assert!(
+            js.contains("for (let i = 0, $$length = each_array.length; i < $$length; i++) {"),
+            "authored index must replace $$index: {js}"
+        );
+    }
+
+    #[test]
+    fn compile_sibling_each_blocks_number_names() {
+        // Sibling eachs get suffixed names in source order.
+        let js = compile_js(
+            "<script>let { a, b } = $props();</script>\n{#each a as x}<p>{x}</p>{/each}{#each b as y}<p>{y}</p>{/each}",
+        );
+        assert!(
+            js.contains("const each_array = $.ensure_array_like(a);"),
+            "{js}"
+        );
+        assert!(
+            js.contains("const each_array_1 = $.ensure_array_like(b);"),
+            "second each must be each_array_1: {js}"
+        );
+        assert!(js.contains("let x = each_array[$$index];"), "{js}");
+        assert!(js.contains("let y = each_array_1[$$index_1];"), "{js}");
+    }
+
+    #[test]
+    fn compile_await_block_drops_catch() {
+        // Always 4-arg `$.await`; the `{:catch}` branch is dropped entirely.
+        let js = compile_js(
+            "<script>let { p } = $props();</script>\n{#await p}<p>load</p>{:then v}<p>{v}</p>{:catch e}<p>err</p>{/await}",
+        );
+        assert!(js.contains("$.await("), "{js}");
+        assert!(
+            js.contains("(value) => {") || js.contains("(v) => {"),
+            "then param: {js}"
+        );
+        assert!(js.contains("`<p>load</p>`"), "{js}");
+        assert!(js.contains("$.escape(v)"), "{js}");
+        assert!(!js.contains("err"), "catch content must be dropped: {js}");
+        assert!(js.contains("$$renderer.push(`<!--]-->`);"), "{js}");
+    }
+
+    #[test]
+    fn compile_await_pending_only_has_empty_then() {
+        // Pending-only await still emits 4 args with an empty `() => {}` then.
+        let js =
+            compile_js("<script>let { p } = $props();</script>\n{#await p}<p>load</p>{/await}");
+        assert!(js.contains("() => {}"), "empty then arrow expected: {js}");
+        assert!(js.contains("`<p>load</p>`"), "{js}");
+    }
+
+    #[test]
+    fn compile_key_block() {
+        let js = compile_js("{#key a}<p>c</p>{/key}");
+        assert_eq!(
+            js,
+            "import * as $ from 'svelte/internal/server';\n\
+             export default function Input($$renderer) {\n\
+             \t$$renderer.push(`<!---->`);\n\
+             \t{\n\
+             \t\t$$renderer.push(`<p>c</p>`);\n\
+             \t}\n\
+             \t$$renderer.push(`<!---->`);\n\
+             }\n"
+        );
+    }
+
+    #[test]
+    fn compile_const_tag_folds_static_read() {
+        // A `{@const}` enters the evaluator: a statically-known init folds a read
+        // into the template while the declaration still emits.
+        let js = compile_js("{#if true}{@const x = 2}<p>{x}</p>{/if}");
+        assert!(js.contains("const x = 2;"), "const decl must emit: {js}");
+        assert!(
+            js.contains("`<p>2</p>`"),
+            "static const read must fold: {js}"
+        );
+        assert!(
+            !js.contains("$.escape(x)"),
+            "known read must not stay dynamic: {js}"
+        );
+    }
+
+    #[test]
+    fn compile_const_tag_dynamic_read_stays_escaped() {
+        // A `{@const}` over an unknown (each-local) value stays dynamic.
+        let js = compile_js(
+            "<script>let { items } = $props();</script>\n{#each items as item}{@const d = item}<p>{d}</p>{/each}",
+        );
+        assert!(js.contains("const d = item;"), "{js}");
+        assert!(
+            js.contains("$.escape(d)"),
+            "dynamic const read must escape: {js}"
+        );
+    }
+
+    #[test]
+    fn compile_marks_text_first_each_body_not_if_branch() {
+        // The each body gets a `<!---->` text-first marker; the if branch does not.
+        let each = compile_js(
+            "<script>let { items } = $props();</script>\n{#each items as item}hi {item}{/each}",
+        );
+        assert!(each.contains("`<!---->hi ${$.escape(item)}`"), "{each}");
+        let iff = compile_js("<script>let { a } = $props();</script>\n{#if a}hi {a}{/if}");
+        assert!(
+            iff.contains("$$renderer.push(`hi ${$.escape(a)}`);"),
+            "if branch must NOT get a text-first marker: {iff}"
+        );
+    }
+
+    #[test]
+    fn compile_rejects_nested_each() {
+        assert_unsupported(
+            "<script>let { m } = $props();</script>\n{#each m as row}{#each row as cell}<p>{cell}</p>{/each}{/each}",
+            "nested {#each}",
+        );
+    }
+
+    #[test]
+    fn compile_rejects_const_at_root() {
+        assert_unsupported(
+            "{@const x = 1}<p>text</p>",
+            "{@const} at the component root",
+        );
+    }
+
+    #[test]
+    fn compile_rejects_comments_with_blocks() {
+        assert_unsupported(
+            "<script>\n\t// note\n\tlet { a } = $props();\n</script>\n{#if a}<p>x</p>{/if}",
+            "comments in a script alongside template blocks",
+        );
+    }
+
+    #[test]
+    fn compile_rejects_snippet_block() {
+        assert_unsupported("{#snippet foo()}<p>x</p>{/snippet}", "{#snippet}");
+    }
+
+    #[test]
+    fn compile_rejects_rune_inside_block() {
+        // The guard runs on block test / body expressions too.
+        assert_unsupported("{#if $state(0)}<p>x</p>{/if}", "$state");
+        assert_unsupported(
+            "<script>let { items } = $props();</script>\n{#each items as item}<p>{$state(0)}</p>{/each}",
+            "$state",
         );
     }
 

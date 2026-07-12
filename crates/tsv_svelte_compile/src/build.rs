@@ -33,10 +33,11 @@
 use bumpalo::Bump;
 use tsv_lang::{SharedInterner, Span};
 use tsv_ts::ast::internal::{
-    ArrowFunctionBody, ArrowFunctionExpression, BlockStatement, CallExpression, Expression,
-    IdentName, Identifier, ImportDeclaration, ImportKind, ImportNamespaceSpecifier, ImportPhase,
-    ImportSpecifier, Literal, LiteralValue, MemberExpression, Statement, StringCooked,
-    TemplateCooked, TemplateElement, TemplateLiteral, UnaryExpression, UnaryOperator,
+    ArrowFunctionBody, ArrowFunctionExpression, BinaryExpression, BinaryOperator, BlockStatement,
+    CallExpression, Expression, ExpressionStatement, IdentName, Identifier, ImportDeclaration,
+    ImportKind, ImportNamespaceSpecifier, ImportPhase, ImportSpecifier, Literal, LiteralValue,
+    MemberExpression, Statement, StringCooked, TemplateCooked, TemplateElement, TemplateLiteral,
+    UnaryExpression, UnaryOperator, UpdateExpression, UpdateOperator,
 };
 
 /// The appendix-buffer bookkeeping plus interner access — everything node
@@ -255,26 +256,25 @@ impl<'arena> Builder<'arena> {
         })
     }
 
-    /// `(<param>) => { <stmts> }` — a block-bodied arrow (the
-    /// `$$renderer.component(($$renderer) => { … })` wrapper). `block_span` is
-    /// the span the block's comment windows anchor on (the caller decides —
-    /// host-anchored when the body holds borrowed statements).
+    /// `(<params>) => { <stmts> }` — a block-bodied arrow (the
+    /// `$$renderer.component(($$renderer) => { … })` wrapper and the `$.await`
+    /// pending / then callbacks). `params` may be minted synthetic identifiers
+    /// (`$$renderer`) or borrowed user patterns (a `{:then value}` binding).
+    /// `block_span` is the span the block's comment windows anchor on (the
+    /// caller decides — host-anchored when the body holds borrowed statements).
     pub fn arrow_block(
         &mut self,
-        param: &str,
+        params: &'arena [Expression<'arena>],
         body: &'arena [Statement<'arena>],
         block_span: Span,
     ) -> Expression<'arena> {
         let start = self.mint("(").start;
-        let param_ident = self.ident(param);
         let params_start = start;
         self.mint(") => {");
         let end = self.mint("}").end;
-        let mut params = bumpalo::collections::Vec::new_in(self.arena);
-        params.push(Expression::Identifier(param_ident));
         Expression::ArrowFunctionExpression(ArrowFunctionExpression {
             type_parameters: None,
-            params: params.into_bump_slice(),
+            params,
             body: ArrowFunctionBody::BlockStatement(BlockStatement {
                 body,
                 span: block_span,
@@ -283,6 +283,116 @@ impl<'arena> Builder<'arena> {
             r#async: false,
             params_start: Some(params_start),
             span: Span::new(start, end),
+        })
+    }
+
+    /// A zero-width synthetic span at the current appendix end. For a wrapper
+    /// node (`if`/`for`/block statement) that needs a span but no backing text —
+    /// its keywords print statically and, with block output, no comments are
+    /// carried, so the span only has to stay in-bounds.
+    pub fn here(&self) -> Span {
+        let pos = self.buffer.len() as u32;
+        Span::new(pos, pos)
+    }
+
+    /// `<object>.<name>` — a non-computed member on a synthetic property name
+    /// (`each_array.length`).
+    pub fn member_prop(
+        &mut self,
+        object: &'arena Expression<'arena>,
+        name: &str,
+    ) -> Expression<'arena> {
+        self.mint(".");
+        let prop = self.ident_expr(name);
+        let span = Span::new(object.span().start, prop.span().end);
+        Expression::MemberExpression(MemberExpression {
+            object,
+            property: prop,
+            computed: false,
+            optional: false,
+            span,
+        })
+    }
+
+    /// `<object>[<index>]` — a computed member (`each_array[$$index]`).
+    pub fn member_computed(
+        &mut self,
+        object: &'arena Expression<'arena>,
+        index: &'arena Expression<'arena>,
+    ) -> Expression<'arena> {
+        self.mint("[");
+        let end = self.mint("]").end;
+        let span = Span::new(object.span().start, end);
+        Expression::MemberExpression(MemberExpression {
+            object,
+            property: index,
+            computed: true,
+            optional: false,
+            span,
+        })
+    }
+
+    /// `<left> <op> <right>` — a binary expression (`$$index < $$length`,
+    /// `each_array.length !== 0`).
+    pub fn binary(
+        &mut self,
+        left: &'arena Expression<'arena>,
+        op: BinaryOperator,
+        right: &'arena Expression<'arena>,
+    ) -> Expression<'arena> {
+        self.mint(&format!(" {} ", op.as_str()));
+        let span = Span::new(left.span().start, right.span().end);
+        Expression::BinaryExpression(BinaryExpression {
+            left,
+            operator: op,
+            right,
+            span,
+        })
+    }
+
+    /// `<argument>++` / `<argument>--` (postfix) — an update expression.
+    pub fn update(
+        &mut self,
+        argument: &'arena Expression<'arena>,
+        op: UpdateOperator,
+    ) -> Expression<'arena> {
+        let text = if op == UpdateOperator::Increment {
+            "++"
+        } else {
+            "--"
+        };
+        let end = self.mint(text).end;
+        let span = Span::new(argument.span().start, end);
+        Expression::UpdateExpression(UpdateExpression {
+            operator: op,
+            argument,
+            prefix: false,
+            span,
+        })
+    }
+
+    /// A numeric literal expression (`0`).
+    pub fn number(&mut self, value: f64) -> Expression<'arena> {
+        let span = self.mint(&format!("{value}"));
+        Expression::Literal(Literal {
+            value: LiteralValue::Number(value),
+            span,
+        })
+    }
+
+    /// `$$renderer.push('<text>')` — a block anchor push with a *string-literal*
+    /// argument (single-quoted after canonicalization), distinct from the
+    /// template-literal pushes the `BodyBuilder` flushes. `text` is a hydration
+    /// anchor comment (`<!--[0-->`, `<!--[-->`, …) — never needs escaping.
+    pub fn push_string_stmt(&mut self, text: &str) -> Statement<'arena> {
+        let arg = self.string_literal_expr(text);
+        let arg_alloc = self.arena.alloc(arg);
+        let call = self.member_call("$$renderer", "push", std::slice::from_ref(arg_alloc));
+        let span = call.span();
+        Statement::ExpressionStatement(ExpressionStatement {
+            expression: call,
+            span,
+            is_directive: false,
         })
     }
 
