@@ -301,41 +301,76 @@ impl FlowGraph {
         &self.reduce_payloads[index - 1]
     }
 
-    /// The reduced antecedent list of a `ReduceLabel` node, in append order (the
-    /// temporary antecedent subset the checker substitutes for `target` while it
-    /// passes this node).
-    #[must_use]
-    pub fn reduce_label_antecedents(&self, id: FlowNodeId) -> Vec<FlowNodeId> {
-        let data = self.reduce_label_data(id);
-        let off = (data.antecedents - 1) as usize; // 1-based pool-run index
+    /// A length-prefixed pool run as a raw slice (`slot` is 1-based; 0 = empty).
+    #[inline]
+    fn pool_run(&self, slot: u32) -> &[u32] {
+        if slot == 0 {
+            return &[];
+        }
+        let off = (slot - 1) as usize;
         let len = self.pool[off] as usize;
-        self.pool[off + 1..off + 1 + len]
-            .iter()
-            .filter_map(|&raw| FlowNodeId::from_raw(raw))
-            .collect()
+        &self.pool[off + 1..off + 1 + len]
     }
 
-    /// The antecedents of a flow node, in append order.
+    /// The single antecedent of a **non-label** flow node (`None` for `Start` /
+    /// `Unreachable`) — the O(1) slot read the CFA's linear-chain walk follows
+    /// (tsgo's `flow.Antecedent` chase), no pool touch, no allocation.
     ///
-    /// Non-label nodes have 0 or 1 antecedent (the single-antecedent slot);
-    /// label nodes decode their length-prefixed pool run.
+    /// Not valid on a label node, whose slot holds a pool-run index — decode
+    /// those via [`FlowGraph::antecedents_iter`].
+    #[inline]
     #[must_use]
-    pub fn antecedents(&self, id: FlowNodeId) -> Vec<FlowNodeId> {
+    pub fn single_antecedent(&self, id: FlowNodeId) -> Option<FlowNodeId> {
+        debug_assert!(
+            !self.flags[id.index()].is_label(),
+            "a label's antecedent slot is a pool-run index — use antecedents_iter"
+        );
+        FlowNodeId::from_raw(self.antecedent[id.index()])
+    }
+
+    /// The antecedents of a flow node, in append order, as a **zero-alloc**
+    /// borrowing iterator — the hot-path form for the CFA walkers (label
+    /// recursion iterates this; linear chains take [`FlowGraph::single_antecedent`]).
+    /// Labels decode their length-prefixed pool run; non-label nodes yield their
+    /// 0-or-1 slot.
+    pub fn antecedents_iter(&self, id: FlowNodeId) -> impl Iterator<Item = FlowNodeId> + '_ {
         let flags = self.flags[id.index()];
         let slot = self.antecedent[id.index()];
-        if flags.is_label() {
-            if slot == 0 {
-                return Vec::new();
-            }
-            let off = (slot - 1) as usize;
-            let len = self.pool[off] as usize;
-            self.pool[off + 1..off + 1 + len]
-                .iter()
-                .filter_map(|&raw| FlowNodeId::from_raw(raw))
-                .collect()
+        let (run, single) = if flags.is_label() {
+            (self.pool_run(slot), None)
         } else {
-            FlowNodeId::from_raw(slot).into_iter().collect()
-        }
+            (&[][..], FlowNodeId::from_raw(slot))
+        };
+        run.iter()
+            .filter_map(|&raw| FlowNodeId::from_raw(raw))
+            .chain(single)
+    }
+
+    /// The reduced antecedent list of a `ReduceLabel` node, in append order, as
+    /// a **zero-alloc** borrowing iterator (the temporary antecedent subset the
+    /// checker substitutes for `target` while it passes this node).
+    pub fn reduce_label_antecedents_iter(
+        &self,
+        id: FlowNodeId,
+    ) -> impl Iterator<Item = FlowNodeId> + '_ {
+        let data = self.reduce_label_data(id);
+        self.pool_run(data.antecedents)
+            .iter()
+            .filter_map(|&raw| FlowNodeId::from_raw(raw))
+    }
+
+    /// [`FlowGraph::reduce_label_antecedents_iter`], collected (the convenient
+    /// form for tests and the DOT renderer; hot paths take the iterator).
+    #[must_use]
+    pub fn reduce_label_antecedents(&self, id: FlowNodeId) -> Vec<FlowNodeId> {
+        self.reduce_label_antecedents_iter(id).collect()
+    }
+
+    /// [`FlowGraph::antecedents_iter`], collected (the convenient form for tests
+    /// and the DOT renderer; hot paths take the iterator).
+    #[must_use]
+    pub fn antecedents(&self, id: FlowNodeId) -> Vec<FlowNodeId> {
+        self.antecedents_iter(id).collect()
     }
 }
 
@@ -2795,7 +2830,7 @@ pub fn render_flow_dot(product: &FlowProduct, node_spans: &[Span], source: &str)
         seen[id.index() + 1] = true;
         let label = flow_node_label(g, id, node_spans, source);
         let _ = writeln!(out, "  N{} [label=\"{}\"];", id.get(), escape_dot(&label));
-        for ante in g.antecedents(id) {
+        for ante in g.antecedents_iter(id) {
             let _ = writeln!(out, "  N{} -> N{};", id.get(), ante.get());
             stack.push(ante); // cycle-guarded by `seen`
         }
@@ -2979,6 +3014,33 @@ mod tests {
         assert!(product.graph.flags(uid).contains(FlowFlags::UNREACHABLE));
         // The SourceFile Start is id 2 (minted right after unreachable).
         assert!(product.graph.node_count() >= 2);
+    }
+
+    #[test]
+    fn antecedent_iter_forms_agree_with_collected_forms() {
+        // A branching + loop + try/finally program exercises single-slot nodes,
+        // multi-antecedent labels, and a ReduceLabel; the zero-alloc iterators
+        // must agree with the collected forms on every node, and the non-label
+        // single-slot read must agree with the general form.
+        let product = build(
+            "function f(a: boolean) { try { while (a) { if (a) break; a = !a; } } finally { g(); } }",
+        );
+        let g = &product.graph;
+        for raw in 1..=g.node_count() {
+            let id = FlowNodeId::from_raw(raw).unwrap();
+            let collected = g.antecedents(id);
+            assert_eq!(g.antecedents_iter(id).collect::<Vec<_>>(), collected);
+            if !g.flags(id).is_label() {
+                assert_eq!(g.single_antecedent(id), collected.first().copied());
+                assert!(collected.len() <= 1);
+            }
+            if g.flags(id).contains(FlowFlags::REDUCE_LABEL) {
+                assert_eq!(
+                    g.reduce_label_antecedents_iter(id).collect::<Vec<_>>(),
+                    g.reduce_label_antecedents(id)
+                );
+            }
+        }
     }
 
     #[test]
