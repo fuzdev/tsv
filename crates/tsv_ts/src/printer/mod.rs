@@ -118,8 +118,27 @@ pub struct Printer<'a> {
     pub(crate) source: &'a str,
     /// Comments from the program (for printing leading/trailing comments)
     pub(crate) comments: &'a [internal::Comment],
-    /// Precomputed line break positions for O(log n) line boundary lookups
+    /// Precomputed line break positions for O(log n) line boundary lookups.
+    ///
+    /// Backs the newline-derived *layout* reads — blank-line preservation
+    /// (`has_blank_line_between`) and expansion intent (`has_newline_between`,
+    /// and the many free-function `*_fast` call sites that read it directly).
+    /// The canonical reprint path ([`crate::format_canonical`]) empties this
+    /// table via [`Self::set_canonical`] so those reads collapse (nothing is
+    /// "on a new line", no blank lines), erasing authoring intent.
     pub(crate) line_breaks: &'a [u32],
+    /// Line breaks used exclusively for *comment* position classification
+    /// (`is_same_line`, `classify_comment_fast`, `PartitionedComments`), kept
+    /// real even in the canonical path so a comment's trailing/leading/own-line
+    /// role stays correct and consecutive line comments never merge onto one
+    /// output line. In the normal path this is the same table as `line_breaks`;
+    /// they diverge only under [`Self::set_canonical`].
+    pub(crate) comment_line_breaks: &'a [u32],
+    /// Whether this printer is producing the intent-erased *canonical* reprint
+    /// (see [`crate::format_canonical`]). Gates the handful of direct
+    /// source-newline scans that don't go through `line_breaks` (type-literal
+    /// brace, mapped-type type-argument, own-line decorators).
+    pub(crate) canonical: bool,
     /// Extra indent depth for declaration contexts (0 normally, 1+ in multi-declarator)
     /// When > 0, multiline objects/arrays get extra indentation
     /// Uses Cell for interior mutability so doc builders (&self) can set this
@@ -238,6 +257,11 @@ impl<'a> Printer<'a> {
             source: inputs.source,
             comments: inputs.comments,
             line_breaks: inputs.line_breaks,
+            // Normal path: comment classification shares the one real table. The
+            // canonical path re-points `line_breaks` at an empty table but leaves
+            // this one real (see `set_canonical`).
+            comment_line_breaks: inputs.line_breaks,
+            canonical: false,
             declaration_indent_depth: Cell::new(0),
             is_expression_statement: Cell::new(false),
             in_top_level_assignment: Cell::new(false),
@@ -385,10 +409,29 @@ impl<'a> Printer<'a> {
         printing::visual_width(&self.source[line_start..pos], TAB_WIDTH)
     }
 
-    /// Check if two positions are on the same line (O(log n) binary search)
+    /// Check if two positions are on the same line (O(log n) binary search).
+    ///
+    /// Reads `comment_line_breaks` (not `line_breaks`) so comment position
+    /// classification stays correct even when the canonical path has emptied the
+    /// layout table. In the normal path the two tables are identical.
     #[inline]
     pub(crate) fn is_same_line(&self, prev_end: u32, curr_start: u32) -> bool {
-        printing::is_same_line_fast(self.line_breaks, prev_end, curr_start)
+        printing::is_same_line_fast(self.comment_line_breaks, prev_end, curr_start)
+    }
+
+    /// Switch this printer into the intent-erased *canonical* reprint mode.
+    ///
+    /// Empties the layout line-break table (so `has_blank_line_between` /
+    /// `has_newline_between` and every direct `*_fast` reader collapse — no blank
+    /// lines, nothing forced multiline by a source newline) and sets the
+    /// `canonical` flag that gates the direct source-newline scans. Comment
+    /// classification keeps the real `comment_line_breaks` table, so comments are
+    /// preserved losslessly (merely re-placed deterministically). Cold path:
+    /// called once, right after construction, before any doc is built.
+    pub(crate) fn set_canonical(&mut self) {
+        self.canonical = true;
+        // `&[]` is `&'static`, which coerces to the field's `'a`.
+        self.line_breaks = &[];
     }
 
     /// Check if there's a blank line (2+ newlines) between two positions (O(log n) binary search)

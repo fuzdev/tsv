@@ -522,15 +522,20 @@ impl<'a> Printer<'a> {
         obj: &TSTypeLiteral<'_>,
         comments_present: bool,
     ) -> bool {
-        let source_is_multiline = super::super::is_brace_block_multiline(self.source, obj.span);
+        // Both reads below are newline-derived authoring intent (a source newline
+        // after `{` / before the first member). The canonical reprint erases them
+        // so an object type breaks only by width.
+        let source_is_multiline =
+            !self.canonical && super::super::is_brace_block_multiline(self.source, obj.span);
         // Prettier breaks an object type when its first member starts on a line
         // below the opening brace. `is_brace_block_multiline` only sees a newline
         // *immediately* after `{`, so a block comment on the brace line
         // (`{ /* c */\n a: T }`) defeats it — detect the newline before the first
         // member directly here.
-        let first_member_on_new_line = obj.members.first().is_some_and(|m| {
-            self.source[obj.span.start as usize..m.span().start as usize].contains('\n')
-        });
+        let first_member_on_new_line = !self.canonical
+            && obj.members.first().is_some_and(|m| {
+                self.source[obj.span.start as usize..m.span().start as usize].contains('\n')
+            });
         let has_line_or_multiline_block = comments_present
             && comments_in_range(self.comments, obj.span.start, obj.span.end)
                 .any(|c| !c.is_block || c.multiline);

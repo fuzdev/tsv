@@ -511,7 +511,8 @@ pub(crate) fn build_args_split_last(
             // Add inline block comments around comma
             if let Some(cpos) = comma_pos {
                 for comment in comments_in_range(printer.comments, arg_end, next_arg_start) {
-                    if is_inline_block_before_comma(comment, cpos, printer.line_breaks, arg_end) {
+                    if is_inline_block_before_comma(comment, cpos, printer.comment_line_breaks, arg_end)
+                    {
                         head_parts.push(d.text(" "));
                         head_parts.push(printer.build_comment_doc(comment));
                     }
@@ -522,7 +523,8 @@ pub(crate) fn build_args_split_last(
 
             if let Some(cpos) = comma_pos {
                 for comment in comments_in_range(printer.comments, arg_end, next_arg_start) {
-                    if is_inline_block_after_comma(comment, cpos, printer.line_breaks, arg_end) {
+                    if is_inline_block_after_comma(comment, cpos, printer.comment_line_breaks, arg_end)
+                    {
                         head_parts.push(printer.build_comment_doc(comment));
                         head_parts.push(d.text(" "));
                     }
@@ -556,7 +558,8 @@ pub(crate) fn build_args_split_last(
             // Only add inline block comments that are BEFORE the comma
             if let Some(cpos) = comma_pos {
                 for comment in comments_in_range(printer.comments, arg_end, next_arg_start) {
-                    if is_inline_block_before_comma(comment, cpos, printer.line_breaks, arg_end) {
+                    if is_inline_block_before_comma(comment, cpos, printer.comment_line_breaks, arg_end)
+                    {
                         all_args_parts.push(d.text(" "));
                         all_args_parts.push(printer.build_comment_doc(comment));
                     }

@@ -68,7 +68,12 @@ fn build_inline_leading_comments(
     arg_start: u32,
 ) -> Option<DocId> {
     let d = printer.d();
-    let pc = PartitionedComments::new(printer.comments, printer.line_breaks, paren_open, arg_start);
+    let pc = PartitionedComments::new(
+        printer.comments,
+        printer.comment_line_breaks,
+        paren_open,
+        arg_start,
+    );
 
     let mut parts = DocBuf::new();
 
@@ -105,7 +110,7 @@ fn build_inline_trailing_comments(
     let d = printer.d();
     let pc = PartitionedComments::new(
         printer.comments,
-        printer.line_breaks,
+        printer.comment_line_breaks,
         arg_end,
         next_boundary,
     );
@@ -550,7 +555,7 @@ fn build_chain_args_force_expand(
         if i == 0 && has_leading_comments {
             let first_pc = PartitionedComments::new(
                 printer.comments,
-                printer.line_breaks,
+                printer.comment_line_breaks,
                 paren_open,
                 arg_start,
             );
@@ -638,7 +643,7 @@ fn build_chain_args_force_expand(
         } else {
             let pc = PartitionedComments::new(
                 printer.comments,
-                printer.line_breaks,
+                printer.comment_line_breaks,
                 arg_end,
                 next_boundary,
             );
@@ -1346,7 +1351,7 @@ fn build_chain_args_multi(
             if has_any_comments && printer.has_comments_between(arg_end, next_arg_start) {
                 let mut pc = PartitionedComments::new(
                     printer.comments,
-                    printer.line_breaks,
+                    printer.comment_line_breaks,
                     arg_end,
                     next_arg_start,
                 );

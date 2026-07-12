@@ -161,6 +161,51 @@ pub fn format_in(program: &Program<'_>, source: &str, arena: &DocArena) -> Strin
     output
 }
 
+/// Format a program with newline-derived authoring intent **erased** — the
+/// intent-erased *canonical* reprint.
+///
+/// [`format`] deliberately preserves authoring intent: an object literal, import
+/// list, or call whose source carried a newline after the opening delimiter stays
+/// expanded even when it would fit inline, and blank lines between statements are
+/// kept. `format_canonical` turns all of that off — constructs collapse when they
+/// fit the print width and break only by width, and blank lines are dropped — so
+/// two programs that differ only in incidental whitespace reprint to the same
+/// string. Comments are preserved (never dropped or merged); only their placement
+/// is normalized deterministically (an own-line comment may become a trailing
+/// comment of the preceding node). The output is idempotent:
+/// `format_canonical(parse(format_canonical(x)))` reproduces its input.
+///
+/// This is a cold path used by tooling that needs a canonical form for comparison
+/// (e.g. diffing two compilers' output); the [`format`] path is untouched and
+/// byte-identical.
+pub fn format_canonical(program: &Program<'_>, source: &str) -> String {
+    let arena = DocArena::for_source(source);
+    format_canonical_in(program, source, &arena)
+}
+
+/// [`format_canonical`] into a caller-provided doc arena (see [`format_in`] for
+/// the arena-reuse contract).
+pub fn format_canonical_in(program: &Program<'_>, source: &str, arena: &DocArena) -> String {
+    // Build with the real line-break table (comment classification needs it), then
+    // switch the printer into canonical mode — which empties the *layout* table so
+    // blank-line / expansion reads collapse, while comment classification keeps the
+    // real table (`set_canonical`).
+    let mut line_breaks = arena.take_line_breaks_scratch();
+    build_line_breaks_into(source, &mut line_breaks);
+    let inputs = PrinterInputs {
+        source,
+        interner: Rc::clone(&program.interner),
+        comments: &program.comments,
+        line_breaks: &line_breaks,
+    };
+    let mut printer = make_printer(arena, &inputs, EmbedContext::default());
+    printer.set_canonical();
+    printer.print_program(program);
+    let output = printer.into_string();
+    arena.park_line_breaks_scratch(line_breaks);
+    output
+}
+
 /// Convert internal AST to JSON with character-based positions
 ///
 /// Returns a `serde_json::Value` parsed from the wire bytes

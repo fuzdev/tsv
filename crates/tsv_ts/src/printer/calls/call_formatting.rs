@@ -448,7 +448,7 @@ fn try_single_arg_comment_paths(
         .any(|c| {
             !c.is_block
                 || !tsv_lang::printing::is_same_line_fast(
-                    printer.line_breaks,
+                    printer.comment_line_breaks,
                     arg_end,
                     c.span.start,
                 )
@@ -461,8 +461,12 @@ fn try_single_arg_comment_paths(
         // prettier, which relocates them to their own line); own-line comments
         // stay on their own lines before the arg. See conformance_prettier.md
         // §Comment relocation (Call open paren `(`).
-        let gap_pc =
-            PartitionedComments::new(printer.comments, printer.line_breaks, paren_open, arg_start);
+        let gap_pc = PartitionedComments::new(
+            printer.comments,
+            printer.comment_line_breaks,
+            paren_open,
+            arg_start,
+        );
 
         let mut paren_line_prefix = DocBuf::new();
         gap_pc.emit_trailing_comments(&mut paren_line_prefix, printer);
@@ -1192,7 +1196,7 @@ fn build_call_with_arg_comments(
         comments_in_range(printer.comments, search_start, call.span.end).any(|c| {
             c.is_block
                 && !tsv_lang::printing::is_same_line_fast(
-                    printer.line_breaks,
+                    printer.comment_line_breaks,
                     search_start,
                     c.span.start,
                 )
@@ -1226,7 +1230,7 @@ fn build_call_with_arg_comments(
 
             let gap_pc = PartitionedComments::new(
                 printer.comments,
-                printer.line_breaks,
+                printer.comment_line_breaks,
                 paren_open,
                 first_arg_start,
             );
@@ -1367,7 +1371,7 @@ fn build_call_with_arg_comments(
 
             let pc = PartitionedComments::new(
                 printer.comments,
-                printer.line_breaks,
+                printer.comment_line_breaks,
                 effective_arg_end,
                 paren_close,
             );

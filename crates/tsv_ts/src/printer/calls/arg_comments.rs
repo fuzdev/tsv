@@ -33,8 +33,12 @@ impl<'a> Printer<'a> {
         arg_end: u32,
         next_arg_start: u32,
     ) -> PartitionedComments<'a> {
-        let mut pc =
-            PartitionedComments::new(self.comments, self.line_breaks, arg_end, next_arg_start);
+        let mut pc = PartitionedComments::new(
+            self.comments,
+            self.comment_line_breaks,
+            arg_end,
+            next_arg_start,
+        );
         pc.route_after_comma_hugging_to_leading(self);
         pc.emit_trailing_comments_around_comma(parts, self);
         pc
@@ -442,7 +446,7 @@ pub(crate) fn emit_first_arg_leading_comments(
     let d = printer.d();
     let pc = PartitionedComments::new(
         printer.comments,
-        printer.line_breaks,
+        printer.comment_line_breaks,
         paren_open,
         first_arg_start,
     );

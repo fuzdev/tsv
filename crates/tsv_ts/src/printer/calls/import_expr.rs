@@ -87,7 +87,7 @@ pub(super) fn build_import_expression_doc(
         if printer.has_comments_between(source_end, paren_close) {
             let pc = PartitionedComments::new(
                 printer.comments,
-                printer.line_breaks,
+                printer.comment_line_breaks,
                 source_end,
                 paren_close,
             );
@@ -155,7 +155,7 @@ pub(super) fn build_import_expression_doc(
     {
         let mut inter = PartitionedComments::new(
             printer.comments,
-            printer.line_breaks,
+            printer.comment_line_breaks,
             source_end,
             options_start,
         );
@@ -180,7 +180,7 @@ pub(super) fn build_import_expression_doc(
         tail.push(options_doc);
         let trailing = PartitionedComments::new(
             printer.comments,
-            printer.line_breaks,
+            printer.comment_line_breaks,
             options_end,
             paren_close,
         );

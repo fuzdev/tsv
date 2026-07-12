@@ -171,7 +171,7 @@ impl<'a> ChainPrinter for Printer<'a> {
     }
 
     fn classify_comments(&self, start: u32, end: u32) -> ClassifiedComments<'_> {
-        ClassifiedComments::from_range(self.comments, start, end, self.line_breaks)
+        ClassifiedComments::from_range(self.comments, start, end, self.comment_line_breaks)
     }
 
     fn build_trailing_block_doc(&self, comments: &[&Comment]) -> DocId {

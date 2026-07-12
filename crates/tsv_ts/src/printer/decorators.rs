@@ -64,6 +64,11 @@ impl<'a> Printer<'a> {
         &self,
         decorators: &[internal::Decorator<'_>],
     ) -> bool {
+        // A source newline after a decorator is authoring layout intent, erased in
+        // the canonical reprint (decorators then stay inline unless width breaks them).
+        if self.canonical {
+            return false;
+        }
         decorators.iter().any(|dec| {
             let end = dec.span.end as usize;
             self.source[end..]

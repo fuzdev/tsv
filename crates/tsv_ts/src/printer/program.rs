@@ -175,7 +175,8 @@ impl<'a> Printer<'a> {
         let mut last_was_inline = false;
 
         for comment in comments_in_range(self.comments, prev_end, curr_start) {
-            let position = classify_comment_fast(comment, prev_end, curr_start, self.line_breaks);
+            let position =
+                classify_comment_fast(comment, prev_end, curr_start, self.comment_line_breaks);
 
             // Skip trailing comments EXCEPT for first statement (file start)
             if !is_first && matches!(position, CommentPosition::Trailing) {

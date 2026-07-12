@@ -542,7 +542,14 @@ impl<'a> Printer<'a> {
     /// - Source multi-line: `{\n\t[K in keyof T]: T[K];\n}` (always)
     pub(super) fn build_mapped_type_doc(&self, m: &TSMappedType<'_>) -> DocId {
         let d = self.d();
-        // Check if source was multi-line (preserve author's formatting choice)
+        // Check if source was multi-line (preserve author's formatting choice).
+        // Intentionally NOT gated by `self.canonical`: a mapped type's source
+        // multi-line-ness is left intact so it stays consistent with
+        // `is_call_with_complex_type_arguments` (which also reads the source
+        // newline). Gating only one of the two would flip the assignment
+        // poorly-breakable classification between canonical passes (the collapsed
+        // output has no newline), breaking idempotence — so mapped-type
+        // multi-line-ness is a deliberate un-erased residual of the canonicalizer.
         let source_is_multiline = super::super::is_brace_block_multiline(self.source, m.span);
 
         // Find the start of the mapping content (after `{`)
