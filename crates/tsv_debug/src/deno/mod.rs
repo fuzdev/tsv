@@ -468,8 +468,7 @@ mod tests {
         // oracle is deterministic, so its canonical form is too).
         let canonical =
             tsv_svelte_compile::canonicalize_js(&compiled.js).expect("canonicalize oracle js");
-        let recanonical =
-            tsv_svelte_compile::canonicalize_js(&canonical).expect("re-canonicalize");
+        let recanonical = tsv_svelte_compile::canonicalize_js(&canonical).expect("re-canonicalize");
         assert_eq!(canonical, recanonical, "canonicalize_js must be idempotent");
         let from_again =
             tsv_svelte_compile::canonicalize_js(&again.js).expect("canonicalize second compile");

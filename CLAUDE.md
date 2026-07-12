@@ -473,6 +473,7 @@ tsv/
 │   ├── tsv_ts/      # TypeScript: parse(), format(), convert_ast_json_bytes()
 │   ├── tsv_css/     # CSS: parse(), format(), convert_ast_json_bytes()
 │   ├── tsv_svelte/  # Svelte: parse(), format(), convert_ast_json_bytes()
+│   ├── tsv_svelte_compile/ # Svelte→JS compiler (Svelte's compile() oracle) + JS canonicalizer (intent-erased reprint); consumed by tsv_debug — no shipped artifact links it
 │   ├── tsv_cli/     # Production CLI (binary: tsv) - pure Rust
 │   ├── tsv_debug/   # Dev utilities (binary: tsv_debug) - uses Deno
 │   ├── tsv_ffi/     # C FFI bindings (Deno's native path)
@@ -692,6 +693,16 @@ cargo run -p tsv_debug canonical_compile file.svelte --target client --css  # cl
 cargo run -p tsv_debug canonical_compile file.svelte --json              # { js, css, warnings } as JSON
 # Fixed cssHash ('svelte-tsvhash') + constant filename make output byte-identical across runs.
 # Also: --target server|client (default server), --dev, --content <str>, --stdin. Compile errors exit non-zero.
+
+# compile_compare - diff tsv's Svelte compile against the canonical compiler, comparing
+# the CANONICALIZED JS of both sides (intent-erased reprint via tsv_svelte_compile::canonicalize_js,
+# so a diff is a real code difference, not incidental whitespace). Self-checks canonicalizer
+# idempotence on the oracle side. Exit codes: 0 parity, 1 real diff, 2 error (currently always 2 —
+# the tsv compile side is a walking skeleton, so it reports "unimplemented" and shows the oracle
+# canonical form). --json emits { target, parity, ours_status, hunks }.
+cargo run -p tsv_debug compile_compare file.svelte                       # human diff / oracle canonical form
+cargo run -p tsv_debug compile_compare --content '<h1>hi</h1>' --json    # machine-readable report
+# Also: --target server|client (default server), --content <str>, --stdin.
 
 # format_prettier - format using prettier (shows line widths by default; --no-line-widths to hide)
 cargo run -p tsv_debug format_prettier file.svelte

@@ -134,7 +134,11 @@ fn report_both(
         let hunks = if parity {
             None
         } else {
-            Some(diff_to_string(ours, oracle, &DiffOptions::compile_compare()))
+            Some(diff_to_string(
+                ours,
+                oracle,
+                &DiffOptions::compile_compare(),
+            ))
         };
         let report = CompareReport {
             target: target_name(target),
@@ -146,19 +150,25 @@ fn report_both(
     } else if parity {
         println!("compile_compare [{}] parity", target_name(target));
     } else {
-        println!("compile_compare [{}] canonical outputs differ", target_name(target));
-        print!("{}", diff_to_string(ours, oracle, &DiffOptions::compile_compare()));
+        println!(
+            "compile_compare [{}] canonical outputs differ",
+            target_name(target)
+        );
+        print!(
+            "{}",
+            diff_to_string(ours, oracle, &DiffOptions::compile_compare())
+        );
     }
-    if parity { Ok(()) } else { Err(CliError::Failed) }
+    if parity {
+        Ok(())
+    } else {
+        Err(CliError::Failed)
+    }
 }
 
 /// Report the walking-skeleton state: tsv compile is unimplemented (exit 2). The
 /// oracle canonical form is shown so it's visible what tsv must reproduce.
-fn report_unimplemented(
-    target: SvelteGenerate,
-    oracle: &str,
-    json: bool,
-) -> Result<(), CliError> {
+fn report_unimplemented(target: SvelteGenerate, oracle: &str, json: bool) -> Result<(), CliError> {
     if json {
         let report = CompareReport {
             target: target_name(target),

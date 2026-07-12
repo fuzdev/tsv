@@ -127,7 +127,10 @@ mod tests {
     fn assert_idempotent(source: &str) -> String {
         let once = canonicalize_js(source).expect("first canonicalize");
         let twice = canonicalize_js(&once).expect("second canonicalize");
-        assert_eq!(once, twice, "canonicalize_js must be idempotent for:\n{source}");
+        assert_eq!(
+            once, twice,
+            "canonicalize_js must be idempotent for:\n{source}"
+        );
         once
     }
 
@@ -137,8 +140,14 @@ mod tests {
         // must reach the SAME canonical form (expansion intent erased).
         let expanded = canonicalize_js("const x = {\n\ta: 1,\n\tb: 2\n};\n").unwrap();
         let inline = canonicalize_js("const x = {a: 1, b: 2};\n").unwrap();
-        assert_eq!(expanded, inline, "multiline-but-fitting object must collapse");
-        assert!(!expanded.contains("a: 1,\n"), "should be single-line: {expanded:?}");
+        assert_eq!(
+            expanded, inline,
+            "multiline-but-fitting object must collapse"
+        );
+        assert!(
+            !expanded.contains("a: 1,\n"),
+            "should be single-line: {expanded:?}"
+        );
     }
 
     #[test]
@@ -146,7 +155,10 @@ mod tests {
         let with_blanks = canonicalize_js("const a = 1;\n\n\nconst b = 2;\n").unwrap();
         let without = canonicalize_js("const a = 1;\nconst b = 2;\n").unwrap();
         assert_eq!(with_blanks, without, "blank lines must be erased");
-        assert!(!with_blanks.contains("\n\n"), "no blank line survives: {with_blanks:?}");
+        assert!(
+            !with_blanks.contains("\n\n"),
+            "no blank line survives: {with_blanks:?}"
+        );
     }
 
     #[test]
@@ -156,14 +168,20 @@ mod tests {
         let long = "const config = {alpha: 1, bravo: 2, charlie: 3, delta: 4, echo: 5, \
                      foxtrot: 6, golf: 7, hotel: 8};\n";
         let inline = canonicalize_js(long).unwrap();
-        assert!(inline.contains('\n'), "over-width object must break across lines");
+        assert!(
+            inline.contains('\n'),
+            "over-width object must break across lines"
+        );
         // Same content, authored expanded, reaches the same canonical form.
         let expanded = canonicalize_js(
             "const config = {\n\talpha: 1,\n\tbravo: 2,\n\tcharlie: 3,\n\tdelta: 4,\n\techo: 5,\n\
              \tfoxtrot: 6,\n\tgolf: 7,\n\thotel: 8\n};\n",
         )
         .unwrap();
-        assert_eq!(inline, expanded, "width-broken forms must be authoring-independent");
+        assert_eq!(
+            inline, expanded,
+            "width-broken forms must be authoring-independent"
+        );
     }
 
     #[test]
@@ -186,7 +204,10 @@ mod tests {
         assert!(out.contains("// first"), "first comment lost: {out:?}");
         assert!(out.contains("// second"), "second comment lost: {out:?}");
         // "// first // second" on one line would be the merge bug.
-        assert!(!out.contains("// first // second"), "comments merged: {out:?}");
+        assert!(
+            !out.contains("// first // second"),
+            "comments merged: {out:?}"
+        );
     }
 
     #[test]
@@ -209,24 +230,36 @@ mod tests {
         // A real newline inside a template literal is content, not layout intent —
         // it must survive canonicalization verbatim.
         let out = canonicalize_js("const t = `a\nb`;\n").unwrap();
-        assert!(out.contains("`a\nb`"), "template literal newline not preserved: {out:?}");
+        assert!(
+            out.contains("`a\nb`"),
+            "template literal newline not preserved: {out:?}"
+        );
     }
 
     #[test]
     fn compile_reports_unimplemented_codegen() {
         let err = compile("<div>hi</div>", &CompileOptions::default()).unwrap_err();
-        assert!(matches!(err, CompileError::Codegen), "expected Codegen, got {err:?}");
+        assert!(
+            matches!(err, CompileError::Codegen),
+            "expected Codegen, got {err:?}"
+        );
     }
 
     #[test]
     fn compile_surfaces_parse_errors() {
         let err = compile("<script>const x = ;</script>", &CompileOptions::default()).unwrap_err();
-        assert!(matches!(err, CompileError::Parse(_)), "expected Parse, got {err:?}");
+        assert!(
+            matches!(err, CompileError::Parse(_)),
+            "expected Parse, got {err:?}"
+        );
     }
 
     #[test]
     fn canonicalize_surfaces_parse_errors() {
         let err = canonicalize_js("const x = ;").unwrap_err();
-        assert!(matches!(err, CanonicalizeError::Parse(_)), "expected Parse, got {err:?}");
+        assert!(
+            matches!(err, CanonicalizeError::Parse(_)),
+            "expected Parse, got {err:?}"
+        );
     }
 }
