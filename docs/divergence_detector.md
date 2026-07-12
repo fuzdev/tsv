@@ -169,6 +169,17 @@ The algorithm lives only in `lib/divergence/safety.ts`; it runs in-process on
 strings already in the Deno heap (source, FFI output, prettier output), so it
 never shells out — per-file cost is dominated by the prettier format call.
 
+**Reading a violation:** each char shows its `real` count with shared context —
+the first labeled `(ours N, prettier M)`, the rest bare `(N, M)`:
+
+```
+content_lost: 7 beyond prettier — '|'×2 (ours 28, prettier 26), '/'×2 (2, 0), '*'×2 (2, 0), '4'×1 (1, 0)
+```
+
+The `'|'×2 (ours 28, prettier 26)` reads as: of the 28 pipes our output dropped,
+26 are shared with prettier (a normalization, not loss) and only 2 are real. The
+`(2, 0)` entries are fully real — prettier dropped none.
+
 ## Overmatching Audit
 
 A pattern that matches a hunk it shouldn't will mark a real bug (or real data loss) as

@@ -10,25 +10,11 @@ The tsv parser aims for **exact AST compatibility** with Svelte's parser. This d
 
 ## Classification
 
-- Compat behavior — Svelte has quirky but harmless behavior. tsv action: tsv replicates it in AST output
-- Correction — Svelte/acorn violates spec, lacks a feature, or has a bug (e.g. acorn dropping all params from an `async <T>()` arrow). tsv action: tsv produces correct/complete AST
-- Representation limit — a value acorn keeps can't round-trip tsv's UTF-8 strings (lone surrogate → U+FFFD; `raw` unaffected). Rare, not a correction
+- **Compat behavior** — Svelte has quirky but harmless behavior (design choices, tokenization quirks, output that doesn't affect semantics). tsv replicates it in AST output
+- **Correction** — Svelte/acorn violates spec, corrupts semantics, or lacks a spec-defined feature (e.g. acorn dropping all params from an `async <T>()` arrow). tsv produces correct/complete AST
+- **Representation limit** — a value acorn keeps can't round-trip tsv's UTF-8 strings (lone surrogate → U+FFFD; `raw` unaffected). Rare, not a correction
 
 **Critical distinction**: Compat behaviors apply ONLY to **AST/JSON output** for tool compatibility. The tsv **formatter** always produces clean, standards-compliant code.
-
-## Decision Framework
-
-**When to match Svelte (replicate compat behaviors):**
-
-- Design choices (harmless metadata, span differences)
-- Tokenization quirks (source extraction oddities)
-- Output that doesn't affect semantics
-
-**When to correct Svelte:**
-
-- Spec violations (incorrect AST structure)
-- Semantic corruption (unparseable values)
-- Missing features (spec-defined syntax Svelte doesn't support)
 
 ---
 
@@ -121,10 +107,8 @@ Where the two goals conflict on conformant input, Svelte-parity wins for now.
   benchmark corpus tsv parses a lower share of `.css` than prettier/biome/oxfmt,
   but that gap is **scope, not deficiency**: those tools run the lenient PostCSS /
   `postcss-scss` / `postcss-less` stack; tsv does not. The rejected files are
-  overwhelmingly **non-standard CSS** — SCSS/Sass (`$vars`, `@mixin`, `@extend`),
-  LESS, CSS Modules (`:global`, `composes`), PostCSS plugin syntax, YAML
-  front-matter, and IE hacks. "Skipped CSS" is **not** a synonym for "SCSS" — most
-  are other non-CSS dialects.
+  overwhelmingly the non-goal dialects listed under "Explicit non-goals" below.
+  "Skipped CSS" is **not** a synonym for "SCSS" — most are other non-CSS dialects.
 - **A leading combinator is accepted in every context (contextual invalidity,
   deferred to diagnostics).** A complex selector may begin with a combinator
   (`> span {}`, `+ p {}`, `~ p {}`) at the top level, in an `@media`/`@supports`/
