@@ -33,9 +33,10 @@
 use bumpalo::Bump;
 use tsv_lang::{SharedInterner, Span};
 use tsv_ts::ast::internal::{
-    CallExpression, Expression, IdentName, Identifier, ImportDeclaration, ImportKind,
-    ImportNamespaceSpecifier, ImportPhase, ImportSpecifier, Literal, LiteralValue,
-    MemberExpression, StringCooked, TemplateCooked, TemplateElement, TemplateLiteral,
+    ArrowFunctionBody, ArrowFunctionExpression, BlockStatement, CallExpression, Expression,
+    IdentName, Identifier, ImportDeclaration, ImportKind, ImportNamespaceSpecifier, ImportPhase,
+    ImportSpecifier, Literal, LiteralValue, MemberExpression, Statement, StringCooked,
+    TemplateCooked, TemplateElement, TemplateLiteral, UnaryExpression, UnaryOperator,
 };
 
 /// The appendix-buffer bookkeeping plus interner access — everything node
@@ -206,6 +207,98 @@ impl<'arena> Builder<'arena> {
             expressions,
             span: Span::new(start, end),
         })
+    }
+
+    /// A call on a borrowed callee expression (`d()`): the callee keeps its
+    /// host span, the `()` is minted.
+    pub fn call_expr(
+        &mut self,
+        callee: &'arena Expression<'arena>,
+        arguments: &'arena [Expression<'arena>],
+    ) -> Expression<'arena> {
+        let end = self.mint("()").end;
+        Expression::CallExpression(CallExpression {
+            callee,
+            type_arguments: None,
+            arguments,
+            optional: false,
+            span: Span::new(callee.span().start, end),
+        })
+    }
+
+    /// `() => <body>` — an expression-bodied arrow around a borrowed expression
+    /// (the `$derived(e)` → `$.derived(() => e)` thunk).
+    pub fn arrow_expr(&mut self, body: &'arena Expression<'arena>) -> Expression<'arena> {
+        let header = self.mint("() => ");
+        Expression::ArrowFunctionExpression(ArrowFunctionExpression {
+            type_parameters: None,
+            params: &[],
+            body: ArrowFunctionBody::Expression(body),
+            return_type: None,
+            r#async: false,
+            params_start: Some(header.start),
+            span: Span::new(header.start, body.span().end),
+        })
+    }
+
+    /// `(<param>) => { <stmts> }` — a block-bodied arrow (the
+    /// `$$renderer.component(($$renderer) => { … })` wrapper). `block_span` is
+    /// the span the block's comment windows anchor on (the caller decides —
+    /// host-anchored when the body holds borrowed statements).
+    pub fn arrow_block(
+        &mut self,
+        param: &str,
+        body: &'arena [Statement<'arena>],
+        block_span: Span,
+    ) -> Expression<'arena> {
+        let start = self.mint("(").start;
+        let param_ident = self.ident(param);
+        let params_start = start;
+        self.mint(") => {");
+        let end = self.mint("}").end;
+        let mut params = bumpalo::collections::Vec::new_in(self.arena);
+        params.push(Expression::Identifier(param_ident));
+        Expression::ArrowFunctionExpression(ArrowFunctionExpression {
+            type_parameters: None,
+            params: params.into_bump_slice(),
+            body: ArrowFunctionBody::BlockStatement(BlockStatement {
+                body,
+                span: block_span,
+            }),
+            return_type: None,
+            r#async: false,
+            params_start: Some(params_start),
+            span: Span::new(start, end),
+        })
+    }
+
+    /// `void 0` — the oracle's spelling of an absent rune argument.
+    pub fn void_zero(&mut self) -> Expression<'arena> {
+        let span = self.mint("void 0");
+        let zero = self.arena.alloc(Expression::Literal(Literal {
+            value: LiteralValue::Number(0.0),
+            span: Span::new(span.end - 1, span.end),
+        }));
+        Expression::UnaryExpression(UnaryExpression {
+            operator: UnaryOperator::Void,
+            argument: zero,
+            prefix: true,
+            span,
+        })
+    }
+
+    /// A `true` literal (the `$.attr(name, value, true)` boolean-attribute arg).
+    pub fn true_literal(&mut self) -> Expression<'arena> {
+        let span = self.mint("true");
+        Expression::Literal(Literal {
+            value: LiteralValue::Boolean(true),
+            span,
+        })
+    }
+
+    /// A single-quoted string literal expression.
+    pub fn string_literal_expr(&mut self, content: &str) -> Expression<'arena> {
+        Expression::Literal(self.string_literal(content))
     }
 }
 

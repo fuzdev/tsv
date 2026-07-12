@@ -1,21 +1,32 @@
-//! Rune refusal walk over borrowed script statements.
+//! Rune refusal walk over borrowed script statements — plus the collection
+//! passes that ride the same traversal.
 //!
-//! The server transform rewrites exactly one rune shape (a top-level
-//! `let … = $props()` declarator init). Every other `$`-prefixed identifier in
-//! a walked value position must REFUSE rather than pass through into
-//! runtime-broken JS — rune calls in statement position (`$effect(() => {})`),
-//! nested functions (`function f() { let c = $state(0); }`), member-form calls
-//! (`$state.raw([])`, `$props.id()`), and bare *references* (`let x = $state;`,
-//! a future `$store` subscription) alike. This module is that guarantee: an
-//! exhaustive walk of every expression-bearing position, refusing any
-//! `$`-prefixed identifier reference it reaches. Calls report the callee root
-//! as a rune for the clearer message; non-computed member property names and
-//! non-computed object keys are *names*, not references, and stay allowed
-//! (`obj.$foo` is fine).
+//! The server transform rewrites a fixed set of rune shapes (top-level
+//! `$props()` / `$state(…)` / `$derived(…)` declarator inits, statement-position
+//! `$effect(…)`). Every other `$`-prefixed identifier in a walked value position
+//! must REFUSE rather than pass through into runtime-broken JS — rune calls in
+//! nested functions, member-form calls (`$props.id()`), and bare *references*
+//! (`let x = $state;`, a future `$store` subscription) alike. Calls report
+//! their callee root as a rune; name-only positions (non-computed member
+//! properties / object keys) are not walked, so `obj.$foo` stays allowed.
+//!
+//! The same walk collects what the static evaluator (`analyze.rs`) needs:
+//!
+//! - **assignment/update target roots** (`updated` — an updated binding is
+//!   never folded by the oracle), and
+//! - **names declared in nested/block scopes** (`nested_declared` — a shadowed
+//!   top-level name can't be trusted by this shadow-naive mutation collection,
+//!   so the binding goes `Opaque` and refuses if it reaches an evaluated spine),
+//!
+//! and refuses **reads of derived bindings** (`derived_names`) — those must
+//! become `d()` calls, which only the emitter's bare-expression positions can
+//! express over borrowed code.
 //!
 //! The matches are exhaustive on purpose — a new `Statement`/`Expression`
 //! variant fails compilation here instead of silently skipping the guard.
 //! TS *type* positions are not walked (nothing in type position evaluates).
+
+use std::collections::HashSet;
 
 use tsv_ts::ast::internal::{
     ArrowFunctionBody, ClassBody, ClassMember, ExportDefaultValue, Expression, ForInOfLeft,
@@ -23,23 +34,56 @@ use tsv_ts::ast::internal::{
 };
 
 use crate::CompileError;
+use crate::analyze::pattern_binding_names;
 
-/// Refuse any rune call anywhere in `stmt` (see module docs). The one sanctioned
-/// exception — the top-level `$props()` declarator init — is excluded by the
-/// caller walking around it, not by this guard.
-pub(crate) fn refuse_runes_in_statement(
-    stmt: &Statement<'_>,
-    source: &str,
-) -> Result<(), CompileError> {
-    walk_statement(stmt, source)
+/// The walk's shared state: the source names resolve against, the collection
+/// sinks, and the refusal set.
+pub(crate) struct WalkCtx<'a> {
+    pub source: &'a str,
+    /// Assignment/update target root names (fed back as `updated` bindings).
+    pub updated: &'a mut HashSet<String>,
+    /// Names declared in nested function/block scopes (shadow candidates).
+    pub nested_declared: &'a mut HashSet<String>,
+    /// Derived binding names — reading one anywhere in walked code refuses.
+    pub derived_names: &'a HashSet<String>,
+    /// Current function-nesting depth (0 = the statement being walked).
+    fn_depth: usize,
 }
 
-/// Refuse any rune call anywhere in `expr`.
-pub(crate) fn refuse_runes_in_expression(
-    expr: &Expression<'_>,
-    source: &str,
+impl<'a> WalkCtx<'a> {
+    pub fn new(
+        source: &'a str,
+        updated: &'a mut HashSet<String>,
+        nested_declared: &'a mut HashSet<String>,
+        derived_names: &'a HashSet<String>,
+    ) -> Self {
+        Self {
+            source,
+            updated,
+            nested_declared,
+            derived_names,
+            fn_depth: 0,
+        }
+    }
+}
+
+/// Walk one borrowed statement: refuse stray runes and derived reads, collect
+/// mutations and nested declarations. `depth` is the statement nesting depth
+/// (0 = a top-level script statement, whose declarations are the top bindings).
+pub(crate) fn walk_statement_guarded(
+    stmt: &Statement<'_>,
+    ctx: &mut WalkCtx<'_>,
+    depth: usize,
 ) -> Result<(), CompileError> {
-    walk_expression(expr, source)
+    walk_statement(stmt, ctx, depth)
+}
+
+/// Walk one expression (template expressions, rewritten declarator pieces).
+pub(crate) fn walk_expression_guarded(
+    expr: &Expression<'_>,
+    ctx: &mut WalkCtx<'_>,
+) -> Result<(), CompileError> {
+    walk_expression(expr, ctx)
 }
 
 /// The `$`-prefixed name of a plain identifier, or `None`. Parsed identifiers
@@ -49,12 +93,19 @@ fn dollar_identifier_name<'s>(
     id: &tsv_ts::ast::internal::Identifier<'_>,
     source: &'s str,
 ) -> Option<&'s str> {
+    let name = identifier_name(id, source)?;
+    name.starts_with('$').then_some(name)
+}
+
+fn identifier_name<'s>(
+    id: &tsv_ts::ast::internal::Identifier<'_>,
+    source: &'s str,
+) -> Option<&'s str> {
     if id.escaped_name.is_some() {
         return None;
     }
     let start = id.span.start as usize;
-    let name = &source[start..start + id.name_len as usize];
-    name.starts_with('$').then_some(name)
+    Some(&source[start..start + id.name_len as usize])
 }
 
 /// The `$`-prefixed root-identifier name of a callee, peeled through member
@@ -77,97 +128,179 @@ fn rune_error(name: &str) -> CompileError {
     CompileError::Unsupported(format!("rune {name}"))
 }
 
-fn walk_statements(stmts: &[Statement<'_>], source: &str) -> Result<(), CompileError> {
-    for stmt in stmts {
-        walk_statement(stmt, source)?;
+/// Record the root identifier(s) of an assignment target (through member
+/// chains and destructuring patterns) as updated.
+fn collect_assign_target_roots(target: &Expression<'_>, ctx: &mut WalkCtx<'_>) {
+    match target {
+        Expression::Identifier(id) => {
+            if let Some(name) = identifier_name(id, ctx.source) {
+                ctx.updated.insert(name.to_string());
+            }
+        }
+        Expression::MemberExpression(m) => collect_assign_target_roots(m.object, ctx),
+        Expression::TSNonNullExpression(t) => collect_assign_target_roots(t.expression, ctx),
+        Expression::TSAsExpression(t) => collect_assign_target_roots(t.expression, ctx),
+        Expression::ParenthesizedExpression(p) => collect_assign_target_roots(p.expression, ctx),
+        Expression::ObjectPattern(obj) => {
+            for prop in obj.properties {
+                match prop {
+                    ObjectPatternProperty::Property(p) => {
+                        collect_assign_target_roots(&p.value, ctx);
+                    }
+                    ObjectPatternProperty::RestElement(rest) => {
+                        collect_assign_target_roots(rest.argument, ctx);
+                    }
+                }
+            }
+        }
+        Expression::ArrayPattern(arr) => {
+            for element in arr.elements.iter().flatten() {
+                collect_assign_target_roots(element, ctx);
+            }
+        }
+        Expression::AssignmentPattern(a) => collect_assign_target_roots(a.left, ctx),
+        Expression::RestElement(r) => collect_assign_target_roots(r.argument, ctx),
+        _ => {}
+    }
+}
+
+/// Record the names a declaration pattern declares into `nested_declared`
+/// (best-effort — unusual pattern shapes just record nothing extra).
+fn collect_nested_declared(pattern: &Expression<'_>, ctx: &mut WalkCtx<'_>) {
+    let mut names = Vec::new();
+    if pattern_binding_names(pattern, ctx.source, &mut names).is_ok() {
+        for name in names {
+            ctx.nested_declared.insert(name);
+        }
+    }
+}
+
+fn enter_function(params: &[Expression<'_>], ctx: &mut WalkCtx<'_>) -> Result<(), CompileError> {
+    ctx.fn_depth += 1;
+    for param in params {
+        collect_nested_declared(param, ctx);
+        walk_expression(param, ctx)?;
     }
     Ok(())
 }
 
-fn walk_statement(stmt: &Statement<'_>, source: &str) -> Result<(), CompileError> {
+fn walk_statements(
+    stmts: &[Statement<'_>],
+    ctx: &mut WalkCtx<'_>,
+    depth: usize,
+) -> Result<(), CompileError> {
+    for stmt in stmts {
+        walk_statement(stmt, ctx, depth)?;
+    }
+    Ok(())
+}
+
+fn walk_statement(
+    stmt: &Statement<'_>,
+    ctx: &mut WalkCtx<'_>,
+    depth: usize,
+) -> Result<(), CompileError> {
     match stmt {
-        Statement::ExpressionStatement(s) => walk_expression(&s.expression, source),
-        Statement::VariableDeclaration(s) => walk_variable_declaration(s, source),
-        Statement::ReturnStatement(s) => walk_opt(s.argument.as_ref(), source),
-        Statement::BlockStatement(s) => walk_statements(s.body, source),
+        Statement::ExpressionStatement(s) => walk_expression(&s.expression, ctx),
+        Statement::VariableDeclaration(s) => walk_variable_declaration(s, ctx, depth),
+        Statement::ReturnStatement(s) => walk_opt(s.argument.as_ref(), ctx),
+        Statement::BlockStatement(s) => walk_statements(s.body, ctx, depth + 1),
         Statement::FunctionDeclaration(s) => {
-            walk_expressions(s.params, source)?;
-            walk_statements(s.body.body, source)
+            if (depth > 0 || ctx.fn_depth > 0)
+                && let Some(id) = &s.id
+                && let Some(name) = identifier_name(id, ctx.source)
+            {
+                ctx.nested_declared.insert(name.to_string());
+            }
+            enter_function(s.params, ctx)?;
+            let result = walk_statements(s.body.body, ctx, depth + 1);
+            ctx.fn_depth -= 1;
+            result
         }
-        Statement::ClassDeclaration(s) => walk_class_body(&s.body, source),
+        Statement::ClassDeclaration(s) => walk_class_body(&s.body, ctx),
         Statement::ExportNamedDeclaration(s) => match &s.declaration {
-            Some(decl) => walk_statement(decl, source),
+            Some(decl) => walk_statement(decl, ctx, depth),
             None => Ok(()),
         },
         Statement::ExportDefaultDeclaration(s) => match &s.declaration {
-            ExportDefaultValue::Expression(e) => walk_expression(e, source),
+            ExportDefaultValue::Expression(e) => walk_expression(e, ctx),
             ExportDefaultValue::FunctionDeclaration(f) => {
-                walk_expressions(f.params, source)?;
-                walk_statements(f.body.body, source)
+                enter_function(f.params, ctx)?;
+                let result = walk_statements(f.body.body, ctx, depth + 1);
+                ctx.fn_depth -= 1;
+                result
             }
-            ExportDefaultValue::ClassDeclaration(c) => walk_class_body(&c.body, source),
+            ExportDefaultValue::ClassDeclaration(c) => walk_class_body(&c.body, ctx),
             ExportDefaultValue::TSDeclareFunction(_)
             | ExportDefaultValue::TSInterfaceDeclaration(_) => Ok(()),
         },
         Statement::IfStatement(s) => {
-            walk_expression(&s.test, source)?;
-            walk_statement(s.consequent, source)?;
+            walk_expression(&s.test, ctx)?;
+            walk_statement(s.consequent, ctx, depth + 1)?;
             match s.alternate {
-                Some(alt) => walk_statement(alt, source),
+                Some(alt) => walk_statement(alt, ctx, depth + 1),
                 None => Ok(()),
             }
         }
         Statement::ForStatement(s) => {
             match &s.init {
                 Some(ForInit::VariableDeclaration(decl)) => {
-                    walk_variable_declaration(decl, source)?;
+                    // For-scope declarations are block-scoped — always shadow
+                    // candidates regardless of depth.
+                    for declarator in decl.declarations {
+                        collect_nested_declared(&declarator.id, ctx);
+                    }
+                    walk_variable_declaration(decl, ctx, depth + 1)?;
                 }
-                Some(ForInit::Expression(e)) => walk_expression(e, source)?,
+                Some(ForInit::Expression(e)) => walk_expression(e, ctx)?,
                 None => {}
             }
-            walk_opt(s.test.as_ref(), source)?;
-            walk_opt(s.update.as_ref(), source)?;
-            walk_statement(s.body, source)
+            walk_opt(s.test.as_ref(), ctx)?;
+            walk_opt(s.update.as_ref(), ctx)?;
+            walk_statement(s.body, ctx, depth + 1)
         }
         Statement::ForInStatement(s) => {
-            walk_for_left(&s.left, source)?;
-            walk_expression(&s.right, source)?;
-            walk_statement(s.body, source)
+            walk_for_left(&s.left, ctx, depth)?;
+            walk_expression(&s.right, ctx)?;
+            walk_statement(s.body, ctx, depth + 1)
         }
         Statement::ForOfStatement(s) => {
-            walk_for_left(&s.left, source)?;
-            walk_expression(&s.right, source)?;
-            walk_statement(s.body, source)
+            walk_for_left(&s.left, ctx, depth)?;
+            walk_expression(&s.right, ctx)?;
+            walk_statement(s.body, ctx, depth + 1)
         }
         Statement::WhileStatement(s) => {
-            walk_expression(&s.test, source)?;
-            walk_statement(s.body, source)
+            walk_expression(&s.test, ctx)?;
+            walk_statement(s.body, ctx, depth + 1)
         }
         Statement::DoWhileStatement(s) => {
-            walk_statement(s.body, source)?;
-            walk_expression(&s.test, source)
+            walk_statement(s.body, ctx, depth + 1)?;
+            walk_expression(&s.test, ctx)
         }
         Statement::SwitchStatement(s) => {
-            walk_expression(&s.discriminant, source)?;
+            walk_expression(&s.discriminant, ctx)?;
             for case in s.cases {
-                walk_opt(case.test.as_ref(), source)?;
-                walk_statements(case.consequent, source)?;
+                walk_opt(case.test.as_ref(), ctx)?;
+                walk_statements(case.consequent, ctx, depth + 1)?;
             }
             Ok(())
         }
         Statement::TryStatement(s) => {
-            walk_statements(s.block.body, source)?;
+            walk_statements(s.block.body, ctx, depth + 1)?;
             if let Some(handler) = &s.handler {
-                walk_opt(handler.param.as_ref(), source)?;
-                walk_statements(handler.body.body, source)?;
+                if let Some(param) = &handler.param {
+                    collect_nested_declared(param, ctx);
+                    walk_expression(param, ctx)?;
+                }
+                walk_statements(handler.body.body, ctx, depth + 1)?;
             }
             if let Some(finalizer) = &s.finalizer {
-                walk_statements(finalizer.body, source)?;
+                walk_statements(finalizer.body, ctx, depth + 1)?;
             }
             Ok(())
         }
-        Statement::ThrowStatement(s) => walk_expression(&s.argument, source),
-        Statement::LabeledStatement(s) => walk_statement(s.body, source),
+        Statement::ThrowStatement(s) => walk_expression(&s.argument, ctx),
+        Statement::LabeledStatement(s) => walk_statement(s.body, ctx, depth + 1),
         // No expression-bearing children.
         Statement::BreakStatement(_)
         | Statement::ContinueStatement(_)
@@ -185,97 +318,138 @@ fn walk_statement(stmt: &Statement<'_>, source: &str) -> Result<(), CompileError
         Statement::TSEnumDeclaration(_) | Statement::TSModuleDeclaration(_) => Err(
             CompileError::Unsupported("TS enum/module declaration in instance script".to_string()),
         ),
-        Statement::TSExportAssignment(s) => walk_expression(&s.expression, source),
+        Statement::TSExportAssignment(s) => walk_expression(&s.expression, ctx),
     }
 }
 
 fn walk_variable_declaration(
     decl: &tsv_ts::ast::internal::VariableDeclaration<'_>,
-    source: &str,
+    ctx: &mut WalkCtx<'_>,
+    depth: usize,
 ) -> Result<(), CompileError> {
     for declarator in decl.declarations {
-        walk_expression(&declarator.id, source)?;
-        walk_opt(declarator.init.as_ref(), source)?;
+        if depth > 0 || ctx.fn_depth > 0 {
+            collect_nested_declared(&declarator.id, ctx);
+        }
+        walk_expression(&declarator.id, ctx)?;
+        walk_opt(declarator.init.as_ref(), ctx)?;
     }
     Ok(())
 }
 
-fn walk_for_left(left: &ForInOfLeft<'_>, source: &str) -> Result<(), CompileError> {
+fn walk_for_left(
+    left: &ForInOfLeft<'_>,
+    ctx: &mut WalkCtx<'_>,
+    depth: usize,
+) -> Result<(), CompileError> {
     match left {
-        ForInOfLeft::VariableDeclaration(decl) => walk_variable_declaration(decl, source),
-        ForInOfLeft::Pattern(pattern) => walk_expression(pattern, source),
+        ForInOfLeft::VariableDeclaration(decl) => {
+            for declarator in decl.declarations {
+                collect_nested_declared(&declarator.id, ctx);
+            }
+            walk_variable_declaration(decl, ctx, depth + 1)
+        }
+        ForInOfLeft::Pattern(pattern) => {
+            collect_assign_target_roots(pattern, ctx);
+            walk_expression(pattern, ctx)
+        }
     }
 }
 
-fn walk_opt(expr: Option<&Expression<'_>>, source: &str) -> Result<(), CompileError> {
+fn walk_opt(expr: Option<&Expression<'_>>, ctx: &mut WalkCtx<'_>) -> Result<(), CompileError> {
     match expr {
-        Some(e) => walk_expression(e, source),
+        Some(e) => walk_expression(e, ctx),
         None => Ok(()),
     }
 }
 
-fn walk_expressions(exprs: &[Expression<'_>], source: &str) -> Result<(), CompileError> {
+fn walk_expressions(exprs: &[Expression<'_>], ctx: &mut WalkCtx<'_>) -> Result<(), CompileError> {
     for expr in exprs {
-        walk_expression(expr, source)?;
+        walk_expression(expr, ctx)?;
     }
     Ok(())
 }
 
-fn walk_function_expression(f: &FunctionExpression<'_>, source: &str) -> Result<(), CompileError> {
-    walk_expressions(f.params, source)?;
-    walk_statements(f.body.body, source)
+fn walk_function_expression(
+    f: &FunctionExpression<'_>,
+    ctx: &mut WalkCtx<'_>,
+) -> Result<(), CompileError> {
+    if let Some(id) = &f.id
+        && let Some(name) = identifier_name(id, ctx.source)
+    {
+        ctx.nested_declared.insert(name.to_string());
+    }
+    enter_function(f.params, ctx)?;
+    let result = walk_statements(f.body.body, ctx, 1);
+    ctx.fn_depth -= 1;
+    result
 }
 
-fn walk_class_body(body: &ClassBody<'_>, source: &str) -> Result<(), CompileError> {
+fn walk_class_body(body: &ClassBody<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), CompileError> {
     for member in body.body {
         match member {
             ClassMember::MethodDefinition(m) => {
                 if m.computed {
-                    walk_expression(&m.key, source)?;
+                    walk_expression(&m.key, ctx)?;
                 }
-                walk_function_expression(&m.value, source)?;
+                walk_function_expression(&m.value, ctx)?;
             }
             ClassMember::PropertyDefinition(p) => {
                 if p.computed {
-                    walk_expression(&p.key, source)?;
+                    walk_expression(&p.key, ctx)?;
                 }
-                walk_opt(p.value.as_ref(), source)?;
+                walk_opt(p.value.as_ref(), ctx)?;
             }
-            ClassMember::StaticBlock(b) => walk_statements(b.body, source)?,
+            ClassMember::StaticBlock(b) => {
+                ctx.fn_depth += 1;
+                let result = walk_statements(b.body, ctx, 1);
+                ctx.fn_depth -= 1;
+                result?;
+            }
             ClassMember::IndexSignature(_) => {}
         }
     }
     Ok(())
 }
 
-fn walk_expression(expr: &Expression<'_>, source: &str) -> Result<(), CompileError> {
+fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), CompileError> {
     match expr {
-        // The guard itself: any call/new whose callee roots in a `$`-identifier.
+        // The rune guard: any call/new whose callee roots in a `$`-identifier.
         Expression::CallExpression(call) => {
-            if let Some(name) = dollar_callee_root(call.callee, source) {
+            if let Some(name) = dollar_callee_root(call.callee, ctx.source) {
                 return Err(rune_error(name));
             }
-            walk_expression(call.callee, source)?;
-            walk_expressions(call.arguments, source)
+            walk_expression(call.callee, ctx)?;
+            walk_expressions(call.arguments, ctx)
         }
         Expression::NewExpression(new_expr) => {
-            if let Some(name) = dollar_callee_root(new_expr.callee, source) {
+            if let Some(name) = dollar_callee_root(new_expr.callee, ctx.source) {
                 return Err(rune_error(name));
             }
-            walk_expression(new_expr.callee, source)?;
-            walk_expressions(new_expr.arguments, source)
+            walk_expression(new_expr.callee, ctx)?;
+            walk_expressions(new_expr.arguments, ctx)
         }
 
         // A bare `$`-prefixed identifier reference (`let x = $state;`, a
-        // `$store` subscription) is oracle-rejected input — refuse. Positions
-        // that carry names rather than references (non-computed member
-        // properties / object keys) are never walked, so `obj.$foo` stays fine.
-        Expression::Identifier(id) => match dollar_identifier_name(id, source) {
-            Some(name) => Err(CompileError::Unsupported(format!(
-                "$-prefixed identifier {name}"
-            ))),
-            None => Ok(()),
-        },
+        // `$store` subscription) is oracle-rejected input — refuse. A derived
+        // binding read outside the emitter's bare positions must become `d()`,
+        // which borrowed code can't express — refuse. Name-only positions
+        // (non-computed member properties / object keys) are never walked.
+        Expression::Identifier(id) => {
+            if let Some(name) = dollar_identifier_name(id, ctx.source) {
+                return Err(CompileError::Unsupported(format!(
+                    "$-prefixed identifier {name}"
+                )));
+            }
+            if let Some(name) = identifier_name(id, ctx.source)
+                && ctx.derived_names.contains(name)
+            {
+                return Err(CompileError::Unsupported(format!(
+                    "read of derived binding {name} (supported only as a bare template expression)"
+                )));
+            }
+            Ok(())
+        }
 
         // Leaves.
         Expression::Literal(_)
@@ -290,75 +464,91 @@ fn walk_expression(expr: &Expression<'_>, source: &str) -> Result<(), CompileErr
                 match prop {
                     ObjectProperty::Property(p) => {
                         if p.computed {
-                            walk_expression(&p.key, source)?;
+                            walk_expression(&p.key, ctx)?;
                         }
-                        walk_expression(&p.value, source)?;
+                        walk_expression(&p.value, ctx)?;
                     }
-                    ObjectProperty::SpreadElement(s) => walk_expression(s.argument, source)?,
+                    ObjectProperty::SpreadElement(s) => walk_expression(s.argument, ctx)?,
                 }
             }
             Ok(())
         }
         Expression::ArrayExpression(arr) => {
             for element in arr.elements {
-                walk_opt(element.as_ref(), source)?;
+                walk_opt(element.as_ref(), ctx)?;
             }
             Ok(())
         }
-        Expression::UnaryExpression(u) => walk_expression(u.argument, source),
-        Expression::UpdateExpression(u) => walk_expression(u.argument, source),
+        Expression::UnaryExpression(u) => walk_expression(u.argument, ctx),
+        Expression::UpdateExpression(u) => {
+            collect_assign_target_roots(u.argument, ctx);
+            walk_expression(u.argument, ctx)
+        }
         Expression::BinaryExpression(b) => {
-            walk_expression(b.left, source)?;
-            walk_expression(b.right, source)
+            walk_expression(b.left, ctx)?;
+            walk_expression(b.right, ctx)
         }
         Expression::MemberExpression(m) => {
-            walk_expression(m.object, source)?;
+            walk_expression(m.object, ctx)?;
             if m.computed {
-                walk_expression(m.property, source)?;
+                walk_expression(m.property, ctx)?;
             }
             Ok(())
         }
         Expression::ConditionalExpression(c) => {
-            walk_expression(c.test, source)?;
-            walk_expression(c.consequent, source)?;
-            walk_expression(c.alternate, source)
+            walk_expression(c.test, ctx)?;
+            walk_expression(c.consequent, ctx)?;
+            walk_expression(c.alternate, ctx)
         }
         Expression::ArrowFunctionExpression(a) => {
-            walk_expressions(a.params, source)?;
-            match &a.body {
-                ArrowFunctionBody::Expression(e) => walk_expression(e, source),
-                ArrowFunctionBody::BlockStatement(b) => walk_statements(b.body, source),
-            }
+            enter_function(a.params, ctx)?;
+            let result = match &a.body {
+                ArrowFunctionBody::Expression(e) => walk_expression(e, ctx),
+                ArrowFunctionBody::BlockStatement(b) => walk_statements(b.body, ctx, 1),
+            };
+            ctx.fn_depth -= 1;
+            result
         }
-        Expression::FunctionExpression(f) => walk_function_expression(f, source),
-        Expression::ClassExpression(c) => walk_class_body(&c.body, source),
-        Expression::SpreadElement(s) => walk_expression(s.argument, source),
-        Expression::TemplateLiteral(t) => walk_expressions(t.expressions, source),
+        Expression::FunctionExpression(f) => walk_function_expression(f, ctx),
+        Expression::ClassExpression(c) => walk_class_body(&c.body, ctx),
+        Expression::SpreadElement(s) => walk_expression(s.argument, ctx),
+        Expression::TemplateLiteral(t) => walk_expressions(t.expressions, ctx),
         Expression::TaggedTemplateExpression(t) => {
-            walk_expression(t.tag, source)?;
-            walk_expressions(t.quasi.expressions, source)
+            walk_expression(t.tag, ctx)?;
+            walk_expressions(t.quasi.expressions, ctx)
         }
-        Expression::AwaitExpression(a) => walk_expression(a.argument, source),
+        // Top-level/template `await` forces the oracle's async-component
+        // shapes (blockers, thunked pushes) — not implemented, refuse. Inside
+        // a nested function it is ordinary code and passes through.
+        Expression::AwaitExpression(a) => {
+            if ctx.fn_depth == 0 {
+                return Err(CompileError::Unsupported(
+                    "top-level await (async component output not implemented)".to_string(),
+                ));
+            }
+            walk_expression(a.argument, ctx)
+        }
         Expression::YieldExpression(y) => match y.argument {
-            Some(argument) => walk_expression(argument, source),
+            Some(argument) => walk_expression(argument, ctx),
             None => Ok(()),
         },
-        Expression::SequenceExpression(s) => walk_expressions(s.expressions, source),
+        Expression::SequenceExpression(s) => walk_expressions(s.expressions, ctx),
         Expression::AssignmentExpression(a) => {
-            walk_expression(a.left, source)?;
-            walk_expression(a.right, source)
+            collect_assign_target_roots(a.left, ctx);
+            walk_expression(a.left, ctx)?;
+            walk_expression(a.right, ctx)
         }
         Expression::ObjectPattern(p) => {
             for prop in p.properties {
                 match prop {
                     ObjectPatternProperty::Property(prop) => {
                         if prop.computed {
-                            walk_expression(&prop.key, source)?;
+                            walk_expression(&prop.key, ctx)?;
                         }
-                        walk_expression(&prop.value, source)?;
+                        walk_expression(&prop.value, ctx)?;
                     }
                     ObjectPatternProperty::RestElement(rest) => {
-                        walk_expression(rest.argument, source)?;
+                        walk_expression(rest.argument, ctx)?;
                     }
                 }
             }
@@ -366,29 +556,29 @@ fn walk_expression(expr: &Expression<'_>, source: &str) -> Result<(), CompileErr
         }
         Expression::ArrayPattern(p) => {
             for element in p.elements {
-                walk_opt(element.as_ref(), source)?;
+                walk_opt(element.as_ref(), ctx)?;
             }
             Ok(())
         }
         Expression::AssignmentPattern(p) => {
-            walk_expression(p.left, source)?;
-            walk_expression(p.right, source)
+            walk_expression(p.left, ctx)?;
+            walk_expression(p.right, ctx)
         }
-        Expression::RestElement(r) => walk_expression(r.argument, source),
-        Expression::TSTypeAssertion(t) => walk_expression(t.expression, source),
-        Expression::TSAsExpression(t) => walk_expression(t.expression, source),
-        Expression::TSSatisfiesExpression(t) => walk_expression(t.expression, source),
-        Expression::TSInstantiationExpression(t) => walk_expression(t.expression, source),
-        Expression::TSNonNullExpression(t) => walk_expression(t.expression, source),
-        Expression::TSParameterProperty(t) => walk_expression(t.parameter, source),
+        Expression::RestElement(r) => walk_expression(r.argument, ctx),
+        Expression::TSTypeAssertion(t) => walk_expression(t.expression, ctx),
+        Expression::TSAsExpression(t) => walk_expression(t.expression, ctx),
+        Expression::TSSatisfiesExpression(t) => walk_expression(t.expression, ctx),
+        Expression::TSInstantiationExpression(t) => walk_expression(t.expression, ctx),
+        Expression::TSNonNullExpression(t) => walk_expression(t.expression, ctx),
+        Expression::TSParameterProperty(t) => walk_expression(t.parameter, ctx),
         Expression::ImportExpression(i) => {
-            walk_expression(i.source, source)?;
+            walk_expression(i.source, ctx)?;
             match i.options {
-                Some(options) => walk_expression(options, source),
+                Some(options) => walk_expression(options, ctx),
                 None => Ok(()),
             }
         }
-        Expression::JsdocCast(j) => walk_expression(j.inner, source),
-        Expression::ParenthesizedExpression(p) => walk_expression(p.expression, source),
+        Expression::JsdocCast(j) => walk_expression(j.inner, ctx),
+        Expression::ParenthesizedExpression(p) => walk_expression(p.expression, ctx),
     }
 }

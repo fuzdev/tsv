@@ -15,6 +15,7 @@
 //! language subset today; unhandled shapes surface as
 //! [`CompileError::Unsupported`] rather than guessed output.
 
+mod analyze;
 mod build;
 mod rune_guard;
 mod transform_server;
@@ -395,15 +396,58 @@ mod tests {
     }
 
     #[test]
-    fn compile_rejects_unsupported_rune() {
-        let err = compile(
+    fn compile_state_rune_folds_known_read() {
+        // `$state(0)` drops the wrapper; the never-updated binding is
+        // statically known, so `{a}` folds into the template (the oracle's
+        // evaluator behavior).
+        let out = compile(
             "<script>let a = $state(0);</script>\n<p>{a}</p>",
             &CompileOptions::default(),
         )
-        .unwrap_err();
+        .unwrap();
+        assert_eq!(
+            out.js,
+            "import * as $ from 'svelte/internal/server';\n\
+             export default function Input($$renderer) {\n\
+             \tlet a = 0;\n\
+             \t$$renderer.push(`<p>0</p>`);\n\
+             }\n"
+        );
+    }
+
+    #[test]
+    fn compile_state_rune_escapes_updated_read() {
+        // A mutated state binding is not foldable — the read stays dynamic.
+        let out = compile(
+            "<script>\n\tlet a = $state(0);\n\tfunction inc() {\n\t\ta += 1;\n\t}\n</script>\n<p>{a}</p>",
+            &CompileOptions::default(),
+        )
+        .unwrap();
         assert!(
-            matches!(&err, CompileError::Unsupported(what) if what.contains("$state")),
-            "expected Unsupported($state), got {err:?}"
+            out.js.contains("`<p>${$.escape(a)}</p>`"),
+            "updated state read must stay dynamic: {}",
+            out.js
+        );
+    }
+
+    #[test]
+    fn compile_derived_rune_rewrites_init_and_read() {
+        // `$derived(e)` → `$.derived(() => e)`; a bare template read of the
+        // (non-foldable) derived binding becomes `d()`.
+        let out = compile(
+            "<script>\n\tlet a = $state(1);\n\tlet d = $derived(a * 2);\n\tfunction inc() {\n\t\ta += 1;\n\t}\n</script>\n<p>{d}</p>",
+            &CompileOptions::default(),
+        )
+        .unwrap();
+        assert!(
+            out.js.contains("let d = $.derived(() => a * 2);"),
+            "derived init not rewritten: {}",
+            out.js
+        );
+        assert!(
+            out.js.contains("`<p>${$.escape(d())}</p>`"),
+            "derived read must become a call: {}",
+            out.js
         );
     }
 
@@ -417,10 +461,23 @@ mod tests {
     }
 
     #[test]
-    fn compile_rejects_statement_position_rune() {
-        assert_unsupported(
-            "<script>\n\t$effect(() => {});\n</script>\n<p>text</p>",
-            "$effect",
+    fn compile_effect_forces_component_wrapper() {
+        // Statement-position `$effect(…)` is dropped; the whole body moves
+        // inside `$$renderer.component(($$renderer) => { … })`.
+        let out = compile(
+            "<script>\n\tlet { a } = $props();\n\t$effect(() => {});\n</script>\n<p>{a}</p>",
+            &CompileOptions::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            out.js,
+            "import * as $ from 'svelte/internal/server';\n\
+             export default function Input($$renderer, $$props) {\n\
+             \t$$renderer.component(($$renderer) => {\n\
+             \t\tlet { a } = $$props;\n\
+             \t\t$$renderer.push(`<p>${$.escape(a)}</p>`);\n\
+             \t});\n\
+             }\n"
         );
     }
 
@@ -433,11 +490,25 @@ mod tests {
     }
 
     #[test]
-    fn compile_rejects_member_form_rune_init() {
-        assert_unsupported(
-            "<script>\n\tlet a = $state.raw([]);\n</script>\n<p>{a}</p>",
-            "$state",
+    fn compile_state_raw_drops_wrapper() {
+        // `$state.raw(v)` is a sanctioned init: the wrapper drops; an array
+        // value isn't statically foldable, so the read stays dynamic.
+        let out = compile(
+            "<script>let a = $state.raw([1]);</script>\n<p>{a}</p>",
+            &CompileOptions::default(),
+        )
+        .unwrap();
+        assert!(out.js.contains("let a = [1];"), "got: {}", out.js);
+        assert!(
+            out.js.contains("`<p>${$.escape(a)}</p>`"),
+            "got: {}",
+            out.js
         );
+    }
+
+    #[test]
+    fn compile_rejects_member_form_rune_misuse() {
+        // Non-sanctioned member-form rune calls still refuse.
         assert_unsupported(
             "<script>\n\tlet { id } = $props;\n\tlet b = $props.id();\n</script>\n<p>{b}</p>",
             "$props",
