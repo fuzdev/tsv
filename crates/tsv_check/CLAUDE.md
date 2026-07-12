@@ -58,7 +58,7 @@
   fused walk — functions-first symbol binding reorders symbol creation
   within a statement list, which would break strict pre-order id
   intervals; see `binder/mod.rs`'s header), plus a **third flow walk**
-  (`flow.rs`) invoked separately from `program.rs`:
+  (`flow/`) invoked separately from `program.rs`:
   - `mod.rs` — the SoA lowering walk: dense 1-based `NodeId`s, side columns
     (`parents`/`kinds`/`spans`/`subtree_end` — the latter makes descendant
     tests O(1) interval checks), the address→NodeId map, per-file facts
@@ -77,8 +77,14 @@
     file-local (bind products stay relocatable); cross-file identity is
     reconciled at merge via owned name strings, with a merge-time atom-remap
     as the planned multi-file replacement.
-  - `flow.rs` — the **third walk**: the per-file control-flow graph
-    (`build_flow`), a faithful port of tsgo's binder flow construction
+  - `flow/` — the **third walk**, a directory-module split by concern:
+    `flags.rs` (the `FlowFlags` bitset), `graph.rs` (`FlowGraph`'s SoA
+    storage + read API, plus the `FlowSwitchClause`/`FlowReduceLabel`
+    payload types), `product.rs` (the owned `FlowProduct`/`FlowStats` +
+    the `render_flow_dot` DOT renderer), `build.rs` (`FlowBuilder` + the
+    `pub fn build_flow` entry point + the pure AST predicates the walk
+    dispatches on), and `tests.rs`. The per-file control-flow graph
+    (`build_flow`) is a faithful port of tsgo's binder flow construction
     (`bind`/`bindContainer`/`bindChildren` + the per-statement flow shapers).
     A `FlowGraph` in SoA form (`u16` `FlowFlags`, kind-discriminated
     `subject`/`antecedent`, length-prefixed pool runs, switch/reduce payload
@@ -122,7 +128,7 @@
   program-wide sort/dedup. The traversal's `visit_type_params` is the seam
   future per-node checks hook into. `check/` also holds `unreachable.rs` — the
   TS7027 (unreachable-code) + TS7028 (unused-label) **flow shim**, a separate
-  consumer of the binder's flow product (`binder/flow.rs`): it reads the
+  consumer of the binder's flow product (`binder/flow/`): it reads the
   fast-path `NODE_FLAGS_UNREACHABLE` bit (tsgo's binder-set-bit branch of
   `checkSourceElementUnreachable`), building a bind-time, variant-independent
   candidate table (so `BoundProgram` stays owned/relocatable) that per-variant
