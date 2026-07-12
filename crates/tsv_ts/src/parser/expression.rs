@@ -1149,14 +1149,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     let arguments = arguments.into_bump_slice();
 
                     let span = Span::new(left.actual_start, paren_end as u32);
-                    // When callee is TSInstantiationExpression (e.g., foo<T>), flatten:
-                    // TSInstantiationExpression + CallExpression → CallExpression with typeArguments
-                    let (callee, type_arguments) = match left.expr {
-                        Expression::TSInstantiationExpression(inst) => {
-                            (inst.expression, Some(inst.type_arguments.clone()))
-                        }
-                        other => (other, None),
-                    };
+                    // A `foo<T>(...)` generic call lifts the callee's `<T>` into
+                    // the call's `typeArguments` (see `flatten_instantiation`).
+                    let (callee, type_arguments) = self.flatten_instantiation(left.expr);
                     left = ParsedExpr::with_start_end(
                         self.arena,
                         Expression::CallExpression(CallExpression {
@@ -1183,14 +1178,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                                 "Optional chaining cannot appear in the tag of tagged template expressions",
                             )));
                         }
-                        // When tag is TSInstantiationExpression (e.g., tag<T>), flatten:
-                        // TSInstantiationExpression + TaggedTemplate → TaggedTemplate with typeArguments
-                        let (tag, type_arguments) = match left.expr {
-                            Expression::TSInstantiationExpression(inst) => {
-                                (inst.expression, Some(inst.type_arguments.clone()))
-                            }
-                            other => (other, None),
-                        };
+                        // A `` tag<T>`x` `` tagged template lifts the tag's `<T>`
+                        // into the tag's `typeArguments` (see `flatten_instantiation`).
+                        let (tag, type_arguments) = self.flatten_instantiation(left.expr);
                         left = self.build_tagged_template(
                             tag,
                             left.actual_start,
@@ -1796,6 +1786,29 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         ))
     }
 
+    /// Flatten a `foo<T>` `TSInstantiationExpression` operand into its inner
+    /// expression plus the lifted `<T>` type arguments — the inverse of
+    /// `parse_instantiation_expression`. When a `(` (generic call) or template
+    /// tag (tagged template) follows the instantiation, the `<T>` belongs to
+    /// that call/tag as its `typeArguments` rather than staying a standalone
+    /// instantiation (acorn parity). A non-instantiation operand passes through
+    /// unchanged with no type arguments. Shared by the subscript loop's call and
+    /// tagged-template arms.
+    fn flatten_instantiation(
+        &self,
+        expr: &'arena Expression<'arena>,
+    ) -> (
+        &'arena Expression<'arena>,
+        Option<TSTypeParameterInstantiation<'arena>>,
+    ) {
+        match expr {
+            Expression::TSInstantiationExpression(inst) => {
+                (inst.expression, Some(inst.type_arguments.clone()))
+            }
+            other => (other, None),
+        }
+    }
+
     /// Reject a property access immediately after a TypeScript instantiation
     /// expression. A `f<T>` (and a bare `new A<T>` — type arguments with no call)
     /// may not be followed by `.`/`?.` property access: acorn rejects `f<T>.x` /
@@ -2281,8 +2294,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `tag_start..quasi.span.end` (a tag has no parens of its own) — lives in one
     /// place. `tag` is the resolved tag expression and `tag_start` its
     /// paren-inclusive start; the postfix arm flattens a `tag<T>`
-    /// `TSInstantiationExpression` off the tag first, lifting `<T>` into
-    /// `type_arguments`.
+    /// `TSInstantiationExpression` off the tag first (via `flatten_instantiation`),
+    /// lifting `<T>` into `type_arguments`.
     fn build_tagged_template(
         &self,
         tag: &'arena Expression<'arena>,
