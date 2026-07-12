@@ -62,7 +62,12 @@
   - `mod.rs` — the SoA lowering walk: dense 1-based `NodeId`s, side columns
     (`parents`/`kinds`/`spans`/`subtree_end` — the latter makes descendant
     tests O(1) interval checks), the address→NodeId map, per-file facts
-    (module-ness via the `isAnExternalModuleIndicatorNode` port).
+    (module-ness via the `isAnExternalModuleIndicatorNode` port). The
+    `SoaWalk` struct, its `add`/`close`/`leaf` id-recording primitives, and
+    `bind_file` live here; the per-node visitor methods live in `lower/`
+    (`statement.rs`/`expression.rs`/`types.rs` — additional `impl SoaWalk`
+    blocks, split by the AST shape each visitor descends), unchanged in
+    responsibility.
   - `sym.rs` — the container-threaded, functions-first symbol-bind walk:
     `getContainerFlags`, `declareSymbolEx` + the duplicate/conflict cascade
     (TS2451/2300/2567/2528 with per-prior-declaration related info),
