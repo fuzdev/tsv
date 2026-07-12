@@ -53,16 +53,22 @@
 //! tsv's `Expression` has no parent pointer, so the walk is replaced by keeping
 //! the true/false targets `Some` **only** while binding an actual sub-condition —
 //! they are set by `do_with_conditional_branches` / the `!`-swap, and reset to
-//! `None` at two boundaries so they never leak into a non-condition: (1) at every
+//! `None` at three boundaries so they never leak into a non-condition: (1) at every
 //! **value sub-position** — `visit_expression` resets them for every non-threading
 //! expression, so a logical nested in a call argument / `?:` arm / array element
-//! (`if (f(x && y))`) is classified top-level (a value), not a sub-condition; and
+//! (`if (f(x && y))`) is classified top-level (a value), not a sub-condition;
 //! (2) at every **flow container** — one can be entered mid-condition
 //! (`if (arr.some(x => x && y))`), which would otherwise leak the outer targets
-//! into the callback body. With both resets a logical expression is top-level iff
-//! `current_true_target` is `None`. Both are deliberate departures from tsgo
-//! (which never saves the targets, relying on the parent walk) required by the
-//! pointer-free heuristic.
+//! into the callback body; and (3) around the **logical-compound-assignment RHS** —
+//! the RHS of `&&=`/`||=`/`??=` is reached through a *threading* node (the
+//! compound-assign itself), so the `visit_expression` auto-reset never fires;
+//! `bind_logical_like_expression` clears the targets explicitly so a logical RHS
+//! (`a &&= x && y`) is classified top-level, matching tsgo's
+//! `isTopLevelLogicalExpression` verdict on the RHS's parent (the compound-assign,
+//! not a logical binary; see that site for detail). With these resets a logical
+//! expression is top-level iff `current_true_target` is `None`. All are deliberate
+//! departures from tsgo (which never saves the targets, relying on the parent walk)
+//! required by the pointer-free heuristic.
 //!
 //! **Deliberate scoping deviations (F1a; documented for F1b):**
 //! - **Types are not descended.** The walk visits value positions only; pure
@@ -3429,6 +3435,130 @@ mod tests {
             product.graph.antecedents(else_label),
             vec![false_a, false_whole],
             "the else branch carries only FALSE(a) + FALSE(whole) — x/y stay top-level"
+        );
+    }
+
+    #[test]
+    fn coalescing_compound_assign_rhs_is_top_level_value() {
+        // `a ??= x || y;` as a STATEMENT — the shared logical-compound-assign branch
+        // walked with `is_and=false, is_nullish=true` (the `??=` path, distinct from
+        // `&&=`). Like `&&=`, the RHS `x || y` is a top-level VALUE: tsgo's
+        // `isTopLevelLogicalExpression(right)` (binder.go:2782) inspects `right`'s
+        // PARENT — the `??=` node, which is a compound-assignment operator, not a
+        // logical binary (`IsLogicalExpression` unwraps parens/`!` then requires a
+        // `&&`/`||`/`??` *binary*), so `right` is top-level. Its own true/false
+        // conditions are self-contained in a throwaway post-label and discarded
+        // (effect-free identifiers), NOT threaded into the outer `??=` post-label.
+        // The `??=`/`||` mirror of `bindLogicalLikeExpression` (binder.go:2266-2268,
+        // the non-`&&` branch) wires the LEFT's TRUE condition (not FALSE, as `&&=`
+        // does) into the post: the outer post carries TRUE(a) + the whole-node
+        // truthiness — 3 antecedents, no x/y. The bug (threading the RHS) would leak
+        // x/y's four conditions.
+        let src = "function f() { a ??= x || y; }";
+        let (product, bound) = build_with_bound(src);
+        let f = nodes_of_kind(&bound, NodeKind::FunctionDeclaration)[0];
+        // The `??=` mutates `a` (a flow effect), so its post-label is materialized and
+        // becomes the function's end-of-flow.
+        let post = product.end_flow_of(f).expect("f end_flow");
+        assert!(product.graph.flags(post).contains(FlowFlags::BRANCH_LABEL));
+
+        let a = ident(&bound, src, "a");
+        let x = ident(&bound, src, "x");
+        let whole = nodes_of_kind(&bound, NodeKind::AssignmentExpression)[0];
+        let true_a = condition_of(&product, a, true);
+        let true_whole = condition_of(&product, whole, true);
+        let false_whole = condition_of(&product, whole, false);
+        // Exact shape (and order): TRUE(a) (the `??=`/`||` mirror of the `&&=` test's
+        // FALSE(a)), then the whole-node TRUE/FALSE — no x/y.
+        assert_eq!(
+            product.graph.antecedents(post),
+            vec![true_a, true_whole, false_whole],
+            "the ??= post-label carries TRUE(a) + TRUE/FALSE(whole) only — x || y stays top-level"
+        );
+        // `x || y` is still narrowed as a value — its TRUE(x) condition exists and
+        // feeds its OWN (discarded, effect-free) post-label, distinct from the ??= post.
+        let true_x = condition_of(&product, x, true);
+        let x_post = find_flow(&product, |g, id| {
+            g.flags(id).is_label() && g.antecedents(id).contains(&true_x)
+        });
+        assert_ne!(
+            x_post, post,
+            "x || y feeds its own post-label, not the ??= post"
+        );
+        assert!(!product.graph.antecedents(post).contains(&true_x));
+    }
+
+    #[test]
+    fn nested_logical_compound_assign_rhs_gets_own_post_label() {
+        // `a &&= b ||= c;` — the RHS `b ||= c` is ITSELF a logical compound-assignment.
+        // Its parent is the outer `&&=` node (an assignment operator, not a logical
+        // binary), so tsgo `isTopLevelLogicalExpression(b ||= c)` is true: it is bound
+        // top-level with its OWN post-label, NOT threaded into the outer `&&=` targets.
+        // Because `b ||= c` has a flow effect (it mutates `b`), its post-label is
+        // materialized and the outer `a`-mutation flows THROUGH it — distinct from the
+        // effect-free logical-RHS case (`a ??= x || y`) where the RHS post is discarded.
+        let src = "function f() { a &&= b ||= c; }";
+        let (product, bound) = build_with_bound(src);
+        let f = nodes_of_kind(&bound, NodeKind::FunctionDeclaration)[0];
+        let post = product.end_flow_of(f).expect("f end_flow");
+        assert!(product.graph.flags(post).contains(FlowFlags::BRANCH_LABEL));
+
+        let a = ident(&bound, src, "a");
+        let b = ident(&bound, src, "b");
+        // Two AssignmentExpressions: the outer `a &&= b ||= c` (whole statement) and
+        // the inner RHS `b ||= c`. Disambiguate by span length (outer encloses inner).
+        let assigns = nodes_of_kind(&bound, NodeKind::AssignmentExpression);
+        assert_eq!(assigns.len(), 2);
+        let span_len = |id: NodeId| bound.spans[id.index()].end - bound.spans[id.index()].start;
+        let outer = assigns
+            .iter()
+            .copied()
+            .max_by_key(|&id| span_len(id))
+            .unwrap();
+        let inner = assigns
+            .iter()
+            .copied()
+            .min_by_key(|&id| span_len(id))
+            .unwrap();
+
+        let false_a = condition_of(&product, a, false);
+        let true_outer = condition_of(&product, outer, true);
+        let false_outer = condition_of(&product, outer, false);
+        // The outer `&&=` post carries FALSE(a) + the outer whole-node TRUE/FALSE only
+        // (the `&&=` mirror) — the inner `b ||= c`'s conditions do NOT leak in.
+        assert_eq!(
+            product.graph.antecedents(post),
+            vec![false_a, true_outer, false_outer],
+            "the &&= post carries FALSE(a) + TRUE/FALSE(outer) only — b ||= c stays top-level"
+        );
+
+        // The inner `b ||= c` has its OWN materialized post-label (it mutates `b`),
+        // carrying its own [TRUE(b), TRUE(inner), FALSE(inner)] — the `||=` mirror,
+        // self-contained exactly as the whole `??=` RHS was, one level down.
+        let true_b = condition_of(&product, b, true);
+        let true_inner = condition_of(&product, inner, true);
+        let false_inner = condition_of(&product, inner, false);
+        let inner_post = find_flow(&product, |g, id| {
+            g.flags(id).is_label() && g.antecedents(id).contains(&true_inner)
+        });
+        assert_ne!(
+            inner_post, post,
+            "b ||= c feeds its own post-label, not the &&= post"
+        );
+        assert_eq!(
+            product.graph.antecedents(inner_post),
+            vec![true_b, true_inner, false_inner],
+            "b ||= c's own post carries TRUE(b) + its whole-node TRUE/FALSE"
+        );
+        // The outer `a`-mutation's antecedent is that inner post (b ||= c had flow
+        // effects), so the nested compound-assign threads through as a top-level value.
+        let a_assign = find_flow(&product, |g, id| {
+            g.flags(id).contains(FlowFlags::ASSIGNMENT) && g.subject(id) == Some(a)
+        });
+        assert_eq!(
+            product.graph.antecedents(a_assign),
+            vec![inner_post],
+            "the outer a-mutation's antecedent is b ||= c's materialized post"
         );
     }
 
