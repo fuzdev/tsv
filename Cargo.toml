@@ -183,6 +183,7 @@ serde_json.workspace = true
 [dev-dependencies]
 tsv_debug = { path = "crates/tsv_debug" }
 tsv_cli = { path = "crates/tsv_cli" }
+tsv_svelte_compile.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 futures-util.workspace = true
 bumpalo.workspace = true
