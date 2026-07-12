@@ -23,7 +23,7 @@ use tsv_svelte::ast::internal::{
     Attribute, AttributeNode, AttributeValue, Element, Fragment, FragmentNode, Root, Style,
 };
 use tsv_ts::ast::internal::{
-    BlockStatement, Expression, ExportDefaultDeclaration, ExportDefaultValue, ExpressionStatement,
+    BlockStatement, ExportDefaultDeclaration, ExportDefaultValue, Expression, ExpressionStatement,
     FunctionDeclaration, Statement, VariableDeclaration, VariableDeclarator,
 };
 
@@ -44,7 +44,7 @@ pub(crate) fn compile_server<'arena>(
     source: &str,
     arena: &'arena bumpalo::Bump,
 ) -> Result<CompileOutput, CompileError> {
-    let mut b = Builder::new(arena, source, root.interner.clone());
+    let mut b = Builder::new(arena, source, std::rc::Rc::clone(&root.interner));
 
     if root.module.is_some() {
         return Err(unsupported("module <script context=\"module\">"));
@@ -157,7 +157,7 @@ pub(crate) fn compile_server<'arena>(
         body: program_body.into_bump_slice(),
         comments: Vec::new(),
         span: Span::new(0, b.buffer.len() as u32),
-        interner: root.interner.clone(),
+        interner: std::rc::Rc::clone(&root.interner),
         goal: tsv_ts::Goal::Module,
     };
 
@@ -294,7 +294,7 @@ fn emit_element<'arena>(
 /// Emit one plain attribute (` name` or ` name="value"`), appending the scope
 /// hash class to a matched `class` attribute.
 fn emit_attribute<'arena>(
-    b: &mut Builder<'arena>,
+    b: &Builder<'arena>,
     attr: &Attribute<'arena>,
     source: &str,
     scope: Option<&ScopeInfo>,
@@ -329,7 +329,7 @@ fn emit_attribute<'arena>(
     {
         let mut matched = false;
         for class in raw.split_ascii_whitespace() {
-            if scope.class_names.contains(&class.to_string()) {
+            if scope.class_names.contains(class) {
                 matched_classes.insert(class.to_string());
                 matched = true;
             }

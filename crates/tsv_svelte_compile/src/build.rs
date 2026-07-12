@@ -29,9 +29,9 @@
 use bumpalo::Bump;
 use tsv_lang::{SharedInterner, Span};
 use tsv_ts::ast::internal::{
-    CallExpression, Expression, IdentName, Identifier, ImportDeclaration, ImportKind, ImportPhase,
-    ImportSpecifier, ImportNamespaceSpecifier, Literal, LiteralValue, MemberExpression,
-    StringCooked, TemplateCooked, TemplateElement, TemplateLiteral,
+    CallExpression, Expression, IdentName, Identifier, ImportDeclaration, ImportKind,
+    ImportNamespaceSpecifier, ImportPhase, ImportSpecifier, Literal, LiteralValue,
+    MemberExpression, StringCooked, TemplateCooked, TemplateElement, TemplateLiteral,
 };
 
 /// The appendix-buffer bookkeeping plus interner access — everything node
@@ -132,13 +132,15 @@ impl<'arena> Builder<'arena> {
         let member_span = Span::new(obj.span().start, prop.span().end);
         self.mint("(");
         let end = self.mint(")").end;
-        let callee = self.arena.alloc(Expression::MemberExpression(MemberExpression {
-            object: obj,
-            property: prop,
-            computed: false,
-            optional: false,
-            span: member_span,
-        }));
+        let callee = self
+            .arena
+            .alloc(Expression::MemberExpression(MemberExpression {
+                object: obj,
+                property: prop,
+                computed: false,
+                optional: false,
+                span: member_span,
+            }));
         Expression::CallExpression(CallExpression {
             callee,
             type_arguments: None,

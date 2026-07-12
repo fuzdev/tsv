@@ -109,9 +109,10 @@ fn test_all_compile_fixtures() {
                             "{name}: compiled js differs from expected_server.js\n\
                              --- ours ---\n{canonical}--- expected ---\n{expected_js}"
                         )),
-                        Err(e) => failures.push(format!(
-                            "{name}: compiled js fails to canonicalize: {e}"
-                        )),
+                        Err(e) => {
+                            failures
+                                .push(format!("{name}: compiled js fails to canonicalize: {e}"));
+                        }
                     }
                     let ours_css = ours.css.as_deref().map(with_trailing_newline);
                     if ours_css != expected_css {

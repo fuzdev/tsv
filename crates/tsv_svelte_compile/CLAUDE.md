@@ -6,10 +6,11 @@
 
 Depends on:
 
-- [`tsv_lang`](../tsv_lang/CLAUDE.md) — `ParseError`
-- `tsv_svelte` — component parsing (`parse`)
-- `tsv_ts` — JavaScript/TypeScript parsing (`parse_with_goal`) and the canonical reprint (`format_canonical`)
-- `tsv_css` — embedded CSS (reserved for the code-generation phase)
+- [`tsv_lang`](../tsv_lang/CLAUDE.md) — `ParseError`, `Span`, the shared interner
+- `tsv_svelte` — component parsing (`parse`) and the internal Svelte AST the transform walks
+- `tsv_ts` — the internal TS AST the generator constructs, plus `parse_with_goal` and the canonical reprint (`format_canonical`)
+- `tsv_css` — the parsed stylesheet the scoping analysis reads
+- `tsv_html` — element classification (void elements)
 
 Oracle: Svelte's own `compile()`. The compiler is measured against it not on raw
 output bytes but on the *canonical reprint* of both sides (see the canonicalizer
@@ -20,15 +21,32 @@ project-wide conventions.
 
 ## Module Map
 
-`src/lib.rs` — the whole crate. Free functions in the tsv pattern:
-
-- `compile(source, &CompileOptions) -> Result<CompileOutput, CompileError>` — a
-  walking skeleton: it parses the component (so genuine parse errors surface as
-  `CompileError::Parse`) and then returns `CompileError::Codegen`, since code
-  generation is not yet implemented.
-- `canonicalize_js(source) -> Result<String, CanonicalizeError>` — the
-  canonicalizer (below). Lives here because the compiler's own output idempotence
-  checks and the oracle comparison both consume it.
+- `lib.rs` — the public API in the tsv free-function pattern:
+  - `compile(source, &CompileOptions) -> Result<CompileOutput, CompileError>` —
+    parses the component and runs the server transform. Generated JS prints
+    through `format_canonical`, so it is canonical-form by construction
+    (`canonicalize_js(output.js)` is a fixed point). Shapes the transform does
+    not cover yet — client generation, dev mode, blocks, directives, runes other
+    than `$props` — return `CompileError::Unsupported` with a clear description,
+    never guessed output.
+  - `canonicalize_js(source) -> Result<String, CanonicalizeError>` — the
+    canonicalizer (below). Lives here because the compiler's own output
+    idempotence checks and the oracle comparison both consume it.
+- `build.rs` — synthetic-AST constructors over the **hybrid appendix buffer**:
+  the print buffer is the host `.svelte` source plus an appendix of minted
+  lexemes. Borrowed user subtrees keep their real host spans; minted
+  literal/template-quasi text lives in the appendix at the spans the nodes
+  claim; synthetic identifiers ride the interned-name channel
+  (`IdentName { escaped: Some(symbol), raw_len: 0 }`, source-free). Codegen owns
+  zero precedence knowledge — the printer's `needs_parens` handles it.
+- `transform_server.rs` — the SSR transform: module scaffold
+  (`import * as $ from 'svelte/internal/server'` + the exported component
+  function), instance-script statements borrowed with the `$props()` declarator
+  init rewritten to `$$props`, the template folded into one
+  `$$renderer.push(\`…\`)` with `{expr}` interpolations wrapped in
+  `$.escape(…)`, and minimal CSS scoping (single class selectors: the
+  `svelte-tsvhash` class appended to matched elements and **source-spliced**
+  into the style text — the author's whitespace is preserved, not reprinted).
 
 Types: `CompileOptions { generate: Generate, dev: bool }` (default: `Server`,
 non-dev), `CompileOutput { js, css, warnings }`, `CompileWarning { code, message }`
