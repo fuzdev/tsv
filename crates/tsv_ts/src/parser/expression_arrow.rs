@@ -79,9 +79,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Capture paren position before parsing params
         let (params_start, _) = self.current_pos();
 
-        // Params + body in the arrow's `[~Await]` context (a non-async arrow is
-        // `[~Await]`; the return type between them is await-free).
-        let (params, return_type, body) = self.with_in_await(false, |p| {
+        // Params + body in the arrow's own `[~Await, ~Yield]` context (an arrow is
+        // never async/generator itself; the return type between them is await-free,
+        // and `yield` in an arrow inside a generator is a plain identifier).
+        let (params, return_type, body) = self.with_fn_context(false, false, |p| {
             let params = p.parse_parameter_list_no_decorators()?.into_bump_slice();
             // Return type annotation: <T>(): type => ... or type predicate
             let return_type = p.parse_optional_return_type()?;
@@ -140,8 +141,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Capture paren position before parsing params
         let (params_start, _) = self.current_pos();
 
-        // Params + body in the arrow's `[~Await]` context (non-async).
-        let (params, return_type, body) = self.with_in_await(false, |p| {
+        // Params + body in the arrow's own `[~Await, ~Yield]` context (an arrow is
+        // never async/generator itself).
+        let (params, return_type, body) = self.with_fn_context(false, false, |p| {
             let params = p.parse_parameter_list_no_decorators()?.into_bump_slice();
             // Return type annotation: (): type => ... or type predicate
             let return_type = p.parse_optional_return_type()?;
@@ -189,7 +191,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect_arrow()?; // consume '=>' (no LineTerminator before it)
 
         // Non-async single-param arrow body is `[~Await]`.
-        let body = self.with_in_await(false, Self::parse_arrow_body)?;
+        let body = self.with_fn_context(false, false, Self::parse_arrow_body)?;
         let end = self.prev_token_end() as u32;
 
         Ok(Expression::ArrowFunctionExpression(
@@ -221,7 +223,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let (paren_pos, _) = self.current_pos();
             (
                 // Async arrow params are `[+Await]`.
-                self.with_in_await(true, Self::parse_parameter_list_no_decorators)?
+                self.with_fn_context(true, false, Self::parse_parameter_list_no_decorators)?
                     .into_bump_slice(),
                 Some(paren_pos as u32),
             )
@@ -248,7 +250,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect_arrow()?; // consume '=>' (no LineTerminator before it)
 
         // Async arrow body is `[+Await]`.
-        let body = self.with_in_await(true, Self::parse_arrow_body)?;
+        let body = self.with_fn_context(true, false, Self::parse_arrow_body)?;
         let end = self.prev_token_end() as u32;
 
         Ok(Expression::ArrowFunctionExpression(

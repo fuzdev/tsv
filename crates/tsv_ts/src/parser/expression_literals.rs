@@ -406,15 +406,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Capture paren position before parsing params (for comment detection)
         let (params_start, _) = self.current_pos();
-        // Params + body in the method's `[Await]` context (async → `[+Await]`).
+        // Params + body in the method's `[Await]`/`[Yield]` context (async → `[+Await]`,
+        // generator → `[+Yield]`).
         let params = self
-            .with_in_await(is_async, Self::parse_parameter_list)?
+            .with_fn_context(is_async, is_generator, Self::parse_parameter_list)?
             .into_bump_slice();
 
         // Check for return type annotation: (): type or type predicate
         let return_type = self.parse_optional_return_type()?;
 
-        let body = self.with_in_await(is_async, Self::parse_function_body)?;
+        let body = self.with_fn_context(is_async, is_generator, Self::parse_function_body)?;
         let end = body.span.end;
 
         Ok(FunctionExpression {

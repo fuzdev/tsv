@@ -147,6 +147,17 @@ pub struct Parser<'a, 'arena> {
     /// not an await-expression: under `Goal::Script` it is an ordinary
     /// identifier (`await_is_identifier`), under `Goal::Module` it is reserved.
     in_await: bool,
+    /// The `[Yield]` grammar context. `true` (`[+Yield]`) inside a generator
+    /// function's params **and** body; reset to `false` (`[~Yield]`) on entering
+    /// any non-generator function-like scope (a plain function, an arrow, a class
+    /// static block or field initializer) and at top level. Unlike `[Await]` it
+    /// is never goal-driven — a generator is marked by `*`, not by module vs
+    /// script. It gates the bare-`yield`-operand guard (`is_bare_assignment_head`):
+    /// a `yield` expression can only be a complete `AssignmentExpression` that no
+    /// operator extends where `yield` is actually a `YieldExpression`, i.e. in
+    /// `[+Yield]`. Outside a generator `yield` is a (deferred) reserved-word
+    /// identifier, so the guard must not fire — see the guard in `expression.rs`.
+    in_yield: bool,
     /// Whether the type grammar disallows function/constructor types at the
     /// current position: a union/intersection constituent (after `|`/`&`,
     /// including the leading-operator forms) or a type-operator operand
@@ -317,6 +328,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // Module top level is `[+Await]` (`ModuleItem[+Await]`); Script top
             // level is `[~Await]` (`ScriptBody[~Await]`).
             in_await: matches!(goal, Goal::Module),
+            // Top level is `[~Yield]` in both goals — a generator scope is entered
+            // only via `*` on a function/method (see `with_fn_context`).
+            in_yield: false,
             fn_type_disallowed: false, // Top level is a full-type position
             conditional_type_disallowed: false, // Top level allows conditional types
             pending_conditional_extends: None,
@@ -725,21 +739,32 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         result
     }
 
-    /// Run `f` with the `[Await]` context set to `value`, restoring it
-    /// afterward (on success and error alike). Mirrors `with_allow_in`; wrap a
-    /// function-like scope's params+body so a nested async/non-async scope sets
-    /// its own `await`-context without leaking to the enclosing one.
-    pub(super) fn with_in_await<T>(
+    /// Run `f` with the function-like scope's `[Await]` and `[Yield]` contexts
+    /// set to `is_async` / `is_generator`, restoring both afterward (on success
+    /// and error alike). Wrap a function-like scope's params+body so a nested
+    /// scope establishes its own `await`/`yield` context without leaking to (or
+    /// inheriting from) the enclosing one: an async generator's body is
+    /// `[+Await, +Yield]`, a plain function or an arrow inside a generator is
+    /// `[~Yield]`, etc. Both flags reset together because they share the same
+    /// boundary — every function-like scope — so threading them as one call makes
+    /// it impossible to set one and forget the other.
+    pub(super) fn with_fn_context<T>(
         &mut self,
-        value: bool,
+        is_async: bool,
+        is_generator: bool,
         f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
     ) -> Result<T, ParseError> {
-        self.with_context_flag(|p| &mut p.in_await, value, f)
+        let saved_await = std::mem::replace(&mut self.in_await, is_async);
+        let saved_yield = std::mem::replace(&mut self.in_yield, is_generator);
+        let result = f(self);
+        self.in_await = saved_await;
+        self.in_yield = saved_yield;
+        result
     }
 
     /// Run `f` with the function-type-disallowed context set to `value`,
-    /// restoring it afterward (on success and error alike). Mirrors
-    /// `with_in_await`. Set `true` around union/intersection constituent and
+    /// restoring it afterward (on success and error alike). A single-flag
+    /// `with_context_flag` wrapper. Set `true` around union/intersection constituent and
     /// type-operator operand parses; set `false` at full-type entry
     /// (`parse_type`) so nested positions parse function types greedily again.
     pub(super) fn with_fn_type_disallowed<T>(

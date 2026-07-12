@@ -145,17 +145,28 @@ impl<'arena> ParsedExpr<'arena> {
         }
     }
 
-    /// Whether this is a leading *unparenthesized* arrow function — its own span
-    /// starts exactly at `actual_start`. Parenthesizing the arrow (`(() => {})`)
-    /// shifts `actual_start` to the outer `(` while the arrow's span starts inside,
-    /// so the two diverge. A bare arrow is a complete `AssignmentExpression`
-    /// (ecma262 §13.15 — a top-level alternative, not a `ConditionalExpression`,
-    /// binary operand, or `LeftHandSideExpression`) that no subscript or operator
-    /// may extend, so both `parse_prefix_expression` (call / member / postfix) and
-    /// `parse_expression_bp` (binary / `as` / assignment / ternary) stop when it holds.
-    fn is_bare_arrow(&self) -> bool {
-        matches!(self.expr, Expression::ArrowFunctionExpression(_))
-            && self.actual_start == self.expr.span().start
+    /// Whether this is a leading *unparenthesized* expression that is itself a
+    /// complete `AssignmentExpression` no subscript or operator may extend — a
+    /// bare arrow function (always), or a bare `yield` expression when parsing
+    /// inside a generator (`in_yield`). Both are top-level `AssignmentExpression`
+    /// alternatives (ecma262 §13.15 — `ArrowFunction` / `YieldExpression`), not a
+    /// `ConditionalExpression`, binary operand, or `LeftHandSideExpression`, so
+    /// both `parse_prefix_expression` (call / member / postfix) and
+    /// `parse_expression_bp` (binary / `as` / assignment / ternary) must stop when
+    /// this holds. The check is span-anchored: a bare head's own span starts
+    /// exactly at `actual_start`, but parenthesizing (`(() => {})` / `(yield)`)
+    /// shifts `actual_start` to the outer `(` while the inner span starts later,
+    /// so the two diverge — a parenthesized arrow/yield is a primary that CAN be
+    /// an operand and is (correctly) not flagged.
+    ///
+    /// `yield` is only a `YieldExpression` in `[+Yield]`; outside a generator it
+    /// is a (deferred) reserved-word identifier that prettier accepts as an
+    /// operand, so the guard must not fire there — hence the `in_yield` gate. See
+    /// the parser's `in_yield` field.
+    fn is_bare_assignment_head(&self, in_yield: bool) -> bool {
+        let is_head = matches!(self.expr, Expression::ArrowFunctionExpression(_))
+            || (in_yield && matches!(self.expr, Expression::YieldExpression(_)));
+        is_head && self.actual_start == self.expr.span().start
     }
 }
 
@@ -423,15 +434,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Parse prefix expression (primary or unary)
         let mut left = self.parse_prefix_expression()?;
 
-        // A leading *unparenthesized* arrow function is a complete
-        // `AssignmentExpression` (see `is_bare_arrow`), so no operator may extend it:
-        // a trailing binary/logical operator, `as` / `satisfies` assertion,
-        // assignment target, or ternary `?` is a syntax error (tsc TS1005 / prettier
-        // reject; acorn's `parseExprOps` enforces the same for binary operators).
-        // Only a sequence `,` or a statement terminator may follow. A concise body
-        // absorbs any trailing operator (`() => x || a`), so this fires only for a
-        // completed arrow (block body, or a typed/parenthesized signature).
-        let leading_bare_arrow = left.is_bare_arrow();
+        // A leading *unparenthesized* arrow function — or a bare `yield` inside a
+        // generator — is a complete `AssignmentExpression` (see
+        // `is_bare_assignment_head`), so no operator may extend it: a trailing
+        // binary/logical operator, `as` / `satisfies` assertion, assignment target,
+        // or ternary `?` is a syntax error (tsc TS1005 / prettier reject; acorn's
+        // `parseExprOps` and `parseMaybeAssign`-above-`parseMaybeConditional`
+        // enforce the same). Only a sequence `,` or a statement terminator may
+        // follow. An operator that can *start* an expression is absorbed first — a
+        // concise arrow body (`() => x || a`) or the yield argument
+        // (`yield a || b`, `yield +c`) — so this fires only for a truly complete
+        // head with no argument/body to absorb it.
+        let leading_bare_head = left.is_bare_assignment_head(self.in_yield);
 
         // Parse infix binary operators and TypeScript `as` / `satisfies` type
         // assertions in one precedence-climbing loop. `as` / `satisfies` bind at
@@ -440,9 +454,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // `(a + b) as T`. (They were previously a second phase below every binary
         // operator, which mis-grouped `(x === y) as T`.)
         loop {
-            // A leading bare arrow takes no infix operator or `as` / `satisfies`
-            // assertion — it is already a complete assignment expression.
-            if leading_bare_arrow {
+            // A leading bare arrow / bare yield takes no infix operator or `as` /
+            // `satisfies` assertion — it is already a complete assignment expression.
+            if leading_bare_head {
                 break;
             }
             let kind = self.current_kind();
@@ -511,9 +525,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Handle assignment operator (after binary ops, before ternary)
         // Assignment is right-associative and has low precedence
         // Check for simple `=` and compound assignment operators (+=, -=, etc.)
-        // A leading bare arrow is not a `LeftHandSideExpression`, so it cannot be an
-        // assignment target (`() => {} = a` is a syntax error).
-        if !leading_bare_arrow
+        // A leading bare arrow / bare yield is not a `LeftHandSideExpression`, so it
+        // cannot be an assignment target (`() => {} = a` / `yield = a` are syntax
+        // errors).
+        if !leading_bare_head
             && min_bp <= BP_ASSIGNMENT
             && let Some(operator) = self.try_assignment_operator()
         {
@@ -544,11 +559,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Handle ternary operator (lowest precedence among binary-like ops, above comma)
         // Handle at BP_ASSIGNMENT to include in assignment expressions but not in binary ops
-        // A leading bare arrow cannot be a `ConditionalExpression` test — the ternary's
-        // test is a `ShortCircuitExpression`, which never derives `ArrowFunction`, so
-        // `() => {} ? b : c` is a syntax error (tsc/prettier reject; acorn over-leniently
-        // accepts it — a cataloged `tsv_rejects` divergence, see conformance_svelte.md).
-        if !leading_bare_arrow && min_bp <= BP_ASSIGNMENT && self.eat(TokenKind::Question) {
+        // A leading bare arrow / bare yield cannot be a `ConditionalExpression`
+        // test — the ternary's test is a `ShortCircuitExpression`, which never
+        // derives `ArrowFunction` / `YieldExpression`, so `() => {} ? b : c` and
+        // `yield ? b : c` are syntax errors. (Both parsers reject the yield form;
+        // for the arrow form acorn over-leniently accepts it — a cataloged
+        // `tsv_rejects` divergence, see conformance_svelte.md.)
+        if !leading_bare_head && min_bp <= BP_ASSIGNMENT && self.eat(TokenKind::Question) {
             // Parse consequent (then branch) - use BP_ASSIGNMENT to exclude comma operator
             // This ensures (a ? b : c, d) parses as ((a ? b : c), d) not (a ? b : (c, d))
             // The consequent is `AssignmentExpression[+In]` — `in` is always the
@@ -762,11 +779,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             _ => self.parse_primary_expression()?,
         };
 
-        // An unparenthesized arrow function is a complete AssignmentExpression —
-        // no subscripts can follow (`() => {}()` is invalid JS; a `(` on the next
-        // line starts a new statement via ASI). A parenthesized arrow
-        // (`(() => {})()`, detected by the span gap) is a callable primary.
-        if parsed.is_bare_arrow() {
+        // An unparenthesized arrow function — or a bare `yield` inside a generator
+        // — is a complete AssignmentExpression, so no `.`-member subscript can
+        // follow (`() => {}()` is invalid JS; `yield.a` is too — the `.` doesn't
+        // extend the head). A parenthesized head (`(() => {})()` / `(yield).a`,
+        // detected by the span gap) is a callable primary. A subscript token that
+        // *starts* an expression is instead absorbed earlier as the yield argument
+        // (`yield [x]` is `yield` of an array; `yield (e)` its parenthesized arg),
+        // so only the no-argument bare head reaches here.
+        if parsed.is_bare_assignment_head(self.in_yield) {
             return Ok(parsed);
         }
 
@@ -1961,6 +1982,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             | TokenKind::NoSubstitutionTemplate
             | TokenKind::TemplateHead
             | TokenKind::RegexLiteral
+            // `/` / `/=` after `yield` is a regex-literal argument, not division:
+            // the lexer emits `Slash`/`SlashEquals` by default (the parser re-lexes
+            // it as a regex only in primary position), and a bare `yield` can't be
+            // the left operand of division without parens, so `yield /a/g` is
+            // `yield (/a/g)` (matching acorn). The primary parser resyncs the regex.
+            | TokenKind::Slash
+            | TokenKind::SlashEquals
             | TokenKind::LessThan
             | TokenKind::Hash => true,
             // Most keywords can start expressions (as primaries, unary ops, or contextual identifiers).

@@ -1,0 +1,615 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 460,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A bare `yield` is a complete AssignmentExpression (ecma262 §13.15): no operator",
+			"start": 20,
+			"end": 102,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " may extend it (see input_invalid_*). Parenthesizing lifts it to a primary that",
+			"start": 104,
+			"end": 185,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " IS a valid operand, and an operator token that starts an expression is taken as",
+			"start": 187,
+			"end": 269,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the yield *argument* rather than extending a bare yield.",
+			"start": 271,
+			"end": 330,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 60
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 459,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 450,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 13,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 332,
+					"end": 449,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 342,
+						"end": 345,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 11
+							},
+							"end": {
+								"line": 6,
+								"column": 14
+							}
+						},
+						"name": "gen"
+					},
+					"expression": false,
+					"generator": true,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 348,
+						"end": 449,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 17
+							},
+							"end": {
+								"line": 12,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "VariableDeclaration",
+								"start": 352,
+								"end": 375,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 25
+									}
+								},
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 358,
+										"end": 374,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 8
+											},
+											"end": {
+												"line": 7,
+												"column": 24
+											}
+										},
+										"id": {
+											"type": "Identifier",
+											"start": 358,
+											"end": 359,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 8
+												},
+												"end": {
+													"line": 7,
+													"column": 9
+												}
+											},
+											"name": "a"
+										},
+										"init": {
+											"type": "LogicalExpression",
+											"start": 362,
+											"end": 374,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 12
+												},
+												"end": {
+													"line": 7,
+													"column": 24
+												}
+											},
+											"left": {
+												"type": "YieldExpression",
+												"start": 363,
+												"end": 368,
+												"loc": {
+													"start": {
+														"line": 7,
+														"column": 13
+													},
+													"end": {
+														"line": 7,
+														"column": 18
+													}
+												},
+												"delegate": false,
+												"argument": null
+											},
+											"operator": "||",
+											"right": {
+												"type": "Identifier",
+												"start": 373,
+												"end": 374,
+												"loc": {
+													"start": {
+														"line": 7,
+														"column": 23
+													},
+													"end": {
+														"line": 7,
+														"column": 24
+													}
+												},
+												"name": "b"
+											}
+										}
+									}
+								],
+								"kind": "const"
+							},
+							{
+								"type": "VariableDeclaration",
+								"start": 378,
+								"end": 404,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 28
+									}
+								},
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 384,
+										"end": 403,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 8
+											},
+											"end": {
+												"line": 8,
+												"column": 27
+											}
+										},
+										"id": {
+											"type": "Identifier",
+											"start": 384,
+											"end": 385,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 8
+												},
+												"end": {
+													"line": 8,
+													"column": 9
+												}
+											},
+											"name": "c"
+										},
+										"init": {
+											"type": "ConditionalExpression",
+											"start": 388,
+											"end": 403,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 12
+												},
+												"end": {
+													"line": 8,
+													"column": 27
+												}
+											},
+											"test": {
+												"type": "YieldExpression",
+												"start": 389,
+												"end": 394,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 13
+													},
+													"end": {
+														"line": 8,
+														"column": 18
+													}
+												},
+												"delegate": false,
+												"argument": null
+											},
+											"consequent": {
+												"type": "Identifier",
+												"start": 398,
+												"end": 399,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 22
+													},
+													"end": {
+														"line": 8,
+														"column": 23
+													}
+												},
+												"name": "x"
+											},
+											"alternate": {
+												"type": "Identifier",
+												"start": 402,
+												"end": 403,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 26
+													},
+													"end": {
+														"line": 8,
+														"column": 27
+													}
+												},
+												"name": "y"
+											}
+										}
+									}
+								],
+								"kind": "const"
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 407,
+								"end": 420,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 15
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 407,
+									"end": 419,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 14
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "LogicalExpression",
+										"start": 413,
+										"end": 419,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 8
+											},
+											"end": {
+												"line": 9,
+												"column": 14
+											}
+										},
+										"left": {
+											"type": "Identifier",
+											"start": 413,
+											"end": 414,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 8
+												},
+												"end": {
+													"line": 9,
+													"column": 9
+												}
+											},
+											"name": "a"
+										},
+										"operator": "||",
+										"right": {
+											"type": "Identifier",
+											"start": 418,
+											"end": 419,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 13
+												},
+												"end": {
+													"line": 9,
+													"column": 14
+												}
+											},
+											"name": "b"
+										}
+									}
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 423,
+								"end": 432,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 11
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 423,
+									"end": 431,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 2
+										},
+										"end": {
+											"line": 10,
+											"column": 10
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "UnaryExpression",
+										"start": 429,
+										"end": 431,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 8
+											},
+											"end": {
+												"line": 10,
+												"column": 10
+											}
+										},
+										"operator": "+",
+										"prefix": true,
+										"argument": {
+											"type": "Identifier",
+											"start": 430,
+											"end": 431,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 9
+												},
+												"end": {
+													"line": 10,
+													"column": 10
+												}
+											},
+											"name": "c"
+										}
+									}
+								}
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 435,
+								"end": 446,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 13
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 435,
+									"end": 445,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 2
+										},
+										"end": {
+											"line": 11,
+											"column": 12
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "Literal",
+										"start": 441,
+										"end": 445,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 8
+											},
+											"end": {
+												"line": 11,
+												"column": 12
+											}
+										},
+										"value": {},
+										"raw": "/a/g",
+										"regex": {
+											"pattern": "a",
+											"flags": "g"
+										}
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A bare `yield` is a complete AssignmentExpression (ecma262 §13.15): no operator",
+							"start": 20,
+							"end": 102
+						},
+						{
+							"type": "Line",
+							"value": " may extend it (see input_invalid_*). Parenthesizing lifts it to a primary that",
+							"start": 104,
+							"end": 185
+						},
+						{
+							"type": "Line",
+							"value": " IS a valid operand, and an operator token that starts an expression is taken as",
+							"start": 187,
+							"end": 269
+						},
+						{
+							"type": "Line",
+							"value": " the yield *argument* rather than extending a bare yield.",
+							"start": 271,
+							"end": 330
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
