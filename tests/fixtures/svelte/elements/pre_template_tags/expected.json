@@ -1,0 +1,506 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 438,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 135,
+				"data": " {@render} / {@debug} tags inside <pre>: whitespace is significant, so they format inline without injecting rendered whitespace "
+			},
+			{
+				"type": "Text",
+				"start": 135,
+				"end": 136,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 136,
+				"end": 161,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 137
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 140
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RenderTag",
+							"start": 141,
+							"end": 155,
+							"expression": {
+								"type": "CallExpression",
+								"start": 150,
+								"end": 154,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 14
+									},
+									"end": {
+										"line": 2,
+										"column": 18
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 150,
+									"end": 152,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 14
+										},
+										"end": {
+											"line": 2,
+											"column": 16
+										}
+									},
+									"name": "fn"
+								},
+								"arguments": [],
+								"optional": false
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 161,
+				"end": 163,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 163,
+				"end": 187,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 4,
+						"column": 1,
+						"character": 164
+					},
+					"end": {
+						"line": 4,
+						"column": 4,
+						"character": 167
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "DebugTag",
+							"start": 168,
+							"end": 181,
+							"identifiers": [
+								{
+									"type": "Identifier",
+									"start": 176,
+									"end": 177,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 13
+										},
+										"end": {
+											"line": 4,
+											"column": 14
+										}
+									},
+									"name": "a"
+								},
+								{
+									"type": "Identifier",
+									"start": 179,
+									"end": 180,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 16
+										},
+										"end": {
+											"line": 4,
+											"column": 17
+										}
+									},
+									"name": "b"
+								}
+							]
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 187,
+				"end": 189,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 189,
+				"end": 257,
+				"data": " bare {const} / {let} declaration tags directly inside <pre> "
+			},
+			{
+				"type": "Text",
+				"start": 257,
+				"end": 258,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 258,
+				"end": 293,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 259
+					},
+					"end": {
+						"line": 7,
+						"column": 4,
+						"character": 262
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "DeclarationTag",
+							"start": 263,
+							"end": 276,
+							"declaration": {
+								"type": "VariableDeclaration",
+								"start": 264,
+								"end": 275,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 6
+									},
+									"end": {
+										"line": 7,
+										"column": 17
+									}
+								},
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 270,
+										"end": 275,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 12
+											},
+											"end": {
+												"line": 7,
+												"column": 17
+											}
+										},
+										"id": {
+											"type": "Identifier",
+											"start": 270,
+											"end": 271,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 12
+												},
+												"end": {
+													"line": 7,
+													"column": 13
+												}
+											},
+											"name": "x"
+										},
+										"init": {
+											"type": "Literal",
+											"start": 274,
+											"end": 275,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 16
+												},
+												"end": {
+													"line": 7,
+													"column": 17
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										}
+									}
+								],
+								"kind": "const"
+							}
+						},
+						{
+							"type": "DeclarationTag",
+							"start": 276,
+							"end": 287,
+							"declaration": {
+								"type": "VariableDeclaration",
+								"start": 277,
+								"end": 286,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 19
+									},
+									"end": {
+										"line": 7,
+										"column": 28
+									}
+								},
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 281,
+										"end": 286,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 23
+											},
+											"end": {
+												"line": 7,
+												"column": 28
+											}
+										},
+										"id": {
+											"type": "Identifier",
+											"start": 281,
+											"end": 282,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 23
+												},
+												"end": {
+													"line": 7,
+													"column": 24
+												}
+											},
+											"name": "y"
+										},
+										"init": {
+											"type": "Literal",
+											"start": 285,
+											"end": 286,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 27
+												},
+												"end": {
+													"line": 7,
+													"column": 28
+												}
+											},
+											"value": 2,
+											"raw": "2"
+										}
+									}
+								],
+								"kind": "let"
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 293,
+				"end": 295,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 295,
+				"end": 365,
+				"data": " {@const} inside a block nested in <pre> (its valid placement) "
+			},
+			{
+				"type": "Text",
+				"start": 365,
+				"end": 366,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 366,
+				"end": 437,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 1,
+						"character": 367
+					},
+					"end": {
+						"line": 10,
+						"column": 4,
+						"character": 370
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "EachBlock",
+							"start": 371,
+							"end": 431,
+							"expression": {
+								"type": "Identifier",
+								"start": 378,
+								"end": 383,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 12
+									},
+									"end": {
+										"line": 10,
+										"column": 17
+									}
+								},
+								"name": "items"
+							},
+							"body": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ConstTag",
+										"start": 392,
+										"end": 415,
+										"declaration": {
+											"type": "VariableDeclaration",
+											"kind": "const",
+											"declarations": [
+												{
+													"type": "VariableDeclarator",
+													"id": {
+														"type": "Identifier",
+														"name": "doubled",
+														"start": 400,
+														"end": 407,
+														"loc": {
+															"start": {
+																"line": 10,
+																"column": 34,
+																"character": 400
+															},
+															"end": {
+																"line": 10,
+																"column": 41,
+																"character": 407
+															}
+														}
+													},
+													"init": {
+														"type": "Identifier",
+														"start": 410,
+														"end": 414,
+														"loc": {
+															"start": {
+																"line": 10,
+																"column": 44
+															},
+															"end": {
+																"line": 10,
+																"column": 48
+															}
+														},
+														"name": "item"
+													},
+													"start": 400,
+													"end": 414
+												}
+											],
+											"start": 394,
+											"end": 414
+										}
+									},
+									{
+										"type": "ExpressionTag",
+										"start": 415,
+										"end": 424,
+										"expression": {
+											"type": "Identifier",
+											"start": 416,
+											"end": 423,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 50
+												},
+												"end": {
+													"line": 10,
+													"column": 57
+												}
+											},
+											"name": "doubled"
+										}
+									}
+								]
+							},
+							"context": {
+								"type": "Identifier",
+								"name": "item",
+								"start": 387,
+								"end": 391,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 21,
+										"character": 387
+									},
+									"end": {
+										"line": 10,
+										"column": 25,
+										"character": 391
+									}
+								}
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
