@@ -690,6 +690,24 @@ impl<'a> Printer<'a> {
         pair: &'static str,
         sep: DocId,
     ) -> DocId {
+        let opening = self.d().text(&pair[..1]);
+        self.build_empty_bracketed_with_comments_doc(span_start, span_end, opening, &pair[1..], sep)
+    }
+
+    /// Like [`Self::build_empty_inline_with_comments_doc`] but with an arbitrary
+    /// `opening` doc (which may carry a prefix, e.g. a parenthesized-intersection
+    /// `(A & {`) and a static `closing` string (`}`, `]`, `})`). The empty body
+    /// stays delimiter-tight when comment-free (`{}` not `{ }`), so a union-member
+    /// or paren-intersection object type that reaches the alignment path prints
+    /// with no spurious bracket space and preserves any interior comment.
+    pub(crate) fn build_empty_bracketed_with_comments_doc(
+        &self,
+        span_start: u32,
+        span_end: u32,
+        opening: DocId,
+        closing: &'static str,
+        sep: DocId,
+    ) -> DocId {
         let d = self.d();
         let body_start = span_start + 1; // After opening delimiter
         let body_end = span_end.saturating_sub(1); // Before closing delimiter
@@ -702,7 +720,7 @@ impl<'a> Printer<'a> {
             .collect();
 
         if comments.is_empty() {
-            return d.text(pair);
+            return d.concat(&[opening, d.text(closing)]);
         }
 
         // Dangling comments join with hardline (prettier `printDanglingComments`).
@@ -721,10 +739,10 @@ impl<'a> Printer<'a> {
         let close_sep = if has_line { d.hardline() } else { sep };
 
         d.group(d.concat(&[
-            d.text(&pair[..1]),
+            opening,
             d.indent(d.concat(&[sep, d.concat(&comment_parts)])),
             close_sep,
-            d.text(&pair[1..]),
+            d.text(closing),
         ]))
     }
 

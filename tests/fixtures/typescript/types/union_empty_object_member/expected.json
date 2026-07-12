@@ -1,0 +1,652 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 477,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Empty object type as a union member keeps its braces tight (`{}`, no",
+			"start": 20,
+			"end": 91,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " bracketSpacing) — an empty object literal has no content to space around.",
+			"start": 93,
+			"end": 169,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Leading empty union member behaves the same.",
+			"start": 193,
+			"end": 240,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 48
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Empty object inside a parenthesized intersection union member.",
+			"start": 267,
+			"end": 332,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 66
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An interior comment in an empty union-member object is preserved.",
+			"start": 363,
+			"end": 431,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 456,
+			"end": 463,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 24
+				},
+				"end": {
+					"line": 13,
+					"column": 31
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 476,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 467,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 14,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 171,
+					"end": 190,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 20
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 176,
+						"end": 180,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 6
+							},
+							"end": {
+								"line": 4,
+								"column": 10
+							}
+						},
+						"name": "Bare"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 183,
+						"end": 189,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 13
+							},
+							"end": {
+								"line": 4,
+								"column": 19
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 183,
+								"end": 184,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 13
+									},
+									"end": {
+										"line": 4,
+										"column": 14
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 183,
+									"end": 184,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 13
+										},
+										"end": {
+											"line": 4,
+											"column": 14
+										}
+									},
+									"name": "A"
+								}
+							},
+							{
+								"type": "TSTypeLiteral",
+								"start": 187,
+								"end": 189,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 17
+									},
+									"end": {
+										"line": 4,
+										"column": 19
+									}
+								},
+								"members": []
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Empty object type as a union member keeps its braces tight (`{}`, no",
+							"start": 20,
+							"end": 91
+						},
+						{
+							"type": "Line",
+							"value": " bracketSpacing) — an empty object literal has no content to space around.",
+							"start": 93,
+							"end": 169
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 242,
+					"end": 264,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 23
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 247,
+						"end": 254,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 6
+							},
+							"end": {
+								"line": 7,
+								"column": 13
+							}
+						},
+						"name": "Leading"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 257,
+						"end": 263,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 16
+							},
+							"end": {
+								"line": 7,
+								"column": 22
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeLiteral",
+								"start": 257,
+								"end": 259,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 16
+									},
+									"end": {
+										"line": 7,
+										"column": 18
+									}
+								},
+								"members": []
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 262,
+								"end": 263,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 21
+									},
+									"end": {
+										"line": 7,
+										"column": 22
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 262,
+									"end": 263,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 21
+										},
+										"end": {
+											"line": 7,
+											"column": 22
+										}
+									},
+									"name": "A"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Leading empty union member behaves the same.",
+							"start": 193,
+							"end": 240
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 334,
+					"end": 360,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 27
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 339,
+						"end": 344,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 6
+							},
+							"end": {
+								"line": 10,
+								"column": 11
+							}
+						},
+						"name": "Paren"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 347,
+						"end": 359,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 14
+							},
+							"end": {
+								"line": 10,
+								"column": 26
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 347,
+								"end": 348,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 14
+									},
+									"end": {
+										"line": 10,
+										"column": 15
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 347,
+									"end": 348,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 14
+										},
+										"end": {
+											"line": 10,
+											"column": 15
+										}
+									},
+									"name": "A"
+								}
+							},
+							{
+								"type": "TSParenthesizedType",
+								"start": 351,
+								"end": 359,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 18
+									},
+									"end": {
+										"line": 10,
+										"column": 26
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSIntersectionType",
+									"start": 352,
+									"end": 358,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 19
+										},
+										"end": {
+											"line": 10,
+											"column": 25
+										}
+									},
+									"types": [
+										{
+											"type": "TSTypeReference",
+											"start": 352,
+											"end": 353,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 19
+												},
+												"end": {
+													"line": 10,
+													"column": 20
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 352,
+												"end": 353,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 19
+													},
+													"end": {
+														"line": 10,
+														"column": 20
+													}
+												},
+												"name": "B"
+											}
+										},
+										{
+											"type": "TSTypeLiteral",
+											"start": 356,
+											"end": 358,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 23
+												},
+												"end": {
+													"line": 10,
+													"column": 25
+												}
+											},
+											"members": []
+										}
+									]
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Empty object inside a parenthesized intersection union member.",
+							"start": 267,
+							"end": 332
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 433,
+					"end": 466,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 34
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 438,
+						"end": 447,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 6
+							},
+							"end": {
+								"line": 13,
+								"column": 15
+							}
+						},
+						"name": "Commented"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 450,
+						"end": 465,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 18
+							},
+							"end": {
+								"line": 13,
+								"column": 33
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 450,
+								"end": 451,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 18
+									},
+									"end": {
+										"line": 13,
+										"column": 19
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 450,
+									"end": 451,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 18
+										},
+										"end": {
+											"line": 13,
+											"column": 19
+										}
+									},
+									"name": "A"
+								}
+							},
+							{
+								"type": "TSTypeLiteral",
+								"start": 454,
+								"end": 465,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 22
+									},
+									"end": {
+										"line": 13,
+										"column": 33
+									}
+								},
+								"members": []
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An interior comment in an empty union-member object is preserved.",
+							"start": 363,
+							"end": 431
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " c ",
+							"start": 456,
+							"end": 463
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

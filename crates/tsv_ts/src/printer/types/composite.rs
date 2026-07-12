@@ -365,6 +365,37 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Emit the comments in a conditional-type branch gap — between `?` and the
+    /// true branch, or between `:` and the false branch — into `parts`, returning
+    /// whether the branch type must itself drop to its own indented line.
+    ///
+    /// The first comment trails the operator (` // c`); a line comment ends its
+    /// line, so each subsequent comment drops to its own indented line rather than
+    /// merging onto the operator's line (`// c1 // c2` would reparse as a single
+    /// comment — a boundary loss). A single-line block stays inline (in-place
+    /// collapse). A line comment or a multiline block forces the branch onto its
+    /// own line (`needs_indent`). The `?`- and `:`-branch loops share this so they
+    /// can't drift.
+    fn push_conditional_branch_gap_comments(&self, parts: &mut DocBuf, from: u32, to: u32) -> bool {
+        let d = self.d();
+        let mut needs_indent = false;
+        let mut prev_was_line_comment = false;
+        for comment in comments_in_range(self.comments, from, to) {
+            if prev_was_line_comment {
+                parts.push(d.hardline());
+                parts.push(d.text(INDENT));
+            } else {
+                parts.push(d.text(" "));
+            }
+            parts.push(self.build_comment_doc(comment));
+            if !comment.is_block || comment.multiline {
+                needs_indent = true;
+            }
+            prev_was_line_comment = !comment.is_block;
+        }
+        needs_indent
+    }
+
     /// Build conditional type doc when comments force a breaking layout.
     /// This handles: line comments, multiline block comments, and comments
     /// before `?` or `:` operators.
@@ -456,17 +487,9 @@ impl<'a> Printer<'a> {
         q_parts.push(d.hardline());
         q_parts.push(d.text("?"));
 
-        // Comments AFTER the `?` token — emit between `?` and the true branch. A line
-        // comment or a multiline block drops the branch onto its own (indented) line;
-        // a single-line block stays inline on the `?` arm (in-place collapse).
-        let mut needs_indent_before_true = false;
-        for comment in comments_in_range(self.comments, after_q_start, true_type_start) {
-            q_parts.push(d.text(" "));
-            q_parts.push(self.build_comment_doc(comment));
-            if !comment.is_block || comment.multiline {
-                needs_indent_before_true = true;
-            }
-        }
+        // Comments AFTER the `?` token — emit between `?` and the true branch.
+        let needs_indent_before_true =
+            self.push_conditional_branch_gap_comments(&mut q_parts, after_q_start, true_type_start);
         q_parts.push(self.build_conditional_branch_tail_doc(
             c.true_type,
             true_type_doc,
@@ -491,22 +514,8 @@ impl<'a> Printer<'a> {
 
         // Comments after : only (between : and false_type)
         let colon_end = colon.map_or(true_type_end, |c| c + 1);
-        let mut needs_indent_before_false = false;
-        let mut prev_was_line_comment = false;
-        for comment in comments_in_range(self.comments, colon_end, false_type_start) {
-            if prev_was_line_comment {
-                // Line comments end the line, so subsequent comments need a new line
-                q_parts.push(d.hardline());
-                q_parts.push(d.text(INDENT));
-            } else {
-                q_parts.push(d.text(" "));
-            }
-            q_parts.push(self.build_comment_doc(comment));
-            if !comment.is_block || comment.multiline {
-                needs_indent_before_false = true;
-            }
-            prev_was_line_comment = !comment.is_block;
-        }
+        let needs_indent_before_false =
+            self.push_conditional_branch_gap_comments(&mut q_parts, colon_end, false_type_start);
         q_parts.push(self.build_conditional_branch_tail_doc(
             c.false_type,
             false_type_doc,
