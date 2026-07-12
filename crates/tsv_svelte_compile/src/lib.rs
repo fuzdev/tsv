@@ -79,6 +79,12 @@ pub enum CanonicalizeError {
     /// The input did not parse as a JavaScript/TypeScript module.
     #[error("failed to parse JavaScript for canonicalization: {0}")]
     Parse(#[from] tsv_lang::ParseError),
+    /// The canonical reprint itself failed to reparse — the canonicalizer
+    /// corrupted the program (e.g. content trailed onto a `//` comment's line).
+    /// Always a canonicalizer bug; surfaced loudly instead of returning the
+    /// corrupt string.
+    #[error("canonical output failed to reparse (canonicalizer bug): {0}")]
+    CorruptOutput(tsv_lang::ParseError),
 }
 
 /// Compile a Svelte component to JavaScript.
@@ -113,10 +119,20 @@ pub fn compile(source: &str, options: &CompileOptions) -> Result<CompileOutput, 
 /// reproduces it. Because both an oracle's output and the compiler's output pass
 /// through the same normalization, a byte difference between their canonical
 /// forms is a genuine code difference.
+///
+/// The output is self-validated by reparse before it is returned — a reprint the
+/// parser rejects (canonicalizer corruption) surfaces as
+/// [`CanonicalizeError::CorruptOutput`] instead of a silently broken string.
+/// This is a comparison harness, so the extra parse is cheap insurance.
 pub fn canonicalize_js(source: &str) -> Result<String, CanonicalizeError> {
     let arena = bumpalo::Bump::new();
     let program = tsv_ts::parse_with_goal(source, Goal::Module, &arena)?;
-    Ok(tsv_ts::format_canonical(&program, source))
+    let output = tsv_ts::format_canonical(&program, source);
+    let check_arena = bumpalo::Bump::new();
+    if let Err(err) = tsv_ts::parse_with_goal(&output, Goal::Module, &check_arena) {
+        return Err(CanonicalizeError::CorruptOutput(err));
+    }
+    Ok(output)
 }
 
 #[cfg(test)]
@@ -132,6 +148,30 @@ mod tests {
             "canonicalize_js must be idempotent for:\n{source}"
         );
         once
+    }
+
+    /// Losslessness assertions for a canonicalize run over a source carrying the
+    /// given comment texts: idempotent output, each comment present exactly once,
+    /// original relative order preserved.
+    fn assert_comments_lossless(source: &str, comments: &[&str]) -> String {
+        let out = assert_idempotent(source);
+        let mut prev_pos = 0;
+        for comment in comments {
+            let pos = out
+                .find(comment)
+                .unwrap_or_else(|| panic!("comment {comment:?} lost:\n{out}"));
+            assert_eq!(
+                out.matches(comment).count(),
+                1,
+                "comment {comment:?} duplicated:\n{out}"
+            );
+            assert!(
+                pos >= prev_pos,
+                "comment {comment:?} reordered (found at {pos}, previous comment ends at {prev_pos}):\n{out}"
+            );
+            prev_pos = pos + comment.len();
+        }
+        out
     }
 
     #[test]
@@ -207,6 +247,54 @@ mod tests {
         assert!(
             !out.contains("// first // second"),
             "comments merged: {out:?}"
+        );
+    }
+
+    #[test]
+    fn template_interpolation_chain_trailing_comment_stays_valid() {
+        // D1: a `+` chain inside a template interpolation with an operand-trailing
+        // `//` comment. Collapsing would trail the comment inside `${...}` and
+        // swallow the closer (`${x + y // c})z`), making the output unparseable —
+        // the chain must stay broken so the comment ends at a real line end.
+        let out = assert_comments_lossless("const r = `(${x + // c\n\ty})z`;\n", &["// c"]);
+        // The output must reparse (canonicalize_js validates this itself, but pin
+        // the invariant explicitly at the test level too).
+        canonicalize_js(&out).expect("D1 output must reparse");
+    }
+
+    #[test]
+    fn binary_chain_multiple_trailing_comments_do_not_merge() {
+        // D2 (`+` chain): two operand-trailing comments must not merge onto one
+        // trailing line (which also reorders them: `a + b + c; // two // one`).
+        assert_comments_lossless(
+            "const q = a + // one\n\tb + // two\n\tc;\n",
+            &["// one", "// two"],
+        );
+    }
+
+    #[test]
+    fn logical_chain_multiple_trailing_comments_do_not_merge() {
+        // D2 (`||` chain): same class through the logical-expression path.
+        assert_comments_lossless(
+            "const ok = first || // one\n\tsecond || // two\n\tthird;\n",
+            &["// one", "// two"],
+        );
+    }
+
+    #[test]
+    fn chain_with_trailing_comments_as_call_arg_stays_lossless() {
+        // Not-statement-final variant: the commented chain is a call argument, so
+        // there is no statement end for a trailing comment to legally land on.
+        assert_comments_lossless("f(a + // one\n\tb + // two\n\tc);\n", &["// one", "// two"]);
+    }
+
+    #[test]
+    fn chain_with_trailing_comments_as_array_element_stays_lossless() {
+        // Not-statement-final variant: the commented chain is an array element
+        // followed by another element — trailing past the `,` must not swallow it.
+        assert_comments_lossless(
+            "const xs = [a + // one\n\tb, // two\n\tc];\n",
+            &["// one", "// two"],
         );
     }
 

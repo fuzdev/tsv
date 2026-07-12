@@ -192,9 +192,11 @@ impl<'a> Printer<'a> {
         // The first line comment trails the comma when authored on the comma's
         // line (no newline between); an own-line one drops below. After a line
         // comment every following comment is on its own line (set in the loop).
+        // Comment-adjacency read (real even in canonical mode): an own-line line
+        // comment must drop below the comma, not merge into the `line_suffix` run.
         let mut needs_hardline = comments
             .get(first_line_idx)
-            .is_some_and(|c| self.has_newline_between(comma_pos, c.span.start));
+            .is_some_and(|c| self.comment_has_newline_between(comma_pos, c.span.start));
         for comment in &comments[first_line_idx..] {
             if needs_hardline {
                 parts.push(d.hardline());

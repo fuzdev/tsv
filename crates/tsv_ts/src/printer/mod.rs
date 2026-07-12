@@ -446,6 +446,20 @@ impl<'a> Printer<'a> {
         printing::has_newline_between_fast(self.line_breaks, start, end)
     }
 
+    /// [`Self::has_newline_between`] against the *comment* line-break table.
+    ///
+    /// For comment-adjacency classification — is a comment on its neighbor's
+    /// source line? — which must stay real in canonical mode ([`Self::set_canonical`])
+    /// just like [`Self::is_same_line`]: these reads decide whether a `//` line
+    /// comment's emission is followed by a break, and erasing them lets content
+    /// trail onto a line-comment's output line (swallow / merge — content loss).
+    /// In the normal path the two tables are identical, so this is byte-identical
+    /// to `has_newline_between` there.
+    #[inline]
+    pub(crate) fn comment_has_newline_between(&self, start: u32, end: u32) -> bool {
+        printing::has_newline_between_fast(self.comment_line_breaks, start, end)
+    }
+
     /// Wrap content and closing line with declaration indent depth handling
     ///
     /// In multi-declarator contexts (declaration_indent_depth > 0), content gets

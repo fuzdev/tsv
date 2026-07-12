@@ -20,7 +20,7 @@ project-wide conventions.
 
 ## Module Map
 
-`src/lib.rs` — the whole crate for this slice. Free functions in the tsv pattern:
+`src/lib.rs` — the whole crate. Free functions in the tsv pattern:
 
 - `compile(source, &CompileOptions) -> Result<CompileOutput, CompileError>` — a
   walking skeleton: it parses the component (so genuine parse errors surface as
@@ -46,13 +46,21 @@ and reprints it through `tsv_ts::format_canonical`, which erases newline-derived
   delimiter; it breaks only when width forces it;
 - **comments are preserved** in content and relative order, never dropped or
   merged; only their placement is normalized deterministically (an own-line
-  comment may become a trailing comment of the preceding node).
+  comment may become a trailing comment of the preceding node). A construct
+  carrying a `//` line comment before more content stays broken — trailing the
+  comment onto a continuing line would swallow that content (inside a template
+  interpolation it even makes the output unparseable), so comment presence
+  overrides collapse there.
 
 Two guarantees follow. **Idempotence**: canonicalizing an already-canonical string
 reproduces it. **Authoring-independence**: two programs that differ only in
 incidental whitespace reprint to the same string. Together these make a byte
 difference between two canonical forms a genuine code difference — the parity bar
 for oracle comparison.
+
+The output is self-validated: `canonicalize_js` reparses its own reprint before
+returning and surfaces a rejection as `CanonicalizeError::CorruptOutput` — a
+canonicalizer bug is loud, never a silently corrupt comparison string.
 
 Real content is *not* intent and survives verbatim: a newline inside a template
 literal, a multi-line string via line continuation, and a mapped type's source
