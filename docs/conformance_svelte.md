@@ -344,6 +344,29 @@ so it is pinned by the
 `tsv_rejects.txt` fixture. **Upstream candidate**: acorn-typescript
 `tsParseNonArrayType` — `void`/`null` accepted as qualified-name heads.
 
+**Type-reference type arguments after a line break (`B` ⏎ `<T>`, rejected)**: a
+type-argument list binds to the preceding type reference only when no line
+terminator intervenes — TypeScript's `parseTypeArgumentsOfTypeReference` is
+guarded by `!scanner.hasPrecedingLineBreak()`. So `B` ⏎ `<T>` is the type `B`
+followed by a separate `<T>`, not `B<T>`. tsv applies the same guard it already
+uses at the sibling type-argument sites (`typeof X` ⏎ `<T>`, `extends B` ⏎ `<T>`,
+postfix `B` ⏎ `[]`). In a **type-member** list both parsers agree: the line break
+splits `a: B` ⏎ `<T>(): C` into a property member and a call-signature member (and
+`a: B` ⏎ `<T>;`, a bare type-argument list with no `(`, rejects in both) — pinned
+as the ordinary fixture
+[type_members/type_args_line_break](../tests/fixtures/typescript/types/type_members/type_args_line_break/).
+In a **non-member** position (`let a: B` ⏎ `<T>;`, `type Y = B` ⏎ `<T>;`) tsc and
+prettier reject, but acorn-typescript *recovers* — it parses the type as `B` and
+treats the leftover `<T>;` as a floating `TSTypeParameterDeclaration`
+expression-statement. tsv rejects (`Expected expression, found ';'`), matching
+tsc/prettier and diverging from acorn's recovery. Since acorn accepts, that half
+can't be an `input_invalid_*` fixture, so it is pinned by the
+[type_args/line_break](../tests/fixtures/typescript/types/type_args/line_break_svelte_divergence/)
+`tsv_rejects.txt` fixture. This is deliberate tsc-over-acorn strictness, the same
+reverse direction as the reserved-keyword-qualified-head and arrow-as-operand
+entries. **Upstream candidate**: acorn-typescript — `tsParseTypeReference`
+consumes type arguments across a line break (no `hasPrecedingLineBreak` guard).
+
 **Arrow function as an operand (rejected)**: an `ArrowFunction` is a complete
 `AssignmentExpression` — a top-level alternative of that production
 ([ecma262 §13.15](https://tc39.es/ecma262/#prod-AssignmentExpression)), not a
