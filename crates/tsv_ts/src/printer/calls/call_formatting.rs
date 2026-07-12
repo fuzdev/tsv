@@ -13,7 +13,6 @@ use super::arg_predicates::{
     arrow_body_is_call_through_non_null, arrow_has_trailing_param_comments,
     is_array_or_object_unwrapped, is_concise_numeric_array, is_curried_arrow,
     is_function_composition_args, is_ternary_arrow_body, last_arg_is_array_or_object,
-    preceding_args_allow_expand_last,
 };
 use super::arg_wrapping::{
     append_type_args_with_gap_comments, arg_needs_soft_wrap, build_args_joined_with_comments,
@@ -902,7 +901,6 @@ fn try_expand_last_function_arg(
     );
 
     if last_is_function
-        && preceding_args_allow_expand_last(call.arguments, printer.line_breaks)
         && !(call_has_comments && any_comment_forces_expansion(call, printer, paren_open))
         && !(call_has_comments
             && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
@@ -1071,7 +1069,6 @@ fn try_expand_last_array_object_arg(
     if call.arguments.len() >= 2
         && last_arg_is_array_or_object(call.arguments)
         && !call.arguments.last().is_some_and(is_concise_numeric_array)
-        && preceding_args_allow_expand_last(call.arguments, printer.line_breaks)
         && !(call_has_comments && any_comment_forces_expansion(call, printer, paren_open))
         && !(call_has_comments
             && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))

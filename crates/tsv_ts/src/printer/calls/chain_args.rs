@@ -15,7 +15,6 @@ use super::arg_predicates::{
     arrow_body_is_call_through_non_null, arrow_has_trailing_param_comments, is_block_function,
     is_concise_numeric_array, is_curried_arrow, is_function_composition_args,
     is_short_second_arg_for_expand_first, is_ternary_arrow_body, last_arg_is_array_or_object,
-    preceding_args_allow_expand_last,
 };
 use super::arg_wrapping::{
     ChainArgKind, build_args_split_last, build_arrow_sig_doc, build_break_body_state,
@@ -960,7 +959,6 @@ fn build_chain_args_multi(
     // without trying fits(). conditional_group uses fits() directly.
     if call.arguments.len() >= 2
         && call.arguments.last().is_some_and(is_block_function)
-        && preceding_args_allow_expand_last(call.arguments, printer.line_breaks)
         && !comments_force_expansion
         && !(has_any_comments
             && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
@@ -993,7 +991,6 @@ fn build_chain_args_multi(
     // don't disable the hug, so a typed arrow expands the same way (its full
     // signature is emitted via build_arrow_sig_doc).
     if call.arguments.len() >= 2
-        && preceding_args_allow_expand_last(call.arguments, printer.line_breaks)
         && !comments_force_expansion
         && !(has_any_comments
             && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
@@ -1065,7 +1062,6 @@ fn build_chain_args_multi(
     // couldExpandArg keys only on the body type — a typed arrow expands the same
     // way (its full signature is emitted via build_arrow_sig_doc).
     if call.arguments.len() >= 2
-        && preceding_args_allow_expand_last(call.arguments, printer.line_breaks)
         && !comments_force_expansion
         && !(has_any_comments
             && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
@@ -1206,9 +1202,7 @@ fn build_chain_args_multi(
     // Skip when last two args have the same outer type - use expand-all instead.
     if call.arguments.len() >= 2
         && last_arg_is_array_or_object(call.arguments)
-        && !call.arguments.last().is_some_and(is_concise_numeric_array)
-        && preceding_args_allow_expand_last(call.arguments, printer.line_breaks)
-        && !comments_force_expansion
+        && !call.arguments.last().is_some_and(is_concise_numeric_array)        && !comments_force_expansion
         && !(has_any_comments
             && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
         // Prettier blocks expand-last for 2-arg arrow+array (React hook pattern)
