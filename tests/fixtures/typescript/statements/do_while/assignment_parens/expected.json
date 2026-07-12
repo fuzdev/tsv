@@ -1,0 +1,321 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 105,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 104,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 95,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 5,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "DoWhileStatement",
+					"start": 20,
+					"end": 45,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 26
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 23,
+						"end": 25,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 4
+							},
+							"end": {
+								"line": 2,
+								"column": 6
+							}
+						},
+						"body": []
+					},
+					"test": {
+						"type": "AssignmentExpression",
+						"start": 34,
+						"end": 42,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 15
+							},
+							"end": {
+								"line": 2,
+								"column": 23
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 34,
+							"end": 35,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 15
+								},
+								"end": {
+									"line": 2,
+									"column": 16
+								}
+							},
+							"name": "x"
+						},
+						"right": {
+							"type": "CallExpression",
+							"start": 38,
+							"end": 42,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 19
+								},
+								"end": {
+									"line": 2,
+									"column": 23
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 38,
+								"end": 40,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 19
+									},
+									"end": {
+										"line": 2,
+										"column": 21
+									}
+								},
+								"name": "fn"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					}
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 47,
+					"end": 69,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 23
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 50,
+						"end": 52,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 4
+							},
+							"end": {
+								"line": 3,
+								"column": 6
+							}
+						},
+						"body": []
+					},
+					"test": {
+						"type": "AssignmentExpression",
+						"start": 61,
+						"end": 66,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 15
+							},
+							"end": {
+								"line": 3,
+								"column": 20
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 61,
+							"end": 62,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 15
+								},
+								"end": {
+									"line": 3,
+									"column": 16
+								}
+							},
+							"name": "x"
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 65,
+							"end": 66,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 19
+								},
+								"end": {
+									"line": 3,
+									"column": 20
+								}
+							},
+							"name": "y"
+						}
+					}
+				},
+				{
+					"type": "DoWhileStatement",
+					"start": 71,
+					"end": 94,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 24
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 74,
+						"end": 76,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 4
+							},
+							"end": {
+								"line": 4,
+								"column": 6
+							}
+						},
+						"body": []
+					},
+					"test": {
+						"type": "AssignmentExpression",
+						"start": 85,
+						"end": 91,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 15
+							},
+							"end": {
+								"line": 4,
+								"column": 21
+							}
+						},
+						"operator": "+=",
+						"left": {
+							"type": "Identifier",
+							"start": 85,
+							"end": 86,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 15
+								},
+								"end": {
+									"line": 4,
+									"column": 16
+								}
+							},
+							"name": "x"
+						},
+						"right": {
+							"type": "Literal",
+							"start": 90,
+							"end": 91,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 20
+								},
+								"end": {
+									"line": 4,
+									"column": 21
+								}
+							},
+							"value": 1,
+							"raw": "1"
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

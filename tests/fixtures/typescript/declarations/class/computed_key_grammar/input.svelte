@@ -5,5 +5,8 @@
 		[(x, y)]() {}
 		[a in b]() {}
 		[c ? d : e] = 1;
+		// an assignment key is parenthesized for clarity (like an object computed key)
+		[(x = 0)] = 1;
+		[(x = 0)]() {}
 	}
 </script>
