@@ -333,6 +333,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
         Ok(RestElement {
             argument: self.alloc(argument),
+            optional: false,
             type_annotation: None,
             span: spread.span,
         })

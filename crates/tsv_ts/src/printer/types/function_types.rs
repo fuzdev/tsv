@@ -743,6 +743,11 @@ impl<'a> Printer<'a> {
                     comments_doc,
                     self.build_function_type_param_expression_doc(rest.argument),
                 ];
+                // Optional rest parameter `...a?` — carried on the rest element, not
+                // `argument` (see `RestElement`), between the binding and any annotation.
+                if rest.optional {
+                    parts.push(d.text("?"));
+                }
                 if let Some(ta) = &rest.type_annotation {
                     parts.push(self.build_type_annotation_doc(ta));
                 }
