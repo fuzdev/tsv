@@ -240,7 +240,7 @@ fn stringify_number(n: f64) -> Result<String, Gray> {
 /// Evaluate `expr` against the binding table — the ported `scope.evaluate`.
 pub(crate) fn evaluate(
     expr: &Expression<'_>,
-    bindings: &Bindings<'_>,
+    scope: &Scope<'_, '_>,
     source: &str,
     depth: usize,
 ) -> EvalResult {
@@ -257,8 +257,9 @@ pub(crate) fn evaluate(
             }
             let start = id.span.start as usize;
             let name = &source[start..start + id.name_len as usize];
-            match bindings.get(name) {
-                Some(binding) => {
+            match scope.resolve(name) {
+                Resolved::Masked => Ok(Evaluation::single(Entry::Unknown)),
+                Resolved::Binding(binding) => {
                     if binding.kind == BindingKind::Prop {
                         return Ok(Evaluation::single(Entry::Unknown));
                     }
@@ -269,14 +270,14 @@ pub(crate) fn evaluate(
                         return Ok(Evaluation::single(Entry::Unknown));
                     }
                     match binding.initial {
-                        Initial::Expr(init) => evaluate(init, bindings, source, depth + 1),
+                        Initial::Expr(init) => evaluate(init, scope, source, depth + 1),
                         Initial::Function => Ok(Evaluation::single(Entry::FunctionSentinel)),
                         Initial::Undefined => Ok(Evaluation::known(Value::Undefined)),
                         Initial::None => Ok(Evaluation::single(Entry::Unknown)),
                     }
                 }
-                None if name == "undefined" => Ok(Evaluation::known(Value::Undefined)),
-                None => Ok(Evaluation::single(Entry::Unknown)),
+                Resolved::None if name == "undefined" => Ok(Evaluation::known(Value::Undefined)),
+                Resolved::None => Ok(Evaluation::single(Entry::Unknown)),
             }
         }
 
@@ -287,8 +288,8 @@ pub(crate) fn evaluate(
                 LessThan, LessThanEquals, Minus, Percent, Pipe, PipePipe, Plus, QuestionQuestion,
                 RightShift, Slash, Star, StarStar, UnsignedRightShift,
             };
-            let a = evaluate(bin.left, bindings, source, depth + 1)?;
-            let b = evaluate(bin.right, bindings, source, depth + 1)?;
+            let a = evaluate(bin.left, scope, source, depth + 1)?;
+            let b = evaluate(bin.right, scope, source, depth + 1)?;
             match bin.operator {
                 // Logical operators (merged into BinaryExpression in this AST)
                 // follow the oracle's LogicalExpression case.
@@ -360,9 +361,9 @@ pub(crate) fn evaluate(
         }
 
         Expression::ConditionalExpression(cond) => {
-            let test = evaluate(cond.test, bindings, source, depth + 1)?;
-            let consequent = evaluate(cond.consequent, bindings, source, depth + 1)?;
-            let alternate = evaluate(cond.alternate, bindings, source, depth + 1)?;
+            let test = evaluate(cond.test, scope, source, depth + 1)?;
+            let consequent = evaluate(cond.consequent, scope, source, depth + 1)?;
+            let alternate = evaluate(cond.alternate, scope, source, depth + 1)?;
             if let Some(tv) = test.known_value() {
                 return Ok(if tv.truthy() { consequent } else { alternate });
             }
@@ -372,7 +373,7 @@ pub(crate) fn evaluate(
         }
 
         Expression::UnaryExpression(unary) => {
-            let argument = evaluate(unary.argument, bindings, source, depth + 1)?;
+            let argument = evaluate(unary.argument, scope, source, depth + 1)?;
             if let Some(v) = argument.known_value() {
                 return Ok(Evaluation::known(unary_op(unary.operator, v)?));
             }
@@ -396,13 +397,13 @@ pub(crate) fn evaluate(
         }
 
         Expression::CallExpression(call) => {
-            match global_keypath(call.callee, bindings, source) {
+            match global_keypath(call.callee, scope, source) {
                 Some(keypath) if keypath.starts_with('$') => {
                     // The rune table.
                     let arg = call.arguments.first();
                     match keypath.as_str() {
                         "$state" | "$state.raw" | "$derived" => match arg {
-                            Some(arg) => evaluate(arg, bindings, source, depth + 1),
+                            Some(arg) => evaluate(arg, scope, source, depth + 1),
                             None => Ok(Evaluation::known(Value::Undefined)),
                         },
                         "$props.id" => Ok(Evaluation::single(Entry::StringSentinel)),
@@ -415,7 +416,7 @@ pub(crate) fn evaluate(
                         "$derived.by" => match arg {
                             Some(Expression::ArrowFunctionExpression(arrow)) => match &arrow.body {
                                 ArrowFunctionBody::Expression(body) => {
-                                    evaluate(body, bindings, source, depth + 1)
+                                    evaluate(body, scope, source, depth + 1)
                                 }
                                 ArrowFunctionBody::BlockStatement(_) => {
                                     Ok(Evaluation::single(Entry::Unknown))
@@ -442,7 +443,7 @@ pub(crate) fn evaluate(
                 None => return gray("template quasi with invalid escape"),
             }
             for (i, e) in template.expressions.iter().enumerate() {
-                let evaluated = evaluate(e, bindings, source, depth + 1)?;
+                let evaluated = evaluate(e, scope, source, depth + 1)?;
                 match evaluated.known_value() {
                     Some(value) => {
                         // The oracle concatenates `e.value + cooked` — plain JS
@@ -461,7 +462,7 @@ pub(crate) fn evaluate(
             Ok(Evaluation::known(Value::Str(result)))
         }
 
-        Expression::MemberExpression(_) => match global_keypath(expr, bindings, source) {
+        Expression::MemberExpression(_) => match global_keypath(expr, scope, source) {
             // The oracle folds `global_constants` keypaths (Math.PI, …) — not
             // ported, so any global-rooted member read refuses.
             Some(keypath) => gray(format!(
@@ -537,7 +538,7 @@ fn literal_value(lit: &tsv_ts::ast::internal::Literal<'_>, source: &str) -> Eval
 /// non-computed member accesses rooted at an identifier with **no** local
 /// binding. `None` when the root is a local binding, computed, or not an
 /// identifier.
-fn global_keypath(expr: &Expression<'_>, bindings: &Bindings<'_>, source: &str) -> Option<String> {
+fn global_keypath(expr: &Expression<'_>, scope: &Scope<'_, '_>, source: &str) -> Option<String> {
     match expr {
         Expression::Identifier(id) => {
             if id.escaped_name.is_some() {
@@ -545,14 +546,14 @@ fn global_keypath(expr: &Expression<'_>, bindings: &Bindings<'_>, source: &str) 
             }
             let start = id.span.start as usize;
             let name = &source[start..start + id.name_len as usize];
-            if bindings.get(name).is_some() {
+            if scope.is_local(name) {
                 None
             } else {
                 Some(name.to_string())
             }
         }
         Expression::MemberExpression(member) if !member.computed => {
-            let object = global_keypath(member.object, bindings, source)?;
+            let object = global_keypath(member.object, scope, source)?;
             let Expression::Identifier(prop) = member.property else {
                 return None;
             };
@@ -834,3 +835,53 @@ fn callee_keypath(callee: &Expression<'_>, source: &str) -> Option<String> {
 
 // Keep HashSet in the module's public surface for the callers' collections.
 pub(crate) type NameSet = HashSet<String>;
+
+/// A block-scope overlay entry (each item/index, `{:then}` value, `{@const}`).
+// TODO: constructed by the {#if}/{#each}/{#await}/{@const} emitters (block
+// emission in progress — the resolution side below is already live).
+#[allow(dead_code)]
+pub(crate) enum ScopeEntry<'arena> {
+    /// Masked to UNKNOWN: the binding exists but is never statically known to
+    /// this port (each items/indexes, await values). Behaviorally equivalent to
+    /// the oracle's UNKNOWN/NUMBER sentinels for every emission decision this
+    /// port makes.
+    Masked,
+    /// A `{@const}` binding — evaluates through its initial like a top-level
+    /// binding (the oracle folds statically-known const-tag reads).
+    Const(Binding<'arena>),
+}
+
+/// The name-resolution context evaluation runs against: the top-level table
+/// plus the active block-scope overlays (innermost last).
+pub(crate) struct Scope<'a, 'arena> {
+    pub bindings: &'a Bindings<'arena>,
+    pub overlays: &'a [HashMap<String, ScopeEntry<'arena>>],
+}
+
+pub(crate) enum Resolved<'a, 'arena> {
+    Masked,
+    Binding(&'a Binding<'arena>),
+    None,
+}
+
+impl<'a, 'arena> Scope<'a, 'arena> {
+    pub fn resolve(&self, name: &str) -> Resolved<'a, 'arena> {
+        for overlay in self.overlays.iter().rev() {
+            match overlay.get(name) {
+                Some(ScopeEntry::Masked) => return Resolved::Masked,
+                Some(ScopeEntry::Const(binding)) => return Resolved::Binding(binding),
+                None => {}
+            }
+        }
+        match self.bindings.get(name) {
+            Some(binding) => Resolved::Binding(binding),
+            None => Resolved::None,
+        }
+    }
+
+    /// Whether `name` resolves to anything local (overlay or table) — the
+    /// global-keypath test (a rune/global root must be unresolved).
+    pub fn is_local(&self, name: &str) -> bool {
+        !matches!(self.resolve(name), Resolved::None)
+    }
+}

@@ -61,9 +61,11 @@ use tsv_ts::ast::internal::{
     FunctionDeclaration, Statement, VariableDeclaration, VariableDeclarator,
 };
 
+use std::collections::HashMap;
+
 use crate::analyze::{
-    Binding, BindingKind, Bindings, Initial, NameSet, RuneInit, classify_rune_init, evaluate,
-    is_effect_call, pattern_binding_names, stringify_value,
+    Binding, BindingKind, Bindings, Initial, NameSet, RuneInit, Scope, ScopeEntry,
+    classify_rune_init, evaluate, is_effect_call, pattern_binding_names, stringify_value,
 };
 use crate::build::{Builder, escape_template_text};
 use crate::rune_guard::{WalkCtx, walk_expression_guarded, walk_statement_guarded};
@@ -129,6 +131,80 @@ struct EmitEnv<'arena, 's> {
     /// Script comments are being carried — emitters whose synthetic call
     /// windows would sweep host comments (`$.attr` family) must refuse.
     has_comments: bool,
+    /// Active block-scope overlays (each items/indexes, `{:then}` values,
+    /// `{@const}` bindings), innermost last.
+    overlays: Vec<HashMap<String, ScopeEntry<'arena>>>,
+    /// Inside an `{#each}` body — a nested each would need the oracle's
+    /// unique-name allocation order, which is not confidently reproducible.
+    // TODO: read by the {#each} emitter (block emission in progress).
+    #[allow(dead_code)]
+    in_each: bool,
+    /// Source-order counters for the oracle's unique names.
+    // TODO: read by the {#each} emitter (block emission in progress).
+    #[allow(dead_code)]
+    each_array_count: usize,
+    #[allow(dead_code)]
+    index_count: usize,
+}
+
+impl<'arena> EmitEnv<'arena, '_> {
+    fn value_scope(&self) -> Scope<'_, 'arena> {
+        Scope {
+            bindings: &self.bindings,
+            overlays: &self.overlays,
+        }
+    }
+
+    /// Push a block-scope overlay; refuses names that shadow a derived binding
+    /// (the guard's derived-read refusal is name-based and can't see scopes).
+    // TODO: called by the block emitters (block emission in progress).
+    #[allow(dead_code)]
+    fn push_overlay(
+        &mut self,
+        entries: HashMap<String, ScopeEntry<'arena>>,
+    ) -> Result<(), CompileError> {
+        for name in entries.keys() {
+            if self.derived_names.contains(name) {
+                return Err(unsupported(format!(
+                    "block-scope binding {name} shadows a $derived binding"
+                )));
+            }
+        }
+        self.overlays.push(entries);
+        Ok(())
+    }
+
+    // TODO: called by the block emitters (block emission in progress).
+    #[allow(dead_code)]
+    fn pop_overlay(&mut self) {
+        self.overlays.pop();
+    }
+
+    /// The `each_array` unique name for the next `{#each}` (source order).
+    // TODO: called by the {#each} emitter (block emission in progress).
+    #[allow(dead_code)]
+    fn next_each_array_name(&mut self) -> String {
+        let n = self.each_array_count;
+        self.each_array_count += 1;
+        if n == 0 {
+            "each_array".to_string()
+        } else {
+            format!("each_array_{n}")
+        }
+    }
+
+    /// The `$$index` unique name for the next index-less `{#each}`.
+    // TODO: called by the {#each} emitter (block emission in progress).
+    #[allow(dead_code)]
+    fn next_index_name(&mut self) -> String {
+        let n = self.index_count;
+        self.index_count += 1;
+        if n == 0 {
+            "$$index".to_string()
+        } else {
+            format!("$$index_{n}")
+        }
+    }
 }
 
 /// Compile a parsed component to server output.
@@ -236,6 +312,10 @@ pub(crate) fn compile_server<'arena>(
         scope,
         matched_classes: BTreeSet::new(),
         has_comments,
+        overlays: Vec::new(),
+        in_each: false,
+        each_array_count: 0,
+        index_count: 0,
     };
 
     // 5. Function header skeleton. The text is minted for appendix
@@ -863,6 +943,8 @@ impl<'arena> BodyBuilder<'arena> {
     }
 
     /// Flush the pending template, then append a statement.
+    // TODO: called by the block emitters (block emission in progress).
+    #[allow(dead_code)]
     fn push_statement(
         &mut self,
         b: &mut Builder<'arena>,
@@ -1055,7 +1137,7 @@ fn emit_expression_tag<'arena>(
     let wrapped = wrap_value_expr(env, expr)?;
 
     // The fold gate: a known evaluation folds into the static text.
-    let evaluated = evaluate(expr, &env.bindings, env.source, 0)
+    let evaluated = evaluate(expr, &env.value_scope(), env.source, 0)
         .map_err(|g| unsupported(format!("static evaluation not portable: {}", g.0)))?;
     if let Some(value) = evaluated.known_value() {
         if !escape {
@@ -1433,7 +1515,7 @@ fn emit_mixed_attribute<'arena>(
             AttributeValue::ExpressionTag(tag) => {
                 // Guard first — never fold an oracle-invalid expression.
                 let wrapped = wrap_value_expr(env, &tag.expression)?;
-                let evaluated = evaluate(&tag.expression, &env.bindings, env.source, 0)
+                let evaluated = evaluate(&tag.expression, &env.value_scope(), env.source, 0)
                     .map_err(|g| unsupported(format!("static evaluation not portable: {}", g.0)))?;
                 if let Some(value) = evaluated.known_value() {
                     // Folds into the quasi — plain `(value ?? '') + ''`, no
