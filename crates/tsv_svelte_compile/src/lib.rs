@@ -522,6 +522,31 @@ mod tests {
             "$inspect",
         );
         assert_unsupported("<p>{$state(0)}</p>", "$state");
+        // A rune buried inside a foldable expression must refuse — the guard
+        // runs before evaluation, so the fold can't paper over it.
+        assert_unsupported("<p>{true ? 1 : $state(2)}</p>", "$state");
+    }
+
+    #[test]
+    fn compile_exponentiation_fold_matches_js_semantics() {
+        // ECMAScript `**` special cases (oracle-verified): a NaN exponent and
+        // |base| == 1 with an infinite exponent both fold to NaN, where IEEE
+        // `pow` would give 1.
+        for source in [
+            "<p>{1 ** (1 / 0)}</p>",
+            "<p>{(0 - 1) ** (1 / 0)}</p>",
+            "<p>{1 ** (0 / 0)}</p>",
+        ] {
+            let out = compile(source, &CompileOptions::default()).unwrap();
+            assert!(
+                out.js.contains("`<p>NaN</p>`"),
+                "{source} must fold to NaN: {}",
+                out.js
+            );
+        }
+        // The plain case stays IEEE.
+        let out = compile("<p>{2 ** 3}</p>", &CompileOptions::default()).unwrap();
+        assert!(out.js.contains("`<p>8</p>`"), "got: {}", out.js);
     }
 
     #[test]

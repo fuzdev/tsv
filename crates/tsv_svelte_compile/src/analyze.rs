@@ -568,6 +568,9 @@ fn global_keypath(expr: &Expression<'_>, bindings: &Bindings<'_>, source: &str) 
 }
 
 /// Compute a known binary operation, `Gray` outside the ported combos.
+// The `** ` special-case compares against exactly ±1.0 — the ECMAScript
+// `Number::exponentiate` rule being ported, not an approximate comparison.
+#[allow(clippy::float_cmp)]
 fn binary_op(op: BinaryOperator, a: &Value, b: &Value) -> Result<Value, Gray> {
     use BinaryOperator::{
         BangEquals, BangEqualsEquals, EqualsEquals, EqualsEqualsEquals, GreaterThan,
@@ -583,7 +586,16 @@ fn binary_op(op: BinaryOperator, a: &Value, b: &Value) -> Result<Value, Gray> {
         (Star, Num(x), Num(y)) => Ok(Num(x * y)),
         (Slash, Num(x), Num(y)) => Ok(Num(x / y)),
         (Percent, Num(x), Num(y)) => Ok(Num(x % y)),
-        (StarStar, Num(x), Num(y)) => Ok(Num(x.powf(*y))),
+        (StarStar, Num(x), Num(y)) => {
+            // ECMAScript `Number::exponentiate` diverges from IEEE `pow`: a NaN
+            // exponent is always NaN (IEEE: `1 ** NaN` is 1), and |base| == 1
+            // with an infinite exponent is NaN (IEEE: 1).
+            if y.is_nan() || (x.abs() == 1.0 && y.is_infinite()) {
+                Ok(Num(f64::NAN))
+            } else {
+                Ok(Num(x.powf(*y)))
+            }
+        }
         (LessThan, Num(x), Num(y)) => Ok(Bool(x < y)),
         (LessThanEquals, Num(x), Num(y)) => Ok(Bool(x <= y)),
         (GreaterThan, Num(x), Num(y)) => Ok(Bool(x > y)),
