@@ -710,6 +710,7 @@ dependencies = [
  "tsv_html",
  "tsv_lang",
  "tsv_svelte",
+ "tsv_svelte_compile",
  "tsv_ts",
 ]
 

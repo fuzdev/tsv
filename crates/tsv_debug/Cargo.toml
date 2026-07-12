@@ -22,6 +22,7 @@ tsv_lang = { workspace = true }
 tsv_svelte = { workspace = true, features = ["convert"] }
 tsv_ts = { workspace = true, features = ["convert", "debug_lex"] }
 tsv_css = { workspace = true, features = ["convert", "debug_lex"] }
+tsv_svelte_compile = { workspace = true }
 tsv_html = { workspace = true }
 argh.workspace = true
 serde.workspace = true

@@ -7,6 +7,7 @@ pub mod canonical_compile;
 pub mod canonical_parse;
 pub mod check;
 pub mod compare;
+pub mod compile_compare;
 pub mod conformance_audit;
 pub mod fixture_init;
 pub mod fixtures_audit;

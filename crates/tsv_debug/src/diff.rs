@@ -43,6 +43,15 @@ impl DiffLabels {
         }
     }
 
+    /// Labels for compile_compare command (ours vs the Svelte oracle),
+    /// comparing the canonical reprints of each side's compiled JS.
+    pub const fn compile_compare() -> Self {
+        Self {
+            left_term: "ours-only",
+            right_term: "oracle-only",
+        }
+    }
+
     /// Labels for ast_diff command (original vs formatted)
     pub const fn ast_diff() -> Self {
         Self {
@@ -248,6 +257,14 @@ impl DiffOptions {
     /// Create options suitable for the compare command
     pub fn compare() -> Self {
         Self::compact(DiffLabels::compare()).with_header()
+    }
+
+    /// Create options suitable for the compile_compare command (two canonical
+    /// JS reprints; no JSON-path annotations since the inputs are code, not JSON).
+    pub fn compile_compare() -> Self {
+        Self::compact(DiffLabels::compile_compare())
+            .without_json_paths()
+            .with_header()
     }
 
     /// Create options suitable for ast_diff command

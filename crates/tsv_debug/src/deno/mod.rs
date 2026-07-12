@@ -463,6 +463,21 @@ mod tests {
         assert_eq!(compiled.js, again.js, "compile js must be deterministic");
         assert_eq!(compiled.css, again.css, "compile css must be deterministic");
 
+        // Canonicalize the oracle's server JS (the parity substrate): the result
+        // must be idempotent, and stable across two oracle calls (the compile
+        // oracle is deterministic, so its canonical form is too).
+        let canonical =
+            tsv_svelte_compile::canonicalize_js(&compiled.js).expect("canonicalize oracle js");
+        let recanonical =
+            tsv_svelte_compile::canonicalize_js(&canonical).expect("re-canonicalize");
+        assert_eq!(canonical, recanonical, "canonicalize_js must be idempotent");
+        let from_again =
+            tsv_svelte_compile::canonicalize_js(&again.js).expect("canonicalize second compile");
+        assert_eq!(
+            canonical, from_again,
+            "canonical form must be stable across deterministic oracle calls"
+        );
+
         // Pool heal: kill the pooled actor's event loop, then verify the next
         // call finds the dead slot, respawns it in place, and completes the
         // dispatch on the fresh actor. This is the guard against the

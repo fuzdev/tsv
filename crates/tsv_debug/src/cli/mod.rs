@@ -8,7 +8,8 @@ use commands::{
     authoring_audit::AuthoringAuditCommand, buffer_sizes::BufferSizesCommand,
     build_fanout_audit::BuildFanoutAuditCommand, canonical_compile::CanonicalCompileCommand,
     canonical_parse::CanonicalParseCommand, check::CheckCommand, compare::CompareCommand,
-    conformance_audit::ConformanceAuditCommand, fixture_init::FixtureInitCommand,
+    compile_compare::CompileCompareCommand, conformance_audit::ConformanceAuditCommand,
+    fixture_init::FixtureInitCommand,
     fixtures_audit::FixturesAuditCommand, fixtures_update::FixturesUpdateCommand,
     fixtures_update_formatted::FixturesUpdateFormattedCommand,
     fixtures_update_parsed::FixturesUpdateParsedCommand,
@@ -29,10 +30,15 @@ use commands::{
 /// a distinct failure class).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CliError {
-    /// A failure the command already reported — exit code 1.
+    /// A failure the command already reported — exit code 1. Also carries the
+    /// `compile_compare` "real difference found" outcome (a reported non-match).
     Failed,
     /// A spawned task panicked while being joined — exit code 2.
     TaskPanic,
+    /// A hard error distinct from a reported difference — exit code 2. Used by
+    /// `compile_compare` for compile/canonicalize failures and the still-unimplemented
+    /// tsv side, so its `0` parity / `1` diff / `2` error contract stays intact.
+    Errored,
 }
 
 impl CliError {
@@ -41,7 +47,7 @@ impl CliError {
     pub fn exit_code(self) -> u8 {
         match self {
             Self::Failed => 1,
-            Self::TaskPanic => 2,
+            Self::TaskPanic | Self::Errored => 2,
         }
     }
 }
@@ -67,6 +73,7 @@ pub enum Subcommand {
     LineWidth(LineWidthCommand),
     CanonicalParse(CanonicalParseCommand),
     CanonicalCompile(CanonicalCompileCommand),
+    CompileCompare(CompileCompareCommand),
     FormatPrettier(FormatPrettierCommand),
     FixtureInit(FixtureInitCommand),
     FixturesUpdate(FixturesUpdateCommand),
@@ -109,6 +116,7 @@ impl TopLevel {
             Subcommand::LineWidth(c) => c.run(),
             Subcommand::CanonicalParse(c) => c.run(),
             Subcommand::CanonicalCompile(c) => c.run(),
+            Subcommand::CompileCompare(c) => c.run(),
             Subcommand::FormatPrettier(c) => c.run(),
             Subcommand::FixtureInit(c) => c.run(),
             Subcommand::FixturesUpdate(c) => c.run(),
@@ -137,8 +145,10 @@ mod tests {
     #[test]
     fn exit_codes_are_stable() {
         // The exit-code contract `main` maps to a process code: 1 for a reported
-        // failure, 2 for a spawned-task panic. Pinned so the refactor can't drift it.
+        // failure/difference, 2 for a spawned-task panic or a hard error. Pinned so
+        // the refactor can't drift it.
         assert_eq!(CliError::Failed.exit_code(), 1);
         assert_eq!(CliError::TaskPanic.exit_code(), 2);
+        assert_eq!(CliError::Errored.exit_code(), 2);
     }
 }
