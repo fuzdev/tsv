@@ -161,8 +161,8 @@ Each language is a self-contained Rust crate exposing the same
 central `Language` trait, registry, or dynamic dispatch ("closed scope, open convention and crates").
 That means builds tree-shake, so the parse build excludes the printers,
 and the formatter build excludes the JSON-AST conversion layer.
-Languages tree-shake the same way - a build binding only TypeScript would exclude
-Svelte and CSS entirely (publishing minimal builds is a TODO).
+Languages tree-shake the same way - a TypeScript-only build would exclude
+Svelte and CSS entirely (publishing lang-specific builds is a TODO).
 Future LSP/incremental features will be later feature-gated layers that don't bloat
 these artifacts - see [docs/architecture.md](docs/architecture.md)
 
