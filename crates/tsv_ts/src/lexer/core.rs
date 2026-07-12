@@ -471,12 +471,22 @@ impl<'a> Lexer<'a> {
                 // Without this, `1.e1` would lex as `1.` followed by member access `.e1`.
                 is_integer = false;
                 self.advance(); // consume '.'
-            } else if next_char.is_none() || !next_char.is_some_and(is_id_start) {
-                // Trailing decimal: 5. or 0. (followed by operator, punctuation, or end)
-                // Don't consume if followed by identifier: 5.toString() is invalid anyway
-                // Do consume for 0..toString() so the number is "0." and second dot is member access
+            } else {
+                // Trailing decimal: `5.` / `0.` (operator, punctuation, or end),
+                // `5..foo` / `0..toString()` (the next `.` is member access). The
+                // `.` is greedily the decimal point (maximal munch), so consume it.
                 is_integer = false;
                 self.advance(); // consume '.'
+                // ecma262 12.9.3: the SourceCharacter immediately following a
+                // NumericLiteral must not be an IdentifierStart. After a trailing
+                // `.` that rejects `5.foo` / `10.$a` (identifier) and `10._1` /
+                // `1._5` (a leading `_` in the empty fraction) — read as a member
+                // access before — and keyword-led `5.in` / `5.instanceof`, which
+                // the parser would otherwise accept as `5. in b`. (`5foo` with no
+                // `.` hits the same rule via the parser's number→primary path.)
+                if self.cur_char().is_some_and(is_id_start) {
+                    return Err(lex_err("Identifier directly after number", self.position));
+                }
             }
         }
 
