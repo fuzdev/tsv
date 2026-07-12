@@ -8,7 +8,7 @@
 //!   assignment-target / for-left positions), types, and their sub-nodes
 //!   (heritage clauses, type parameters, member signatures, decorators, import/
 //!   export specifiers, …). It fills the parent/kind/span/`subtree_end` side
-//!   columns, the zero-initialized `node_flags` column, and the address→id map.
+//!   columns and the address→id map.
 //!   Pre-order — each parent precedes its contiguous subtree, so the
 //!   `subtree_end` interval test (`is X a descendant of Y`) stays valid. Sibling
 //!   order follows the traversal, not always source order (an annotated binding
@@ -230,10 +230,11 @@ pub enum NodeKind {
     TSMappedTypeParameter,
 }
 
-/// Per-node flag bits in the [`BoundFile::node_flags`] column (one `u8` per
-/// [`NodeId`]). F0 mints the column zero-initialized and sets nothing; the flow
-/// construction pass (F1) sets [`NODE_FLAGS_UNREACHABLE`] during unreachable
-/// tagging, and the ambient/context node-identity bits move here later.
+/// Per-node flag bits in the [`flow::FlowProduct::node_flags`] column (one `u8`
+/// per [`NodeId`], minted zeroed by the flow builder — the sole writer today,
+/// setting [`NODE_FLAGS_UNREACHABLE`] during unreachable tagging). A bind-side
+/// column returns to [`BoundFile`] when a bind-time writer lands (the planned
+/// ambient/context node-identity bits).
 #[allow(clippy::identity_op)] // bit 0 — kept in the `1 << N` idiom for the bits F1 adds
 pub const NODE_FLAGS_UNREACHABLE: u8 = 1 << 0;
 
@@ -272,9 +273,6 @@ pub struct BoundFile {
     /// The last id in each node's pre-order subtree (self for a leaf) — makes
     /// descendant tests an O(1) id-range check.
     pub subtree_end: Vec<NodeId>,
-    /// Per-node flag byte (see [`NODE_FLAGS_UNREACHABLE`]), one per [`NodeId`],
-    /// zero-initialized. F0 sets nothing; the flow pass (F1) writes it.
-    pub node_flags: Vec<u8>,
     /// Node `(arena address, kind)` -> id (the random-access escape hatch). The
     /// kind is part of the key so the one offset-0 collision pair
     /// (`MethodDefinition` and its inline `value: FunctionExpression`) stays
@@ -296,12 +294,6 @@ impl BoundFile {
     #[must_use]
     pub fn is_descendant_of(&self, descendant: NodeId, ancestor: NodeId) -> bool {
         ancestor < descendant && descendant <= self.subtree_end[ancestor.index()]
-    }
-
-    /// The flag byte for `id` (see [`NODE_FLAGS_UNREACHABLE`]).
-    #[must_use]
-    pub fn node_flags(&self, id: NodeId) -> u8 {
-        self.node_flags[id.index()]
     }
 
     /// Strict `(address, kind)` -> [`NodeId`] resolution for flow consumers.
@@ -533,7 +525,6 @@ pub fn bind_file<'arena>(
         kinds: walk.kinds,
         spans: walk.spans,
         subtree_end: walk.subtree_end,
-        node_flags: walk.node_flags,
         address_map: walk.address_map,
         diagnostics,
         facts,
@@ -555,7 +546,6 @@ struct SoaWalk {
     kinds: Vec<NodeKind>,
     spans: Vec<Span>,
     subtree_end: Vec<NodeId>,
-    node_flags: Vec<u8>,
     address_map: FxHashMap<(usize, NodeKind), NodeId>,
 }
 
@@ -573,7 +563,6 @@ impl SoaWalk {
         self.kinds.push(kind);
         self.spans.push(span);
         self.subtree_end.push(id); // provisional (a leaf owns only itself)
-        self.node_flags.push(0); // F0 mints the column zeroed; F1 sets it
         // The insert must run in ALL profiles — the flow walk's strict
         // `require_node_id` reads this map at runtime. Each node is added exactly
         // once by the pre-order walk, so a prior entry for this `(address, kind)`
@@ -1396,6 +1385,15 @@ impl SoaWalk {
                 self.close(id);
             }
         }
+        // Lockstep guard: the arm above must have registered this expression
+        // under the `(address, kind)` key the shared `expression_addr_kind`
+        // mapping (the flow walk's resolver) predicts — drift between the two
+        // is caught here per lowered expression in debug builds (which the
+        // conformance gate runs), before the strict resolver would hard-fail.
+        debug_assert!(
+            self.address_map.contains_key(&expression_addr_kind(expr)),
+            "visit_expression and expression_addr_kind disagree on an expression's (address, kind) key"
+        );
     }
 
     fn visit_function_expression(&mut self, f: &FunctionExpression<'_>, parent: NodeId) {
@@ -1995,6 +1993,61 @@ pub(crate) fn statement_kind(stmt: &Statement<'_>) -> NodeKind {
     }
 }
 
+/// The `(arena address, NodeKind)` compound key for an expression variant — the
+/// key `SoaWalk::visit_expression` registers it under in the address map.
+/// Shared with the flow walk's `expr_id`, so the two mappings cannot drift: a
+/// `debug_assert` at the end of `visit_expression` pins the agreement on every
+/// lowered expression (corpus-exercised — the conformance gate runs debug
+/// builds), and the flow walk's strict resolver hard-fails on any residual
+/// mismatch. A `JsdocCast` resolves to its **inner** expression's key: the flow
+/// walk treats the cast wrapper as transparent (matching tsgo, where the
+/// reparsed cast is not a flow subject), and the SoA walk lowers both the
+/// wrapper and the inner, so the inner's key is always present.
+pub(crate) fn expression_addr_kind(e: &Expression<'_>) -> (usize, NodeKind) {
+    use Expression as E;
+    match e {
+        E::JsdocCast(c) => expression_addr_kind(c.inner),
+        E::Literal(x) => (addr_of(x), NodeKind::Literal),
+        E::Identifier(x) => (addr_of(x), NodeKind::Identifier),
+        E::PrivateIdentifier(x) => (addr_of(x), NodeKind::PrivateIdentifier),
+        E::ObjectExpression(x) => (addr_of(x), NodeKind::ObjectExpression),
+        E::ArrayExpression(x) => (addr_of(x), NodeKind::ArrayExpression),
+        E::UnaryExpression(x) => (addr_of(x), NodeKind::UnaryExpression),
+        E::UpdateExpression(x) => (addr_of(x), NodeKind::UpdateExpression),
+        E::BinaryExpression(x) => (addr_of(x), NodeKind::BinaryExpression),
+        E::CallExpression(x) => (addr_of(x), NodeKind::CallExpression),
+        E::NewExpression(x) => (addr_of(x), NodeKind::NewExpression),
+        E::MemberExpression(x) => (addr_of(x), NodeKind::MemberExpression),
+        E::ConditionalExpression(x) => (addr_of(x), NodeKind::ConditionalExpression),
+        E::ArrowFunctionExpression(x) => (addr_of(x), NodeKind::ArrowFunctionExpression),
+        E::FunctionExpression(x) => (addr_of(x), NodeKind::FunctionExpression),
+        E::ClassExpression(x) => (addr_of(x), NodeKind::ClassExpression),
+        E::SpreadElement(x) => (addr_of(x), NodeKind::SpreadElement),
+        E::TemplateLiteral(x) => (addr_of(x), NodeKind::TemplateLiteral),
+        E::TaggedTemplateExpression(x) => (addr_of(x), NodeKind::TaggedTemplateExpression),
+        E::AwaitExpression(x) => (addr_of(x), NodeKind::AwaitExpression),
+        E::YieldExpression(x) => (addr_of(x), NodeKind::YieldExpression),
+        E::SequenceExpression(x) => (addr_of(x), NodeKind::SequenceExpression),
+        E::RegexLiteral(x) => (addr_of(x), NodeKind::RegexLiteral),
+        E::ThisExpression(x) => (addr_of(x), NodeKind::ThisExpression),
+        E::Super(x) => (addr_of(x), NodeKind::Super),
+        E::AssignmentExpression(x) => (addr_of(x), NodeKind::AssignmentExpression),
+        E::ObjectPattern(x) => (addr_of(x), NodeKind::ObjectPattern),
+        E::ArrayPattern(x) => (addr_of(x), NodeKind::ArrayPattern),
+        E::AssignmentPattern(x) => (addr_of(x), NodeKind::AssignmentPattern),
+        E::RestElement(x) => (addr_of(x), NodeKind::RestElement),
+        E::TSTypeAssertion(x) => (addr_of(x), NodeKind::TSTypeAssertion),
+        E::TSAsExpression(x) => (addr_of(x), NodeKind::TSAsExpression),
+        E::TSSatisfiesExpression(x) => (addr_of(x), NodeKind::TSSatisfiesExpression),
+        E::TSInstantiationExpression(x) => (addr_of(x), NodeKind::TSInstantiationExpression),
+        E::TSNonNullExpression(x) => (addr_of(x), NodeKind::TSNonNullExpression),
+        E::TSParameterProperty(x) => (addr_of(x), NodeKind::TSParameterProperty),
+        E::ImportExpression(x) => (addr_of(x), NodeKind::ImportExpression),
+        E::MetaProperty(x) => (addr_of(x), NodeKind::MetaProperty),
+        E::ParenthesizedExpression(x) => (addr_of(x), NodeKind::ParenthesizedExpression),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2075,15 +2128,6 @@ mod tests {
         assert!(bound.kinds.contains(&NodeKind::TSKeywordType)); // `number`
         assert!(bound.kinds.contains(&NodeKind::CallExpression)); // `f(1)`
         assert!(bound.kinds.contains(&NodeKind::Literal)); // `1`
-    }
-
-    #[test]
-    fn node_flags_column_is_zeroed_and_sized() {
-        let bound = bind("const x = 1; function f<T>(a: T) { return a; }");
-        assert_eq!(bound.node_flags.len(), bound.node_count as usize);
-        assert!(bound.node_flags.iter().all(|&b| b == 0));
-        // The accessor agrees with the column.
-        assert_eq!(bound.node_flags(NodeId::FIRST), 0);
     }
 
     #[test]

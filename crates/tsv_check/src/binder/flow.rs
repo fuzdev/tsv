@@ -99,7 +99,7 @@
 //       (+ the newFlowNode* / createFlow* / finishFlowLabel / addAntecedent
 //        constructor family and the per-statement flow shapers)
 
-use crate::binder::{BoundFile, NodeKind, addr_of, statement_kind};
+use crate::binder::{BoundFile, NodeKind, addr_of, expression_addr_kind, statement_kind};
 use crate::ids::{FlowNodeId, NodeId};
 use smallvec::SmallVec;
 use tsv_lang::Span;
@@ -362,7 +362,8 @@ pub struct FlowProduct {
     /// non-leaf nodes cleared in dead code; a dead *leaf* keeps
     /// `Some(unreachable)`).
     pub flow_of_node: Vec<Option<FlowNodeId>>,
-    /// The F0 `node_flags` column with the `Unreachable` bit set during the
+    /// Per-node flag bytes, one per [`NodeId`] (minted zeroed here — the flow
+    /// walk is the sole writer today), with the `Unreachable` bit set during the
     /// dead-code walk (`NODE_FLAGS_UNREACHABLE`).
     pub node_flags: Vec<u8>,
     /// Function-body + `SourceFile` end-of-flow anchors (binder.go:1561,1569),
@@ -548,7 +549,7 @@ impl<'a> FlowBuilder<'a> {
             pool: Vec::new(),
             label_scratch: crate::hash::FxHashMap::default(),
             flow_of_node: vec![None; n],
-            node_flags: bound.node_flags.clone(),
+            node_flags: vec![0u8; n],
             end_flow: Vec::new(),
             return_flow: Vec::new(),
             fallthrough_flow: Vec::new(),
@@ -1925,53 +1926,12 @@ impl<'a> FlowBuilder<'a> {
     }
 
     /// The F0 [`NodeId`] of an expression node — its variant payload's
-    /// `(address, kind)` in the address map (the compound key F0's lowering walk
-    /// used). Each arm's [`NodeKind`] mirrors the one `visit_expression` assigns to
-    /// that variant in `binder/mod.rs`. Condition / mutation subjects are always
-    /// value expressions F0 lowered, so this never misses.
+    /// `(address, kind)` in the address map, via the shared
+    /// [`expression_addr_kind`] mapping (the same one `visit_expression`'s
+    /// lockstep guard pins in `binder/mod.rs`). Condition / mutation subjects are
+    /// always value expressions F0 lowered, so this never misses.
     fn expr_id(&self, e: &Expression<'_>) -> NodeId {
-        use Expression as E;
-        let (addr, kind) = match e {
-            E::JsdocCast(c) => return self.expr_id(c.inner),
-            E::Literal(x) => (addr_of(x), NodeKind::Literal),
-            E::Identifier(x) => (addr_of(x), NodeKind::Identifier),
-            E::PrivateIdentifier(x) => (addr_of(x), NodeKind::PrivateIdentifier),
-            E::ObjectExpression(x) => (addr_of(x), NodeKind::ObjectExpression),
-            E::ArrayExpression(x) => (addr_of(x), NodeKind::ArrayExpression),
-            E::UnaryExpression(x) => (addr_of(x), NodeKind::UnaryExpression),
-            E::UpdateExpression(x) => (addr_of(x), NodeKind::UpdateExpression),
-            E::BinaryExpression(x) => (addr_of(x), NodeKind::BinaryExpression),
-            E::CallExpression(x) => (addr_of(x), NodeKind::CallExpression),
-            E::NewExpression(x) => (addr_of(x), NodeKind::NewExpression),
-            E::MemberExpression(x) => (addr_of(x), NodeKind::MemberExpression),
-            E::ConditionalExpression(x) => (addr_of(x), NodeKind::ConditionalExpression),
-            E::ArrowFunctionExpression(x) => (addr_of(x), NodeKind::ArrowFunctionExpression),
-            E::FunctionExpression(x) => (addr_of(x), NodeKind::FunctionExpression),
-            E::ClassExpression(x) => (addr_of(x), NodeKind::ClassExpression),
-            E::SpreadElement(x) => (addr_of(x), NodeKind::SpreadElement),
-            E::TemplateLiteral(x) => (addr_of(x), NodeKind::TemplateLiteral),
-            E::TaggedTemplateExpression(x) => (addr_of(x), NodeKind::TaggedTemplateExpression),
-            E::AwaitExpression(x) => (addr_of(x), NodeKind::AwaitExpression),
-            E::YieldExpression(x) => (addr_of(x), NodeKind::YieldExpression),
-            E::SequenceExpression(x) => (addr_of(x), NodeKind::SequenceExpression),
-            E::RegexLiteral(x) => (addr_of(x), NodeKind::RegexLiteral),
-            E::ThisExpression(x) => (addr_of(x), NodeKind::ThisExpression),
-            E::Super(x) => (addr_of(x), NodeKind::Super),
-            E::AssignmentExpression(x) => (addr_of(x), NodeKind::AssignmentExpression),
-            E::ObjectPattern(x) => (addr_of(x), NodeKind::ObjectPattern),
-            E::ArrayPattern(x) => (addr_of(x), NodeKind::ArrayPattern),
-            E::AssignmentPattern(x) => (addr_of(x), NodeKind::AssignmentPattern),
-            E::RestElement(x) => (addr_of(x), NodeKind::RestElement),
-            E::TSTypeAssertion(x) => (addr_of(x), NodeKind::TSTypeAssertion),
-            E::TSAsExpression(x) => (addr_of(x), NodeKind::TSAsExpression),
-            E::TSSatisfiesExpression(x) => (addr_of(x), NodeKind::TSSatisfiesExpression),
-            E::TSInstantiationExpression(x) => (addr_of(x), NodeKind::TSInstantiationExpression),
-            E::TSNonNullExpression(x) => (addr_of(x), NodeKind::TSNonNullExpression),
-            E::TSParameterProperty(x) => (addr_of(x), NodeKind::TSParameterProperty),
-            E::ImportExpression(x) => (addr_of(x), NodeKind::ImportExpression),
-            E::MetaProperty(x) => (addr_of(x), NodeKind::MetaProperty),
-            E::ParenthesizedExpression(x) => (addr_of(x), NodeKind::ParenthesizedExpression),
-        };
+        let (addr, kind) = expression_addr_kind(e);
         self.require(addr, kind)
     }
 
@@ -3019,6 +2979,15 @@ mod tests {
         assert!(product.graph.flags(uid).contains(FlowFlags::UNREACHABLE));
         // The SourceFile Start is id 2 (minted right after unreachable).
         assert!(product.graph.node_count() >= 2);
+    }
+
+    #[test]
+    fn node_flags_column_is_minted_here_zeroed_and_sized() {
+        // The per-node flag column lives on the flow product (its sole writer);
+        // reachable-only code leaves every byte zero.
+        let (product, bound) = build_with_bound("const x = 1; function f<T>(a: T) { return a; }");
+        assert_eq!(product.node_flags.len(), bound.node_count as usize);
+        assert!(product.node_flags.iter().all(|&b| b == 0));
     }
 
     #[test]
