@@ -150,6 +150,90 @@ pub enum PrettierParser<'a> {
     Filepath(&'a str),
 }
 
+/// Target runtime for [`svelte_compile`]: which output the Svelte compiler emits.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SvelteGenerate {
+    /// Server-side rendering output (the default).
+    Server,
+    /// Client-side output.
+    Client,
+}
+
+impl SvelteGenerate {
+    /// The `generate` value the Svelte compiler expects.
+    fn name(self) -> &'static str {
+        match self {
+            SvelteGenerate::Server => "server",
+            SvelteGenerate::Client => "client",
+        }
+    }
+}
+
+impl std::str::FromStr for SvelteGenerate {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, String> {
+        match s {
+            "server" => Ok(SvelteGenerate::Server),
+            "client" => Ok(SvelteGenerate::Client),
+            _ => Err(format!(
+                "Unknown target: '{s}'. Valid targets: server, client"
+            )),
+        }
+    }
+}
+
+/// A warning emitted by the Svelte compiler, projected to the fields the oracle
+/// needs. `start`/`end` are `{ line, column, character }` objects when the
+/// warning is tied to a source position, otherwise absent.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SvelteCompileWarning {
+    /// Warning category code (e.g. `css_unused_selector`).
+    pub code: String,
+    /// Human-readable message.
+    pub message: String,
+    /// Start location, when the warning is positional.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start: Option<Value>,
+    /// End location, when the warning is positional.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end: Option<Value>,
+}
+
+/// The normalized product of a Svelte `compile()` — the deterministic compile
+/// oracle's output.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SvelteCompileOutput {
+    /// Generated JavaScript.
+    pub js: String,
+    /// Generated CSS, or `None` when the component has no styles.
+    pub css: Option<String>,
+    /// Compiler warnings.
+    #[serde(default)]
+    pub warnings: Vec<SvelteCompileWarning>,
+}
+
+/// Compile Svelte source with the official Svelte compiler (the deterministic
+/// compile oracle).
+///
+/// Runs a runes-only, external-CSS compile with a fixed CSS scoping hash and a
+/// constant filename, so identical `source` produces byte-identical output
+/// across calls. `generate` selects the server or client runtime; `dev` toggles
+/// development output.
+///
+/// # Errors
+/// Returns an error if Deno is not available or the Svelte compiler rejects the
+/// source (a compile error surfaces as [`DenoError::ToolError`]).
+pub async fn svelte_compile(
+    source: &str,
+    generate: SvelteGenerate,
+    dev: bool,
+) -> Result<SvelteCompileOutput, DenoError> {
+    let options = serde_json::json!({ "generate": generate.name(), "dev": dev });
+    let result = call_tool("svelte-compile", source, Some(options)).await?;
+    serde_json::from_value(result).map_err(DenoError::ResponseParse)
+}
+
 /// Run prettier on content
 ///
 /// # Arguments
@@ -351,6 +435,33 @@ mod tests {
             ast.get("type").and_then(|v| v.as_str()),
             Some("StyleSheetFile")
         );
+
+        // Test the Svelte compile oracle: a tiny runes component with a <style>.
+        const COMPONENT: &str = "<script>let { name } = $props();</script>\n<h1>{name}</h1>\n<style>h1 { color: red; }</style>\n";
+        let result = svelte_compile(COMPONENT, SvelteGenerate::Server, false).await;
+        assert!(result.is_ok(), "svelte_compile failed: {result:?}");
+        let compiled = result.unwrap();
+        assert!(
+            compiled.js.contains("$$renderer"),
+            "server compile should emit SSR output: {}",
+            compiled.js
+        );
+        // The component has a <style>, so the fixed scoping hash must appear in the CSS.
+        let css = compiled
+            .css
+            .as_deref()
+            .expect("component has a <style>, so css must be present");
+        assert!(
+            css.contains("svelte-tsvhash"),
+            "css must carry the deterministic scoping class: {css}"
+        );
+
+        // Determinism: a second identical compile must be byte-identical.
+        let again = svelte_compile(COMPONENT, SvelteGenerate::Server, false)
+            .await
+            .expect("second svelte_compile failed");
+        assert_eq!(compiled.js, again.js, "compile js must be deterministic");
+        assert_eq!(compiled.css, again.css, "compile css must be deterministic");
 
         // Pool heal: kill the pooled actor's event loop, then verify the next
         // call finds the dead slot, respawns it in place, and completes the
