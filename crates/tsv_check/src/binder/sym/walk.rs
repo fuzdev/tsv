@@ -130,21 +130,7 @@ impl<'a> SymbolBinder<'a> {
                     b.bind_params(f.params);
                 });
             }
-            Statement::ClassDeclaration(c) => {
-                let sym = if skip_symbol {
-                    None
-                } else {
-                    c.id.as_ref().map(|id| {
-                        let d = self.decl_from_ident(id, c.span, mods);
-                        self.declare_block_scoped(
-                            d,
-                            SymbolFlags::CLASS,
-                            SymbolFlags::CLASS_EXCLUDES,
-                        )
-                    })
-                };
-                self.bind_class_body(&c.body, sym, c.type_parameters.as_ref());
-            }
+            Statement::ClassDeclaration(c) => self.bind_class_statement(c, mods, skip_symbol),
             Statement::TSInterfaceDeclaration(i) => {
                 let d = self.decl_from_ident(&i.id, i.span, mods);
                 let sym = self.declare_block_scoped(
@@ -154,71 +140,17 @@ impl<'a> SymbolBinder<'a> {
                 );
                 self.bind_interface_body(&i.body, sym, i.type_parameters.as_ref());
             }
-            Statement::TSEnumDeclaration(e) => {
-                let (inc, exc) = if e.r#const {
-                    (SymbolFlags::CONST_ENUM, SymbolFlags::CONST_ENUM_EXCLUDES)
-                } else {
-                    (
-                        SymbolFlags::REGULAR_ENUM,
-                        SymbolFlags::REGULAR_ENUM_EXCLUDES,
-                    )
-                };
-                let d = self.decl_from_ident(&e.id, e.span, mods);
-                let sym = self.declare_block_scoped(d, inc, exc);
-                self.bind_enum_members(e.members, sym);
-            }
+            Statement::TSEnumDeclaration(e) => self.bind_enum_statement(e, mods),
             Statement::TSModuleDeclaration(m) => self.bind_module(m, mods),
-            Statement::TSTypeAliasDeclaration(t) => {
-                // tsgo's `declareSymbolEx` adds a TS1369 "Did you mean
-                // 'export type { T }'?" related info when a conflicting declaration
-                // is `export type T;` — a type alias with a *missing* `= type`
-                // (binder.go:260). That shape is deliberately unported: tsv's parser
-                // rejects `export type T;` ("Expected '='"), so the declaration never
-                // reaches this cascade. The sole corpus baseline exercising the hint
-                // (`exportDeclaration_missingBraces.ts`) is therefore a tsv
-                // parse-rejection, not a gradeable bind.
-                let d = self.decl_from_ident(&t.id, t.span, mods);
-                self.declare_block_scoped(
-                    d,
-                    SymbolFlags::TYPE_ALIAS,
-                    SymbolFlags::TYPE_ALIAS_EXCLUDES,
-                );
-                self.bind_type_params_in_new_locals(t.type_parameters.as_ref());
-            }
+            Statement::TSTypeAliasDeclaration(t) => self.bind_type_alias_statement(t, mods),
             Statement::ImportDeclaration(imp) => {
                 for spec in imp.specifiers {
                     self.bind_import_specifier(spec);
                 }
             }
-            Statement::TSImportEqualsDeclaration(ie) => {
-                let d = self.decl_from_ident(
-                    &ie.id,
-                    ie.span,
-                    DeclMods {
-                        exported: ie.is_export,
-                        default: false,
-                    },
-                );
-                // An `import =` with an external reference or a plain entity name
-                // is an alias either way for the family (locals unless exported).
-                let _ = &ie.module_reference;
-                self.declare_alias(d, ie.is_export);
-            }
+            Statement::TSImportEqualsDeclaration(ie) => self.bind_import_equals_statement(ie),
             Statement::ExportNamedDeclaration(e) => {
-                if let Some(inner) = e.declaration {
-                    self.visit_statement(
-                        inner,
-                        DeclMods {
-                            exported: true,
-                            default: false,
-                        },
-                        skip_symbol,
-                    );
-                } else {
-                    for spec in e.specifiers {
-                        self.bind_export_specifier(spec);
-                    }
-                }
+                self.bind_export_named_statement(e, skip_symbol);
             }
             Statement::ExportDefaultDeclaration(e) => self.bind_export_default(e, skip_symbol),
             // Control flow: descend for nested bindings + block scopes.
@@ -232,21 +164,7 @@ impl<'a> SymbolBinder<'a> {
                     self.visit_statement(alt, DeclMods::default(), false);
                 }
             }
-            Statement::ForStatement(s) => self.with_block_scope(|bd| {
-                if let Some(init) = &s.init {
-                    match init {
-                        ForInit::VariableDeclaration(decl) => bd.bind_var_declaration(decl),
-                        ForInit::Expression(e) => bd.visit_expression(e),
-                    }
-                }
-                if let Some(t) = &s.test {
-                    bd.visit_expression(t);
-                }
-                if let Some(u) = &s.update {
-                    bd.visit_expression(u);
-                }
-                bd.visit_statement(s.body, DeclMods::default(), false);
-            }),
+            Statement::ForStatement(s) => self.bind_for_statement(s),
             Statement::ForInStatement(s) => self.with_block_scope(|bd| {
                 bd.bind_for_left(&s.left);
                 bd.visit_expression(&s.right);
@@ -265,43 +183,8 @@ impl<'a> SymbolBinder<'a> {
                 self.visit_statement(s.body, DeclMods::default(), false);
                 self.visit_expression(&s.test);
             }
-            Statement::SwitchStatement(s) => {
-                self.visit_expression(&s.discriminant);
-                self.with_block_scope(|bd| {
-                    for case in s.cases {
-                        if let Some(t) = &case.test {
-                            bd.visit_expression(t);
-                        }
-                        bd.bind_statement_list(case.consequent, false);
-                    }
-                });
-            }
-            Statement::TryStatement(s) => {
-                self.with_block_scope(|bd| bd.bind_statement_list(s.block.body, true));
-                if let Some(h) = &s.handler {
-                    // The catch clause is a block scope holding the (block-scoped)
-                    // parameter; its body is a *separate* nested block scope, so a
-                    // `const e` shadowing `catch(e)` is a check-time TS2492, not a
-                    // binder conflict (tsgo `bindVariableDeclarationOrBindingElement`
-                    // -> `IsBlockOrCatchScoped`).
-                    self.with_block_scope(|bd| {
-                        if let Some(param) = &h.param {
-                            bd.bind_binding(
-                                param,
-                                SymbolFlags::BLOCK_SCOPED_VARIABLE,
-                                SymbolFlags::BLOCK_SCOPED_VARIABLE_EXCLUDES,
-                                true,
-                                DeclMods::default(),
-                                h.span,
-                            );
-                        }
-                        bd.with_block_scope(|body| body.bind_statement_list(h.body.body, true));
-                    });
-                }
-                if let Some(f) = &s.finalizer {
-                    self.with_block_scope(|bd| bd.bind_statement_list(f.body, true));
-                }
-            }
+            Statement::SwitchStatement(s) => self.bind_switch_statement(s),
+            Statement::TryStatement(s) => self.bind_try_statement(s),
             Statement::LabeledStatement(s) => {
                 self.visit_statement(s.body, DeclMods::default(), false);
             }
@@ -312,38 +195,7 @@ impl<'a> SymbolBinder<'a> {
             }
             Statement::ThrowStatement(s) => self.visit_expression(&s.argument),
             Statement::ExpressionStatement(s) => self.visit_expression(&s.expression),
-            Statement::TSExportAssignment(ea) => {
-                // `export = x` — tsgo `bindExportAssignment` with `IsExportEquals`:
-                // declared into `exports` under the `"export="` name with ALL
-                // excludes (self-merge-only), so a second `export =` conflicts.
-                if let Some(sym) = self.container.symbol {
-                    let name = self.atoms.export_equals();
-                    // The name node is the expression when it is a bare identifier
-                    // (tsgo `getNonAssignedNameOfDeclaration`), else the whole node.
-                    let error_span = match &ea.expression {
-                        Expression::Identifier(id) => id.name_span(),
-                        _ => ea.span,
-                    };
-                    let d = DeclInput {
-                        name,
-                        display: name,
-                        error_span,
-                        is_default_export: false,
-                        is_export_assignment_default: false,
-                        exported: true,
-                        node: self.node_id_of(ea, NodeKind::TSExportAssignment),
-                    };
-                    let table = self.exports_of(sym);
-                    self.declare_symbol(
-                        table,
-                        Some(sym),
-                        d,
-                        SymbolFlags::PROPERTY,
-                        SymbolFlags::ALL,
-                    );
-                }
-                self.visit_expression(&ea.expression);
-            }
+            Statement::TSExportAssignment(ea) => self.bind_export_assignment_statement(ea),
             Statement::ExportAllDeclaration(_)
             | Statement::TSNamespaceExportDeclaration(_)
             | Statement::BreakStatement(_)
@@ -351,6 +203,194 @@ impl<'a> SymbolBinder<'a> {
             | Statement::EmptyStatement(_)
             | Statement::DebuggerStatement(_) => {}
         }
+    }
+
+    #[inline]
+    fn bind_class_statement(
+        &mut self,
+        c: &tsv_ts::ast::internal::ClassDeclaration<'a>,
+        mods: DeclMods,
+        skip_symbol: bool,
+    ) {
+        let sym = if skip_symbol {
+            None
+        } else {
+            c.id.as_ref().map(|id| {
+                let d = self.decl_from_ident(id, c.span, mods);
+                self.declare_block_scoped(d, SymbolFlags::CLASS, SymbolFlags::CLASS_EXCLUDES)
+            })
+        };
+        self.bind_class_body(&c.body, sym, c.type_parameters.as_ref());
+    }
+
+    #[inline]
+    fn bind_enum_statement(
+        &mut self,
+        e: &tsv_ts::ast::internal::TSEnumDeclaration<'a>,
+        mods: DeclMods,
+    ) {
+        let (inc, exc) = if e.r#const {
+            (SymbolFlags::CONST_ENUM, SymbolFlags::CONST_ENUM_EXCLUDES)
+        } else {
+            (
+                SymbolFlags::REGULAR_ENUM,
+                SymbolFlags::REGULAR_ENUM_EXCLUDES,
+            )
+        };
+        let d = self.decl_from_ident(&e.id, e.span, mods);
+        let sym = self.declare_block_scoped(d, inc, exc);
+        self.bind_enum_members(e.members, sym);
+    }
+
+    #[inline]
+    fn bind_type_alias_statement(
+        &mut self,
+        t: &tsv_ts::ast::internal::TSTypeAliasDeclaration<'a>,
+        mods: DeclMods,
+    ) {
+        // tsgo's `declareSymbolEx` adds a TS1369 "Did you mean
+        // 'export type { T }'?" related info when a conflicting declaration
+        // is `export type T;` — a type alias with a *missing* `= type`
+        // (binder.go:260). That shape is deliberately unported: tsv's parser
+        // rejects `export type T;` ("Expected '='"), so the declaration never
+        // reaches this cascade. The sole corpus baseline exercising the hint
+        // (`exportDeclaration_missingBraces.ts`) is therefore a tsv
+        // parse-rejection, not a gradeable bind.
+        let d = self.decl_from_ident(&t.id, t.span, mods);
+        self.declare_block_scoped(d, SymbolFlags::TYPE_ALIAS, SymbolFlags::TYPE_ALIAS_EXCLUDES);
+        self.bind_type_params_in_new_locals(t.type_parameters.as_ref());
+    }
+
+    #[inline]
+    fn bind_import_equals_statement(
+        &mut self,
+        ie: &tsv_ts::ast::internal::TSImportEqualsDeclaration<'a>,
+    ) {
+        let d = self.decl_from_ident(
+            &ie.id,
+            ie.span,
+            DeclMods {
+                exported: ie.is_export,
+                default: false,
+            },
+        );
+        // An `import =` with an external reference or a plain entity name
+        // is an alias either way for the family (locals unless exported).
+        let _ = &ie.module_reference;
+        self.declare_alias(d, ie.is_export);
+    }
+
+    #[inline]
+    fn bind_export_named_statement(
+        &mut self,
+        e: &tsv_ts::ast::internal::ExportNamedDeclaration<'a>,
+        skip_symbol: bool,
+    ) {
+        if let Some(inner) = e.declaration {
+            self.visit_statement(
+                inner,
+                DeclMods {
+                    exported: true,
+                    default: false,
+                },
+                skip_symbol,
+            );
+        } else {
+            for spec in e.specifiers {
+                self.bind_export_specifier(spec);
+            }
+        }
+    }
+
+    #[inline]
+    fn bind_for_statement(&mut self, s: &tsv_ts::ast::internal::ForStatement<'a>) {
+        self.with_block_scope(|bd| {
+            if let Some(init) = &s.init {
+                match init {
+                    ForInit::VariableDeclaration(decl) => bd.bind_var_declaration(decl),
+                    ForInit::Expression(e) => bd.visit_expression(e),
+                }
+            }
+            if let Some(t) = &s.test {
+                bd.visit_expression(t);
+            }
+            if let Some(u) = &s.update {
+                bd.visit_expression(u);
+            }
+            bd.visit_statement(s.body, DeclMods::default(), false);
+        });
+    }
+
+    #[inline]
+    fn bind_switch_statement(&mut self, s: &tsv_ts::ast::internal::SwitchStatement<'a>) {
+        self.visit_expression(&s.discriminant);
+        self.with_block_scope(|bd| {
+            for case in s.cases {
+                if let Some(t) = &case.test {
+                    bd.visit_expression(t);
+                }
+                bd.bind_statement_list(case.consequent, false);
+            }
+        });
+    }
+
+    #[inline]
+    fn bind_try_statement(&mut self, s: &tsv_ts::ast::internal::TryStatement<'a>) {
+        self.with_block_scope(|bd| bd.bind_statement_list(s.block.body, true));
+        if let Some(h) = &s.handler {
+            // The catch clause is a block scope holding the (block-scoped)
+            // parameter; its body is a *separate* nested block scope, so a
+            // `const e` shadowing `catch(e)` is a check-time TS2492, not a
+            // binder conflict (tsgo `bindVariableDeclarationOrBindingElement`
+            // -> `IsBlockOrCatchScoped`).
+            self.with_block_scope(|bd| {
+                if let Some(param) = &h.param {
+                    bd.bind_binding(
+                        param,
+                        SymbolFlags::BLOCK_SCOPED_VARIABLE,
+                        SymbolFlags::BLOCK_SCOPED_VARIABLE_EXCLUDES,
+                        true,
+                        DeclMods::default(),
+                        h.span,
+                    );
+                }
+                bd.with_block_scope(|body| body.bind_statement_list(h.body.body, true));
+            });
+        }
+        if let Some(f) = &s.finalizer {
+            self.with_block_scope(|bd| bd.bind_statement_list(f.body, true));
+        }
+    }
+
+    #[inline]
+    fn bind_export_assignment_statement(
+        &mut self,
+        ea: &tsv_ts::ast::internal::TSExportAssignment<'a>,
+    ) {
+        // `export = x` — tsgo `bindExportAssignment` with `IsExportEquals`:
+        // declared into `exports` under the `"export="` name with ALL
+        // excludes (self-merge-only), so a second `export =` conflicts.
+        if let Some(sym) = self.container.symbol {
+            let name = self.atoms.export_equals();
+            // The name node is the expression when it is a bare identifier
+            // (tsgo `getNonAssignedNameOfDeclaration`), else the whole node.
+            let error_span = match &ea.expression {
+                Expression::Identifier(id) => id.name_span(),
+                _ => ea.span,
+            };
+            let d = DeclInput {
+                name,
+                display: name,
+                error_span,
+                is_default_export: false,
+                is_export_assignment_default: false,
+                exported: true,
+                node: self.node_id_of(ea, NodeKind::TSExportAssignment),
+            };
+            let table = self.exports_of(sym);
+            self.declare_symbol(table, Some(sym), d, SymbolFlags::PROPERTY, SymbolFlags::ALL);
+        }
+        self.visit_expression(&ea.expression);
     }
 
     fn bind_var_declaration(&mut self, decl: &tsv_ts::ast::internal::VariableDeclaration<'a>) {
