@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 498,
+		"end": 520,
 		"attributes": [],
 		"children": [
 			{
@@ -309,13 +309,13 @@
 				"type": "Rule",
 				"prelude": {
 					"type": "SelectorList",
-					"start": 405,
-					"end": 418,
+					"start": 427,
+					"end": 440,
 					"children": [
 						{
 							"type": "ComplexSelector",
-							"start": 405,
-							"end": 418,
+							"start": 427,
+							"end": 440,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -323,16 +323,16 @@
 									"selectors": [
 										{
 											"type": "AttributeSelector",
-											"start": 405,
-											"end": 418,
+											"start": 427,
+											"end": 440,
 											"name": "type",
 											"matcher": "=",
 											"value": "text",
 											"flags": null
 										}
 									],
-									"start": 405,
-									"end": 418
+									"start": 427,
+									"end": 440
 								}
 							]
 						}
@@ -340,32 +340,32 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 419,
-					"end": 450,
+					"start": 441,
+					"end": 472,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 423,
-							"end": 446,
+							"start": 445,
+							"end": 468,
 							"property": "border",
 							"value": "1px solid black"
 						}
 					]
 				},
-				"start": 405,
-				"end": 450
+				"start": 427,
+				"end": 472
 			},
 			{
 				"type": "Rule",
 				"prelude": {
 					"type": "SelectorList",
-					"start": 452,
-					"end": 468,
+					"start": 474,
+					"end": 490,
 					"children": [
 						{
 							"type": "ComplexSelector",
-							"start": 452,
-							"end": 468,
+							"start": 474,
+							"end": 490,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -373,16 +373,16 @@
 									"selectors": [
 										{
 											"type": "AttributeSelector",
-											"start": 452,
-											"end": 468,
+											"start": 474,
+											"end": 490,
 											"name": "data-id",
 											"matcher": "=",
 											"value": "item",
 											"flags": null
 										}
 									],
-									"start": 452,
-									"end": 468
+									"start": 474,
+									"end": 490
 								}
 							]
 						}
@@ -390,32 +390,32 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 469,
-					"end": 489,
+					"start": 491,
+					"end": 511,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 473,
-							"end": 485,
+							"start": 495,
+							"end": 507,
 							"property": "margin",
 							"value": "10px"
 						}
 					]
 				},
-				"start": 452,
-				"end": 489
+				"start": 474,
+				"end": 511
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 490,
-			"styles": "\n\t/* Exact match */\n\t[attr='value'] {\n\t\tcolor: red;\n\t}\n\n\t/* Prefix match */\n\t[href^='https'] {\n\t\tcolor: blue;\n\t}\n\n\t/* Suffix match */\n\t[href$='.pdf'] {\n\t\tcolor: green;\n\t}\n\n\t/* Substring match */\n\t[title*='example'] {\n\t\tcolor: yellow;\n\t}\n\n\t/* Whitespace list contains */\n\t[class~='active'] {\n\t\tcolor: purple;\n\t}\n\n\t/* Dash prefix match */\n\t[lang|='en'] {\n\t\tcolor: orange;\n\t}\n\n\t/* Unquoted values */\n\t[type='text'] {\n\t\tborder: 1px solid black;\n\t}\n\t[data-id='item'] {\n\t\tmargin: 10px;\n\t}\n",
+			"end": 512,
+			"styles": "\n\t/* Exact match */\n\t[attr='value'] {\n\t\tcolor: red;\n\t}\n\n\t/* Prefix match */\n\t[href^='https'] {\n\t\tcolor: blue;\n\t}\n\n\t/* Suffix match */\n\t[href$='.pdf'] {\n\t\tcolor: green;\n\t}\n\n\t/* Substring match */\n\t[title*='example'] {\n\t\tcolor: yellow;\n\t}\n\n\t/* Whitespace list contains */\n\t[class~='active'] {\n\t\tcolor: purple;\n\t}\n\n\t/* Dash prefix match */\n\t[lang|='en'] {\n\t\tcolor: orange;\n\t}\n\n\t/* Exact match, bare attribute selectors */\n\t[type='text'] {\n\t\tborder: 1px solid black;\n\t}\n\t[data-id='item'] {\n\t\tmargin: 10px;\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 499,
+	"end": 521,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
