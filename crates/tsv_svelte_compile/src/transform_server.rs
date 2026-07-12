@@ -262,37 +262,23 @@ pub(crate) fn compile_server<'arena>(
         .instance
         .map_or(lbrace, |script| script.content.span.start);
 
-    // 5. Template → one `$$renderer.push(`…`)` statement.
-    let mut accum = TemplateAccum {
-        texts: vec![String::new()],
-        exprs: BumpVec::new_in(arena),
-    };
+    // 6. Emit the template into the body: statements interleaved with
+    // `$$renderer.push(…)` template flushes (blocks split the pushes).
+    let mut out = BodyBuilder::new_in(arena);
+    for stmt in body {
+        out.stmts.push(stmt);
+    }
     emit_fragment(
         &mut env,
         &root.fragment,
-        &mut accum,
+        &mut out,
         FragmentCtx {
             is_component_root: true,
             preserve_whitespace: false,
             parent_name: None,
         },
     )?;
-    if !(accum.exprs.is_empty() && accum.texts.iter().all(String::is_empty)) {
-        let template = env
-            .b
-            .template_literal(&accum.texts, accum.exprs.into_bump_slice());
-        let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
-        args.push(template);
-        let push_call = env
-            .b
-            .member_call("$$renderer", "push", args.into_bump_slice());
-        let span = push_call.span();
-        body.push(Statement::ExpressionStatement(ExpressionStatement {
-            expression: push_call,
-            span,
-            is_directive: false,
-        }));
-    }
+    let body = out.finish(&mut env.b, arena);
 
     // A scoped selector that matches no element would be pruned by the oracle —
     // pruning isn't implemented, so refuse rather than emit unpruned CSS.
@@ -309,9 +295,8 @@ pub(crate) fn compile_server<'arena>(
     // 7. Effects force the `$$renderer.component(($$renderer) => { … })`
     // wrapper around the whole body (the effects themselves are dropped).
     let body = if has_effects {
-        let inner = body.into_bump_slice();
         let inner_span = Span::new(block_start, env.b.buffer.len() as u32);
-        let arrow = env.b.arrow_block("$$renderer", inner, inner_span);
+        let arrow = env.b.arrow_block("$$renderer", body, inner_span);
         let arrow_alloc = env.b.arena.alloc(arrow);
         let call = env
             .b
@@ -323,7 +308,7 @@ pub(crate) fn compile_server<'arena>(
             span,
             is_directive: false,
         }));
-        outer
+        outer.into_bump_slice()
     } else {
         body
     };
@@ -342,7 +327,7 @@ pub(crate) fn compile_server<'arena>(
         params: params.into_bump_slice(),
         return_type: None,
         body: BlockStatement {
-            body: body.into_bump_slice(),
+            body,
             span: Span::new(block_start, rbrace_end),
         },
         generator: false,
@@ -808,14 +793,28 @@ fn rewrite_script_statement<'arena>(
     })))
 }
 
-/// Alternating static template text and interpolation expressions
-/// (`texts.len() == exprs.len() + 1` — the [`Builder::template_literal`] shape).
-struct TemplateAccum<'arena> {
+/// A statement body under construction: the statements emitted so far plus the
+/// pending template accumulator (alternating static text and interpolation
+/// expressions, `texts.len() == exprs.len() + 1` — the
+/// [`Builder::template_literal`] shape). Control-flow blocks `flush` the
+/// pending template into a `$$renderer.push(…)` statement, emit their own
+/// statements, and let closer-anchor text accumulate into the next template —
+/// the oracle's multi-push output shape.
+struct BodyBuilder<'arena> {
+    stmts: BumpVec<'arena, Statement<'arena>>,
     texts: Vec<String>,
     exprs: BumpVec<'arena, Expression<'arena>>,
 }
 
-impl<'arena> TemplateAccum<'arena> {
+impl<'arena> BodyBuilder<'arena> {
+    fn new_in(arena: &'arena bumpalo::Bump) -> Self {
+        Self {
+            stmts: BumpVec::new_in(arena),
+            texts: vec![String::new()],
+            exprs: BumpVec::new_in(arena),
+        }
+    }
+
     /// Append an already template-escaped chunk to the current static part.
     ///
     /// Cross-chunk `${` seam invariant: each chunk is template-escaped
@@ -823,8 +822,9 @@ impl<'arena> TemplateAccum<'arena> {
     /// `{` starting the next would slip through unescaped. That pairing is
     /// unreachable — a decoded text run is always a single chunk (the parser
     /// yields one `Text` node per run, entities included), and every other
-    /// chunk this transform appends starts with `<`, `/`, `>`, or a space —
-    /// but assert it so a future emitter change fails loudly.
+    /// chunk this transform appends starts with `<`, `/`, `>`, a space, or an
+    /// anchor comment (`<!…`) — but assert it so a future emitter change fails
+    /// loudly.
     fn push_text(&mut self, chunk: &str) {
         // Every element of `texts` exists by construction (starts with one entry;
         // `push_expr` appends the follower).
@@ -840,6 +840,47 @@ impl<'arena> TemplateAccum<'arena> {
     fn push_expr(&mut self, expr: Expression<'arena>) {
         self.exprs.push(expr);
         self.texts.push(String::new());
+    }
+
+    /// Flush the pending template (if any) into a `$$renderer.push(…)`
+    /// statement.
+    fn flush(&mut self, b: &mut Builder<'arena>, arena: &'arena bumpalo::Bump) {
+        if self.exprs.is_empty() && self.texts.iter().all(String::is_empty) {
+            return;
+        }
+        let texts = std::mem::replace(&mut self.texts, vec![String::new()]);
+        let exprs = std::mem::replace(&mut self.exprs, BumpVec::new_in(arena));
+        let template = b.template_literal(&texts, exprs.into_bump_slice());
+        let template_alloc = arena.alloc(template);
+        let push_call = b.member_call("$$renderer", "push", std::slice::from_ref(template_alloc));
+        let span = push_call.span();
+        self.stmts
+            .push(Statement::ExpressionStatement(ExpressionStatement {
+                expression: push_call,
+                span,
+                is_directive: false,
+            }));
+    }
+
+    /// Flush the pending template, then append a statement.
+    fn push_statement(
+        &mut self,
+        b: &mut Builder<'arena>,
+        arena: &'arena bumpalo::Bump,
+        stmt: Statement<'arena>,
+    ) {
+        self.flush(b, arena);
+        self.stmts.push(stmt);
+    }
+
+    /// Finish: flush and return the statement slice.
+    fn finish(
+        mut self,
+        b: &mut Builder<'arena>,
+        arena: &'arena bumpalo::Bump,
+    ) -> &'arena [Statement<'arena>] {
+        self.flush(b, arena);
+        self.stmts.into_bump_slice()
     }
 }
 
@@ -934,7 +975,7 @@ struct FragmentCtx<'p> {
 fn emit_fragment<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     fragment: &Fragment<'arena>,
-    accum: &mut TemplateAccum<'arena>,
+    out: &mut BodyBuilder<'arena>,
     ctx: FragmentCtx<'_>,
 ) -> Result<(), CompileError> {
     let nodes: &'arena [FragmentNode<'arena>] = fragment.nodes;
@@ -979,22 +1020,22 @@ fn emit_fragment<'arena>(
     if ctx.is_component_root
         && matches!(list.first(), Some(CleanNode::Text(_) | CleanNode::Expr(_)))
     {
-        accum.push_text("<!---->");
+        out.push_text("<!---->");
     }
 
     for node in &list {
         match node {
             CleanNode::Text(data) => {
-                accum.push_text(&escape_template_text(&escape_html_text(data)));
+                out.push_text(&escape_template_text(&escape_html_text(data)));
             }
             CleanNode::Element(element) => {
-                emit_element(env, element, accum, &ctx)?;
+                emit_element(env, element, out, &ctx)?;
             }
             CleanNode::Expr(tag) => {
-                emit_expression_tag(env, &tag.expression, accum, true)?;
+                emit_expression_tag(env, &tag.expression, out, true)?;
             }
             CleanNode::Html(tag) => {
-                emit_expression_tag(env, &tag.expression, accum, false)?;
+                emit_expression_tag(env, &tag.expression, out, false)?;
             }
         }
     }
@@ -1006,7 +1047,7 @@ fn emit_fragment<'arena>(
 fn emit_expression_tag<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     expr: &'arena Expression<'arena>,
-    accum: &mut TemplateAccum<'arena>,
+    out: &mut BodyBuilder<'arena>,
     escape: bool,
 ) -> Result<(), CompileError> {
     // Guard FIRST (stray runes, non-bare derived reads, template mutations
@@ -1024,7 +1065,7 @@ fn emit_expression_tag<'arena>(
         }
         let text = stringify_value(value)
             .map_err(|g| unsupported(format!("static fold not portable: {}", g.0)))?;
-        accum.push_text(&escape_template_text(&escape_html_text(&text)));
+        out.push_text(&escape_template_text(&escape_html_text(&text)));
         return Ok(());
     }
 
@@ -1033,7 +1074,7 @@ fn emit_expression_tag<'arena>(
     } else {
         env.b.member_call("$", "html", wrapped)
     };
-    accum.push_expr(call);
+    out.push_expr(call);
     Ok(())
 }
 
@@ -1125,7 +1166,7 @@ fn normalize_whitespace(list: &mut Vec<CleanNode<'_>>, parent_name: Option<&str>
 fn emit_element<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     element: &'arena Element<'arena>,
-    accum: &mut TemplateAccum<'arena>,
+    out: &mut BodyBuilder<'arena>,
     parent_ctx: &FragmentCtx<'_>,
 ) -> Result<(), CompileError> {
     let name = env
@@ -1163,27 +1204,27 @@ fn emit_element<'arena>(
         _ => {}
     }
 
-    accum.push_text(&format!("<{name}"));
+    out.push_text(&format!("<{name}"));
     for attr_node in element.attributes {
         let AttributeNode::Attribute(attr) = attr_node else {
             return Err(unsupported("non-plain attribute (directive/spread)"));
         };
-        emit_attribute(env, attr, &name, accum)?;
+        emit_attribute(env, attr, &name, out)?;
     }
 
     if tsv_html::is_void_element(&name) {
         // XHTML-compliant self-close, matching the oracle.
-        accum.push_text("/>");
+        out.push_text("/>");
         if !element.fragment.nodes.is_empty() {
             return Err(unsupported(format!("children on void element <{name}>")));
         }
         return Ok(());
     }
-    accum.push_text(">");
+    out.push_text(">");
     emit_fragment(
         env,
         &element.fragment,
-        accum,
+        out,
         FragmentCtx {
             is_component_root: false,
             preserve_whitespace: parent_ctx.preserve_whitespace
@@ -1192,7 +1233,7 @@ fn emit_element<'arena>(
             parent_name: Some(&name),
         },
     )?;
-    accum.push_text(&format!("</{name}>"));
+    out.push_text(&format!("</{name}>"));
     Ok(())
 }
 
@@ -1204,7 +1245,7 @@ fn emit_attribute<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     attr: &'arena Attribute<'arena>,
     element_name: &str,
-    accum: &mut TemplateAccum<'arena>,
+    out: &mut BodyBuilder<'arena>,
 ) -> Result<(), CompileError> {
     // The oracle lowercases attribute names outside foreign namespaces (svg
     // refuses above).
@@ -1223,7 +1264,7 @@ fn emit_attribute<'arena>(
 
     let Some(values) = attr.value else {
         // Boolean attribute: the oracle emits `name=""`.
-        accum.push_text(&escape_template_text(&format!(" {name}=\"\"")));
+        out.push_text(&escape_template_text(&format!(" {name}=\"\"")));
         return Ok(());
     };
 
@@ -1250,16 +1291,16 @@ fn emit_attribute<'arena>(
                     value.push_str(SCOPE_HASH_CLASS);
                 }
             }
-            accum.push_text(&escape_template_text(&format!(
+            out.push_text(&escape_template_text(&format!(
                 " {name}=\"{}\"",
                 escape_html_attr(&value)
             )));
             Ok(())
         }
         [AttributeValue::ExpressionTag(tag)] => {
-            emit_dynamic_attribute(env, &name, &tag.expression, accum)
+            emit_dynamic_attribute(env, &name, &tag.expression, out)
         }
-        _ => emit_mixed_attribute(env, &name, values, accum),
+        _ => emit_mixed_attribute(env, &name, values, out),
     }
 }
 
@@ -1287,7 +1328,7 @@ fn emit_dynamic_attribute<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     name: &str,
     expr: &'arena Expression<'arena>,
-    accum: &mut TemplateAccum<'arena>,
+    out: &mut BodyBuilder<'arena>,
 ) -> Result<(), CompileError> {
     // The oracle omits expression-valued event handlers from SSR output —
     // implement nothing rather than emit a wrong attribute.
@@ -1340,7 +1381,7 @@ fn emit_dynamic_attribute<'arena>(
             env.b.member_call("$", "attr", args.into_bump_slice())
         }
     };
-    accum.push_expr(call);
+    out.push_expr(call);
     Ok(())
 }
 
@@ -1351,7 +1392,7 @@ fn emit_mixed_attribute<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     name: &str,
     values: &'arena [AttributeValue<'arena>],
-    accum: &mut TemplateAccum<'arena>,
+    out: &mut BodyBuilder<'arena>,
 ) -> Result<(), CompileError> {
     if name.starts_with("on") {
         return Err(unsupported(format!("event attribute {name}")));
@@ -1436,7 +1477,7 @@ fn emit_mixed_attribute<'arena>(
             env.b.member_call("$", "attr", args.into_bump_slice())
         }
     };
-    accum.push_expr(call);
+    out.push_expr(call);
     Ok(())
 }
 
