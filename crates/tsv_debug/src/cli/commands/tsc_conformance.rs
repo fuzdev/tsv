@@ -8,9 +8,9 @@ use crate::cli::CliError;
 use crate::tsc_conformance::index::IndexReport;
 use crate::tsc_conformance::runner::SkeletonReport;
 use crate::tsc_conformance::{
-    FamilyFilter, RunFilter, RunOptions, baselines_dir, check_one, corpus_materialized,
-    denominators, discover_baselines, dump_flow_dot, histogram, run_index, run_roundtrip,
-    run_skeleton, tests_by_code,
+    FAMILIES, FamilyFilter, MissingCause, RunFilter, RunOptions, baselines_dir, check_one,
+    corpus_materialized, denominators, discover_baselines, dump_flow_dot, histogram, run_index,
+    run_roundtrip, run_skeleton, tests_by_code,
 };
 use argh::FromArgs;
 use std::path::{Path, PathBuf};
@@ -130,6 +130,33 @@ const RUN_MISSING_DEFERRED_CFA_PIN: usize = 26;
 /// triage run.
 const RUN_MISSING_OTHER_PIN: usize = 0;
 const RUN_FAMILY_SPAN_MISMATCH_PIN: usize = 0;
+
+/// Per-family `(match, missing)` pins, one row per [`FAMILIES`] entry (same
+/// order — dup, flow); a length mismatch with `FAMILIES` fails to compile.
+/// Adding a family = its two pin consts + a row here.
+const RUN_FAMILY_PARTITION_PINS: [(usize, usize); FAMILIES.len()] = [
+    (RUN_DUP_MATCH_PIN, RUN_DUP_MISSING_PIN),
+    (RUN_FLOW_MATCH_PIN, RUN_FLOW_MISSING_PIN),
+];
+
+/// Exact pins for the missing-cause partition. [`MissingCause::Other`] is NOT
+/// here — it gates unconditionally (a hard invariant, enforced on filtered
+/// triage runs too) rather than as a full-run pin. Adding a deferred cause =
+/// its pin const + a row here.
+const RUN_MISSING_CAUSE_PINS: [(MissingCause, &str, usize); 4] = [
+    (MissingCause::Merge, "missing merge", RUN_MISSING_MERGE_PIN),
+    (MissingCause::Lib, "missing lib", RUN_MISSING_LIB_PIN),
+    (
+        MissingCause::DeferredLateBound,
+        "missing late-bound",
+        RUN_MISSING_DEFERRED_LATE_BOUND_PIN,
+    ),
+    (
+        MissingCause::DeferredCfa,
+        "missing cfa",
+        RUN_MISSING_DEFERRED_CFA_PIN,
+    ),
+];
 const RUN_CARVE_OUT_RULE_A_PIN: usize = 380;
 const RUN_CARVE_OUT_RULE_A_FAMILY_PIN: usize = 11;
 const RUN_MODULE_DETECTION_PIN: usize = 1;
@@ -415,16 +442,15 @@ impl RunCommand {
     }
 }
 
-/// Parse a `--family` value into a [`FamilyFilter`] (`dup` / `flow` / `all`).
+/// Parse a `--family` value into a [`FamilyFilter`] (a `FAMILIES` key or `all`).
 fn parse_family_filter(arg: &str) -> Result<FamilyFilter, String> {
-    match arg.to_lowercase().as_str() {
-        "dup" => Ok(FamilyFilter::Dup),
-        "flow" => Ok(FamilyFilter::Flow),
-        "all" => Ok(FamilyFilter::All),
-        other => Err(format!(
-            "Error: --family expects dup, flow, or all, got {other:?}"
-        )),
-    }
+    let lower = arg.to_lowercase();
+    FamilyFilter::parse(&lower).ok_or_else(|| {
+        format!(
+            "Error: --family expects {}, got {lower:?}",
+            FamilyFilter::tokens()
+        )
+    })
 }
 
 /// Enforce the skeleton gates: the clean-grade + empty-channel invariants and zero
@@ -468,10 +494,10 @@ fn enforce_run_gates(report: &SkeletonReport, enforce_pins: bool) -> Result<(), 
     // The honest-residual gate: every missing must be explained by merge / lib /
     // late-bound / cfa. An `other` miss is a same-table cascade bug — a HARD zero (an
     // invariant, so a filtered triage run catches it too), not just a full-run pin.
-    if report.missing_other != RUN_MISSING_OTHER_PIN {
+    if report.missing(MissingCause::Other) != RUN_MISSING_OTHER_PIN {
         errs.push(format!(
             "missing OTHER {} != 0 (an unclassified family miss — a same-table cascade bug), e.g. {}",
-            report.missing_other,
+            report.missing(MissingCause::Other),
             report.missing_other_samples.first().map_or("", String::as_str)
         ));
     }
@@ -625,55 +651,25 @@ fn enforce_run_gates(report: &SkeletonReport, enforce_pins: bool) -> Result<(), 
             report.family_missing,
             RUN_FAMILY_MISSING_PIN,
         );
-        // Sub-family partitions (dup = bind/merge/check; flow = TS7027/TS7028).
-        pin(
-            &mut errs,
-            "dup match",
-            report.dup_match(),
-            RUN_DUP_MATCH_PIN,
-        );
-        pin(
-            &mut errs,
-            "dup missing",
-            report.dup_missing(),
-            RUN_DUP_MISSING_PIN,
-        );
-        pin(
-            &mut errs,
-            "flow match",
-            report.flow_match(),
-            RUN_FLOW_MATCH_PIN,
-        );
-        pin(
-            &mut errs,
-            "flow missing",
-            report.flow_missing(),
-            RUN_FLOW_MISSING_PIN,
-        );
-        pin(
-            &mut errs,
-            "missing merge",
-            report.missing_merge,
-            RUN_MISSING_MERGE_PIN,
-        );
-        pin(
-            &mut errs,
-            "missing lib",
-            report.missing_lib,
-            RUN_MISSING_LIB_PIN,
-        );
-        pin(
-            &mut errs,
-            "missing late-bound",
-            report.missing_deferred_late_bound,
-            RUN_MISSING_DEFERRED_LATE_BOUND_PIN,
-        );
-        pin(
-            &mut errs,
-            "missing cfa",
-            report.missing_deferred_cfa,
-            RUN_MISSING_DEFERRED_CFA_PIN,
-        );
+        // Sub-family partitions, one row per graded family (dup, flow).
+        for (family, (match_pin, missing_pin)) in FAMILIES.iter().zip(RUN_FAMILY_PARTITION_PINS) {
+            pin(
+                &mut errs,
+                &format!("{} match", family.key),
+                report.family_match_for(family),
+                match_pin,
+            );
+            pin(
+                &mut errs,
+                &format!("{} missing", family.key),
+                report.family_missing_for(family),
+                missing_pin,
+            );
+        }
+        // The missing-cause partition (`Other` gates unconditionally above).
+        for (cause, label, want) in RUN_MISSING_CAUSE_PINS {
+            pin(&mut errs, label, report.missing(cause), want);
+        }
         pin(
             &mut errs,
             "family span_mismatch",
@@ -903,11 +899,11 @@ fn build_report_value(report: &SkeletonReport) -> serde_json::Value {
                 "total": report.family_missing,
                 "dup": report.dup_missing(),
                 "flow": report.flow_missing(),
-                "merge_path": report.missing_merge,
-                "lib_conflict": report.missing_lib,
-                "late_bound": report.missing_deferred_late_bound,
-                "cfa": report.missing_deferred_cfa,
-                "other": report.missing_other,
+                "merge_path": report.missing(MissingCause::Merge),
+                "lib_conflict": report.missing(MissingCause::Lib),
+                "late_bound": report.missing(MissingCause::DeferredLateBound),
+                "cfa": report.missing(MissingCause::DeferredCfa),
+                "other": report.missing(MissingCause::Other),
             },
             "extra": report.family_extra,
             "span_mismatch": report.family_span_mismatch,
@@ -991,11 +987,11 @@ fn render_report_md(report: &SkeletonReport) -> String {
     let _ = writeln!(
         s,
         "  - by cause: merge-path {}, lib-conflict {}, late-bound {}, cfa {}, other {}",
-        report.missing_merge,
-        report.missing_lib,
-        report.missing_deferred_late_bound,
-        report.missing_deferred_cfa,
-        report.missing_other
+        report.missing(MissingCause::Merge),
+        report.missing(MissingCause::Lib),
+        report.missing(MissingCause::DeferredLateBound),
+        report.missing(MissingCause::DeferredCfa),
+        report.missing(MissingCause::Other)
     );
     let _ = writeln!(s, "- extra (GATE=0): {}", report.family_extra);
     let _ = writeln!(s, "- span mismatch: {}\n", report.family_span_mismatch);
@@ -1618,9 +1614,7 @@ mod tests {
             family_positive_variants: 3,
             family_match: 5,
             family_missing: 2,
-            missing_merge: 0,
-            missing_lib: 0,
-            missing_other: 2,
+            missing_by_cause: std::collections::BTreeMap::from([(MissingCause::Other, 2usize)]),
             family_extra: 0,
             related_match: 1,
             // Inserted out of ascending order — the BTreeMap and the render must sort.

@@ -37,4 +37,7 @@ pub use discovery::{baselines_dir, corpus_materialized, discover_baselines};
 pub use index::run_index;
 pub use query::{denominators, histogram, tests_by_code};
 pub use roundtrip::run_roundtrip;
-pub use runner::{FamilyFilter, RunFilter, RunOptions, check_one, dump_flow_dot, run_skeleton};
+pub use runner::{
+    FAMILIES, FamilyFilter, MissingCause, RunFilter, RunOptions, check_one, dump_flow_dot,
+    run_skeleton,
+};
