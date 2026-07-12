@@ -1,0 +1,4 @@
+<script>
+	throw
+	expr;
+</script>
