@@ -98,8 +98,38 @@ where
         Expression::ArrayExpression(arr) if has_comments(arr.span.start, arr.span.end) => false,
         // Truly empty {} and [] are short
         Expression::ObjectExpression(_) | Expression::ArrayExpression(_) => true,
+        // TS cast wrappers (`as` / `satisfies` / `<T>`, never `!`): mirror prettier's
+        // couldExpandArg, which looks through the cast to a non-empty (or commented)
+        // object/array and expands all args rather than expand-first.
+        Expression::TSAsExpression(_)
+        | Expression::TSSatisfiesExpression(_)
+        | Expression::TSTypeAssertion(_)
+            if cast_wraps_expandable_object_or_array(arg, &has_comments) =>
+        {
+            false
+        }
         // Other args: check if "hopefully short"
         _ => is_hopefully_short_arg(arg),
+    }
+}
+
+/// Whether a TS cast-wrapped arg (`as` / `satisfies` / `<T>`, never non-null) wraps an
+/// object or array prettier's `couldExpandArg` would expand — a non-empty, or
+/// comment-bearing, object/array. Such a second arg forces expand-all rather than
+/// expand-first, mirroring `!couldExpandArg`. An empty, uncommented wrapped collection
+/// (`{} as T`) stays "short" and still expands-first, matching prettier.
+fn cast_wraps_expandable_object_or_array<F>(arg: &Expression<'_>, has_comments: &F) -> bool
+where
+    F: Fn(u32, u32) -> bool,
+{
+    match unwrap_ts_type_wrappers(arg) {
+        Expression::ObjectExpression(obj) => {
+            !obj.properties.is_empty() || has_comments(obj.span.start, obj.span.end)
+        }
+        Expression::ArrayExpression(arr) => {
+            !arr.elements.is_empty() || has_comments(arr.span.start, arr.span.end)
+        }
+        _ => false,
     }
 }
 

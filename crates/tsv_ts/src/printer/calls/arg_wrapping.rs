@@ -829,10 +829,13 @@ pub(super) fn should_expand_first_arg(
         return false;
     }
 
-    // Prettier's couldExpandArg returns true for objects/arrays with hasComment(node),
-    // which includes leading comments. This makes !couldExpandArg(secondArg) = false,
-    // blocking shouldExpandFirstArg. Without this check, the expand-first path also
-    // drops the leading comment (SAFETY).
+    // Prettier's couldExpandArg returns true for a bare object/array with a leading
+    // comment (`hasComment(node)`), so `!couldExpandArg(secondArg)` is false and it
+    // breaks all args. tsv matches by blocking expand-first here. A cast-wrapped
+    // collection (`/* c */ {} as T`) is deliberately NOT blocked — prettier's comment
+    // attaches to the cast, `couldExpandArg` stays false, and it expand-firsts; the
+    // expand-first path carries the inter-arg leading comment via
+    // `build_after_comma_leading_comments`.
     if matches!(
         &args[1],
         internal::Expression::ObjectExpression(_) | internal::Expression::ArrayExpression(_)

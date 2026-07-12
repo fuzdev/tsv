@@ -11,6 +11,7 @@ use super::super::Printer;
 use crate::ast::internal;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
+use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
     /// Open a non-last argument gap that may carry comments and emit its head into
@@ -135,6 +136,64 @@ pub(crate) fn is_comment_before_comma(comment: &internal::Comment, comma_pos: us
 #[inline]
 pub(crate) fn is_comment_after_comma(comment: &internal::Comment, comma_pos: usize) -> bool {
     (comment.span.start as usize) > comma_pos
+}
+
+/// Build inline block comments AFTER the comma as leading on the next arg.
+///
+/// For `fn(a, /** @type {T} */ b)`, the comment is after the comma and should
+/// be emitted as `/** @type {T} */ ` before `b`, not as trailing on `a`. Shared
+/// by the call, `new`, and chain expand-first paths so a block comment leading the
+/// second arg is preserved inline rather than dropped.
+pub(super) fn build_after_comma_leading_comments(
+    printer: &Printer<'_>,
+    prev_arg_end: u32,
+    arg_start: u32,
+) -> Option<DocId> {
+    let d = printer.d();
+    let comma_pos = find_comma_pos(printer.source, prev_arg_end, arg_start)?;
+    let mut parts = DocBuf::new();
+    for comment in comments_in_range(printer.comments, prev_arg_end, arg_start) {
+        if is_comment_after_comma(comment, comma_pos)
+            && comment.is_block
+            && is_comment_inline_with_next(printer, comment.span.end, arg_start)
+        {
+            parts.push(printer.build_comment_doc(comment));
+            parts.push(d.text(" "));
+        }
+    }
+    if parts.is_empty() {
+        None
+    } else {
+        Some(d.concat(&parts))
+    }
+}
+
+/// Build inline block comments BEFORE the comma as trailing on the current arg.
+///
+/// For `fn(a /* comment */, b)`, the comment is before the comma and should
+/// be emitted as ` /* comment */` after `a`.
+pub(super) fn build_before_comma_trailing_comments(
+    printer: &Printer<'_>,
+    arg_end: u32,
+    next_arg_start: u32,
+) -> Option<DocId> {
+    let d = printer.d();
+    let comma_pos = find_comma_pos(printer.source, arg_end, next_arg_start)?;
+    let mut parts = DocBuf::new();
+    for comment in comments_in_range(printer.comments, arg_end, next_arg_start) {
+        if is_comment_before_comma(comment, comma_pos)
+            && comment.is_block
+            && printer.is_same_line(arg_end, comment.span.start)
+        {
+            parts.push(d.text(" "));
+            parts.push(printer.build_comment_doc(comment));
+        }
+    }
+    if parts.is_empty() {
+        None
+    } else {
+        Some(d.concat(&parts))
+    }
 }
 
 /// Check if a comment is an inline block comment before the comma

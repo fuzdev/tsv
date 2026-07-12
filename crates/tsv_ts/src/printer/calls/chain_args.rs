@@ -6,9 +6,9 @@
 use super::super::comments::{CommentFilter, CommentSpacing};
 use super::super::{Printer, has_newline_before_position, is_multiline_template_expression};
 use super::arg_comments::{
-    PartitionedComments, any_comment_forces_expansion, find_comma_pos, first_arg_has_any_comments,
-    has_blank_line_between_args, has_inter_argument_comments, has_trailing_comments_on_args,
-    is_comment_after_comma, is_comment_before_comma, is_comment_inline_with_next,
+    PartitionedComments, any_comment_forces_expansion, build_after_comma_leading_comments,
+    build_before_comma_trailing_comments, first_arg_has_any_comments, has_blank_line_between_args,
+    has_inter_argument_comments, has_trailing_comments_on_args, is_comment_inline_with_next,
     last_arg_has_comments,
 };
 use super::arg_predicates::{
@@ -25,7 +25,6 @@ use super::arg_wrapping::{
 };
 use crate::ast::internal::{self, Expression};
 use smallvec::smallvec;
-use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 
@@ -120,62 +119,6 @@ fn build_inline_trailing_comments(
         parts.push(printer.build_comment_doc(comment));
     }
     Some(d.concat(&parts))
-}
-
-/// Build inline block comments AFTER the comma as leading on the next arg.
-///
-/// For `fn(a, /** @type {T} */ b)`, the comment is after the comma and should
-/// be emitted as `/** @type {T} */ ` before `b`, not as trailing on `a`.
-fn build_after_comma_leading_comments(
-    printer: &Printer<'_>,
-    prev_arg_end: u32,
-    arg_start: u32,
-) -> Option<DocId> {
-    let d = printer.d();
-    let comma_pos = find_comma_pos(printer.source, prev_arg_end, arg_start)?;
-    let mut parts = DocBuf::new();
-    for comment in comments_in_range(printer.comments, prev_arg_end, arg_start) {
-        if is_comment_after_comma(comment, comma_pos)
-            && comment.is_block
-            && is_comment_inline_with_next(printer, comment.span.end, arg_start)
-        {
-            parts.push(printer.build_comment_doc(comment));
-            parts.push(d.text(" "));
-        }
-    }
-    if parts.is_empty() {
-        None
-    } else {
-        Some(d.concat(&parts))
-    }
-}
-
-/// Build inline block comments BEFORE the comma as trailing on the current arg.
-///
-/// For `fn(a /* comment */, b)`, the comment is before the comma and should
-/// be emitted as ` /* comment */` after `a`.
-fn build_before_comma_trailing_comments(
-    printer: &Printer<'_>,
-    arg_end: u32,
-    next_arg_start: u32,
-) -> Option<DocId> {
-    let d = printer.d();
-    let comma_pos = find_comma_pos(printer.source, arg_end, next_arg_start)?;
-    let mut parts = DocBuf::new();
-    for comment in comments_in_range(printer.comments, arg_end, next_arg_start) {
-        if is_comment_before_comma(comment, comma_pos)
-            && comment.is_block
-            && printer.is_same_line(arg_end, comment.span.start)
-        {
-            parts.push(d.text(" "));
-            parts.push(printer.build_comment_doc(comment));
-        }
-    }
-    if parts.is_empty() {
-        None
-    } else {
-        Some(d.concat(&parts))
-    }
 }
 
 /// Build a Doc for call arguments only (for chain printing)
@@ -1198,9 +1141,10 @@ fn build_chain_args_multi(
         && !comments_force_expansion
         && !(has_any_comments && first_arg_has_any_comments(call.arguments, printer, paren_open))
         // Prettier's shouldExpandFirstArg checks !couldExpandArg(secondArg).
-        // couldExpandArg returns true for objects/arrays when hasComment(node) is true,
-        // which includes leading comments. Block expand-first when the second arg is
-        // an object/array with leading comments — those become expandable.
+        // couldExpandArg returns true for a bare object/array with a leading comment
+        // (hasComment(node)), so prettier breaks all args; tsv matches by blocking
+        // expand-first. A cast-wrapped collection is NOT blocked — prettier expand-firsts
+        // it and the inter-arg comment is carried inline below.
         && !(matches!(
             &call.arguments[1],
             Expression::ObjectExpression(_) | Expression::ArrayExpression(_)
