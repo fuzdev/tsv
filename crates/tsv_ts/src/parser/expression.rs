@@ -2195,6 +2195,29 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // then binds as the `new` argument list, not a call on the callee.
                     callee = self.wrap_non_null_assertion(callee)?;
                 }
+                TokenKind::NoSubstitutionTemplate | TokenKind::TemplateHead => {
+                    // A tagged template extends the callee itself: `new Foo`x`` is
+                    // `new (Foo`x`)()`, not `(new Foo())`x``. Per the grammar, a
+                    // `new` callee is an ordinary MemberExpression, whose production
+                    // includes `MemberExpression TemplateLiteral` — so a trailing tag
+                    // before any explicit `(...)` binds to the callee, not the `new`.
+                    let quasi = self.parse_template_literal(true)?;
+                    let quasi_span = quasi.span();
+                    if let Expression::TemplateLiteral(template) = quasi {
+                        let span = Span::new(callee.actual_start, quasi_span.end);
+                        callee = ParsedExpr::with_start_end(
+                            self.arena,
+                            Expression::TaggedTemplateExpression(TaggedTemplateExpression {
+                                tag: callee.expr,
+                                type_arguments: None,
+                                quasi: template,
+                                span,
+                            }),
+                            callee.actual_start,
+                            quasi_span.end_usize(),
+                        );
+                    }
+                }
                 _ => break,
             }
         }

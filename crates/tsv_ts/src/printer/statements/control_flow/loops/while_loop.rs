@@ -71,7 +71,7 @@ impl<'a> Printer<'a> {
             // - When broken: line becomes newline + indent -> `while (cond)\n\ta;`
             let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
             let body_start = stmt.body.span().start;
-            let body_doc = self.build_statement_doc(stmt.body);
+            let body_doc = self.build_statement_doc(stmt.body, false);
 
             let mut head_parts: DocBuf = smallvec![d.text("while")];
             if let Some(kc) = &keyword_comments {

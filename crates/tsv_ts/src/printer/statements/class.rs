@@ -369,6 +369,12 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a static initialization block
+    // TODO: `StaticBlock` reuses `BlockStatement`'s doc-building machinery via
+    // this synthetic wrapper purely to save duplicating the body-printing logic,
+    // but a `StaticBlock` isn't a `BlockStatement` (see `build_static_block_body_doc`
+    // and its `in_program_or_block=false` carve-out) — a second such divergent
+    // property would need a second bolt-on. Worth a real `StaticBlock`-native path
+    // (or an explicit node-kind tag) if that happens.
     fn build_static_block_doc(&self, block: &internal::StaticBlock<'_>) -> DocId {
         let d = self.d();
         // Create a BlockStatement wrapper to reuse existing doc building logic
@@ -378,7 +384,7 @@ impl<'a> Printer<'a> {
         };
         d.concat(&[
             d.text("static "),
-            self.build_block_statement_doc(&block_stmt),
+            self.build_static_block_body_doc(&block_stmt),
         ])
     }
 

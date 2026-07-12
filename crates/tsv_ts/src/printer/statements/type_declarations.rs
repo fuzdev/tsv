@@ -1193,17 +1193,20 @@ impl<'a> Printer<'a> {
 
                     // Shared per-statement walk (leading comments, blank-line
                     // separators, format-ignore, trailing same-line comments) —
-                    // same as block-statement bodies.
+                    // same as block-statement bodies. A `TSModuleBlock` isn't a
+                    // Program/BlockStatement, so its bare string statements are
+                    // never directive-prologue eligible — see
+                    // `Printer::needs_avoid_directive_parens`.
                     let body_start = block.span.start + 1; // After opening '{'
                     let body_end = block.span.end.saturating_sub(1); // Before '}'
                     let mut stmt_parts = d.pooled_docbuf();
                     let (prev_end, _prev_stmt_end) = self.build_statement_list_docs_into(
                         &mut stmt_parts,
                         block.body,
-                        body_start,
-                        body_end,
+                        Span::new(body_start, body_end),
                         false,
                         delimiter_pull_pos,
+                        false,
                     );
 
                     // Handle own-line trailing comments after the last statement

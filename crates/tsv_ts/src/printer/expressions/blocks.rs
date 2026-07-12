@@ -12,17 +12,21 @@
 
 use crate::ast::internal;
 use crate::printer::{CommentVec, Printer, is_effectively_empty_body};
+use tsv_lang::Span;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
-    /// Build a Doc for a block statement
+    /// Build a Doc for a block statement. Its body is a genuine `BlockStatement`
+    /// (a function/method/catch body, or a plain block reached through the
+    /// non-static-block callers below), so bare string statements inside it are
+    /// directive-prologue eligible — see [`Printer::needs_avoid_directive_parens`].
     pub(in crate::printer) fn build_block_statement_doc(
         &self,
         block: &internal::BlockStatement<'_>,
     ) -> DocId {
-        self.build_block_statement_doc_core(block, false)
+        self.build_block_statement_doc_core(block, false, true)
     }
 
     /// Build a Doc for a block statement, expanding empty blocks to `{\n}`
@@ -32,17 +36,33 @@ impl<'a> Printer<'a> {
         &self,
         block: &internal::BlockStatement<'_>,
     ) -> DocId {
-        self.build_block_statement_doc_core(block, true)
+        self.build_block_statement_doc_core(block, true, true)
+    }
+
+    /// Build a Doc for a `StaticBlock`'s body, reusing this module's block
+    /// machinery via a synthetic `BlockStatement` wrapper (see
+    /// `build_static_block_doc`). Unlike a real `BlockStatement`, a static
+    /// block's ESTree-equivalent node type isn't directive-prologue eligible
+    /// (Prettier's grandparent check only matches `Program`/`BlockStatement`),
+    /// so a bare string statement here never gets the avoid-directive parens —
+    /// see [`Printer::needs_avoid_directive_parens`].
+    pub(in crate::printer) fn build_static_block_body_doc(
+        &self,
+        block: &internal::BlockStatement<'_>,
+    ) -> DocId {
+        self.build_block_statement_doc_core(block, false, false)
     }
 
     /// Core implementation for block statement doc building
     ///
     /// When `expand_empty` is true, empty blocks without comments become `{\n}`.
-    /// When false, they become `{}`.
+    /// When false, they become `{}`. `in_program_or_block` is threaded to the
+    /// contained expression statements — see [`Printer::build_statement_doc`].
     fn build_block_statement_doc_core(
         &self,
         block: &internal::BlockStatement<'_>,
         expand_empty: bool,
+        in_program_or_block: bool,
     ) -> DocId {
         // Reset is_expression_statement when entering a block body.
         // This ensures chains inside function bodies don't incorrectly inherit
@@ -50,7 +70,7 @@ impl<'a> Printer<'a> {
         let prev_is_expr_stmt = self.is_expression_statement.get();
         self.is_expression_statement.set(false);
 
-        let result = self.build_block_statement_doc_inner(block, expand_empty);
+        let result = self.build_block_statement_doc_inner(block, expand_empty, in_program_or_block);
 
         self.is_expression_statement.set(prev_is_expr_stmt);
         result
@@ -60,8 +80,9 @@ impl<'a> Printer<'a> {
         &self,
         block: &internal::BlockStatement<'_>,
         expand_empty: bool,
+        in_program_or_block: bool,
     ) -> DocId {
-        self.build_block_body_doc(block, expand_empty, DocBuf::new())
+        self.build_block_body_doc(block, expand_empty, DocBuf::new(), in_program_or_block)
     }
 
     /// Build inner comments doc for empty block
@@ -92,6 +113,7 @@ impl<'a> Printer<'a> {
         block: &internal::BlockStatement<'_>,
         expand_empty: bool,
         leading_content: DocBuf,
+        in_program_or_block: bool,
     ) -> DocId {
         let d = self.d();
         let has_leading = !leading_content.is_empty();
@@ -152,10 +174,10 @@ impl<'a> Printer<'a> {
         let (_prev_end, prev_stmt_end) = self.build_statement_list_docs_into(
             &mut body_parts,
             block.body,
-            block_start,
-            block_end,
+            Span::new(block_start, block_end),
             has_leading,
             delimiter_pull_pos,
+            in_program_or_block,
         );
 
         // Handle trailing comments after the last statement (on their own line)
@@ -197,7 +219,7 @@ impl<'a> Printer<'a> {
     /// drawn from the arena's `DocBuf` free-list, so a fill-in-place seam (rather
     /// than take-by-value + return) keeps a single RAII owner and no aliasing.
     ///
-    /// `body_start` is the offset just after `{`; `body_end` is the offset of `}`.
+    /// `body_span` covers just after `{` to just before `}`.
     /// Returns `(prev_end, prev_stmt_end)` where `prev_end` is advanced past the
     /// final statement's trailing same-line comments (the start position for
     /// own-line trailing-comment handling) and `prev_stmt_end` is the final
@@ -208,17 +230,24 @@ impl<'a> Printer<'a> {
     /// the caller emits those as a prefix on the `{` line instead (the open-brace
     /// trailing-comment divergence). Pass `None` to keep the default behavior.
     ///
+    /// `in_program_or_block` is forwarded to each statement — see
+    /// [`Printer::build_statement_doc`].
+    ///
     /// Callers handle the empty-body case, own-line trailing comments after the
     /// last statement, and the enclosing braces — those differ between contexts.
     pub(in crate::printer) fn build_statement_list_docs_into(
         &self,
         body_parts: &mut DocBuf,
         body: &[internal::Statement<'_>],
-        body_start: u32,
-        body_end: u32,
+        body_span: Span,
         has_leading: bool,
         delimiter_pull_pos: Option<u32>,
+        in_program_or_block: bool,
     ) -> (u32, Option<u32>) {
+        let Span {
+            start: body_start,
+            end: body_end,
+        } = body_span;
         let d = self.d();
         let mut prev_end = body_start;
         let mut prev_stmt_end: Option<u32> = None;
@@ -329,7 +358,7 @@ impl<'a> Printer<'a> {
             if body_has_comments && self.has_format_ignore_in_range(prev_end, stmt_start) {
                 body_parts.push(self.raw_source_doc(stmt.span()));
             } else {
-                body_parts.push(self.build_statement_doc(stmt));
+                body_parts.push(self.build_statement_doc(stmt, in_program_or_block));
             }
 
             // Handle trailing same-line comments after this statement, and advance
@@ -397,7 +426,9 @@ impl<'a> Printer<'a> {
         }
 
         // Use unified body builder with leading content
-        // Note: expand_empty=false because outer comments will expand the block anyway
-        self.build_block_body_doc(block, false, leading_content)
+        // Note: expand_empty=false because outer comments will expand the block anyway.
+        // This helper is never used for a static block, so the body is always
+        // directive-prologue eligible.
+        self.build_block_body_doc(block, false, leading_content, true)
     }
 }

@@ -109,11 +109,12 @@ impl<'a> Printer<'a> {
                 parts.push(leading_doc);
             }
 
-            // Statement — if preceded by a format-ignore directive, emit raw source
+            // Statement — if preceded by a format-ignore directive, emit raw source.
+            // A Program's body is always directive-prologue eligible.
             if has_ignore {
                 parts.push(self.raw_source_doc(statement.span()));
             } else {
-                parts.push(self.build_statement_doc(statement));
+                parts.push(self.build_statement_doc(statement, true));
             }
 
             // Trailing same-line comments. Bound the scan by the next statement's
