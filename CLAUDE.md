@@ -76,7 +76,7 @@ deno task fixtures:validate <pattern>    # Fast, targeted fixture validation
 
 # For full validation before committing
 cargo test --workspace                   # Run ALL tests (~5-10s, includes all fixtures)
-deno task check                          # Full validation (check + test + clippy + fmt)
+deno task check                          # Full committed-tree gate: fmt, audits, typecheck, tests, clippy (see benches/js/CLAUDE.md §Gate map)
 ```
 
 **Prefer `fixtures:validate` over `cargo test --workspace`** when working on fixtures - it's faster, shows detailed diffs, and filters by pattern. Use `cargo test --workspace` for full test suite before committing.
@@ -149,7 +149,7 @@ cargo run -p tsv_cli format --content '<div>x</div>' --parser svelte     # forma
 ### Testing & Code Quality
 
 ```bash
-deno task check          # typecheck + test + lint + fmt (full validation)
+deno task check          # full committed-tree gate: fmt, audits, typecheck, tests, clippy (benches/js/CLAUDE.md §Gate map)
 deno task doctor         # one-pass setup check: runtimes, canonical pins + checkout alignment, node_modules freshness, oracle checkouts, corpus entries, build artifacts. Exit 1 only on MISLEADING state (pin drift, skew, stale deps); absences are warnings (--strict promotes warnings to failures)
 deno task typecheck      # cargo check
 deno task test           # cargo test
@@ -237,9 +237,9 @@ Version source of truth: `Cargo.toml` `[workspace.package] version` (read direct
 
 Package shape: built from the wasm-pack `web` target, then `scripts/patch_npm_package.ts` adds a Node/Bun entry (`index.js`, sync auto-init), a browser entry (`browser.js`, guarded `await init()`), `index.d.ts`, conditional `exports`, npm metadata, and the variant README. The export list is extracted from the generated JS, so new `lang_bindings!` languages flow through automatically.
 
-`scripts/publish.ts` orchestrates the release end to end (preflight → bump → check → conformance → build (npm packages + deno bundles, so artifact validation never sees stale bundles) → verify → artifact validation: size bounds + Deno smoke + Node tests → idempotent npm publish → git commit + tag + push), printing a wasm size summary (raw + gzipped) at the end. It stamps CHANGELOG.md's `## Unreleased` section into the released version's section — that section must be non-empty and carry a `<!-- bump: <level> -->` marker that matches `--bump` (the bump is required in **both** places and they must agree; on stamp the marker is dropped and a fresh empty `## Unreleased` reset to `bump: patch` is seeded for the next cycle). The user keeps it updated as work lands — agents don't touch `CHANGELOG.md` (see [Committing](#committing)). A failed wetrun is resumable: re-run `--wetrun` without `--bump`.
+`scripts/publish.ts` orchestrates the release end to end (preflight → bump → check → conformance:all → build (npm packages + deno bundles, so artifact validation never sees stale bundles) → verify → artifact validation: size bounds + Deno smoke + Node tests → idempotent npm publish → git commit + tag + push), printing a wasm size summary (raw + gzipped) at the end. It stamps CHANGELOG.md's `## Unreleased` section into the released version's section — that section must be non-empty and carry a `<!-- bump: <level> -->` marker that matches `--bump` (the bump is required in **both** places and they must agree; on stamp the marker is dropped and a fresh empty `## Unreleased` reset to `bump: patch` is seeded for the next cycle). The user keeps it updated as work lands — agents don't touch `CHANGELOG.md` (see [Committing](#committing)). A failed wetrun is resumable: re-run `--wetrun` without `--bump`.
 
-**Conformance gates (Step 3b).** The release-cadence correctness gates that run against **external oracles** — so they can't live in `deno task check` — run here via `deno task conformance`: the Svelte parser vs `svelte/compiler` (`conformance:svelte-fixtures`), the TS parser vs acorn-typescript's own suite (`conformance:ts-fixtures`) and the tsc corpus (`conformance:ts-repo`), plus all three languages' AST + formatter vs the canonical parsers / prettier (`corpus:compare:parse` + `:format`, `--all`). Skipped by `--no-check`. The step preflights the oracles (`../svelte`, `../acorn-typescript`, `../typescript` checkouts + the `benches/js` `node_modules` sidecar, `deno task bench:install`): a **`--wetrun` FAILS** when any is missing (releasing without gates requires the explicit `--no-check`), a dry-run warn-and-skips, and any skip is re-warned in the run's final summary. `deno task doctor` checks the same setup (and more) ahead of time. `test262` (needs `../test262`) and the CSS-WPT harvest stay manual, out of the automated step. A `corpus:compare:format` SAFETY hit is self-verified in-run (the native format is re-run and must reproduce byte-identically), so treat it as real; the historical FFI heisenbug now surfaces as a loud `native format nondeterminism` per-file error instead (see ./benches/js/CLAUDE.md §Known Issues).
+**Conformance gates (Step 3b).** The release-cadence correctness gates that run against **external oracles** — so they can't live in `deno task check` — run here via `deno task conformance:all`: the Svelte parser vs `svelte/compiler` (`conformance:svelte-fixtures`), the TS parser vs acorn-typescript's own suite (`conformance:ts-fixtures`) and the tsc corpus (`conformance:ts-repo`), plus all three languages' AST + formatter vs the canonical parsers / prettier (`corpus:compare:parse` + `:format`, `--all`), and the JS parser vs test262 **positives** (`conformance:test262`, pure Rust — the ~2.5k negatives are the deferred early-error frontier, reported not gated). Skipped by `--no-check`. The step preflights the oracles (`../svelte`, `../acorn-typescript`, `../typescript`, `../test262` checkouts + the `benches/js` `node_modules` sidecar, `deno task bench:install`): a **`--wetrun` FAILS** when any is missing (releasing without gates requires the explicit `--no-check`), a dry-run warn-and-skips, and any skip is re-warned in the run's final summary. `deno task doctor` checks the same setup (and more) ahead of time. Only the CSS-WPT harvest stays manual, out of the automated step. A `corpus:compare:format` SAFETY hit is self-verified in-run (the native format is re-run and must reproduce byte-identically), so treat it as real; the historical FFI heisenbug now surfaces as a loud `native format nondeterminism` per-file error instead (see ./benches/js/CLAUDE.md §Known Issues).
 
 ```bash
 deno task publish                        # dry-run: validate everything, no mutation
@@ -299,8 +299,13 @@ deno task conformance                  # the pre-release aggregate: svelte-fixtu
 # release-cadence correctness gates across Svelte/CSS/TS that need external oracles (svelte/compiler,
 # acorn-ts/parseCss, tsc baselines, prettier) so they can't live in `deno task check`. The format leg's
 # prettier calls ride a content-addressed output cache (benches/js/lib/prettier_cache.ts — repeat runs
-# skip re-formatting unchanged files; TSV_PRETTIER_CACHE=0 disables). Wired into `publish.ts` Step 3b;
-# test262 (../test262) + CSS-WPT harvest stay manual.
+# skip re-formatting unchanged files; TSV_PRETTIER_CACHE=0 disables). Wired (as `conformance:all`) into
+# `publish.ts` Step 3b. CSS-WPT harvest stays manual.
+
+deno task conformance:test262          # tsv's JS parser vs test262 POSITIVES (pure Rust, `test262 --gate`);
+# negatives (the deferred early-error frontier) are reported, not gated. Exact POSITIVE_PASSED_PIN in the command.
+deno task conformance:all              # the full drop-in conformance gate = `conformance` (5 FFI legs) +
+# `conformance:test262` (pure Rust). What publish Step 3b runs.
 
 deno task divergence:audit         # audit divergence pattern coverage (--json for machine-readable)
 ```
@@ -767,7 +772,10 @@ cargo run -p tsv_debug conformance_audit
 # test262 - run ECMAScript conformance tests against our parser (pure Rust, no Deno)
 cargo run -p tsv_debug test262                       # run all tests (expects ../test262)
 cargo run -p tsv_debug test262 language/expressions  # filter by path pattern
-# Options: --path <dir>, --list, --verbose (show all failures), --negative-only, --positive-only
+# Options: --path <dir>, --list, --verbose (show all failures), --negative-only, --positive-only,
+#          --gate (the release gate: fail ONLY on a positive-parse regression or a shift in the pinned
+#           positive count; negatives — the deferred early-error frontier — are reported, not gated.
+#           A bare run exits non-zero because negatives fail by design, so it's a diagnostic, not a gate.)
 
 # Differential conformance (tsv vs oxc-parser) — emit a JSON manifest of the
 # graded strict subset, then run the Deno consumer to bucket the agreement and

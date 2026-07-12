@@ -518,12 +518,12 @@ Safety violations fail the corpus check immediately — they are never skipped.
 ### Corpus Compare Options
 
 ```bash
-deno task corpus:compare:format --all [options]       # the gates corpus view (~6,000 files)
+deno task corpus:compare:format --all [options]       # the gates corpus view (~6,200 files)
 deno task corpus:compare:format <path> [options]      # Scans <path> recursively
 deno task corpus:compare:format:run <path> [options]  # Skip FFI build (faster iteration)
 
 Options:
-  --all             Compare the gates corpus view (~6,000 files: real repos + the
+  --all             Compare the gates corpus view (~6,200 files: real repos + the
                     prettier fixture suites — see benches/js/CLAUDE.md §Corpus)
   --filter <lang>   Only compare files of this language (svelte, typescript, css)
   --limit <n>       Limit to first n files per language

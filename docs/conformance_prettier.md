@@ -967,7 +967,7 @@ See [directives.md](./directives.md) for the user-facing reference.
 **Corpus comparison** validates formatting against Prettier on real codebases:
 
 ```bash
-deno task corpus:compare:format --all --explain           # The gates corpus view (~6,000 files: real repos + prettier suites)
+deno task corpus:compare:format --all --explain           # The gates corpus view (~6,200 files: real repos + prettier suites)
 deno task corpus:compare:format ~/dev/project --explain  # Single project (scans all files recursively)
 ```
 
@@ -988,10 +988,15 @@ See ./divergence_detector.md for implementation details.
 **Triage caveat — prettier-plugin-svelte's verbatim fallback**: when the
 embedded formatter throws on any construct in a `<script>` block,
 prettier-plugin-svelte emits the **whole block verbatim** instead of failing.
-The plugin routes `<script lang="ts">` through prettier's babel-based
-`babel-ts` parser, so the trigger is babel rejecting the code — e.g.
-`@(f()).g` is a babel SyntaxError (babel follows the strict TC39 decorator
-grammar; tsc accepts it). **Both tsv pipelines disarm this with
+For `<script lang="ts">` the plugin formats the embedded script through
+prettier's real **`typescript`** parser (`embed.ts` →
+`textToDoc(content, {parser: 'typescript'})`), so a construct that path throws
+on — e.g. `@(a?.b)()` (a `TypeError` in prettier's needs-parens printer) or
+`x?.#a` (`An optional chain cannot contain private identifiers.`) — **does**
+trigger the verbatim fallback in `.svelte`, exactly as on a pure-`.ts` run. (A
+`<script>` with **no** explicit `lang` is formatted through `babel-ts` instead,
+whose stricter TC39 decorator grammar rejects forms like `@(f()).g` that tsc
+and the `typescript` parser accept.) **Both tsv pipelines disarm this with
 `PRETTIER_DEBUG=1`** (the tsv_debug sidecar sets it on the Deno spawn; the
 `corpus:compare:format:run` task sets it in its env), which makes the plugin
 and prettier-core rethrow — so `compare`, fixture validation,
@@ -999,12 +1004,8 @@ and prettier-core rethrow — so `compare`, fixture validation,
 code frame) instead of fake-stable output. The caveat applies when probing
 prettier **outside** these pipelines (a bare `prettier` invocation, editor
 integrations, upstream issue repros): there the fallback silently "preserves"
-the whole script. Forms that only crash prettier's `typescript`
-parser (e.g. `@(a?.b)()`, a `TypeError` in needs-parens) do **not** trigger
-the fallback in `.svelte` — babel-ts accepts them and the script formats
-normally; they fail visibly on pure-`.ts` runs instead, where no fallback
-exists. Confirm by re-running the suspect construct in a single-form file or
-as pure `.ts`. (Also see
+the whole script. Confirm by re-running the suspect construct in a single-form
+file or as pure `.ts`, where no fallback exists so it fails visibly. (Also see
 [fixture_overview.md §Common Pitfalls](./fixture_overview.md#common-pitfalls) —
 the fallback can fake a "prettier-stable" fixture input.)
 
