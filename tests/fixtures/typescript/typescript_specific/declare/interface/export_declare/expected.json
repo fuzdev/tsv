@@ -1,0 +1,355 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 272,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Non-exported `declare interface`: the `declare` field is emitted before `id`",
+			"start": 20,
+			"end": 99,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `export declare interface`: the `declare` field is emitted after `body`",
+			"start": 141,
+			"end": 215,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 75
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 271,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 262,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 101,
+					"end": 138,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 2
+						}
+					},
+					"declare": true,
+					"id": {
+						"type": "Identifier",
+						"start": 119,
+						"end": 120,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 19
+							},
+							"end": {
+								"line": 3,
+								"column": 20
+							}
+						},
+						"name": "A"
+					},
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 121,
+						"end": 138,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 21
+							},
+							"end": {
+								"line": 5,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "TSPropertySignature",
+								"start": 125,
+								"end": 135,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 12
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 125,
+									"end": 126,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 3
+										}
+									},
+									"name": "a"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 126,
+									"end": 134,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 3
+										},
+										"end": {
+											"line": 4,
+											"column": 11
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSNumberKeyword",
+										"start": 128,
+										"end": 134,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 5
+											},
+											"end": {
+												"line": 4,
+												"column": 11
+											}
+										}
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Non-exported `declare interface`: the `declare` field is emitted before `id`",
+							"start": 20,
+							"end": 99
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 217,
+					"end": 261,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 2
+						}
+					},
+					"exportKind": "type",
+					"declaration": {
+						"type": "TSInterfaceDeclaration",
+						"start": 224,
+						"end": 261,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 8
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"id": {
+							"type": "Identifier",
+							"start": 242,
+							"end": 243,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 26
+								},
+								"end": {
+									"line": 8,
+									"column": 27
+								}
+							},
+							"name": "B"
+						},
+						"body": {
+							"type": "TSInterfaceBody",
+							"start": 244,
+							"end": 261,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 28
+								},
+								"end": {
+									"line": 10,
+									"column": 2
+								}
+							},
+							"body": [
+								{
+									"type": "TSPropertySignature",
+									"start": 248,
+									"end": 258,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 12
+										}
+									},
+									"computed": false,
+									"key": {
+										"type": "Identifier",
+										"start": 248,
+										"end": 249,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 2
+											},
+											"end": {
+												"line": 9,
+												"column": 3
+											}
+										},
+										"name": "b"
+									},
+									"typeAnnotation": {
+										"type": "TSTypeAnnotation",
+										"start": 249,
+										"end": 257,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 3
+											},
+											"end": {
+												"line": 9,
+												"column": 11
+											}
+										},
+										"typeAnnotation": {
+											"type": "TSStringKeyword",
+											"start": 251,
+											"end": 257,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 5
+												},
+												"end": {
+													"line": 9,
+													"column": 11
+												}
+											}
+										}
+									}
+								}
+							]
+						},
+						"declare": true
+					},
+					"specifiers": [],
+					"source": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `export declare interface`: the `declare` field is emitted after `body`",
+							"start": 141,
+							"end": 215
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
