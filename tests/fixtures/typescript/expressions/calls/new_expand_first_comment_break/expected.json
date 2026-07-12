@@ -1,0 +1,571 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 593,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " `new` expand-first breaks all args for comments its inline tail can't carry,",
+			"start": 20,
+			"end": 99,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " matching the plain-call path and prettier: a line comment leading the second",
+			"start": 101,
+			"end": 180,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " arg, or a block comment trailing the first arg before the comma. (An inline",
+			"start": 182,
+			"end": 260,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " block comment leading the second arg is instead carried inline — see",
+			"start": 262,
+			"end": 333,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " expand_first_leading_block_comment.)",
+			"start": 335,
+			"end": 374,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment leading the second arg",
+			"start": 377,
+			"end": 415,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 39
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 455,
+			"end": 459,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 5
+				},
+				"end": {
+					"line": 12,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " block comment trailing the first arg, before the comma",
+			"start": 470,
+			"end": 527,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 58
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 566,
+			"end": 573,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 4
+				},
+				"end": {
+					"line": 20,
+					"column": 11
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 592,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 583,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 23,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 417,
+					"end": 467,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 417,
+						"end": 466,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 1
+							},
+							"end": {
+								"line": 14,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 421,
+							"end": 424,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 5
+								},
+								"end": {
+									"line": 9,
+									"column": 8
+								}
+							},
+							"name": "Foo"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 428,
+								"end": 453,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 3
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 434,
+									"end": 453,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 8
+										},
+										"end": {
+											"line": 12,
+											"column": 3
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 439,
+											"end": 449,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 3
+												},
+												"end": {
+													"line": 11,
+													"column": 13
+												}
+											},
+											"expression": {
+												"type": "CallExpression",
+												"start": 439,
+												"end": 448,
+												"loc": {
+													"start": {
+														"line": 11,
+														"column": 3
+													},
+													"end": {
+														"line": 11,
+														"column": 12
+													}
+												},
+												"callee": {
+													"type": "Identifier",
+													"start": 439,
+													"end": 446,
+													"loc": {
+														"start": {
+															"line": 11,
+															"column": 3
+														},
+														"end": {
+															"line": 11,
+															"column": 10
+														}
+													},
+													"name": "doThing"
+												},
+												"arguments": [],
+												"optional": false
+											}
+										}
+									]
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c",
+										"start": 455,
+										"end": 459
+									}
+								]
+							},
+							{
+								"type": "Identifier",
+								"start": 462,
+								"end": 463,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 3
+									}
+								},
+								"name": "x"
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `new` expand-first breaks all args for comments its inline tail can't carry,",
+							"start": 20,
+							"end": 99
+						},
+						{
+							"type": "Line",
+							"value": " matching the plain-call path and prettier: a line comment leading the second",
+							"start": 101,
+							"end": 180
+						},
+						{
+							"type": "Line",
+							"value": " arg, or a block comment trailing the first arg before the comma. (An inline",
+							"start": 182,
+							"end": 260
+						},
+						{
+							"type": "Line",
+							"value": " block comment leading the second arg is instead carried inline — see",
+							"start": 262,
+							"end": 333
+						},
+						{
+							"type": "Line",
+							"value": " expand_first_leading_block_comment.)",
+							"start": 335,
+							"end": 374
+						},
+						{
+							"type": "Line",
+							"value": " line comment leading the second arg",
+							"start": 377,
+							"end": 415
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 529,
+					"end": 582,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 529,
+						"end": 581,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 1
+							},
+							"end": {
+								"line": 22,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 533,
+							"end": 536,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 5
+								},
+								"end": {
+									"line": 17,
+									"column": 8
+								}
+							},
+							"name": "Foo"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 540,
+								"end": 565,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 20,
+										"column": 3
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 546,
+									"end": 565,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 8
+										},
+										"end": {
+											"line": 20,
+											"column": 3
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 551,
+											"end": 561,
+											"loc": {
+												"start": {
+													"line": 19,
+													"column": 3
+												},
+												"end": {
+													"line": 19,
+													"column": 13
+												}
+											},
+											"expression": {
+												"type": "CallExpression",
+												"start": 551,
+												"end": 560,
+												"loc": {
+													"start": {
+														"line": 19,
+														"column": 3
+													},
+													"end": {
+														"line": 19,
+														"column": 12
+													}
+												},
+												"callee": {
+													"type": "Identifier",
+													"start": 551,
+													"end": 558,
+													"loc": {
+														"start": {
+															"line": 19,
+															"column": 3
+														},
+														"end": {
+															"line": 19,
+															"column": 10
+														}
+													},
+													"name": "doThing"
+												},
+												"arguments": [],
+												"optional": false
+											}
+										}
+									]
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 566,
+										"end": 573
+									}
+								]
+							},
+							{
+								"type": "Identifier",
+								"start": 577,
+								"end": 578,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 2
+									},
+									"end": {
+										"line": 21,
+										"column": 3
+									}
+								},
+								"name": "x"
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment trailing the first arg, before the comma",
+							"start": 470,
+							"end": 527
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
