@@ -187,9 +187,24 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	svelte: 7,
-	typescript: 144,
+	typescript: 142,
 	css: 22,
 };
+// typescript 144→142 (2026-07-12, ../prettier 1dcd0b0, ../svelte 8fb7ceeba, ../kit
+// 1b4adccf7, ../svelte.dev fb5a4e2, ../prettier-plugin-svelte 7809486, oracle
+// acorn-typescript 1.0.11): the avoid-becoming-a-directive parens fix — Prettier's
+// `needs-parentheses.js` wraps a bare non-directive string-literal statement in
+// parens whenever its immediate container is a `Program` or `BlockStatement`
+// (recomputed fresh, so redundant source parens in an ineligible container like a
+// `StaticBlock`/`SwitchCase`/`TSModuleBlock` get stripped too); tsv only preserved
+// existing source parens and never added or stripped them.
+// `build_expression_statement_doc` (statements/mod.rs) now applies
+// `needs_avoid_directive_parens`, threaded via a new `in_program_or_block: bool`
+// parameter through `build_statement_doc` and the block-building chain. Moved two
+// files unknown→match: js/directives/issue-7346.js, js/quotes/strings.js. A
+// before/after --all path-diff (via a `git worktree` at the pre-fix commit)
+// confirmed exactly these two moved, 0 files ENTERED unknown, SAFETY 0. svelte/css
+// unmoved.
 // typescript 146→144 (2026-07-12, ../prettier 1dcd0b0, ../svelte 8fb7ceeba, ../kit
 // 1b4adccf7, ../svelte.dev fb5a4e2, ../prettier-plugin-svelte 7809486, oracle
 // acorn-typescript 1.0.11): the catch-block-collapse-ignores-finally fix —

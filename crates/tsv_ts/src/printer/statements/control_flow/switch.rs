@@ -356,13 +356,16 @@ impl<'a> Printer<'a> {
                         parts.push(self.build_comment_doc(comment));
                     }
                     parts.push(d.text(" "));
-                    parts.push(self.build_statement_doc(stmt));
+                    // A SwitchCase consequent isn't a Program/BlockStatement, so a
+                    // bare string statement here is never directive-prologue
+                    // eligible — see `Printer::needs_avoid_directive_parens`.
+                    parts.push(self.build_statement_doc(stmt, false));
                     parts.extend(trailing);
                 } else if has_inline_line_comment && leading_comments.is_empty() {
                     // Inline line comment, no leading: `case 'a': // comment\n{`
                     // Block at case level (no indent)
                     parts.push(d.hardline());
-                    parts.push(self.build_statement_doc(stmt));
+                    parts.push(self.build_statement_doc(stmt, false));
                     parts.extend(trailing);
                 } else {
                     // Leading comments exist - indent both comments and block
@@ -372,7 +375,7 @@ impl<'a> Printer<'a> {
                         stmt_parts.push(self.build_comment_doc(comment));
                         stmt_parts.push(d.hardline());
                     }
-                    stmt_parts.push(self.build_statement_doc(stmt));
+                    stmt_parts.push(self.build_statement_doc(stmt, false));
                     stmt_parts.extend(trailing);
                     parts.push(d.indent(d.concat(&stmt_parts)));
                 }
@@ -405,7 +408,7 @@ impl<'a> Printer<'a> {
                     }
                 }
 
-                stmt_parts.push(self.build_statement_doc(stmt));
+                stmt_parts.push(self.build_statement_doc(stmt, false));
                 stmt_parts.extend(trailing);
 
                 parts.push(d.indent(d.concat(&stmt_parts)));

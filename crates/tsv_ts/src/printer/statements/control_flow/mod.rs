@@ -35,7 +35,10 @@ impl<'a> Printer<'a> {
         if let Statement::BlockStatement(block) = body {
             self.build_block_statement_doc(block)
         } else {
-            self.build_statement_doc(body)
+            // Non-block body: its container is the control-flow statement
+            // itself, never Program/BlockStatement, so a bare string statement
+            // here is never directive-prologue eligible.
+            self.build_statement_doc(body, false)
         }
     }
 
