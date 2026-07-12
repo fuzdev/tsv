@@ -11,7 +11,7 @@ use crate::ast::internal;
 use crate::printer::calls::arg_predicates::{
     arrow_body_is_call_through_non_null, arrow_has_trailing_param_comments,
     is_array_or_object_unwrapped, is_concise_numeric_array, is_function_composition_args,
-    is_ternary_arrow_body, preceding_args_allow_expand_last,
+    is_ternary_arrow_body,
 };
 use crate::printer::calls::{
     PartitionedComments, build_args_joined_with_comments, build_args_split_last,
@@ -580,7 +580,6 @@ impl<'a> Printer<'a> {
 
             if new_expr.arguments.len() >= 2
                 && (last_is_function || last_is_expandable_collection)
-                && preceding_args_allow_expand_last(new_expr.arguments, self.line_breaks)
                 && !(new_has_comments
                     && has_inter_argument_comments_slice(new_expr.arguments, self))
             {

@@ -49,7 +49,7 @@ use super::Printer;
 use super::chain;
 use crate::ast::internal;
 use arg_comments::{any_comment_forces_expansion, last_arg_has_comments};
-use arg_predicates::{is_block_function, preceding_args_allow_expand_last};
+use arg_predicates::is_block_function;
 use tsv_lang::doc::arena::DocId;
 
 /// Check if a chain expression contains any call expressions
@@ -123,7 +123,6 @@ impl<'a> Printer<'a> {
             let call_has_comments = self.has_comments_between(paren_open, call.span.end);
             if call.arguments.len() >= 2
                 && call.arguments.last().is_some_and(is_block_function)
-                && preceding_args_allow_expand_last(call.arguments, self.line_breaks)
                 && !has_blank_lines_between_args
                 && !(call_has_comments && any_comment_forces_expansion(call, self, paren_open))
                 && !(call_has_comments

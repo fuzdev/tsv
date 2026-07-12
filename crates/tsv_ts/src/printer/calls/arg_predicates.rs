@@ -1,7 +1,6 @@
 //! Call-argument and arrow shape predicates shared by the call, new, and chain printers.
 
 use crate::ast::internal::{self, Expression};
-use tsv_lang::printing::has_newline_between_fast;
 
 /// Check if an argument is "hopefully short" enough to stay inline
 ///
@@ -228,21 +227,6 @@ fn get_ts_type_wrapper_inner<'a>(expr: &'a Expression<'a>) -> Option<&'a Express
     }
 }
 
-/// Check if preceding args allow the "expand last arg" conditional group pattern.
-///
-/// Only checks for multiline objects — the conditional group's fits() mechanism
-/// handles width naturally. If preceding args don't fit on one line, the inline
-/// state fails and we fall through to expand-all.
-///
-/// Matches Prettier's `shouldExpandLastArg` which doesn't check preceding arg complexity.
-#[inline]
-pub(in crate::printer) fn preceding_args_allow_expand_last(
-    arguments: &[Expression<'_>],
-    line_breaks: &[u32],
-) -> bool {
-    !has_multiline_object_before_last(arguments, line_breaks)
-}
-
 /// Check if an expression is a function with a block body.
 ///
 /// Matches arrow functions with block bodies (`() => { ... }`) and
@@ -395,10 +379,8 @@ pub fn is_simple_call_argument(expr: &Expression<'_>, depth: usize) -> bool {
         // Update expressions (++x, x++)
         Expression::UpdateExpression(update) => is_simple_call_argument(update.argument, depth),
 
-        // Spread elements are NOT simple (matches prettier — no SpreadElement case)
-        Expression::SpreadElement(_) => false,
-
-        // Everything else is not simple (arrow functions, function expressions, etc.)
+        // Everything else is not simple: arrow functions, function expressions, and
+        // spread elements (matches prettier — no SpreadElement case), etc.
         _ => false,
     }
 }
@@ -544,38 +526,6 @@ pub(in crate::printer) fn is_function_composition_args(arguments: &[Expression<'
     }
 
     false
-}
-
-/// Check if an expression is an object with newlines inside it.
-///
-/// Prettier preserves multiline object formatting and expands all call args
-/// when any preceding arg is a multiline object in source.
-pub(in crate::printer) fn is_multiline_object(expr: &Expression<'_>, line_breaks: &[u32]) -> bool {
-    if let Expression::ObjectExpression(obj) = expr {
-        if obj.properties.is_empty() {
-            return false;
-        }
-        // Check if there's a newline after the opening brace
-        let first_prop_start = obj.properties[0].span().start;
-        has_newline_between_fast(line_breaks, obj.span.start + 1, first_prop_start)
-    } else {
-        false
-    }
-}
-
-/// Check if any argument (except the last) is a multiline object.
-///
-/// When true, the call should use hard expansion instead of the hug pattern.
-pub(in crate::printer) fn has_multiline_object_before_last(
-    args: &[Expression<'_>],
-    line_breaks: &[u32],
-) -> bool {
-    if args.len() < 2 {
-        return false;
-    }
-    args[..args.len() - 1]
-        .iter()
-        .any(|arg| is_multiline_object(arg, line_breaks))
 }
 
 #[cfg(test)]
