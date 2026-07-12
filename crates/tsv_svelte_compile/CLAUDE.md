@@ -26,14 +26,13 @@ project-wide conventions.
     parses the component and runs the server transform. Generated JS prints
     through `format_canonical`, so it is canonical-form by construction
     (`canonicalize_js(output.js)` is a fixed point). Shapes the transform does
-    not cover yet — client generation, dev mode, blocks, directives, script
-    comments, `<option>` / populated `<select>`/`<optgroup>` (the oracle emits
-    closure calls / `<!>` anchors there), and every `$`-prefixed identifier
-    reference or call in a walked value position other than the rewritten
-    top-level `let … = $props()` declarator init (`rune_guard.rs` walks every
-    borrowed subtree; non-computed member/object *names* like `obj.$foo` stay
-    allowed) — return `CompileError::Unsupported` with a clear description,
-    never guessed output.
+    not cover yet — client generation, dev mode, blocks (and `{@const}`, which
+    is grammatically reachable only inside them), directives/spread, top-level
+    `await`, `<option>` / populated `<select>`/`<optgroup>` (the oracle emits
+    closure calls / `<!>` anchors there), template-expression comments, and
+    every `$`-prefixed identifier reference or call outside the sanctioned
+    rewrites below — return `CompileError::Unsupported` with a clear
+    description, never guessed output.
   - `canonicalize_js(source) -> Result<String, CanonicalizeError>` — the
     canonicalizer (below). Lives here because the compiler's own output
     idempotence checks and the oracle comparison both consume it.
@@ -42,33 +41,58 @@ project-wide conventions.
   lexemes. Borrowed user subtrees keep their real host spans; minted
   literal/template-quasi text lives in the appendix at the spans the nodes
   claim; synthetic identifiers ride the interned-name channel
-  (`IdentName { escaped: Some(symbol), raw_len: 0 }`, source-free). Codegen owns
-  zero precedence knowledge — the printer's `needs_parens` handles it.
-- `rune_guard.rs` — the rune refusal walk: an exhaustive traversal of every
-  expression-bearing position in the borrowed script statements (and template
-  expressions), refusing any `$`-prefixed identifier reference it reaches —
-  calls report their callee root as a rune; bare references (`let x = $state;`,
-  a future `$store` subscription) refuse as reserved identifiers; name-only
-  positions (non-computed member properties / object keys) are not walked.
-  Exhaustive matches on purpose — new AST variants fail compilation here
-  instead of silently skipping the guard.
+  (`IdentName { escaped: Some(symbol), raw_len: 0 }`, source-free — `ident_at`
+  places one at a caller-chosen span, either fictional-low so header comment
+  windows stay empty, or *stolen* from the node it replaces so authored gaps
+  survive). Codegen owns zero precedence knowledge — the printer's
+  `needs_parens` handles it.
+- `analyze.rs` — the script binding table and the **static-evaluation port**:
+  the oracle folds statically-known template expressions into the emitted text,
+  so parity needs the same fold decision. The evaluator mirrors the oracle's
+  abstract interpreter over a bounded domain (strings, f64, booleans,
+  null/undefined + the STRING/NUMBER/FUNCTION/UNKNOWN sentinels) and refuses
+  (`Gray`) anything it can't bound byte-exactly (the oracle's globals tables,
+  string→number coercion, non-integer number stringification, …). Bindings
+  mirror the oracle: props/updated/no-initial are UNKNOWN; rune inits evaluate
+  through to their argument; shadowed names go `Opaque` (refuse-on-spine).
+- `rune_guard.rs` — the rune refusal walk plus the collection passes riding the
+  same exhaustive traversal: refuses any `$`-prefixed identifier reference or
+  `$`-rooted call outside the sanctioned rewrites, refuses derived-binding
+  reads outside bare emitter positions and top-level `await`, and collects
+  assignment/update roots (`updated`) and nested-scope declarations (shadow
+  candidates) for the evaluator. Exhaustive matches on purpose — new AST
+  variants fail compilation here instead of silently skipping the guard.
 - `transform_server.rs` — the SSR transform: module scaffold
   (`import * as $ from 'svelte/internal/server'` + the exported component
-  function), instance-script statements borrowed with the `$props()` declarator
-  init rewritten to `$$props`, the template folded into one
-  `$$renderer.push(\`…\`)` with `{expr}` interpolations wrapped in
-  `$.escape(…)`, and minimal CSS scoping (single class selectors: the
-  `svelte-tsvhash` class appended to matched elements and **source-spliced**
-  into the style text — the author's whitespace is preserved, not reprinted).
-  Static emission implements the oracle's normalization, derived from Svelte's
-  own `clean_nodes`/`escape_html` and probe-verified: whitespace-only boundary
-  text drops and edge runs trim per fragment; a text edge run abutting a
-  non-text node collapses to one space (runs abutting `{expr}` stay — text +
-  expression count as one text); interior whitespace is verbatim;
-  `<pre>`/`<textarea>` preserve everything; entities decode then re-escape
-  (`[&<]` in text, `[&"<]` in static attributes); boolean attributes emit
-  `name=""`; `class`/`style` values collapse+trim; void elements close `/>`;
-  a text-first component fragment gets a `<!---->` prefix.
+  function), instance-script statements borrowed with rune rewrites —
+  `$props()` → `$$props` (span-stolen), `$state(v)`/`$state.raw(v)` → `v`
+  (`void 0` argument-less), `$derived(e)` → `$.derived(() => e)`,
+  `$derived.by(f)` → `$.derived(f)`, statement-position `$effect`/`$effect.pre`
+  dropped and forcing the `$$renderer.component(($$renderer) => { … })`
+  wrapper — the template folded into one `$$renderer.push(\`…\`)` with
+  `{expr}` → `$.escape(expr)` (a bare derived read becomes `d()`; known
+  evaluations fold as static text), `{@html expr}` → `$.html(expr)`, dynamic
+  and mixed attributes → `$.attr(name, expr[, true])` / `$.attr_class` /
+  `$.attr_style` with `$.stringify` interpolations, and minimal CSS scoping
+  (single class selectors: the `svelte-tsvhash` class appended to matched
+  elements and **source-spliced** into the style text — the author's
+  whitespace is preserved, not reprinted). Static emission implements the
+  oracle's normalization, derived from Svelte's own `clean_nodes`/`escape_html`
+  and probe-verified: whitespace-only boundary text drops and edge runs trim
+  per fragment; a text edge run abutting a non-text node collapses to one
+  space (runs abutting `{expr}` stay — text + expression count as one text);
+  interior whitespace is verbatim; `<pre>`/`<textarea>` preserve everything;
+  entities decode then re-escape (`[&<]` in text, `[&"<]` in static
+  attributes); boolean attributes emit `name=""`; `class`/`style` values
+  collapse+trim; void elements close `/>`; a text-first component fragment
+  gets a `<!---->` prefix. Instance-script comments carry through into the
+  synthetic program (host-absolute spans; the import prints as a separate
+  comment-free program so no window bridges a low anchor to its appendix
+  source literal); divergent placement classes refuse — comments after the
+  last script statement (the oracle re-attaches them into the template),
+  template-expression comments, comments inside dropped rune regions, and
+  comments alongside `$derived` / argument-less `$state()` /
+  expression-valued attributes (window-sweep hazards).
 
 Types: `CompileOptions { generate: Generate, dev: bool }` (default: `Server`,
 non-dev), `CompileOutput { js, css, warnings }`, `CompileWarning { code, message }`

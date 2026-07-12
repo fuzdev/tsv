@@ -92,7 +92,7 @@ impl<'arena> Builder<'arena> {
     /// synthetic header node's windows empty/inverted, and a *stolen* host span
     /// (the node it replaces, e.g. `$$props` over the original `$props()` call)
     /// keeps the surrounding gaps exactly the authored ones.
-    pub fn ident_at(&mut self, name: &str, span: Span) -> Identifier<'arena> {
+    pub fn ident_at(&self, name: &str, span: Span) -> Identifier<'arena> {
         let ident_name = IdentName {
             escaped: Some(self.interner.borrow_mut().get_or_intern(name)),
             raw_len: 0,

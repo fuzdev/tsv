@@ -756,7 +756,7 @@ fn rewrite_script_statement<'arena>(
                 let init_span = declarator
                     .init
                     .as_ref()
-                    .map_or(declarator.span, |i| i.span());
+                    .map_or(declarator.span, Expression::span);
                 let props_ident = b.ident_at("$$props", init_span);
                 Some(Expression::Identifier(props_ident))
             }
