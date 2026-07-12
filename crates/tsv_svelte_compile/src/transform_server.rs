@@ -10,6 +10,24 @@
 //! }
 //! ```
 //!
+//! Static template emission follows the oracle's normalization, derived from
+//! Svelte's own `clean_nodes` + `escape_html` (empirically probe-verified):
+//!
+//! - **Whitespace** (per fragment, whitespace class `[ \t\r\n]`): drop
+//!   whitespace-only boundary text nodes and trim the boundary runs of edge
+//!   text; collapse a text node's leading/trailing run to one space where it
+//!   abuts a non-text node — except next to `{expr}` tags, which count as part
+//!   of the text; keep interior whitespace verbatim. Inside `<pre>`/`<textarea>`
+//!   nothing is normalized (a lone leading `"\n"` text in `<pre>` is dropped);
+//!   inside `select`/`table`-family parents a collapsed space-only text is
+//!   removed entirely. A component fragment starting with text/`{expr}` is
+//!   prefixed with `<!---->`.
+//! - **Entities**: text emits the *decoded* data re-escaped with `[&<]`
+//!   (`&`→`&amp;`, `<`→`&lt;`); static attribute values re-escape with `[&"<]`.
+//! - **Attributes**: a boolean attribute emits `name=""`; `class`/`style`
+//!   values collapse `[ \t\n\r\f]+` runs to one space and trim.
+//! - **Void elements** close with `/>`.
+//!
 //! Codegen owns zero precedence knowledge — the printer's `needs_parens`
 //! handles it. Shapes the transform does not yet cover return a clear
 //! [`CompileError::Unsupported`] rather than guessing.
@@ -20,7 +38,8 @@ use bumpalo::collections::Vec as BumpVec;
 use tsv_css::ast::internal::{CssBlockChild, CssNode, SimpleSelector};
 use tsv_lang::{InfallibleResolve, Span};
 use tsv_svelte::ast::internal::{
-    Attribute, AttributeNode, AttributeValue, Element, Fragment, FragmentNode, Root, Style,
+    Attribute, AttributeNode, AttributeValue, Element, ExpressionTag, Fragment, FragmentNode, Root,
+    Style,
 };
 use tsv_ts::ast::internal::{
     BlockStatement, ExportDefaultDeclaration, ExportDefaultValue, Expression, ExpressionStatement,
@@ -28,6 +47,7 @@ use tsv_ts::ast::internal::{
 };
 
 use crate::build::{Builder, escape_template_text};
+use crate::rune_guard::{refuse_runes_in_expression, refuse_runes_in_statement};
 use crate::{CompileError, CompileOutput};
 
 /// The deterministic scoping class — the fixed `cssHash` the oracle sidecar
@@ -37,6 +57,12 @@ const SCOPE_HASH_CLASS: &str = "svelte-tsvhash";
 /// The component function name. Derived from the constant filename the
 /// deterministic oracle compiles under (`input.svelte` → `Input`).
 const COMPONENT_NAME: &str = "Input";
+
+/// Parents whose whitespace-only children are removed entirely instead of
+/// collapsing to a single space (Svelte's `can_remove_entirely` list).
+const REMOVE_WS_ENTIRELY_PARENTS: &[&str] = &[
+    "select", "tr", "table", "tbody", "thead", "tfoot", "colgroup", "datalist",
+];
 
 /// Compile a parsed component to server output.
 pub(crate) fn compile_server<'arena>(
@@ -67,8 +93,13 @@ pub(crate) fn compile_server<'arena>(
     let mut body: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
     let mut uses_props = false;
     if let Some(script) = root.instance {
-        // TODO: user script comments are dropped for now (the synthetic program
-        // carries an empty comment list); carrying them through is a later slice.
+        // TODO: carrying user script comments through to the synthetic program
+        // is a later slice — refuse rather than silently drop them.
+        if !script.content.comments.is_empty() {
+            return Err(unsupported(
+                "comments in the instance script (not carried through yet)",
+            ));
+        }
         for stmt in script.content.body {
             let rewritten = rewrite_script_statement(&mut b, stmt, source, &mut uses_props)?;
             body.push(rewritten);
@@ -102,7 +133,11 @@ pub(crate) fn compile_server<'arena>(
         scope.as_ref(),
         &mut matched_classes,
         &mut accum,
-        true,
+        FragmentCtx {
+            is_component_root: true,
+            preserve_whitespace: false,
+            parent_name: None,
+        },
     )?;
     if !(accum.exprs.is_empty() && accum.texts.iter().all(String::is_empty)) {
         let template = b.template_literal(&accum.texts, accum.exprs.into_bump_slice());
@@ -186,11 +221,25 @@ struct TemplateAccum<'arena> {
 }
 
 impl<'arena> TemplateAccum<'arena> {
-    fn push_text(&mut self, text: &str) {
+    /// Append an already template-escaped chunk to the current static part.
+    ///
+    /// Cross-chunk `${` seam invariant: each chunk is template-escaped
+    /// independently, so a literal `$` ending one chunk followed by a literal
+    /// `{` starting the next would slip through unescaped. That pairing is
+    /// unreachable — a decoded text run is always a single chunk (the parser
+    /// yields one `Text` node per run, entities included), and every other
+    /// chunk this transform appends starts with `<`, `/`, `>`, or a space —
+    /// but assert it so a future emitter change fails loudly.
+    fn push_text(&mut self, chunk: &str) {
         // Every element of `texts` exists by construction (starts with one entry;
         // `push_expr` appends the follower).
         #[allow(clippy::unwrap_used)]
-        self.texts.last_mut().unwrap().push_str(text);
+        let current = self.texts.last_mut().unwrap();
+        debug_assert!(
+            !(current.ends_with('$') && chunk.starts_with('{')),
+            "cross-chunk `${{` would defeat template escaping"
+        );
+        current.push_str(chunk);
     }
 
     fn push_expr(&mut self, expr: Expression<'arena>) {
@@ -199,9 +248,90 @@ impl<'arena> TemplateAccum<'arena> {
     }
 }
 
-/// Walk a fragment, appending static HTML to the template text and wrapping
-/// `{expr}` interpolations in `$.escape(…)`. At the root boundary,
-/// whitespace-only text nodes are trimmed (matching the oracle's SSR output).
+/// Svelte's template whitespace class (`[ \t\r\n]` — the compiler's
+/// `regex_*_whitespaces` patterns; deliberately narrower than Unicode
+/// whitespace, so e.g. a decoded `&nbsp;` is content).
+fn is_template_ws(c: char) -> bool {
+    matches!(c, ' ' | '\t' | '\r' | '\n')
+}
+
+fn is_ws_only(s: &str) -> bool {
+    s.chars().all(is_template_ws)
+}
+
+/// Replace the leading `[ \t\r\n]+` run with `replacement` (no-op without one).
+fn replace_leading_ws(s: &str, replacement: &str) -> String {
+    let trimmed = s.trim_start_matches(is_template_ws);
+    if trimmed.len() == s.len() {
+        s.to_string()
+    } else {
+        format!("{replacement}{trimmed}")
+    }
+}
+
+/// Replace the trailing `[ \t\r\n]+` run with `replacement` (no-op without one).
+fn replace_trailing_ws(s: &str, replacement: &str) -> String {
+    let trimmed = s.trim_end_matches(is_template_ws);
+    if trimmed.len() == s.len() {
+        s.to_string()
+    } else {
+        format!("{trimmed}{replacement}")
+    }
+}
+
+/// HTML-escape text content the way the oracle does (`escape_html`, `[&<]`).
+fn escape_html_text(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
+/// HTML-escape a static attribute value (`escape_html(value, true)`, `[&"<]`).
+fn escape_html_attr(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '"' => out.push_str("&quot;"),
+            '<' => out.push_str("&lt;"),
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
+/// A fragment child after comment-dropping and text decoding, mutable for the
+/// whitespace normalization pass.
+enum CleanNode<'arena> {
+    Text(String),
+    Expr(&'arena ExpressionTag<'arena>),
+    Element(&'arena Element<'arena>),
+}
+
+impl CleanNode<'_> {
+    fn is_expr(&self) -> bool {
+        matches!(self, CleanNode::Expr(_))
+    }
+}
+
+/// Per-fragment emission context.
+struct FragmentCtx<'p> {
+    /// The component's root fragment (drives the `<!---->` text-first marker).
+    is_component_root: bool,
+    /// Inside `<pre>`/`<textarea>`: no whitespace normalization.
+    preserve_whitespace: bool,
+    /// The enclosing element's name (`None` at the root).
+    parent_name: Option<&'p str>,
+}
+
+/// Walk a fragment: normalize whitespace per the oracle's `clean_nodes` rules,
+/// then append static HTML / `$.escape(expr)` interpolations to the template.
 fn emit_fragment<'arena>(
     b: &mut Builder<'arena>,
     fragment: &Fragment<'arena>,
@@ -209,34 +339,21 @@ fn emit_fragment<'arena>(
     scope: Option<&ScopeInfo>,
     matched_classes: &mut BTreeSet<String>,
     accum: &mut TemplateAccum<'arena>,
-    root_boundary: bool,
+    ctx: FragmentCtx<'_>,
 ) -> Result<(), CompileError> {
     let nodes: &'arena [FragmentNode<'arena>] = fragment.nodes;
-    let mut start = 0;
-    let mut end = nodes.len();
-    if root_boundary {
-        while start < end && is_ws_only_text(&nodes[start]) {
-            start += 1;
-        }
-        while end > start && is_ws_only_text(&nodes[end - 1]) {
-            end -= 1;
-        }
-    }
-    for node in &nodes[start..end] {
+
+    // Decode and filter into the working list (comments are dropped — the
+    // oracle compiles with preserveComments off).
+    let mut list: Vec<CleanNode<'arena>> = Vec::with_capacity(nodes.len());
+    for node in nodes {
         match node {
             FragmentNode::Text(text) => {
-                accum.push_text(&escape_template_text(text.raw_span.extract(source)));
+                list.push(CleanNode::Text(text.data(source).into_owned()));
             }
-            FragmentNode::Element(element) => {
-                emit_element(b, element, source, scope, matched_classes, accum)?;
-            }
-            FragmentNode::ExpressionTag(tag) => {
-                // `{expr}` → `${$.escape(expr)}` with the expression BORROWED
-                // (host span, prints verbatim through the normal machinery).
-                let args = std::slice::from_ref(&tag.expression);
-                let escaped = b.member_call("$", "escape", args);
-                accum.push_expr(escaped);
-            }
+            FragmentNode::Element(element) => list.push(CleanNode::Element(element)),
+            FragmentNode::ExpressionTag(tag) => list.push(CleanNode::Expr(tag)),
+            FragmentNode::Comment(_) => {}
             other => {
                 return Err(unsupported(format!(
                     "template node {}",
@@ -245,23 +362,125 @@ fn emit_fragment<'arena>(
             }
         }
     }
+
+    if !ctx.preserve_whitespace {
+        normalize_whitespace(&mut list, ctx.parent_name);
+    }
+
+    // A lone leading newline text in <pre> is dropped (the browser would drop
+    // it too, which would otherwise break hydration).
+    if ctx.parent_name == Some("pre")
+        && let Some(CleanNode::Text(data)) = list.first()
+        && (data == "\n" || data == "\r\n")
+    {
+        list.remove(0);
+    }
+
+    // Component fragment starting with text/{expr}: `<!---->` keeps it from
+    // gluing to the previous SSR fragment.
+    if ctx.is_component_root
+        && matches!(list.first(), Some(CleanNode::Text(_) | CleanNode::Expr(_)))
+    {
+        accum.push_text("<!---->");
+    }
+
+    for node in &list {
+        match node {
+            CleanNode::Text(data) => {
+                accum.push_text(&escape_template_text(&escape_html_text(data)));
+            }
+            CleanNode::Element(element) => {
+                emit_element(b, element, source, scope, matched_classes, accum, &ctx)?;
+            }
+            CleanNode::Expr(tag) => {
+                // Runes are script-only; refuse them in template expressions too.
+                refuse_runes_in_expression(&tag.expression, source)?;
+                // `{expr}` → `${$.escape(expr)}` with the expression BORROWED
+                // (host span, prints verbatim through the normal machinery).
+                let args = std::slice::from_ref(&tag.expression);
+                let escaped = b.member_call("$", "escape", args);
+                accum.push_expr(escaped);
+            }
+        }
+    }
     Ok(())
+}
+
+/// The oracle's whitespace normalization (Svelte `clean_nodes`, whitespace
+/// pass): boundary whitespace-only nodes dropped and edge-text runs trimmed,
+/// then each text node's edge runs abutting a non-text node collapse to one
+/// space (or nothing after a whitespace-ending text) — runs abutting `{expr}`
+/// tags stay, interior whitespace stays. An all-collapsed `" "` text is dropped
+/// entirely under the `select`/`table`-family parents.
+fn normalize_whitespace(list: &mut Vec<CleanNode<'_>>, parent_name: Option<&str>) {
+    // Boundary: drop whitespace-only text nodes, then trim the edge runs of a
+    // surviving edge text node.
+    while matches!(list.first(), Some(CleanNode::Text(t)) if is_ws_only(t)) {
+        list.remove(0);
+    }
+    if let Some(CleanNode::Text(t)) = list.first_mut() {
+        *t = replace_leading_ws(t, "");
+    }
+    while matches!(list.last(), Some(CleanNode::Text(t)) if is_ws_only(t)) {
+        list.pop();
+    }
+    if let Some(CleanNode::Text(t)) = list.last_mut() {
+        *t = replace_trailing_ws(t, "");
+    }
+
+    let can_remove_entirely =
+        parent_name.is_some_and(|name| REMOVE_WS_ENTIRELY_PARENTS.contains(&name));
+
+    // Inner pass: mutate in place reading the (already-mutated) previous
+    // neighbor, mirroring the oracle's in-place iteration; drops applied after
+    // so neighbors keep indexing the pre-drop list.
+    let mut drop_flags = vec![false; list.len()];
+    for i in 0..list.len() {
+        let prev_is_expr = i > 0 && list[i - 1].is_expr();
+        let prev_text_ends_ws = i > 0
+            && matches!(&list[i - 1], CleanNode::Text(t) if t.chars().next_back().is_some_and(is_template_ws));
+        let next_is_expr = list.get(i + 1).is_some_and(CleanNode::is_expr);
+        let has_next = i + 1 < list.len();
+
+        let CleanNode::Text(data) = &mut list[i] else {
+            continue;
+        };
+        if i > 0 && !prev_is_expr {
+            *data = replace_leading_ws(data, if prev_text_ends_ws { "" } else { " " });
+        }
+        if has_next && !next_is_expr {
+            *data = replace_trailing_ws(data, " ");
+        }
+        if data.is_empty() || (data == " " && can_remove_entirely) {
+            drop_flags[i] = true;
+        }
+    }
+    let mut keep = drop_flags.iter();
+    list.retain(|_| !*keep.next().unwrap_or(&false));
 }
 
 /// Emit one element's open tag, children, and close tag into the template.
 fn emit_element<'arena>(
     b: &mut Builder<'arena>,
-    element: &Element<'arena>,
+    element: &'arena Element<'arena>,
     source: &str,
     scope: Option<&ScopeInfo>,
     matched_classes: &mut BTreeSet<String>,
     accum: &mut TemplateAccum<'arena>,
+    parent_ctx: &FragmentCtx<'_>,
 ) -> Result<(), CompileError> {
     let name = b
         .interner
         .borrow()
         .resolve_infallible(element.name)
         .to_string();
+    match name.as_str() {
+        // Namespace-dependent whitespace/emission rules not implemented.
+        "svg" | "math" => return Err(unsupported(format!("<{name}> (foreign namespace)"))),
+        // Template-level <script>/<style> have special semantics in the oracle.
+        "script" | "style" => return Err(unsupported(format!("template-level <{name}>"))),
+        _ => {}
+    }
 
     accum.push_text(&format!("<{name}"));
     for attr_node in element.attributes {
@@ -270,14 +489,16 @@ fn emit_element<'arena>(
         };
         emit_attribute(b, attr, source, scope, matched_classes, accum)?;
     }
-    accum.push_text(">");
 
     if tsv_html::is_void_element(&name) {
+        // XHTML-compliant self-close, matching the oracle.
+        accum.push_text("/>");
         if !element.fragment.nodes.is_empty() {
             return Err(unsupported(format!("children on void element <{name}>")));
         }
         return Ok(());
     }
+    accum.push_text(">");
     emit_fragment(
         b,
         &element.fragment,
@@ -285,14 +506,22 @@ fn emit_element<'arena>(
         scope,
         matched_classes,
         accum,
-        false,
+        FragmentCtx {
+            is_component_root: false,
+            preserve_whitespace: parent_ctx.preserve_whitespace
+                || name == "pre"
+                || name == "textarea",
+            parent_name: Some(&name),
+        },
     )?;
     accum.push_text(&format!("</{name}>"));
     Ok(())
 }
 
-/// Emit one plain attribute (` name` or ` name="value"`), appending the scope
-/// hash class to a matched `class` attribute.
+/// Emit one plain attribute: ` name=""` for a boolean attribute, else
+/// ` name="decoded value"` with the oracle's attribute escaping; `class`/`style`
+/// values collapse whitespace runs and trim, and a matched `class` gains the
+/// scope hash class.
 fn emit_attribute<'arena>(
     b: &Builder<'arena>,
     attr: &Attribute<'arena>,
@@ -308,7 +537,8 @@ fn emit_attribute<'arena>(
         .to_string();
 
     let Some(values) = attr.value else {
-        accum.push_text(&format!(" {name}"));
+        // Boolean attribute: the oracle emits `name=""`.
+        accum.push_text(&escape_template_text(&format!(" {name}=\"\"")));
         return Ok(());
     };
     let [AttributeValue::Text(text)] = values else {
@@ -316,19 +546,35 @@ fn emit_attribute<'arena>(
             "non-static value for attribute {name}"
         )));
     };
-    let raw = text.raw_span.extract(source);
-    if raw.contains('"') {
-        return Err(unsupported(format!(
-            "double quote in attribute value {name}"
-        )));
-    }
+    let decoded = text.data(source);
 
-    let mut value = raw.to_string();
+    // class/style are whitespace-insensitive: runs ([ \t\n\r\f]+) collapse to
+    // one space and the whole value trims (the oracle's
+    // WHITESPACE_INSENSITIVE_ATTRIBUTES handling).
+    let mut value = if name == "class" || name == "style" {
+        let mut collapsed = String::with_capacity(decoded.len());
+        let mut in_ws = false;
+        for c in decoded.chars() {
+            if matches!(c, ' ' | '\t' | '\n' | '\r' | '\x0c') {
+                in_ws = true;
+            } else {
+                if in_ws && !collapsed.is_empty() {
+                    collapsed.push(' ');
+                }
+                in_ws = false;
+                collapsed.push(c);
+            }
+        }
+        collapsed
+    } else {
+        decoded.into_owned()
+    };
+
     if name == "class"
         && let Some(scope) = scope
     {
         let mut matched = false;
-        for class in raw.split_ascii_whitespace() {
+        for class in value.split_ascii_whitespace() {
             if scope.class_names.contains(class) {
                 matched_classes.insert(class.to_string());
                 matched = true;
@@ -339,12 +585,11 @@ fn emit_attribute<'arena>(
             value.push_str(SCOPE_HASH_CLASS);
         }
     }
-    accum.push_text(&escape_template_text(&format!(" {name}=\"{value}\"")));
+    accum.push_text(&escape_template_text(&format!(
+        " {name}=\"{}\"",
+        escape_html_attr(&value)
+    )));
     Ok(())
-}
-
-fn is_ws_only_text(node: &FragmentNode<'_>) -> bool {
-    matches!(node, FragmentNode::Text(t) if t.is_ascii_ws_only)
 }
 
 fn fragment_node_kind(node: &FragmentNode<'_>) -> &'static str {
@@ -368,16 +613,19 @@ fn fragment_node_kind(node: &FragmentNode<'_>) -> &'static str {
 }
 
 /// Rewrite one instance-script statement for the server module. Today that is
-/// the `$props()` rune: a declarator initialized by `$props()` has its init
-/// replaced with the synthetic `$$props` identifier (and the component function
-/// gains the `$$props` parameter). Other rune calls are refused; everything
-/// else passes through borrowed.
+/// the `$props()` rune: a top-level declarator initialized by a direct,
+/// argument-less `$props()` call has its init replaced with the synthetic
+/// `$$props` identifier (and the component function gains the `$$props`
+/// parameter). Every other rune use anywhere in the statement — statement
+/// position, nested functions, member-form calls — is refused by the
+/// `rune_guard` walk; everything else passes through borrowed.
 ///
 /// Passthrough/rebuild is a *shallow* re-slot: `Statement`/`VariableDeclarator`
 /// hold children inline by value, so placing a borrowed statement into the
 /// synthetic body clones the wrapper only — children remain shared `&'arena`
 /// refs into the parsed AST, and the original wrapper never enters the printed
-/// tree (no duplicate spans in what the printer walks).
+/// tree (no duplicate spans in what the printer walks). See `build.rs` for the
+/// address-keyed side-table caveat.
 fn rewrite_script_statement<'arena>(
     b: &mut Builder<'arena>,
     stmt: &'arena Statement<'arena>,
@@ -385,31 +633,28 @@ fn rewrite_script_statement<'arena>(
     uses_props: &mut bool,
 ) -> Result<Statement<'arena>, CompileError> {
     let Statement::VariableDeclaration(decl) = stmt else {
+        refuse_runes_in_statement(stmt, source)?;
         return Ok(stmt.clone());
     };
-    let mut needs_rewrite = false;
-    for declarator in decl.declarations {
-        if let Some(init) = &declarator.init
-            && let Some(rune) = rune_call_name(init, source)
-        {
-            if rune == "$props" {
-                needs_rewrite = true;
-            } else {
-                return Err(unsupported(format!("rune {rune}")));
-            }
-        }
-    }
-    if !needs_rewrite {
+
+    let has_props_init = decl
+        .declarations
+        .iter()
+        .any(|d| d.init.as_ref().is_some_and(|i| is_props_call(i, source)));
+    if !has_props_init {
+        refuse_runes_in_statement(stmt, source)?;
         return Ok(stmt.clone());
     }
 
     let mut declarations: BumpVec<'arena, VariableDeclarator<'arena>> = BumpVec::new_in(b.arena);
     for declarator in decl.declarations {
+        // The binding pattern is guarded in every case (a rune can't hide in a
+        // pattern default either).
+        refuse_runes_in_expression(&declarator.id, source)?;
         let is_props = declarator
             .init
             .as_ref()
-            .and_then(|init| rune_call_name(init, source))
-            .is_some_and(|rune| rune == "$props");
+            .is_some_and(|init| is_props_call(init, source));
         if is_props {
             *uses_props = true;
             let props_ident = b.ident("$$props");
@@ -420,6 +665,9 @@ fn rewrite_script_statement<'arena>(
                 span: declarator.span,
             });
         } else {
+            if let Some(init) = &declarator.init {
+                refuse_runes_in_expression(init, source)?;
+            }
             declarations.push(declarator.clone());
         }
     }
@@ -431,25 +679,23 @@ fn rewrite_script_statement<'arena>(
     }))
 }
 
-/// The rune name (`$props`, `$state`, …) when `expr` is a direct call of a
-/// `$`-prefixed identifier, else `None`.
-///
-/// Parsed user identifiers are span-identity (`escaped: None` — the name is the
-/// leading `name_len` bytes at the span start), so the name is a direct source
-/// slice; an interned (escaped) name can't be a rune.
-fn rune_call_name<'s>(expr: &Expression<'_>, source: &'s str) -> Option<&'s str> {
+/// Whether `expr` is exactly the sanctioned rewrite shape: a direct,
+/// argument-less call of the plain identifier `$props`.
+fn is_props_call(expr: &Expression<'_>, source: &str) -> bool {
     let Expression::CallExpression(call) = expr else {
-        return None;
+        return false;
     };
+    if !call.arguments.is_empty() {
+        return false;
+    }
     let Expression::Identifier(id) = call.callee else {
-        return None;
+        return false;
     };
     if id.escaped_name.is_some() {
-        return None;
+        return false;
     }
     let start = id.span.start as usize;
-    let name = &source[start..start + id.name_len as usize];
-    name.starts_with('$').then_some(name)
+    &source[start..start + id.name_len as usize] == "$props"
 }
 
 /// The scoping analysis product: which class names the style scopes, and the

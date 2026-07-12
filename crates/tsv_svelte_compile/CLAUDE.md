@@ -26,9 +26,12 @@ project-wide conventions.
     parses the component and runs the server transform. Generated JS prints
     through `format_canonical`, so it is canonical-form by construction
     (`canonicalize_js(output.js)` is a fixed point). Shapes the transform does
-    not cover yet — client generation, dev mode, blocks, directives, runes other
-    than `$props` — return `CompileError::Unsupported` with a clear description,
-    never guessed output.
+    not cover yet — client generation, dev mode, blocks, directives,
+    script comments, and every rune use other than the rewritten top-level
+    `let … = $props()` declarator (statement position, nested functions, and
+    member-form calls included — `rune_guard.rs` walks every borrowed subtree)
+    — return `CompileError::Unsupported` with a clear description, never
+    guessed output.
   - `canonicalize_js(source) -> Result<String, CanonicalizeError>` — the
     canonicalizer (below). Lives here because the compiler's own output
     idempotence checks and the oracle comparison both consume it.
@@ -39,6 +42,11 @@ project-wide conventions.
   claim; synthetic identifiers ride the interned-name channel
   (`IdentName { escaped: Some(symbol), raw_len: 0 }`, source-free). Codegen owns
   zero precedence knowledge — the printer's `needs_parens` handles it.
+- `rune_guard.rs` — the rune refusal walk: an exhaustive traversal of every
+  expression-bearing position in the borrowed script statements (and template
+  expressions), refusing any call/`new` whose callee roots in a `$`-prefixed
+  identifier. Exhaustive matches on purpose — new AST variants fail compilation
+  here instead of silently skipping the guard.
 - `transform_server.rs` — the SSR transform: module scaffold
   (`import * as $ from 'svelte/internal/server'` + the exported component
   function), instance-script statements borrowed with the `$props()` declarator
@@ -47,6 +55,15 @@ project-wide conventions.
   `$.escape(…)`, and minimal CSS scoping (single class selectors: the
   `svelte-tsvhash` class appended to matched elements and **source-spliced**
   into the style text — the author's whitespace is preserved, not reprinted).
+  Static emission implements the oracle's normalization, derived from Svelte's
+  own `clean_nodes`/`escape_html` and probe-verified: whitespace-only boundary
+  text drops and edge runs trim per fragment; a text edge run abutting a
+  non-text node collapses to one space (runs abutting `{expr}` stay — text +
+  expression count as one text); interior whitespace is verbatim;
+  `<pre>`/`<textarea>` preserve everything; entities decode then re-escape
+  (`[&<]` in text, `[&"<]` in static attributes); boolean attributes emit
+  `name=""`; `class`/`style` values collapse+trim; void elements close `/>`;
+  a text-first component fragment gets a `<!---->` prefix.
 
 Types: `CompileOptions { generate: Generate, dev: bool }` (default: `Server`,
 non-dev), `CompileOutput { js, css, warnings }`, `CompileWarning { code, message }`

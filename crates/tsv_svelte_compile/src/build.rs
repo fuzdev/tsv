@@ -24,7 +24,11 @@
 //! must be rebuilt with one field changed (the `$props()` init rewrite), the
 //! by-value fields are shallow-cloned — children remain shared `&'arena` refs
 //! into the parsed AST, and the original wrapper never enters the printed tree
-//! (no duplicate spans in what the printer walks).
+//! (no duplicate spans in what the printer walks). Caveat for future
+//! address-keyed side-tables (the printer's `chain_arg_share` pattern): a
+//! shallow clone mints a NEW wrapper address while its children keep theirs,
+//! so any map keyed by node pointer must be scoped to one printed tree, never
+//! shared across the parsed AST and the synthetic program.
 
 use bumpalo::Bump;
 use tsv_lang::{SharedInterner, Span};
@@ -84,10 +88,27 @@ impl<'arena> Builder<'arena> {
     /// A single-quoted string literal minted into the appendix. `content` must
     /// not itself require escaping (module specifiers do not).
     pub fn string_literal(&mut self, content: &str) -> Literal<'arena> {
-        debug_assert!(
-            !content.contains(['\'', '\\', '\n']),
-            "string_literal content must not need escaping: {content:?}"
-        );
+        // Escape quote/backslash/newlines so any content is safe in release
+        // builds too (module specifiers never need it, but safety must not be a
+        // debug-only guarantee). When escaping fires, the minted raw text differs
+        // from the decoded value, so the cooked channel switches to `Decoded`.
+        if content.contains(['\'', '\\', '\n', '\r']) {
+            let mut escaped = String::with_capacity(content.len() + 2);
+            for c in content.chars() {
+                match c {
+                    '\'' => escaped.push_str("\\'"),
+                    '\\' => escaped.push_str("\\\\"),
+                    '\n' => escaped.push_str("\\n"),
+                    '\r' => escaped.push_str("\\r"),
+                    _ => escaped.push(c),
+                }
+            }
+            let span = self.mint(&format!("'{escaped}'"));
+            return Literal {
+                value: LiteralValue::String(StringCooked::Decoded(self.arena.alloc_str(content))),
+                span,
+            };
+        }
         let span = self.mint(&format!("'{content}'"));
         Literal {
             value: LiteralValue::String(StringCooked::Verbatim),

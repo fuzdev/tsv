@@ -16,6 +16,7 @@
 //! [`CompileError::Unsupported`] rather than guessed output.
 
 mod build;
+mod rune_guard;
 mod transform_server;
 
 use tsv_ts::Goal;
@@ -403,6 +404,151 @@ mod tests {
         assert!(
             matches!(&err, CompileError::Unsupported(what) if what.contains("$state")),
             "expected Unsupported($state), got {err:?}"
+        );
+    }
+
+    /// Assert `compile` refuses with an `Unsupported` message containing `what`.
+    fn assert_unsupported(source: &str, what: &str) {
+        let err = compile(source, &CompileOptions::default()).unwrap_err();
+        assert!(
+            matches!(&err, CompileError::Unsupported(msg) if msg.contains(what)),
+            "expected Unsupported({what}), got {err:?} for:\n{source}"
+        );
+    }
+
+    #[test]
+    fn compile_rejects_statement_position_rune() {
+        assert_unsupported(
+            "<script>\n\t$effect(() => {});\n</script>\n<p>text</p>",
+            "$effect",
+        );
+    }
+
+    #[test]
+    fn compile_rejects_rune_in_nested_function() {
+        assert_unsupported(
+            "<script>\n\tfunction f() {\n\t\tlet c = $state(0);\n\t\treturn c;\n\t}\n</script>\n<p>text</p>",
+            "$state",
+        );
+    }
+
+    #[test]
+    fn compile_rejects_member_form_rune_init() {
+        assert_unsupported(
+            "<script>\n\tlet a = $state.raw([]);\n</script>\n<p>{a}</p>",
+            "$state",
+        );
+        assert_unsupported(
+            "<script>\n\tlet { id } = $props;\n\tlet b = $props.id();\n</script>\n<p>{b}</p>",
+            "$props",
+        );
+    }
+
+    #[test]
+    fn compile_rejects_rune_in_arrow_and_template_expression() {
+        assert_unsupported(
+            "<script>\n\tconst f = () => $inspect(1);\n</script>\n<p>text</p>",
+            "$inspect",
+        );
+        assert_unsupported("<p>{$state(0)}</p>", "$state");
+    }
+
+    #[test]
+    fn compile_rejects_script_comments() {
+        assert_unsupported(
+            "<script>\n\t// note\n\tlet a = 1;\n</script>\n<p>text</p>",
+            "comments in the instance script",
+        );
+    }
+
+    #[test]
+    fn compile_collapses_sibling_whitespace() {
+        // Inter-sibling whitespace runs (newlines, blank lines) collapse to one
+        // space; element-boundary whitespace trims (the oracle's clean_nodes).
+        let out = compile(
+            "<p>text1</p>\n\n<div>\n\t<p>text2</p>\n\t<p>text3</p>\n</div>\n",
+            &CompileOptions::default(),
+        )
+        .unwrap();
+        assert!(
+            out.js
+                .contains("`<p>text1</p> <div><p>text2</p> <p>text3</p></div>`"),
+            "sibling/boundary whitespace not normalized: {}",
+            out.js
+        );
+    }
+
+    #[test]
+    fn compile_preserves_text_interior_whitespace() {
+        // Interior whitespace of a content text node is verbatim; edge runs
+        // adjacent to {expr} tags stay (text + expr count as one text).
+        let out = compile(
+            "<script>let { a } = $props();</script>\n<p>text  x {a} y</p>",
+            &CompileOptions::default(),
+        )
+        .unwrap();
+        assert!(
+            out.js.contains("`<p>text  x ${$.escape(a)} y</p>`"),
+            "interior/expr-adjacent whitespace mangled: {}",
+            out.js
+        );
+    }
+
+    #[test]
+    fn compile_preserves_pre_whitespace() {
+        let out = compile("<pre>  a\n  b  </pre>", &CompileOptions::default()).unwrap();
+        assert!(
+            out.js.contains("`<pre>  a\n  b  </pre>`"),
+            "pre whitespace not preserved: {}",
+            out.js
+        );
+    }
+
+    #[test]
+    fn compile_marks_text_first_root_fragment() {
+        let out = compile(" x <p>text</p> ", &CompileOptions::default()).unwrap();
+        assert!(
+            out.js.contains("`<!---->x <p>text</p>`"),
+            "text-first root fragment must be <!----> prefixed: {}",
+            out.js
+        );
+    }
+
+    #[test]
+    fn compile_decodes_and_reescapes_entities() {
+        // Entities decode, then text re-escapes only & and < (the oracle's
+        // escape_html content rule): &gt; becomes a literal >.
+        let out = compile("<p>&amp; &lt; &gt; &quot;</p>", &CompileOptions::default()).unwrap();
+        assert!(
+            out.js.contains("`<p>&amp; &lt; > \"</p>`"),
+            "entity decode/re-escape wrong: {}",
+            out.js
+        );
+        // Attribute values re-escape &, ", and < (escape_html attr rule).
+        let out = compile(
+            "<p title=\"&amp; &lt; &gt; &quot;q\">text</p>",
+            &CompileOptions::default(),
+        )
+        .unwrap();
+        assert!(
+            out.js.contains(" title=\"&amp; &lt; > &quot;q\""),
+            "attribute entity escaping wrong: {}",
+            out.js
+        );
+    }
+
+    #[test]
+    fn compile_void_and_boolean_attributes() {
+        let out = compile(
+            "<p>text1<br />text2</p>\n<input value=\"value\" disabled />",
+            &CompileOptions::default(),
+        )
+        .unwrap();
+        assert!(
+            out.js
+                .contains("`<p>text1<br/>text2</p> <input value=\"value\" disabled=\"\"/>`"),
+            "void self-close / boolean attribute wrong: {}",
+            out.js
         );
     }
 
