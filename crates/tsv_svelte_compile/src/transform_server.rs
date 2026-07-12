@@ -126,6 +126,9 @@ struct EmitEnv<'arena, 's> {
     derived_names: NameSet,
     scope: Option<ScopeInfo>,
     matched_classes: BTreeSet<String>,
+    /// Script comments are being carried — emitters whose synthetic call
+    /// windows would sweep host comments (`$.attr` family) must refuse.
+    has_comments: bool,
 }
 
 /// Compile a parsed component to server output.
@@ -153,18 +156,18 @@ pub(crate) fn compile_server<'arena>(
     // 1. `import * as $ from 'svelte/internal/server';`
     let import = b.import_namespace("$", "svelte/internal/server");
 
-    // 2. Script analysis pass: the top-level binding table (evaluator input)
+    // 2. Comment carry-through: script comments thread into the synthetic
+    // program (their spans are host-absolute, so the detached-comment machinery
+    // works against the buffer). Classes whose placement can't be made to
+    // converge refuse — see `collect_script_comments`.
+    let script_comments = collect_script_comments(root, source)?;
+    let has_comments = !script_comments.is_empty();
+
+    // 3. Script analysis pass: the top-level binding table (evaluator input)
     // and the derived-name set (read rewriting / refusal).
     let mut bindings = Bindings::empty();
     let mut derived_names = NameSet::default();
     if let Some(script) = root.instance {
-        // TODO: carrying user script comments through to the synthetic program
-        // is a later slice — refuse rather than silently drop them.
-        if !script.content.comments.is_empty() {
-            return Err(unsupported(
-                "comments in the instance script (not carried through yet)",
-            ));
-        }
         analyze_script(
             script.content.body,
             source,
@@ -172,14 +175,24 @@ pub(crate) fn compile_server<'arena>(
             &mut derived_names,
         )?;
     }
+    if has_comments && !derived_names.is_empty() {
+        // The `$.derived(() => …)` wrapper and `d()` reads bridge host and
+        // appendix spans in ways whose comment windows sweep wrongly.
+        return Err(unsupported(
+            "comments in a script that uses $derived (not carried through yet)",
+        ));
+    }
 
-    // 3. Script rewrite pass: rune rewrites, guard walks, mutation/shadow
-    // collection, effect detection.
+    // 4. Script rewrite pass: rune rewrites, guard walks, mutation/shadow
+    // collection, effect detection. Rewrites drop source regions (rune call
+    // wrappers, whole effect statements) — a comment inside a dropped region
+    // has nowhere to go, so it refuses.
     let mut body: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
     let mut uses_props = false;
     let mut has_effects = false;
     let mut updated = NameSet::default();
     let mut nested_declared = NameSet::default();
+    let mut dropped_regions: Vec<Span> = Vec::new();
     if let Some(script) = root.instance {
         for stmt in script.content.body {
             let rewritten = rewrite_script_statement(
@@ -191,6 +204,8 @@ pub(crate) fn compile_server<'arena>(
                 &mut nested_declared,
                 &mut uses_props,
                 &mut has_effects,
+                has_comments,
+                &mut dropped_regions,
             )?;
             if let Some(rewritten) = rewritten {
                 body.push(rewritten);
@@ -203,6 +218,15 @@ pub(crate) fn compile_server<'arena>(
     for name in &nested_declared {
         bindings.mark_opaque(name);
     }
+    for comment in &script_comments {
+        for region in &dropped_regions {
+            if comment.span.start >= region.start && comment.span.end <= region.end {
+                return Err(unsupported(
+                    "comment inside a rewritten rune region (dropped by the transform)",
+                ));
+            }
+        }
+    }
 
     let mut env = EmitEnv {
         b,
@@ -211,21 +235,32 @@ pub(crate) fn compile_server<'arena>(
         derived_names,
         scope,
         matched_classes: BTreeSet::new(),
+        has_comments,
     };
 
-    // 4. Function header skeleton (minted in reading order).
-    let export_start = env.b.mint("export default function ").start;
-    let fn_id = env.b.ident(COMPONENT_NAME);
-    let params_start = env.b.mint("(").start;
+    // 5. Function header skeleton. The text is minted for appendix
+    // readability, but the header NODES carry fictional zero spans: every
+    // comment window they anchor is then empty or inverted (both yield no
+    // comments), so host-span script comments are only ever found by the
+    // function-body block windows — the one place they belong. The body block
+    // anchors on the script content start so leading script comments emit
+    // before the first statement.
+    env.b.mint("export default function ");
+    let fn_id = env.b.ident_at(COMPONENT_NAME, Span::new(0, 0));
+    env.b.mint("(");
+    let params_start = 0;
     let mut params: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
-    let renderer = env.b.ident("$$renderer");
+    let renderer = env.b.ident_at("$$renderer", Span::new(0, 0));
     params.push(Expression::Identifier(renderer));
     if uses_props {
         env.b.mint(", ");
-        let props = env.b.ident("$$props");
+        let props = env.b.ident_at("$$props", Span::new(0, 0));
         params.push(Expression::Identifier(props));
     }
     let lbrace = env.b.mint(") {").end - 1;
+    let block_start = root
+        .instance
+        .map_or(lbrace, |script| script.content.span.start);
 
     // 5. Template → one `$$renderer.push(`…`)` statement.
     let mut accum = TemplateAccum {
@@ -271,11 +306,11 @@ pub(crate) fn compile_server<'arena>(
         }
     }
 
-    // 6. Effects force the `$$renderer.component(($$renderer) => { … })`
+    // 7. Effects force the `$$renderer.component(($$renderer) => { … })`
     // wrapper around the whole body (the effects themselves are dropped).
     let body = if has_effects {
         let inner = body.into_bump_slice();
-        let inner_span = Span::new(lbrace, env.b.buffer.len() as u32);
+        let inner_span = Span::new(block_start, env.b.buffer.len() as u32);
         let arrow = env.b.arrow_block("$$renderer", inner, inner_span);
         let arrow_alloc = env.b.arena.alloc(arrow);
         let call = env
@@ -293,7 +328,13 @@ pub(crate) fn compile_server<'arena>(
         body
     };
 
-    // 7. Assemble function + program.
+    // 8. Assemble and print. The import and the component function print as
+    // TWO single-statement programs, concatenated: the import's source literal
+    // must keep a real appendix span (its text is extracted), and any window
+    // from a low anchor to that appendix span would sweep every host-span
+    // comment — a separate comment-free program sidesteps the whole class.
+    // Concatenation equals the single-program print: canonical mode joins
+    // top-level statements with exactly one hardline and no blank lines.
     let rbrace_end = env.b.mint("}").end;
     let function = FunctionDeclaration {
         id: Some(fn_id),
@@ -302,30 +343,40 @@ pub(crate) fn compile_server<'arena>(
         return_type: None,
         body: BlockStatement {
             body: body.into_bump_slice(),
-            span: Span::new(lbrace, rbrace_end),
+            span: Span::new(block_start, rbrace_end),
         },
         generator: false,
         r#async: false,
         params_start,
-        span: Span::new(export_start + "export default ".len() as u32, rbrace_end),
+        span: Span::new(0, rbrace_end),
     };
     let export = ExportDefaultDeclaration {
         declaration: ExportDefaultValue::FunctionDeclaration(function),
-        span: Span::new(export_start, rbrace_end),
+        span: Span::new(0, rbrace_end),
     };
 
-    let mut program_body: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
-    program_body.push(Statement::ImportDeclaration(import));
-    program_body.push(Statement::ExportDefaultDeclaration(export));
-    let program = tsv_ts::ast::internal::Program {
-        body: program_body.into_bump_slice(),
+    let mut import_body: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
+    import_body.push(Statement::ImportDeclaration(import));
+    let import_program = tsv_ts::ast::internal::Program {
+        body: import_body.into_bump_slice(),
         comments: Vec::new(),
         span: Span::new(0, env.b.buffer.len() as u32),
         interner: std::rc::Rc::clone(&root.interner),
         goal: tsv_ts::Goal::Module,
     };
 
-    let js = tsv_ts::format_canonical(&program, &env.b.buffer);
+    let mut export_body: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
+    export_body.push(Statement::ExportDefaultDeclaration(export));
+    let export_program = tsv_ts::ast::internal::Program {
+        body: export_body.into_bump_slice(),
+        comments: script_comments,
+        span: Span::new(0, env.b.buffer.len() as u32),
+        interner: std::rc::Rc::clone(&root.interner),
+        goal: tsv_ts::Goal::Module,
+    };
+
+    let mut js = tsv_ts::format_canonical(&import_program, &env.b.buffer);
+    js.push_str(&tsv_ts::format_canonical(&export_program, &env.b.buffer));
     let css = match (root.css, &env.scope) {
         (Some(style), Some(scope)) => Some(splice_scoped_css(style, source, scope)),
         _ => None,
@@ -336,6 +387,66 @@ pub(crate) fn compile_server<'arena>(
         css,
         warnings: Vec::new(),
     })
+}
+
+/// Collect the comments carried into the synthetic program: exactly the host
+/// comments inside the instance script's content span. Classes that can't
+/// converge refuse:
+///
+/// - comments outside the script (template-expression comments) — the emitters
+///   don't thread them yet;
+/// - a fragment node *before* the script end (template-before-script) — the
+///   `$.escape`/`$.html` wrapper windows would sweep script comments;
+/// - format-ignore directives — they'd switch the printer to raw-source
+///   emission of synthetic spans.
+fn collect_script_comments(
+    root: &Root<'_>,
+    source: &str,
+) -> Result<Vec<tsv_lang::Comment>, CompileError> {
+    if root.comments.is_empty() {
+        return Ok(Vec::new());
+    }
+    let Some(script) = root.instance else {
+        return Err(unsupported(
+            "template comments (only instance-script comments are carried through)",
+        ));
+    };
+    let content = script.content.span;
+    // A comment after the LAST script statement diverges: the oracle's printer
+    // re-attaches it as a leading comment of the next emitted node (inside the
+    // template's `$.escape(…)` argument), a placement this transform can't
+    // reproduce — refuse the class.
+    let last_stmt_end = script
+        .content
+        .body
+        .last()
+        .map_or(content.start, |stmt| stmt.span().end);
+    let mut comments = Vec::with_capacity(root.comments.len());
+    for comment in &root.comments {
+        if comment.span.start < content.start || comment.span.end > content.end {
+            return Err(unsupported(
+                "template comments (only instance-script comments are carried through)",
+            ));
+        }
+        if comment.span.start >= last_stmt_end {
+            return Err(unsupported(
+                "comment after the last script statement (the oracle re-attaches it into the template)",
+            ));
+        }
+        let text = comment.content(source);
+        if text.contains("prettier-ignore") || text.contains("format-ignore") {
+            return Err(unsupported("format-ignore directive comment in script"));
+        }
+        comments.push(comment.clone());
+    }
+    for node in root.fragment.nodes {
+        if node.span().start < content.end {
+            return Err(unsupported(
+                "comments with template markup before the script (window ordering)",
+            ));
+        }
+    }
+    Ok(comments)
 }
 
 fn unsupported(what: impl Into<String>) -> CompileError {
@@ -573,6 +684,8 @@ fn rewrite_script_statement<'arena>(
     nested_declared: &mut NameSet,
     uses_props: &mut bool,
     has_effects: &mut bool,
+    has_comments: bool,
+    dropped_regions: &mut Vec<Span>,
 ) -> Result<Option<Statement<'arena>>, CompileError> {
     // Statement-position effects are dropped (and force the wrapper); their
     // callback is still guard-walked so stray runes inside refuse.
@@ -580,6 +693,7 @@ fn rewrite_script_statement<'arena>(
         && let Some(callback) = is_effect_call(&expr_stmt.expression, source)
     {
         *has_effects = true;
+        dropped_regions.push(stmt.span());
         let mut ctx = WalkCtx::new(source, updated, nested_declared, derived_names);
         walk_expression_guarded(callback, &mut ctx)?;
         return Ok(None);
@@ -617,10 +731,33 @@ fn rewrite_script_statement<'arena>(
         if matches!(rune, None | Some(RuneInit::Props)) {
             walk_expression_guarded(&declarator.id, &mut ctx)?;
         }
+        // A rune init rewrite drops the call's own syntax around the kept
+        // argument — record the dropped region(s) so comments inside refuse.
+        if let (Some(init), Some(_)) = (&declarator.init, &rune) {
+            let init_span = init.span();
+            match rune {
+                Some(RuneInit::State(Some(arg)))
+                | Some(RuneInit::Derived(arg))
+                | Some(RuneInit::DerivedBy(arg)) => {
+                    let arg_span = arg.span();
+                    dropped_regions.push(Span::new(init_span.start, arg_span.start));
+                    dropped_regions.push(Span::new(arg_span.end, init_span.end));
+                }
+                _ => dropped_regions.push(init_span),
+            }
+        }
+
         let new_init = match rune {
             Some(RuneInit::Props) => {
                 *uses_props = true;
-                let props_ident = b.ident("$$props");
+                // Span-steal: the synthetic `$$props` takes the replaced
+                // `$props()` call's host span, so the declarator's `=`-gap
+                // comment windows stay exactly the authored ones.
+                let init_span = declarator
+                    .init
+                    .as_ref()
+                    .map_or(declarator.span, |i| i.span());
+                let props_ident = b.ident_at("$$props", init_span);
                 Some(Expression::Identifier(props_ident))
             }
             Some(RuneInit::State(arg)) => match arg {
@@ -628,7 +765,16 @@ fn rewrite_script_statement<'arena>(
                     walk_expression_guarded(arg, &mut ctx)?;
                     Some(arg.clone())
                 }
-                None => Some(b.void_zero()),
+                None => {
+                    if has_comments {
+                        // `void 0` mints an appendix literal; the declarator's
+                        // init windows would then sweep host comments.
+                        return Err(unsupported(
+                            "comments in a script with an argument-less $state()",
+                        ));
+                    }
+                    Some(b.void_zero())
+                }
             },
             Some(RuneInit::Derived(expr)) => {
                 walk_expression_guarded(expr, &mut ctx)?;
@@ -1148,6 +1294,13 @@ fn emit_dynamic_attribute<'arena>(
     if name.starts_with("on") {
         return Err(unsupported(format!("event attribute {name}")));
     }
+    // The `$.attr` family interleaves minted (appendix) and borrowed (host)
+    // argument spans; with host comments present their windows would sweep.
+    if env.has_comments {
+        return Err(unsupported(
+            "comments in a script alongside expression-valued attributes",
+        ));
+    }
     // A string-literal expression value takes the oracle's inline-literal path
     // (pre-escaped static emission) — refuse rather than guess its edge rules.
     if matches!(expr, Expression::Literal(lit)
@@ -1202,6 +1355,11 @@ fn emit_mixed_attribute<'arena>(
 ) -> Result<(), CompileError> {
     if name.starts_with("on") {
         return Err(unsupported(format!("event attribute {name}")));
+    }
+    if env.has_comments {
+        return Err(unsupported(
+            "comments in a script alongside expression-valued attributes",
+        ));
     }
     if (name == "class" || name == "style") && env.scope.is_some() {
         return Err(unsupported(format!(

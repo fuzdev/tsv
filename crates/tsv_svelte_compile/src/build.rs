@@ -86,6 +86,20 @@ impl<'arena> Builder<'arena> {
         self.arena.alloc(Expression::Identifier(ident))
     }
 
+    /// A synthetic identifier at a caller-chosen span (no minting). The
+    /// interned-name channel never extracts the span, so the span's only job is
+    /// steering the printer's comment windows — a *fictional* low span keeps a
+    /// synthetic header node's windows empty/inverted, and a *stolen* host span
+    /// (the node it replaces, e.g. `$$props` over the original `$props()` call)
+    /// keeps the surrounding gaps exactly the authored ones.
+    pub fn ident_at(&mut self, name: &str, span: Span) -> Identifier<'arena> {
+        let ident_name = IdentName {
+            escaped: Some(self.interner.borrow_mut().get_or_intern(name)),
+            raw_len: 0,
+        };
+        Identifier::simple(ident_name, span)
+    }
+
     /// A single-quoted string literal minted into the appendix. `content` must
     /// not itself require escaping (module specifiers do not).
     pub fn string_literal(&mut self, content: &str) -> Literal<'arena> {

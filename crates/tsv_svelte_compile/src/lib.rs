@@ -525,11 +525,48 @@ mod tests {
     }
 
     #[test]
-    fn compile_rejects_script_comments() {
+    fn compile_carries_script_comments_losslessly() {
+        // Leading, trailing-same-line, and between-statement comments carry
+        // through: each present exactly once, relative order preserved, and
+        // the output is a canonicalize fixed point.
+        let out = compile(
+            "<script>\n\t// leading\n\tlet { prop } = $props();\n\tlet a = 1; // trailing\n\t// between one\n\t// between two\n\tlet b = 2;\n</script>\n\n<p>{prop}</p>\n",
+            &CompileOptions::default(),
+        )
+        .unwrap();
+        let mut prev = 0;
+        for comment in [
+            "// leading",
+            "// trailing",
+            "// between one",
+            "// between two",
+        ] {
+            let pos = out
+                .js
+                .find(comment)
+                .unwrap_or_else(|| panic!("comment {comment:?} lost:\n{}", out.js));
+            assert_eq!(
+                out.js.matches(comment).count(),
+                1,
+                "comment {comment:?} duplicated:\n{}",
+                out.js
+            );
+            assert!(pos >= prev, "comment {comment:?} reordered:\n{}", out.js);
+            prev = pos + comment.len();
+        }
+        assert_eq!(canonicalize_js(&out.js).unwrap(), out.js);
+    }
+
+    #[test]
+    fn compile_rejects_divergent_comment_classes() {
+        // After the last script statement: the oracle re-attaches into the
+        // template — refused.
         assert_unsupported(
-            "<script>\n\t// note\n\tlet a = 1;\n</script>\n<p>text</p>",
-            "comments in the instance script",
+            "<script>\n\tlet a = 1;\n\t// after last\n</script>\n<p>text</p>",
+            "after the last script statement",
         );
+        // Template-expression comments aren't carried yet.
+        assert_unsupported("<p>{/* c */ 1}</p>", "template comments");
     }
 
     #[test]
