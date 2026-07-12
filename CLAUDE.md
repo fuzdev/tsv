@@ -8,8 +8,16 @@ High-performance Rust parser as a drop-in replacement for Svelte's modern parser
 
 ## Committing
 
-`git add` and `git commit` are denied by `.claude/settings.local.json` in
-this repo — make the edits and stop, the user commits.
+**Branch exception (`svelte-compiler` branch / the `~/dev/tsv-svelte-compiler`
+worktree only — remove this block before merging to main):** agent commits
+ARE permitted here. Commit at sensible stopping points with short 1-liner
+messages (`fix:` / `feat:` / `docs:` / `test:` / `refactor:` / `chore:`
+prefixes; no body, no trailers, no `Co-Authored-By`). Merging to main,
+version bumps, and publishing remain user-owned.
+
+On main and every other branch: `git add` and `git commit` are denied by
+`.claude/settings.local.json` in this repo — make the edits and stop, the
+user commits.
 
 **Do not edit `CHANGELOG.md`.** Like release version bumps, the changelog is
 the user's responsibility — agents make the source/doc/fixture edits and leave
