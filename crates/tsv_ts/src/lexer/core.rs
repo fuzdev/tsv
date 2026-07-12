@@ -498,7 +498,11 @@ impl<'a> Lexer<'a> {
 
     /// Scan a numeric literal — decimal, `0x`/`0b`/`0o` radix, float, exponent,
     /// or `BigInt` suffix — writing the `Number` token into `*dst`. `first` is the
-    /// digit at `start` the dispatch already matched. Mirrors the `_into`
+    /// byte at `start` the dispatch matched; it is read only to detect a leading-
+    /// `0` radix prefix, so it is a digit for `5`/`0x…` or `.` for a leading-dot
+    /// fraction (`.5`) — both non-`0`, both routing to `scan_decimal_number`. The
+    /// single number entry point, so the "identifier directly after a number"
+    /// boundary rule (ecma262 12.9.3) lives here once. Mirrors the `_into`
     /// write-through of the other large scanners so the dispatch arm is one
     /// `return`. Errors on a legacy octal literal (`0777`), illegal in strict mode.
     fn scan_number_into(
@@ -564,27 +568,21 @@ impl<'a> Lexer<'a> {
             self.advance();
         }
 
-        self.reject_identifier_after_number()?;
-
-        *dst = self.make_token(TokenKind::Number, start);
-        Ok(())
-    }
-
-    /// ecma262 12.9.3: "The SourceCharacter immediately following a
-    /// NumericLiteral must not be an IdentifierStart or DecimalDigit" — the spec's
-    /// own example is that `3in` is an error, not the two tokens `3` and `in`.
-    /// Enforce the IdentifierStart half uniformly at the end of every numeric-
-    /// literal scan path (`scan_number_into` and the leading-`.` fraction in
-    /// `next_token`), so a number abutting a keyword-operator (`5in` / `1.5in` /
-    /// `0xffin` / `5nin` / `.5in`) is rejected rather than read as `5 in y`; the
-    /// parser's number→primary path only catches a following *identifier*
-    /// (`5foo`), not an infix keyword. A DecimalDigit can only follow a complete
-    /// number after an out-of-range radix digit (`0b12`) or a BigInt suffix
-    /// (`5n3`), both of which the parser already rejects as adjacent number tokens.
-    fn reject_identifier_after_number(&self) -> Result<(), Box<ParseError>> {
+        // ecma262 12.9.3: "The SourceCharacter immediately following a
+        // NumericLiteral must not be an IdentifierStart or DecimalDigit" — the
+        // spec's own example is that `3in` is an error, not the two tokens `3` and
+        // `in`. Enforcing the IdentifierStart half here (the single number entry)
+        // rejects a number abutting a keyword-operator (`5in` / `1.5in` / `0xffin`
+        // / `5nin` / `.5in`) rather than reading it as `5 in y`; the parser's
+        // number→primary path only catches a following *identifier* (`5foo`), not
+        // an infix keyword. A DecimalDigit can only follow a complete number after
+        // an out-of-range radix digit (`0b12`) or a BigInt suffix (`5n3`), both of
+        // which the parser already rejects as adjacent number tokens.
         if self.cur_char().is_some_and(is_id_start) {
             return Err(lex_err("Identifier directly after number", self.position));
         }
+
+        *dst = self.make_token(TokenKind::Number, start);
         Ok(())
     }
 
@@ -813,15 +811,12 @@ impl<'a> Lexer<'a> {
                     self.advance(); // consume third .
                     self.make_token(TokenKind::DotDotDot, start)
                 } else if self.byte_ahead(1).is_some_and(|b| b.is_ascii_digit()) {
-                    // Number starting with a decimal point (`.5`, `.5e3`). Reuse the
-                    // decimal scanner with an empty integer part (its leading
-                    // `scan_digits` consumes nothing here, then the fraction/exponent
-                    // path runs) so this entry can't drift from `scan_number_into`'s
-                    // fraction/exponent/separator handling — the duplication is what
-                    // let `.5in` escape the boundary rule below.
-                    self.scan_decimal_number()?;
-                    self.reject_identifier_after_number()?;
-                    self.make_token(TokenKind::Number, start)
+                    // Number starting with a decimal point (`.5`, `.5e3`). Route it
+                    // through the one number entry with `.` as `first` (a non-`0`
+                    // byte → empty integer part → fraction/exponent), so leading-dot
+                    // fractions share `scan_number_into`'s separator/exponent and
+                    // boundary handling instead of a parallel scan that can drift.
+                    return self.scan_number_into(start, b'.', dst);
                 } else {
                     // Single dot: member access operator
                     self.advance();
