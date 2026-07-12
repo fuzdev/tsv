@@ -784,6 +784,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "tsv_svelte_compile"
+version = "0.1.0"
+dependencies = [
+ "bumpalo",
+ "thiserror",
+ "tsv_css",
+ "tsv_lang",
+ "tsv_svelte",
+ "tsv_ts",
+]
+
+[[package]]
 name = "tsv_ts"
 version = "0.1.0"
 dependencies = [
