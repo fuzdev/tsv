@@ -34,6 +34,13 @@ pub struct Test262Command {
     #[argh(switch)]
     positive_only: bool,
 
+    /// gate mode: fail only on a POSITIVE-parse regression (or a shift in the
+    /// pinned positive-pass count); negative failures (the deferred early-error
+    /// frontier) are reported, not gated. The release gate — `deno task
+    /// conformance:test262` and publish Step 3b.
+    #[argh(switch)]
+    gate: bool,
+
     /// emit a JSON manifest of the graded strict subset (relative path, module
     /// flag, expected verdict, tsv verdict) to this file and exit — the input
     /// to `benches/js/diagnostics/test262_compare.ts` (tsv vs oxc-parser)
@@ -57,6 +64,15 @@ const DISCOVERED_PIN: usize = 49_136;
 /// graded set silently shifts the differential and the bench corpus.
 /// Measured 2026-07-06, ../test262 at 7153986f.
 const GRADED_MANIFEST_PIN: usize = 46_544;
+
+/// REGRESSION PIN (exact): positive-parse pass count on an unfiltered `--gate`
+/// run — the drop-in property the release gate enforces (tsv rejects no valid
+/// syntax; every graded positive parses). Exact like `DISCOVERED_PIN`: a drop is
+/// a regression or a positive silently reclassified as skipped, a rise is a
+/// test262 pull or a grading change — both re-pinned deliberately. Measured
+/// 2026-07-12, ../test262 at 7153986f. Mirrors `TEST262_POSITIVES_PIN` in
+/// benches/js/lib/gate_counts.ts (the harvest's positive-file count).
+const POSITIVE_PASSED_PIN: usize = 42_113;
 
 impl Test262Command {
     pub(crate) fn run(self) -> Result<(), CliError> {
@@ -263,6 +279,49 @@ impl Test262Command {
             0.0
         };
         println!("Pass rate: {passed}/{total} ({pass_rate:.1}%)");
+
+        // Gate mode (--gate): scope the pass/fail verdict to the POSITIVE-parse
+        // drop-in property — tsv must reject no valid syntax. The ~2.4k negative
+        // failures are the deliberately-deferred early-error frontier (see
+        // docs/conformance_test262.md), so a full run's non-zero exit is a
+        // diagnostic, not a release regression; gate mode ignores negative_failed
+        // and fails only on a positive regression or a shift in the pinned
+        // positive-pass count. This is what `deno task conformance:test262` and
+        // publish Step 3b run.
+        if self.gate {
+            let mut gate_failed = false;
+            if summary.positive_failed > 0 {
+                eprintln!(
+                    "\nGATE FAIL: {} positive test(s) regressed — tsv rejects valid syntax \
+                     (a drop-in parser regression). See the Failures above.",
+                    summary.positive_failed
+                );
+                gate_failed = true;
+            }
+            // Exact pin on the positive-pass count (unfiltered, positives graded),
+            // so a positive silently reclassified as SKIPPED — which
+            // positive_failed==0 can't see — still trips. Same ritual as
+            // DISCOVERED_PIN; re-pin deliberately on a test262 pull.
+            if self.filters.is_empty()
+                && !self.negative_only
+                && summary.positive_passed != POSITIVE_PASSED_PIN
+            {
+                eprintln!(
+                    "\nGATE FAIL: positive pass count {} ≠ pinned {POSITIVE_PASSED_PIN}. \
+                     If deliberate (test262 pull, grading change), re-pin POSITIVE_PASSED_PIN.",
+                    summary.positive_passed
+                );
+                gate_failed = true;
+            }
+            if gate_failed {
+                return Err(CliError::Failed);
+            }
+            println!(
+                "\nGATE PASS: {} positive tests, 0 failed (negatives reported, not gated).",
+                summary.positive_passed
+            );
+            return Ok(());
+        }
 
         // Exit with appropriate code
         if summary.all_passed() {
