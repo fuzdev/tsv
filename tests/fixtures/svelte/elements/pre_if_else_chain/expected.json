@@ -1,0 +1,422 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 378,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 120,
+				"data": " {:else if} chain inside <pre>: whitespace is significant, so the flattened chain stays inline without expanding "
+			},
+			{
+				"type": "Text",
+				"start": 120,
+				"end": 121,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 121,
+				"end": 166,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 122
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 125
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "IfBlock",
+							"elseif": false,
+							"start": 126,
+							"end": 160,
+							"test": {
+								"type": "Identifier",
+								"start": 131,
+								"end": 132,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 10
+									},
+									"end": {
+										"line": 2,
+										"column": 11
+									}
+								},
+								"name": "a"
+							},
+							"consequent": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 133,
+										"end": 134,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							},
+							"alternate": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 134,
+										"end": 160,
+										"type": "IfBlock",
+										"elseif": true,
+										"test": {
+											"type": "Identifier",
+											"start": 144,
+											"end": 145,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 23
+												},
+												"end": {
+													"line": 2,
+													"column": 24
+												}
+											},
+											"name": "b"
+										},
+										"consequent": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 146,
+													"end": 147,
+													"raw": "y",
+													"data": "y"
+												}
+											]
+										},
+										"alternate": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 154,
+													"end": 155,
+													"raw": "z",
+													"data": "z"
+												}
+											]
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 166,
+				"end": 168,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 168,
+				"end": 240,
+				"data": " three-level chain exercises the recursive {:else if} flattening "
+			},
+			{
+				"type": "Text",
+				"start": 240,
+				"end": 241,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 241,
+				"end": 299,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 242
+					},
+					"end": {
+						"line": 5,
+						"column": 4,
+						"character": 245
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "IfBlock",
+							"elseif": false,
+							"start": 246,
+							"end": 293,
+							"test": {
+								"type": "Identifier",
+								"start": 251,
+								"end": 252,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 10
+									},
+									"end": {
+										"line": 5,
+										"column": 11
+									}
+								},
+								"name": "a"
+							},
+							"consequent": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 253,
+										"end": 254,
+										"raw": "w",
+										"data": "w"
+									}
+								]
+							},
+							"alternate": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 254,
+										"end": 293,
+										"type": "IfBlock",
+										"elseif": true,
+										"test": {
+											"type": "Identifier",
+											"start": 264,
+											"end": 265,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 23
+												},
+												"end": {
+													"line": 5,
+													"column": 24
+												}
+											},
+											"name": "b"
+										},
+										"consequent": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 266,
+													"end": 267,
+													"raw": "x",
+													"data": "x"
+												}
+											]
+										},
+										"alternate": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"start": 267,
+													"end": 293,
+													"type": "IfBlock",
+													"elseif": true,
+													"test": {
+														"type": "Identifier",
+														"start": 277,
+														"end": 278,
+														"loc": {
+															"start": {
+																"line": 5,
+																"column": 36
+															},
+															"end": {
+																"line": 5,
+																"column": 37
+															}
+														},
+														"name": "c"
+													},
+													"consequent": {
+														"type": "Fragment",
+														"nodes": [
+															{
+																"type": "Text",
+																"start": 279,
+																"end": 280,
+																"raw": "y",
+																"data": "y"
+															}
+														]
+													},
+													"alternate": {
+														"type": "Fragment",
+														"nodes": [
+															{
+																"type": "Text",
+																"start": 287,
+																"end": 288,
+																"raw": "z",
+																"data": "z"
+															}
+														]
+													}
+												}
+											]
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 299,
+				"end": 301,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 301,
+				"end": 339,
+				"data": " chain without a final {:else} "
+			},
+			{
+				"type": "Text",
+				"start": 339,
+				"end": 340,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 340,
+				"end": 377,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 341
+					},
+					"end": {
+						"line": 8,
+						"column": 4,
+						"character": 344
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "IfBlock",
+							"elseif": false,
+							"start": 345,
+							"end": 371,
+							"test": {
+								"type": "Identifier",
+								"start": 350,
+								"end": 351,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 10
+									},
+									"end": {
+										"line": 8,
+										"column": 11
+									}
+								},
+								"name": "a"
+							},
+							"consequent": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 352,
+										"end": 353,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							},
+							"alternate": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"start": 353,
+										"end": 371,
+										"type": "IfBlock",
+										"elseif": true,
+										"test": {
+											"type": "Identifier",
+											"start": 363,
+											"end": 364,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 23
+												},
+												"end": {
+													"line": 8,
+													"column": 24
+												}
+											},
+											"name": "b"
+										},
+										"consequent": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 365,
+													"end": 366,
+													"raw": "y",
+													"data": "y"
+												}
+											]
+										},
+										"alternate": null
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
