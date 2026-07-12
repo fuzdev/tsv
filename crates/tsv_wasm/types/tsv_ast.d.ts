@@ -924,6 +924,8 @@ export interface RestElement {
 	end: number;
 	loc: SourceLocation;
 	argument: Expression;
+	/** Optional rest parameter (`...a?`) — only in a parameter position (invalid TS, deferred). */
+	optional?: boolean;
 	typeAnnotation?: TSTypeAnnotation;
 }
 
