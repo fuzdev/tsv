@@ -504,7 +504,9 @@ impl<'a> Lexer<'a> {
     /// single number entry point, so the "identifier directly after a number"
     /// boundary rule (ecma262 12.9.3) lives here once. Mirrors the `_into`
     /// write-through of the other large scanners so the dispatch arm is one
-    /// `return`. Errors on a legacy octal literal (`0777`), illegal in strict mode.
+    /// `return`. Errors on the strict-mode-illegal leading-zero literals — legacy
+    /// octal (`0777`), non-octal decimal (`08`/`09`), and the separator forms
+    /// (`0_0`) — all disallowed because tsv is strict-only.
     fn scan_number_into(
         &mut self,
         start: usize,
@@ -541,17 +543,34 @@ impl<'a> Lexer<'a> {
                         return Err(lex_err("Missing octal digits after '0o'", start));
                     }
                 }
-                Some(b'0'..=b'7') => {
-                    // Legacy octal (0777) - reject in strict mode (ES modules)
-                    // ES modules are always strict, so this is always an error
+                Some(b'0'..=b'9') => {
+                    // Leading-zero decimal literals — `LegacyOctalIntegerLiteral`
+                    // (`010`, all octal digits) and `NonOctalDecimalIntegerLiteral`
+                    // (`08`/`09`/`089`, containing an 8 or 9) — are disallowed in
+                    // strict mode (ecma262 Annex B.1.1; the strict early error at
+                    // sec-additional-syntax-numeric-literals). ES modules are always
+                    // strict and tsv has no sloppy mode, so both always reject. A
+                    // leading `0` is a valid literal only before `.`/`e`/`n`/a radix
+                    // prefix/end — never before another digit.
                     return Err(lex_err(
-                        "Octal literals are not allowed in strict mode. Use the syntax '0o' instead.",
+                        "Leading-zero literals are not allowed in strict mode. Use '0o' for octal.",
+                        start,
+                    ));
+                }
+                Some(b'_') => {
+                    // A `NumericLiteralSeparator` cannot appear in a leading-zero
+                    // legacy form (`0_0`/`0_8` — the `LegacyOctalLikeDecimalInteger`
+                    // productions carry no `[Sep]` parameter), so a `_` immediately
+                    // after a leading `0` is rejected.
+                    return Err(lex_err(
+                        "Numeric separators are not allowed in legacy octal-like literals",
                         start,
                     ));
                 }
                 _ => {
-                    // Regular number or float starting with 0 (e.g., 0.5, 08, 09)
-                    // Note: 08 and 09 are valid decimal literals (non-octal digits)
+                    // Regular number or float starting with 0 (e.g. `0`, `0.5`,
+                    // `0e1`, `0n`) — the leading `0` is followed by `.`/`e`/`n`/a
+                    // radix prefix/end, none of which are a digit or `_`.
                     bigint_allowed = self.scan_decimal_number()?;
                 }
             }
