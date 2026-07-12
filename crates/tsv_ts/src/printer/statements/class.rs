@@ -457,11 +457,10 @@ impl<'a> Printer<'a> {
             )
             .map_or(key_start, |p| p as u32);
             self.push_pre_name_comments_doc(&mut parts, cursor, bracket_pos);
-            // Parenthesize an `in` computed key inside a for-header init
-            // (`for (C = class { [(b in c)]() {} };…)`); a no-op elsewhere. The
-            // object computed-key path applies this via `needs_parens`; class
-            // members build the key directly, so apply it here.
-            let key_doc = self.wrap_for_init_in(&prop.key, self.build_expression_doc(&prop.key));
+            // Parenthesize an assignment-expression computed key (`[(x = 0)] = 1`)
+            // and an `in` key inside a for-header init, exactly like the object
+            // computed-key path (shared helper).
+            let key_doc = self.build_computed_key_expr_doc(&prop.key);
             let (doc, end) = self.build_computed_key_bracket_doc(cursor, &prop.key, key_doc);
             key_region_end = end;
             parts.push(doc);
@@ -678,10 +677,10 @@ impl<'a> Printer<'a> {
                 .map_or(key_start, |p| p as u32);
                 self.push_pre_name_comments_doc(&mut parts, cursor, bracket_pos);
             }
-            // Parenthesize an `in` computed key inside a for-header init (mirrors
-            // the object computed-key `needs_parens` wrap); a no-op elsewhere.
-            let key_doc =
-                self.wrap_for_init_in(&method.key, self.build_expression_doc(&method.key));
+            // Parenthesize an assignment-expression computed key (`[(x = 0)]() {}`)
+            // and an `in` key inside a for-header init, via the shared object/class
+            // computed-key helper.
+            let key_doc = self.build_computed_key_expr_doc(&method.key);
             let (doc, end) = self.build_computed_key_bracket_doc(cursor, &method.key, key_doc);
             key_region_end = end;
             parts.push(doc);

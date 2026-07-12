@@ -194,7 +194,17 @@ impl<'a> Printer<'a> {
         {
             parts.push(self.build_condition_group_preserve_inline(&stmt.test, open, close));
         } else {
-            parts.push(self.build_expression_doc(&stmt.test));
+            // Double-parens an assignment for clarity (`do {} while ((x = y))`),
+            // matching if/while/for. Unlike those, keep the plain (self-grouping)
+            // expression doc — the do-while condition has no enclosing group, so the
+            // ungrouped-binary path would strand a broken `&&` chain.
+            let test_doc =
+                if self.needs_parens(&stmt.test, crate::printer::ParenContext::StatementTest) {
+                    self.d().parens(self.build_expression_doc(&stmt.test))
+                } else {
+                    self.build_expression_doc(&stmt.test)
+                };
+            parts.push(test_doc);
         }
 
         // Comments between the condition's `)` and the do-while's terminating `;`,

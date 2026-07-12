@@ -8,6 +8,7 @@
 use super::analysis::SymbolLookup;
 use super::types::{ChainGroup, ChainNode};
 use crate::ast::internal::{self, Expression};
+use crate::printer::{ParenContext, needs_parens};
 use tsv_lang::doc::{
     DocBuf,
     arena::{DocArena, DocId},
@@ -30,6 +31,10 @@ pub trait ChainPrinter: SymbolLookup {
 
     /// Print an expression as a DocId
     fn print_expression(&self, expr: &Expression<'_>) -> DocId;
+
+    /// Whether we're building a `for` header init clause — an `in` binary in a
+    /// computed member index (`for (x = arr[(a in b)]; …)`) needs parens there.
+    fn in_for_init(&self) -> bool;
 
     /// Build inner doc for logical binary in parenthesized chain base
     fn build_parenthesized_base_inner_logical(
@@ -319,7 +324,20 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
             object_end,
             bracket_end,
         } => {
-            let inner = printer.print_expression(expr);
+            // A computed member index is `[ Expression ]` — an assignment expression
+            // there is parenthesized for clarity (`arr[(x = 0)]`, `obj?.[(x = 0)]`),
+            // matching Prettier and the object/class computed-key paths. Inside a
+            // for-header init, an `in` binary is wrapped too (`for (x = arr[(a in b)];
+            // …)`) — the brackets make the bare `in` reachable here, unlike a chain
+            // base/callee whose parens are structurally mandatory. A sequence
+            // self-parenthesizes via `build_sequence_doc`.
+            let raw_inner = printer.print_expression(expr);
+            let inner =
+                if needs_parens(expr, ParenContext::ComputedPropertyKey, printer.in_for_init()) {
+                    d.parens(raw_inner)
+                } else {
+                    raw_inner
+                };
             let prop_span = printer.get_property_span(expr);
 
             // Find the opening bracket position by scanning from object_end,
