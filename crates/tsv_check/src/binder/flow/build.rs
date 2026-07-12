@@ -1830,16 +1830,7 @@ impl<'a> FlowBuilder<'a> {
                 let id = self.require(addr_of(m), NodeKind::MetaProperty);
                 self.set_flow_nonleaf(id);
             }
-            E::MemberExpression(m) => {
-                // The access flow write (binder.go:618): non-leaf, reachable-
-                // only, gated on `isNarrowableReference`.
-                if is_narrowable_reference(expr) {
-                    let id = self.require(addr_of(m), NodeKind::MemberExpression);
-                    self.set_flow_nonleaf(id);
-                }
-                self.visit_expression(m.object);
-                self.visit_expression(m.property);
-            }
+            E::MemberExpression(m) => self.bind_member_expression_flow(expr, m),
             E::Literal(_) | E::PrivateIdentifier(_) | E::RegexLiteral(_) => {}
             E::ObjectExpression(o) => {
                 for prop in o.properties {
@@ -1852,73 +1843,19 @@ impl<'a> FlowBuilder<'a> {
                 }
             }
             E::UnaryExpression(u) if u.operator == UnaryOperator::Bang => {
-                // `bindPrefixUnaryExpressionFlow` (binder.go:2174): swap the
-                // condition targets around the operand so `!x` narrows inversely.
-                // The pre/post swaps are symmetric — any sub-binder restores the
-                // targets to their entry value (via `do_with_conditional_branches`
-                // / the `!`-swap), so the second swap is a faithful restore.
-                std::mem::swap(
-                    &mut self.current_true_target,
-                    &mut self.current_false_target,
-                );
-                self.visit_expression(u.argument);
-                std::mem::swap(
-                    &mut self.current_true_target,
-                    &mut self.current_false_target,
-                );
+                self.bind_prefix_unary_expression_flow(u);
             }
             E::UnaryExpression(u) => self.visit_expression(u.argument),
             E::UpdateExpression(u) => self.visit_expression(u.argument),
             E::BinaryExpression(b) if b.operator.is_logical() => {
-                // `bindBinaryExpressionFlow` logical branch (binder.go:2219).
-                let is_and = b.operator == BinaryOperator::AmpersandAmpersand;
-                let is_nullish = b.operator == BinaryOperator::QuestionQuestion;
-                self.bind_binary_expression_flow(expr, b.left, b.right, is_and, is_nullish, None);
+                self.bind_logical_binary_expression_flow(expr, b);
             }
             E::BinaryExpression(b) => {
                 self.visit_expression(b.left);
                 self.visit_expression(b.right);
             }
-            E::CallExpression(c) => {
-                // IIFE detection (`GetImmediatelyInvokedFunctionExpression`,
-                // utilities.go:1834; `bindCallExpressionFlow`, binder.go:2419):
-                // a non-async (non-generator) function/arrow callee — through any
-                // grouping parens — is inlined into the containing flow. Its
-                // arguments bind FIRST so the callee's flow write captures the
-                // post-argument flow.
-                let mut unwrapped = c.callee;
-                while let E::ParenthesizedExpression(p) = unwrapped {
-                    unwrapped = p.expression;
-                }
-                match unwrapped {
-                    E::ArrowFunctionExpression(a) if !a.r#async => {
-                        for arg in c.arguments {
-                            self.visit_expression(arg);
-                        }
-                        let id = self.require(addr_of(a), NodeKind::ArrowFunctionExpression);
-                        self.visit_arrow(a, id, true);
-                    }
-                    E::FunctionExpression(f) if !f.r#async && !f.generator => {
-                        for arg in c.arguments {
-                            self.visit_expression(arg);
-                        }
-                        let id = self.require(addr_of(f), NodeKind::FunctionExpression);
-                        self.visit_function_expression(f, id, true);
-                    }
-                    _ => {
-                        self.visit_expression(c.callee);
-                        for arg in c.arguments {
-                            self.visit_expression(arg);
-                        }
-                    }
-                }
-            }
-            E::NewExpression(n) => {
-                self.visit_expression(n.callee);
-                for a in n.arguments {
-                    self.visit_expression(a);
-                }
-            }
+            E::CallExpression(c) => self.bind_call_expression_flow(c),
+            E::NewExpression(n) => self.visit_new_expression(n),
             E::ConditionalExpression(c) => self.bind_conditional_expression_flow(c),
             E::ArrowFunctionExpression(a) => {
                 let id = self.require(addr_of(a), NodeKind::ArrowFunctionExpression);
@@ -1935,70 +1872,21 @@ impl<'a> FlowBuilder<'a> {
                     self.visit_expression(e);
                 }
             }
-            E::TaggedTemplateExpression(t) => {
-                self.visit_expression(t.tag);
-                for e in t.quasi.expressions {
-                    self.visit_expression(e);
-                }
-            }
+            E::TaggedTemplateExpression(t) => self.visit_tagged_template_expression(t),
             E::AwaitExpression(a) => self.visit_expression(a.argument),
             E::YieldExpression(y) => {
                 if let Some(a) = y.argument {
                     self.visit_expression(a);
                 }
             }
-            E::SequenceExpression(s) => {
-                // `bindBinaryExpressionFlow` comma branch: each operand's value
-                // is discarded (statement-like), so a top-level dotted-name call
-                // is a potential assertion — apply maybe-call per operand
-                // (visit-then-maybe, like `ExpressionStatement`). tsgo nests
-                // comma as left-assoc `BinaryExpression`s applying maybe-call to
-                // both `Left`/`Right` at each level; the flattened form applies
-                // it once per leaf operand (intermediate comma nodes are no-op
-                // non-calls), so the effect matches.
-                // tsgo: binder.go bindBinaryExpressionFlow (comma branch)
-                for e in s.expressions {
-                    self.visit_expression(e);
-                    self.maybe_bind_expression_flow_if_call(e);
-                }
-            }
+            E::SequenceExpression(s) => self.bind_sequence_expression_flow(s),
             E::AssignmentExpression(a) if is_logical_assign_op(a.operator) => {
-                // `bindBinaryExpressionFlow` logical compound-assignment branch.
-                let is_and = a.operator == AssignmentOperator::LogicalAndAssign;
-                let is_nullish = a.operator == AssignmentOperator::NullishAssign;
-                self.bind_binary_expression_flow(
-                    expr,
-                    a.left,
-                    a.right,
-                    is_and,
-                    is_nullish,
-                    Some(a.left),
-                );
+                self.bind_logical_assignment_expression_flow(expr, a);
             }
-            E::AssignmentExpression(a) => {
-                // `bindBinaryExpressionFlow` assignment branch (binder.go:2249) —
-                // bind operands, then the target's `Assignment` mutation.
-                self.visit_expression(a.left);
-                self.visit_expression(a.right);
-                self.bind_assignment_target_flow(a.left);
-            }
-            E::ObjectPattern(op) => {
-                self.visit_decorators(op.decorators);
-                for prop in op.properties {
-                    self.visit_object_pattern_property(prop);
-                }
-            }
-            E::ArrayPattern(ap) => {
-                self.visit_decorators(ap.decorators);
-                for el in ap.elements.iter().flatten() {
-                    self.visit_expression(el);
-                }
-            }
-            E::AssignmentPattern(a) => {
-                self.visit_decorators(a.decorators);
-                self.visit_expression(a.left);
-                self.visit_expression(a.right);
-            }
+            E::AssignmentExpression(a) => self.bind_assignment_expression_flow(a),
+            E::ObjectPattern(op) => self.visit_object_pattern(op),
+            E::ArrayPattern(ap) => self.visit_array_pattern(ap),
+            E::AssignmentPattern(a) => self.visit_assignment_pattern(a),
             E::RestElement(r) => self.visit_expression(r.argument),
             E::TSTypeAssertion(t) => self.visit_expression(t.expression),
             E::TSAsExpression(t) => self.visit_expression(t.expression),
@@ -2006,18 +1894,190 @@ impl<'a> FlowBuilder<'a> {
             E::TSInstantiationExpression(t) => self.visit_expression(t.expression),
             E::TSNonNullExpression(t) => self.visit_expression(t.expression),
             E::TSParameterProperty(pp) => self.visit_expression(pp.parameter),
-            E::ImportExpression(i) => {
-                self.visit_expression(i.source);
-                if let Some(o) = i.options {
-                    self.visit_expression(o);
-                }
-            }
+            E::ImportExpression(i) => self.visit_import_expression(i),
             E::JsdocCast(c) => self.visit_expression(c.inner),
             E::ParenthesizedExpression(p) => self.visit_expression(p.expression),
         }
         if let Some((t, f)) = restore {
             self.current_true_target = t;
             self.current_false_target = f;
+        }
+    }
+
+    #[inline]
+    fn bind_member_expression_flow(
+        &mut self,
+        expr: &Expression<'_>,
+        m: &tsv_ts::ast::internal::MemberExpression<'_>,
+    ) {
+        // The access flow write (binder.go:618): non-leaf, reachable-
+        // only, gated on `isNarrowableReference`.
+        if is_narrowable_reference(expr) {
+            let id = self.require(addr_of(m), NodeKind::MemberExpression);
+            self.set_flow_nonleaf(id);
+        }
+        self.visit_expression(m.object);
+        self.visit_expression(m.property);
+    }
+
+    #[inline]
+    fn bind_prefix_unary_expression_flow(
+        &mut self,
+        u: &tsv_ts::ast::internal::UnaryExpression<'_>,
+    ) {
+        // `bindPrefixUnaryExpressionFlow` (binder.go:2174): swap the
+        // condition targets around the operand so `!x` narrows inversely.
+        // The pre/post swaps are symmetric — any sub-binder restores the
+        // targets to their entry value (via `do_with_conditional_branches`
+        // / the `!`-swap), so the second swap is a faithful restore.
+        std::mem::swap(
+            &mut self.current_true_target,
+            &mut self.current_false_target,
+        );
+        self.visit_expression(u.argument);
+        std::mem::swap(
+            &mut self.current_true_target,
+            &mut self.current_false_target,
+        );
+    }
+
+    #[inline]
+    fn bind_logical_binary_expression_flow(
+        &mut self,
+        expr: &Expression<'_>,
+        b: &BinaryExpression<'_>,
+    ) {
+        // `bindBinaryExpressionFlow` logical branch (binder.go:2219).
+        let is_and = b.operator == BinaryOperator::AmpersandAmpersand;
+        let is_nullish = b.operator == BinaryOperator::QuestionQuestion;
+        self.bind_binary_expression_flow(expr, b.left, b.right, is_and, is_nullish, None);
+    }
+
+    #[inline]
+    fn bind_call_expression_flow(&mut self, c: &tsv_ts::ast::internal::CallExpression<'_>) {
+        use Expression as E;
+        // IIFE detection (`GetImmediatelyInvokedFunctionExpression`,
+        // utilities.go:1834; `bindCallExpressionFlow`, binder.go:2419):
+        // a non-async (non-generator) function/arrow callee — through any
+        // grouping parens — is inlined into the containing flow. Its
+        // arguments bind FIRST so the callee's flow write captures the
+        // post-argument flow.
+        let mut unwrapped = c.callee;
+        while let E::ParenthesizedExpression(p) = unwrapped {
+            unwrapped = p.expression;
+        }
+        match unwrapped {
+            E::ArrowFunctionExpression(a) if !a.r#async => {
+                for arg in c.arguments {
+                    self.visit_expression(arg);
+                }
+                let id = self.require(addr_of(a), NodeKind::ArrowFunctionExpression);
+                self.visit_arrow(a, id, true);
+            }
+            E::FunctionExpression(f) if !f.r#async && !f.generator => {
+                for arg in c.arguments {
+                    self.visit_expression(arg);
+                }
+                let id = self.require(addr_of(f), NodeKind::FunctionExpression);
+                self.visit_function_expression(f, id, true);
+            }
+            _ => {
+                self.visit_expression(c.callee);
+                for arg in c.arguments {
+                    self.visit_expression(arg);
+                }
+            }
+        }
+    }
+
+    #[inline]
+    fn visit_new_expression(&mut self, n: &tsv_ts::ast::internal::NewExpression<'_>) {
+        self.visit_expression(n.callee);
+        for a in n.arguments {
+            self.visit_expression(a);
+        }
+    }
+
+    #[inline]
+    fn visit_tagged_template_expression(
+        &mut self,
+        t: &tsv_ts::ast::internal::TaggedTemplateExpression<'_>,
+    ) {
+        self.visit_expression(t.tag);
+        for e in t.quasi.expressions {
+            self.visit_expression(e);
+        }
+    }
+
+    #[inline]
+    fn bind_sequence_expression_flow(&mut self, s: &tsv_ts::ast::internal::SequenceExpression<'_>) {
+        // `bindBinaryExpressionFlow` comma branch: each operand's value
+        // is discarded (statement-like), so a top-level dotted-name call
+        // is a potential assertion — apply maybe-call per operand
+        // (visit-then-maybe, like `ExpressionStatement`). tsgo nests
+        // comma as left-assoc `BinaryExpression`s applying maybe-call to
+        // both `Left`/`Right` at each level; the flattened form applies
+        // it once per leaf operand (intermediate comma nodes are no-op
+        // non-calls), so the effect matches.
+        // tsgo: binder.go bindBinaryExpressionFlow (comma branch)
+        for e in s.expressions {
+            self.visit_expression(e);
+            self.maybe_bind_expression_flow_if_call(e);
+        }
+    }
+
+    #[inline]
+    fn bind_logical_assignment_expression_flow(
+        &mut self,
+        expr: &Expression<'_>,
+        a: &tsv_ts::ast::internal::AssignmentExpression<'_>,
+    ) {
+        // `bindBinaryExpressionFlow` logical compound-assignment branch.
+        let is_and = a.operator == AssignmentOperator::LogicalAndAssign;
+        let is_nullish = a.operator == AssignmentOperator::NullishAssign;
+        self.bind_binary_expression_flow(expr, a.left, a.right, is_and, is_nullish, Some(a.left));
+    }
+
+    #[inline]
+    fn bind_assignment_expression_flow(
+        &mut self,
+        a: &tsv_ts::ast::internal::AssignmentExpression<'_>,
+    ) {
+        // `bindBinaryExpressionFlow` assignment branch (binder.go:2249) —
+        // bind operands, then the target's `Assignment` mutation.
+        self.visit_expression(a.left);
+        self.visit_expression(a.right);
+        self.bind_assignment_target_flow(a.left);
+    }
+
+    #[inline]
+    fn visit_object_pattern(&mut self, op: &tsv_ts::ast::internal::ObjectPattern<'_>) {
+        self.visit_decorators(op.decorators);
+        for prop in op.properties {
+            self.visit_object_pattern_property(prop);
+        }
+    }
+
+    #[inline]
+    fn visit_array_pattern(&mut self, ap: &tsv_ts::ast::internal::ArrayPattern<'_>) {
+        self.visit_decorators(ap.decorators);
+        for el in ap.elements.iter().flatten() {
+            self.visit_expression(el);
+        }
+    }
+
+    #[inline]
+    fn visit_assignment_pattern(&mut self, a: &tsv_ts::ast::internal::AssignmentPattern<'_>) {
+        self.visit_decorators(a.decorators);
+        self.visit_expression(a.left);
+        self.visit_expression(a.right);
+    }
+
+    #[inline]
+    fn visit_import_expression(&mut self, i: &tsv_ts::ast::internal::ImportExpression<'_>) {
+        self.visit_expression(i.source);
+        if let Some(o) = i.options {
+            self.visit_expression(o);
         }
     }
 
