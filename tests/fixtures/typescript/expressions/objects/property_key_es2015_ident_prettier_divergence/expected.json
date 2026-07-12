@@ -1,0 +1,744 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 446,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An astral identifier (a valid ES2015 ID_Start) is a bare object key.",
+			"start": 20,
+			"end": 91,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A type-literal member unquotes the same key.",
+			"start": 117,
+			"end": 164,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 48
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An interface member does too.",
+			"start": 192,
+			"end": 224,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 33
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A class member key is never unquoted — it stays a string literal.",
+			"start": 258,
+			"end": 326,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A key that is not a valid identifier stays quoted.",
+			"start": 354,
+			"end": 407,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 54
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 445,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 436,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 16,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 93,
+					"end": 115,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 23
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 99,
+							"end": 114,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 22
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 99,
+								"end": 102,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 10
+									}
+								},
+								"name": "obj"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 105,
+								"end": 114,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 13
+									},
+									"end": {
+										"line": 3,
+										"column": 22
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 107,
+										"end": 112,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 15
+											},
+											"end": {
+												"line": 3,
+												"column": 20
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 107,
+											"end": 109,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 15
+												},
+												"end": {
+													"line": 3,
+													"column": 17
+												}
+											},
+											"name": "𐊧"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 111,
+											"end": 112,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 19
+												},
+												"end": {
+													"line": 3,
+													"column": 20
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An astral identifier (a valid ES2015 ID_Start) is a bare object key.",
+							"start": 20,
+							"end": 91
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 166,
+					"end": 190,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 25
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 171,
+						"end": 172,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 6
+							},
+							"end": {
+								"line": 5,
+								"column": 7
+							}
+						},
+						"name": "T"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeLiteral",
+						"start": 175,
+						"end": 189,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 10
+							},
+							"end": {
+								"line": 5,
+								"column": 24
+							}
+						},
+						"members": [
+							{
+								"type": "TSPropertySignature",
+								"start": 177,
+								"end": 187,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 12
+									},
+									"end": {
+										"line": 5,
+										"column": 22
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 177,
+									"end": 179,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 12
+										},
+										"end": {
+											"line": 5,
+											"column": 14
+										}
+									},
+									"name": "𐊧"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 179,
+									"end": 187,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 14
+										},
+										"end": {
+											"line": 5,
+											"column": 22
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSNumberKeyword",
+										"start": 181,
+										"end": 187,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 16
+											},
+											"end": {
+												"line": 5,
+												"column": 22
+											}
+										}
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A type-literal member unquotes the same key.",
+							"start": 117,
+							"end": 164
+						}
+					]
+				},
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 226,
+					"end": 256,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 236,
+						"end": 237,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 11
+							},
+							"end": {
+								"line": 7,
+								"column": 12
+							}
+						},
+						"name": "I"
+					},
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 238,
+						"end": 256,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 13
+							},
+							"end": {
+								"line": 9,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "TSPropertySignature",
+								"start": 242,
+								"end": 253,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 13
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 242,
+									"end": 244,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 2
+										},
+										"end": {
+											"line": 8,
+											"column": 4
+										}
+									},
+									"name": "𐊧"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 244,
+									"end": 252,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 4
+										},
+										"end": {
+											"line": 8,
+											"column": 12
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSNumberKeyword",
+										"start": 246,
+										"end": 252,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 6
+											},
+											"end": {
+												"line": 8,
+												"column": 12
+											}
+										}
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An interface member does too.",
+							"start": 192,
+							"end": 224
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 328,
+					"end": 352,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 334,
+						"end": 335,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 7
+							},
+							"end": {
+								"line": 11,
+								"column": 8
+							}
+						},
+						"name": "C"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 336,
+						"end": 352,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 9
+							},
+							"end": {
+								"line": 13,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 340,
+								"end": 349,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 11
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Literal",
+									"start": 340,
+									"end": 344,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 2
+										},
+										"end": {
+											"line": 12,
+											"column": 6
+										}
+									},
+									"value": "𐊧",
+									"raw": "'𐊧'"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 347,
+									"end": 348,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 9
+										},
+										"end": {
+											"line": 12,
+											"column": 10
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A class member key is never unquoted — it stays a string literal.",
+							"start": 258,
+							"end": 326
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 409,
+					"end": 435,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 27
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 415,
+							"end": 434,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 7
+								},
+								"end": {
+									"line": 15,
+									"column": 26
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 415,
+								"end": 420,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 7
+									},
+									"end": {
+										"line": 15,
+										"column": 12
+									}
+								},
+								"name": "digit"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 423,
+								"end": 434,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 15
+									},
+									"end": {
+										"line": 15,
+										"column": 26
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 425,
+										"end": 432,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 17
+											},
+											"end": {
+												"line": 15,
+												"column": 24
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Literal",
+											"start": 425,
+											"end": 429,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 17
+												},
+												"end": {
+													"line": 15,
+													"column": 21
+												}
+											},
+											"value": "0a",
+											"raw": "'0a'"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 431,
+											"end": 432,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 23
+												},
+												"end": {
+													"line": 15,
+													"column": 24
+												}
+											},
+											"value": 2,
+											"raw": "2"
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A key that is not a valid identifier stays quoted.",
+							"start": 354,
+							"end": 407
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
