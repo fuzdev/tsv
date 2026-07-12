@@ -15,7 +15,7 @@
  * Usage:
  *   deno task publish                        # dry-run (validate everything)
  *   deno task publish --bump minor           # dry-run, preview the bump
- *   deno task publish --wetrun --bump patch  # bump + check + conformance + build + validate + publish + git
+ *   deno task publish --wetrun --bump patch  # bump + check + conformance:all + build + validate + publish + git
  *   deno task publish --wetrun               # resume a failed wetrun (sentinel retry only)
  *
  * Flags:
@@ -312,28 +312,31 @@ if (no_check) {
 // Step 3b: Conformance gates
 //
 // The release-cadence correctness gates that run against EXTERNAL oracles and so
-// can't live in `deno task check`: the Svelte parser vs `svelte/compiler`
-// (conformance:svelte-fixtures), and all three languages' AST + formatter vs the
-// canonical parsers / prettier (corpus:compare:parse + :format, --all). Running
-// them here means a release can't ship a parse/format regression the in-repo gate
-// is structurally blind to. Skipped by --no-check alongside Step 3.
+// can't live in `deno task check`: the Svelte/TS parsers vs their own suites +
+// svelte/compiler / acorn-typescript / tsc baselines (conformance:svelte-fixtures
+// / ts-fixtures / ts-repo), all three languages' AST + formatter vs the canonical
+// parsers / prettier (corpus:compare:parse + :format, --all), and the JS parser vs
+// test262 POSITIVES (conformance:test262, pure Rust — negatives are the deferred
+// early-error frontier, reported not gated). `deno task conformance:all` runs the
+// whole set. Running them here means a release can't ship a parse/format
+// regression the in-repo gate is structurally blind to. Skipped by --no-check
+// alongside Step 3.
 //
 // The gates need the ../svelte + ../acorn-typescript + ../typescript +
-// ../typescript-go checkouts and the benches/js `node_modules` sidecar
-// (`deno task bench:install`). The
+// ../typescript-go + ../test262 checkouts and the benches/js `node_modules`
+// sidecar (`deno task bench:install`). The
 // probe must cover every oracle the aggregate's legs need — the gates
 // themselves fail closed on a missing checkout, so the probe is the ONE
 // tolerance point: a dry-run warn-and-skips (clean machines can still
 // validate), but a --wetrun BLOCKS — releasing with the gates never run
 // requires the explicit --no-check. Any skip is re-warned in the final summary
-// so it can't scroll away. test262 (needs ../test262) and the CSS-WPT harvest
-// stay manual.
+// so it can't scroll away. Only the CSS-WPT harvest stays manual.
 let conformance_skip_reason: string | null = null;
 if (no_check) {
 	console.log('\n=== Step 3b: Conformance gates — SKIPPED (--no-check) ===');
 	conformance_skip_reason = '--no-check';
 } else {
-	console.log('\n=== Step 3b: Conformance gates (deno task conformance) ===');
+	console.log('\n=== Step 3b: Conformance gates (deno task conformance:all) ===');
 	const missing = [
 		exists('../svelte/packages/svelte/tests') ? null : '../svelte checkout',
 		exists('../acorn-typescript/test') ? null : '../acorn-typescript checkout',
@@ -350,6 +353,7 @@ if (no_check) {
 		exists('../typescript-go/internal/bundled/libs')
 			? null
 			: '../typescript-go bundled libs (internal/bundled/libs)',
+		exists('../test262/test') ? null : '../test262 checkout',
 		exists('benches/js/node_modules') ? null : 'benches/js/node_modules (deno task bench:install)',
 	].filter((m): m is string => m !== null);
 	if (missing.length > 0 && wetrun) {
@@ -362,18 +366,19 @@ if (no_check) {
 		conformance_skip_reason = `missing ${missing.join(' + ')}`;
 		console.warn(
 			`  WARN: skipping — ${conformance_skip_reason}. ` +
-				'A --wetrun would FAIL here; run `deno task conformance` on a machine with the oracles.',
+				'A --wetrun would FAIL here; run `deno task conformance:all` on a machine with the oracles.',
 		);
 	} else {
 		run(
-			'deno task conformance',
+			'deno task conformance:all',
 			'deno',
-			['task', 'conformance'],
+			['task', 'conformance:all'],
 			undefined,
 			'  Conformance gate failed. If it was a corpus:compare:format SAFETY hit, re-run\n' +
 				'  `deno task corpus:compare:format ~/dev/<that-repo>` on the single repo to rule out\n' +
 				'  the known --all FFI heisenbug (benches/js/CLAUDE.md §Known Issues) before treating\n' +
-				'  it as a real regression.',
+				'  it as a real regression. A conformance:test262 GATE FAIL is a real positive-parse\n' +
+				'  regression (or a deliberate test262 pull needing a POSITIVE_PASSED_PIN re-pin).',
 		);
 	}
 }
@@ -529,7 +534,7 @@ if (conformance_skip_reason !== null) {
 	// build output, and a release whose conformance gates never ran must be the
 	// last thing on screen, not a scrolled-away footnote.
 	console.warn(`\n  ⚠ Step 3b conformance gates did NOT run (${conformance_skip_reason}).`);
-	console.warn('    Run `deno task conformance` and verify it passes for this release.');
+	console.warn('    Run `deno task conformance:all` and verify it passes for this release.');
 }
 if (!wetrun) {
 	console.log(`\n  Dry-run complete for v${version} — all checks passed.`);

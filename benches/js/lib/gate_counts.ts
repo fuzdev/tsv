@@ -264,7 +264,11 @@ export const SVELTE_STYLES_BLOCKS_MIN = 264;
 /** bench:harvest:wpt — exact `<style>` blocks from the default `../wpt/css`. Measured 2026-07-06: ../wpt at 7437c7bc. */
 export const WPT_CSS_HARVEST_PIN = 22_310;
 
-/** bench:harvest:test262 — exact expected-positive files in the cache list. Measured 2026-07-06: ../test262 at 7153986f (46,544 graded). */
+/**
+ * bench:harvest:test262 — exact expected-positive files in the cache list. Measured 2026-07-06: ../test262 at 7153986f (46,544 graded).
+ * Mirrors the Rust `POSITIVE_PASSED_PIN` (crates/tsv_debug/src/cli/commands/test262.rs) that the
+ * `conformance:test262` release gate enforces — same positive count, keep the two in lockstep on a test262 pull.
+ */
 export const TEST262_POSITIVES_PIN = 42_113;
 
 /**

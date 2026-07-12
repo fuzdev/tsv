@@ -217,7 +217,7 @@ See [CLAUDE.md § Rust Crates](CLAUDE.md#rust-crates-minimal-deps) for the full 
 # Build workspace (recommended - uses deno tasks)
 deno task build          # dev build
 deno task dev            # watch mode (requires: cargo install cargo-watch)
-deno task check          # all checks (typecheck, test, lint, fmt)
+deno task check          # all checks (typecheck, tests, audits, lint, fmt)
 
 # Or build directly with cargo
 cargo build --workspace

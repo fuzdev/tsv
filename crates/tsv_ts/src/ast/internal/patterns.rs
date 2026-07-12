@@ -104,6 +104,13 @@ pub struct AssignmentPattern<'arena> {
 pub struct RestElement<'arena> {
     /// The binding for the rest (typically an identifier)
     pub argument: &'arena Expression<'arena>,
+    /// Optional rest parameter (`...a?`). Only ever set in a parameter position;
+    /// the `?` extends `span` and precedes `type_annotation`. `...a?` is invalid
+    /// TypeScript (tsc TS1047, a *deferred* grammar-check like TS1051 `set x(a?)`),
+    /// so tsv parses and preserves it — acorn's shape carries `optional` on the
+    /// rest element (never on `argument`). Never set for a destructuring rest
+    /// (`[...a]` / `{...a}`), which takes no `?`.
+    pub optional: bool,
     // Inline by value — see `TSFunctionType.return_type`; `TSTypeAnnotation` is held
     // inline (`Option<TSTypeAnnotation>`) everywhere else.
     pub type_annotation: Option<TSTypeAnnotation<'arena>>,

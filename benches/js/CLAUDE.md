@@ -10,6 +10,40 @@ Uses [@fuzdev/fuz_util](https://github.com/fuzdev/fuz_util) benchmarking library
 > and `diagnostics/` entries stay Deno-idiomatic; `smoke` is portable across all
 > three (`smoke` / `smoke:node` / `smoke:bun`).
 
+## Gate map
+
+> Which check runs which corpus/oracle, and when. `deno task check` needs only
+> this repo; every other gate needs sibling checkouts (`../svelte`,
+> `../acorn-typescript`, `../typescript`, `../prettier`, `../test262`, `../wpt`),
+> so they run at dev/release cadence and CI runs only the committed-tree tier.
+
+| Gate | Composition | Corpus / oracle | Cadence |
+| --- | --- | --- | --- |
+| **`deno task check`** | `cargo fmt --check` · `pins:audit` · `typecheck` · `conformance:audit` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `test:deno` · `cargo test` (incl. fixtures) · `swallow:audit` · `check:ast-types` · `clippy` | **committed tree only** — `tests/fixtures` + pure-Rust/Deno audits, no external oracle | every commit; the CI `check` job |
+| **`deno task conformance:all`** | `conformance` (one process, five FFI legs: `svelte-fixtures` · `ts-fixtures` · `ts-repo` · `corpus:compare:parse --all` · `corpus:compare:format --all`) **+** `conformance:test262` (pure Rust; JS parser vs test262 positives) | `../svelte`, `../acorn-typescript`, `../typescript` (tsc baselines), `../prettier`, `../test262`; the **`gates`** corpus view (~6,200) | release; `scripts/publish.ts` **Step 3b** |
+| **`deno task bench` / `bench:conformance`** | perf throughput ×3 runtimes + compose; parse-coverage report | **`perf`** view (~3,200; 100%-coverage invariant) / **`conformance`** view (fixtures + wpt/test262 harvests; coverage-only + node-only) | dev / release cadence; feeds tsv.fuz.dev |
+
+**JS parser (test262) IS release-gated** via `conformance:test262` (pure Rust,
+`tsv_debug test262 --gate`), folded into `conformance:all` which `publish.ts` Step
+3b runs. It gates the exact test262 **positive-parse** count (`POSITIVE_PASSED_PIN`
+in the command); the ~2.5k negatives are the deferred early-error frontier
+(reported, not gated). **Only CSS-WPT grading (`../wpt`) stays manual** — its
+frontier is deferred §5.5 error-recovery, and real-CSS regressions are already
+partly caught by `corpus:compare:parse` (CSS AST vs `parseCss`).
+
+**Preflight:** `deno task doctor` checks the whole chain (runtimes, canonical
+pins, checkout alignment, oracle presence, corpus entries, build artifacts)
+ahead of time; Step 3b re-probes the three parser checkouts + `node_modules` and
+**fails a `--wetrun`** on any miss (`--no-check` is the only release-without-gates
+path). CI runs `deno task check` only — it has no sibling checkouts, so of the
+pinned counts only the committed-tree ones (`fixtures_validate`, `swallow_audit`)
+execute there (see §Pinned gate counts).
+
+Corpus **views** are defined in §Corpus; the pinned counts every graded gate
+enforces are in §Pinned gate counts.
+
+---
+
 ## Cross-Runtime (Deno + Node + Bun)
 
 The bench runs under **Deno, Node, and Bun** from one shared codebase.
@@ -398,7 +432,7 @@ Setup posture: strict — a missing `../typescript` checkout, a partial checkout
 green-skipping (the baselines are the oracle; publish Step 3b's probe is the
 tolerance point). Full-corpus runs freshness-check `KNOWN_GAPS` (stale entries fail).
 
-**Pre-release aggregate — `deno task conformance`.** The three parse-conformance
+**Pre-release aggregate — `deno task conformance` (+ `conformance:test262` = `conformance:all`).** The three parse-conformance
 gates (svelte-fixtures, ts-fixtures, ts-repo), the two `tsc_conformance` legs
 (`tsc-roundtrip` — the baseline parse↔render self-check — then `tsc-check` — the
 tsv_check binder-family conformance gate, which also writes the committed
@@ -406,17 +440,22 @@ tsv_check binder-family conformance gate, which also writes the committed
 `cargo`, so the task carries `--allow-run=cargo`; `tsc-check` additionally needs
 the materialized `_submodules/TypeScript` corpus + `internal/bundled/libs`), plus
 `corpus:compare:parse --all` and `corpus:compare:format --all`, are the
-release-cadence correctness gates that run against external oracles (and so
-can't live in `deno task check`). `deno task
-conformance` builds the corpus FFI once and runs the legs in **ONE process**
-(`conformance.ts`, the driver): the canonical oracle modules (prettier, the svelte
-plugin, svelte/compiler, acorn, acorn-ts) load once via the module cache instead of
-once per leg, each leg gets a timing line, and failure semantics match a `&&` chain
-exactly (every leg exits the process on a finding — fail-fast). The driver takes no
-arguments; the per-leg tasks remain the scoped/triage entries. It is wired into
-`scripts/publish.ts` **Step 3b** (skipped by `--no-check`). Step 3b preflights the
-oracles (`../svelte`, `../acorn-typescript`, `../typescript`, `../typescript-go`,
-this dir's `node_modules`): a missing one
+release-cadence correctness gates that run against external oracles (and so can't
+live in `deno task check`). `deno task conformance:all` runs the pure-Rust **test262
+positive gate** FIRST (`conformance:test262` — `tsv_debug test262 --gate`, gating the
+exact positive-pass count; the ~2.5k negatives are the deferred early-error frontier,
+reported not gated), THEN the aggregate — fail-fast, so a positive-parse regression
+trips the ~1-min gate before the multi-minute FFI legs run. That superset is what
+publish Step 3b runs. `deno task conformance` builds the corpus FFI once and
+runs all seven legs in **ONE process** (`conformance.ts`, the driver): the canonical
+oracle modules (prettier, the svelte plugin, svelte/compiler, acorn, acorn-ts) load
+once via the module cache instead of once per leg (the two `tsc_conformance` legs are
+pure-Rust `cargo` shell-outs), each leg gets a timing line, and failure semantics
+match a `&&` chain exactly (every leg exits the process on a finding — fail-fast). The
+driver takes no arguments; the per-leg tasks remain the scoped/triage entries.
+`conformance:all` is wired into `scripts/publish.ts` **Step 3b** (skipped by
+`--no-check`). Step 3b preflights the oracles (`../svelte`, `../acorn-typescript`,
+`../typescript`, `../typescript-go`, `../test262`, this dir's `node_modules`): a missing one
 **FAILS a `--wetrun`** (only the explicit `--no-check` releases without gates),
 warn-and-skips a dry-run, and any skip is re-warned in the run's final summary.
 The gates themselves fail closed on a missing checkout (0 scanned = FAIL), so a
@@ -427,8 +466,8 @@ must reproduce byte-identically; nondeterminism surfaces as a loud per-file
 error instead — see §Known Issues). Both corpus tools also fail (exit 1)
 on a run that compared nothing: an empty scope (`No files found`) or an
 every-file-errored / every-file-parse-fail-skipped run is a systemic failure —
-sidecar/FFI down or a wrong corpus — never a pass. `test262` (needs `../test262`) and the
-CSS-WPT harvest stay manual, outside the automated step.
+sidecar/FFI down or a wrong corpus — never a pass. Only the CSS-WPT harvest stays
+manual, outside the automated step.
 
 ## Pinned gate counts
 

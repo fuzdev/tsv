@@ -80,6 +80,11 @@ pub(super) fn write_rest_element(
     node_header(w, "RestElement", rest.span, ctx);
     w.raw(",\"argument\":");
     write_expression(w, rest.argument, ctx);
+    // acorn carries a rest parameter's `?` on the rest element (never on
+    // `argument`), between `argument` and `typeAnnotation`, only when present.
+    if rest.optional {
+        w.raw(",\"optional\":true");
+    }
     write_type_annotation_field(w, rest.type_annotation.as_ref(), ctx);
     close_node(w, "RestElement", rest.span, ctx);
 }

@@ -29,6 +29,14 @@ parse under the syntactic grammar but the spec rejects semantically — duplicat
 params, escaped reserved words, etc.), deferred to a future diagnostics layer by
 design, not parser bugs.
 
+**Release gate.** `deno task conformance:test262` (the `test262 --gate` mode,
+folded into `conformance:all` and run by `publish.ts` Step 3b) gates exactly the
+**positive** side: it fails on any positive-parse regression, or a shift in the
+pinned positive-pass count (`POSITIVE_PASSED_PIN` in the command, mirrored by
+`TEST262_POSITIVES_PIN` in `benches/js/lib/gate_counts.ts`). The negative failures
+above are the deferred early-error frontier — **reported, not gated** — so a bare
+`test262` run exits non-zero (a diagnostic) while the scoped `--gate` run is green.
+
 **Feature filtering.** Tests whose `features:` frontmatter names a syntactic
 proposal tsv does not implement are skipped, not graded — scoring them as parse
 failures would measure scope, not a conformance gap. The set
@@ -332,11 +340,11 @@ Found 49136 test files
 Processing: 49136/49136
 
 Results:
-  Positive tests: 41898 passed, 0 failed
+  Positive tests: 42320 passed, 0 failed
   Negative tests: 1795 passed, 2455 failed
-  Skipped:        2988 (sloppy mode: 2494, unimplemented feature: 422, runtime: 38, resolution: 34)
+  Skipped:        2566 (sloppy mode: 2494, runtime: 38, resolution: 34)
 
-Pass rate: 43693/46148 (94.7%)
+Pass rate: 44115/46570 (94.7%)
 ```
 
 ### Verbose (Failures)

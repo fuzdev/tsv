@@ -468,6 +468,7 @@ Same layout inside an inline element (head wraps + body expands, element hugs th
 - Constrained infer extends-operand parens — ◆prettier_bug — [constrained_extends_parens](../tests/fixtures/typescript/types/infer/constrained_extends_parens_prettier_divergence/)
 - Arrow type param trailing comma — ◆design_choice — [single_type_param](../tests/fixtures/typescript/expressions/arrow/generic/single_type_param_prettier_divergence/)
 - Single curly type-argument hug — ◆design_choice — [call_type_arg_member_comment](../tests/fixtures/typescript/typescript_specific/generics/call_type_arg_member_comment_prettier_divergence/), [call_type_arg_empty_comment](../tests/fixtures/typescript/typescript_specific/generics/call_type_arg_empty_comment_prettier_divergence/)
+- Optional rest parameter `?` — ◆design_choice — [rest_optional_param](../tests/fixtures/typescript/typescript_specific/rest_optional_param_prettier_divergence/)
 
 **Instantiation expression parens**: Prettier strips parentheses from ternary and binary expressions in `TSInstantiationExpression` (`(x ? y : z)<T>` → `x ? y : z<T>`), changing semantics. Without parens, `<T>` only applies to the last operand. tsv preserves parens to maintain the original meaning. Both formatters agree on preserving parens for assignment expressions (`(x = y)<T>`).
 
@@ -492,6 +493,8 @@ tsv treats these like any other function call—no special-casing for module pat
 **Arrow type param trailing comma**: For a generic arrow with a **single type param that has no constraint** (`<T>`, default-only `<T = string>`, or `const`-modified `<const T>`), Prettier forces a trailing comma — `<T,>` — via `shouldForceTrailingComma` (`language-js/print/type-parameters.js`). It does so to keep the output valid as TSX, where a bare `<T>` is ambiguous with a JSX element; the guard fires whenever the file is not known to end in `.ts`, which is always the case for a Svelte `<script>` body (prettier-plugin-svelte hands it to prettier without a `.ts` filepath). tsv has no JSX — it never emits TSX, and Svelte's own parser accepts bare `<T>` in every TS position (`<script>`, template `{...}`, `{@const}`) — so the disambiguation is vestigial and tsv emits the bare canonical form. Multi-param (`<T, U>`), constrained (`<T extends X>`), and empty (`<>`) type params are unaffected; prettier never forces the comma for those and tsv matches. The accepted tradeoff: in a mixed-tool repo prettier rewrites `<T>` back to `<T,>`, so the two ping-pong on this construct (reviewed and accepted — bare `<T>` is correct for a non-JSX formatter). Fixtures: [single_type_param](../tests/fixtures/typescript/expressions/arrow/generic/single_type_param_prettier_divergence/), [const_type_param_arrow](../tests/fixtures/typescript/typescript_specific/generics/const_type_param_arrow_prettier_divergence/), and — stacked with the acorn-typescript async param-drop parser bug — [async_generic/stacked](../tests/fixtures/typescript/expressions/arrow/async_generic/stacked_svelte_prettier_divergence/), [async_generic/forms](../tests/fixtures/typescript/expressions/arrow/async_generic/forms_svelte_prettier_divergence/) (optional-param, object-`as`-body, and a type-vs-value-position contrast that pins the comma to value position) and [curried_typed_callback](../tests/fixtures/typescript/expressions/arrow/curried_typed_callback_svelte_prettier_divergence/). The comment-relocation fixture [arrow_type_params_paren_comment](../tests/fixtures/typescript/declarations/function/arrow_type_params_paren_comment_prettier_divergence/) also exercises it.
 
 **Single curly type-argument hug**: A call/`new` whose sole type argument is an object type literal, a mapped type, or an empty object stays hugged to the opening angle bracket — `fn<{` … `}>()` — even when the body carries a comment that forces it to break across lines; the type literal carries its own group and breaks block-style internally. Prettier instead breaks the `<…>` list onto its own indented lines for a comment-bearing mapped or empty type (`fn<⏎\t{⏎\t\t// c⏎\t\t…⏎\t}⏎>()`), while keeping a populated object literal hugged. tsv applies one hugging layout to all three — the same layout its type-reference type-argument path already uses (`Array<{ … }>`) — so the call/`new` and type positions stay consistent. The comment itself stays exactly where the author wrote it in both formatters; only the angle-bracket layout differs. Fixtures: [call_type_arg_member_comment](../tests/fixtures/typescript/typescript_specific/generics/call_type_arg_member_comment_prettier_divergence/) (mapped + populated-object contrast), [call_type_arg_empty_comment](../tests/fixtures/typescript/typescript_specific/generics/call_type_arg_empty_comment_prettier_divergence/) (empty body: inline block comment hugs in both, a line comment is the divergence).
+
+**Optional rest parameter `?`**: A rest parameter written with an optional `?` marker (`(...a?)`, in a value signature, an interface call / construct signature, or a function type) is invalid TypeScript — tsc reports **TS1047** "a rest parameter cannot be optional". But that is a *deferred grammar-check* error, not a parse rejection: tsc's own parser stores the `?` on the parameter node regardless of the `...` and reports TS1047 later during checking (`checker.ts` `checkGrammarParameterList`), exactly like the already-deferred **TS1051** (`set x(a?)`). Per tsv's permissive-parser stance it accepts the syntax and preserves the token; acorn-typescript's AST likewise carries `optional: true` on the `RestElement` (never on `argument`). Prettier instead **strips** the `?` on every rest parameter (`(...a?)` → `(...a)`), silently deleting a token the source wrote — the same information-loss shape as its `import defer` phase-drop below. tsv preserves the author's `?`; plain rest (`...b`) is unaffected. Fixture: [rest_optional_param](../tests/fixtures/typescript/typescript_specific/rest_optional_param_prettier_divergence/).
 
 #### Import-phase proposals
 
@@ -964,7 +967,7 @@ See [directives.md](./directives.md) for the user-facing reference.
 **Corpus comparison** validates formatting against Prettier on real codebases:
 
 ```bash
-deno task corpus:compare:format --all --explain           # The gates corpus view (~6,000 files: real repos + prettier suites)
+deno task corpus:compare:format --all --explain           # The gates corpus view (~6,200 files: real repos + prettier suites)
 deno task corpus:compare:format ~/dev/project --explain  # Single project (scans all files recursively)
 ```
 
@@ -985,10 +988,15 @@ See ./divergence_detector.md for implementation details.
 **Triage caveat — prettier-plugin-svelte's verbatim fallback**: when the
 embedded formatter throws on any construct in a `<script>` block,
 prettier-plugin-svelte emits the **whole block verbatim** instead of failing.
-The plugin routes `<script lang="ts">` through prettier's babel-based
-`babel-ts` parser, so the trigger is babel rejecting the code — e.g.
-`@(f()).g` is a babel SyntaxError (babel follows the strict TC39 decorator
-grammar; tsc accepts it). **Both tsv pipelines disarm this with
+For `<script lang="ts">` the plugin formats the embedded script through
+prettier's real **`typescript`** parser (`embed.ts` →
+`textToDoc(content, {parser: 'typescript'})`), so a construct that path throws
+on — e.g. `@(a?.b)()` (a `TypeError` in prettier's needs-parens printer) or
+`x?.#a` (`An optional chain cannot contain private identifiers.`) — **does**
+trigger the verbatim fallback in `.svelte`, exactly as on a pure-`.ts` run. (A
+`<script>` with **no** explicit `lang` is formatted through `babel-ts` instead,
+whose stricter TC39 decorator grammar rejects forms like `@(f()).g` that tsc
+and the `typescript` parser accept.) **Both tsv pipelines disarm this with
 `PRETTIER_DEBUG=1`** (the tsv_debug sidecar sets it on the Deno spawn; the
 `corpus:compare:format:run` task sets it in its env), which makes the plugin
 and prettier-core rethrow — so `compare`, fixture validation,
@@ -996,12 +1004,8 @@ and prettier-core rethrow — so `compare`, fixture validation,
 code frame) instead of fake-stable output. The caveat applies when probing
 prettier **outside** these pipelines (a bare `prettier` invocation, editor
 integrations, upstream issue repros): there the fallback silently "preserves"
-the whole script. Forms that only crash prettier's `typescript`
-parser (e.g. `@(a?.b)()`, a `TypeError` in needs-parens) do **not** trigger
-the fallback in `.svelte` — babel-ts accepts them and the script formats
-normally; they fail visibly on pure-`.ts` runs instead, where no fallback
-exists. Confirm by re-running the suspect construct in a single-form file or
-as pure `.ts`. (Also see
+the whole script. Confirm by re-running the suspect construct in a single-form
+file or as pure `.ts`, where no fallback exists so it fails visibly. (Also see
 [fixture_overview.md §Common Pitfalls](./fixture_overview.md#common-pitfalls) —
 the fallback can fake a "prettier-stable" fixture input.)
 
