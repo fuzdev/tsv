@@ -242,7 +242,7 @@ impl<'a> Printer<'a> {
             } else {
                 d.text(" ")
             });
-            tail_parts.push(self.build_statement_doc(stmt.body));
+            tail_parts.push(self.build_statement_doc(stmt.body, false));
         } else {
             // No space before empty statement: `label:;` not `label: ;`
             let separator = if matches!(stmt.body, Statement::EmptyStatement(_)) {
@@ -251,7 +251,7 @@ impl<'a> Printer<'a> {
                 ": "
             };
             tail_parts.push(d.text(separator));
-            tail_parts.push(self.build_statement_doc(stmt.body));
+            tail_parts.push(self.build_statement_doc(stmt.body, false));
         }
         let tail = d.concat(&tail_parts);
 

@@ -49,10 +49,12 @@ impl<'a> Printer<'a> {
         if let Statement::BlockStatement(block) = alternate {
             parts.push(self.build_block_statement_expand_empty_doc(block));
         } else if comment_forced || is_inline_alternate(alternate) {
-            parts.push(self.build_statement_doc(alternate));
+            parts.push(self.build_statement_doc(alternate, false));
         } else {
             let d = self.d();
-            parts.push(d.indent(d.concat(&[d.hardline(), self.build_statement_doc(alternate)])));
+            parts.push(
+                d.indent(d.concat(&[d.hardline(), self.build_statement_doc(alternate, false)])),
+            );
         }
     }
 
@@ -71,11 +73,11 @@ impl<'a> Printer<'a> {
                 if let Statement::BlockStatement(block) = alternate {
                     parts.push(self.build_block_statement_expand_empty_doc(block));
                 } else {
-                    parts.push(self.build_statement_doc(alternate));
+                    parts.push(self.build_statement_doc(alternate, false));
                 }
             } else {
                 parts.push(d.hardline());
-                parts.push(d.indent(self.build_statement_doc(alternate)));
+                parts.push(d.indent(self.build_statement_doc(alternate, false)));
             }
         }
     }
@@ -129,7 +131,7 @@ impl<'a> Printer<'a> {
             if has_line && is_non_block_non_if {
                 // Line comment + non-block body: comment stays on else line, body indented
                 // } else // c\n\texpr;
-                let body_doc = self.build_statement_doc(alternate);
+                let body_doc = self.build_statement_doc(alternate, false);
                 parts.push(d.indent(d.concat(&[d.hardline(), body_doc])));
             } else if has_line {
                 parts.push(d.hardline());
@@ -246,7 +248,7 @@ impl<'a> Printer<'a> {
             // - When broken: line becomes newline + indent -> `if (cond)\n\ta;`
             let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
             let body_start = stmt.consequent.span().start;
-            let consequent_doc = self.build_statement_doc(stmt.consequent);
+            let consequent_doc = self.build_statement_doc(stmt.consequent, false);
 
             let mut head_parts: DocBuf = smallvec![d.text("if")];
             if let Some(kc) = keyword_comments {
@@ -321,7 +323,7 @@ impl<'a> Printer<'a> {
         } else {
             // Non-block consequent: handle head-body comments between ) and body
             let body_start = stmt.consequent.span().start;
-            let consequent_doc = self.build_statement_doc(stmt.consequent);
+            let consequent_doc = self.build_statement_doc(stmt.consequent, false);
 
             if self.has_comments_between(paren_end, body_start) {
                 let has_line = self.has_line_comments_between(paren_end, body_start);
@@ -428,7 +430,7 @@ impl<'a> Printer<'a> {
                 if has_line && is_non_block_non_if {
                     // Line comment + non-block body: comment stays on else line, body indented
                     // else // c\n\texpr;
-                    let body_doc = self.build_statement_doc(alternate);
+                    let body_doc = self.build_statement_doc(alternate, false);
                     parts.push(d.indent(d.concat(&[d.hardline(), body_doc])));
                 } else if has_line {
                     parts.push(d.hardline());
