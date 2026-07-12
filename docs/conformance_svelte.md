@@ -344,6 +344,34 @@ so it is pinned by the
 `tsv_rejects.txt` fixture. **Upstream candidate**: acorn-typescript
 `tsParseNonArrayType` — `void`/`null` accepted as qualified-name heads.
 
+**Arrow function as an operand (rejected)**: an `ArrowFunction` is a complete
+`AssignmentExpression` — a top-level alternative of that production
+([ecma262 §13.15](https://tc39.es/ecma262/#prod-AssignmentExpression)), not a
+`ConditionalExpression`, binary operand, or `LeftHandSideExpression`. So a *bare*
+(unparenthesized) arrow cannot be extended by any operator: a trailing
+binary/logical operator (`() => {} || a`), `as`/`satisfies` assertion
+(`() => {} as T`), assignment target (`() => {} = a`), or ternary `?`
+(`() => {} ? b : c`) is a syntax error — only a sequence `,` or a statement
+terminator may follow. Parenthesizing the arrow (`(() => {}) || a`) makes it a
+primary and lifts the restriction. tsc and prettier reject all of these
+(`Expected ';'`, TS1005). acorn-typescript rejects the operator / assertion /
+assignment forms too — pinned as the ordinary both-reject `input_invalid_*` cases
+in [block_body_not_operand](../tests/fixtures/typescript/expressions/arrow/block_body_not_operand/) —
+but *over-leniently accepts the ternary*: its arrow guard lives only in
+`parseExprOps` (blocking a binary operator), while `parseMaybeConditional` sits
+above it and still folds `?` onto the arrow test. tsc/prettier/spec reject it, so
+tsv rejects it, matching the compiler and diverging from acorn's lone accept.
+Since acorn accepts the ternary, that half can't be an `input_invalid_*` fixture,
+so it is pinned by the
+[block_body_ternary](../tests/fixtures/typescript/expressions/arrow/block_body_ternary_svelte_divergence/)
+`tsv_rejects.txt` fixture. (Subscripts and calls on a bare arrow — `() => {}()`,
+`() => {}.x` — are the same principle, pinned separately by
+[block_body_not_callable](../tests/fixtures/typescript/expressions/arrow/block_body_not_callable/).)
+This is deliberate tsc-over-acorn strictness, the same reverse direction as the
+legacy import-assertions and reserved-keyword-qualified-head entries above.
+**Upstream candidate**: acorn-typescript — `parseMaybeConditional` folds a
+ternary onto an unparenthesized arrow above the `parseExprOps` arrow guard.
+
 #### Import-phase proposals
 
 The Stage-3 **source-phase imports** and **import defer** proposals add a phase to
