@@ -171,14 +171,18 @@ pub(in crate::printer) fn is_array_or_object_unwrapped(expr: &Expression<'_>) ->
     )
 }
 
-/// Unwrap TypeScript type wrappers (as, satisfies, <T>, !) to get the inner expression.
-/// Returns the innermost non-wrapper expression.
+/// Unwrap the TypeScript cast wrappers (as, satisfies, <T>) to get the inner expression.
+/// Returns the innermost non-cast expression.
+///
+/// Mirrors Prettier's `couldExpandArg`, which looks through `isBinaryCastExpression`
+/// (`as`/`satisfies`) and `TSTypeAssertion` (`<T>x`) but NOT `TSNonNullExpression`: a
+/// `{...}!` / `[...]!` argument is not treated as an expandable object/array, so it does
+/// not hug the call parens.
 fn unwrap_ts_type_wrappers<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
     match expr {
         Expression::TSAsExpression(e) => unwrap_ts_type_wrappers(e.expression),
         Expression::TSSatisfiesExpression(e) => unwrap_ts_type_wrappers(e.expression),
         Expression::TSTypeAssertion(e) => unwrap_ts_type_wrappers(e.expression),
-        Expression::TSNonNullExpression(e) => unwrap_ts_type_wrappers(e.expression),
         _ => expr,
     }
 }
