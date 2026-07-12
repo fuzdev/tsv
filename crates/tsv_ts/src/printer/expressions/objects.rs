@@ -415,12 +415,7 @@ impl<'a> Printer<'a> {
         let key_region_end;
         let key_doc = if prop.computed {
             // Assignment expressions need parens in computed keys: {[(a = b)]: c}
-            let key_expr_doc =
-                if self.needs_parens(&prop.key, super::ParenContext::ComputedPropertyKey) {
-                    d.parens(self.build_expression_doc(&prop.key))
-                } else {
-                    self.build_expression_doc(&prop.key)
-                };
+            let key_expr_doc = self.build_computed_key_expr_doc(&prop.key);
             let (doc, end) =
                 self.build_computed_key_bracket_doc(prop.span.start, &prop.key, key_expr_doc);
             key_region_end = end;
@@ -847,6 +842,20 @@ impl<'a> Printer<'a> {
             b':',
         )
         .map_or(start, |pos| pos as u32)
+    }
+
+    /// Parenthesize a computed `[expr]` key when the expression needs it for
+    /// clarity — an assignment (`[(x = 0)]`) or, inside a for-header init, an `in`
+    /// binary (`for (…[(a in b)]…)`, via `needs_parens`' ambient for-init rule).
+    /// Shared by object and class computed property/method keys. (The computed
+    /// member-*access* index applies the same rule inline in the chain printer,
+    /// which threads `in_for_init` explicitly.)
+    pub(in crate::printer) fn build_computed_key_expr_doc(&self, key: &Expression<'_>) -> DocId {
+        if self.needs_parens(key, super::ParenContext::ComputedPropertyKey) {
+            self.d().parens(self.build_expression_doc(key))
+        } else {
+            self.build_expression_doc(key)
+        }
     }
 
     /// Build a `[key]` doc with comments preserved inside brackets.

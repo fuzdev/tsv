@@ -261,67 +261,18 @@ Variant files must match the input file extension:
 - Ours rewrites to a third stable form (not input, not the form) → `divergent_variant_*`
 - Run `deno task fixtures:audit <pattern>` to classify
 
-**Unformatted variants** (normalization tests):
+**Unformatted variants** (normalization tests) — behavior is identical across every
+extension (`.svelte`, `.svelte.ts`, `.ts`, `.css`; the extension just matches the input
+and selects the prettier parser):
 
-```
-📁 Regular directories (Svelte)
-   → unformatted_*.svelte
-   → Normalizes to input with BOTH prettier AND our formatter
-
-📁 _prettier_divergence directories (Svelte)
-   → unformatted_ours_*.svelte
-   → Normalizes to input with our formatter, NOT with prettier
-   → unformatted_prettier_*.svelte
-   → Normalizes to output_prettier with prettier (requires output_prettier.svelte)
-   → unformatted_*.svelte
-   → Normalizes to input with BOTH formatters (only when no output_prettier.svelte —
-     input must be prettier-stable)
-
-📁 Svelte rune modules (.svelte.ts)
-   → unformatted_*.svelte.ts
-   → Normalizes to input with BOTH prettier AND our formatter
-
-📁 TypeScript-only directories
-   → unformatted_*.ts (regular) or unformatted_ours_*.ts (_prettier_divergence)
-   → Normalizes to input with prettier's TypeScript parser AND our formatter
-```
-
-**Details:**
-
-- **`unformatted_*.svelte`** - Validated by BOTH prettier AND our formatter
-  - Use in regular Svelte fixture directories
-  - Tests that both formatters normalize correctly
-  - In `_prettier_divergence` directories, allowed only without `output_prettier.svelte` (S9 enforced) — input must be prettier-stable for prettier to normalize to it
-
-- **`unformatted_ours_*.svelte`** - Normalizes to input with our formatter, NOT with prettier
-  - Use ONLY in `_prettier_divergence` directories (enforced by S8)
-  - Our formatter normalizes these to input; prettier must NOT normalize to input
-  - Makes validation intent explicit through naming
-
-- **`unformatted_prettier_*.svelte`** - Normalizes to output_prettier with prettier
-  - Use ONLY in `_prettier_divergence` directories with `output_prettier.svelte`
-  - Tests that prettier normalizes these variants to its canonical output
-  - Our formatter validation is NOT applied (tests prettier's behavior)
-
-- **`unformatted_*.svelte.ts`** - For Svelte rune module fixtures
-  - Use when input file is `input.svelte.ts`
-  - Validated by BOTH prettier (via svelte plugin) AND our formatter
-
-- **`unformatted_*.ts`** - For TypeScript-only fixtures (regular directories)
-  - Use when input file is `input.ts`
-  - Validated by prettier's TypeScript parser AND our formatter
-
-- **`unformatted_ours_*.ts`** - For TypeScript-only fixtures (`_prettier_divergence` directories)
-  - Use when input file is `input.ts` and prettier has quirks
-  - Our formatter normalizes these to input; prettier must NOT normalize to input
-
-- **`unformatted_*.css`** - For CSS-only fixtures (regular directories)
-  - Use when input file is `input.css`
-  - Validated by prettier's CSS parser AND our formatter
-
-- **`unformatted_ours_*.css`** - For CSS-only fixtures (`_prettier_divergence` directories)
-  - Use when input file is `input.css` and prettier has quirks
-  - Our formatter normalizes these to input; prettier must NOT normalize to input
+- **`unformatted_*.*`** — normalizes to input with BOTH prettier AND our formatter.
+  Regular directories; in `_prettier_divergence` directories allowed only without
+  `output_prettier.*` (S9 — input must be prettier-stable for prettier to normalize to it)
+- **`unformatted_ours_*.*`** — normalizes to input with our formatter, NOT with prettier
+  (the claim is verified). ONLY in `_prettier_divergence` directories (S8)
+- **`unformatted_prettier_*.*`** — prettier normalizes it to `output_prettier.*` (which
+  must exist); our formatter validation is not applied. ONLY in `_prettier_divergence`
+  directories
 
 ### Standard Variant Names
 
@@ -388,20 +339,14 @@ Quirk name — description (example):
 - Be specific: `parens_spaces` not just `spaces`
 - Match pattern consistently across fixtures
 
-**For documenting prettier's unstable intermediate output** (`prettier_intermediate_*.*`):
+**For documenting prettier's unstable intermediate output** (`prettier_intermediate_*.*` / `prettier_intermediate_to_variant_*.*`):
 
-When prettier requires multiple passes to reach stable output, use `prettier_intermediate_*` to capture the first-pass output:
-
-- `prettier_intermediate_expanded` — First-pass output from `unformatted_ours_expanded`
-- `prettier_intermediate_compact` — First-pass output from `unformatted_ours_compact`
-
-**Requirements:**
-
-- Must have corresponding `unformatted_ours_*` file with same suffix
-- Extension must match input file (`.svelte`, `.ts`, `.css`, `.svelte.ts`)
-- Content must be prettier's actual first-pass output (not hand-written)
-- Must be unstable (prettier changes it on re-format)
-- Must converge to `input.*` after second prettier pass
+Capture prettier's actual first-pass output (not hand-written) from the same-suffix
+`unformatted_ours_*` source — the shared suffix links them (e.g.
+`unformatted_ours_expanded` → `prettier_intermediate_expanded`). Use the
+`_to_variant_` form when prettier's second pass lands on a documented
+`variant_*`/`prettier_variant_*` sibling instead of `input.*`. Validation: rules
+N7/N7b in ./fixture_overview.md.
 
 **Example:**
 
@@ -413,115 +358,35 @@ trailing_member_computed_comment_prettier_divergence/
 └── README.md
 ```
 
-The suffix `_expanded` links `unformatted_ours_expanded` to `prettier_intermediate_expanded`.
+**For documenting dual-stable and divergent-variant forms** (`variant_*.*` / `divergent_variant_*.*`):
 
-**For documenting prettier's unstable intermediate output that converges to a variant** (`prettier_intermediate_to_variant_*.*`):
+All three prettier-stable-form kinds are prettier-idempotent and differ only in what
+our formatter does — `prettier_variant_*`: ours → `input`; `variant_*`: ours keeps it
+(dual-stable); `divergent_variant_*`: ours → a distinct third stable form (three stable
+forms coexist). Suffixes describe the form, e.g. `variant_compact`, `variant_wrapped`,
+`divergent_variant_own_line` (heritage keyword own-line form), `divergent_variant_spaces`
+(a blank-line form). Validation: rules N9/N11 + C3b/C3c in ./fixture_overview.md;
+README.md required.
 
-Use this pattern when prettier's two-pass walk lands on a documented `variant_*` or `prettier_variant_*` file instead of `input.*`.
+**No-oracle marker files** — three fixed filenames (not variant patterns), all rare;
+their claim semantics and coexistence rules are ./fixture_overview.md rules
+F5/S18, F6/S19, F7/S20:
 
-- `prettier_intermediate_to_variant_block_own_line` — First-pass output that converges to a sibling `variant_block_before_colon` on the second pass
-
-**Requirements:**
-
-- Must have corresponding `unformatted_ours_*` file with same suffix
-- Must coexist with at least one `variant_*` or `prettier_variant_*` file (the convergence target)
-- Extension must match input file (`.svelte`, `.ts`, `.css`, `.svelte.ts`)
-- Content must be prettier's actual first-pass output (not hand-written)
-- Must be unstable (prettier changes it on re-format)
-- Second prettier pass must NOT equal `input.*` (else use `prettier_intermediate_*` instead)
-- Second prettier pass must equal the content of some `variant_*` or `prettier_variant_*` sibling
-
-The suffix names follow the same rules as `prettier_intermediate_*` — link them to the source `unformatted_ours_*` file by sharing the suffix.
-
-**For documenting dual-stable forms** (`variant_*.*`):
-
-When prettier produces a stable output that our formatter also keeps stable (idempotent),
-but neither normalizes to `input.*`:
-
-- `variant_compact` — Compact dual-stable form (both formatters keep as-is)
-- `variant_wrapped` — Wrapped dual-stable form (both formatters keep as-is)
-
-**Requirements:**
-
-- Must be in `_prettier_divergence` directory
-- Extension must match input file
-- `prettier(file) == file` (prettier keeps it stable)
-- `ours(ours(file)) == ours(file)` (our output is idempotent)
-- `ours(file) != input` (must NOT normalize to input — else use `prettier_variant_*`)
-- Content must differ from input and from all `prettier_variant_*` files
-- README.md required
-
-**Key distinction from `prettier_variant_*`:** both are prettier-stable; they differ in our formatter:
-
-- `prettier_variant_*` — normalizes to `input`
-- `variant_*` — stable (idempotent), NOT `input`
-
-**For documenting divergent-variant forms** (`divergent_variant_*.*`):
-
-When prettier keeps a form stable but our formatter rewrites it to a *third*
-stable form — distinct from both the form and `input`, so three stable forms
-coexist (`input`, prettier's `V`, our `ours(V)`):
-
-- `divergent_variant_own_line` — heritage keyword own-line form (prettier keeps `class P⏎/* c */⏎extends Q`; ours → `class P /* c */ extends Q`)
-- `divergent_variant_spaces` — a blank-line form prettier keeps but ours drops the blank
-- `divergent_variant_nonblock` — a comment-before-`else` form prettier keeps but ours re-collapses the non-block body
-
-**Requirements:**
-
-- Must be in a `_prettier_divergence` directory
-- Extension must match input file
-- `prettier(file) == file` (prettier keeps it stable)
-- `ours(file) != input` (else use `prettier_variant_*`)
-- `ours(file) != file` (else it's dual-stable — use `variant_*`)
-- `ours(ours(file)) == ours(file)` (the rewritten third form is itself a fixed point)
-- Content must differ from input and from all `variant_*` / `prettier_variant_*` files
-- README.md required
-
-**Key distinction from `variant_*` and `prettier_variant_*`:** all three are prettier-stable; they differ in what our formatter does:
-
-- `prettier_variant_*` — ours → `input`
-- `variant_*` — ours keeps it (dual-stable)
-- `divergent_variant_*` — ours → a distinct third stable form
-
-**For documenting prettier non-convergence** (`prettier_nonconvergent.txt`):
-
-When prettier never reaches a fixed point on the input (each pass keeps changing
-the output forever), no prettier-anchored claim file is expressible — there is
-no canonical output to record. Add the fixed-name marker file instead:
-
-- Fixed filename `prettier_nonconvergent.txt` (not a variant pattern; content is free-form prose)
-- Must be in a `_prettier_divergence` directory with README.md
-- Cannot coexist with any prettier-claim file (`output_prettier.*`, `unformatted_*`, `unformatted_prettier_*`, `prettier_variant_*`, `variant_*`, `divergent_variant_*`, `prettier_intermediate_*`) — S18; `unformatted_ours_*` is allowed
-- The validator live-verifies the claim (F5): `prettier(input) != input` AND `prettier²(input) != prettier(input)`
-- Rare — use only when `deno task fixtures:update:formatted` cannot converge (see ./fixture_overview.md rules F5/S18)
-
-**For documenting prettier rejection** (`prettier_rejects.txt`):
-
-When prettier *throws* on the input (a parse rejection or a printer crash), no
-prettier-anchored claim file is expressible — prettier can't produce any output.
-Add the fixed-name marker file instead:
-
-- Fixed filename `prettier_rejects.txt` (not a variant pattern; its trimmed content is the position-stripped expected-error substring, matched with `contains` — all prose lives in README.md)
-- Must be in a `_prettier_divergence` directory with README.md
-- Cannot coexist with any prettier-claim file (same forbid-set as `prettier_nonconvergent.txt`) — S19; `unformatted_ours_*` is allowed. Mutually exclusive with `prettier_nonconvergent.txt` (prettier either throws or oscillates)
-- The validator live-verifies the claim (F6): `prettier(input)` errors with a message containing the pinned substring
-- The input must be valid by tsv's parse oracle (Svelte / acorn-typescript). Hand-author it (`fixture_init` runs prettier, which throws), then `deno task fixtures:update:parsed` for `expected.json`
-- Rare — use only for genuine upstream prettier parser/printer bugs (see ./fixture_overview.md rules F6/S19)
-
-**For documenting tsv over-rejection** (`tsv_rejects.txt`):
-
-When **tsv** rejects an input the canonical parser (Svelte / acorn-typescript /
-`parseCss`) *accepts* — a spec-stricter parse than acorn's — the divergence cannot
-be an `input_invalid_*` fixture (which requires *both* parsers to reject) nor a
-plain fixture (which requires tsv to parse+format the input). Add the fixed-name
-marker instead:
-
-- Fixed filename `tsv_rejects.txt` (not a variant pattern; its trimmed content is the position-stripped expected **tsv**-error substring, matched with `contains` — all prose lives in README.md)
-- Must be in a `_svelte_divergence` directory with README.md and `expected_svelte.json` (the canonical AST)
-- No `expected.json` / `expected_ours.json` — tsv produces no AST. Mutually exclusive with every format-claim file, `input_invalid_*`, and the prettier no-oracle markers (`prettier_rejects.txt` / `prettier_nonconvergent.txt`)
-- The validator live-verifies the claim (F7): `tsv::parse(input)` errors with a message containing the pinned substring, AND the canonical parser accepts and matches `expected_svelte.json` (a canonical rejection means the divergence is dead → convert to `input_invalid_*`)
-- Hand-author `input.*` (prettier is not consulted), then `deno task fixtures:update:parsed` generates `expected_svelte.json` from the canonical parser (failing loudly if it rejects)
-- Rare — use only for a deliberate, cataloged tsv over-rejection (see ./fixture_overview.md rules F7/S20 and the catalog in ./conformance_svelte.md §TypeScript Corrections)
+- `prettier_nonconvergent.txt` — prettier never reaches a fixed point on the input;
+  content is free-form prose. Use only when `deno task fixtures:update:formatted`
+  cannot converge.
+- `prettier_rejects.txt` — prettier throws on the input (parse rejection or printer
+  crash); the trimmed content is the position-stripped expected-error substring
+  (matched with `contains`; all prose lives in README.md). The input must be valid by
+  tsv's parse oracle. Hand-author it (`fixture_init` runs prettier, which throws),
+  then `deno task fixtures:update:parsed` for `expected.json`.
+- `tsv_rejects.txt` — **tsv** rejects an input the canonical parser accepts (neither
+  `input_invalid_*`, which needs both to reject, nor a plain fixture, which needs tsv
+  to parse). Lives in a `_svelte_divergence` dir with README + `expected_svelte.json`;
+  trimmed content is the expected **tsv**-error substring. Hand-author `input.*`
+  (prettier is not consulted), then `deno task fixtures:update:parsed` generates
+  `expected_svelte.json` (failing loudly if the canonical parser rejects — the
+  divergence would be dead). Catalog in ./conformance_svelte.md §TypeScript Corrections.
 
 ---
 

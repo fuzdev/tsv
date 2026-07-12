@@ -40,6 +40,10 @@ impl<'a> ChainPrinter for Printer<'a> {
         self.build_expression_doc(expr)
     }
 
+    fn in_for_init(&self) -> bool {
+        self.in_for_init.get()
+    }
+
     fn build_parenthesized_base_inner_logical(
         &self,
         binary: &internal::BinaryExpression<'_>,

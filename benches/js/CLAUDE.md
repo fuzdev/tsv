@@ -1390,49 +1390,36 @@ Implementation: `lib/binary_sizes.ts`
 
 ## Known Issues
 
-- **Corpus SAFETY flakiness under `--all` load (two historical heisenbugs, both
-  now guarded in-harness).** Because the safety check is differential vs
-  prettier — it iterates the characters _ours_ deviates on and uses prettier
-  only as a subtrahend — the two sides fail in **opposite** directions:
-  1. **FFI marshalling (false positive — fabricates a violation).** Deno's
-     `buffer` fast-call path intermittently handed the native `.so` a
-     stale/wrong source pointer under memory pressure, so **ours** read
-     corrupted input and genuinely (but spuriously) dropped content — a
-     real-looking `content_lost` (historically re-flagging
-     `prettier/tests/format/css/numbers/numbers.css`, a documented `@include`
-     divergence, as SAFETY under `--all`). Only `ours`-side corruption can fake
-     a loss. Hardened twice over in `lib/ffi.ts` (explicit `pointer` params +
-     persistent externalized marshalling buffers — pointers probe-verified
-     stable across forced full GCs, and the original `buffer`-path corruption
-     no longer reproduces on current Deno under synthetic pressure), and
-     **self-verified at the verdict**: before recording any SAFETY finding,
-     `corpus_compare_format.ts` re-runs the native format and requires
-     byte-identity — corruption surfaces as a loud per-file
-     `native format nondeterminism` error, never as a silent SAFETY count.
-  2. **Prettier empty-output miss (false _negative_ — masks a violation).** The
-     in-process prettier (`lib/canonical.ts` — NOT the `tsv_debug` Rust
-     sidecar, a separate prettier host with the same symptom) can intermittently
-     return empty output under load. That can **never fabricate** a
-     `content_lost`: an empty `prettier` inflates `prettier_excess` to the whole
-     source, which only cancels `ours`'s deltas — the danger is masking a real
-     loss in the same file. Guarded three ways: `corpus_compare_format.ts`
-     errors out on semantically-empty (whitespace-only counts) prettier output
-     for non-empty source; the prettier cache neither stores nor returns
-     semantically-empty entries; and the Rust sidecar's `run_prettier` returns
-     a hard `DenoError::EmptyOutput` instead of `Ok("")`, so the fixture
-     validator reports the miss accurately rather than as a spurious F2/F3
-     content mismatch. Deliberately **no retry** anywhere: a flaky oracle must
-     stay loud.
+- **Corpus SAFETY robustness under `--all` load.** The safety check is
+  differential vs prettier — it iterates the characters _ours_ deviates on and
+  uses prettier only as a subtrahend — so the two sides can only fail in
+  **opposite** directions, and each is guarded in-harness:
+  1. **Native-side corruption would fabricate a violation** (only `ours`-side
+     corruption can fake a loss). `lib/ffi.ts` uses explicit `pointer` params +
+     persistent externalized marshalling buffers, and every SAFETY finding is
+     **self-verified at the verdict**: `corpus_compare_format.ts` re-runs the
+     native format and requires byte-identity before recording it — corruption
+     surfaces as a loud per-file `native format nondeterminism` error, never as
+     a silent SAFETY count.
+  2. **A prettier empty-output miss would mask a violation** (never fabricate
+     one — an empty `prettier` inflates `prettier_excess`, which only cancels
+     `ours`'s deltas). The in-process prettier (`lib/canonical.ts` — a separate
+     host from the `tsv_debug` Rust sidecar) can intermittently return empty
+     output under load; guarded three ways: `corpus_compare_format.ts` errors
+     on semantically-empty prettier output for non-empty source; the prettier
+     cache neither stores nor returns semantically-empty entries; and the Rust
+     sidecar's `run_prettier` returns a hard `DenoError::EmptyOutput` instead
+     of `Ok("")`. Deliberately **no retry** anywhere: a flaky oracle must stay
+     loud.
 
-  **Triage:** a SAFETY finding now reproduces by construction (two in-run
-  native runs agreed), so treat it as real; confirm root cause with the
-  **native CLI** (`tsv format <file>` is deterministic) and diff semantic chars
-  vs prettier. A `native format nondeterminism` or prettier-miss **error**
-  is the heisenbug surfacing — re-run to clear it, and investigate the
-  environment if it persists. For "did my change regress?", diff the sorted
-  `.safety[].path` lists before/after (a real regression is a _new path_, not
-  a count bump); a change scoped to one printer/crate can't lose content in
-  unrelated languages.
+  **Triage:** a SAFETY finding reproduces by construction (two in-run native
+  runs agreed), so treat it as real; confirm root cause with the **native CLI**
+  (`tsv format <file>` is deterministic) and diff semantic chars vs prettier. A
+  `native format nondeterminism` or prettier-miss **error** is the environment
+  acting up — re-run to clear it, and investigate if it persists. For "did my
+  change regress?", diff the sorted `.safety[].path` lists before/after (a real
+  regression is a _new path_, not a count bump); a change scoped to one
+  printer/crate can't lose content in unrelated languages.
 - **Parse benchmark overhead**: JSON materialization, not parsing, dominates
   the `-json` rows (see `results/report.<runtime>.md` for the current per-language
   ratios). Use `tsv-internal` for raw parse speed. Both the native and WASM rows go through

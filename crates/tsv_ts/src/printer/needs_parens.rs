@@ -107,8 +107,10 @@ pub enum ParenContext {
     /// Assignment expressions need parens for clarity
     TemplateLiteralExpression,
 
-    /// Computed property key: `{[<expr>]: value}`
-    /// Assignment expressions need parens for clarity
+    /// Computed `[<expr>]` bracket — an object/class computed property key
+    /// (`{[<expr>]: value}`, `class C { [<expr>] }`) or a computed member-access
+    /// index (`arr[<expr>]`, `obj?.[<expr>]`). An assignment expression is
+    /// parenthesized for clarity in all three (a sequence self-parenthesizes).
     ComputedPropertyKey,
 
     /// Statement test condition: `if (<expr>)`, `while (<expr>)`, `for (;<expr>;)`, `do {} while (<expr>)`
