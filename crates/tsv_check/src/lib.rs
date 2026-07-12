@@ -35,12 +35,18 @@
 //! - `hash` (private) — the crate's Fx-style hasher and `FxHashMap`/`FxHashSet`.
 //! - `span_scan` (private) — the bracket-inclusive computed-key scan the binder
 //!   and check pass share, so their spans agree by construction.
-//! - `binder` (private) — the fused lower+bind pre-order walk.
+//! - `binder` (private) — the two cooperating walks (pre-order SoA lowering +
+//!   functions-first symbol bind) plus the third flow-construction walk.
 //! - `check` (private) — the syntactic per-node check pass ([`check_file_members`]:
-//!   duplicate member declarations today; a general walk for future per-node checks).
+//!   duplicate member declarations today; a general walk for future per-node
+//!   checks) plus `unreachable` — the TS7027/TS7028 flow shim over the binder's
+//!   flow product.
 //! - [`merge`] — the single-threaded global-scope fold (cross-declaration-space
 //!   conflicts, `globalThis`/`undefined`, module augmentations).
-//! - `program` (private) — pipeline assembly and the parse-error short-circuit.
+//! - `program` (private) — pipeline assembly: the unconditional per-unit
+//!   bind+check concat (the baseline-oracle parity path — a parse-rejected unit
+//!   contributes nothing, but never suppresses its siblings; the product-mode
+//!   short-circuit is deliberately not modelled here).
 //!
 //! ## Reference-anchor convention
 //!

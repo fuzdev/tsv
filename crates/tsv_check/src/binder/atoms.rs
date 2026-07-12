@@ -1,4 +1,4 @@
-//! The binder's program-scoped name interner.
+//! The binder's per-file name interner.
 //!
 //! Binding needs cross-occurrence name identity: two `x` at different spans must
 //! resolve to one symbol-table key. Span-identity identifier names give equality
@@ -6,6 +6,15 @@
 //! [`Atom`] through one interner pass — the common case slices `source[name_span]`
 //! (no allocation beyond the interner's own copy), escaped names go through the
 //! parser's decoded channel.
+//!
+//! **Scope: one file's bind.** Each `bind_file` runs a fresh instance, so an
+//! [`Atom`] is comparable only within its own file — a deliberate deviation from
+//! a program-scoped interner, keeping every bind product program-independent
+//! (relocatable/cacheable across programs and lib folds). Cross-file name
+//! identity is reconciled at merge time, today by resolving atoms to owned name
+//! strings in `FileMerge`; a merge-time atom-remap table (old→new integer map)
+//! is the planned replacement when multi-file volume makes the string bridge
+//! measurable.
 //!
 //! This is the checker's **own** interner (a fresh `string-interner` instance),
 //! not the parser's per-document `SharedInterner` — their tenant lifecycles stay
@@ -20,14 +29,15 @@ use string_interner::backend::StringBackend;
 use string_interner::symbol::SymbolU32;
 use string_interner::{StringInterner, Symbol};
 
-/// A dense, program-scoped interned name identity.
+/// A dense interned name identity, valid within one file's bind.
 ///
 /// Equal atoms mean equal names — the symbol-table key. Wraps the interner's
-/// `u32` symbol so distinct-name lookups are integer compares.
+/// `u32` symbol so distinct-name lookups are integer compares. Atoms from
+/// different files never compare (each `bind_file` has its own interner).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Atom(u32);
 
-/// The binder's name interner (its own `string-interner` instance).
+/// The binder's per-file name interner (its own `string-interner` instance).
 pub struct Atoms {
     interner: StringInterner<StringBackend<SymbolU32>>,
     /// tsgo's `InternalSymbolNameDefault` — the forced name of every default

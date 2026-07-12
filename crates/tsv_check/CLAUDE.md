@@ -30,11 +30,15 @@
 
 - `lib.rs` — public API surface.
 - `program.rs` — pipeline assembly, ported from tsgo
-  `program.go GetDiagnosticsOfAnyProgram`: per-unit parse with the goal
-  rule (`Goal::Module` first, `Goal::Script` retry on failure, both-fail =
-  program parse-rejection), the **parse-error short-circuit** (any unit
-  rejects ⇒ zero bind/check diagnostics program-wide), per-file
-  bind-then-check concatenation, final sort+dedup.
+  `harnessutil.go CompileFilesEx` (the baseline-oracle **parity path**):
+  per-unit parse with the goal rule (`Goal::Module` first, `Goal::Script`
+  retry on failure, both-fail = that unit parse-rejects), then the
+  **unconditional** per-unit bind-then-check concatenation — a rejected unit
+  contributes nothing (no AST), but never suppresses a sibling's
+  diagnostics — and the final sort+dedup. The **product-mode short-circuit**
+  (`program.go GetDiagnosticsOfAnyProgram`: syntactic errors ⇒ skip semantic
+  program-wide) is a deliberate mode distinction deferred to the `tsv check`
+  path, NOT modelled here (see the module header).
 - `merge.rs` — the single-threaded globals merge between bind and check,
   ported from tsgo `initializeChecker`'s phase order (script locals +
   globalThis check → global augmentations → undefined check → deferred
@@ -67,9 +71,12 @@
   - `symbols.rs` — `Symbol`, `SymbolFlags` + the `*Excludes` conflict-mask
     const tables (ported bit-for-bit from tsgo's `symbolflags.go`), pooled
     declaration lists, `TableId` symbol tables.
-  - `atoms.rs` — the checker's own program-scoped name interner (a fresh
-    `string-interner` instance — never the parser's per-document
-    `SharedInterner`), reserved internal-name atoms.
+  - `atoms.rs` — the checker's own **per-file** name interner (a fresh
+    `string-interner` instance per `bind_file` — never the parser's
+    per-document `SharedInterner`), reserved internal-name atoms. Atoms are
+    file-local (bind products stay relocatable); cross-file identity is
+    reconciled at merge via owned name strings, with a merge-time atom-remap
+    as the planned multi-file replacement.
   - `flow.rs` — the **third walk**: the per-file control-flow graph
     (`build_flow`), a faithful port of tsgo's binder flow construction
     (`bind`/`bindContainer`/`bindChildren` + the per-statement flow shapers).
@@ -82,8 +89,11 @@
     inlining/initializer forks/labeled statements, and renders DOT for
     `check-test --dump-flow`. Invoked from `program.rs`'s per-unit loop (NOT
     `bind_file`) so **lib files skip flow construction** (recorded deviation).
-    Consumers resolve NodeIds through the SoA walk's **strict**
-    `require_node_id` (a miss aborts). The flow product rides `BoundUnit`,
+    NodeId resolution has **two paths by design**: the flow builder resolves
+    through the SoA walk's strict `require_node_id` (a miss aborts — a silent
+    fallback would mis-attribute graph edges), while the unreachable candidate
+    walk uses the lenient lookup (a miss just means "not a candidate"). The
+    flow product rides `BoundUnit`,
     consumed by `check/unreachable.rs` (TS7027/7028) and, later, the CFA type
     engine. The address map keys on `(address, NodeKind)`, so the one offset-0
     collision pair — a `MethodDefinition` and its inline

@@ -31,8 +31,9 @@
 //! (the corpus has pathological-nesting tests and tsv's parser has no depth
 //! guard), and each test's check is wrapped in `catch_unwind` so a panic lands
 //! in its own bucket instead of killing the run. A stack-overflow *abort* can't
-//! be caught; the [`CRASH_EXCLUSIONS`] list carves out any test that aborts even
-//! the big stack (empty on the pinned corpus).
+//! be caught; the [`CRASH_EXCLUSIONS`] list carves out crashers by kind — the
+//! genuine-abort class is empty on the pinned corpus (every current entry is a
+//! catchable panic tracking a tsv parser bug, liveness-probed each run).
 //
 // tsgo: internal/compiler/program.go GetDiagnosticsOfAnyProgram (the pipeline)
 // tsgo: internal/testrunner/compiler_runner.go (the in-scope selection)

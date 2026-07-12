@@ -511,8 +511,10 @@ fn merge_symbol(target: &mut GlobalEntry, source: &MergeSymbol, out: &mut MergeO
 }
 
 /// tsgo `reportMergeSymbolError` — the same three-way message selection as the
-/// bind-time cascade, emitting on **every** declaration of both symbols with
-/// related info, deduped through [`MergeOut::lookup_or_issue`].
+/// bind-time cascade, emitting a fresh primary on **every** declaration of both
+/// symbols with related info; the caller-side `compact_and_merge_related_infos`
+/// collapses the duplicate primaries (see [`MergeOut`]'s header for why there is
+/// no issued-index dedup here).
 fn report_merge_symbol_error(target: &GlobalEntry, source: &MergeSymbol, out: &mut MergeOut) {
     let is_either_enum =
         target.flags.intersects(SymbolFlags::ENUM) || source.flags.intersects(SymbolFlags::ENUM);
