@@ -46,4 +46,18 @@
 	class C {
 		m() {}
 	}
+
+	// Bare block statement (expands)
+	{
+	}
+
+	// Labeled block statement (expands)
+	lbl: {
+	}
+
+	// Nested bare block inside a block (expands)
+	{
+		{
+		}
+	}
 </script>

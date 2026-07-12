@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 752,
+	"end": 906,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -201,24 +201,72 @@
 					"column": 42
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " Bare block statement (expands)",
+			"start": 744,
+			"end": 777,
+			"loc": {
+				"start": {
+					"line": 50,
+					"column": 1
+				},
+				"end": {
+					"line": 50,
+					"column": 34
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Labeled block statement (expands)",
+			"start": 786,
+			"end": 822,
+			"loc": {
+				"start": {
+					"line": 54,
+					"column": 1
+				},
+				"end": {
+					"line": 54,
+					"column": 37
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Nested bare block inside a block (expands)",
+			"start": 836,
+			"end": 881,
+			"loc": {
+				"start": {
+					"line": 58,
+					"column": 1
+				},
+				"end": {
+					"line": 58,
+					"column": 46
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 751,
+		"end": 905,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 742,
+			"end": 896,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 49,
+					"line": 63,
 					"column": 9
 				}
 			},
@@ -1196,6 +1244,126 @@
 							"value": " Empty class method body (stays inline)",
 							"start": 677,
 							"end": 718
+						}
+					]
+				},
+				{
+					"type": "BlockStatement",
+					"start": 779,
+					"end": 783,
+					"loc": {
+						"start": {
+							"line": 51,
+							"column": 1
+						},
+						"end": {
+							"line": 52,
+							"column": 2
+						}
+					},
+					"body": [],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Bare block statement (expands)",
+							"start": 744,
+							"end": 777
+						}
+					]
+				},
+				{
+					"type": "LabeledStatement",
+					"start": 824,
+					"end": 833,
+					"loc": {
+						"start": {
+							"line": 55,
+							"column": 1
+						},
+						"end": {
+							"line": 56,
+							"column": 2
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 829,
+						"end": 833,
+						"loc": {
+							"start": {
+								"line": 55,
+								"column": 6
+							},
+							"end": {
+								"line": 56,
+								"column": 2
+							}
+						},
+						"body": []
+					},
+					"label": {
+						"type": "Identifier",
+						"start": 824,
+						"end": 827,
+						"loc": {
+							"start": {
+								"line": 55,
+								"column": 1
+							},
+							"end": {
+								"line": 55,
+								"column": 4
+							}
+						},
+						"name": "lbl"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Labeled block statement (expands)",
+							"start": 786,
+							"end": 822
+						}
+					]
+				},
+				{
+					"type": "BlockStatement",
+					"start": 883,
+					"end": 895,
+					"loc": {
+						"start": {
+							"line": 59,
+							"column": 1
+						},
+						"end": {
+							"line": 62,
+							"column": 2
+						}
+					},
+					"body": [
+						{
+							"type": "BlockStatement",
+							"start": 887,
+							"end": 892,
+							"loc": {
+								"start": {
+									"line": 60,
+									"column": 2
+								},
+								"end": {
+									"line": 61,
+									"column": 3
+								}
+							},
+							"body": []
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Nested bare block inside a block (expands)",
+							"start": 836,
+							"end": 881
 						}
 					]
 				}

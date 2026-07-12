@@ -1,7 +1,7 @@
 /**
  * 4-way formatter differential triage: tsv (FFI) vs prettier(-typescript) vs
  * biome-wasm vs oxfmt. A hand-triage aid for the Biome/oxfmt corpus-output
- * mining pass (see grimoire TODO_BIOME_PRETTIER_DIFFS.md) — NOT a gate.
+ * mining pass (see internal notes) — NOT a gate.
  *
  * The corpus:compare:format tool only diffs tsv vs prettier; this adds biome +
  * oxfmt as third/fourth opinions so a tsv-vs-prettier divergence can be bucketed:

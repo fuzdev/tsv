@@ -75,7 +75,12 @@ impl<'a> Printer<'a> {
             Statement::VariableDeclaration(decl) => self.build_variable_declaration_doc(decl, true),
             Statement::TSTypeAliasDeclaration(decl) => self.build_type_alias_declaration_doc(decl),
             Statement::ReturnStatement(ret) => self.build_return_statement_doc(ret),
-            Statement::BlockStatement(block) => self.build_block_statement_doc(block),
+            // A statement-position block (bare `{ }`, a labeled block's body, or a
+            // block nested directly in another block) expands its empty form to `{\n}`,
+            // matching prettier. Only control-flow *bodies* (while/for/do/catch) and
+            // function/class bodies collapse to `{}`, and those are built by their own
+            // parents — never through this dispatch.
+            Statement::BlockStatement(block) => self.build_block_statement_expand_empty_doc(block),
             Statement::FunctionDeclaration(decl) => self.build_function_declaration_doc(decl),
             Statement::ClassDeclaration(decl) => self.build_class_declaration_doc(decl),
             Statement::ExportNamedDeclaration(decl) => {
