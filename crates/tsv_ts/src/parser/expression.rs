@@ -144,6 +144,19 @@ impl<'arena> ParsedExpr<'arena> {
             actual_end: actual_end as u32,
         }
     }
+
+    /// Whether this is a leading *unparenthesized* arrow function — its own span
+    /// starts exactly at `actual_start`. Parenthesizing the arrow (`(() => {})`)
+    /// shifts `actual_start` to the outer `(` while the arrow's span starts inside,
+    /// so the two diverge. A bare arrow is a complete `AssignmentExpression`
+    /// (ecma262 §13.15 — a top-level alternative, not a `ConditionalExpression`,
+    /// binary operand, or `LeftHandSideExpression`) that no subscript or operator
+    /// may extend, so both `parse_prefix_expression` (call / member / postfix) and
+    /// `parse_expression_bp` (binary / `as` / assignment / ternary) stop when it holds.
+    fn is_bare_arrow(&self) -> bool {
+        matches!(self.expr, Expression::ArrowFunctionExpression(_))
+            && self.actual_start == self.expr.span().start
+    }
 }
 
 /// How `parse_postfix_expression` should treat the subscript chain.
@@ -410,6 +423,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Parse prefix expression (primary or unary)
         let mut left = self.parse_prefix_expression()?;
 
+        // A leading *unparenthesized* arrow function is a complete
+        // `AssignmentExpression` (see `is_bare_arrow`), so no operator may extend it:
+        // a trailing binary/logical operator, `as` / `satisfies` assertion,
+        // assignment target, or ternary `?` is a syntax error (tsc TS1005 / prettier
+        // reject; acorn's `parseExprOps` enforces the same for binary operators).
+        // Only a sequence `,` or a statement terminator may follow. A concise body
+        // absorbs any trailing operator (`() => x || a`), so this fires only for a
+        // completed arrow (block body, or a typed/parenthesized signature).
+        let leading_bare_arrow = left.is_bare_arrow();
+
         // Parse infix binary operators and TypeScript `as` / `satisfies` type
         // assertions in one precedence-climbing loop. `as` / `satisfies` bind at
         // the RELATIONAL tier (`BP_AS`), left-associative, consuming a *type* on the
@@ -417,6 +440,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // `(a + b) as T`. (They were previously a second phase below every binary
         // operator, which mis-grouped `(x === y) as T`.)
         loop {
+            // A leading bare arrow takes no infix operator or `as` / `satisfies`
+            // assertion — it is already a complete assignment expression.
+            if leading_bare_arrow {
+                break;
+            }
             let kind = self.current_kind();
 
             let Some((left_bp, right_bp, operator)) = infix_operator_info(kind) else {
@@ -483,7 +511,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Handle assignment operator (after binary ops, before ternary)
         // Assignment is right-associative and has low precedence
         // Check for simple `=` and compound assignment operators (+=, -=, etc.)
-        if min_bp <= BP_ASSIGNMENT
+        // A leading bare arrow is not a `LeftHandSideExpression`, so it cannot be an
+        // assignment target (`() => {} = a` is a syntax error).
+        if !leading_bare_arrow
+            && min_bp <= BP_ASSIGNMENT
             && let Some(operator) = self.try_assignment_operator()
         {
             self.advance()?; // consume assignment operator
@@ -513,7 +544,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Handle ternary operator (lowest precedence among binary-like ops, above comma)
         // Handle at BP_ASSIGNMENT to include in assignment expressions but not in binary ops
-        if min_bp <= BP_ASSIGNMENT && self.eat(TokenKind::Question) {
+        // A leading bare arrow cannot be a `ConditionalExpression` test — the ternary's
+        // test is a `ShortCircuitExpression`, which never derives `ArrowFunction`, so
+        // `() => {} ? b : c` is a syntax error (tsc/prettier reject; acorn over-leniently
+        // accepts it — a cataloged `tsv_rejects` divergence, see conformance_svelte.md).
+        if !leading_bare_arrow && min_bp <= BP_ASSIGNMENT && self.eat(TokenKind::Question) {
             // Parse consequent (then branch) - use BP_ASSIGNMENT to exclude comma operator
             // This ensures (a ? b : c, d) parses as ((a ? b : c), d) not (a ? b : (c, d))
             // The consequent is `AssignmentExpression[+In]` — `in` is always the
@@ -731,9 +766,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // no subscripts can follow (`() => {}()` is invalid JS; a `(` on the next
         // line starts a new statement via ASI). A parenthesized arrow
         // (`(() => {})()`, detected by the span gap) is a callable primary.
-        if matches!(parsed.expr, Expression::ArrowFunctionExpression(_))
-            && parsed.actual_start == parsed.expr.span().start
-        {
+        if parsed.is_bare_arrow() {
             return Ok(parsed);
         }
 
