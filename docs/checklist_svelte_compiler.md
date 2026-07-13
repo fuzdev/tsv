@@ -184,6 +184,20 @@ The oracle's normalization (`3-transform/utils.js:126` `clean_nodes`, `escape_ht
 - **Supported**: `{@render}` of a local snippet (standalone-eligible) or a snippet prop like `{@render children()}` (dynamic — keeps the anchor); optional-chained callee.
 - **Refused**: `{@render} callee is not a resolvable local snippet or snippet prop` — a member callee (`obj.snip()`) or an unresolved identifier.
 
+### Components
+
+A **static** component invocation compiles to `Name($$renderer, props)` (`shared/component.js` `build_inline_component`). The callee is the component's name reference; `props` is a plain object literal, or `$.spread_props([…])` when spreads are present. A trailing `<!---->` anchor (`empty_comment`) follows unless the enclosing fragment is standalone — the oracle's `clean_nodes` `is_standalone` (`3-transform/utils.js:285`): a sole non-dynamic component with no `--custom-property` attribute reuses the block's anchor.
+
+**Prop values** (`build_attribute_value`, `is_component = true`): a static text value is the *decoded* data as a string literal (no HTML escape, no trim); a single expression value passes through with **no fold** (a bare `$derived` read becomes `d()`); a mixed text+expression value is a template literal with `$.stringify` interpolations, folding to a string literal when every part is statically known. A property key is an identifier when it matches the identifier grammar, else a quoted string; `{ n: n }` prints as `{ n }`. An `on*` handler is an ordinary prop (unlike an element handler, which is dropped). Prop-value expressions feed `needs_context` (a `new`/prop-rooted member/call — including inside a `{...spread}` — wraps the body).
+
+- **Supported**: self-closing / prop-only components; string / expression / shorthand / boolean / mixed / non-identifier-key props; consecutive props grouped into objects with `$.spread_props` for spreads; a plain-declaration or import callee; standalone-anchor elision.
+- **Refused**: `dynamic <{name}> component (member or reactive binding)` — a member component (`<Foo.Bar>`) or a component whose name binding is a prop / `$state` / `$derived` / block-local (the oracle emits an `if (expr) {…}` truthiness guard — a later slice).
+- **Refused**: `<{name}> component with children` — the implicit `children` snippet prop and named snippet props are a later slice (an empty or whitespace-only body is not children).
+- **Refused**: `--custom-property attribute on <{name}> component` — the oracle wraps the call in `$.css_props`.
+- **Refused**: `bind: directive on <{name}> component` — the oracle emits a `do…while` settle loop.
+- **Refused**: `directive on <{name}> component` — a non-`bind:` directive (`use:`/`transition:`/…; mostly oracle-rejected input).
+- **Refused**: `comments in a script alongside a component invocation` — the component call's minted / borrowed prop-value spans would sweep the carried-comment windows.
+
 ### Attributes
 
 | Shape | Status |
@@ -206,7 +220,7 @@ The oracle's normalization (`3-transform/utils.js:126` `clean_nodes`, `escape_ht
 | Shape | Status |
 | --- | --- |
 | HTML elements, nesting, void elements | Supported |
-| components (`<Foo>`, `<foo.bar>`) | **Refused**: `<{name}> component (component rendering not implemented)` — the oracle emits `Foo($$renderer, {})` calls |
+| components (`<Foo … />`) | Supported (self-closing / prop-only) — see [Components](#components) |
 | `<option>` | **Refused**: `<option> (oracle emits $$renderer.option closures)` |
 | populated `<select>` / `<optgroup>` | **Refused**: `` <{name}> with children (oracle emits a `<!>` anchor) `` (empty `<select>` is Supported) |
 | SVG / MathML | **Refused**: `<{name}> (foreign namespace)` |

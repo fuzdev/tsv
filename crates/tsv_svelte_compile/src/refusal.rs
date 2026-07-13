@@ -176,6 +176,11 @@ pub enum Refusal {
     /// `sanitize_slots` first statement would sweep the comment windows).
     #[error("comments in a script with a $$slots reference (injected sanitize_slots)")]
     CommentsWithSlots,
+    /// Comments alongside a component invocation (the component call's minted
+    /// object-literal / borrowed prop-value spans would sweep the comment
+    /// windows).
+    #[error("comments in a script alongside a component invocation")]
+    CommentsWithComponent,
     /// A `format-ignore` directive comment in the script.
     #[error("format-ignore directive comment in script")]
     FormatIgnoreComment,
@@ -298,13 +303,46 @@ pub enum Refusal {
         name: String,
     },
 
-    // ── Elements ───────────────────────────────────────────────────────────
-    /// A component element (`<Foo>`, `<foo.bar>`).
-    #[error("<{name}> component (component rendering not implemented)")]
-    ComponentElement {
+    // ── Components ─────────────────────────────────────────────────────────
+    /// A dynamic component — a member component (`<Foo.Bar>`) or a component
+    /// whose name binding is reactive (a prop, `$state`/`$derived`, or a
+    /// block-local): the oracle emits the `if (expr) {…}` truthiness guard with
+    /// hydration anchors, not a plain `Name($$renderer, …)` call.
+    #[error("dynamic <{name}> component (member or reactive binding)")]
+    DynamicComponent {
         /// The component tag as written.
         name: String,
     },
+    /// A component with children (the implicit `children` snippet prop and named
+    /// snippet props are a later slice).
+    #[error("<{name}> component with children")]
+    ComponentChildren {
+        /// The component tag as written.
+        name: String,
+    },
+    /// A `--custom-property` attribute on a component (the oracle wraps the call
+    /// in `$.css_props`).
+    #[error("--custom-property attribute on <{name}> component")]
+    ComponentCustomProperty {
+        /// The component tag as written.
+        name: String,
+    },
+    /// A `bind:` directive on a component (the oracle emits a `do…while` settle
+    /// loop).
+    #[error("bind: directive on <{name}> component")]
+    ComponentBindDirective {
+        /// The component tag as written.
+        name: String,
+    },
+    /// A non-`bind:` directive (`use:`/`transition:`/`class:`/…) on a component
+    /// (mostly oracle-rejected input; refused rather than guessed).
+    #[error("directive on <{name}> component")]
+    ComponentDirective {
+        /// The component tag as written.
+        name: String,
+    },
+
+    // ── Elements ───────────────────────────────────────────────────────────
     /// A foreign-namespace element (SVG/MathML).
     #[error("<{name}> (foreign namespace)")]
     ForeignNamespace {
@@ -405,7 +443,17 @@ impl Refusal {
                 Cow::Borrowed("interpolated {name} attribute on a styled component")
             }
             Self::ValueAttribute { .. } => Cow::Borrowed("value attribute on <{name}>"),
-            Self::ComponentElement { .. } => Cow::Borrowed("<{name}> component"),
+            Self::DynamicComponent { .. } => {
+                Cow::Borrowed("dynamic <{name}> component (member or reactive binding)")
+            }
+            Self::ComponentChildren { .. } => Cow::Borrowed("<{name}> component with children"),
+            Self::ComponentCustomProperty { .. } => {
+                Cow::Borrowed("--custom-property attribute on <{name}> component")
+            }
+            Self::ComponentBindDirective { .. } => {
+                Cow::Borrowed("bind: directive on <{name}> component")
+            }
+            Self::ComponentDirective { .. } => Cow::Borrowed("directive on <{name}> component"),
             Self::ForeignNamespace { .. } => Cow::Borrowed("<{name}> (foreign namespace)"),
             Self::ElementWithChildren { .. } => Cow::Borrowed("<{name}> with children"),
             Self::TemplateLevelElement { .. } => Cow::Borrowed("template-level <{name}>"),
@@ -476,6 +524,9 @@ impl Refusal {
             Self::CommentsWithSlots => Cow::Borrowed(
                 "comments in a script with a $$slots reference (injected sanitize_slots)",
             ),
+            Self::CommentsWithComponent => {
+                Cow::Borrowed("comments in a script alongside a component invocation")
+            }
             Self::FormatIgnoreComment => Cow::Borrowed("format-ignore directive comment in script"),
             Self::TemplateComments => Cow::Borrowed(
                 "template comments (only instance-script comments are carried through)",
@@ -554,11 +605,11 @@ mod tests {
             "lang=\"ts\" instance script (type stripping not implemented)"
         );
         assert_eq!(
-            Refusal::ComponentElement {
+            Refusal::DynamicComponent {
                 name: "Foo.Bar".to_string()
             }
             .to_string(),
-            "<Foo.Bar> component (component rendering not implemented)"
+            "dynamic <Foo.Bar> component (member or reactive binding)"
         );
         // Literal braces render verbatim.
         assert_eq!(

@@ -58,10 +58,11 @@ use tsv_svelte::ast::internal::{
     Root, SnippetBlock, SpecialElement, SpecialElementKind, Style,
 };
 use tsv_ts::ast::internal::{
-    BinaryOperator, BlockStatement, ExportDefaultDeclaration, ExportDefaultValue, Expression,
-    ExpressionStatement, ForInit, ForStatement, FunctionDeclaration, IfStatement, ObjectPattern,
-    ObjectPatternProperty, Property, PropertyKind, RestElement, Statement, UpdateOperator,
-    VariableDeclaration, VariableDeclarationKind, VariableDeclarator,
+    ArrayExpression, BinaryOperator, BlockStatement, ExportDefaultDeclaration, ExportDefaultValue,
+    Expression, ExpressionStatement, ForInit, ForStatement, FunctionDeclaration, IfStatement,
+    ObjectExpression, ObjectPattern, ObjectPatternProperty, ObjectProperty, Property, PropertyKind,
+    RestElement, Statement, UpdateOperator, VariableDeclaration, VariableDeclarationKind,
+    VariableDeclarator,
 };
 
 use std::collections::HashMap;
@@ -142,6 +143,11 @@ struct EmitEnv<'arena, 's> {
     source: &'s str,
     bindings: Bindings<'arena>,
     derived_names: NameSet,
+    /// Top-level `$state`/`$state.raw` binding names. Stored as `Normal` in the
+    /// binding table (a plain server variable after rewrite), but the oracle's
+    /// `binding.kind` is `state` (non-`normal`), so a component whose name is a
+    /// `$state` binding is dynamic — this set recovers that distinction.
+    state_names: NameSet,
     scope: Option<ScopeInfo>,
     matched_classes: BTreeSet<String>,
     /// Script comments are being carried — emitters whose synthetic call
@@ -263,6 +269,12 @@ pub(crate) fn compile_server<'arena>(
     // misplaced comment.
     if has_comments && fragment_contains_block(&root.fragment) {
         return Err(unsupported(Refusal::CommentsAlongsideTemplateBlocks));
+    }
+    // Comments alongside a component invocation refuse: the component call's
+    // minted object-literal / borrowed prop-value spans interleave with the
+    // carried-comment windows in unprobed ways.
+    if has_comments && fragment_has_component(&root.fragment) {
+        return Err(unsupported(Refusal::CommentsWithComponent));
     }
 
     // 3. Script analysis pass: the top-level binding table (evaluator input)
@@ -459,11 +471,34 @@ pub(crate) fn compile_server<'arena>(
         }
     }
 
+    // Top-level `$state`/`$state.raw` binding names — a component named after one
+    // is dynamic (see `component_dynamic`).
+    let mut state_names = NameSet::default();
+    if let Some(script) = root.instance {
+        for stmt in script.content.body {
+            if let Statement::VariableDeclaration(decl) = stmt {
+                for declarator in decl.declarations {
+                    if matches!(
+                        declarator
+                            .init
+                            .as_ref()
+                            .and_then(|init| classify_rune_init(init, source)),
+                        Some(RuneInit::State(_))
+                    ) && let Some(name) = identifier_binding_name(&declarator.id, source)
+                    {
+                        state_names.insert(name);
+                    }
+                }
+            }
+        }
+    }
+
     let mut env = EmitEnv {
         b,
         source,
         bindings,
         derived_names,
+        state_names,
         scope,
         matched_classes: BTreeSet::new(),
         has_comments,
@@ -1587,9 +1622,12 @@ fn emit_fragment<'arena>(
     // wrapping the render already made the block's sole child the element, so the
     // inherited value is false).
     let is_standalone = if ctx.hoist_snippets {
-        matches!(list.as_slice(), [CleanNode::Render(tag)]
-            if render_callee_name(&tag.expression, source)
-                .is_some_and(|name| !render_callee_dynamic(env, name)))
+        match list.as_slice() {
+            [CleanNode::Render(tag)] => render_callee_name(&tag.expression, source)
+                .is_some_and(|name| !render_callee_dynamic(env, name)),
+            [CleanNode::Element(element)] => component_is_standalone_eligible(env, element),
+            _ => false,
+        }
     } else {
         ctx.is_standalone
     };
@@ -2588,17 +2626,13 @@ fn emit_element<'arena>(
         .borrow()
         .resolve_infallible(element.name)
         .to_string();
-    // The oracle compiles a component (`<Foo>`, `<Foo.Bar>`) into a call
-    // (`Foo($$renderer, {})`), never static markup — component rendering is a
-    // later milestone. Exhaustive over `ElementKind` so a new kind can't silently
-    // fall through to the static-HTML path below.
+    // A component (`<Foo>`, `<Foo.Bar>`) compiles to a call
+    // (`Foo($$renderer, {…props})`), not static markup — route it to the
+    // component emitter. Exhaustive over `ElementKind` so a new kind can't
+    // silently fall through to the static-HTML path below.
     match element.kind {
         ElementKind::Html => {}
-        ElementKind::Component => {
-            return Err(unsupported(Refusal::ComponentElement {
-                name: name.clone(),
-            }));
-        }
+        ElementKind::Component => return emit_component(env, element, out, &name, is_standalone),
     }
     match name.as_str() {
         // Namespace-dependent whitespace/emission rules not implemented.
@@ -2671,6 +2705,401 @@ fn emit_element<'arena>(
     )?;
     out.push_text(&format!("</{name}>"));
     Ok(())
+}
+
+/// Whether a component is *dynamic* — the oracle's `metadata.dynamic`
+/// (`2-analyze/visitors/Component.js:14`): `binding !== null && (binding.kind !==
+/// 'normal' || name.includes('.'))`. A dynamic component compiles to an
+/// `if (expr) {…}` truthiness guard with hydration anchors, not a plain call —
+/// refused in this slice.
+///
+/// - A member component (`<Foo.Bar>`) is always dynamic.
+/// - A block-local name (each item/index, `{:then}` value, `{@const}`) resolves
+///   through an overlay to a non-`normal` binding → dynamic.
+/// - A top-level `prop`/`$derived`/`$state` binding → dynamic. A plain
+///   declaration/import (`normal`) or an unresolved global (`binding === null`)
+///   is **not** dynamic.
+fn component_dynamic(env: &EmitEnv<'_, '_>, name: &str) -> bool {
+    if name.contains('.') {
+        return true;
+    }
+    if env
+        .overlays
+        .iter()
+        .any(|overlay| overlay.contains_key(name))
+    {
+        return true;
+    }
+    match env.bindings.get(name) {
+        None => false,
+        Some(binding) => match binding.kind {
+            BindingKind::Prop | BindingKind::Derived => true,
+            BindingKind::Normal | BindingKind::Opaque => env.state_names.contains(name),
+        },
+    }
+}
+
+/// Whether a sole fragment child is a standalone-eligible component (the oracle's
+/// `clean_nodes` `is_standalone`: a non-dynamic `Component` with no
+/// `--custom-property` attribute — `hmr` is always off here). When true its call
+/// reuses the enclosing block's anchor and emits no trailing `<!---->`.
+fn component_is_standalone_eligible(env: &EmitEnv<'_, '_>, element: &Element<'_>) -> bool {
+    if element.kind != ElementKind::Component {
+        return false;
+    }
+    let name = {
+        let interner = env.b.interner.borrow();
+        interner.resolve_infallible(element.name).to_string()
+    };
+    if component_dynamic(env, &name) {
+        return false;
+    }
+    !element.attributes.iter().any(|attr_node| {
+        let AttributeNode::Attribute(attr) = attr_node else {
+            return false;
+        };
+        let interner = env.b.interner.borrow();
+        interner.resolve_infallible(attr.name).starts_with("--")
+    })
+}
+
+/// Whether the component fragment has renderable children (any non-whitespace
+/// text or non-comment node) — the implicit `children` / named-snippet props are
+/// a later slice, so a component with children refuses.
+fn component_has_children(element: &Element<'_>) -> bool {
+    element.fragment.nodes.iter().any(|node| match node {
+        FragmentNode::Text(text) => !text.is_ascii_ws_only,
+        FragmentNode::Comment(_) => false,
+        _ => true,
+    })
+}
+
+/// Whether `name` matches the ECMAScript identifier grammar Svelte's `b.key` uses
+/// (`regex_is_valid_identifier`, `/^[a-zA-Z_$][a-zA-Z_$0-9]*$/`) — an identifier
+/// key, otherwise a string-literal key.
+fn is_valid_js_identifier(name: &str) -> bool {
+    let mut chars = name.chars();
+    match chars.next() {
+        Some(c) if c.is_ascii_alphabetic() || c == '_' || c == '$' => {}
+        _ => return false,
+    }
+    chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
+}
+
+/// Emit `Name($$renderer, props)` for a component invocation (`<Foo … />`),
+/// followed by a trailing `<!---->` anchor unless the enclosing fragment is
+/// standalone (the oracle's `empty_comment` push). Dynamic components, components
+/// with children, `--custom-property` attributes, and directives are refused —
+/// see the individual refusal sites.
+fn emit_component<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    element: &'arena Element<'arena>,
+    out: &mut BodyBuilder<'arena>,
+    name: &str,
+    is_standalone: bool,
+) -> Result<(), CompileError> {
+    let arena = env.b.arena;
+    // A dynamic component (member / reactive binding) compiles to the truthiness
+    // guard — a later slice.
+    if component_dynamic(env, name) {
+        return Err(unsupported(Refusal::DynamicComponent {
+            name: name.to_string(),
+        }));
+    }
+    // Children (the implicit `children` / named snippet props) are a later slice.
+    if component_has_children(element) {
+        return Err(unsupported(Refusal::ComponentChildren {
+            name: name.to_string(),
+        }));
+    }
+
+    // Build the props/spreads expression (a plain object, or `$.spread_props`).
+    let props_expr = build_component_props(env, element, name)?;
+
+    // `Name($$renderer, props)`. The callee is the component reference (a plain
+    // identifier — member components refuse above).
+    let callee = env.b.ident_expr(name);
+    let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
+    args.push(Expression::Identifier(env.b.ident("$$renderer")));
+    args.push(props_expr);
+    let call = env.b.call_of(callee, args.into_bump_slice(), false);
+    let span = call.span();
+    let stmt = Statement::ExpressionStatement(ExpressionStatement {
+        expression: call,
+        span,
+        is_directive: false,
+    });
+    out.push_statement(&mut env.b, arena, stmt);
+
+    // A non-standalone component keeps the `<!---->` anchor so its output doesn't
+    // fuse with the surrounding fragment.
+    if !is_standalone {
+        out.push_text("<!---->");
+    }
+    Ok(())
+}
+
+/// A group of component attributes: consecutive plain attributes accumulate into
+/// one object literal; a `{...spread}` starts a new group (the oracle's
+/// `props_and_spreads` grouping in `shared/component.js`).
+enum PropGroup<'a, 'arena> {
+    Props(Vec<&'a Attribute<'arena>>),
+    Spread(&'a Expression<'arena>),
+}
+
+/// Build the component call's props argument: a plain object `{ … }` when there
+/// are no spreads (or a single leading props group), otherwise
+/// `$.spread_props([ … ])` interleaving objects and spread expressions in source
+/// order. Refuses `--custom-property` attributes, `bind:`, and other directives.
+fn build_component_props<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    element: &'arena Element<'arena>,
+    name: &str,
+) -> Result<Expression<'arena>, CompileError> {
+    let arena = env.b.arena;
+    let mut groups: Vec<PropGroup<'_, 'arena>> = Vec::new();
+    for attr_node in element.attributes {
+        match attr_node {
+            AttributeNode::Attribute(attr) => {
+                let attr_name = {
+                    let interner = env.b.interner.borrow();
+                    interner.resolve_infallible(attr.name).to_string()
+                };
+                // A `--custom-property` attribute takes the oracle's `$.css_props`
+                // path — a later slice.
+                if attr_name.starts_with("--") {
+                    return Err(unsupported(Refusal::ComponentCustomProperty {
+                        name: name.to_string(),
+                    }));
+                }
+                match groups.last_mut() {
+                    Some(PropGroup::Props(props)) => props.push(attr),
+                    _ => groups.push(PropGroup::Props(vec![attr])),
+                }
+            }
+            AttributeNode::SpreadAttribute(spread) => {
+                groups.push(PropGroup::Spread(&spread.expression));
+            }
+            AttributeNode::BindDirective(_) => {
+                return Err(unsupported(Refusal::ComponentBindDirective {
+                    name: name.to_string(),
+                }));
+            }
+            _ => {
+                return Err(unsupported(Refusal::ComponentDirective {
+                    name: name.to_string(),
+                }));
+            }
+        }
+    }
+
+    // The oracle emits a plain object when there are no groups, or exactly one
+    // props group; otherwise `$.spread_props([...])`.
+    let single_object =
+        groups.is_empty() || (groups.len() == 1 && matches!(groups[0], PropGroup::Props(_)));
+    if single_object {
+        let attrs: &[&Attribute<'arena>] = match groups.first() {
+            Some(PropGroup::Props(props)) => props,
+            _ => &[],
+        };
+        return build_props_object(env, attrs);
+    }
+
+    // `$.spread_props([ obj_or_spread, … ])`. Mint the brackets around the
+    // element construction so the array span encloses the minted object spans.
+    let lbracket = env.b.mint("[").start;
+    let mut elements: BumpVec<'arena, Option<Expression<'arena>>> = BumpVec::new_in(arena);
+    for group in &groups {
+        let element_expr = match group {
+            PropGroup::Props(props) => build_props_object(env, props)?,
+            PropGroup::Spread(expr) => wrap_value_expr(env, expr)?[0].clone(),
+        };
+        elements.push(Some(element_expr));
+    }
+    let rbracket = env.b.mint("]").end;
+    let array = Expression::ArrayExpression(ArrayExpression {
+        elements: elements.into_bump_slice(),
+        spread_trailing_comma: false,
+        span: Span::new(lbracket, rbracket),
+    });
+    let array_alloc = arena.alloc(array);
+    Ok(env
+        .b
+        .member_call("$", "spread_props", std::slice::from_ref(array_alloc)))
+}
+
+/// Build a plain object literal `{ … }` from a run of component attributes. The
+/// braces are minted around the property construction so the object span encloses
+/// the (appendix) key spans (the object printer reads its own span region for the
+/// expansion decision — all appendix, no newlines, so it collapses when it fits).
+fn build_props_object<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    attrs: &[&'arena Attribute<'arena>],
+) -> Result<Expression<'arena>, CompileError> {
+    let arena = env.b.arena;
+    let obrace = env.b.mint("{").start;
+    let mut properties: BumpVec<'arena, ObjectProperty<'arena>> = BumpVec::new_in(arena);
+    for attr in attrs {
+        properties.push(ObjectProperty::Property(build_component_property(
+            env, attr,
+        )?));
+    }
+    let cbrace = env.b.mint("}").end;
+    Ok(Expression::ObjectExpression(ObjectExpression {
+        properties: properties.into_bump_slice(),
+        spread_trailing_comma: false,
+        span: Span::new(obrace, cbrace),
+    }))
+}
+
+/// Build one `key: value` object property from a component attribute. The key is
+/// an identifier when it matches the identifier grammar (else a string literal);
+/// `shorthand` is set when the key is an identifier and the value is the plain
+/// identifier of the same name (`{ n: n }` prints as `{ n }`). The key is minted
+/// before the value, so the (key-only) property span stays forward and in the
+/// appendix; the value prints from its own span.
+fn build_component_property<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    attr: &'arena Attribute<'arena>,
+) -> Result<Property<'arena>, CompileError> {
+    let name = {
+        let interner = env.b.interner.borrow();
+        interner.resolve_infallible(attr.name).to_string()
+    };
+    let key_is_ident = is_valid_js_identifier(&name);
+    let key = if key_is_ident {
+        Expression::Identifier(env.b.ident(&name))
+    } else {
+        env.b.string_literal_expr(&name)
+    };
+    let key_span = key.span();
+    let value = build_prop_value(env, attr)?;
+    let shorthand = key_is_ident
+        && matches!(&value, Expression::Identifier(id)
+            if plain_identifier_name(id, env.source).as_deref() == Some(name.as_str()));
+    Ok(Property {
+        key,
+        value,
+        kind: PropertyKind::Init,
+        shorthand,
+        computed: false,
+        method: false,
+        span: key_span,
+    })
+}
+
+/// Build a component attribute's prop value:
+///
+/// - a boolean attribute → `true`;
+/// - a single static text value → the *decoded* data as a string literal (no
+///   HTML escaping, no trim — the oracle's `is_component` branch of
+///   `build_attribute_value`);
+/// - a single expression value → guarded, bare-derived → `d()`, passed through
+///   with **no fold** (the single-chunk component path doesn't evaluate);
+/// - a mixed text+expression value → a template literal (or a folded string
+///   literal when every part is statically known).
+fn build_prop_value<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    attr: &'arena Attribute<'arena>,
+) -> Result<Expression<'arena>, CompileError> {
+    let Some(values) = attr.value else {
+        return Ok(env.b.true_literal());
+    };
+    match values {
+        [AttributeValue::Text(text)] => {
+            let decoded = text.data(env.source);
+            Ok(env.b.string_literal_expr(&decoded))
+        }
+        [AttributeValue::ExpressionTag(tag)] => {
+            let wrapped = wrap_value_expr(env, &tag.expression)?;
+            Ok(wrapped[0].clone())
+        }
+        _ => build_component_mixed_value(env, values),
+    }
+}
+
+/// Build a mixed text+expression component attribute value. Unlike the element
+/// mixed-attribute path there is no whitespace trim, no HTML escaping, and no
+/// `$.attr*` wrapper — the oracle's component `build_attribute_value` returns the
+/// bare value: a folded string literal when every part is statically known, else
+/// a template literal with `$.stringify(expr)` interpolations (omitted when the
+/// evaluator proves a defined string).
+fn build_component_mixed_value<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    values: &'arena [AttributeValue<'arena>],
+) -> Result<Expression<'arena>, CompileError> {
+    let mut texts: Vec<String> = vec![String::new()];
+    // The unescaped folded value in parallel — consumed only when every part folds.
+    let mut raw = String::new();
+    let mut exprs: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(env.b.arena);
+    for value in values {
+        match value {
+            AttributeValue::Text(text) => {
+                let decoded = text.data(env.source);
+                raw.push_str(&decoded);
+                #[allow(clippy::unwrap_used)]
+                texts
+                    .last_mut()
+                    .unwrap()
+                    .push_str(&escape_template_text(&decoded));
+            }
+            AttributeValue::ExpressionTag(tag) => {
+                // Guard first — never fold an oracle-invalid expression.
+                let wrapped = wrap_value_expr(env, &tag.expression)?;
+                let evaluated = evaluate(&tag.expression, &env.value_scope(), env.source, 0)
+                    .map_err(|g| unsupported(Refusal::StaticEvalNotPortable(g.0)))?;
+                if let Some(value) = evaluated.known_value() {
+                    let text = stringify_value(value)
+                        .map_err(|g| unsupported(Refusal::StaticFoldNotPortable(g.0)))?;
+                    raw.push_str(&text);
+                    #[allow(clippy::unwrap_used)]
+                    texts
+                        .last_mut()
+                        .unwrap()
+                        .push_str(&escape_template_text(&text));
+                    continue;
+                }
+                let piece = if evaluated.is_defined_string() {
+                    wrapped[0].clone()
+                } else {
+                    env.b.member_call("$", "stringify", wrapped)
+                };
+                exprs.push(piece);
+                texts.push(String::new());
+            }
+        }
+    }
+
+    if exprs.is_empty() {
+        return Ok(env.b.string_literal_expr(&raw));
+    }
+    Ok(env.b.template_literal(&texts, exprs.into_bump_slice()))
+}
+
+/// Recursively test whether a fragment contains a component (`<Foo … />`) — the
+/// comments+component refusal gate.
+fn fragment_has_component(fragment: &Fragment<'_>) -> bool {
+    fragment.nodes.iter().any(|node| match node {
+        FragmentNode::Element(element) => {
+            element.kind == ElementKind::Component || fragment_has_component(&element.fragment)
+        }
+        FragmentNode::SpecialElement(se) => fragment_has_component(&se.fragment),
+        FragmentNode::IfBlock(b) => {
+            fragment_has_component(&b.consequent)
+                || b.alternate.as_ref().is_some_and(fragment_has_component)
+        }
+        FragmentNode::EachBlock(b) => {
+            fragment_has_component(&b.body)
+                || b.fallback.as_ref().is_some_and(fragment_has_component)
+        }
+        FragmentNode::AwaitBlock(b) => [&b.pending, &b.then, &b.catch]
+            .into_iter()
+            .flatten()
+            .any(fragment_has_component),
+        FragmentNode::KeyBlock(b) => fragment_has_component(&b.fragment),
+        FragmentNode::SnippetBlock(s) => fragment_has_component(&s.body),
+        _ => false,
+    })
 }
 
 /// Emit one plain attribute. Static text values inline (with entity decoding,

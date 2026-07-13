@@ -26,11 +26,13 @@ project-wide conventions.
     parses the component and runs the server transform. Generated JS prints
     through `format_canonical`, so it is canonical-form by construction
     (`canonicalize_js(output.js)` is a fixed point). The control-flow blocks
-    `{#if}`/`{#each}`/`{#await}`/`{#key}`, `{@const}`, and `{#snippet}`/`{@render}`
-    are covered (see the transform_server block emitters below). Shapes the
-    transform does not cover yet — client generation, dev mode, components
-    (`<Foo>` / `<Foo.Bar>`, which the oracle emits as `Foo($$renderer, {})`
-    calls), instance-script exports in every form (the oracle compiles
+    `{#if}`/`{#each}`/`{#await}`/`{#key}`, `{@const}`, `{#snippet}`/`{@render}`,
+    and **static component invocations** (`<Foo … />` →
+    `Foo($$renderer, {…props})` / `$.spread_props`; self-closing / prop-only —
+    dynamic/member components, component children, `bind:`/`--css-var`/directives
+    refuse) are covered (see the transform_server block emitters below). Shapes
+    the transform does not cover yet — client generation, dev mode,
+    instance-script exports in every form (the oracle compiles
     `export const`/`function`/`{a}` via `$.bind_props`, not implemented; rejects
     `export default`/`export let`), non-JS instance scripts — `generics`, or a
     `lang` other than `"js"`/`""` (type stripping not implemented;

@@ -31,7 +31,7 @@
 //! past the analysis.
 
 use tsv_svelte::ast::internal::{
-    AttributeNode, AttributeValue, AwaitBlock, ConstTag, EachBlock, Element, Fragment,
+    AttributeNode, AttributeValue, AwaitBlock, ConstTag, EachBlock, Element, ElementKind, Fragment,
     FragmentNode, HtmlTag, IfBlock, KeyBlock, RenderTag, Root, SnippetBlock,
 };
 use tsv_ts::ast::internal::{
@@ -689,16 +689,24 @@ fn walk_render_tag(tag: &RenderTag<'_>, nc: &mut Nc<'_>) {
 
 fn walk_element(element: &Element<'_>, nc: &mut Nc<'_>) {
     for attr_node in element.attributes {
-        // Only plain attributes reach emission; directives/spreads are refused
-        // there, so their expressions never affect the compiled output.
-        if let AttributeNode::Attribute(attr) = attr_node
-            && let Some(values) = attr.value
-        {
-            for value in values {
-                if let AttributeValue::ExpressionTag(tag) = value {
-                    walk_expr(&tag.expression, nc);
+        match attr_node {
+            // Plain attribute expression values feed the trigger check.
+            AttributeNode::Attribute(attr) => {
+                if let Some(values) = attr.value {
+                    for value in values {
+                        if let AttributeValue::ExpressionTag(tag) = value {
+                            walk_expr(&tag.expression, nc);
+                        }
+                    }
                 }
             }
+            // A component's `{...spread}` is emitted (a `$.spread_props` element),
+            // so its expression must feed the trigger check too. On a regular
+            // element a spread is refused at emission, so it's ignored there.
+            AttributeNode::SpreadAttribute(spread) if element.kind == ElementKind::Component => {
+                walk_expr(&spread.expression, nc);
+            }
+            _ => {}
         }
     }
     walk_fragment(&element.fragment, nc);

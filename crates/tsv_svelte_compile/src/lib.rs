@@ -1061,12 +1061,218 @@ mod tests {
     }
 
     #[test]
-    fn compile_refuses_components() {
-        // Components compile to calls (`Foo($$renderer, {})`), not static markup —
-        // component rendering is a later milestone, so they refuse now.
-        assert_unsupported("<Foo />", "<Foo> component");
-        assert_unsupported("<Foo>text</Foo>", "<Foo> component");
-        assert_unsupported("<Foo.Bar />", "component");
+    fn compile_self_closing_component() {
+        // A plain component invocation compiles to `Name($$renderer, {})`. As the
+        // sole root child it is standalone — no trailing `<!---->` anchor.
+        let js = compile_js("<Foo />");
+        assert_eq!(
+            js,
+            "import * as $ from 'svelte/internal/server';\n\
+             export default function Input($$renderer) {\n\
+             \tFoo($$renderer, {});\n\
+             }\n"
+        );
+    }
+
+    #[test]
+    fn compile_component_prop_value_shapes() {
+        // string → 's'; expr(prop) → the reference; shorthand `{value}` collapses
+        // to `value`; boolean → `true`. The component declares props, so `$$props`
+        // is injected, but no `$$renderer.component` wrapper (a bare prop
+        // reference is not `needs_context`-unsafe).
+        let js = compile_js(
+            "<script>let { x, value } = $props();</script>\n<Foo a=\"s\" b={x} {value} disabled />",
+        );
+        assert_eq!(
+            js,
+            "import * as $ from 'svelte/internal/server';\n\
+             export default function Input($$renderer, $$props) {\n\
+             \tlet { x, value } = $$props;\n\
+             \tFoo($$renderer, { a: 's', b: x, value, disabled: true });\n\
+             }\n"
+        );
+    }
+
+    #[test]
+    fn compile_component_shorthand_collapses_when_names_match() {
+        // `b={b}` → `{ b }` (key === value identifier); `b={x}` → `{ b: x }`.
+        let js = compile_js("<script>let { b } = $props();</script>\n<Foo b={b} />");
+        assert!(js.contains("Foo($$renderer, { b });"), "{js}");
+        let js = compile_js("<script>let { b } = $props();</script>\n<Foo a={b} />");
+        assert!(js.contains("Foo($$renderer, { a: b });"), "{js}");
+    }
+
+    #[test]
+    fn compile_component_derived_prop_reads_as_call() {
+        // A bare `$derived` read in a prop value becomes `d()` — so a `{d}`
+        // shorthand is NOT collapsed (the value is a call, not the identifier).
+        let js = compile_js(
+            "<script>let n = $state(1);\n\tlet d = $derived(n * 2);\n\tfunction inc() {\n\t\tn++;\n\t}</script>\n<Foo a={d} {d} />",
+        );
+        assert!(js.contains("Foo($$renderer, { a: d(), d: d() });"), "{js}");
+    }
+
+    #[test]
+    fn compile_component_mixed_and_string_value_semantics() {
+        // Mixed text+expr → a template literal with `$.stringify`; a single static
+        // text value entity-decodes but is NOT HTML-escaped (a JS value, not
+        // markup); an all-fold mixed value collapses to a string literal.
+        let js = compile_js("<script>let { y } = $props();</script>\n<Foo a=\"x {y} z\" />");
+        assert!(
+            js.contains("Foo($$renderer, { a: `x ${$.stringify(y)} z` });"),
+            "{js}"
+        );
+        let js = compile_js("<Foo a=\"&amp; &lt; &gt;\" />");
+        assert!(js.contains("Foo($$renderer, { a: '& < >' });"), "{js}");
+        let js = compile_js("<script>let a = 1;\n\tlet b = 2;</script>\n<Foo t=\"x{a}y{b}\" />");
+        assert!(js.contains("Foo($$renderer, { t: 'x1y2' });"), "{js}");
+    }
+
+    #[test]
+    fn compile_component_non_identifier_key_quotes() {
+        let js = compile_js("<Foo data-x=\"1\" aria-label=\"hi\" />");
+        assert!(
+            js.contains("Foo($$renderer, { 'data-x': '1', 'aria-label': 'hi' });"),
+            "{js}"
+        );
+    }
+
+    #[test]
+    fn compile_component_spread_props() {
+        // Consecutive props group into object literals; spreads break the run,
+        // wrapping the whole thing in `$.spread_props([...])`.
+        let js = compile_js("<script>let { r } = $props();</script>\n<Foo a={1} {...r} b={2} />");
+        assert!(
+            js.contains("Foo($$renderer, $.spread_props([{ a: 1 }, r, { b: 2 }]));"),
+            "{js}"
+        );
+        let js = compile_js("<script>let { r, s } = $props();</script>\n<Foo {...r} {...s} />");
+        assert!(
+            js.contains("Foo($$renderer, $.spread_props([r, s]));"),
+            "{js}"
+        );
+    }
+
+    #[test]
+    fn compile_component_event_handler_is_a_plain_prop() {
+        // Unlike an element `on*` handler (dropped), a component `onclick={fn}` is
+        // an ordinary prop.
+        let js = compile_js("<script>function fn() {}</script>\n<Foo onclick={fn} />");
+        assert!(js.contains("Foo($$renderer, { onclick: fn });"), "{js}");
+    }
+
+    #[test]
+    fn compile_component_anchor_when_not_standalone() {
+        // Inside an element the component is not standalone → trailing `<!---->`.
+        let js = compile_js("<div><Foo /></div>");
+        assert!(
+            js.contains("$$renderer.push(`<div>`);")
+                && js.contains("Foo($$renderer, {});")
+                && js.contains("$$renderer.push(`<!----></div>`);"),
+            "{js}"
+        );
+        // Two sibling components each get an anchor (not a sole child).
+        let js = compile_js("<Foo /><Bar />");
+        assert!(
+            js.contains("Foo($$renderer, {});")
+                && js.contains("$$renderer.push(`<!---->`);")
+                && js.contains("Bar($$renderer, {});"),
+            "{js}"
+        );
+    }
+
+    #[test]
+    fn compile_component_sole_block_child_is_standalone() {
+        // `{#if a}<Foo/>{/if}` — the component is the branch's sole child, so it
+        // reuses the branch anchor and emits no trailing `<!---->`.
+        let js = compile_js("{#if a}<Foo />{/if}");
+        assert!(js.contains("Foo($$renderer, {});"), "{js}");
+        assert!(
+            !js.contains("$$renderer.push(`<!---->`)"),
+            "sole block-child component must not add an anchor: {js}"
+        );
+    }
+
+    #[test]
+    fn compile_refuses_dynamic_components() {
+        // A member component and a component named after a reactive binding
+        // (prop / $state / $derived / each-local) all compile to the oracle's
+        // truthiness guard — refused in this slice.
+        assert_unsupported("<Foo.Bar />", "dynamic <Foo.Bar> component");
+        assert_unsupported(
+            "<script>let { Foo } = $props();</script>\n<Foo />",
+            "dynamic <Foo> component",
+        );
+        assert_unsupported(
+            "<script>let Foo = $state(null);</script>\n<Foo />",
+            "dynamic <Foo> component",
+        );
+        assert_unsupported(
+            "<script>let n = $state(1);\n\tlet Foo = $derived(n);\n\tfunction f() {\n\t\tn++;\n\t}</script>\n<Foo />",
+            "dynamic <Foo> component",
+        );
+        // A plain local / import is NOT dynamic — it compiles.
+        compile(
+            "<script>const Foo = null;</script>\n<Foo />",
+            &CompileOptions::default(),
+        )
+        .expect("plain-local component compiles");
+    }
+
+    #[test]
+    fn compile_refuses_component_children() {
+        // Children (implicit `children` / named snippet props) are a later slice;
+        // an empty or whitespace-only component body is NOT children.
+        assert_unsupported("<Foo>text</Foo>", "<Foo> component with children");
+        assert_unsupported("<Foo><p>x</p></Foo>", "<Foo> component with children");
+        compile("<Foo></Foo>", &CompileOptions::default()).expect("empty children compiles");
+        compile("<Foo>   </Foo>", &CompileOptions::default())
+            .expect("whitespace-only children compiles");
+    }
+
+    #[test]
+    fn compile_refuses_component_directives_and_css_vars() {
+        // `--custom-property` → `$.css_props`; `bind:` → a settle loop; other
+        // directives are (mostly) oracle-rejected — all refused here.
+        assert_unsupported(
+            "<Foo --my-color=\"red\" />",
+            "--custom-property attribute on <Foo> component",
+        );
+        assert_unsupported(
+            "<script>let { v } = $props();</script>\n<Foo bind:value={v} />",
+            "bind: directive on <Foo> component",
+        );
+    }
+
+    #[test]
+    fn compile_refuses_comments_with_component() {
+        // Carried script comments alongside a component invocation refuse.
+        assert_unsupported(
+            "<script>\n\t// note\n\tlet x = 1;\n</script>\n<Foo a={x} />",
+            "comments in a script alongside a component invocation",
+        );
+    }
+
+    #[test]
+    fn compile_component_prop_new_expression_wraps() {
+        // A `new` in a prop value drives `needs_context` (walked in
+        // needs_context.rs), wrapping the body and injecting `$$props`.
+        let js = compile_js("<Foo a={new Date()} />");
+        assert!(
+            js.contains("$$renderer.component(($$renderer) =>")
+                && js.contains("Foo($$renderer, { a: new Date() });"),
+            "{js}"
+        );
+    }
+
+    #[test]
+    fn compile_component_spread_member_on_prop_wraps() {
+        // A member access inside a component spread must feed needs_context.
+        let js = compile_js("<script>let { p } = $props();</script>\n<Foo {...p.x} />");
+        assert!(
+            js.contains("$$renderer.component(($$renderer) =>"),
+            "spread member-on-prop must wrap: {js}"
+        );
     }
 
     #[test]
