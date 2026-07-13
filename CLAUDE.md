@@ -741,6 +741,18 @@ cargo run -p tsv_debug compile_fixtures_validate [pattern...]
 cargo run -p tsv_debug compile_corpus_compare <paths...>
 # Also: --list, --json.
 
+# erase_comment_census - size the type-eraser's comment-refusal haircut over a corpus (pure
+# Rust, no Deno). Per lang="ts" component: collects the spans type erasure drops (TS-only
+# statements, `: T` annotations, type params/args, as/satisfies/! tails, type-only
+# imports/exports, declare items) and counts comments intersecting an erased span's refusal
+# window — the span extended to the next surviving token, so `let x: Foo /* c */ = v` counts
+# while a leading JSDoc on an erased interface (which survives erasure) does not. Also flags
+# cheaply-detectable non-TS blockers (directives/spread, special elements, module scripts,
+# option/select, instance exports) to approximate "type stripping is this file's only blocker";
+# runes/derived/evaluator refusals are NOT detected, so that bucket is an approximation.
+cargo run --release -p tsv_debug -- erase_comment_census ../fuz_ui ../zzz
+# Also: --verbose (per exposed file), --json.
+
 # format_prettier - format using prettier (shows line widths by default; --no-line-widths to hide)
 cargo run -p tsv_debug format_prettier file.svelte
 
@@ -856,6 +868,19 @@ cargo run -p tsv_debug profile file1.ts file2.svelte  # profile specific files
 # Pure Rust, no Deno; run with --release. Full detail: ./docs/performance.md §2.
 cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib
 # Options: --iterations <n> (default: 5), --json (adds per-file data)
+
+# compile_profile - profile Svelte compile timing against the format wall (pure Rust, no Deno).
+# Per compiling .svelte file, three medians: compile (the whole cold per-call shape —
+# tsv_svelte_compile::compile has no warm/arena-reuse entry point, so this IS its production
+# shape) vs parse + format of the same file (warm reset-reuse arenas, the tsv_cli shape).
+# Headline = the ratio column, compile / (parse + format): the compile-multiple over the format
+# wall (design frame ~2-3x for the all-linear pipeline) — the cheap tripwire for super-linear or
+# rebuilt work. Refusals/parse failures are counted, not timed; a CorruptOutput is a compiler
+# bug and fails the run. Compare ratios only against ratios from this same command (the two
+# rows keep their own production shapes on purpose). Run with --release for anchors.
+cargo run --release -p tsv_debug -- compile_profile tests/fixtures_compile
+cargo run --release -p tsv_debug -- compile_profile ../svelte/packages/svelte/tests/runtime-runes
+# Options: --iterations <n> (default: 10), --json
 
 # buffer_sizes - AST histograms for tuning the TS printer's SmallVec inline
 # capacities (named_specs, CommentLines) + the line-count distribution behind the
