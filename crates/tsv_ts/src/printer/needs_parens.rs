@@ -638,9 +638,12 @@ fn export_default_leftmost<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
         Expression::BinaryExpression(b) => export_default_leftmost(b.left),
         Expression::AssignmentExpression(a) => export_default_leftmost(a.left),
         Expression::ConditionalExpression(c) => export_default_leftmost(c.test),
-        Expression::SequenceExpression(s) => {
-            s.expressions.first().map_or(expr, export_default_leftmost)
-        }
+        // A `SequenceExpression` self-parenthesizes in `build_sequence_doc` (its printed
+        // form always starts with `(`), so — like the paren-aware member/call/tag descents
+        // below — the walk stops here instead of recursing to the leftmost operand.
+        // Recursing would double-wrap a class/function-leftmost sequence:
+        // `export default ((class {}, x))` instead of prettier's `(class {}, x)`.
+        Expression::SequenceExpression(_) => expr,
         Expression::UpdateExpression(u) if !u.prefix => export_default_leftmost(u.argument),
         Expression::TSAsExpression(e) => export_default_leftmost(e.expression),
         Expression::TSSatisfiesExpression(e) => export_default_leftmost(e.expression),

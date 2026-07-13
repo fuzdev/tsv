@@ -1,0 +1,148 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 139,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 63,
+				"name": "supports",
+				"prelude": "selector(#ABC)",
+				"block": {
+					"type": "Block",
+					"start": 34,
+					"end": 63,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 38,
+								"end": 39,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 38,
+										"end": 39,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 38,
+														"end": 39
+													}
+												],
+												"start": 38,
+												"end": 39
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 40,
+								"end": 60,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 45,
+										"end": 55,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 38,
+							"end": 60
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 65,
+				"end": 130,
+				"name": "supports",
+				"prelude": "(background: url(#ABC))",
+				"block": {
+					"type": "Block",
+					"start": 99,
+					"end": 130,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 103,
+								"end": 104,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 103,
+										"end": 104,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 103,
+														"end": 104
+													}
+												],
+												"start": 103,
+												"end": 104
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 105,
+								"end": 127,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 110,
+										"end": 122,
+										"property": "color",
+										"value": "green"
+									}
+								]
+							},
+							"start": 103,
+							"end": 127
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 131,
+			"styles": "\n\t@supports selector(#ABC) {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@supports (background: url(#ABC)) {\n\t\ta {\n\t\t\tcolor: green;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 140,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
