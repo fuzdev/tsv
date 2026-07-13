@@ -295,8 +295,36 @@ pub(crate) fn compile_server<'arena>(
                 has_comments,
                 &mut dropped_regions,
             )?;
-            if let Some(rewritten) = rewritten {
-                body.push(rewritten);
+            let Some(rewritten) = rewritten else {
+                continue;
+            };
+            // The oracle splits a multi-declarator top-level declaration into
+            // one declaration per declarator, source order (probe-verified for
+            // let/const/var, no-init, dependent, destructured, and mixed
+            // rune+plain declarators; the per-declarator rune rewrites above
+            // compose with the split). Declarations in nested scopes (function
+            // bodies, blocks, for-heads) stay joined — borrowed passthrough
+            // already matches that. Comments refuse: the oracle re-anchors a
+            // comment *inside* the split (`let // c` then the declarator on the
+            // next line), a placement this transform can't reproduce.
+            match rewritten {
+                Statement::VariableDeclaration(decl) if decl.declarations.len() > 1 => {
+                    if has_comments {
+                        return Err(unsupported(
+                            "comments in a script alongside a multi-declarator declaration \
+                             (the oracle re-anchors comments inside the split)",
+                        ));
+                    }
+                    for declarator in decl.declarations {
+                        body.push(Statement::VariableDeclaration(VariableDeclaration {
+                            kind: decl.kind,
+                            declarations: std::slice::from_ref(declarator),
+                            declare: decl.declare,
+                            span: declarator.span,
+                        }));
+                    }
+                }
+                other => body.push(other),
             }
         }
     }

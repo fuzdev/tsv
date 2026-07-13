@@ -87,7 +87,11 @@ project-wide conventions.
   `$props()` → `$$props` (span-stolen), `$state(v)`/`$state.raw(v)` → `v`
   (`void 0` argument-less), `$derived(e)` → `$.derived(() => e)`,
   `$derived.by(f)` → `$.derived(f)`, statement-position `$effect`/`$effect.pre`
-  dropped — the whole body wrapping in
+  dropped — a multi-declarator top-level declaration splitting into one
+  declaration per declarator, source order (the oracle's shape; nested
+  declarations and for-heads stay joined; comments alongside a multi-declarator
+  refuse — the oracle re-anchors them inside the split) — the whole body
+  wrapping in
   `$$renderer.component(($$renderer) => { … })` whenever `needs_context` fires (a
   dropped effect, or the new/member/call analysis above), which also forces the
   `$$props` parameter — the template folded into one `$$renderer.push(\`…\`)` with

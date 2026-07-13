@@ -998,6 +998,65 @@ mod tests {
     }
 
     #[test]
+    fn compile_splits_multi_declarator_declaration() {
+        // The oracle splits a multi-declarator top-level declaration into one
+        // declaration per declarator, source order preserved.
+        let js = compile_js("<script>let a = 1, b = a + 1;</script>\n<p>x</p>");
+        assert_eq!(
+            js,
+            "import * as $ from 'svelte/internal/server';\n\
+             export default function Input($$renderer) {\n\
+             \tlet a = 1;\n\
+             \tlet b = a + 1;\n\
+             \t$$renderer.push(`<p>x</p>`);\n\
+             }\n"
+        );
+    }
+
+    #[test]
+    fn compile_splits_mixed_rune_and_plain_declarators() {
+        // The per-declarator rune rewrites compose with the split.
+        let js = compile_js(
+            "<script>let a = $state(1), d = $derived(a * 2);\n\tfunction f() {\n\t\ta++;\n\t}</script>\n<p>{d}</p>",
+        );
+        assert!(
+            js.contains("\tlet a = 1;\n\tlet d = $.derived(() => a * 2);\n"),
+            "mixed declarators must split with rewrites applied: {js}"
+        );
+    }
+
+    #[test]
+    fn compile_keeps_nested_multi_declarator_joined() {
+        // Only instance-script top-level declarations split; a declaration
+        // inside a function body stays joined as ONE statement (the oracle
+        // leaves it alone). The canonical reprint breaks its declarators across
+        // continuation lines (multi-init declarations always break) — the same
+        // on both sides of the parity diff, so still one `let`.
+        let js = compile_js(
+            "<script>function f() {\n\t\tlet a = 1,\n\t\t\tb = 2;\n\t\treturn a + b;\n\t}</script>\n<p>{f()}</p>",
+        );
+        assert!(
+            js.contains("let a = 1,\n\t\t\tb = 2;"),
+            "nested declaration must stay one statement: {js}"
+        );
+        assert_eq!(
+            js.matches("let").count(),
+            1,
+            "nested declaration must not split: {js}"
+        );
+    }
+
+    #[test]
+    fn compile_refuses_comment_with_multi_declarator() {
+        // The oracle re-anchors a comment INSIDE the split (`let // c` then the
+        // declarator on the next line) — not reproducible, refuse.
+        assert_unsupported(
+            "<script>\n\t// lead\n\tlet a = 1, b = 2;\n</script>\n<p>x</p>",
+            "multi-declarator declaration",
+        );
+    }
+
+    #[test]
     fn compile_rejects_option_and_populated_select() {
         // The oracle compiles <option> into $$renderer.option closures, and a
         // populated <select>/<optgroup> gets a `<!>` anchor — static emission
