@@ -6,6 +6,7 @@ use crate::compile_fixtures::{
 use crate::deno::{self, SvelteGenerate};
 use crate::diff::{DiffOptions, diff_to_string};
 use argh::FromArgs;
+use futures_util::StreamExt;
 use std::path::Path;
 use tsv_cli::json_utils::to_json_with_tabs;
 use tsv_svelte_compile::{CompileOptions, canonicalize_js, compile};
@@ -100,9 +101,19 @@ impl CompileFixturesValidateCommand {
     }
 
     async fn validate_all(&self, fixtures: Vec<CompileFixture>) -> Result<(), CliError> {
-        let mut reports = Vec::with_capacity(fixtures.len());
-        for fixture in &fixtures {
-            reports.push(validate_fixture(fixture).await);
+        // Validate fixtures concurrently on the bulk sidecar pool, in input
+        // order — each fixture's failure details are buffered into its report,
+        // so concurrent fixtures can't interleave output and the printed order
+        // stays deterministic.
+        let count = fixtures.len();
+        let mut stream = super::spawn_work_stream(
+            fixtures,
+            super::ResultOrder::Input,
+            |fixture| async move { validate_fixture(&fixture).await },
+        );
+        let mut reports = Vec::with_capacity(count);
+        while let Some(joined) = stream.next().await {
+            reports.push(super::task_result(joined, "compile-validation")?);
         }
 
         // All three checks gate: oracle freshness, expected idempotence, AND
