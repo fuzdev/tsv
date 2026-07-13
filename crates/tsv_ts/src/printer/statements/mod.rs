@@ -621,14 +621,30 @@ impl<'a> Printer<'a> {
 
         // Broken: keyword (\n  expr\n);
         // Flat: keyword expr;
-        let broken_doc = d.concat(&[
-            d.text(" ("),
-            d.indent(d.concat(&[d.softline(), d.group(expr_doc), trailing_comments_doc])),
-            d.softline(),
-            d.text(")"),
-        ]);
-
-        let flat_doc = d.concat(&[d.text(" "), expr_doc, trailing_comments_doc]);
+        // The trailing-comment doc is `empty()` when the terminator gap has no comment
+        // (the common case) — omit it so neither `if_break` branch (both are materialized)
+        // carries a wasted empty child. Byte-identical: an empty child renders to nothing.
+        let (broken_doc, flat_doc) = if inline_trailing.is_empty() {
+            (
+                d.concat(&[
+                    d.text(" ("),
+                    d.indent(d.concat(&[d.softline(), d.group(expr_doc)])),
+                    d.softline(),
+                    d.text(")"),
+                ]),
+                d.concat(&[d.text(" "), expr_doc]),
+            )
+        } else {
+            (
+                d.concat(&[
+                    d.text(" ("),
+                    d.indent(d.concat(&[d.softline(), d.group(expr_doc), trailing_comments_doc])),
+                    d.softline(),
+                    d.text(")"),
+                ]),
+                d.concat(&[d.text(" "), expr_doc, trailing_comments_doc]),
+            )
+        };
 
         let mut inner_parts: DocBuf = smallvec![
             d.text(keyword),

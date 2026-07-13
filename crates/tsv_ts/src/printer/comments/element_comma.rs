@@ -124,8 +124,18 @@ impl<'a> Printer<'a> {
         trailing: &TrailingComments<'_>,
         comma: DocId,
     ) {
-        parts.push(self.build_block_comments_doc(&trailing.block));
+        // The comment runs are empty on the common (comment-free) path — collected as
+        // empty vecs by the zero-comment gate in `collect_trailing_comments`. Skip
+        // pushing their `empty()` docs so a comment-free element leaves no wasted child
+        // in the enclosing list concat (which render + every fits pass would still walk).
+        // Byte-identical: an empty comment run builds `concat(&[]) == empty()`, so pushing
+        // it vs not is the same rendered output.
+        if !trailing.block.is_empty() {
+            parts.push(self.build_block_comments_doc(&trailing.block));
+        }
         parts.push(comma);
-        parts.push(self.build_line_comments_suffix_doc(&trailing.line));
+        if !trailing.line.is_empty() {
+            parts.push(self.build_line_comments_suffix_doc(&trailing.line));
+        }
     }
 }

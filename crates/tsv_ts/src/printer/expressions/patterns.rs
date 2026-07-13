@@ -307,11 +307,16 @@ impl<'a> Printer<'a> {
                 let mut prev_end = obj.span.start + 1;
 
                 for (i, prop) in obj.properties.iter().enumerate() {
-                    // Check for leading comments before this property
+                    // Check for leading comments before this property. Gated on the
+                    // object-wide comment flag: with no comment in the pattern span, the
+                    // per-property gap is empty too, so skip the `empty()` leading child
+                    // (render + every fits pass would still walk it). Byte-identical.
                     let prop_start = prop.span().start;
-                    let leading_comments =
-                        self.build_inline_comments_between_doc_trailing_space(prev_end, prop_start);
-                    parts.push(leading_comments);
+                    if has_comments {
+                        let leading_comments = self
+                            .build_inline_comments_between_doc_trailing_space(prev_end, prop_start);
+                        parts.push(leading_comments);
+                    }
 
                     parts.push(self.build_object_pattern_property_doc(prop));
 
@@ -795,9 +800,8 @@ impl<'a> Printer<'a> {
             .type_annotation
             .as_ref()
             .map_or(arr.span.end, |t| t.span.start);
-        let (has_line_comments, has_own_line_block) = if self
-            .has_comments_between(arr.span.start, boundary)
-        {
+        let has_comments = self.has_comments_between(arr.span.start, boundary);
+        let (has_line_comments, has_own_line_block) = if has_comments {
             // Flatten once (skip holes) and share across both scans.
             let non_null: SmallVec<[_; 8]> = arr.elements.iter().flatten().collect();
             let has_line_comments = self
@@ -818,7 +822,7 @@ impl<'a> Printer<'a> {
         if has_line_comments || has_own_line_block {
             self.build_expanded_array_pattern_doc(arr)
         } else {
-            self.build_grouped_array_pattern_doc(arr)
+            self.build_grouped_array_pattern_doc(arr, has_comments)
         }
     }
 
@@ -839,8 +843,15 @@ impl<'a> Printer<'a> {
         d.concat(&[body_doc, tail])
     }
 
-    /// Build grouped array pattern doc (width-based expansion)
-    fn build_grouped_array_pattern_doc(&self, arr: &internal::ArrayPattern<'_>) -> DocId {
+    /// Build grouped array pattern doc (width-based expansion). `has_comments` is the
+    /// caller's whole-pattern comment pre-check (threaded to avoid re-scanning): when
+    /// false, the per-element leading gap is empty, so the `empty()` leading child is
+    /// skipped (render + fits would still walk it). Byte-identical.
+    fn build_grouped_array_pattern_doc(
+        &self,
+        arr: &internal::ArrayPattern<'_>,
+        has_comments: bool,
+    ) -> DocId {
         let d = self.d();
         let mut parts = d.pooled_docbuf();
         let mut prev_end = arr.span.start + 1;
@@ -851,9 +862,11 @@ impl<'a> Printer<'a> {
             if let Some(e) = elem {
                 // Check for leading comments before this element
                 let elem_start = e.span().start;
-                let leading_comments =
-                    self.build_inline_comments_between_doc_trailing_space(prev_end, elem_start);
-                parts.push(leading_comments);
+                if has_comments {
+                    let leading_comments =
+                        self.build_inline_comments_between_doc_trailing_space(prev_end, elem_start);
+                    parts.push(leading_comments);
+                }
 
                 parts.push(self.build_expression_doc(e));
 

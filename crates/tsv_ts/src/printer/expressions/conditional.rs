@@ -199,7 +199,8 @@ impl<'a> Printer<'a> {
         // Comments before ? go after test, comments after ? go before consequent,
         // comments after : go before alternate. These positions only bound the comment
         // scans below, so a ternary with no comment anywhere skips both position scans.
-        let (question_pos, colon_pos) = if self.has_comments_between(test_end, alternate_start) {
+        let ternary_has_comments = self.has_comments_between(test_end, alternate_start);
+        let (question_pos, colon_pos) = if ternary_has_comments {
             (
                 self.find_char_outside_comments(test_end, consequent_start, b'?'),
                 self.find_char_outside_comments(consequent_end, alternate_start, b':'),
@@ -208,34 +209,50 @@ impl<'a> Printer<'a> {
             (None, None)
         };
 
-        // Comments between test and ?
-        let comments_before_question = if let Some(q) = question_pos {
-            self.build_inline_comments_between_doc(test_end, q)
-        } else {
-            self.build_inline_comments_between_doc(test_end, consequent_start)
-        };
+        // The four comment slots (before/after `?`, before/after `:`) are all empty on
+        // the comment-free common path — each gap ⊆ [test_end, alternate_start], so no
+        // comment there means every slot builds to `empty()`. Build them only when the
+        // ternary span carries a comment; otherwise skip the redundant per-gap scan (the
+        // `test_end → consequent_start` one below runs even with no `?` position) and the
+        // four empty children in the `inner` concat. Byte-identical: empty slots render to
+        // nothing, so the lean concat is the same output.
+        let comment_slots = ternary_has_comments.then(|| {
+            // Comments between test and ?
+            let comments_before_question = if let Some(q) = question_pos {
+                self.build_inline_comments_between_doc(test_end, q)
+            } else {
+                self.build_inline_comments_between_doc(test_end, consequent_start)
+            };
 
-        // Comments between ? and consequent (e.g., `b ? /* comment */ c`)
-        // Trailing space so the comment doesn't touch the consequent
-        let comments_after_question = if let Some(q) = question_pos {
-            self.build_inline_comments_between_doc_trailing_space(q + 1, consequent_start)
-        } else {
-            d.empty()
-        };
+            // Comments between ? and consequent (e.g., `b ? /* comment */ c`)
+            // Trailing space so the comment doesn't touch the consequent
+            let comments_after_question = if let Some(q) = question_pos {
+                self.build_inline_comments_between_doc_trailing_space(q + 1, consequent_start)
+            } else {
+                d.empty()
+            };
 
-        // Comments between consequent and : (e.g., `b ? c /* comment */ : d`)
-        let comments_before_colon = if let Some(c) = colon_pos {
-            self.build_inline_comments_between_doc(consequent_end, c)
-        } else {
-            d.empty()
-        };
+            // Comments between consequent and : (e.g., `b ? c /* comment */ : d`)
+            let comments_before_colon = if let Some(c) = colon_pos {
+                self.build_inline_comments_between_doc(consequent_end, c)
+            } else {
+                d.empty()
+            };
 
-        // Comments between : and alternate (e.g., `c : /* comment */ d`)
-        let comments_after_colon = if let Some(c) = colon_pos {
-            self.build_inline_comments_between_doc_trailing_space(c + 1, alternate_start)
-        } else {
-            d.empty()
-        };
+            // Comments between : and alternate (e.g., `c : /* comment */ d`)
+            let comments_after_colon = if let Some(c) = colon_pos {
+                self.build_inline_comments_between_doc_trailing_space(c + 1, alternate_start)
+            } else {
+                d.empty()
+            };
+
+            (
+                comments_before_question,
+                comments_after_question,
+                comments_before_colon,
+                comments_after_colon,
+            )
+        });
 
         // Handle nested conditional in consequent specially:
         // - When flat: parens for parsing `a ? (b ? c : d) : e`
@@ -284,21 +301,42 @@ impl<'a> Printer<'a> {
                 d.indent(self.parenthesize_ternary_branch(cond.alternate, alternate))
             };
 
-        let inner = d.concat(&[
-            test,
+        let inner = if let Some((
             comments_before_question,
-            d.indent(d.concat(&[
-                d.line(),
-                d.text("? "),
-                comments_after_question,
-                consequent_doc,
-                comments_before_colon,
-                d.line(),
-                d.text(": "),
-                comments_after_colon,
-                alternate_doc,
-            ])),
-        ]);
+            comments_after_question,
+            comments_before_colon,
+            comments_after_colon,
+        )) = comment_slots
+        {
+            d.concat(&[
+                test,
+                comments_before_question,
+                d.indent(d.concat(&[
+                    d.line(),
+                    d.text("? "),
+                    comments_after_question,
+                    consequent_doc,
+                    comments_before_colon,
+                    d.line(),
+                    d.text(": "),
+                    comments_after_colon,
+                    alternate_doc,
+                ])),
+            ])
+        } else {
+            // Comment-free common path: no comment slots, so omit the four empty children.
+            d.concat(&[
+                test,
+                d.indent(d.concat(&[
+                    d.line(),
+                    d.text("? "),
+                    consequent_doc,
+                    d.line(),
+                    d.text(": "),
+                    alternate_doc,
+                ])),
+            ])
+        };
 
         // If chained (nested in another conditional), don't wrap in group
         // This allows the parent's break decision to cascade
