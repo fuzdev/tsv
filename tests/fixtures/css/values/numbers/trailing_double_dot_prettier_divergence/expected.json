@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 167,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 10,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 10,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										}
+									],
+									"start": 9,
+									"end": 10
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 11,
+					"end": 158,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 123,
+							"end": 129,
+							"property": "a",
+							"value": "1.."
+						},
+						{
+							"type": "Declaration",
+							"start": 133,
+							"end": 143,
+							"property": "b",
+							"value": "1..e-10"
+						},
+						{
+							"type": "Declaration",
+							"start": 147,
+							"end": 154,
+							"property": "c",
+							"value": "1..5"
+						}
+					]
+				},
+				"start": 9,
+				"end": 158
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 159,
+			"styles": "\n\ta {\n\t\t/* a malformed consecutive double-dot is left verbatim (like ..5, 1.5.5, 1.px); prettier normalizes it */\n\t\ta: 1..;\n\t\tb: 1..e-10;\n\t\tc: 1..5;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 168,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

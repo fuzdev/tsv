@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 65,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 56,
+				"name": "container",
+				"prelude": "(a: )",
+				"block": {
+					"type": "Block",
+					"start": 26,
+					"end": 56,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 30,
+								"end": 32,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 30,
+										"end": 32,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "x",
+														"start": 30,
+														"end": 32
+													}
+												],
+												"start": 30,
+												"end": 32
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 33,
+								"end": 53,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 38,
+										"end": 48,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 30,
+							"end": 53
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 57,
+			"styles": "\n\t@container (a: ) {\n\t\t.x {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 66,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

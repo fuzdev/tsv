@@ -33,6 +33,7 @@ use std::borrow::Cow;
 use std::fmt::Write;
 
 use super::Printer;
+use super::value_normalization;
 use crate::ast::internal;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::source_scan;
@@ -609,7 +610,14 @@ impl<'a> Printer<'a> {
                 }
             }
             internal::SimpleSelector::Invalid { span } => {
-                d.text_pooled(span.extract(self.source).trim())
+                // A dropped forgiving-list item (`:is(.a > . > .b)`) is emitted
+                // verbatim except that its whitespace runs (spaces, tabs, newlines)
+                // collapse to single spaces — the same normalization every other
+                // selector-argument position gets, and what prettier does inside a
+                // selector.
+                d.text_pooled(&value_normalization::collapse_whitespace_runs(
+                    span.extract(self.source).trim(),
+                ))
             }
         }
     }

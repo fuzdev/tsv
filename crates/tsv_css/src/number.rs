@@ -67,9 +67,15 @@ pub(crate) fn number_part_len(s: &str) -> usize {
             && after_dot
                 .chars()
                 .next()
-                .is_none_or(|ch| !continues_unit(ch))
+                .is_none_or(|ch| !continues_unit(ch) && ch != '.')
         {
-            // Trailing dot before a number terminator / EOF: `1.` → `1`.
+            // Trailing dot before a number terminator / EOF: `1.` → `1`. A *second*
+            // dot (`1..`) is excluded (`ch != '.'`): consuming this dot would strip it
+            // (`1.` → `1`) and re-glue the leftover onto the next token
+            // (`1..e-10` → `1.e-10`, `1..` → `1.`), which re-parses as a number and
+            // normalizes again — an F1 non-idempotency. A malformed consecutive-double-
+            // dot number is instead left verbatim (like `..5` / `1.5.5` / `1.px`
+            // already are; prettier normalizes `1..` → `1`, a cataloged divergence).
             i += 1;
         }
     }
@@ -152,6 +158,16 @@ mod tests {
     fn number_part_len_malformed_boundaries() {
         // A second dot terminates the number.
         assert_eq!(number_part_len("1.2.3"), 3);
+        // A consecutive double dot is not absorbed into the number: only the
+        // integer part is taken, so the malformed run is left verbatim rather than
+        // trimmed one dot per pass (F1). `1..`/`1..e-10`/`1..5` → `1` + `..…`.
+        assert_eq!(number_part_len("1.."), 1);
+        assert_eq!(number_part_len("1..e-10"), 1);
+        assert_eq!(number_part_len("1..5"), 1);
+        // A single trailing dot is still consumed (`1.` → `1`), and a trailing dot
+        // before an exponent (`1.e1`) too — those stay idempotent.
+        assert_eq!(number_part_len("1."), 2);
+        assert_eq!(number_part_len("1.e1"), 4);
         // Only the first exponent is consumed.
         assert_eq!(number_part_len("5e10e10"), 4);
         // Leading-dot fraction plus exponent.

@@ -9,98 +9,6 @@ use crate::printer::Printer;
 use tsv_lang::TAB_WIDTH;
 use tsv_lang::doc::{self, DocBuf, arena::DocId};
 
-/// Whether `line` ends inside an unclosed `/* … */` block comment, given whether it
-/// started inside one. Scans with string awareness so a `/*` inside a quoted CSS
-/// value (`content: '/*'`) doesn't open a comment; string state never carries across
-/// lines (an unescaped newline ends a CSS string).
-///
-/// The per-line projection of `tsv_lang::source_scan`'s `TriviaProfile::CSS`
-/// semantics, kept as its own state machine because `skip_trivia` can neither
-/// resume inside an already-open comment nor report whether the span it skipped
-/// was left unterminated.
-// TODO: an unquoted `url()` token may legally contain `/*` (css-syntax url-token);
-// the CSS lexer currently rejects such input outright, so formatted output never
-// carries one — if url-token lexing lands, this scan must learn to skip `url(…)`.
-fn line_ends_inside_block_comment(line: &str, starts_inside: bool) -> bool {
-    let bytes = line.as_bytes();
-    let mut in_comment = starts_inside;
-    let mut in_string: Option<u8> = None;
-    let mut i = 0;
-    while i < bytes.len() {
-        let b = bytes[i];
-        if in_comment {
-            if b == b'*' && bytes.get(i + 1) == Some(&b'/') {
-                in_comment = false;
-                i += 2;
-                continue;
-            }
-        } else if let Some(quote) = in_string {
-            if b == b'\\' {
-                i += 2;
-                continue;
-            }
-            if b == quote {
-                in_string = None;
-            }
-        } else {
-            // An unquoted `url(...)` is an opaque `<url-token>` — an interior `/*` is
-            // literal, not a comment start (css-syntax §4.3.6). Skip it whole so it can't
-            // open comment mode, matching the CSS lexer. (Quoted `url("…")` is a function
-            // — its string is handled by the `in_string` branch above.)
-            if let Some(next) = skip_unquoted_url(bytes, i) {
-                i = next;
-                continue;
-            }
-            match b {
-                b'/' if bytes.get(i + 1) == Some(&b'*') => {
-                    in_comment = true;
-                    i += 2;
-                    continue;
-                }
-                b'\'' | b'"' => in_string = Some(b),
-                _ => {}
-            }
-        }
-        i += 1;
-    }
-    in_comment
-}
-
-/// If `bytes[i..]` begins a standalone, unquoted `url(` (ASCII-ci; `url` not glued to a
-/// preceding identifier char; first non-whitespace content not a quote), return the index
-/// just past its closing `)` — so the caller skips the opaque url-token whole. `None`
-/// otherwise, including quoted `url("…")` (a function-token, left to the string handling).
-/// Mirrors the CSS lexer's `consume_url_token`.
-fn skip_unquoted_url(bytes: &[u8], i: usize) -> Option<usize> {
-    // `url` must be a standalone ident, not the tail of one (`myurl(`, `bg-url(`).
-    let prev_is_ident = i > 0 && {
-        let p = bytes[i - 1];
-        p.is_ascii_alphanumeric() || p == b'-' || p == b'_' || p >= 0x80
-    };
-    if prev_is_ident || !bytes.get(i..i + 4)?.eq_ignore_ascii_case(b"url(") {
-        return None;
-    }
-    // Quoted content (`url( "x" )`) is a function-token, not a url-token.
-    let mut j = i + 4;
-    while matches!(bytes.get(j), Some(b' ' | b'\t')) {
-        j += 1;
-    }
-    if matches!(bytes.get(j), Some(b'"' | b'\'')) {
-        return None;
-    }
-    // Consume to the matching unescaped `)` (or line end — a url-token never spans
-    // output lines, so an unclosed run means the rest of the line is url content).
-    let mut k = i + 4;
-    while k < bytes.len() {
-        match bytes[k] {
-            b'\\' => k += 2,
-            b')' => return Some(k + 1),
-            _ => k += 1,
-        }
-    }
-    Some(k)
-}
-
 impl<'a> Printer<'a> {
     /// Format a Script tag
     ///
@@ -292,11 +200,12 @@ impl<'a> Printer<'a> {
 
             // Pass the entire source to the CSS printer (CSS node spans are
             // absolute, which keeps blank-line detection correct) and share the
-            // printer's whole-source line_breaks table rather than rebuilding
-            // it per <style> island. base_indent_offset=1 accounts for the
-            // Svelte wrapper indent.
+            // printer's whole-source line_breaks table rather than rebuilding it
+            // per <style> island. `base_indent_offset` is the wrapper indent level
+            // the CSS renders at directly (the CSS printer folds it into its
+            // starting `indent_level`), so the result needs no post-hoc re-indent.
             let embed = tsv_lang::EmbedContext {
-                base_indent_offset: 1,
+                base_indent_offset: self.indent_level + 1,
                 ..tsv_lang::EmbedContext::default()
             };
             // Share the host document's doc arena rather than allocating a fresh
@@ -311,28 +220,16 @@ impl<'a> Printer<'a> {
                 self.d(),
             );
 
-            // Indent each line - trim trailing newlines first to avoid extra blank lines
-            // Note: CSS formatter adds trailing newline, we need to remove it before line processing
-            let css_trimmed = formatted_css.trim_end();
-            self.indent_level += 1;
-            let mut in_multiline_comment = false;
-            for line in css_trimmed.lines() {
-                // A line that starts inside an open block comment is comment interior:
-                // indenting it would mutate the comment's content (and compound every
-                // pass, since the reparsed content keeps the added tab), so it's
-                // written verbatim. Comments can open mid-line (selector/value gaps),
-                // hence the full-line scan rather than a line-start check.
-                let is_comment_continuation = in_multiline_comment;
-                in_multiline_comment = line_ends_inside_block_comment(line, in_multiline_comment);
-
-                // Don't indent blank lines or comment interior lines
-                if !line.is_empty() && !is_comment_continuation {
-                    self.write_indent();
-                }
-                self.write(line);
-                self.write("\n");
-            }
-            self.indent_level -= 1;
+            // The CSS is already at its final indentation, so it's written
+            // verbatim — no per-line re-indent. The old post-hoc re-indenter had to
+            // special-case verbatim content (block-comment interiors) because it
+            // otherwise compounded a preserved newline one indent level per format
+            // pass; rendering at the wrapper level upfront removes that hazard
+            // uniformly for every verbatim form (raw at-rule preludes, comment
+            // interiors, `Invalid` selector text). Trim the CSS's own trailing
+            // newline; the closing tag supplies its line break.
+            self.write(formatted_css.trim_end());
+            self.write("\n");
         } else if had_content {
             // Preserve block structure when original had whitespace-only content
             self.write("\n");
@@ -438,39 +335,5 @@ impl<'a> Printer<'a> {
         }
         self.write(&output);
         self.arena.park_render_scratch(output);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::line_ends_inside_block_comment;
-
-    #[test]
-    fn detects_mid_line_comment_open() {
-        assert!(line_ends_inside_block_comment(".a, /* x", false));
-        assert!(!line_ends_inside_block_comment(".a, /* x */ .b {", false));
-        assert!(line_ends_inside_block_comment(
-            "color: red; /* x */ /* y",
-            false
-        ));
-    }
-
-    #[test]
-    fn resumes_inside_open_comment() {
-        assert!(line_ends_inside_block_comment("still inside", true));
-        assert!(!line_ends_inside_block_comment("y */ .b {", true));
-        // `/*` inside an open comment is content, not a nested opener
-        assert!(!line_ends_inside_block_comment("/* y */", true));
-        assert!(line_ends_inside_block_comment("y */ /* z", true));
-    }
-
-    #[test]
-    fn comment_glyphs_in_strings_are_content() {
-        assert!(!line_ends_inside_block_comment("content: '/*';", false));
-        assert!(!line_ends_inside_block_comment("content: \"/*\";", false));
-        // an escaped quote does not close the string
-        assert!(!line_ends_inside_block_comment(r"content: 'a\'/*';", false));
-        // a quote inside an open comment does not start a string
-        assert!(line_ends_inside_block_comment("' */ /* x", true));
     }
 }

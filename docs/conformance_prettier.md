@@ -199,6 +199,7 @@ columns wide. Cataloged in [Tabs-Only Alignment](#tabs-only-alignment).
 ### CSS: At-Rules
 
 - @container spacing — ◆spec_violation — [container_spacing](../tests/fixtures/css/at_rules/container_spacing_prettier_divergence/)
+- @container empty feature value — ◆stable_quirk — [container_empty_feature_value](../tests/fixtures/css/at_rules/container_empty_feature_value_prettier_divergence/)
 - @container line wrap — ◆print_width — [container_long](../tests/fixtures/css/at_rules/container_long_prettier_divergence/)
 - @import line wrap — ◆print_width — [import_media_query_long](../tests/fixtures/css/at_rules/import_media_query_long_prettier_divergence/)
 - @media boolean spacing — ◆spec_violation — [media_boolean_spacing](../tests/fixtures/css/at_rules/media_boolean_spacing_prettier_divergence/)
@@ -245,6 +246,7 @@ The boolean **connectors** `and`/`or`/`not` are **preserved** (`@supports (a: b)
 - Space-separated value wrap — ◆print_width — [space_separated_long_wrap](../tests/fixtures/css/values/lists/space_separated_long_wrap_prettier_divergence/)
 - Comma+space value boundary — ◆print_width — [comma_space_separated_long](../tests/fixtures/css/values/lists/comma_space_separated_long_prettier_divergence/)
 - Number dot-ident — ◆spec_violation — [number_dot_ident](../tests/fixtures/css/values/numbers/number_dot_ident_prettier_divergence/)
+- Trailing double-dot — ◆stable_quirk — [trailing_double_dot](../tests/fixtures/css/values/numbers/trailing_double_dot_prettier_divergence/)
 - Block-valued custom prop — ◆design_choice — [block_value](../tests/fixtures/css/values/variables/block_value_svelte_prettier_divergence/)
 - Empty custom-prop value — ◆stable_quirk — [empty_value](../tests/fixtures/css/values/variables/empty_value_prettier_divergence/)
 - Empty value + `!important` — ◆prettier_bug — [empty_value_important](../tests/fixtures/css/values/variables/empty_value_important_prettier_divergence/)
@@ -258,6 +260,8 @@ The boolean **connectors** `and`/`or`/`not` are **preserved** (`@supports (a: b)
 **Comma+space value boundary**: When comma-separated values contain space-separated parts (like multiple `box-shadow` values), Prettier tolerates lines exceeding printWidth. tsv breaks to stay within 100 chars. See `comma_space_separated_long/` for the matching behavior at 100 and 102 chars.
 
 **Number dot-ident**: tsv matches Prettier's number normalization for all valid CSS — scientific-notation exponents (`1E+2`→`1e2`, `5e0`→`5`), trailing/leading zeros (`1.50`→`1.5`, `.5`→`0.5`), and a trailing dot before a terminator (`1.`→`1`, `1.e1`→`1e1`). This applies to declaration values and to `@media`/`@supports` preludes; `@container` preludes are left raw, matching Prettier. The lone divergence is the _invalid_ sequence `<number>.<ident>` (e.g. `1.px`, `1.foo`): Prettier merges it into a dimension (`1px`), but per CSS Syntax 3 §4.3.3 that is three tokens (`<number>` `<delim .>` `<ident>`), not a dimension — so tsv preserves the source verbatim. This only arises in invalid CSS; Prettier itself keeps `url(1.png)` unmerged.
+
+**Trailing double-dot**: A malformed number with a *consecutive* double dot (`1..`, `1..e-10`, `1..5`) — `parseCss` accepts it (stored raw). The number tokenizer strips a *single* trailing dot (`1.` → `1`), but stripping one from `1..` and re-gluing the leftover onto the next token (`1..e-10` → `1.e-10`) re-parses as a number and normalizes again on the next pass (an F1 non-idempotency). tsv therefore leaves the whole malformed run **verbatim** — uniform with the other malformed-dot forms it already preserves (`..5`, `1.5.5`, `1.px`; see "Number dot-ident" above). Prettier normalizes it (`1..` → `1`, `1..e-10` → `1e-10`, some over two passes — its own transient non-idempotency). Only arises on malformed input.
 
 **Block-valued custom property**: A custom property whose entire value is a top-level `{...}` block is valid per CSS Variables Level 1 §2.1 (`<declaration-value>`, any token sequence with balanced brackets) and appears in Prettier's own corpus. Prettier formats the block contents on their own indented lines like a nested rule body (closing `}` on its own line, then `;`); tsv preserves the value as a single opaque single-line expression. Both forms are stable/idempotent under their respective formatters. (Svelte's CSS parser rejects this form outright with `css_expected_identifier`, so this is also a `_svelte_divergence` — see [conformance_svelte.md](./conformance_svelte.md).)
 

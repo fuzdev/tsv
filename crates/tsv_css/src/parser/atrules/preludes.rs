@@ -155,8 +155,15 @@ pub(super) fn parse_condition_query<'arena>(
 
             // Handle whitespace normalization
             if parser.check(TokenKind::Whitespace) {
+                // A whitespace run right after a value colon (`(a: )`, empty value) is
+                // the prettier-mandated single space after `:` — keep it before `)`
+                // rather than dropping it, or `(a: )` would collapse to `(a:)` while
+                // `(a:)` gains the space (the colon-space rule below), an F1 oscillation.
+                // In `@supports`/`@container` a `:` is always a value colon.
+                let after_value_colon = matches!(prev_token_kind, Some(TokenKind::Colon));
                 let skip_whitespace = matches!(prev_token_kind, Some(TokenKind::LeftParen))
-                    || matches!(parser.peek_kind(), Ok(TokenKind::RightParen));
+                    || (matches!(parser.peek_kind(), Ok(TokenKind::RightParen))
+                        && !after_value_colon);
 
                 parser.advance()?;
 

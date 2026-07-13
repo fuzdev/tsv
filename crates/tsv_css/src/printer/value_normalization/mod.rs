@@ -11,7 +11,7 @@ mod splitting;
 pub(crate) use colors::format_color_from_source;
 pub(crate) use numbers::normalize_dimension_from_source;
 pub(crate) use splitting::{
-    extract_function_args, normalize_css_whitespace, split_args_by_comma,
+    collapse_whitespace_runs, extract_function_args, normalize_css_whitespace, split_args_by_comma,
     split_by_space_preserving_parens,
 };
 
