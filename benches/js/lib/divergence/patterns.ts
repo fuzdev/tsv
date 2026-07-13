@@ -1700,11 +1700,26 @@ const inline_content_block_style: DivergencePattern = {
 		const dangle_close = /<\/[A-Za-z][\w.:-]*[ \t]*$/; //               `</tag` at EOL
 		const dangle_open = /^[ \t]*>/; //                                  `>` starts a line
 		const block_head_alone = /^[ \t]*\{#(?:if|each|await|key|snippet)\b[^}]*\}[ \t]*$/;
+		// The block body boundary is render-free, so tsv breaks it whenever the body renders
+		// multiline while prettier welds the body to the tag. Two more ours-side markers for
+		// that break, neither of which the `alone` head marker sees:
+		//   - the head ENDS an our-line that has a prefix (a preceding sibling the block hugs
+		//     — `{fn(x)}{#if …}` — where prettier hugged the body onto that same line); and
+		//   - a branch / close tag (`{:else}`, `{:else if …}`, `{:then …}`, `{:catch …}`,
+		//     `{/if}`, …) sits ALONE on an our-line, where prettier welded it to the body.
+		// Both are produced only by tsv breaking a boundary prettier keeps hugged. The other
+		// whitespace-only svelte divergences carry neither (verbatim `prettier-ignore` /
+		// region-markers, `<svelte:element>` attr wrap, an html template literal) — they have
+		// no block tag on a changed line at all.
+		const block_head_at_eol = /\{#(?:if|each|await|key|snippet)\b[^}]*\}[ \t]*$/;
+		const block_branch_alone = /^[ \t]*\{[:/](?:else|then|catch|if|each|await|key|snippet)\b[^}]*\}[ \t]*$/;
 		let has_signature = false;
 		for (const hunk of ctx.hunks) {
 			if (
 				hunk.removed_lines.concat(hunk.added_lines).some((l) => dangle_close.test(l) || dangle_open.test(l)) ||
-				hunk.added_lines.some((l) => block_head_alone.test(l))
+				hunk.added_lines.some(
+					(l) => block_head_alone.test(l) || block_head_at_eol.test(l) || block_branch_alone.test(l),
+				)
 			) {
 				has_signature = true;
 				break;

@@ -1214,12 +1214,9 @@ impl<'a> Printer<'a> {
                 has_preceding_breakable,
                 gt_prefix,
             ),
-            FragmentNode::SnippetBlock(b) => self.build_snippet_block_doc_with_full_context(
-                b,
-                in_multiline_context,
-                has_preceding_breakable,
-                gt_prefix,
-            ),
+            FragmentNode::SnippetBlock(b) => {
+                self.build_snippet_block_doc_with_full_context(b, gt_prefix)
+            }
             _ => return None,
         })
     }

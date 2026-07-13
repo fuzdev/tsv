@@ -21,8 +21,11 @@
 //!    semantics-preserving; the element *expansion* it may trigger is the layout change
 //!    under test.
 //!
-//! 2. **At a tag's content boundary** — the whitespace between an element's opening tag
-//!    and its first child, or between its last child and the closing tag. This run is
+//! 2. **At a fragment's content boundary** — the whitespace between a fragment's opening
+//!    tag and its first child, or between its last child and the closing tag. Svelte has
+//!    two fragment families and **both** boundaries are probed: an element's/component's
+//!    content, and a **block branch's** body (`{#if}` / `{:else}` / `{#each}` / its
+//!    `{:else}` fallback / each `{#await}` phase / `{#key}` / `{#snippet}`). This run is
 //!    render-**free** under Svelte 5 (start/end-of-content whitespace is removed at
 //!    compile: `<p>foo<span> - bar</span></p>` renders `foo- bar`), so here the run may
 //!    be *created and destroyed*, not just reshaped: each boundary is probed at all
@@ -108,7 +111,7 @@ pub struct AuthoringAuditCommand {
 }
 
 /// The kind of boundary the toggle site sits on.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 enum SiteKind {
     /// Whitespace-only `Text` node between two siblings.
     WsOnly,
@@ -121,6 +124,11 @@ enum SiteKind {
     BoundaryLeading,
     /// Between an element's last child and its closing tag — likewise.
     BoundaryTrailing,
+    /// Between a block's opening/branch tag (`{#if …}`, `{:else}`, `{:then …}`, …) and
+    /// the first child of that branch — render-free, same three forms.
+    BlockBoundaryLeading,
+    /// Between a block branch's last child and its closing/next-branch tag — likewise.
+    BlockBoundaryTrailing,
 }
 
 impl SiteKind {
@@ -131,8 +139,21 @@ impl SiteKind {
             Self::ContentTrailing => "content-trailing",
             Self::BoundaryLeading => "boundary-leading",
             Self::BoundaryTrailing => "boundary-trailing",
+            Self::BlockBoundaryLeading => "block-boundary-leading",
+            Self::BlockBoundaryTrailing => "block-boundary-trailing",
         }
     }
+
+    /// The ordered kind list, for the per-kind report breakdown.
+    const ALL: [Self; 7] = [
+        Self::WsOnly,
+        Self::ContentLeading,
+        Self::ContentTrailing,
+        Self::BoundaryLeading,
+        Self::BoundaryTrailing,
+        Self::BlockBoundaryLeading,
+        Self::BlockBoundaryTrailing,
+    ];
 }
 
 /// A single toggle site: the byte range (in the formatted base `F`) of the
@@ -246,14 +267,21 @@ fn is_ascii_ws(c: char) -> bool {
 /// of one document — and none of them may select the layout.
 const BOUNDARY_FORMS: [&str; 3] = ["", " ", "\n"];
 
-/// Collect the content-boundary sites of one element's fragment: the (possibly empty)
-/// whitespace run between its opening tag and first child, and between its last child
-/// and its closing tag. Each is emitted once per *other* form in [`BOUNDARY_FORMS`], so
-/// a hugged boundary gets probed with a space and a newline spliced in, and vice versa.
+/// Collect the content-boundary sites of one fragment — an element's content or a block
+/// branch's body, which are the same thing structurally and equally render-free: the
+/// (possibly empty) whitespace run between the opening tag and the first child, and
+/// between the last child and the closing tag. Each is emitted once per *other* form in
+/// [`BOUNDARY_FORMS`], so a hugged boundary gets probed with a space and a newline spliced
+/// in, and vice versa. `kinds` is the (leading, trailing) pair to label them with.
 ///
 /// Caller must have excluded whitespace-significant subtrees (`<pre>`/`<textarea>`),
 /// where this run is literal content and the mutation would change the render.
-fn collect_boundary_sites(nodes: &[FragmentNode<'_>], src: &str, out: &mut Vec<Site>) {
+fn collect_boundary_sites(
+    nodes: &[FragmentNode<'_>],
+    src: &str,
+    kinds: (SiteKind, SiteKind),
+    out: &mut Vec<Site>,
+) {
     let (Some(first), Some(last)) = (nodes.first(), nodes.last()) else {
         return;
     };
@@ -285,13 +313,7 @@ fn collect_boundary_sites(nodes: &[FragmentNode<'_>], src: &str, out: &mut Vec<S
         }
         _ => 0,
     };
-    push_boundary_forms(
-        content_start,
-        content_start + lead,
-        src,
-        SiteKind::BoundaryLeading,
-        out,
-    );
+    push_boundary_forms(content_start, content_start + lead, src, kinds.0, out);
 
     let trail = match last {
         FragmentNode::Text(t) => {
@@ -300,14 +322,18 @@ fn collect_boundary_sites(nodes: &[FragmentNode<'_>], src: &str, out: &mut Vec<S
         }
         _ => 0,
     };
-    push_boundary_forms(
-        content_end - trail,
-        content_end,
-        src,
-        SiteKind::BoundaryTrailing,
-        out,
-    );
+    push_boundary_forms(content_end - trail, content_end, src, kinds.1, out);
 }
+
+/// The (leading, trailing) kind pair for an element's content boundary.
+const ELEMENT_BOUNDARY: (SiteKind, SiteKind) =
+    (SiteKind::BoundaryLeading, SiteKind::BoundaryTrailing);
+
+/// The (leading, trailing) kind pair for a block branch's body boundary.
+const BLOCK_BOUNDARY: (SiteKind, SiteKind) = (
+    SiteKind::BlockBoundaryLeading,
+    SiteKind::BlockBoundaryTrailing,
+);
 
 /// Emit one site per alternative form of the boundary run `src[start..end]` (which may be
 /// empty — a hugged boundary). A run carrying a blank line is Tier-1 significant and is
@@ -333,6 +359,28 @@ fn push_boundary_forms(start: usize, end: usize, src: &str, kind: SiteKind, out:
     }
 }
 
+/// A block branch (`{#if}` consequent, `{:else}`, `{#each}` body / fallback, an
+/// `{#await}` phase, `{#key}`, `{#snippet}`) is a fragment exactly like an element's
+/// content, and its boundary is equally render-free — so it gets both site families.
+/// Inside `<pre>`/`<textarea>` the run is literal, so only the inter-sibling family applies.
+fn collect_block_fragment(
+    fragment: &tsv_svelte::ast::internal::Fragment<'_>,
+    src: &str,
+    ws_sig: bool,
+    out: &mut Vec<Site>,
+) {
+    if !ws_sig {
+        collect_boundary_sites(fragment.nodes, src, BLOCK_BOUNDARY, out);
+    }
+    collect_sites(fragment.nodes, src, ws_sig, out);
+}
+
+/// Is this alternate the `{:else if …}` form — one nested `IfBlock` that spans the rest
+/// of the chain, closing tag included — rather than a real `{:else}` fragment?
+fn is_elseif_chain(alternate: &tsv_svelte::ast::internal::Fragment<'_>) -> bool {
+    matches!(alternate.nodes, [FragmentNode::IfBlock(b)] if b.elseif)
+}
+
 /// Descend into a node's child fragments, propagating (and entering) whitespace
 /// significance.
 fn recurse_children(node: &FragmentNode<'_>, src: &str, ws_sig: bool, out: &mut Vec<Site>) {
@@ -343,7 +391,7 @@ fn recurse_children(node: &FragmentNode<'_>, src: &str, ws_sig: bool, out: &mut 
             // The content boundary is render-free only outside `<pre>`/`<textarea>`, where
             // it is literal content and the dangle is mandatory.
             if !child_ws_sig {
-                collect_boundary_sites(el.fragment.nodes, src, out);
+                collect_boundary_sites(el.fragment.nodes, src, ELEMENT_BOUNDARY, out);
             }
             collect_sites(el.fragment.nodes, src, child_ws_sig, out);
         }
@@ -354,29 +402,38 @@ fn recurse_children(node: &FragmentNode<'_>, src: &str, ws_sig: bool, out: &mut 
             // (the conservative miss is a `<svelte:element this="pre">` literal,
             // vanishingly rare and not worth a special case here).
             if !ws_sig {
-                collect_boundary_sites(el.fragment.nodes, src, out);
+                collect_boundary_sites(el.fragment.nodes, src, ELEMENT_BOUNDARY, out);
             }
             collect_sites(el.fragment.nodes, src, ws_sig, out);
         }
         FragmentNode::IfBlock(b) => {
-            collect_sites(b.consequent.nodes, src, ws_sig, out);
+            collect_block_fragment(&b.consequent, src, ws_sig, out);
             if let Some(alt) = &b.alternate {
-                collect_sites(alt.nodes, src, ws_sig, out);
+                // An `{:else if}` chain is an alternate holding one nested `IfBlock` whose
+                // span runs from `{:else if` through the closing `{/if}` — so that fragment
+                // has no boundary of its own to probe (splicing at its edges would land
+                // outside the block). Recurse only; the nested block's own branches are
+                // probed when we reach it.
+                if is_elseif_chain(alt) {
+                    collect_sites(alt.nodes, src, ws_sig, out);
+                } else {
+                    collect_block_fragment(alt, src, ws_sig, out);
+                }
             }
         }
         FragmentNode::EachBlock(b) => {
-            collect_sites(b.body.nodes, src, ws_sig, out);
+            collect_block_fragment(&b.body, src, ws_sig, out);
             if let Some(fb) = &b.fallback {
-                collect_sites(fb.nodes, src, ws_sig, out);
+                collect_block_fragment(fb, src, ws_sig, out);
             }
         }
         FragmentNode::AwaitBlock(b) => {
             for frag in [&b.pending, &b.then, &b.catch].into_iter().flatten() {
-                collect_sites(frag.nodes, src, ws_sig, out);
+                collect_block_fragment(frag, src, ws_sig, out);
             }
         }
-        FragmentNode::KeyBlock(b) => collect_sites(b.fragment.nodes, src, ws_sig, out),
-        FragmentNode::SnippetBlock(b) => collect_sites(b.body.nodes, src, ws_sig, out),
+        FragmentNode::KeyBlock(b) => collect_block_fragment(&b.fragment, src, ws_sig, out),
+        FragmentNode::SnippetBlock(b) => collect_block_fragment(&b.body, src, ws_sig, out),
         // Leaf fragment nodes (no child fragment): text, comments, expression /
         // html / const / declaration / debug / render tags.
         _ => {}
@@ -443,6 +500,9 @@ struct Report {
     sites: usize,
     variant_parse_errors: usize,
     counts: BTreeMap<Bucket, usize>,
+    /// Per-site-kind bucket counts — the work-list view: which boundary family a
+    /// divergence lives in.
+    kind_counts: BTreeMap<(SiteKind, Bucket), usize>,
     examples: BTreeMap<Bucket, Vec<Outcome>>,
     base_non_idempotent_paths: Vec<String>,
     dump_seq: usize,
@@ -451,6 +511,10 @@ struct Report {
 impl Report {
     fn count(&self, b: Bucket) -> usize {
         self.counts.get(&b).copied().unwrap_or(0)
+    }
+
+    fn kind_count(&self, k: SiteKind, b: Bucket) -> usize {
+        self.kind_counts.get(&(k, b)).copied().unwrap_or(0)
     }
 }
 
@@ -703,6 +767,10 @@ impl AuthoringAuditCommand {
     fn record(&self, report: &mut Report, outcome: Outcome) {
         let bucket = outcome.bucket();
         *report.counts.entry(bucket).or_default() += 1;
+        *report
+            .kind_counts
+            .entry((outcome.kind, bucket))
+            .or_default() += 1;
         if interesting(bucket) {
             let slot = report.examples.entry(bucket).or_default();
             if slot.len() < self.examples {
@@ -788,6 +856,40 @@ fn print_human(report: &Report, verbose: bool, triaged: bool) {
         );
     }
 
+    println!();
+    println!("  by site kind (which boundary family a divergence lives in):");
+    let buckets: &[Bucket] = if triaged {
+        &[
+            Bucket::CleanBoth,
+            Bucket::BugA,
+            Bucket::NonIdempotent,
+            Bucket::PinB,
+            Bucket::SanctionedC,
+        ]
+    } else {
+        &[
+            Bucket::ConvergeUntriaged,
+            Bucket::DivergeUntriaged,
+            Bucket::NonIdempotent,
+        ]
+    };
+    print!("    {:<24}", "kind");
+    for b in buckets {
+        print!("{:>20}", bucket_key(*b));
+    }
+    println!();
+    for kind in SiteKind::ALL {
+        let total: usize = buckets.iter().map(|b| report.kind_count(kind, *b)).sum();
+        if total == 0 {
+            continue;
+        }
+        print!("    {:<24}", kind.label());
+        for b in buckets {
+            print!("{:>20}", report.kind_count(kind, *b));
+        }
+        println!();
+    }
+
     if !report.base_non_idempotent_paths.is_empty() {
         println!();
         println!("  ✗ base-non-idempotent files (F1 broken — excluded from the authoring");
@@ -850,6 +952,21 @@ fn print_json(report: &Report) {
             (bucket_key(*k).to_string(), serde_json::Value::Array(arr))
         })
         .collect();
+    let kind_counts: serde_json::Map<String, serde_json::Value> = SiteKind::ALL
+        .iter()
+        .map(|kind| {
+            let per_bucket: serde_json::Map<String, serde_json::Value> = report
+                .kind_counts
+                .iter()
+                .filter(|((k, _), _)| k == kind)
+                .map(|((_, b), n)| (bucket_key(*b).to_string(), serde_json::json!(n)))
+                .collect();
+            (
+                kind.label().to_string(),
+                serde_json::Value::Object(per_bucket),
+            )
+        })
+        .collect();
     let out = serde_json::json!({
         "files_scanned": report.files_scanned,
         "files_parse_error": report.files_parse_error,
@@ -857,6 +974,7 @@ fn print_json(report: &Report) {
         "sites": report.sites,
         "variant_parse_errors": report.variant_parse_errors,
         "counts": counts,
+        "kind_counts": kind_counts,
         "examples": examples,
         "base_non_idempotent_paths": report.base_non_idempotent_paths,
     });

@@ -10,8 +10,12 @@
 }
 	yes
 {/if}
-{#if a}a{:else if b // c
-}b{/if}
+{#if a}
+	a
+{:else if b // c
+}
+	b
+{/if}
 {#each items // c
 as item}
 	{item}
@@ -26,8 +30,10 @@ then val}
 }
 	text
 {/key}
-{#each list as it}{@const y = it // c
-	}{it}{/each}
+{#each list as it}
+	{@const y = it // c
+	}{it}
+{/each}
 <div
 	{...expr // c
 	}
