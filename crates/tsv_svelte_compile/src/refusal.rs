@@ -205,6 +205,36 @@ pub enum Refusal {
     /// A nested `{#each}` (unique-name allocation order is not reproducible).
     #[error("nested {{#each}} (the oracle's unique-name allocation order is not reproducible)")]
     NestedEach,
+
+    // ── Snippets / render tags ─────────────────────────────────────────────
+    /// A typed or generic `{#snippet}` (implies TypeScript).
+    #[error("typed or generic {{#snippet}} (implies TypeScript)")]
+    SnippetTyped,
+    /// A `{#snippet}` whose hoist classification is ambiguous for the name-based
+    /// port: a name it references is both an instance binding and a nested
+    /// (non-parameter) local, so free-vs-shadowed can't be told apart.
+    #[error(
+        "{{#snippet}} {name} references a binding that is both an instance binding \
+         and a nested local (hoist classification ambiguous)"
+    )]
+    SnippetHoistAmbiguous {
+        /// The snippet name.
+        name: String,
+    },
+    /// A `{#snippet}` sharing a fragment with a `{@const}`/`<svelte:head>` — the
+    /// relative hoist order across kinds isn't reproduced.
+    #[error("{{#snippet}} alongside a {{@const}}/<svelte:head> in the same fragment (hoist order)")]
+    SnippetHoistOrder,
+    /// A duplicate top-level `{#snippet}` name (the oracle rejects it).
+    #[error("duplicate {{#snippet}} {name} (the oracle rejects it)")]
+    DuplicateSnippetName {
+        /// The duplicated snippet name.
+        name: String,
+    },
+    /// A `{@render}` whose callee is neither a resolvable local snippet nor a
+    /// snippet prop (a member callee or an unresolved identifier).
+    #[error("{{@render}} callee is not a resolvable local snippet or snippet prop")]
+    RenderTagUnsupportedCallee,
     /// A block-scope binding shadows a `$derived` binding.
     #[error("block-scope binding {name} shadows a $derived binding")]
     BlockScopeShadowsDerived {
@@ -461,6 +491,19 @@ impl Refusal {
             Self::NestedEach => Cow::Borrowed(
                 "nested {#each} (the oracle's unique-name allocation order is not reproducible)",
             ),
+            Self::SnippetTyped => Cow::Borrowed("typed or generic {#snippet} (implies TypeScript)"),
+            Self::SnippetHoistAmbiguous { .. } => {
+                Cow::Borrowed("{#snippet} {name} hoist classification ambiguous")
+            }
+            Self::SnippetHoistOrder => Cow::Borrowed(
+                "{#snippet} alongside a {@const}/<svelte:head> in the same fragment (hoist order)",
+            ),
+            Self::DuplicateSnippetName { .. } => {
+                Cow::Borrowed("duplicate {#snippet} {name} (the oracle rejects it)")
+            }
+            Self::RenderTagUnsupportedCallee => {
+                Cow::Borrowed("{@render} callee is not a resolvable local snippet or snippet prop")
+            }
             Self::HtmlTagStaticValue => Cow::Borrowed("{@html} with a statically-known value"),
             Self::MutationInTemplateExpr => Cow::Borrowed("mutation inside a template expression"),
             Self::NonPlainAttribute => Cow::Borrowed("non-plain attribute (directive/spread)"),

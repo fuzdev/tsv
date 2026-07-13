@@ -20,6 +20,7 @@ mod build;
 mod needs_context;
 mod refusal;
 mod rune_guard;
+mod snippet;
 mod transform_server;
 
 pub use refusal::Refusal;
@@ -644,8 +645,90 @@ mod tests {
     }
 
     #[test]
-    fn compile_rejects_snippet_block() {
-        assert_unsupported("{#snippet foo()}<p>x</p>{/snippet}", "{#snippet}");
+    fn compile_hoistable_snippet_and_render() {
+        // A top-level snippet whose only reference is its own parameter hoists to
+        // module scope; `{@render foo(1)}` becomes `foo($$renderer, 1)`, standalone
+        // (sole child, non-dynamic) so no trailing anchor.
+        let js = compile_js("{#snippet foo(x)}<p>{x}</p>{/snippet}\n{@render foo(1)}");
+        assert_eq!(
+            js,
+            "import * as $ from 'svelte/internal/server';\n\
+             function foo($$renderer, x) {\n\
+             \t$$renderer.push(`<p>${$.escape(x)}</p>`);\n\
+             }\n\
+             export default function Input($$renderer) {\n\
+             \tfoo($$renderer, 1);\n\
+             }\n"
+        );
+    }
+
+    #[test]
+    fn compile_non_hoistable_snippet_stays_in_body() {
+        // A snippet referencing a prop can't hoist — the `function` declaration
+        // stays in the component body, after the props destructure.
+        let js = compile_js(
+            "<script>let { name } = $props();</script>\n{#snippet foo()}<p>{name}</p>{/snippet}\n{@render foo()}",
+        );
+        assert_eq!(
+            js,
+            "import * as $ from 'svelte/internal/server';\n\
+             export default function Input($$renderer, $$props) {\n\
+             \tlet { name } = $$props;\n\
+             \tfunction foo($$renderer) {\n\
+             \t\t$$renderer.push(`<p>${$.escape(name)}</p>`);\n\
+             \t}\n\
+             \tfoo($$renderer);\n\
+             }\n"
+        );
+    }
+
+    #[test]
+    fn compile_render_prop_snippet_is_dynamic() {
+        // `{@render children()}` where `children` is a prop is dynamic, so the
+        // render tag keeps the trailing `<!---->` even as the sole child.
+        let js = compile_js("<script>let { children } = $props();</script>\n{@render children()}");
+        assert!(
+            js.contains("children($$renderer);\n\t$$renderer.push(`<!---->`);"),
+            "dynamic prop render must keep the anchor: {js}"
+        );
+    }
+
+    #[test]
+    fn compile_render_optional_callee() {
+        // `{@render foo?.()}` → `foo?.($$renderer)`.
+        let js = compile_js("{#snippet foo()}<b>s</b>{/snippet}\n{@render foo?.()}");
+        assert!(js.contains("foo?.($$renderer);"), "{js}");
+    }
+
+    #[test]
+    fn compile_rejects_typed_snippet() {
+        // Typed params or generics imply TypeScript (the oracle rejects them
+        // without `lang="ts"`; tsv's permissive parser accepts, so refuse rather
+        // than emit invalid JS).
+        assert_unsupported(
+            "{#snippet foo(x: number)}<p>{x}</p>{/snippet}\n{@render foo(1)}",
+            "typed or generic {#snippet}",
+        );
+        assert_unsupported(
+            "{#snippet foo<T>(x)}<p>{x}</p>{/snippet}\n{@render foo(1)}",
+            "typed or generic {#snippet}",
+        );
+    }
+
+    #[test]
+    fn compile_rejects_render_member_callee() {
+        assert_unsupported(
+            "<script>let { obj } = $props();</script>\n{@render obj.snip()}",
+            "{@render} callee is not a resolvable local snippet or snippet prop",
+        );
+    }
+
+    #[test]
+    fn compile_rejects_duplicate_snippet_name() {
+        assert_unsupported(
+            "{#snippet foo()}<b>1</b>{/snippet}\n{#snippet foo()}<b>2</b>{/snippet}\n{@render foo()}",
+            "duplicate {#snippet} foo",
+        );
     }
 
     #[test]

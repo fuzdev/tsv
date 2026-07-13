@@ -26,15 +26,16 @@ project-wide conventions.
     parses the component and runs the server transform. Generated JS prints
     through `format_canonical`, so it is canonical-form by construction
     (`canonicalize_js(output.js)` is a fixed point). The control-flow blocks
-    `{#if}`/`{#each}`/`{#await}`/`{#key}` and `{@const}` are covered (see the
-    transform_server block emitters below). Shapes the transform does not cover
-    yet — client generation, dev mode, components (`<Foo>` / `<Foo.Bar>`, which
-    the oracle emits as `Foo($$renderer, {})` calls), instance-script exports in
-    every form (the oracle compiles `export const`/`function`/`{a}` via
-    `$.bind_props`, not implemented; rejects `export default`/`export let`),
-    non-JS instance scripts — `generics`, or a `lang` other than `"js"`/`""`
-    (type stripping not implemented; `lang="js"`/`lang=""` compile as plain JS),
-    `{#snippet}`/`{@render}`/`{@debug}`, directives/spread, top-level `await`,
+    `{#if}`/`{#each}`/`{#await}`/`{#key}`, `{@const}`, and `{#snippet}`/`{@render}`
+    are covered (see the transform_server block emitters below). Shapes the
+    transform does not cover yet — client generation, dev mode, components
+    (`<Foo>` / `<Foo.Bar>`, which the oracle emits as `Foo($$renderer, {})`
+    calls), instance-script exports in every form (the oracle compiles
+    `export const`/`function`/`{a}` via `$.bind_props`, not implemented; rejects
+    `export default`/`export let`), non-JS instance scripts — `generics`, or a
+    `lang` other than `"js"`/`""` (type stripping not implemented;
+    `lang="js"`/`lang=""` compile as plain JS), `{@debug}`, directives/spread,
+    top-level `await`,
     `<option>` / populated `<select>`/`<optgroup>` (the oracle emits closure
     calls / `<!>` anchors there), template-expression comments, and every
     `$`-prefixed identifier reference or call outside the sanctioned rewrites
@@ -89,7 +90,17 @@ project-wide conventions.
   expression, or a member/call whose root (`is_safe_identifier`) is not a plain
   identifier or is a prop/import binding — a plain local, a global, and rune
   bindings stay safe. A member/call rooted at a prop/import that is *also* bound
-  in a nested scope is ambiguous for this name-based port and refuses.
+  in a nested scope is ambiguous for this name-based port and refuses. Descends
+  into `{#snippet}` bodies (a function-like subtree — a `new`/prop-rooted access
+  there still fires the flag) and `{@render}` arguments.
+- `snippet.rs` — the `{#snippet}` hoist analysis (name-based port of Svelte's
+  `can_hoist_snippet`): which top-level snippets go to true module scope. Collects
+  each snippet's free references (a flat scope-tracking walk) minus its bound
+  names; a free reference to an instance binding (prop/`$state`/`$derived`/plain
+  top-level decl — *not* imports/globals) blocks hoisting, and a name that is both
+  an instance binding and a nested local is ambiguous and refuses. Hoistability is
+  a fixpoint over snippet-to-snippet references. Also collects every snippet name
+  (render-callee classification, generated-name collisions).
 - `transform_server.rs` — the SSR transform: module scaffold
   (`import * as $ from 'svelte/internal/server'`, then any instance-script
   `import` declarations hoisted to module scope in source order — an import
@@ -151,7 +162,16 @@ project-wide conventions.
   `const` declaration to the top of its branch body and enters the evaluator's
   innermost block-scope overlay so later reads fold. Each/await locals and the
   `{:then}` value mask to UNKNOWN in that overlay; a block body that shadows a
-  `$derived` name refuses. Instance-script comments carry through into the
+  `$derived` name refuses. **Snippets/render**: a `{#snippet}` becomes a
+  `function name($$renderer, ...params) { … }` — hoisted to true module scope
+  (its own program between imports and export) when `snippet.rs` deems it
+  hoistable, else to its nearest enclosing block scope's init (a block-scope
+  fragment collects the snippets of its whole element subtree and emits them
+  first; parameters mask to UNKNOWN). A `{@render callee(args)}` becomes
+  `callee($$renderer, ...args)` (`?.` preserved) with a trailing `<!---->` anchor
+  unless the enclosing block's sole trimmed child is this render with a
+  non-dynamic (local-snippet) callee — the `is_standalone` flag, inherited by
+  element children. Instance-script comments carry through into the
   synthetic program (host-absolute spans; the import prints as a separate
   comment-free program so no window bridges a low anchor to its appendix
   source literal); divergent placement classes refuse — comments after the

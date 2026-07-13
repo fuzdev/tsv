@@ -54,8 +54,8 @@ use tsv_css::ast::internal::{CssBlockChild, CssNode, SimpleSelector};
 use tsv_lang::{InfallibleResolve, Span};
 use tsv_svelte::ast::internal::{
     Attribute, AttributeNode, AttributeValue, AwaitBlock, ConstTag, EachBlock, Element,
-    ElementKind, ExpressionTag, Fragment, FragmentNode, HtmlTag, IfBlock, KeyBlock, Root,
-    SpecialElement, SpecialElementKind, Style,
+    ElementKind, ExpressionTag, Fragment, FragmentNode, HtmlTag, IfBlock, KeyBlock, RenderTag,
+    Root, SnippetBlock, SpecialElement, SpecialElementKind, Style,
 };
 use tsv_ts::ast::internal::{
     BinaryOperator, BlockStatement, ExportDefaultDeclaration, ExportDefaultValue, Expression,
@@ -72,6 +72,7 @@ use crate::analyze::{
 };
 use crate::build::{Builder, escape_template_text};
 use crate::rune_guard::{WalkCtx, walk_expression_guarded, walk_statement_guarded};
+use crate::snippet::{SnippetAnalysis, snippet_name};
 use crate::{CompileError, CompileOutput, Refusal};
 
 /// The deterministic scoping class — the fixed `cssHash` the oracle sidecar
@@ -157,6 +158,14 @@ struct EmitEnv<'arena, 's> {
     /// each block regardless of an authored index.
     each_array_count: usize,
     index_count: usize,
+    /// The snippet hoist analysis: which top-level snippets go to module scope,
+    /// and every snippet name (render-callee classification, name collisions).
+    snippets: SnippetAnalysis,
+    /// Module-scope `function` declarations for hoistable top-level snippets,
+    /// emitted between the imports and the exported component function (source
+    /// order — a top-level snippet is visited in order as the root fragment is
+    /// walked).
+    hoisted_snippets: Vec<Statement<'arena>>,
 }
 
 impl<'arena> EmitEnv<'arena, '_> {
@@ -272,6 +281,38 @@ pub(crate) fn compile_server<'arena>(
         // The `$.derived(() => …)` wrapper and `d()` reads bridge host and
         // appendix spans in ways whose comment windows sweep wrongly.
         return Err(unsupported(Refusal::CommentsWithDerived));
+    }
+
+    // 3b. Snippet hoist analysis: which top-level `{#snippet}`s go to module
+    // scope. Imports don't disqualify hoisting, so the instance-binding set the
+    // analysis subtracts is the binding table minus the import locals.
+    let import_names: NameSet = root
+        .instance
+        .into_iter()
+        .flat_map(|script| script.content.body)
+        .filter_map(|stmt| match stmt {
+            Statement::ImportDeclaration(import) => Some(import),
+            _ => None,
+        })
+        .flat_map(|import| import.specifiers)
+        .filter_map(|spec| {
+            use tsv_ts::ast::internal::ImportSpecifier;
+            let local = match spec {
+                ImportSpecifier::Default(s) => &s.local,
+                ImportSpecifier::Named(s) => &s.local,
+                ImportSpecifier::Namespace(s) => &s.local,
+            };
+            plain_identifier_name(local, source)
+        })
+        .collect();
+    let instance_binding_names: NameSet = bindings.names().map(str::to_string).collect();
+    let snippets =
+        crate::snippet::analyze_snippets(root, source, &instance_binding_names, &import_names)?;
+    // Script comments plus snippets/render reshape the component body (a hoisted
+    // function, a per-render flush) in ways whose comment windows aren't probed;
+    // refuse the combination.
+    if has_comments && fragment_has_snippet_or_render(&root.fragment) {
+        return Err(unsupported(Refusal::CommentsAlongsideTemplateBlocks));
     }
 
     // 4. Script rewrite pass: rune rewrites, guard walks, mutation/shadow
@@ -430,6 +471,8 @@ pub(crate) fn compile_server<'arena>(
         in_each: false,
         each_array_count: 0,
         index_count: 0,
+        snippets,
+        hoisted_snippets: Vec::new(),
     };
 
     // 5. Function header skeleton. The text is minted for appendix
@@ -469,6 +512,8 @@ pub(crate) fn compile_server<'arena>(
         FragmentCtx {
             mark_text_first: true,
             is_component_root: true,
+            hoist_snippets: true,
+            is_standalone: false,
             preserve_whitespace: false,
             parent_name: None,
         },
@@ -572,6 +617,23 @@ pub(crate) fn compile_server<'arena>(
         goal: tsv_ts::Goal::Module,
     };
 
+    // Hoistable top-level snippets print as their own comment-free program,
+    // between the imports and the exported component function (the oracle's
+    // module-scope placement). Empty when nothing hoists.
+    let hoisted_program = (!env.hoisted_snippets.is_empty()).then(|| {
+        let mut hoisted_body: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
+        for snippet in env.hoisted_snippets.drain(..) {
+            hoisted_body.push(snippet);
+        }
+        tsv_ts::ast::internal::Program {
+            body: hoisted_body.into_bump_slice(),
+            comments: Vec::new(),
+            span: Span::new(0, env.b.buffer.len() as u32),
+            interner: std::rc::Rc::clone(&root.interner),
+            goal: tsv_ts::Goal::Module,
+        }
+    });
+
     let mut export_body: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
     export_body.push(Statement::ExportDefaultDeclaration(export));
     let export_program = tsv_ts::ast::internal::Program {
@@ -583,6 +645,9 @@ pub(crate) fn compile_server<'arena>(
     };
 
     let mut js = tsv_ts::format_canonical(&import_program, &env.b.buffer);
+    if let Some(hoisted_program) = &hoisted_program {
+        js.push_str(&tsv_ts::format_canonical(hoisted_program, &env.b.buffer));
+    }
     js.push_str(&tsv_ts::format_canonical(&export_program, &env.b.buffer));
     let css = match (root.css, &env.scope) {
         (Some(style), Some(scope)) => Some(splice_scoped_css(style, source, scope)),
@@ -1363,6 +1428,7 @@ enum CleanNode<'arena> {
     Each(&'arena EachBlock<'arena>),
     Await(&'arena AwaitBlock<'arena>),
     Key(&'arena KeyBlock<'arena>),
+    Render(&'arena RenderTag<'arena>),
 }
 
 impl CleanNode<'_> {
@@ -1375,6 +1441,7 @@ impl CleanNode<'_> {
 }
 
 /// Per-fragment emission context.
+#[allow(clippy::struct_excessive_bools)] // independent per-fragment flags, not a state machine
 struct FragmentCtx<'p> {
     /// Whether a text-first fragment gets the leading `<!---->` anchor. True for
     /// the component root and `{#each}` bodies (the oracle's `is_text_first`:
@@ -1384,6 +1451,21 @@ struct FragmentCtx<'p> {
     /// Whether this is the component's root fragment (a `{@const}` here refuses —
     /// grammatically block-only, and its component-scope placement is unprobed).
     is_component_root: bool,
+    /// Whether this fragment is a **block scope** (component root, a block body,
+    /// or a `<svelte:head>` closure) that owns snippet hoisting. The oracle
+    /// hoists a `{#snippet}` to its nearest enclosing block scope, bubbling
+    /// *through* elements (which share the block's `init`), so a block-scope
+    /// fragment collects snippets from its whole element subtree and emits their
+    /// `function` declarations at the front; an element-child fragment
+    /// (`hoist_snippets = false`) leaves its snippets to the enclosing block.
+    hoist_snippets: bool,
+    /// The enclosing scope's `is_standalone` (the oracle's `clean_nodes`
+    /// `is_standalone`, inherited by element children). A block scope recomputes
+    /// it from its own trimmed list; an element child inherits it. When true, a
+    /// sole `{@render}` reuses the parent block's anchor and emits no trailing
+    /// `<!---->`. An element wrapping the render makes the enclosing block's sole
+    /// child the element (not a render), so the inherited value is false.
+    is_standalone: bool,
     /// Inside `<pre>`/`<textarea>`: no whitespace normalization.
     preserve_whitespace: bool,
     /// The enclosing element's name (`None` at the root).
@@ -1424,6 +1506,10 @@ fn emit_fragment<'arena>(
             FragmentNode::EachBlock(block) => list.push(CleanNode::Each(block)),
             FragmentNode::AwaitBlock(block) => list.push(CleanNode::Await(block)),
             FragmentNode::KeyBlock(block) => list.push(CleanNode::Key(block)),
+            FragmentNode::RenderTag(tag) => list.push(CleanNode::Render(tag)),
+            // Snippets are hoisted to the enclosing block scope (below), not
+            // emitted inline — skip them in the template list.
+            FragmentNode::SnippetBlock(_) => {}
             FragmentNode::ConstTag(tag) => {
                 if ctx.is_component_root {
                     return Err(unsupported(Refusal::ConstTagAtRoot));
@@ -1439,6 +1525,19 @@ fn emit_fragment<'arena>(
         }
     }
 
+    // Snippets hoist to their nearest enclosing block scope, bubbling through
+    // elements (which share the block's `init`): a block-scope fragment collects
+    // its whole element subtree's snippets and emits their `function`
+    // declarations first (hoistable top-level ones to module scope, the rest to
+    // this block's init); an element-child fragment leaves them to the block.
+    let hoisted_snippets = if ctx.hoist_snippets {
+        let mut collected: Vec<&'arena SnippetBlock<'arena>> = Vec::new();
+        collect_hoisted_snippets(fragment, &mut collected);
+        collected
+    } else {
+        Vec::new()
+    };
+
     // Emit hoisted `{@const}` declarations first — they precede the anchor's
     // following content and enter the evaluator's innermost overlay so later
     // reads in this fragment fold. `<svelte:head>` is hoisted the same way; a
@@ -1447,11 +1546,19 @@ fn emit_fragment<'arena>(
     if !head_nodes.is_empty() && !const_tags.is_empty() {
         return Err(unsupported(Refusal::SvelteHeadWithConstTag));
     }
+    // A snippet sharing a block with a `{@const}`/`<svelte:head>` can't fix the
+    // relative hoist order across kinds — refuse the mix.
+    if !hoisted_snippets.is_empty() && (!const_tags.is_empty() || !head_nodes.is_empty()) {
+        return Err(unsupported(Refusal::SnippetHoistOrder));
+    }
     for tag in &const_tags {
         emit_const_tag(env, tag, out)?;
     }
     for head in &head_nodes {
         emit_svelte_head(env, head, out)?;
+    }
+    for snippet in &hoisted_snippets {
+        emit_snippet(env, snippet, out)?;
     }
 
     if !ctx.preserve_whitespace {
@@ -1474,13 +1581,26 @@ fn emit_fragment<'arena>(
         out.push_text("<!---->");
     }
 
+    // `is_standalone` (the oracle's `clean_nodes` flag) is recomputed at a block
+    // scope from its own trimmed list — a sole non-dynamic `{@render}` reuses the
+    // parent block's anchor — and *inherited* by element children (an element
+    // wrapping the render already made the block's sole child the element, so the
+    // inherited value is false).
+    let is_standalone = if ctx.hoist_snippets {
+        matches!(list.as_slice(), [CleanNode::Render(tag)]
+            if render_callee_name(&tag.expression, source)
+                .is_some_and(|name| !render_callee_dynamic(env, name)))
+    } else {
+        ctx.is_standalone
+    };
+
     for node in &list {
         match node {
             CleanNode::Text(data) => {
                 out.push_text(&escape_template_text(&escape_html_text(data)));
             }
             CleanNode::Element(element) => {
-                emit_element(env, element, out, &ctx)?;
+                emit_element(env, element, out, &ctx, is_standalone)?;
             }
             CleanNode::Expr(tag) => {
                 emit_expression_tag(env, &tag.expression, out, true)?;
@@ -1492,6 +1612,7 @@ fn emit_fragment<'arena>(
             CleanNode::Each(block) => emit_each_block(env, block, out, &ctx)?,
             CleanNode::Await(block) => emit_await_block(env, block, out, &ctx)?,
             CleanNode::Key(block) => emit_key_block(env, block, out, &ctx)?,
+            CleanNode::Render(tag) => emit_render_tag(env, tag, out, is_standalone)?,
         }
     }
     Ok(())
@@ -1507,6 +1628,36 @@ fn fragment_contains_block(fragment: &Fragment<'_>) -> bool {
         | FragmentNode::KeyBlock(_)
         | FragmentNode::ConstTag(_) => true,
         FragmentNode::Element(element) => fragment_contains_block(&element.fragment),
+        _ => false,
+    })
+}
+
+/// Recursively test whether a fragment contains a `{#snippet}` or `{@render}`
+/// (the comments+snippet/render refusal gate — a hoisted snippet function or a
+/// per-render flush reshapes the body in ways whose comment windows aren't
+/// probed).
+fn fragment_has_snippet_or_render(fragment: &Fragment<'_>) -> bool {
+    fragment.nodes.iter().any(|node| match node {
+        FragmentNode::SnippetBlock(_) | FragmentNode::RenderTag(_) => true,
+        FragmentNode::Element(element) => fragment_has_snippet_or_render(&element.fragment),
+        FragmentNode::SpecialElement(se) => fragment_has_snippet_or_render(&se.fragment),
+        FragmentNode::IfBlock(b) => {
+            fragment_has_snippet_or_render(&b.consequent)
+                || b.alternate
+                    .as_ref()
+                    .is_some_and(fragment_has_snippet_or_render)
+        }
+        FragmentNode::EachBlock(b) => {
+            fragment_has_snippet_or_render(&b.body)
+                || b.fallback
+                    .as_ref()
+                    .is_some_and(fragment_has_snippet_or_render)
+        }
+        FragmentNode::AwaitBlock(b) => [&b.pending, &b.then, &b.catch]
+            .into_iter()
+            .flatten()
+            .any(fragment_has_snippet_or_render),
+        FragmentNode::KeyBlock(b) => fragment_has_snippet_or_render(&b.fragment),
         _ => false,
     })
 }
@@ -1537,6 +1688,8 @@ fn emit_child_body<'arena>(
         FragmentCtx {
             mark_text_first,
             is_component_root: false,
+            hoist_snippets: true,
+            is_standalone: false,
             preserve_whitespace,
             parent_name: None,
         },
@@ -1573,7 +1726,7 @@ fn guard_dropped<'arena>(
 /// collide with a user binding — the oracle's component-scope name generation
 /// would then pick a different suffix, which this port doesn't replicate.
 fn check_name_free(env: &EmitEnv<'_, '_>, name: &str) -> Result<(), CompileError> {
-    if env.bindings.contains(name) {
+    if env.bindings.contains(name) || env.snippets.names.contains(name) {
         return Err(unsupported(Refusal::GeneratedNameCollision {
             name: name.to_string(),
         }));
@@ -2116,6 +2269,191 @@ fn emit_key_block<'arena>(
     Ok(())
 }
 
+/// Emit a `{#snippet name(params)}…{/snippet}` as a
+/// `function name($$renderer, ...params) { … }` declaration. A hoistable
+/// top-level snippet goes to module scope (`env.hoisted_snippets`); everything
+/// else goes to the current fragment's init (via `out`, flushing any pending
+/// template first). The snippet body reuses the fragment machinery, with the
+/// parameters masked to UNKNOWN so their reads never fold.
+fn emit_snippet<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    snippet: &'arena SnippetBlock<'arena>,
+    out: &mut BodyBuilder<'arena>,
+) -> Result<(), CompileError> {
+    let arena = env.b.arena;
+    // A generic or type-annotated snippet implies TypeScript (type stripping is
+    // not implemented) — the oracle rejects it without `lang="ts"`, and a
+    // `lang="ts"` component is already refused at the entry.
+    if snippet.type_parameters.is_some()
+        || snippet.type_params_raw.is_some()
+        || snippet.raw_parameters.is_some()
+        || snippet.parameters.iter().any(param_is_typed)
+    {
+        return Err(unsupported(Refusal::SnippetTyped));
+    }
+    let Some(name) = snippet_name(snippet, env.source) else {
+        // An escaped snippet name isn't reproducible by this port.
+        return Err(unsupported(Refusal::SnippetTyped));
+    };
+    let name = name.to_string();
+
+    // Mask the parameters to UNKNOWN in the body (a parameter read never folds),
+    // and refuse a parameter that shadows a `$derived` binding (the overlay push
+    // enforces this).
+    let mut overlay: HashMap<String, ScopeEntry<'arena>> = HashMap::new();
+    for param in snippet.parameters {
+        let mut names = Vec::new();
+        pattern_binding_names(param, env.source, &mut names)?;
+        for name in names {
+            overlay.insert(name, ScopeEntry::Masked);
+        }
+    }
+
+    // Snippet bodies are in the oracle's `is_text_first` parent set, so a
+    // text-first body gets the leading `<!---->` anchor.
+    let body = emit_child_body(env, &snippet.body, &[], true, false, overlay)?;
+
+    // `($$renderer, ...params)` — the synthetic renderer first, borrowed params
+    // verbatim.
+    let mut params: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
+    params.push(Expression::Identifier(env.b.ident("$$renderer")));
+    for param in snippet.parameters {
+        params.push(param.clone());
+    }
+    let block_span = env.b.here();
+    let fn_decl = env
+        .b
+        .function_declaration(&name, params.into_bump_slice(), body, block_span);
+
+    // Only a hoistable *top-level* snippet is in the hoistable map; a nested or
+    // body-local snippet (`is_hoisted` false) goes to this block's init.
+    if env.snippets.is_hoisted(&name) {
+        env.hoisted_snippets.push(fn_decl);
+    } else {
+        out.push_statement(&mut env.b, arena, fn_decl);
+    }
+    Ok(())
+}
+
+/// Collect the snippets that hoist to this block scope: the fragment's own
+/// snippets plus those inside descendant **elements** (which share the block's
+/// `init`). Stops at nested blocks and special elements — those are separate
+/// scopes that collect their own.
+fn collect_hoisted_snippets<'arena>(
+    fragment: &Fragment<'arena>,
+    out: &mut Vec<&'arena SnippetBlock<'arena>>,
+) {
+    for node in fragment.nodes {
+        match node {
+            FragmentNode::SnippetBlock(snippet) => out.push(snippet),
+            FragmentNode::Element(element) => collect_hoisted_snippets(&element.fragment, out),
+            _ => {}
+        }
+    }
+}
+
+/// Whether a `{#snippet}` parameter pattern carries a type annotation (an
+/// optional `?` marker or `: Type`) — a TypeScript construct.
+fn param_is_typed(param: &Expression<'_>) -> bool {
+    match param {
+        Expression::Identifier(id) => id.type_annotation().is_some() || id.optional,
+        Expression::ObjectPattern(p) => p.properties.iter().any(|prop| match prop {
+            ObjectPatternProperty::Property(prop) => param_is_typed(&prop.value),
+            ObjectPatternProperty::RestElement(rest) => param_is_typed(rest.argument),
+        }),
+        Expression::ArrayPattern(p) => p.elements.iter().flatten().any(param_is_typed),
+        Expression::AssignmentPattern(p) => param_is_typed(p.left),
+        Expression::RestElement(r) => param_is_typed(r.argument),
+        _ => false,
+    }
+}
+
+/// The plain callee name of a `{@render}` expression: unwrap the (possibly
+/// optional) call, requiring a plain-identifier callee. `None` for a member
+/// callee, a non-call, or an escaped identifier.
+fn render_callee_name<'s>(expr: &Expression<'_>, source: &'s str) -> Option<&'s str> {
+    let call = match expr {
+        Expression::CallExpression(c) => c,
+        Expression::ParenthesizedExpression(p) => match p.expression {
+            Expression::CallExpression(c) => c,
+            _ => return None,
+        },
+        _ => return None,
+    };
+    match call.callee {
+        Expression::Identifier(id) if id.escaped_name.is_none() => {
+            let start = id.span.start as usize;
+            Some(&source[start..start + id.name_len as usize])
+        }
+        _ => None,
+    }
+}
+
+/// Whether a `{@render}` callee is *dynamic* (the oracle's
+/// `binding?.kind !== 'normal'`): a local snippet is non-dynamic, a snippet prop
+/// is dynamic. A non-standalone (dynamic) callee's fragment keeps the trailing
+/// `<!---->` anchor even when the render is the sole child.
+fn render_callee_dynamic(env: &EmitEnv<'_, '_>, name: &str) -> bool {
+    !env.snippets.names.contains(name)
+}
+
+/// Emit `{@render callee(args)}` → `callee($$renderer, ...args)` (or
+/// `callee?.($$renderer, …)` when optional), followed by a `<!---->` anchor
+/// unless the enclosing fragment is standalone. The callee must resolve to a
+/// local snippet or a snippet prop; anything else refuses. Arguments ride the
+/// same value machinery as block tests (a bare derived read becomes `d()`).
+fn emit_render_tag<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    tag: &'arena RenderTag<'arena>,
+    out: &mut BodyBuilder<'arena>,
+    is_standalone: bool,
+) -> Result<(), CompileError> {
+    let arena = env.b.arena;
+    // Unwrap the (possibly optional) call.
+    let call = match &tag.expression {
+        Expression::CallExpression(c) => c,
+        Expression::ParenthesizedExpression(p) => match &p.expression {
+            Expression::CallExpression(c) => c,
+            _ => return Err(unsupported(Refusal::RenderTagUnsupportedCallee)),
+        },
+        _ => return Err(unsupported(Refusal::RenderTagUnsupportedCallee)),
+    };
+    // The callee must be a plain identifier resolving to a local snippet or a
+    // snippet prop.
+    let Some(name) = render_callee_name(&tag.expression, env.source) else {
+        return Err(unsupported(Refusal::RenderTagUnsupportedCallee));
+    };
+    let is_snippet = env.snippets.names.contains(name);
+    let is_prop = env.bindings.is_prop(name);
+    if !is_snippet && !is_prop {
+        return Err(unsupported(Refusal::RenderTagUnsupportedCallee));
+    }
+
+    // `callee($$renderer, ...args)`. Arguments go through the value machinery so
+    // a bare derived read becomes `d()` and runes/mutations refuse.
+    let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
+    args.push(Expression::Identifier(env.b.ident("$$renderer")));
+    for arg in call.arguments {
+        args.push(wrap_single(env, arg)?);
+    }
+    let render_call = env
+        .b
+        .call_of(call.callee, args.into_bump_slice(), call.optional);
+    let span = render_call.span();
+    let stmt = Statement::ExpressionStatement(ExpressionStatement {
+        expression: render_call,
+        span,
+        is_directive: false,
+    });
+    out.push_statement(&mut env.b, arena, stmt);
+    // A dynamic or non-sole render keeps the anchor so its output doesn't glue to
+    // the surrounding fragment (the oracle's `empty_comment` push).
+    if !is_standalone {
+        out.push_text("<!---->");
+    }
+    Ok(())
+}
+
 /// Emit `{expr}` (escaped) or `{@html expr}` (raw) — the oracle's text-sequence
 /// interpolation with its fold gate.
 fn emit_expression_tag<'arena>(
@@ -2242,6 +2580,7 @@ fn emit_element<'arena>(
     element: &'arena Element<'arena>,
     out: &mut BodyBuilder<'arena>,
     parent_ctx: &FragmentCtx<'_>,
+    is_standalone: bool,
 ) -> Result<(), CompileError> {
     let name = env
         .b
@@ -2322,6 +2661,8 @@ fn emit_element<'arena>(
         FragmentCtx {
             mark_text_first: false,
             is_component_root: false,
+            hoist_snippets: false,
+            is_standalone,
             preserve_whitespace: parent_ctx.preserve_whitespace
                 || name == "pre"
                 || name == "textarea",

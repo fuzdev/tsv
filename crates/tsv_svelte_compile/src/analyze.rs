@@ -87,6 +87,20 @@ impl<'arena> Bindings<'arena> {
         self.map.contains_key(name)
     }
 
+    /// The top-level binding names (snippet-hoist instance-binding set).
+    pub fn names(&self) -> impl Iterator<Item = &str> {
+        self.map.keys().map(String::as_str)
+    }
+
+    /// Whether this binding is a `$props()` destructure (render-callee dynamic
+    /// classification: a prop callee is dynamic, so its render tag is not
+    /// standalone).
+    pub fn is_prop(&self, name: &str) -> bool {
+        self.map
+            .get(name)
+            .is_some_and(|b| b.kind == BindingKind::Prop)
+    }
+
     pub fn insert(&mut self, name: String, binding: Binding<'arena>) {
         self.map.insert(name, binding);
     }

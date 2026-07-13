@@ -34,10 +34,10 @@ use bumpalo::Bump;
 use tsv_lang::{SharedInterner, Span};
 use tsv_ts::ast::internal::{
     ArrowFunctionBody, ArrowFunctionExpression, BinaryExpression, BinaryOperator, BlockStatement,
-    CallExpression, Expression, ExpressionStatement, IdentName, Identifier, ImportDeclaration,
-    ImportKind, ImportNamespaceSpecifier, ImportPhase, ImportSpecifier, Literal, LiteralValue,
-    MemberExpression, Statement, StringCooked, TemplateCooked, TemplateElement, TemplateLiteral,
-    UnaryExpression, UnaryOperator, UpdateExpression, UpdateOperator,
+    CallExpression, Expression, ExpressionStatement, FunctionDeclaration, IdentName, Identifier,
+    ImportDeclaration, ImportKind, ImportNamespaceSpecifier, ImportPhase, ImportSpecifier, Literal,
+    LiteralValue, MemberExpression, Statement, StringCooked, TemplateCooked, TemplateElement,
+    TemplateLiteral, UnaryExpression, UnaryOperator, UpdateExpression, UpdateOperator,
 };
 
 /// The appendix-buffer bookkeeping plus interner access — everything node
@@ -241,6 +241,27 @@ impl<'arena> Builder<'arena> {
         })
     }
 
+    /// A call on a borrowed callee with an argument list (`foo($$renderer, x)`
+    /// or, when `optional`, `foo?.($$renderer, x)`): the callee keeps its host
+    /// span, the `(…)` is minted. `arguments` may mix synthetic and borrowed
+    /// expressions.
+    pub fn call_of(
+        &mut self,
+        callee: &'arena Expression<'arena>,
+        arguments: &'arena [Expression<'arena>],
+        optional: bool,
+    ) -> Expression<'arena> {
+        self.mint(if optional { "?.(" } else { "(" });
+        let end = self.mint(")").end;
+        Expression::CallExpression(CallExpression {
+            callee,
+            type_arguments: None,
+            arguments,
+            optional,
+            span: Span::new(callee.span().start, end),
+        })
+    }
+
     /// `() => <body>` — an expression-bodied arrow around a borrowed expression
     /// (the `$derived(e)` → `$.derived(() => e)` thunk).
     pub fn arrow_expr(&mut self, body: &'arena Expression<'arena>) -> Expression<'arena> {
@@ -423,6 +444,39 @@ impl<'arena> Builder<'arena> {
     /// A single-quoted string literal expression.
     pub fn string_literal_expr(&mut self, content: &str) -> Expression<'arena> {
         Expression::Literal(self.string_literal(content))
+    }
+
+    /// `function <name>(<params>) { <body> }` — a named function declaration
+    /// (the emitted snippet function). `name` rides the interned-name channel;
+    /// `params` may mix the synthetic `$$renderer` identifier with borrowed
+    /// snippet parameter patterns (host spans). `block_span` anchors the body's
+    /// comment windows (host-anchored when the body holds borrowed statements).
+    pub fn function_declaration(
+        &mut self,
+        name: &str,
+        params: &'arena [Expression<'arena>],
+        body: &'arena [Statement<'arena>],
+        block_span: Span,
+    ) -> Statement<'arena> {
+        let start = self.mint("function ").start;
+        let id = self.ident(name);
+        let params_start = self.mint("(").start;
+        self.mint(") {");
+        let end = self.mint("}").end;
+        Statement::FunctionDeclaration(FunctionDeclaration {
+            id: Some(id),
+            type_parameters: None,
+            params,
+            return_type: None,
+            body: BlockStatement {
+                body,
+                span: block_span,
+            },
+            generator: false,
+            r#async: false,
+            params_start,
+            span: Span::new(start, end),
+        })
     }
 }
 

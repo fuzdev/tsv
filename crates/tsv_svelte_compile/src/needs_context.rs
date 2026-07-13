@@ -32,7 +32,7 @@
 
 use tsv_svelte::ast::internal::{
     AttributeNode, AttributeValue, AwaitBlock, ConstTag, EachBlock, Element, Fragment,
-    FragmentNode, HtmlTag, IfBlock, KeyBlock, Root,
+    FragmentNode, HtmlTag, IfBlock, KeyBlock, RenderTag, Root, SnippetBlock,
 };
 use tsv_ts::ast::internal::{
     ArrowFunctionBody, ClassBody, ClassMember, ExportDefaultValue, Expression, ForInOfLeft,
@@ -645,13 +645,45 @@ fn walk_fragment_node(node: &FragmentNode<'_>, nc: &mut Nc<'_>) {
         FragmentNode::AwaitBlock(block) => walk_await_block(block, nc),
         FragmentNode::KeyBlock(block) => walk_key_block(block, nc),
         FragmentNode::ConstTag(tag) => walk_const_tag(tag, nc),
+        FragmentNode::SnippetBlock(snippet) => walk_snippet_block(snippet, nc),
+        FragmentNode::RenderTag(tag) => walk_render_tag(tag, nc),
         // Emission refuses these shapes, so their contents never reach output;
         // matched explicitly so a new variant fails compilation here.
         FragmentNode::SpecialElement(_)
-        | FragmentNode::SnippetBlock(_)
         | FragmentNode::DeclarationTag(_)
-        | FragmentNode::DebugTag(_)
-        | FragmentNode::RenderTag(_) => {}
+        | FragmentNode::DebugTag(_) => {}
+    }
+}
+
+/// A `{#snippet}` is a function-like subtree: its parameters + body locals
+/// shadow the component scope, and any `new`/unsafe member/call in its body
+/// still triggers the wrapper (a prop-rooted access inside a snippet fires
+/// `needs_context`, and a `new` in a *hoistable* snippet body fires it too).
+fn walk_snippet_block(snippet: &SnippetBlock<'_>, nc: &mut Nc<'_>) {
+    nc.fn_depth += 1;
+    for param in snippet.parameters {
+        declare_pattern(param, nc);
+        walk_expr(param, nc);
+    }
+    walk_fragment(&snippet.body, nc);
+    nc.fn_depth -= 1;
+}
+
+/// A `{@render}` walks only its call arguments — the oracle visits the render
+/// callee with expression metadata (not as a `CallExpression`), so a plain
+/// snippet/prop callee never triggers `needs_context`; a member callee is
+/// refused at emission time. Arguments are ordinary template expressions.
+fn walk_render_tag(tag: &RenderTag<'_>, nc: &mut Nc<'_>) {
+    let call = match &tag.expression {
+        Expression::CallExpression(c) => Some(c),
+        Expression::ParenthesizedExpression(p) => match p.expression {
+            Expression::CallExpression(c) => Some(c),
+            _ => None,
+        },
+        _ => None,
+    };
+    if let Some(call) = call {
+        walk_exprs(call.arguments, nc);
     }
 }
 
