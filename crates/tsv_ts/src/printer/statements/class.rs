@@ -161,11 +161,12 @@ impl<'a> Printer<'a> {
             // Comments between name and type params: `class A/* c */ <T> {}`
             // Line comments get a hardline to prevent absorbing type params as comment text
             if let Some(type_params) = &decl.type_parameters {
-                header_parts.push(self.build_name_to_type_params_comments(
+                self.push_name_to_type_params_comments(
+                    &mut header_parts,
                     id.span.end,
                     type_params.span.start,
                     CommentSpacing::Trailing,
-                ));
+                );
                 // Type params get their own group - break independently of heritage.
                 header_parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
             }
@@ -716,11 +717,12 @@ impl<'a> Printer<'a> {
             .type_parameters
             .as_ref()
             .map_or(method.value.params_start, |tp| tp.span.start);
-        parts.push(self.build_name_to_type_params_comments(
+        self.push_name_to_type_params_comments(
+            &mut parts,
             after_key,
             next_after_key,
             CommentSpacing::for_type_params(method.value.type_parameters.is_some()),
-        ));
+        );
 
         // Type parameters if present: method<T>()
         if let Some(type_params) = &method.value.type_parameters {

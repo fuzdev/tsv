@@ -8,7 +8,6 @@
 // - Rest elements: `...rest`
 
 use crate::ast::internal::{self, ArrowFunctionBody, Expression, ObjectPatternProperty};
-use crate::printer::CommentSpacing;
 use crate::printer::{
     CommentVec, ParenContext, PatternContext, Printer, object_pattern_should_expand,
 };
@@ -757,28 +756,41 @@ impl<'a> Printer<'a> {
                     };
                     // Comments between key and value, split at `:`
                     // e.g., `{[x] /* c1 */: /* c2 */ a}` → before `:` and after `:`
+                    //
+                    // The `: ` is static text, so the `:` byte scan exists only to split
+                    // the two comment ranges — a comment-free `{a: b}` neither scans nor
+                    // pushes an empty child.
                     let value_start = p.value.span().start;
-                    #[allow(clippy::expect_used)]
-                    // Parser guarantees `:` exists in destructuring property
-                    let colon_pos = find_char_skipping_comments(
-                        self.source.as_bytes(),
-                        key_region_end as usize,
-                        value_start as usize,
-                        b':',
-                    )
-                    .expect(": not found in destructuring property")
-                        as u32;
-                    let pre_colon_comments =
-                        self.build_inline_comments_between_doc(key_region_end, colon_pos);
-                    let mut parts: DocBuf = smallvec![key_doc, pre_colon_comments];
-                    parts.push(d.text(": "));
-                    // Comments after `:`
-                    let after_colon_comments = self
-                        .build_inline_comments_between_doc_trailing_space(
-                            colon_pos + 1,
-                            value_start,
-                        );
-                    parts.push(after_colon_comments);
+                    let mut parts: DocBuf = smallvec![key_doc];
+                    if self.has_comments_between(key_region_end, value_start) {
+                        #[allow(clippy::expect_used)]
+                        // Parser guarantees `:` exists in destructuring property
+                        let colon_pos = find_char_skipping_comments(
+                            self.source.as_bytes(),
+                            key_region_end as usize,
+                            value_start as usize,
+                            b':',
+                        )
+                        .expect(": not found in destructuring property")
+                            as u32;
+                        if let Some(pre_colon_comments) =
+                            self.build_inline_comments_between_doc_opt(key_region_end, colon_pos)
+                        {
+                            parts.push(pre_colon_comments);
+                        }
+                        parts.push(d.text(": "));
+                        // Comments after `:`
+                        if let Some(after_colon_comments) = self
+                            .build_inline_comments_between_doc_trailing_space_opt(
+                                colon_pos + 1,
+                                value_start,
+                            )
+                        {
+                            parts.push(after_colon_comments);
+                        }
+                    } else {
+                        parts.push(d.text(": "));
+                    }
                     parts.push(self.build_expression_doc(&p.value));
                     d.concat(&parts)
                 }
@@ -1092,16 +1104,18 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a rest element
     pub(super) fn build_rest_element_doc(&self, rest: &internal::RestElement<'_>) -> DocId {
         let d = self.d();
-        // Comments between `...` and the argument (e.g., `.../* c */ args`)
+        // Comments between `...` and the argument (e.g., `.../* c */ args`). Skipped on
+        // the comment-free path — rest/spread elements are everywhere (`f(...xs)`,
+        // `{a, ...rest}`, `(...args) =>`) and a comment inside the `...` gap is not.
         let dots_end = rest.span.start + "...".len() as u32;
         let arg_start = rest.argument.span().start;
-        let comments_doc =
-            self.build_comments_between(dots_end, arg_start, CommentSpacing::Trailing);
-        let mut parts: DocBuf = smallvec![
-            d.text("..."),
-            comments_doc,
-            self.build_expression_doc(rest.argument),
-        ];
+        let mut parts: DocBuf = smallvec![d.text("...")];
+        if let Some(comments_doc) =
+            self.build_inline_comments_between_doc_trailing_space_opt(dots_end, arg_start)
+        {
+            parts.push(comments_doc);
+        }
+        parts.push(self.build_expression_doc(rest.argument));
         // Optional rest parameter `...a?` — the `?` is carried on the rest element
         // (not `argument`), between the binding and any annotation. See `RestElement`.
         if rest.optional {

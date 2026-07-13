@@ -163,11 +163,12 @@ impl<'a> Printer<'a> {
         let mut ext_parts: DocBuf = smallvec![d.text("extends ")];
         if let Some(kw_start) = extends_keyword_start {
             let kw_end = kw_start + "extends".len() as u32;
-            ext_parts.push(self.build_comments_between(
+            if let Some(comments) = self.build_inline_comments_between_doc_trailing_space_opt(
                 kw_end,
                 super_class.span().start,
-                CommentSpacing::Trailing,
-            ));
+            ) {
+                ext_parts.push(comments);
+            }
         }
         ext_parts.push(self.build_super_class_doc(super_class));
         if let Some(type_args) = super_type_parameters {
