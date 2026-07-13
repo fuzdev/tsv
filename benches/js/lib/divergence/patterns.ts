@@ -1695,7 +1695,9 @@ const inline_content_block_style: DivergencePattern = {
 		// they false-match exactly those forms). One body-drop variant stays uncovered:
 		// where prettier instead wraps an element's *attributes* (no `>` dangle and the
 		// head was never hugged), which has no safe marker distinct from those forms.
-		const dangle_close = /<\/[A-Za-z][\w-]*[ \t]*$/; //                  `</tag` at EOL
+		// The tag-name class admits `:` and `.` — a dangled `</svelte:element` or `</Foo.Bar` is
+		// the same marker as `</div`, and a Svelte closing tag can carry either.
+		const dangle_close = /<\/[A-Za-z][\w.:-]*[ \t]*$/; //               `</tag` at EOL
 		const dangle_open = /^[ \t]*>/; //                                  `>` starts a line
 		const block_head_alone = /^[ \t]*\{#(?:if|each|await|key|snippet)\b[^}]*\}[ \t]*$/;
 		let has_signature = false;

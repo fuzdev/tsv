@@ -181,6 +181,7 @@ deno task pins:audit                 # canonical-oracle version sync (gated in `
 deno task scan:audit                 # guard against new raw find/rfind/match_indices substring scans over source (gated in `deno task check`); see Debug Tooling
 deno task fanout:audit               # guard against super-linear doc-node fanout (the per-layout-candidate rebuild blowup); gated in `deno task check`; see Debug Tooling
 deno task roundtrip:audit            # cheap tripwire that format(tests/fixtures) reparses (pure-Rust phase 1, no *_unreparseable output; gated in `deno task check`) — real yield is external corpora; see Debug Tooling
+deno task authoring:audit            # authoring-independence over Svelte boundary whitespace: every render-equivalent authoring of one document (hug ↔ space ↔ newline at a tag's content boundary; space ↔ newline between siblings) must reach ONE tsv fixed point (pure Rust, no sidecar; gated in `deno task check`) — exits 1 on any non-idempotency; see Debug Tooling
 deno task fuzz:audit                 # seeded mutational fuzzer over tests/fixtures (fixed --seed 0 --iterations 5000; pure Rust, no sidecar; gated in `deno task check`) — asserts no-panic + idempotency + structural-reparse on mutated input; see Debug Tooling
 ```
 
@@ -872,11 +873,26 @@ cargo run -p tsv_debug scan_audit --list     # enumerate every scan site
 # authoring_audit - probe whether the SAME logical document, authored with
 # different boundary whitespace, formats to ONE tsv fixed point. Stronger than the
 # corpus idempotency sweep: a formatter can be idempotent yet authoring-DEPENDENT
-# (two authorings settling on two different stable outputs). Mutates only
-# non-significant boundary whitespace between siblings (space↔single-newline, never
-# a blank line, never inside <pre>/<textarea>) — safe by construction (HTML
-# whitespace collapse); the element expansion a toggle may trigger is the property
-# under test. Svelte (.svelte) only for now.
+# (two authorings settling on two different stable outputs). Two mutation families,
+# never a blank line (Tier-1 significant) and never inside <pre>/<textarea>:
+#   - BETWEEN siblings — space↔single-newline only. Inter-node whitespace is
+#     render-SIGNIFICANT (it collapses to one space, it doesn't vanish), so the run is
+#     reshaped, never created or destroyed. Both forms collapse identically ⇒ safe.
+#   - At a tag's CONTENT BOUNDARY — hug↔space↔newline, i.e. the run IS created and
+#     destroyed. Svelte 5 removes start/end-of-content whitespace at compile, so all
+#     three authorings render identically. This is the family that catches a formatter
+#     letting a render-free character pick the layout (the delimiter-dangle class); it
+#     probes only elements whose content already spans lines, where layout is at stake.
+#     Note what that skips: for content that FITS on one line tsv preserves an authored
+#     boundary space (`<span> text </span>` and `<span>text</span>` are BOTH stable), so a
+#     clean run means no render-free character picks a LAYOUT — not that none survives in
+#     the output. That preservation is deliberate and prettier-matching (fixture
+#     `inline_boundary_whitespace`); see conformance_prettier.md §Svelte: Inline content
+#     block-style.
+# The element expansion a mutation may trigger is the property under test. Svelte only.
+# Gated in `deno task check` via the `authoring:audit` task — which scans tests/fixtures
+# ONLY, so point it at a real codebase too: findings live there (a non-idempotent fill
+# 2-cycle was green on fixtures while failing on ~/dev/zzz).
 cargo run -p tsv_debug authoring_audit                  # audit tests/fixtures (pure Rust)
 cargo run -p tsv_debug authoring_audit ~/dev/zzz/src    # audit a real codebase
 # Pure-Rust verdict per site: converge / diverge (dual-stable) / diverge
