@@ -39,6 +39,19 @@ pub struct Comment {
     /// comment is single-line (a multiline block comment ends on an unshifted
     /// later line).
     pub bump_pattern_columns: bool,
+    /// Whether this comment is **bound to the token that follows it**, and so is
+    /// printed by the AST node that token begins rather than by the enclosing gap.
+    /// The one class today is the JSDoc type cast's `@type`/`@satisfies` comment,
+    /// which `tsv_ts`'s parser sets when it builds a `JsdocCast`: the comment plus
+    /// the `(` it glues to *are* the cast, so anything printed between them
+    /// re-binds the cast to a wider node on reparse.
+    ///
+    /// The range lookups below **skip** an owned comment, so no gap emitter can
+    /// print it and no paren the printer synthesizes around an enclosing
+    /// expression can land between the comment and its token. Only the owning node
+    /// prints it, from its own copy — set this flag exclusively where that node
+    /// also prints, or the comment is dropped.
+    pub owned_by_node: bool,
 }
 
 impl Comment {
@@ -282,6 +295,12 @@ pub fn find_first_comment_from(comments: &[Comment], pos: u32) -> usize {
 ///
 /// Returns an iterator over comments where start <= span.start && span.end <= end.
 /// Uses binary search to find the starting point: O(log n + k) where k is result count.
+///
+/// [`Comment::owned_by_node`] comments are **skipped**: they belong to the node whose
+/// token they glue to, which prints them itself. This is the single seam that keeps
+/// them out of every gap emitter *and* every layout predicate — both funnel through
+/// here — so an owned comment can never be printed twice, and no synthesized paren
+/// can be placed between it and its token.
 #[inline]
 pub fn comments_in_range(
     comments: &[Comment],
@@ -292,13 +311,30 @@ pub fn comments_in_range(
     comments[first_idx..]
         .iter()
         .take_while(move |c| c.span.end <= end)
+        .filter(|c| !c.owned_by_node)
 }
 
 /// Check if any comments exist in the range [start, end)
 ///
-/// Uses binary search: O(log n)
+/// Skips [`Comment::owned_by_node`] comments, like [`comments_in_range`].
+///
+/// Uses binary search: O(log n + k) where k is comments in range
 #[inline]
 pub fn has_comments_in_range(comments: &[Comment], start: u32, end: u32) -> bool {
+    comments_in_range(comments, start, end).next().is_some()
+}
+
+/// Check if any comments exist in [start, end), **including** owned ones — the
+/// existence check for a caller that only wants to know whether the range prints any
+/// comment text at all, not whether *it* has to print it.
+///
+/// A [`Comment::owned_by_node`] comment is printed by its own node, so no emitter needs
+/// to see it — but it is still in the output, and still occupies width. A pure *layout*
+/// gate must therefore count it (the member-chain's structural fast path is the case in
+/// point: skipping it on an owned-comment-only chain changes how the chain groups).
+/// Use [`has_comments_in_range`] for anything that decides whether to *emit*.
+#[inline]
+pub fn has_any_comments_in_range(comments: &[Comment], start: u32, end: u32) -> bool {
     let first_idx = find_first_comment_from(comments, start);
     comments.get(first_idx).is_some_and(|c| c.span.end <= end)
 }
@@ -324,11 +360,12 @@ pub fn has_multiline_block_comments_in_range(comments: &[Comment], start: u32, e
 /// Iterate over comments after a position (span.start >= pos)
 ///
 /// Returns an iterator over all comments starting at or after the given position.
+/// Skips [`Comment::owned_by_node`] comments, like [`comments_in_range`].
 /// Uses binary search to find the starting point: O(log n + k) where k is result count.
 #[inline]
 pub fn comments_after(comments: &[Comment], pos: u32) -> impl Iterator<Item = &Comment> {
     let first_idx = find_first_comment_from(comments, pos);
-    comments[first_idx..].iter()
+    comments[first_idx..].iter().filter(|c| !c.owned_by_node)
 }
 
 #[cfg(test)]
@@ -346,6 +383,7 @@ mod tests {
             span: Span::new(start, end),
             emit_character_field: false,
             bump_pattern_columns: false,
+            owned_by_node: false,
         }
     }
 

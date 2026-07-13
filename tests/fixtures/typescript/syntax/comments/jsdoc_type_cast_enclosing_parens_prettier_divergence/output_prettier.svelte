@@ -1,0 +1,24 @@
+<script>
+	// An enclosing paren the formatter adds around an expression whose left edge is a
+	// JSDoc cast goes OUTSIDE the cast's comment — the comment must stay glued to its
+	// own `(`, or the cast re-parses onto the enclosing paren's expression.
+
+	// clarity parens around a `??` ternary operand
+	const a = cond ? x : /** @type {A} */ ((b).c ?? d);
+	const e = cond ? /** @type {A} */ ((b).c ?? d) : x;
+	const f = /** @type {A} */ ((b).c ?? d) ? x : y;
+
+	// required parens: `??` mixed with `||`, member base, callee, `new` callee, `**` operand
+	const g = /** @type {A} */ ((b).c ?? d) || x;
+	const h = /** @type {A} */ ((b).c ?? d).n;
+	const i = /** @type {A} */ ((b).c ?? d)();
+	const j = new /** @type {A} */ ((b).c ?? d)();
+	const k = /** @type {A} */ ((b).c ?? d) ** 2;
+
+	// sequence and assignment keep their value-position parens
+	const l = /** @type {A} */ ((b).c, d);
+	const m = /** @type {A} */ ((b).c = d);
+
+	// no enclosing paren: the comment already sits against its own `(`
+	const n = /** @type {A} */ (b).c ?? d;
+</script>

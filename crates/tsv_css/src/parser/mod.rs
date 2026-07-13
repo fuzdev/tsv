@@ -109,6 +109,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
             },
             emit_character_field: false,
             bump_pattern_columns: false,
+            owned_by_node: false,
         }
     }
 

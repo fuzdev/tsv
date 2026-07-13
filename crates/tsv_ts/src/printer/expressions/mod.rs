@@ -30,7 +30,10 @@ mod template_literal;
 use self::operators::OperatorBuf;
 use crate::ast::internal::{BinaryExpression, Expression, TSType};
 use crate::printer::comments::{CommentFilter, CommentSpacing};
-use crate::printer::{ParenContext, PatternContext, Printer, chain, class_expr_has_decorators};
+use crate::printer::{
+    ParenContext, PatternContext, Printer, chain, class_expr_has_decorators,
+    jsdoc_cast_comment_is_own_line,
+};
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::comments_in_range;
@@ -211,12 +214,20 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for a JSDoc type cast: `/** @type {T} */ (inner)`.
     ///
-    /// The leading `@type`/`@satisfies` comment for this cast level lives in the
-    /// gap before the `(` and is emitted by the *caller* (statement / RHS / arg
-    /// leading-comment path, keyed on `cast.span.start` = the `(`). This method
-    /// emits the parens plus any comments between this `(` and the inner — which
-    /// is how a **nested** cast's own `@type` comment lands (`/** @type {A} */
-    /// (/** @type {B} */ (expr))`). The inner is built bare: the cast's own
+    /// The cast **owns** its leading `@type`/`@satisfies` comment (the parser sets
+    /// `Comment::owned_by_node`, so every gap emitter and layout predicate skips it)
+    /// and prints it here, glued to its own `(`. That gluing is the correctness
+    /// property: the comment and the `(` together *are* the cast, so a paren the
+    /// printer synthesizes around an *enclosing* expression — `??` clarity parens
+    /// under a ternary, a member/call base, a `new` callee, a `**` operand — lands
+    /// **outside** the pair instead of between them. Printed from the enclosing gap
+    /// instead (prettier's model, and its bug), that paren separates the two and the
+    /// cast silently re-binds to the wider expression on reparse. See
+    /// `docs/conformance_prettier.md` §JSDoc / paren semantics.
+    ///
+    /// A **nested** cast's comment lands the same way — the inner `JsdocCast` prints
+    /// its own (`/** @type {A} */ (/** @type {B} */ (expr))`) — so the interior gap
+    /// below carries only ordinary comments. The inner is built bare: the cast's own
     /// parens provide grouping, so `needs_parens` must not double-wrap it.
     ///
     /// Layout follows prettier-plugin-svelte's `ParenthesizedExpression`: an
@@ -229,6 +240,19 @@ impl<'a> Printer<'a> {
         let open = cast.span.start; // the `(`
         let inner_start = cast.inner.span().start;
         let inner_doc = self.build_expression_doc(cast.inner);
+
+        // The owned comment, glued to the `(`. A comment the author gave a line of its
+        // own keeps it (the same predicate drives the enclosing assignment to hang, so
+        // the `(` lands indented under it); any other authored newline between the two
+        // collapses to a space, matching prettier.
+        let comment_doc = self.build_comment_doc(&cast.comment);
+        let comment_gap = if jsdoc_cast_comment_is_own_line(cast, self.source) {
+            d.hardline()
+        } else {
+            d.text(" ")
+        };
+        let lead = d.concat(&[comment_doc, comment_gap]);
+        let with_lead = |paren_doc: DocId| d.concat(&[lead, paren_doc]);
 
         // A line comment in the gap before the inner must force a hardline layout —
         // otherwise `(// c <inner>)` runs the inner and the `)` into the comment
@@ -246,17 +270,17 @@ impl<'a> Printer<'a> {
                 });
             }
             parts.push(inner_doc);
-            return d.concat(&[
+            return with_lead(d.concat(&[
                 d.text("("),
                 d.indent(d.concat(&parts)),
                 d.hardline(),
                 d.text(")"),
-            ]);
+            ]));
         }
 
-        // Comments between this cast's `(` and the inner expression (a nested
-        // cast's own `@type` comment, when `inner` is itself a JsdocCast) — all
-        // block comments here, so they hug inline.
+        // Ordinary comments between this cast's `(` and the inner expression — all
+        // block comments here, so they hug inline. A nested cast's own `@type` comment
+        // is NOT among them: that cast owns it and prints it itself.
         let interior = self.build_comments_between(open + 1, inner_start, CommentSpacing::Trailing);
         let body = d.concat(&[interior, inner_doc]);
 
@@ -265,14 +289,14 @@ impl<'a> Printer<'a> {
             cast.inner,
             Expression::ObjectExpression(_) | Expression::ArrayExpression(_)
         ) {
-            d.concat(&[d.text("("), body, d.text(")")])
+            with_lead(d.concat(&[d.text("("), body, d.text(")")]))
         } else {
-            d.group(d.concat(&[
+            with_lead(d.group(d.concat(&[
                 d.text("("),
                 d.indent(d.concat(&[d.softline(), body])),
                 d.softline(),
                 d.text(")"),
-            ]))
+            ])))
         }
     }
 
