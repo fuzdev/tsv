@@ -187,9 +187,32 @@ export const CORPUS_PARSE_TSV_ERRORS_PIN: Record<Language, number> = {
  *   2026-07-12 pin.
  *
  * css 125 unchanged (no CSS-crate change on this branch).
+ *
+ * svelte 1107→1101 (re-pinned DOWN — deliberate divergences, not a regression). Re-measured
+ * 2026-07-13; typescript and css unchanged, SAFETY 0. Attributed the same way (format the
+ * whole `gates` corpus with the pre-change binary and with this one, diff the per-file match
+ * sets — a file can only flip if tsv's own output changed, so that set is a cheap strict
+ * superset). The svelte baseline re-measures at exactly 1107, so there is NO corpus churn in
+ * this window and the entire −6 is behavior:
+ *
+ * - svelte −6: the content-boundary stance now covers the language's SECOND fragment family
+ *   — block bodies. A block whose body renders multiline lays out block-style (head and tail
+ *   intact) however the author wrote the boundary, since Svelte 5 removes that whitespace at
+ *   compile; hug is all-or-nothing across the construct's branches; and the body-expand
+ *   decision is width's alone, never keyed on whether the head may wrap. Exactly 6 files flip
+ *   match→divergence, all of them prettier's welded block body becoming block-style: fuz_ui
+ *   `Redirect` (an `{#if}`/`{:else}` whose branches now break together) and `ApiModule`,
+ *   fuz_blog `FeedItemDate` (the real-world instance of the width-driven body after a
+ *   breakable sibling), prettier-plugin-svelte's `each-block-else-with-nested-if-inline-elseif-else`
+ *   and its `svelte-key-block-break` input+output. All 6 land in `known` (svelte `unknown`
+ *   holds at its pin of 7, once `inline_content_block_style` learned two more ours-side
+ *   markers: a block head ENDING a line that has a prefix, and a branch/close tag alone on
+ *   its own line), prettier keeps tsv's new form stable in every case, and all 6 outputs
+ *   reparse and are idempotent. See conformance_prettier.md §Svelte: Inline content
+ *   block-style.
  */
 export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
-	svelte: 1107,
+	svelte: 1101,
 	typescript: 4164,
 	css: 125,
 };
