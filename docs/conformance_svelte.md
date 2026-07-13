@@ -207,6 +207,22 @@ Svelte ❌ / Prettier ✅ / tsv ✅ in every case below:
 
 **Async generic arrow params**: acorn-typescript drops all function parameters from `async` arrow functions that have type parameters (`async <T,>(x: T) => x` → `params: []`). Non-async generic arrows are unaffected. This is semantic corruption — tools consuming the AST would see zero-argument functions. **Upstream candidate**: acorn-typescript async arrow parsing.
 
+**Import-phase proposals (forward-looking, ungated).** tsv accepts the TC39
+import-phase syntax — `import defer * as ns from '…'` / `import source x from '…'`
+and the dynamic `import.defer(…)` / `import.source(…)` — and emits a `phase` field
+(`'defer'` / `'source'`) on the `ImportDeclaration` / `ImportExpression` wire node
+(declared in `crates/tsv_wasm/types/tsv_ast.d.ts`). Unlike every case above, this one
+is **un-fixturable**: acorn-typescript **and** Svelte's parser both *reject*
+import-phase, so no canonical `expected.json` exists to gate the shape against (a
+`_svelte_divergence` fixture needs the oracle to *accept*, which it does not), and the
+syntax is not yet in the finished ECMAScript standard. prettier is no oracle here
+either — it drops the `defer` keyword and rejects `import source`. The emitted `phase`
+shape mirrors the TC39 proposals' AST; because there is no oracle, it is a deliberate
+extension rather than a drop-in guarantee, and **if acorn-typescript later implements
+import-phase with a different shape, tsv should re-align to it**. Emitted from
+`crates/tsv_ts/src/ast/convert/write/statements.rs` (declaration) and
+`crates/tsv_ts/src/ast/convert/write/expressions.rs` (expression).
+
 Its one accept-side consequence is a *reverse* divergence — tsv **over-rejects** here. A parameter decorator is invalid on an arrow in every form (tsc + prettier + acorn all reject `(@dec a) => a`, `<T>(@dec a) => a`, `async (@dec a) => a` — the drop-in rejections pinned by the `input_invalid_*` cases in [decorators/parameter_arrow](../tests/fixtures/typescript/typescript_specific/decorators/parameter_arrow/)). But in the async-generic form acorn *accepts* `async <T>(@dec a) => a`, only because the param-drop bug above silently discards the parameter and its decorator. tsc still rejects the decorator, so tsv rejects too — matching every other arrow form and diverging from acorn's lossy accept (a `tsv_rejects.txt` fixture).
 
 Fixtures: [async_generic/stacked](../tests/fixtures/typescript/expressions/arrow/async_generic/stacked_svelte_prettier_divergence/), [async_generic/forms](../tests/fixtures/typescript/expressions/arrow/async_generic/forms_svelte_prettier_divergence/), [async_generic/basic_ts](../tests/fixtures/typescript/expressions/arrow/async_generic/basic_ts_svelte_divergence/), [async_generic/long](../tests/fixtures/typescript/expressions/arrow/async_generic/long_svelte_divergence/), [async_generic/param_decorator](../tests/fixtures/typescript/expressions/arrow/async_generic/param_decorator_svelte_divergence/), [curried_typed_callback](../tests/fixtures/typescript/expressions/arrow/curried_typed_callback_svelte_prettier_divergence/). `async_generic/forms` adds the optional-param (`x?`) drop, distinct from the plain param (`stacked`) and rest param (`long`); `async_generic/param_decorator` is the over-rejection direction (tsv rejects a decorator acorn's param-drop swallows).

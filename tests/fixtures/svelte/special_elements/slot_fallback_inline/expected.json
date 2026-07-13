@@ -1,0 +1,83 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 63,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "SlotElement",
+				"start": 0,
+				"end": 21,
+				"name": "slot",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 5,
+						"character": 5
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 6,
+							"end": 14,
+							"raw": "fallback",
+							"data": "fallback"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 21,
+				"end": 23,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "SvelteFragment",
+				"start": 23,
+				"end": 62,
+				"name": "svelte:fragment",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 24
+					},
+					"end": {
+						"line": 3,
+						"column": 16,
+						"character": 39
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 40,
+							"end": 44,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

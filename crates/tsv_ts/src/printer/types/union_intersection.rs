@@ -731,7 +731,8 @@ impl<'a> Printer<'a> {
                 // the line-comment path with the first member's (now-hoisted) paren-leading
                 // stripped, so the other comments aren't dropped. Otherwise stay compact
                 // inline (block comments emitted in place).
-                let inner = if self.intersection_needs_line_comment_layout(intersection) {
+                let line_comment_layout = self.intersection_needs_line_comment_layout(intersection);
+                let inner = if line_comment_layout {
                     self.build_intersection_type_doc_with_line_comments(intersection, true)
                 } else {
                     self.build_intersection_type_doc_with_first_paren_leading_stripped(
@@ -745,7 +746,17 @@ impl<'a> Printer<'a> {
                     parts.push(d.hardline());
                 }
                 parts.push(inner);
-                return d.concat(&parts);
+                let body = d.concat(&parts);
+                // The compact inline body renders flush-left; indent the hoisted
+                // comment(s) + intersection under the alias `=` so continuation lines
+                // align (`type T = // c⏎⇥A & B`) and the form stays idempotent —
+                // without it, pass 2 re-indents the reparsed, no-longer-parenthesized
+                // body. The line-comment layout already self-indents per member.
+                return if line_comment_layout {
+                    body
+                } else {
+                    d.indent(body)
+                };
             }
         }
 
