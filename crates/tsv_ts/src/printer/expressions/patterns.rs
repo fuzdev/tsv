@@ -1023,6 +1023,12 @@ impl<'a> Printer<'a> {
         // bare. Same rule as an assignment expression's left.
         let left_doc = if self.needs_parens(pattern.left, ParenContext::AssignmentTarget) {
             d.parens(self.build_expression_doc(pattern.left))
+        } else if let Expression::ObjectPattern(obj) = pattern.left {
+            // A destructuring default's left object pattern does NOT expand on nesting
+            // — prettier's shouldBreak excludes an AssignmentPattern parent (object.js),
+            // so `{ a: { b } = {} }` (and deeper) stays inline. Width-based breaking
+            // still applies. (Array-pattern lefts don't expand on nesting.)
+            self.build_object_pattern_doc_with_context(obj, PatternContext::AssignmentDefault)
         } else {
             self.build_expression_doc(pattern.left)
         };
