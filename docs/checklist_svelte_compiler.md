@@ -91,6 +91,10 @@ Sanctioned rewrites (all Supported, at parity):
 
 A never-updated `$state`/plain binding is statically known and its template reads **fold** into the emitted text (the oracle's evaluator behavior, ported in `analyze.rs`); a bare template read of a non-foldable `$derived` binding becomes a call (`d()`).
 
+**`$$slots` — Supported.** A `$$slots` reference (the oracle's `uses_slots`, detected in the `needs_context` walk) injects `const $$slots = $.sanitize_slots($$props)` as the component function's first statement — before any wrapper — and forces the `$$props` parameter (`transform-server.js:300`). It reads through the rune guard's `$`-prefix refusal by a carve-out. Component-wide reassignment collection also rides that walk, so a binding mutated inside a dropped event handler is still marked updated (and not folded).
+
+- **Refused**: `comments in a script with a $$slots reference (injected sanitize_slots)` — the injected first statement would sweep the carried-comment windows.
+
 Everything else `$`-shaped refuses (the `rune_guard.rs` exhaustive walk):
 
 - **Refused**: `rune {name}` — any non-sanctioned rune call (`$effect.tracking`, `$inspect`, `$bindable`, `$host`, member-form misuse, a rune call in any non-sanctioned position)

@@ -172,6 +172,10 @@ pub enum Refusal {
     /// Comments alongside expression-valued attributes.
     #[error("comments in a script alongside expression-valued attributes")]
     CommentsAlongsideExprAttributes,
+    /// Comments alongside a `$$slots` reference (the injected
+    /// `sanitize_slots` first statement would sweep the comment windows).
+    #[error("comments in a script with a $$slots reference (injected sanitize_slots)")]
+    CommentsWithSlots,
     /// A `format-ignore` directive comment in the script.
     #[error("format-ignore directive comment in script")]
     FormatIgnoreComment,
@@ -432,6 +436,9 @@ impl Refusal {
             Self::CommentsAlongsideExprAttributes => {
                 Cow::Borrowed("comments in a script alongside expression-valued attributes")
             }
+            Self::CommentsWithSlots => Cow::Borrowed(
+                "comments in a script with a $$slots reference (injected sanitize_slots)",
+            ),
             Self::FormatIgnoreComment => Cow::Borrowed("format-ignore directive comment in script"),
             Self::TemplateComments => Cow::Borrowed(
                 "template comments (only instance-script comments are carried through)",

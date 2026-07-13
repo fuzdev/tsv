@@ -379,6 +379,17 @@ pub(crate) fn compile_server<'arena>(
     if needs_context {
         uses_props = true;
     }
+    // A `$$slots` reference makes the component inject
+    // `const $$slots = $.sanitize_slots($$props)` (below) and take `$$props`
+    // (the oracle's `should_inject_props` includes `uses_slots`). Carried script
+    // comments plus the injected first statement would sweep the function-body
+    // comment windows, so refuse that combination for now.
+    if component.uses_slots {
+        if has_comments {
+            return Err(unsupported(Refusal::CommentsWithSlots));
+        }
+        uses_props = true;
+    }
     for comment in &script_comments {
         for region in &dropped_regions {
             if comment.span.start >= region.start && comment.span.end <= region.end {
@@ -479,6 +490,20 @@ pub(crate) fn compile_server<'arena>(
             is_directive: false,
         }));
         outer.into_bump_slice()
+    } else {
+        body
+    };
+
+    // The oracle unshifts `const $$slots = $.sanitize_slots($$props)` to the top
+    // of the component function body — before the wrapper (`transform-server.js`
+    // `:300`). Prepend it here so it sits outside any `$$renderer.component`
+    // wrapper, matching the oracle's placement.
+    let body = if component.uses_slots {
+        let slots_decl = build_sanitize_slots_decl(&mut env.b, arena);
+        let mut with_slots: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
+        with_slots.push(slots_decl);
+        with_slots.extend_from_slice(body);
+        with_slots.into_bump_slice()
     } else {
         body
     };
@@ -1487,6 +1512,21 @@ fn check_name_free(env: &EmitEnv<'_, '_>, name: &str) -> Result<(), CompileError
 }
 
 /// A single-declarator `let`/`const` declaration statement.
+/// `const $$slots = $.sanitize_slots($$props);` — the oracle's `uses_slots`
+/// binding, prepended to the component function body.
+fn build_sanitize_slots_decl<'arena>(
+    b: &mut Builder<'arena>,
+    arena: &'arena bumpalo::Bump,
+) -> Statement<'arena> {
+    // Mint the id before the init so the declaration span runs forward
+    // (`id.start < init.end`), the same invariant the each-array decl relies on.
+    let slots_id = Expression::Identifier(b.ident("$$slots"));
+    let props_ident = b.ident("$$props");
+    let props_arg = arena.alloc(Expression::Identifier(props_ident));
+    let init = b.member_call("$", "sanitize_slots", std::slice::from_ref(props_arg));
+    declaration_stmt(b, VariableDeclarationKind::Const, slots_id, init)
+}
+
 fn declaration_stmt<'arena>(
     b: &Builder<'arena>,
     kind: VariableDeclarationKind,

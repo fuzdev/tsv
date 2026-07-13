@@ -60,6 +60,9 @@ struct Nc<'a> {
     /// same walk so mutations inside dropped event handlers still mark a binding
     /// updated (and so it is not statically folded).
     reassigned: NameSet,
+    /// Set by any `$$slots` reference (the oracle's `uses_slots`): the component
+    /// gains `const $$slots = $.sanitize_slots($$props)` and the `$$props` param.
+    uses_slots: bool,
 }
 
 /// The whole-component analysis product consumed by the server transform.
@@ -69,6 +72,8 @@ pub(crate) struct ComponentContext {
     /// Names reassigned anywhere in the component (script + template, including
     /// inside dropped event handlers).
     pub reassigned: NameSet,
+    /// Whether the component references `$$slots` (oracle's `uses_slots`).
+    pub uses_slots: bool,
 }
 
 /// Analyze the component for the `$$renderer.component(…)` wrapper decision and
@@ -95,6 +100,7 @@ pub(crate) fn analyze_component(
         needs: false,
         refuse: None,
         reassigned: NameSet::default(),
+        uses_slots: false,
     };
 
     if let Some(script) = root.instance {
@@ -120,6 +126,7 @@ pub(crate) fn analyze_component(
     Ok(ComponentContext {
         needs_context: nc.needs,
         reassigned: nc.reassigned,
+        uses_slots: nc.uses_slots,
     })
 }
 
@@ -291,9 +298,15 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
         Expression::FunctionExpression(f) => walk_function_expression(f, nc),
         Expression::ClassExpression(c) => walk_class_body(&c.body, nc),
 
+        // A bare identifier reference: detect `$$slots` (the oracle's
+        // `uses_slots`), otherwise a leaf.
+        Expression::Identifier(id) => {
+            if plain_name(id, nc.source) == Some("$$slots") {
+                nc.uses_slots = true;
+            }
+        }
         // Leaves — no children, no bindings.
-        Expression::Identifier(_)
-        | Expression::Literal(_)
+        Expression::Literal(_)
         | Expression::PrivateIdentifier(_)
         | Expression::RegexLiteral(_)
         | Expression::ThisExpression(_)

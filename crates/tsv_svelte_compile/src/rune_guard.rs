@@ -443,11 +443,15 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
         // (non-computed member properties / object keys) are never walked.
         Expression::Identifier(id) => {
             if let Some(name) = dollar_identifier_name(id, ctx.source) {
-                return Err(CompileError::Unsupported(
-                    Refusal::DollarPrefixedIdentifier {
-                        name: name.to_string(),
-                    },
-                ));
+                // `$$slots` is a real runtime reference (the transform injects
+                // `const $$slots = $.sanitize_slots($$props)`), not a rune.
+                if name != "$$slots" {
+                    return Err(CompileError::Unsupported(
+                        Refusal::DollarPrefixedIdentifier {
+                            name: name.to_string(),
+                        },
+                    ));
+                }
             }
             if let Some(name) = identifier_name(id, ctx.source)
                 && ctx.derived_names.contains(name)

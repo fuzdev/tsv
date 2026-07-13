@@ -1456,6 +1456,28 @@ mod tests {
     }
 
     #[test]
+    fn compile_slots_reference_injects_sanitize() {
+        // A `$$slots` reference injects the binding and takes `$$props`.
+        let out = compile("<p>{$$slots}</p>", &CompileOptions::default()).unwrap();
+        assert!(
+            out.js.contains("const $$slots = $.sanitize_slots($$props)")
+                && out.js.contains("function Input($$renderer, $$props)"),
+            "sanitize_slots injection missing: {}",
+            out.js
+        );
+    }
+
+    #[test]
+    fn compile_rejects_slots_with_comments() {
+        // Script comments plus the injected first statement would sweep the
+        // comment windows — refused for now.
+        assert_unsupported(
+            "<script>\n\t// note\n\tlet x = 1;\n</script>\n<p>{x}{$$slots}</p>",
+            "$$slots reference",
+        );
+    }
+
+    #[test]
     fn compile_rejects_client_generation() {
         let options = CompileOptions {
             generate: Generate::Client,
