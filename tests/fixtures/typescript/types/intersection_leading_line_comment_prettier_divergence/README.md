@@ -5,9 +5,16 @@ trailing the `=` (`type C = // leading\n\ta & b;`).
 
 **tsv** keeps the comment trailing the `=`, with the intersection on a
 continuation line indented one level. **Prettier** relocates the comment to its
-own line after the `=`. Both forms are stable under their respective formatters.
-The same pattern applies when the inner type is a parenthesized union
-(`(a | b) & c`).
+own line after the `=` (`variant_own_line`). Both the input and the own-line
+form are stable under tsv (dual-stable). The same pattern applies when the inner
+type is a parenthesized union (`(a | b) & c`).
+
+When the comment is authored *inside* the first member's redundant parens
+(`type C = (// leading\n\ta) & b;`, `unformatted_ours_parens`), tsv strips the
+parens and hoists the comment to the same trailing-`=` continuation form as the
+input — indented, so the result is idempotent. Prettier instead breaks the
+intersection first (`prettier_intermediate_to_variant_parens`) before converging
+to the own-line form.
 
 ## Reason
 
