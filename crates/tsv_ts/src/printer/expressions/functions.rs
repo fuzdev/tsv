@@ -1158,23 +1158,11 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         if params.is_empty() {
-            // Check for dangling comments in empty parens: fn(/* comment */)
-            // Use find_closing_paren which skips comment/string content,
-            // so comments containing ')' don't cause false matches.
-            if let Some(open) = params_start {
-                // Find the close paren independently of `trailing_comments_end` — that
-                // boundary is clamped to the `)` position for non-empty params, which is
-                // too tight here (the depth-tracked search must reach the `)` itself).
-                if let Some(close_after) = self.find_closing_paren(open, self.source.len() as u32) {
-                    let close = close_after - 1;
-                    if let Some(comment_doc) =
-                        self.build_inline_comments_between_doc_no_leading_space_opt(open + 1, close)
-                    {
-                        return d.parens(comment_doc);
-                    }
-                }
-            }
-            return d.text("()");
+            // Search to the end of source rather than `trailing_comments_end` — that
+            // boundary is clamped to the `)` position for non-empty params, which is
+            // too tight here (the depth-tracked search must reach the `)` itself).
+            return self
+                .build_empty_params_with_comments_doc(params_start, self.source.len() as u32);
         }
 
         // Zero-comment fast gate: one binary search over the whole params window.

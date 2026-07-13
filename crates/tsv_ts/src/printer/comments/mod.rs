@@ -446,24 +446,6 @@ impl<'a> Printer<'a> {
         self.build_comments_between(start, end, CommentSpacing::None)
     }
 
-    /// Build a Doc for inline comments (no spaces), returning None if no comments.
-    ///
-    /// Use this instead of `has_comments_between` + `build_inline_comments_between_doc_no_leading_space`
-    /// to avoid redundant binary searches.
-    #[inline]
-    pub(crate) fn build_inline_comments_between_doc_no_leading_space_opt(
-        &self,
-        start: u32,
-        end: u32,
-    ) -> Option<DocId> {
-        self.build_comments_between_filtered_opt(
-            start,
-            end,
-            CommentSpacing::None,
-            CommentFilter::All,
-        )
-    }
-
     /// Build a Doc for inline comments between two positions (trailing space)
     ///
     /// Used when comments appear before an element and need a space after.

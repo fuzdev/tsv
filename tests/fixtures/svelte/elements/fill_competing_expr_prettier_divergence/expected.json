@@ -1,0 +1,865 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 577,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 195,
+				"data": " Two breakable expressions compete for the same line in a fill that overflows. Only one needs\n     to break, so the layout has a choice to make — and it must make the same one every pass. "
+			},
+			{
+				"type": "Text",
+				"start": 195,
+				"end": 196,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 196,
+				"end": 386,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 197
+					},
+					"end": {
+						"line": 3,
+						"column": 4,
+						"character": 200
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 201,
+							"end": 203,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 203,
+							"end": 379,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 4,
+									"column": 2,
+									"character": 204
+								},
+								"end": {
+									"line": 4,
+									"column": 5,
+									"character": 207
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 208,
+										"end": 211,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "RegularElement",
+										"start": 211,
+										"end": 371,
+										"name": "div",
+										"name_loc": {
+											"start": {
+												"line": 5,
+												"column": 3,
+												"character": 212
+											},
+											"end": {
+												"line": 5,
+												"column": 6,
+												"character": 215
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 216,
+													"end": 220,
+													"raw": "\n\t\t\t",
+													"data": "\n\t\t\t"
+												},
+												{
+													"type": "RegularElement",
+													"start": 220,
+													"end": 362,
+													"name": "small",
+													"name_loc": {
+														"start": {
+															"line": 6,
+															"column": 4,
+															"character": 221
+														},
+														"end": {
+															"line": 6,
+															"column": 9,
+															"character": 226
+														}
+													},
+													"attributes": [],
+													"fragment": {
+														"type": "Fragment",
+														"nodes": [
+															{
+																"type": "Text",
+																"start": 227,
+																"end": 232,
+																"raw": "\n\t\t\t\t",
+																"data": "\n\t\t\t\t"
+															},
+															{
+																"type": "ExpressionTag",
+																"start": 232,
+																"end": 245,
+																"expression": {
+																	"type": "Identifier",
+																	"start": 233,
+																	"end": 244,
+																	"loc": {
+																		"start": {
+																			"line": 7,
+																			"column": 5
+																		},
+																		"end": {
+																			"line": 7,
+																			"column": 16
+																		}
+																	},
+																	"name": "expr1abcdef"
+																}
+															},
+															{
+																"type": "Text",
+																"start": 245,
+																"end": 251,
+																"raw": " text1",
+																"data": " text1"
+															},
+															{
+																"type": "ExpressionTag",
+																"start": 251,
+																"end": 291,
+																"expression": {
+																	"type": "ConditionalExpression",
+																	"start": 252,
+																	"end": 290,
+																	"loc": {
+																		"start": {
+																			"line": 7,
+																			"column": 24
+																		},
+																		"end": {
+																			"line": 9,
+																			"column": 9
+																		}
+																	},
+																	"test": {
+																		"type": "BinaryExpression",
+																		"start": 252,
+																		"end": 269,
+																		"loc": {
+																			"start": {
+																				"line": 7,
+																				"column": 24
+																			},
+																			"end": {
+																				"line": 7,
+																				"column": 41
+																			}
+																		},
+																		"left": {
+																			"type": "Identifier",
+																			"start": 252,
+																			"end": 263,
+																			"loc": {
+																				"start": {
+																					"line": 7,
+																					"column": 24
+																				},
+																				"end": {
+																					"line": 7,
+																					"column": 35
+																				}
+																			},
+																			"name": "expr1abcdef"
+																		},
+																		"operator": "!==",
+																		"right": {
+																			"type": "Literal",
+																			"start": 268,
+																			"end": 269,
+																			"loc": {
+																				"start": {
+																					"line": 7,
+																					"column": 40
+																				},
+																				"end": {
+																					"line": 7,
+																					"column": 41
+																				}
+																			},
+																			"value": 1,
+																			"raw": "1"
+																		}
+																	},
+																	"consequent": {
+																		"type": "Literal",
+																		"start": 277,
+																		"end": 280,
+																		"loc": {
+																			"start": {
+																				"line": 8,
+																				"column": 7
+																			},
+																			"end": {
+																				"line": 8,
+																				"column": 10
+																			}
+																		},
+																		"value": "s",
+																		"raw": "'s'"
+																	},
+																	"alternate": {
+																		"type": "Literal",
+																		"start": 288,
+																		"end": 290,
+																		"loc": {
+																			"start": {
+																				"line": 9,
+																				"column": 7
+																			},
+																			"end": {
+																				"line": 9,
+																				"column": 9
+																			}
+																		},
+																		"value": "",
+																		"raw": "''"
+																	}
+																}
+															},
+															{
+																"type": "Text",
+																"start": 291,
+																"end": 293,
+																"raw": ", ",
+																"data": ", "
+															},
+															{
+																"type": "ExpressionTag",
+																"start": 293,
+																"end": 310,
+																"expression": {
+																	"type": "MemberExpression",
+																	"start": 294,
+																	"end": 309,
+																	"loc": {
+																		"start": {
+																			"line": 9,
+																			"column": 13
+																		},
+																		"end": {
+																			"line": 9,
+																			"column": 28
+																		}
+																	},
+																	"object": {
+																		"type": "Identifier",
+																		"start": 294,
+																		"end": 297,
+																		"loc": {
+																			"start": {
+																				"line": 9,
+																				"column": 13
+																			},
+																			"end": {
+																				"line": 9,
+																				"column": 16
+																			}
+																		},
+																		"name": "obj"
+																	},
+																	"property": {
+																		"type": "Identifier",
+																		"start": 298,
+																		"end": 309,
+																		"loc": {
+																			"start": {
+																				"line": 9,
+																				"column": 17
+																			},
+																			"end": {
+																				"line": 9,
+																				"column": 28
+																			}
+																		},
+																		"name": "expr2abcdef"
+																	},
+																	"computed": false,
+																	"optional": false
+																}
+															},
+															{
+																"type": "Text",
+																"start": 310,
+																"end": 316,
+																"raw": " text2",
+																"data": " text2"
+															},
+															{
+																"type": "ExpressionTag",
+																"start": 316,
+																"end": 350,
+																"expression": {
+																	"type": "ConditionalExpression",
+																	"start": 317,
+																	"end": 349,
+																	"loc": {
+																		"start": {
+																			"line": 9,
+																			"column": 36
+																		},
+																		"end": {
+																			"line": 9,
+																			"column": 68
+																		}
+																	},
+																	"test": {
+																		"type": "BinaryExpression",
+																		"start": 317,
+																		"end": 338,
+																		"loc": {
+																			"start": {
+																				"line": 9,
+																				"column": 36
+																			},
+																			"end": {
+																				"line": 9,
+																				"column": 57
+																			}
+																		},
+																		"left": {
+																			"type": "MemberExpression",
+																			"start": 317,
+																			"end": 332,
+																			"loc": {
+																				"start": {
+																					"line": 9,
+																					"column": 36
+																				},
+																				"end": {
+																					"line": 9,
+																					"column": 51
+																				}
+																			},
+																			"object": {
+																				"type": "Identifier",
+																				"start": 317,
+																				"end": 320,
+																				"loc": {
+																					"start": {
+																						"line": 9,
+																						"column": 36
+																					},
+																					"end": {
+																						"line": 9,
+																						"column": 39
+																					}
+																				},
+																				"name": "obj"
+																			},
+																			"property": {
+																				"type": "Identifier",
+																				"start": 321,
+																				"end": 332,
+																				"loc": {
+																					"start": {
+																						"line": 9,
+																						"column": 40
+																					},
+																					"end": {
+																						"line": 9,
+																						"column": 51
+																					}
+																				},
+																				"name": "expr2abcdef"
+																			},
+																			"computed": false,
+																			"optional": false
+																		},
+																		"operator": "!==",
+																		"right": {
+																			"type": "Literal",
+																			"start": 337,
+																			"end": 338,
+																			"loc": {
+																				"start": {
+																					"line": 9,
+																					"column": 56
+																				},
+																				"end": {
+																					"line": 9,
+																					"column": 57
+																				}
+																			},
+																			"value": 1,
+																			"raw": "1"
+																		}
+																	},
+																	"consequent": {
+																		"type": "Literal",
+																		"start": 341,
+																		"end": 344,
+																		"loc": {
+																			"start": {
+																				"line": 9,
+																				"column": 60
+																			},
+																			"end": {
+																				"line": 9,
+																				"column": 63
+																			}
+																		},
+																		"value": "s",
+																		"raw": "'s'"
+																	},
+																	"alternate": {
+																		"type": "Literal",
+																		"start": 347,
+																		"end": 349,
+																		"loc": {
+																			"start": {
+																				"line": 9,
+																				"column": 66
+																			},
+																			"end": {
+																				"line": 9,
+																				"column": 68
+																			}
+																		},
+																		"value": "",
+																		"raw": "''"
+																	}
+																}
+															},
+															{
+																"type": "Text",
+																"start": 350,
+																"end": 354,
+																"raw": "\n\t\t\t",
+																"data": "\n\t\t\t"
+															}
+														]
+													}
+												},
+												{
+													"type": "Text",
+													"start": 362,
+													"end": 365,
+													"raw": "\n\t\t",
+													"data": "\n\t\t"
+												}
+											]
+										}
+									},
+									{
+										"type": "Text",
+										"start": 371,
+										"end": 373,
+										"raw": "\n\t",
+										"data": "\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 379,
+							"end": 380,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 386,
+				"end": 388,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 388,
+				"end": 470,
+				"data": " Contrast: the same shape, short enough to fit — neither expression breaks "
+			},
+			{
+				"type": "Text",
+				"start": 470,
+				"end": 471,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 471,
+				"end": 576,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 16,
+						"column": 1,
+						"character": 472
+					},
+					"end": {
+						"line": 16,
+						"column": 4,
+						"character": 475
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 476,
+							"end": 478,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 478,
+							"end": 569,
+							"name": "small",
+							"name_loc": {
+								"start": {
+									"line": 17,
+									"column": 2,
+									"character": 479
+								},
+								"end": {
+									"line": 17,
+									"column": 7,
+									"character": 484
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "ExpressionTag",
+										"start": 485,
+										"end": 492,
+										"expression": {
+											"type": "Identifier",
+											"start": 486,
+											"end": 491,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 9
+												},
+												"end": {
+													"line": 17,
+													"column": 14
+												}
+											},
+											"name": "expr1"
+										}
+									},
+									{
+										"type": "Text",
+										"start": 492,
+										"end": 498,
+										"raw": " text1",
+										"data": " text1"
+									},
+									{
+										"type": "ExpressionTag",
+										"start": 498,
+										"end": 522,
+										"expression": {
+											"type": "ConditionalExpression",
+											"start": 499,
+											"end": 521,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 22
+												},
+												"end": {
+													"line": 17,
+													"column": 44
+												}
+											},
+											"test": {
+												"type": "BinaryExpression",
+												"start": 499,
+												"end": 510,
+												"loc": {
+													"start": {
+														"line": 17,
+														"column": 22
+													},
+													"end": {
+														"line": 17,
+														"column": 33
+													}
+												},
+												"left": {
+													"type": "Identifier",
+													"start": 499,
+													"end": 504,
+													"loc": {
+														"start": {
+															"line": 17,
+															"column": 22
+														},
+														"end": {
+															"line": 17,
+															"column": 27
+														}
+													},
+													"name": "expr1"
+												},
+												"operator": "!==",
+												"right": {
+													"type": "Literal",
+													"start": 509,
+													"end": 510,
+													"loc": {
+														"start": {
+															"line": 17,
+															"column": 32
+														},
+														"end": {
+															"line": 17,
+															"column": 33
+														}
+													},
+													"value": 1,
+													"raw": "1"
+												}
+											},
+											"consequent": {
+												"type": "Literal",
+												"start": 513,
+												"end": 516,
+												"loc": {
+													"start": {
+														"line": 17,
+														"column": 36
+													},
+													"end": {
+														"line": 17,
+														"column": 39
+													}
+												},
+												"value": "s",
+												"raw": "'s'"
+											},
+											"alternate": {
+												"type": "Literal",
+												"start": 519,
+												"end": 521,
+												"loc": {
+													"start": {
+														"line": 17,
+														"column": 42
+													},
+													"end": {
+														"line": 17,
+														"column": 44
+													}
+												},
+												"value": "",
+												"raw": "''"
+											}
+										}
+									},
+									{
+										"type": "Text",
+										"start": 522,
+										"end": 524,
+										"raw": ", ",
+										"data": ", "
+									},
+									{
+										"type": "ExpressionTag",
+										"start": 524,
+										"end": 531,
+										"expression": {
+											"type": "Identifier",
+											"start": 525,
+											"end": 530,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 48
+												},
+												"end": {
+													"line": 17,
+													"column": 53
+												}
+											},
+											"name": "expr2"
+										}
+									},
+									{
+										"type": "Text",
+										"start": 531,
+										"end": 537,
+										"raw": " text2",
+										"data": " text2"
+									},
+									{
+										"type": "ExpressionTag",
+										"start": 537,
+										"end": 561,
+										"expression": {
+											"type": "ConditionalExpression",
+											"start": 538,
+											"end": 560,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 61
+												},
+												"end": {
+													"line": 17,
+													"column": 83
+												}
+											},
+											"test": {
+												"type": "BinaryExpression",
+												"start": 538,
+												"end": 549,
+												"loc": {
+													"start": {
+														"line": 17,
+														"column": 61
+													},
+													"end": {
+														"line": 17,
+														"column": 72
+													}
+												},
+												"left": {
+													"type": "Identifier",
+													"start": 538,
+													"end": 543,
+													"loc": {
+														"start": {
+															"line": 17,
+															"column": 61
+														},
+														"end": {
+															"line": 17,
+															"column": 66
+														}
+													},
+													"name": "expr2"
+												},
+												"operator": "!==",
+												"right": {
+													"type": "Literal",
+													"start": 548,
+													"end": 549,
+													"loc": {
+														"start": {
+															"line": 17,
+															"column": 71
+														},
+														"end": {
+															"line": 17,
+															"column": 72
+														}
+													},
+													"value": 1,
+													"raw": "1"
+												}
+											},
+											"consequent": {
+												"type": "Literal",
+												"start": 552,
+												"end": 555,
+												"loc": {
+													"start": {
+														"line": 17,
+														"column": 75
+													},
+													"end": {
+														"line": 17,
+														"column": 78
+													}
+												},
+												"value": "s",
+												"raw": "'s'"
+											},
+											"alternate": {
+												"type": "Literal",
+												"start": 558,
+												"end": 560,
+												"loc": {
+													"start": {
+														"line": 17,
+														"column": 81
+													},
+													"end": {
+														"line": 17,
+														"column": 83
+													}
+												},
+												"value": "",
+												"raw": "''"
+											}
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 569,
+							"end": 570,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
