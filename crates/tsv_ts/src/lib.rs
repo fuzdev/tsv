@@ -175,6 +175,20 @@ pub fn format_in(program: &Program<'_>, source: &str, arena: &DocArena) -> Strin
 /// comment of the preceding node). The output is idempotent:
 /// `format_canonical(parse(format_canonical(x)))` reproduces its input.
 ///
+/// # Residual: mapped-type multi-line-ness is NOT erased
+///
+/// One newline-derived read survives canonicalization: a `TSMappedType` whose
+/// source span carries a newline still force-breaks, so `Fn<{\n[K in keyof T]: T[K]\n}>`
+/// and its inline authoring do **not** reach the same canonical string. This is
+/// deliberate and load-bearing — see `printer::types::composite::build_mapped_type_doc`
+/// for why erasing it is unsound rather than merely unimplemented. The output stays
+/// idempotent (a force-broken mapped type reprints force-broken); it is only the
+/// *authoring-independence* property that has this one hole.
+///
+/// The residual is unreachable for the current consumer (compiled JS carries no
+/// TypeScript types, so a mapped type cannot appear in it). A caller that
+/// canonicalizes hand-written TS must account for it.
+///
 /// This is a cold path used by tooling that needs a canonical form for comparison
 /// (e.g. diffing two compilers' output); the [`format`] path is untouched and
 /// byte-identical.

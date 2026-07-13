@@ -111,7 +111,7 @@ impl<'a> Printer<'a> {
             let has_blank_lines_between_args = call.arguments.windows(2).any(|w| {
                 has_blank_line_between_args(
                     self.source,
-                    self.line_breaks,
+                    self.layout_line_breaks,
                     w[0].span().end,
                     w[1].span().start,
                 )

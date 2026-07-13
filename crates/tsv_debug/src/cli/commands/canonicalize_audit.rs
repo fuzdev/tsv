@@ -4,7 +4,8 @@ use std::path::{Path, PathBuf};
 use tsv_cli::json_utils::to_json_with_tabs;
 use tsv_svelte_compile::{CanonicalizeError, canonicalize_js};
 
-/// Audit `canonicalize_js` at corpus scale: idempotence + output validity.
+/// Audit `canonicalize_js` at corpus scale: idempotence + output validity +
+/// comment losslessness.
 ///
 /// Walks the given paths (default `tests/fixtures`) for TS/JS sources and runs
 /// the canonicalizer twice on each file. Buckets:
@@ -16,6 +17,13 @@ use tsv_svelte_compile::{CanonicalizeError, canonicalize_js};
 /// - **CORRUPT-OUTPUT** — the canonical reprint failed to reparse (the
 ///   canonicalizer's self-validation fired, or the second pass rejected the
 ///   first's output). A canonicalizer bug (failure).
+/// - **COMMENT-LOSS** — the reprint dropped, merged, duplicated, or reordered a
+///   comment. A canonicalizer bug (failure), and the one the other two buckets
+///   are structurally blind to: a swallowed comment leaves valid JS *and* is
+///   idempotent (once it's gone it stays gone, so pass 2 reproduces pass 1). The
+///   canonical path routes comment classification through its own line-break
+///   table precisely to prevent this; this bucket is what proves the routing is
+///   still intact at corpus scale.
 ///
 /// Pure Rust, no sidecar. Exits 1 on any failure. The `canonicalize:audit` deno
 /// task gates this over `tests/fixtures` in `deno task check`; point it at real
@@ -40,12 +48,19 @@ struct AuditReport {
     input_rejected: usize,
     non_idempotent: Vec<String>,
     corrupt_output: Vec<CorruptEntry>,
+    comment_loss: Vec<CommentLossEntry>,
 }
 
 #[derive(serde::Serialize)]
 struct CorruptEntry {
     path: String,
     error: String,
+}
+
+#[derive(serde::Serialize)]
+struct CommentLossEntry {
+    path: String,
+    detail: String,
 }
 
 impl CanonicalizeAuditCommand {
@@ -79,14 +94,34 @@ impl CanonicalizeAuditCommand {
                 continue;
             };
             match canonicalize_js(&source) {
-                Ok(once) => match canonicalize_js(&once) {
-                    Ok(twice) if twice == once => report.clean += 1,
-                    Ok(_) => report.non_idempotent.push(display(file)),
-                    Err(e) => report.corrupt_output.push(CorruptEntry {
-                        path: display(file),
-                        error: e.to_string(),
-                    }),
-                },
+                Ok(once) => {
+                    let mut clean = true;
+                    match canonicalize_js(&once) {
+                        Ok(twice) if twice == once => {}
+                        Ok(_) => {
+                            report.non_idempotent.push(display(file));
+                            clean = false;
+                        }
+                        Err(e) => {
+                            report.corrupt_output.push(CorruptEntry {
+                                path: display(file),
+                                error: e.to_string(),
+                            });
+                            clean = false;
+                        }
+                    }
+                    // Independent of idempotence: a swallowed comment is idempotent.
+                    if let Some(detail) = comment_loss(&source, &once) {
+                        report.comment_loss.push(CommentLossEntry {
+                            path: display(file),
+                            detail,
+                        });
+                        clean = false;
+                    }
+                    if clean {
+                        report.clean += 1;
+                    }
+                }
                 // Self-validation catches corruption inside the first call.
                 Err(CanonicalizeError::CorruptOutput(e)) => {
                     report.corrupt_output.push(CorruptEntry {
@@ -98,7 +133,8 @@ impl CanonicalizeAuditCommand {
             }
         }
 
-        let failures = report.non_idempotent.len() + report.corrupt_output.len();
+        let failures =
+            report.non_idempotent.len() + report.corrupt_output.len() + report.comment_loss.len();
 
         if self.json {
             match to_json_with_tabs(&report) {
@@ -115,13 +151,17 @@ impl CanonicalizeAuditCommand {
             for entry in &report.corrupt_output {
                 println!("CORRUPT-OUTPUT {}  ({})", entry.path, entry.error);
             }
+            for entry in &report.comment_loss {
+                println!("COMMENT-LOSS {}  ({})", entry.path, entry.detail);
+            }
             println!(
-                "canonicalize_audit: {} files — {} clean, {} input-rejected, {} non-idempotent, {} corrupt-output",
+                "canonicalize_audit: {} files — {} clean, {} input-rejected, {} non-idempotent, {} corrupt-output, {} comment-loss",
                 report.files,
                 report.clean,
                 report.input_rejected,
                 report.non_idempotent.len(),
-                report.corrupt_output.len()
+                report.corrupt_output.len(),
+                report.comment_loss.len()
             );
         }
 
@@ -135,6 +175,70 @@ impl CanonicalizeAuditCommand {
 
 fn display(path: &Path) -> String {
     path.display().to_string()
+}
+
+/// Compare an input's comments against its canonical reprint's.
+///
+/// The canonical reprint may *move* a comment (an own-line comment can become a
+/// trailing comment of the preceding node) but must never drop, merge, duplicate,
+/// or reorder one. Comment text is whitespace-normalized before comparison because
+/// re-indenting the interior of a multi-line block comment is legitimate
+/// reformatting; every real failure still surfaces:
+///
+/// - **dropped** — the list shortens.
+/// - **swallowed / merged** — the text itself changes: the tokens that got glued
+///   onto the `//` comment's output line land *inside* the comment on reparse.
+/// - **duplicated** — the list lengthens.
+/// - **reordered** — the list permutes.
+///
+/// Returns `None` when the comments survive intact, `Some(detail)` naming the first
+/// divergence otherwise. A parse failure yields `None`: the input was already
+/// accepted by `canonicalize_js`, and a bad output is the CORRUPT-OUTPUT bucket's.
+fn comment_loss(input: &str, output: &str) -> Option<String> {
+    let before = comment_texts(input)?;
+    let after = comment_texts(output)?;
+    if before == after {
+        return None;
+    }
+    // A common prefix that matches means the divergence is a count change.
+    match before.iter().zip(&after).position(|(b, a)| b != a) {
+        Some(i) => Some(format!(
+            "comment {}/{} changed: {} -> {}",
+            i + 1,
+            before.len(),
+            truncate(&before[i]),
+            truncate(&after[i])
+        )),
+        None => Some(format!("comment count {} -> {}", before.len(), after.len())),
+    }
+}
+
+/// Every comment in `source`, in source order, whitespace-normalized.
+///
+/// `None` if the source doesn't parse as a strict module.
+fn comment_texts(source: &str) -> Option<Vec<String>> {
+    let arena = bumpalo::Bump::new();
+    let program = tsv_ts::parse(source, &arena).ok()?;
+    Some(
+        program
+            .comments
+            .iter()
+            .map(|c| {
+                let text = &source[c.span.start as usize..c.span.end as usize];
+                text.split_whitespace().collect::<Vec<_>>().join(" ")
+            })
+            .collect(),
+    )
+}
+
+/// Clip a comment's text for a one-line report entry.
+fn truncate(text: &str) -> String {
+    const MAX: usize = 48;
+    if text.chars().count() <= MAX {
+        return format!("{text:?}");
+    }
+    let clipped: String = text.chars().take(MAX).collect();
+    format!("{clipped:?}...")
 }
 
 /// Recursively collect auditable sources: `.ts` / `.js` / `.mts` / `.cts`

@@ -349,7 +349,7 @@ impl<'a> Printer<'a> {
         let has_blank_lines = new_expr.arguments.windows(2).any(|window| {
             has_blank_line_between_args(
                 self.source,
-                self.line_breaks,
+                self.layout_line_breaks,
                 window[0].span().end,
                 window[1].span().start,
             )

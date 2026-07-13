@@ -160,8 +160,8 @@ impl<'a> ChainPrinter for Printer<'a> {
         Printer::exit_chain_arg_share(self, was_active);
     }
 
-    fn get_line_breaks(&self) -> &[u32] {
-        self.line_breaks
+    fn get_layout_line_breaks(&self) -> &[u32] {
+        self.layout_line_breaks
     }
 
     fn has_comments_between(&self, start: u32, end: u32) -> bool {

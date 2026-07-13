@@ -167,6 +167,13 @@ fn validate_output_js(js: &str) -> Result<(), CompileError> {
 /// through the same normalization, a byte difference between their canonical
 /// forms is a genuine code difference.
 ///
+/// One caveat on that last claim, for callers outside this crate: `format_canonical`
+/// does **not** erase a mapped type's source multi-line-ness (a deliberate residual —
+/// see its docs), so two sources differing only in how a mapped type was authored do
+/// canonicalize differently. It cannot bite the compiler-parity use this exists for —
+/// compiled JS carries no TypeScript types — but it does mean "canonical form" is not
+/// unconditionally authoring-independent over arbitrary TS.
+///
 /// The output is self-validated by reparse before it is returned — a reprint the
 /// parser rejects (canonicalizer corruption) surfaces as
 /// [`CanonicalizeError::CorruptOutput`] instead of a silently broken string.

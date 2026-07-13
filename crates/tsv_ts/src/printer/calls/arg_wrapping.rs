@@ -970,7 +970,7 @@ pub(super) fn build_args_with_blank_lines(
             if !printer.has_comments_between(prev_end, curr_start)
                 && has_blank_line_between_args(
                     printer.source,
-                    printer.line_breaks,
+                    printer.layout_line_breaks,
                     prev_end,
                     curr_start,
                 )
@@ -993,7 +993,8 @@ pub(super) fn build_args_with_blank_lines(
             if printer.has_comments_between(arg_end, next_start) {
                 let pc = printer.open_inter_arg_gap(&mut arg_parts, arg_end, next_start);
 
-                let next_has_blank = pc.has_blank_line_in_gap(printer.source, printer.line_breaks);
+                let next_has_blank =
+                    pc.has_blank_line_in_gap(printer.source, printer.layout_line_breaks);
                 if next_has_blank {
                     arg_parts.push(d.literalline());
                 }
@@ -1006,7 +1007,7 @@ pub(super) fn build_args_with_blank_lines(
                 // (handled at top of next iteration)
                 let next_has_blank = has_blank_line_between_args(
                     printer.source,
-                    printer.line_breaks,
+                    printer.layout_line_breaks,
                     arg_end,
                     next_start,
                 );

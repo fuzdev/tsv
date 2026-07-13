@@ -368,7 +368,7 @@ pub(super) fn build_call_doc_with_wrapping(
     let has_blank_lines = call.arguments.windows(2).any(|window| {
         has_blank_line_between_args(
             printer.source,
-            printer.line_breaks,
+            printer.layout_line_breaks,
             window[0].span().end,
             window[1].span().start,
         )
@@ -1332,7 +1332,8 @@ fn build_call_with_arg_comments(
                 // below finish it.
                 let pc = printer.open_inter_arg_gap(&mut arg_parts, arg_end, next_arg_start);
 
-                let has_blank_line = pc.has_blank_line_in_gap(printer.source, printer.line_breaks);
+                let has_blank_line =
+                    pc.has_blank_line_in_gap(printer.source, printer.layout_line_breaks);
                 if has_blank_line || pc.has_trailing_line() {
                     force_expansion = true;
                 }
@@ -1353,7 +1354,7 @@ fn build_call_with_arg_comments(
             } else {
                 let has_blank_line = has_blank_line_between_args(
                     printer.source,
-                    printer.line_breaks,
+                    printer.layout_line_breaks,
                     arg_end,
                     next_arg_start,
                 );

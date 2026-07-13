@@ -126,8 +126,12 @@ pub trait ChainPrinter: SymbolLookup {
     /// Restore the chain arg-doc share state captured by [`Self::enter_chain_arg_share`].
     fn exit_chain_arg_share(&self, was_active: bool);
 
-    /// Get the precomputed line breaks table for O(log n) line boundary lookups
-    fn get_line_breaks(&self) -> &[u32];
+    /// Get the precomputed *layout* line-breaks table for O(log n) line boundary
+    /// lookups (blank lines between chain methods, callback multi-line-ness).
+    ///
+    /// Empty under the canonical reprint, which erases those reads. Not for comment
+    /// classification — see the `layout_line_breaks` field on `Printer`.
+    fn get_layout_line_breaks(&self) -> &[u32];
 
     /// Check if there are any comments between two positions
     fn has_comments_between(&self, start: u32, end: u32) -> bool;

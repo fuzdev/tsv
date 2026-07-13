@@ -261,7 +261,7 @@ fn should_force_chain_expand<'a, P: ChainPrinter>(
     let has_blank_lines_between = has_blank_lines_between_methods(groups, printer);
 
     // Single pass: count calls and callbacks, and check if any callback breaks
-    let line_breaks = printer.get_line_breaks();
+    let line_breaks = printer.get_layout_line_breaks();
     let (call_count, calls_with_callbacks, any_callback_breaks) = call_nodes().fold(
         (0usize, 0usize, false),
         |(calls, count, any_breaks), node| {

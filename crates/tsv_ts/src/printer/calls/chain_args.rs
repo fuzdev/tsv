@@ -217,7 +217,7 @@ fn build_call_args_doc_for_chain_impl(
     let has_blank_lines = call.arguments.windows(2).any(|window| {
         has_blank_line_between_args(
             printer.source,
-            printer.line_breaks,
+            printer.layout_line_breaks,
             window[0].span().end,
             window[1].span().start,
         )
@@ -528,7 +528,7 @@ fn build_chain_args_force_expand(
             if !has_comments_before
                 && has_blank_line_between_args(
                     printer.source,
-                    printer.line_breaks,
+                    printer.layout_line_breaks,
                     prev_end,
                     arg_start,
                 )
@@ -561,11 +561,11 @@ fn build_chain_args_force_expand(
             // (blank line preservation at the top of the loop handles the line break)
             let has_comments_before_next = printer.has_comments_between(arg_end, next_arg_start);
             let next_has_blank = if has_comments_before_next {
-                pc.has_blank_line_in_gap(printer.source, printer.line_breaks)
+                pc.has_blank_line_in_gap(printer.source, printer.layout_line_breaks)
             } else {
                 has_blank_line_between_args(
                     printer.source,
-                    printer.line_breaks,
+                    printer.layout_line_breaks,
                     arg_end,
                     next_arg_start,
                 )

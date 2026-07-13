@@ -134,7 +134,7 @@ pub(super) fn build_import_expression_doc(
     let inter_blank_no_comments = !has_inter_comments
         && has_blank_line_between_args(
             printer.source,
-            printer.line_breaks,
+            printer.layout_line_breaks,
             source_end,
             options_start,
         );
@@ -170,7 +170,7 @@ pub(super) fn build_import_expression_doc(
         // don't read as a blank line).
         let inter_blank = inter_blank_no_comments
             || (has_inter_comments
-                && inter.has_blank_line_in_gap(printer.source, printer.line_breaks));
+                && inter.has_blank_line_in_gap(printer.source, printer.layout_line_breaks));
 
         // Leading comments (own-line + hugged after-comma) lead the options arg; its
         // trailing region follows: same-line block/line comments inline, then own-line
