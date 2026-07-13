@@ -393,6 +393,11 @@ impl<'a> Printer<'a> {
         if attr_docs.is_empty() {
             d.concat(&[d.text("<"), name])
         } else {
+            // Always the attr-keyed trailing break. main's `hug_start && !is_empty` fast path
+            // (emit the attr concat alone, skipping an `empty()` child) optimized a branch this
+            // file no longer has: a hugged open tag used to suppress the trailing break, which is
+            // exactly the delimiter-dangle machinery the block-style stance removed. There is no
+            // `empty()` child left to avoid, and `hug_start`/`is_empty` are no longer parameters.
             let sl = d.softline();
             let inner = d.concat(&[d.concat(attr_docs), d.dedent(sl)]);
             let attr_group = if force_break {
@@ -853,6 +858,21 @@ impl<'a> Printer<'a> {
         is_html: bool,
     ) {
         let d = self.d();
+
+        // Every gap this fn probes — each attribute's leading range and the trailing range
+        // after the last one — lies inside `[first_range_start, open_tag_end]`. A comment
+        // lands in `has_comments_in_range` only when it sits fully inside the queried range,
+        // so a comment-free open tag means every one of those gaps is comment-free: each
+        // would take the bare-separator branch below and the trailing block would emit
+        // nothing. Answer that with one probe instead of one per attribute plus one.
+        if !tsv_lang::has_comments_in_range(self.comments, first_range_start, open_tag_end) {
+            for attr in attrs {
+                docs.push(separator);
+                docs.push(self.build_attribute_node_doc(attr, is_html));
+            }
+            return;
+        }
+
         for (i, attr) in attrs.iter().enumerate() {
             // Check for JS comments before this attribute
             let range_start = if i == 0 {

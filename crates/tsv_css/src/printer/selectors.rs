@@ -67,6 +67,13 @@ impl<'a> Printer<'a> {
     /// the old `normalize_selector_comment_spacing` string-replace: it preserves each
     /// comment's side of the comma while normalizing the surrounding whitespace.
     fn split_selector_comments_around_comma(&self, start: u32, end: u32) -> (String, String) {
+        // The comma is located only to decide which side of it each comment falls on — it
+        // is re-emitted as static text either way. With no comment in the gap both sides
+        // are empty regardless of where the comma sits, so check that first and skip the
+        // comment-aware byte scan entirely.
+        if !has_comments_in_range(self.comments, start, end) {
+            return (String::new(), String::new());
+        }
         let comma = source_scan::find_char_skipping_comments(
             self.source.as_bytes(),
             start as usize,
@@ -261,6 +268,13 @@ impl<'a> Printer<'a> {
     /// left to the normal builder's own normalize path. Drives the verbatim freeze in
     /// `build_complex_selector_doc`.
     fn complex_has_boundary_comment(&self, complex: &internal::ComplexSelector<'_>) -> bool {
+        // Every gap the loop below probes lies inside the selector's own span, and a
+        // comment registers only when it sits fully inside the queried range — so a
+        // comment-free selector has no boundary comment. One probe answers that, instead
+        // of one per simple selector.
+        if !has_comments_in_range(self.comments, complex.span.start, complex.span.end) {
+            return false;
+        }
         let mut prev_end = complex.span.start;
         for rel in complex.children {
             for simple in rel.selectors {
@@ -743,6 +757,13 @@ impl<'a> Printer<'a> {
     /// Svelte-matching public-AST node span (it ends *before* the `)`, and convert
     /// reads it verbatim — see `convert_pseudo_class_args`), so it interleaves inline.
     fn wrap_args_gap_comments(&self, inner: DocId, args_span: Span, content_span: Span) -> DocId {
+        // Both gaps sit inside the argument parens, so comment-free parens mean both come
+        // back empty and `wrap_inner_with_comments` hands `inner` straight back. One probe
+        // replaces the two range-collects on the common path — this fires on every
+        // `:not()` / `:where()` / `:is()`, which are dense in real stylesheets.
+        if !has_comments_in_range(self.comments, args_span.start, args_span.end) {
+            return inner;
+        }
         let leading = self.comment_blocks_in_range(args_span.start, content_span.start);
         let trailing =
             self.comment_blocks_in_range(content_span.end, args_span.end.saturating_sub(1));

@@ -459,6 +459,27 @@ impl<'a> Printer<'a> {
         self.build_comments_between(start, end, CommentSpacing::Trailing)
     }
 
+    /// Build a Doc for inline comments (trailing space), returning `None` if no comments.
+    ///
+    /// The `_opt` sibling of `build_inline_comments_between_doc_trailing_space`, matching
+    /// the ones the other two spacings already have. Callers that push into a parts
+    /// buffer want this rather than the `DocId` form: the `empty()` it would otherwise
+    /// return is not free — `concat` keeps it as a child slot for the renderer and every
+    /// `fits` pass to walk.
+    #[inline]
+    pub(crate) fn build_inline_comments_between_doc_trailing_space_opt(
+        &self,
+        start: u32,
+        end: u32,
+    ) -> Option<DocId> {
+        self.build_comments_between_filtered_opt(
+            start,
+            end,
+            CommentSpacing::Trailing,
+            CommentFilter::All,
+        )
+    }
+
     /// Build inline comments between two positions with line-comment-safe trailing spacing.
     ///
     /// A block comment keeps the following value (or next comment) on its `*/`

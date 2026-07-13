@@ -270,15 +270,26 @@ impl<'a> Printer<'a> {
         let (left_span, right_span) = (left.span(), right.span());
         // Compare spans, not values: `{a}` has one span, `{a as a}` has two.
         if left_span != right_span {
-            // Split comments at the `as` keyword: before-as and after-as.
-            if let Some(as_pos) = self.find_keyword_in_range(left_span.end, right_span.start, "as")
+            // Split comments at the `as` keyword: before-as and after-as. The ` as ` is
+            // static text, so the keyword scan exists only to bound those two ranges — a
+            // comment-free `{a as b}` neither scans nor pushes an empty child.
+            if !self.has_comments_between(left_span.end, right_span.start) {
+                parts.push(d.text(" as "));
+            } else if let Some(as_pos) =
+                self.find_keyword_in_range(left_span.end, right_span.start, "as")
             {
-                parts.push(self.build_inline_comments_between_doc(left_span.end, as_pos));
+                if let Some(before) =
+                    self.build_inline_comments_between_doc_opt(left_span.end, as_pos)
+                {
+                    parts.push(before);
+                }
                 parts.push(d.text(" as "));
                 let as_end = as_pos + "as".len() as u32;
-                parts.push(
-                    self.build_inline_comments_between_doc_trailing_space(as_end, right_span.start),
-                );
+                if let Some(after) = self
+                    .build_inline_comments_between_doc_trailing_space_opt(as_end, right_span.start)
+                {
+                    parts.push(after);
+                }
             } else {
                 parts.push(d.text(" as "));
             }
