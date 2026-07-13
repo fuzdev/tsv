@@ -302,6 +302,13 @@ pub enum Refusal {
     /// An `<option>` element (the oracle emits `$$renderer.option` closures).
     #[error("<option> (oracle emits $$renderer.option closures)")]
     OptionElement,
+    /// Attributes on a `<svelte:head>` element (not carried in this subset).
+    #[error("attributes on <svelte:head>")]
+    SvelteHeadAttributes,
+    /// A `<svelte:head>` sharing a fragment with a `{@const}` — their hoisted
+    /// order can't be fixed.
+    #[error("<svelte:head> alongside a {{@const}} in the same fragment (hoist order)")]
+    SvelteHeadWithConstTag,
 
     // ── CSS scoping ────────────────────────────────────────────────────────
     /// An at-rule in `<style>`.
@@ -469,6 +476,10 @@ impl Refusal {
             Self::OptionElement => {
                 Cow::Borrowed("<option> (oracle emits $$renderer.option closures)")
             }
+            Self::SvelteHeadAttributes => Cow::Borrowed("attributes on <svelte:head>"),
+            Self::SvelteHeadWithConstTag => Cow::Borrowed(
+                "<svelte:head> alongside a {@const} in the same fragment (hoist order)",
+            ),
             Self::CssAtRule => Cow::Borrowed("css at-rule in <style>"),
             Self::CssNestedRule => Cow::Borrowed("nested css rule in <style>"),
             Self::CssCombinatorSelector => Cow::Borrowed("css combinator selector in <style>"),

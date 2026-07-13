@@ -54,7 +54,8 @@ use tsv_css::ast::internal::{CssBlockChild, CssNode, SimpleSelector};
 use tsv_lang::{InfallibleResolve, Span};
 use tsv_svelte::ast::internal::{
     Attribute, AttributeNode, AttributeValue, AwaitBlock, ConstTag, EachBlock, Element,
-    ElementKind, ExpressionTag, Fragment, FragmentNode, HtmlTag, IfBlock, KeyBlock, Root, Style,
+    ElementKind, ExpressionTag, Fragment, FragmentNode, HtmlTag, IfBlock, KeyBlock, Root,
+    SpecialElement, SpecialElementKind, Style,
 };
 use tsv_ts::ast::internal::{
     BinaryOperator, BlockStatement, ExportDefaultDeclaration, ExportDefaultValue, Expression,
@@ -1350,8 +1351,14 @@ fn emit_fragment<'arena>(
     // whitespace list and emitted first (the oracle's `clean_nodes` hoisting).
     let mut list: Vec<CleanNode<'arena>> = Vec::with_capacity(nodes.len());
     let mut const_tags: Vec<&'arena ConstTag<'arena>> = Vec::new();
+    let mut head_nodes: Vec<&'arena SpecialElement<'arena>> = Vec::new();
     for node in nodes {
         match node {
+            FragmentNode::SpecialElement(se)
+                if matches!(se.kind, SpecialElementKind::SvelteHead) =>
+            {
+                head_nodes.push(se);
+            }
             FragmentNode::Text(text) => {
                 list.push(CleanNode::Text(text.data(source).into_owned()));
             }
@@ -1379,9 +1386,17 @@ fn emit_fragment<'arena>(
 
     // Emit hoisted `{@const}` declarations first — they precede the anchor's
     // following content and enter the evaluator's innermost overlay so later
-    // reads in this fragment fold.
+    // reads in this fragment fold. `<svelte:head>` is hoisted the same way; a
+    // fragment carrying both can't fix their relative order (the oracle keeps
+    // source order across all hoisted kinds), so refuse that combination.
+    if !head_nodes.is_empty() && !const_tags.is_empty() {
+        return Err(unsupported(Refusal::SvelteHeadWithConstTag));
+    }
     for tag in &const_tags {
         emit_const_tag(env, tag, out)?;
+    }
+    for head in &head_nodes {
+        emit_svelte_head(env, head, out)?;
     }
 
     if !ctx.preserve_whitespace {
@@ -1512,6 +1527,70 @@ fn check_name_free(env: &EmitEnv<'_, '_>, name: &str) -> Result<(), CompileError
 }
 
 /// A single-declarator `let`/`const` declaration statement.
+/// The filename the deterministic oracle compiles under. `$.head`'s dedup hash
+/// is `hash(filename)` (`SvelteHead.js`), so a fixed filename makes it constant.
+const COMPILE_FILENAME: &str = "input.svelte";
+
+/// Port of Svelte's `hash` (`utils.js`): strip carriage returns, then a djb2-xor
+/// fold over the code units in reverse, rendered base-36. Used for `$.head`.
+fn svelte_hash(s: &str) -> String {
+    let mut hash: u32 = 5381;
+    for ch in s.chars().rev() {
+        if ch == '\r' {
+            continue;
+        }
+        hash = hash.wrapping_shl(5).wrapping_sub(hash) ^ (ch as u32);
+    }
+    if hash == 0 {
+        return "0".to_string();
+    }
+    const DIGITS: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyz";
+    let mut out = String::new();
+    while hash > 0 {
+        out.push(DIGITS[(hash % 36) as usize] as char);
+        hash /= 36;
+    }
+    out.chars().rev().collect()
+}
+
+/// Emit `$.head(hash, $$renderer, ($$renderer) => { … })` for `<svelte:head>`.
+///
+/// The head fragment is a normal fragment emitted into the closure body, so a
+/// `<title>` (a `TitleElement` needing `$$renderer.title`) or any other special
+/// child refuses through the usual `emit_fragment` path. Attributes on the head
+/// element are refused (the oracle carries none in this subset).
+fn emit_svelte_head<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    head: &'arena SpecialElement<'arena>,
+    out: &mut BodyBuilder<'arena>,
+) -> Result<(), CompileError> {
+    let arena = env.b.arena;
+    if !head.attributes.is_empty() {
+        return Err(unsupported(Refusal::SvelteHeadAttributes));
+    }
+    // The head body: a normal fragment (not text-first-marked) in the closure.
+    let body = emit_child_body(env, &head.fragment, &[], false, false, HashMap::new())?;
+    let here = env.b.here();
+    let renderer_param = Expression::Identifier(env.b.ident("$$renderer"));
+    let params = std::slice::from_ref(arena.alloc(renderer_param));
+    let arrow = env.b.arrow_block(params, body, here);
+
+    // `$.head('<hash>', $$renderer, arrow)`.
+    let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
+    args.push(env.b.string_literal_expr(&svelte_hash(COMPILE_FILENAME)));
+    args.push(Expression::Identifier(env.b.ident("$$renderer")));
+    args.push(arrow);
+    let call = env.b.member_call("$", "head", args.into_bump_slice());
+    let span = call.span();
+    let stmt = Statement::ExpressionStatement(ExpressionStatement {
+        expression: call,
+        span,
+        is_directive: false,
+    });
+    out.push_statement(&mut env.b, arena, stmt);
+    Ok(())
+}
+
 /// `const $$slots = $.sanitize_slots($$props);` — the oracle's `uses_slots`
 /// binding, prepended to the component function body.
 fn build_sanitize_slots_decl<'arena>(

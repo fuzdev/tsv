@@ -195,7 +195,9 @@ The oracle's normalization (`3-transform/utils.js:126` `clean_nodes`, `escape_ht
 | SVG / MathML | **Refused**: `<{name}> (foreign namespace)` |
 | template-level `<script>` / `<style>` | **Refused**: `template-level <{name}>` |
 | children on a void element | **Refused**: `children on void element <{name}>` |
-| special elements (`<slot>`, `<svelte:head>`, `<svelte:window>`, …) | **Refused**: `template node special element` |
+| `<svelte:head>` → `$.head(hash, $$renderer, ($$renderer) => { … })`, hoisted to the fragment front; the head body is a normal fragment (so a `<title>` or other special child refuses through the usual path). The `hash` is the ported `hash("input.svelte")` (`SvelteHead.js`, Svelte's `utils.js`). | Supported |
+| `<svelte:head>` with attributes / sharing a fragment with `{@const}` | **Refused**: `attributes on <svelte:head>` / `<svelte:head> alongside a {@const} in the same fragment (hoist order)` |
+| other special elements (`<slot>`, `<svelte:window>`, `<title>`, …) | **Refused**: `template node special element` |
 | `<svelte:options>` | **Refused**: `<svelte:options>` |
 
 ### Styles (CSS scoping)

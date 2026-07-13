@@ -1478,6 +1478,33 @@ mod tests {
     }
 
     #[test]
+    fn compile_svelte_head_emits_head_call() {
+        // `<svelte:head>` → `$.head('<hash>', $$renderer, closure)`. The hash is
+        // the ported `hash("input.svelte")`.
+        let out = compile(
+            "<svelte:head><meta charset=\"utf-8\" /></svelte:head>",
+            &CompileOptions::default(),
+        )
+        .unwrap();
+        assert!(
+            out.js
+                .contains("$.head('4hbqx4', $$renderer, ($$renderer) =>"),
+            "head call wrong: {}",
+            out.js
+        );
+    }
+
+    #[test]
+    fn compile_rejects_head_with_title() {
+        // `<title>` inside head needs `$$renderer.title` — refused via the normal
+        // special-element path when emitting the head body.
+        assert_unsupported(
+            "<svelte:head><title>Hi</title></svelte:head>",
+            "special element",
+        );
+    }
+
+    #[test]
     fn compile_rejects_client_generation() {
         let options = CompileOptions {
             generate: Generate::Client,
