@@ -1595,6 +1595,62 @@ mod tests {
     }
 
     #[test]
+    fn compile_template_erasure_feeds_the_shape_predicates() {
+        // The other half of the borrow-point contract: a predicate that switches on
+        // an expression's VARIANT must read the erased node, or it classifies the
+        // TypeScript wrapper instead of the expression the oracle prints.
+        //
+        // `is_standalone` (the `{@render}` anchor-elision rule) asks "is the callee
+        // a plain identifier naming a local snippet?" — reading the raw
+        // `(s as any)(a)` calls it dynamic and emits a `<!---->` anchor the oracle
+        // elides.
+        let js = compile_js(
+            "<script lang=\"ts\">\n\tlet { a }: any = $props();\n</script>\n\
+             {#snippet s(x)}<p>{x}</p>{/snippet}\n{@render (s as any)(a)}",
+        );
+        assert!(
+            !js.contains("$$renderer.push(`<!---->`)"),
+            "a sole local-snippet render must elide the anchor through a wrapper: {js}"
+        );
+        // A bare `$derived` read must still become `d()` through a wrapper.
+        let derived = compile_js(
+            "<script lang=\"ts\">\n\tlet { n }: any = $props();\n\tlet d = $derived(n * 2);\n</script>\n\
+             <p>{d as number}</p>",
+        );
+        assert!(
+            derived.contains("$.escape(d())"),
+            "a wrapped derived read must still be called: {derived}"
+        );
+        // A component prop keeps the `{ n }` shorthand through a wrapper.
+        let shorthand = compile_js(
+            "<script lang=\"ts\">\n\timport Foo from './F.svelte';\n\n\tlet { n }: any = $props();\n</script>\n\
+             <Foo n={n as number} />",
+        );
+        assert!(
+            shorthand.contains("Foo($$renderer, { n })"),
+            "a wrapped prop value must keep the shorthand: {shorthand}"
+        );
+    }
+
+    #[test]
+    fn compile_render_call_shape_is_decided_before_erasure() {
+        // "A `{@render}` holds a call expression" is a PARSE-time rule in the oracle
+        // (`render_tag_invalid_expression`), so it is decided on the raw node. A
+        // wrapper around the CALL is rejected even though erasure would reveal a
+        // call underneath; a wrapper around the CALLEE leaves a call and compiles.
+        assert_unsupported(
+            "<script lang=\"ts\">\n\tlet { a }: any = $props();\n</script>\n\
+             {#snippet s(x)}<p>{x}</p>{/snippet}\n{@render (s(a) as any)}",
+            "{@render}",
+        );
+        assert_unsupported(
+            "<script lang=\"ts\">\n\tlet { a }: any = $props();\n</script>\n\
+             {#snippet s(x)}<p>{x}</p>{/snippet}\n{@render s(a)!}",
+            "{@render}",
+        );
+    }
+
+    #[test]
     fn compile_refuses_template_typescript_without_lang_ts() {
         // The oracle's `ts` flag is document-wide: without `lang="ts"` its parser
         // rejects TypeScript in the template too, so accepting it would be an

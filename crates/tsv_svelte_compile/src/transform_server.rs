@@ -1915,8 +1915,17 @@ fn emit_fragment<'arena>(
     // inherited value is false).
     let is_standalone = if ctx.hoist_snippets {
         match list.as_slice() {
-            [CleanNode::Render(tag)] => render_callee_name(&tag.expression, source)
-                .is_some_and(|name| !render_callee_dynamic(env, name)),
+            // `render_callee_name` is a SHAPE predicate (it wants a plain-identifier
+            // callee), so it must read the ERASED expression — the oracle strips
+            // TypeScript before `clean_nodes` runs, and to it `{@render (s as T)(x)}`
+            // is a plain `s(x)`. Reading the raw node would call it dynamic and emit
+            // an anchor the oracle elides. `emit_render_tag` erases again for its own
+            // borrow; a second erase of a type-free node allocates nothing.
+            [CleanNode::Render(tag)] => {
+                let expression = env.erase(&tag.expression)?;
+                render_callee_name(expression, source)
+                    .is_some_and(|name| !render_callee_dynamic(env, name))
+            }
             [CleanNode::Element(element)] => component_is_standalone_eligible(env, element),
             _ => false,
         }
@@ -2799,6 +2808,22 @@ fn collect_hoisted_snippets<'arena>(
     }
 }
 
+/// Whether a `{@render}` expression is a call — the oracle's **parse-time**
+/// shape rule, so it reads the raw (un-erased) node. A TypeScript wrapper AROUND
+/// the call (`{@render (s(x) as T)}`, `{@render s(x)!}`) is
+/// `render_tag_invalid_expression` there, even though erasure would reveal a call
+/// underneath; a wrapper around the *callee* (`{@render (s as T)(x)}`) leaves a
+/// call and compiles.
+fn render_expression_is_call(expr: &Expression<'_>) -> bool {
+    match expr {
+        Expression::CallExpression(_) => true,
+        Expression::ParenthesizedExpression(p) => {
+            matches!(p.expression, Expression::CallExpression(_))
+        }
+        _ => false,
+    }
+}
+
 /// The plain callee name of a `{@render}` expression: unwrap the (possibly
 /// optional) call, requiring a plain-identifier callee. `None` for a member
 /// callee, a non-call, or an escaped identifier.
@@ -2840,11 +2865,20 @@ fn emit_render_tag<'arena>(
     is_standalone: bool,
 ) -> Result<(), CompileError> {
     let arena = env.b.arena;
+    // "A `{@render}` holds a call expression" is a **parse-time** rule in the
+    // oracle (`render_tag_invalid_expression`, raised while reading the tag) — so
+    // it is decided on the RAW node, BEFORE type erasure. The distinction is
+    // observable: `{@render (s as T)(x)}` is a call and compiles, while
+    // `{@render (s(x) as T)}` and `{@render s(x)!}` are rejected even though
+    // erasure would turn both into calls.
+    if !render_expression_is_call(&tag.expression) {
+        return Err(unsupported(Refusal::RenderTagUnsupportedCallee));
+    }
     // The template borrow point: the whole `callee(args)` call is erased once, so
     // the callee classification and the arguments below both read the type-free
-    // node (`{@render s<T>(x as U)}` → `s(x)`).
+    // node (`{@render s<T>(x as U)}` → `s(x)`). Erasing a call yields a call, so
+    // the shape settled above survives.
     let expression = env.erase(&tag.expression)?;
-    // Unwrap the (possibly optional) call.
     let call = match expression {
         Expression::CallExpression(c) => c,
         Expression::ParenthesizedExpression(p) => match &p.expression {
