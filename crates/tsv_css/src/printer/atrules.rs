@@ -140,6 +140,8 @@ impl<'a> Printer<'a> {
                 // `content` is already verbatim (internal whitespace + comments preserved,
                 // outer-trimmed, `url()` inner-trimmed) from the parser's non-normalized
                 // raw path, so it matches prettier as-is — no comment-spacing rewrite.
+                // Embedded newlines survive under Svelte `<style>` because the CSS renders
+                // at its final indent (no post-hoc line re-indent to compound them).
                 self.write(" ");
                 self.write(content);
             }

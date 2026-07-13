@@ -179,6 +179,103 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> Cow<'_, str> {
     }
 }
 
+/// Collapse each maximal whitespace run (spaces, tabs, and line breaks alike) to a
+/// single space — the whitespace normalization tsv applies at every other
+/// selector-argument position, and what prettier applies inside a selector.
+/// String- and comment-aware: whitespace inside a `'…'`/`"…"` string (`\` escapes
+/// honored) or a `/* … */` comment is content and stays verbatim.
+///
+/// Used for a dropped forgiving-selector item (`SimpleSelector::Invalid` — e.g.
+/// `:is(.a > . > .b)`, whose empty `.` class makes the complex selector invalid):
+/// the item is kept in the output verbatim except for this whitespace collapse, so
+/// it renders on one line and matches prettier (see conformance_svelte.md §CSS
+/// Corrections). Idempotent by construction — the collapsed form is a fixed point.
+pub(crate) fn collapse_whitespace_runs(s: &str) -> Cow<'_, str> {
+    // Fast path: nothing to collapse — no run needs rewriting when every whitespace
+    // byte is already a lone ASCII space with non-whitespace on both sides (the
+    // common single-spaced form). Whitespace inside a `'…'`/`/*…*/` interior only
+    // trips this into the (correct, interior-preserving) slow path — a harmless
+    // extra allocation, never a wrong answer.
+    if !needs_whitespace_collapse(s) {
+        return Cow::Borrowed(s);
+    }
+
+    let mut result = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    let mut in_string = false;
+    let mut string_delim = '\0';
+    let mut in_comment = false;
+
+    while let Some(ch) = chars.next() {
+        // Comment interior: copy verbatim (its whitespace is content).
+        if in_comment {
+            result.push(ch);
+            if ch == '*' && chars.peek() == Some(&'/') {
+                result.push('/');
+                chars.next();
+                in_comment = false;
+            }
+            continue;
+        }
+        // String interior: copy verbatim, honoring `\` escapes so an escaped quote
+        // (or a `\`-continuation newline) doesn't end the string early.
+        if in_string {
+            result.push(ch);
+            if ch == '\\' {
+                if let Some(next) = chars.next() {
+                    result.push(next);
+                }
+            } else if ch == string_delim {
+                in_string = false;
+            }
+            continue;
+        }
+        // Comment / string starts.
+        if ch == '/' && chars.peek() == Some(&'*') {
+            result.push('/');
+            result.push('*');
+            chars.next();
+            in_comment = true;
+            continue;
+        }
+        if ch == '\'' || ch == '"' {
+            in_string = true;
+            string_delim = ch;
+            result.push(ch);
+            continue;
+        }
+        // A whitespace run outside strings/comments: consume it whole and emit one
+        // space in its place.
+        if is_css_whitespace(ch) {
+            while chars.peek().is_some_and(|&next| is_css_whitespace(next)) {
+                chars.next();
+            }
+            result.push(' ');
+            continue;
+        }
+        result.push(ch);
+    }
+
+    Cow::Owned(result)
+}
+
+/// Whether `collapse_whitespace_runs` would rewrite `s`: true if any whitespace
+/// byte is not a lone ASCII space (a tab/newline/CR/FF, or a space adjacent to
+/// more whitespace). A conservative superset — it counts whitespace inside a
+/// string/comment interior too, so a true answer there just routes to the slow
+/// path (which preserves the interior); it never returns false when a collapse is
+/// actually needed.
+fn needs_whitespace_collapse(s: &str) -> bool {
+    let bytes = s.as_bytes();
+    bytes.iter().enumerate().any(|(i, &b)| {
+        if b == b' ' {
+            bytes.get(i + 1) == Some(&b' ')
+        } else {
+            b.is_ascii_whitespace()
+        }
+    })
+}
+
 /// Whether `normalize_css_whitespace` leaves byte `b` untouched: an ASCII,
 /// non-whitespace byte that is none of the structural bytes the normalizer acts on
 /// (`(` `)` `,` `/` and the two quotes). A string composed only of such bytes
@@ -383,6 +480,45 @@ mod tests {
             "a\u{00A0}\u{00A0}b"
         ); // not collapsed
         assert_eq!(normalize_css_whitespace("émotion"), "émotion"); // non-ws non-ASCII verbatim
+    }
+
+    #[test]
+    fn test_collapse_whitespace_runs() {
+        // Every whitespace run — spaces, tabs, newlines, and mixed — collapses to a
+        // single space. The newline-free multi-space case is the one a newline-only
+        // collapse used to leave verbatim, diverging from prettier.
+        assert_eq!(collapse_whitespace_runs(".a  >  .  >  .b"), ".a > . > .b");
+        assert_eq!(collapse_whitespace_runs(".a\t>\t.b"), ".a > .b");
+        assert_eq!(collapse_whitespace_runs(".a >\n> .b"), ".a > > .b");
+        assert_eq!(collapse_whitespace_runs(".a \t\n .b"), ".a .b");
+        // A lone tab (run of length 1) still becomes a space.
+        assert_eq!(collapse_whitespace_runs(".a\t.b"), ".a .b");
+
+        // Already single-spaced: unchanged and borrowed (no allocation).
+        let out = collapse_whitespace_runs(".a > .b");
+        assert_eq!(out, ".a > .b");
+        assert!(matches!(out, Cow::Borrowed(_)));
+        assert!(matches!(collapse_whitespace_runs(".a.b"), Cow::Borrowed(_)));
+
+        // String and comment interiors keep their whitespace verbatim.
+        assert_eq!(
+            collapse_whitespace_runs("[data-x='a  b']  .c"),
+            "[data-x='a  b'] .c"
+        );
+        assert_eq!(
+            collapse_whitespace_runs("[data-x=\"a\tb\"]"),
+            "[data-x=\"a\tb\"]"
+        );
+        assert_eq!(collapse_whitespace_runs(".a  /* c  d */  .b"), ".a /* c  d */ .b");
+        // An escaped quote does not end the string early.
+        assert_eq!(
+            collapse_whitespace_runs(r"[x='a\'  b']  .c"),
+            r"[x='a\'  b'] .c"
+        );
+
+        // Idempotent: the collapsed form is a fixed point.
+        let once = collapse_whitespace_runs(".a  >\n>  .b").into_owned();
+        assert_eq!(collapse_whitespace_runs(&once), once);
     }
 
     #[test]
