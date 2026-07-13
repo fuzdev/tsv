@@ -1409,7 +1409,14 @@ impl DocArena {
         }
     }
 
-    /// Check if a doc can break (contains any line elements).
+    /// Check if a doc can break (contains any line elements) — Prettier's `canBreak`.
+    ///
+    /// The dual of [`Self::will_break`]: `will_break` asks whether a doc *must* break,
+    /// this asks whether it *can*. Prettier's assignment `chooseLayout` reads it off the
+    /// printed left-hand side (`canBreakLeftDoc`) to decide whether an unbreakable
+    /// right-hand side — a template literal, a boolean, a number — may stay welded to the
+    /// operator, or must fall through to `fluid` so the break lands after the operator
+    /// instead of inside the assignment target.
     pub fn can_break(&self, id: DocId) -> bool {
         let nodes = self.nodes.borrow();
         self.can_break_inner(id, &nodes)

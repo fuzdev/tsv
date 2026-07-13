@@ -80,6 +80,18 @@ pub enum ChainNode<'a> {
     NonNull,
 }
 
+/// Whether a computed index is a numeric literal — Prettier's `isNumericLiteral` carve-out.
+///
+/// The same predicate drives both halves of prettier's computed-lookup handling, which is
+/// why it lives here rather than in either consumer: `printMemberLookup` (member.js) keeps a
+/// numeric lookup's brackets FLAT while every other index gets a breakable group
+/// (`computed_lookup_doc`), and `printMemberChain` (member-chain.js) lets a numeric lookup
+/// ride along in the current group where a non-numeric one opens a new one
+/// (`is_numeric_accessor`, used by `group_chain_nodes`).
+pub fn is_numeric_index(expr: &internal::Expression<'_>) -> bool {
+    matches!(expr, internal::Expression::Literal(lit) if matches!(lit.value, LiteralValue::Number(_)))
+}
+
 impl<'a> ChainNode<'a> {
     /// Create a new base node
     pub fn base(expr: &'a internal::Expression<'a>, needs_parens: bool) -> Self {
@@ -214,12 +226,7 @@ impl<'a> ChainNode<'a> {
 
     /// Check if this is a numeric computed accessor like [0], [1]
     pub fn is_numeric_accessor(&self) -> bool {
-        if let Self::ComputedMember { expr, .. } = self
-            && let internal::Expression::Literal(lit) = expr
-        {
-            return matches!(lit.value, LiteralValue::Number(_));
-        }
-        false
+        matches!(self, Self::ComputedMember { expr, .. } if is_numeric_index(expr))
     }
 
     /// Check if this is a computed member access

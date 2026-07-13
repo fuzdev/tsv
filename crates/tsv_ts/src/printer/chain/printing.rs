@@ -6,7 +6,7 @@
 // - ChainPrinter trait: Interface for the printer
 
 use super::analysis::SymbolLookup;
-use super::types::{ChainGroup, ChainNode};
+use super::types::{ChainGroup, ChainNode, is_numeric_index};
 use crate::ast::internal::{self, Expression};
 use crate::printer::{ParenContext, needs_parens};
 use tsv_lang::doc::{
@@ -361,17 +361,18 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
                 raw_inner
             };
 
+            let open = if *optional { "?.[" } else { "[" };
+            // A numeric index keeps its brackets flat (prettier's `isNumericLiteral`
+            // carve-out); every other index gets a breakable group.
+            let breakable = !is_numeric_index(expr);
+
             // Chain-level zero-comment gate: a comment-free chain span has no comment in
-            // or around these brackets, so emit the flat `[…]` / `?.[…]` directly —
-            // skipping find_bracket_position (a source scan) and every pre/inside-bracket
-            // comment classification. Byte-identical: those paths all collapse to the
-            // same flat brackets around `inner` when the range is comment-free.
+            // or around these brackets, so emit the `[…]` / `?.[…]` directly — skipping
+            // find_bracket_position (a source scan) and every pre/inside-bracket comment
+            // classification. Those paths all collapse to the same bracket doc around
+            // `inner` when the range is comment-free.
             if !printer.chain_has_comments() {
-                return if *optional {
-                    d.concat(&[d.text("?.["), inner, d.text("]")])
-                } else {
-                    d.brackets(inner)
-                };
+                return computed_lookup_doc(printer, open, inner, breakable);
             }
 
             let prop_span = printer.get_property_span(expr);
@@ -381,7 +382,6 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
             let bracket_open_pos = find_bracket_position(printer, *object_end, prop_span.start);
 
             let inside_start = bracket_open_pos + if *optional { 3 } else { 1 };
-            let open = if *optional { "?.[" } else { "[" };
 
             // A line comment inside the brackets (before the index, or after it before
             // `]`) forces the whole bracket to break so the `//` can't swallow the index
@@ -419,27 +419,21 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
                 let inner_with_comments =
                     d.concat(&[leading_comments_doc, inner, trailing_comments_doc]);
 
-                // When there are block comments inside brackets (e.g.,
-                // `?.[/** @type {string} */ d]`), use a group with indent/softline so
-                // the bracket content can break:
+                // Block comments inside the brackets (e.g. `?.[/** @type {string} */ d]`)
+                // must be able to break onto their own line, so they override the numeric
+                // carve-out — a bare `[0]` stays flat, but `[/* c */ 0]` gets the group:
                 //   obj.chain?.[
                 //       /** @type {string} */ d
                 //   ]
-                // Without comments, keep the flat form (existing behavior).
                 let has_inside_comments = printer
                     .has_comments_between(inside_start, prop_span.start)
                     || printer.has_comments_between(prop_span.end, *bracket_end);
-                if has_inside_comments {
-                    let sl = d.softline();
-                    let content = d.concat(&[sl, inner_with_comments]);
-                    let indented = d.indent(content);
-                    let sl2 = d.softline();
-                    d.group(d.concat(&[d.text(open), indented, sl2, d.text("]")]))
-                } else if *optional {
-                    d.concat(&[d.text("?.["), inner_with_comments, d.text("]")])
-                } else {
-                    d.brackets(inner_with_comments)
-                }
+                computed_lookup_doc(
+                    printer,
+                    open,
+                    inner_with_comments,
+                    breakable || has_inside_comments,
+                )
             };
 
             // The chain builder owns the gap between the object and the `[`
@@ -579,6 +573,29 @@ fn print_group_inner<'a, P: ChainPrinter>(
 //
 // Member Access Printing
 //
+
+/// Build a computed member lookup — Prettier's `printMemberLookup` (member.js):
+/// `group([open, indent([softline, index]), softline, "]"])`.
+///
+/// The brackets are where a computed access sheds width. Prettier never places a break
+/// point *before* the `[` (`printMemberExpression`'s `shouldInline` includes
+/// `node.computed`), so callers must keep the lookup glued to the object — see
+/// `starts_segment` in the member-only builder. A non-breakable lookup (`breakable ==
+/// false`, the numeric-index carve-out) has no break point at all, and so overflows the
+/// print width rather than splitting.
+fn computed_lookup_doc<P: ChainPrinter>(
+    printer: &P,
+    open: &'static str,
+    index: DocId,
+    breakable: bool,
+) -> DocId {
+    let d = printer.arena();
+    if !breakable {
+        return d.concat(&[d.text(open), index, d.text("]")]);
+    }
+    let indented = d.indent(d.concat(&[d.softline(), index]));
+    d.group(d.concat(&[d.text(open), indented, d.softline(), d.text("]")]))
+}
 
 /// Print a member access (shared logic for Member and PrivateMember)
 ///

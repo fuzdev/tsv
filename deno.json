@@ -38,7 +38,7 @@
 		"fixtures:audit": "cargo run -p tsv_debug --quiet fixtures_audit",
 		"fixtures:ts-audit": "cargo run -p tsv_debug --quiet ts_fixture_audit",
 		"conformance:audit": "cargo run -p tsv_debug --quiet conformance_audit",
-		"pins:audit": "deno run --allow-read scripts/check_canonical_pins.ts",
+		"pins:audit": "deno run --allow-read --allow-run=git scripts/check_canonical_pins.ts",
 		"swallow:audit": "cargo test -p tsv_lang --features swallow_check --quiet && cargo run -p tsv_debug --features swallow_check --quiet swallow_audit",
 		"scan:audit": "cargo run -p tsv_debug --quiet scan_audit",
 		"fanout:audit": "cargo run -p tsv_debug --quiet build_fanout_audit",

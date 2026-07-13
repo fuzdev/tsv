@@ -26,7 +26,19 @@
  * format-comparison inputs whose expected output is computed live per file by
  * the pinned npm prettier (no path-keyed ledger to rot), and the checkout
  * legitimately rides `-dev` versions — `deno task doctor` reports it instead.
+ *
+ * **3. Checkout COMMIT drift** (warn-only) — a version string only bumps at
+ * release, so upstream commits landing in between change a graded suite or
+ * corpus with no version signal at all. That window is precisely how the count
+ * pins went stale unnoticed. So each checkout's HEAD is also compared against
+ * the commit `benches/js/lib/gate_counts.ts` records it was measured at
+ * (`GATE_CHECKOUT_COMMITS`), and a move is reported. Deliberately a WARNING:
+ * the count pins are the gate — this exists so that when one trips, "the corpus
+ * moved" is distinguishable from "tsv regressed" at a glance instead of by
+ * reverse-engineering. Absent / non-git checkouts are skipped.
  */
+
+import { GATE_CHECKOUT_COMMITS } from '../benches/js/lib/gate_counts.ts';
 
 const CANONICAL_PACKAGES = [
 	'prettier',
@@ -129,6 +141,35 @@ for (const { pkg_json, npm_package } of CHECKOUT_ALIGNMENT) {
 	}
 }
 
+// --- Checkout commit drift (see the header docstring, half 3) -------------------
+
+/** Resolve a checkout's HEAD, or `null` when it is absent / not a git repo. */
+const head_commit = (repo: string): string | null => {
+	try {
+		const { success, stdout } = new Deno.Command('git', {
+			args: ['-C', repo, 'rev-parse', 'HEAD'],
+			stdout: 'piped',
+			stderr: 'null',
+		}).outputSync();
+		return success ? new TextDecoder().decode(stdout).trim() : null;
+	} catch {
+		return null;
+	}
+};
+
+const drifted: string[] = [];
+for (const [repo, { commit, pins }] of Object.entries(GATE_CHECKOUT_COMMITS)) {
+	const head = head_commit(repo);
+	if (head === null) {
+		checkout_notes.push(`${repo} absent — commit drift not checked`);
+		continue;
+	}
+	// The recorded commits are abbreviated, so compare on the prefix.
+	if (!head.startsWith(commit)) {
+		drifted.push(`${repo}: measured at ${commit}, now at ${head.slice(0, commit.length)} — pins: ${pins}`);
+	}
+}
+
 if (failures.length > 0) {
 	console.error('FAIL: canonical version sync broken:');
 	for (const f of failures) console.error(`  · ${f}`);
@@ -137,6 +178,14 @@ if (failures.length > 0) {
 			'  ⚠ Bumping a canonical pin re-baselines the fixture corpus — see benches/js/CLAUDE.md §"Canonical baseline is coupled".',
 	);
 	Deno.exit(1);
+}
+if (drifted.length > 0) {
+	console.warn('⚠ pins:audit — checkout(s) moved since the gate counts were measured:');
+	for (const d of drifted) console.warn(`  · ${d}`);
+	console.warn(
+		'  The count pins are the gate; this is the diagnosis. If one trips, suspect corpus movement\n' +
+			'  before a tsv regression — and re-record the commit in GATE_CHECKOUT_COMMITS when you re-pin.',
+	);
 }
 console.log(
 	`pins:audit OK — canonical pins agree across sidecar VERSIONS/imports, benches/js/package.json, actor.rs ` +
