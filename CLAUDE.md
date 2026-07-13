@@ -1119,8 +1119,22 @@ pub struct Comment {
     pub span: Span,                // full comment span, delimiters included
     pub emit_character_field: bool, // Serializer hint: include `character` in JSON loc
     pub bump_pattern_columns: bool, // Serializer hint: +1 loc columns (Svelte block-pattern parse)
+    pub owned_by_node: bool,        // Printed by the node it's bound to, not by the enclosing gap
 }
 ```
+
+**Owned comments — the one crack in the detached model.** A comment that is *bound to
+the token after it* can't be located positionally at print time, because a paren the
+printer synthesizes around an enclosing expression lands between the two and re-binds it.
+The single case today is the JSDoc cast: `/** @type {T} */` plus the `(` it glues to
+**are** the cast, so the parser marks the comment `owned_by_node` and hands it to the
+`JsdocCast` node, which prints it. The range lookups (`comments_in_range`,
+`has_comments_in_range`, `comments_after`) **skip** owned comments, so no gap emitter can
+print one and no synthesized paren can be placed inside the pair — at any of the ~29 paren
+sites, present or future. A pure *layout* gate that only asks "does this range print any
+comment text" uses `has_any_comments_in_range` instead (it counts owned comments; the
+member-chain's structural fast path is the case in point). Prettier, oxfmt and biome all
+get this wrong — see [conformance_prettier.md §JSDoc / paren semantics](docs/conformance_prettier.md).
 
 The content is **not stored owned** — comment text is a pure delimiter-stripped
 sub-slice of source, so `Comment` holds a `content_span` and recovers the text on

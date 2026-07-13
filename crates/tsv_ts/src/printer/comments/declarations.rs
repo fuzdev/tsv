@@ -440,16 +440,12 @@ impl<'a> Printer<'a> {
         block_spacing: CommentSpacing,
     ) -> DocId {
         let d = self.d();
-        let first_idx = tsv_lang::find_first_comment_from(self.comments, start);
         let mut parts = DocBuf::new();
         // After a line comment's hardline the next comment starts a fresh (indented)
         // line, so it must not get a leading space — otherwise a 2nd+ own-line comment
         // renders as `\t // c` (stray leading space).
         let mut at_line_start = false;
-        for comment in self.comments[first_idx..]
-            .iter()
-            .take_while(|c| c.span.end <= end)
-        {
+        for comment in comments_in_range(self.comments, start, end) {
             if comment.is_block {
                 // Block comment: use caller-specified spacing
                 match block_spacing {

@@ -301,13 +301,9 @@ impl<'a> Printer<'a> {
         filter: CommentFilter,
     ) -> Option<DocId> {
         let d = self.d();
-        // Single binary search to find first comment
-        let first_idx = tsv_lang::find_first_comment_from(self.comments, start);
 
         // Check if any comments exist in range (considering filter)
-        let has_comments = self.comments[first_idx..]
-            .iter()
-            .take_while(|c| c.span.end <= end)
+        let has_comments = comments_in_range(self.comments, start, end)
             .any(|c| !matches!(filter, CommentFilter::BlockOnly) || c.is_block);
 
         if !has_comments {
@@ -325,10 +321,7 @@ impl<'a> Printer<'a> {
         let mut parts = DocBuf::new();
         let mut prev_was_line = false;
         let mut first = true;
-        for comment in self.comments[first_idx..]
-            .iter()
-            .take_while(|c| c.span.end <= end)
-        {
+        for comment in comments_in_range(self.comments, start, end) {
             // Apply filter
             if matches!(filter, CommentFilter::BlockOnly) && !comment.is_block {
                 continue;

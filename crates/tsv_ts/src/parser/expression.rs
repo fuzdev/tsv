@@ -1639,7 +1639,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // when this expression is used as a callee: (a ? b : c)() should have
         // CallExpression span starting at '(', not at 'a'
         let (paren_start, _) = self.current_pos();
-        let is_jsdoc_cast = self.paren_preceded_by_jsdoc_cast_comment(paren_start);
+        let cast_comment_idx = self.jsdoc_cast_comment_index(paren_start);
         self.expect(&TokenKind::ParenOpen)?; // consume '('
 
         self.grouping_depth += 1;
@@ -1658,17 +1658,24 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // - **JSDoc type cast** (`/** @type {T} */ (expr)`) — the parens are
         //   semantically required (dropping them drops the cast), so a preceding
         //   `@type`/`@satisfies` block comment wraps the inner in a `JsdocCast`. Cast
-        //   semantics subsume grouping, so this wins when both apply.
+        //   semantics subsume grouping, so this wins when both apply. The cast also
+        //   takes **ownership** of that comment: the comment and this `(` are one
+        //   unit, so the cast prints it and the flat-`Vec<Comment>` lookups skip it
+        //   (`Comment::owned_by_node`) — printed from an enclosing gap instead, a
+        //   paren synthesized around an enclosing expression lands between the two
+        //   and the cast silently re-binds to the wider node on reparse.
         // - **Snippet-parameter sub-parse** (`preserve_parens`) — acorn's
         //   `preserveParens` without Svelte's `remove_parens`; wraps in a
         //   layout-transparent `ParenthesizedExpression` so only the wire shape moves.
-        // Comments themselves are still located positionally in the flat
-        // `Vec<Comment>` at print time.
+        // Every other comment stays located positionally at print time.
         let paren_span = Span::new(paren_start as u32, paren_end as u32);
-        let expr = if is_jsdoc_cast {
+        let expr = if let Some(idx) = cast_comment_idx {
+            self.comments[idx].owned_by_node = true;
+            let comment = self.comments[idx].clone();
             self.alloc(Expression::JsdocCast(JsdocCast {
                 inner: parsed.expr,
                 span: paren_span,
+                comment,
             }))
         } else if self.preserve_parens {
             self.alloc(Expression::ParenthesizedExpression(
@@ -1683,15 +1690,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok(ParsedExpr::with_bounds(expr, paren_start, paren_end))
     }
 
-    /// Whether a `(` at `paren_start` is immediately preceded by a JSDoc type-cast
-    /// block comment (`/** @type {T} */` / `/** @satisfies {T} */`), making the
-    /// parens a TypeScript cast that must be preserved.
+    /// The index in `self.comments` of the JSDoc type-cast block comment
+    /// (`/** @type {T} */` / `/** @satisfies {T} */`) immediately preceding a `(` at
+    /// `paren_start` — which is what makes those parens a cast that must be preserved.
+    /// `None` when the `(` is an ordinary grouping/call paren.
     ///
     /// Mirrors prettier's predicate (`is-type-cast-comment.js` +
     /// `postprocess/index.js`): a **block** comment whose text starts with `*`
     /// (the `/**` form) and contains `@type`/`@satisfies` (word boundary), with
     /// only whitespace between the comment's `*/` and the `(`.
-    fn paren_preceded_by_jsdoc_cast_comment(&self, paren_start: usize) -> bool {
+    ///
+    /// The caller hands the index to the `JsdocCast`, which takes ownership of the
+    /// comment — so this must identify it *exactly*, never merely "a cast-shaped
+    /// comment somewhere before here" (an owned comment nothing prints is a dropped
+    /// comment).
+    fn jsdoc_cast_comment_index(&self, paren_start: usize) -> Option<usize> {
         let bytes = self.source.as_bytes();
         // `paren_start` is a full-file offset (`current_pos` adds `base_offset`);
         // `self.source` is the local slice, so translate back to a local index.
@@ -1702,7 +1715,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
         // The preceding token must be a block comment ending exactly at `i`.
         if i < 4 || &bytes[i - 2..i] != b"*/" {
-            return false;
+            return None;
         }
         // Resolve the comment through the lexer's spans rather than re-scanning the
         // source. A `/*` can appear inside this comment's own body *or* a preceding
@@ -1712,17 +1725,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // comment ending here was just drained into `self.comments`; match it by its
         // host-coordinate end and test its exact (delimiter-excluded) content.
         let token_end = (i + self.base_offset) as u32;
-        self.comments
+        let idx = self
+            .comments
             .iter()
-            .rev()
-            .find(|c| c.span.end == token_end)
-            .is_some_and(|c| {
-                c.is_block && {
-                    let start = c.content_span.start as usize - self.base_offset;
-                    let end = c.content_span.end as usize - self.base_offset;
-                    is_jsdoc_type_cast_comment(&self.source[start..end])
-                }
-            })
+            .rposition(|c| c.span.end == token_end)?;
+        let c = &self.comments[idx];
+        let is_cast = c.is_block && {
+            let start = c.content_span.start as usize - self.base_offset;
+            let end = c.content_span.end as usize - self.base_offset;
+            is_jsdoc_type_cast_comment(&self.source[start..end])
+        };
+        is_cast.then_some(idx)
     }
 
     /// Parse a TypeScript angle-bracket type assertion: `<Type>expr`

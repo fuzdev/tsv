@@ -184,6 +184,14 @@ impl<'a> Printer<'a> {
         // Parenthesize an `in` test inside a for-header init (`for (a = (b in c) ? …;…)`);
         // a no-op elsewhere. The test is `[~In]`, so the parens are load-bearing.
         let test = self.wrap_for_init_in(cond.test, test);
+        // Comments the parser stripped along with the test's grouping parens
+        // (`(/* c */ a ?? b) ? x : y`) live in the gap between the conditional's own
+        // start (the removed `(`) and the test's — no other emitter covers it, so
+        // without this the comment is silently dropped. Outside the re-added parens,
+        // matching every other operand position. A no-op when the test wasn't
+        // parenthesized (the two starts coincide).
+        let test =
+            self.prepend_removed_paren_comments(cond.span.start, cond.test.span().start, test);
         // Prettier's shouldNotIndent (binaryish.js:109-113) also applies to binaries
         // in consequent/alternate positions: when parent is ConditionalExpression and
         // grandparent is ReturnStatement/ThrowStatement/CallExpression/NewExpression,
@@ -373,6 +381,10 @@ impl<'a> Printer<'a> {
         // Parenthesize an `in` test inside a for-header init (`for (a = (b in c) ? …;…)`);
         // a no-op elsewhere. The test is `[~In]`, so the parens are load-bearing.
         let test = self.wrap_for_init_in(cond.test, test);
+        // Stripped-grouping-paren comments on the test — see the sibling in
+        // `build_conditional_doc`; both layouts must emit them or the comment is lost.
+        let test =
+            self.prepend_removed_paren_comments(cond.span.start, cond.test.span().start, test);
 
         // Find the ? and : positions for proper comment categorization
         let question_pos = self.find_char_outside_comments(test_end, consequent_start, b'?');
