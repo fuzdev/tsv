@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 73,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 64,
+				"name": "media",
+				"prelude": "(min-width: #FFF)",
+				"block": {
+					"type": "Block",
+					"start": 34,
+					"end": 64,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 38,
+								"end": 39,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 38,
+										"end": 39,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 38,
+														"end": 39
+													}
+												],
+												"start": 38,
+												"end": 39
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 40,
+								"end": 61,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 45,
+										"end": 56,
+										"property": "color",
+										"value": "blue"
+									}
+								]
+							},
+							"start": 38,
+							"end": 61
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 65,
+			"styles": "\n\t@media (min-width: #FFF) {\n\t\ta {\n\t\t\tcolor: blue;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 74,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

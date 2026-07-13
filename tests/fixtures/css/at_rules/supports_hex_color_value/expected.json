@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 128,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 119,
+				"name": "supports",
+				"prelude": "(background: #fff) and (color: #aabbcc) and (border-color: #aabbccdd)",
+				"block": {
+					"type": "Block",
+					"start": 89,
+					"end": 119,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 93,
+								"end": 94,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 93,
+										"end": 94,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 93,
+														"end": 94
+													}
+												],
+												"start": 93,
+												"end": 94
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 95,
+								"end": 116,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 100,
+										"end": 111,
+										"property": "color",
+										"value": "blue"
+									}
+								]
+							},
+							"start": 93,
+							"end": 116
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 120,
+			"styles": "\n\t@supports (background: #fff) and (color: #aabbcc) and (border-color: #aabbccdd) {\n\t\ta {\n\t\t\tcolor: blue;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 129,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
