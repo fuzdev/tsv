@@ -1123,11 +1123,12 @@ impl<'a> Printer<'a> {
                 .type_parameters
                 .as_ref()
                 .map_or(func.params_start, |tp| tp.span.start);
-            parts.push(self.build_name_to_type_params_comments(
+            self.push_name_to_type_params_comments(
+                &mut parts,
                 id.span.end,
                 comment_end,
                 CommentSpacing::for_type_params(func.type_parameters.is_some()),
-            ));
+            );
         }
 
         // Space before type params or params if no name: `function <T>` or `function ()`
@@ -1722,19 +1723,21 @@ impl<'a> Printer<'a> {
             // Comments between name and type params: `class A/* c */ <T> {}`
             // Line comments get a hardline to prevent absorbing type params as comment text
             if let Some(type_params) = &class_expr.type_parameters {
-                parts.push(self.build_name_to_type_params_comments(
+                self.push_name_to_type_params_comments(
+                    &mut parts,
                     id.span.end,
                     type_params.span.start,
                     CommentSpacing::Trailing,
-                ));
+                );
             } else if positions.first_heritage_start.is_none() {
                 // No type params, no heritage: comments between name and body `class A /* c */ {}`
                 // Heritage path handles name→heritage comments when heritage exists
-                parts.push(self.build_name_to_type_params_comments(
+                self.push_name_to_type_params_comments(
+                    &mut parts,
                     id.span.end,
                     class_expr.body.span.start,
                     CommentSpacing::Leading,
-                ));
+                );
             }
         } else if class_expr.type_parameters.is_none()
             && class_expr.super_class.is_none()
