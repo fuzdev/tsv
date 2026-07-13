@@ -164,7 +164,7 @@ impl<'a> Printer<'a> {
 
                     // If the arrow has trailing param comments or leading comments,
                     // force wrapped state
-                    let arrow_token = self.find_arrow_token_for(arrow);
+                    let arrow_token = arrow.arrow_token;
                     let has_trailing_param_comments = new_has_comments
                         && arrow_has_trailing_param_comments(arrow, arrow_token, |start, end| {
                             self.has_comments_between(start, end)

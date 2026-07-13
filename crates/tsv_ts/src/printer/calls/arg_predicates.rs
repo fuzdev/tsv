@@ -168,8 +168,8 @@ pub(in crate::printer) fn is_ternary_arrow_body(body: &Expression<'_>) -> bool {
 /// Does NOT include comments between `=>` and the body — those are body comments,
 /// not trailing param comments.
 ///
-/// `arrow_token_pos` is the byte offset of `=>` in the source. Callers should obtain
-/// this via `printer.find_arrow_token_for(arrow)`.
+/// `arrow_token_pos` is the byte offset of `=>` in the source — the parser-recorded
+/// `arrow.arrow_token`.
 pub(crate) fn arrow_has_trailing_param_comments<F>(
     arrow: &internal::ArrowFunctionExpression<'_>,
     arrow_token_pos: u32,
