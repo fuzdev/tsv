@@ -58,8 +58,9 @@ use tsv_svelte::ast::internal::{
 };
 use tsv_ts::ast::internal::{
     BinaryOperator, BlockStatement, ExportDefaultDeclaration, ExportDefaultValue, Expression,
-    ExpressionStatement, ForInit, ForStatement, FunctionDeclaration, IfStatement, Statement,
-    UpdateOperator, VariableDeclaration, VariableDeclarationKind, VariableDeclarator,
+    ExpressionStatement, ForInit, ForStatement, FunctionDeclaration, IfStatement, ObjectPattern,
+    ObjectPatternProperty, Property, PropertyKind, RestElement, Statement, UpdateOperator,
+    VariableDeclaration, VariableDeclarationKind, VariableDeclarator,
 };
 
 use std::collections::HashMap;
@@ -279,6 +280,24 @@ pub(crate) fn compile_server<'arena>(
     let mut dropped_regions: Vec<Span> = Vec::new();
     if let Some(script) = root.instance {
         for stmt in script.content.body {
+            // Instance-script exports refuse — every form. The oracle compiles
+            // `export const`/`function`/`{a}` into a trailing
+            // `$.bind_props($$props, { … })` (not implemented), rejects
+            // `export default` and `export let` (runes mode), and drops
+            // `export * from`; passing any of them through verbatim would nest
+            // an `export` inside the component function (invalid JS).
+            if matches!(
+                stmt,
+                Statement::ExportNamedDeclaration(_)
+                    | Statement::ExportDefaultDeclaration(_)
+                    | Statement::ExportAllDeclaration(_)
+                    | Statement::TSNamespaceExportDeclaration(_)
+                    | Statement::TSExportAssignment(_)
+            ) {
+                return Err(unsupported(
+                    "instance-script export (component exports / $.bind_props not implemented)",
+                ));
+            }
             if matches!(stmt, Statement::ImportDeclaration(_)) {
                 user_imports.push(stmt.clone());
                 continue;
@@ -627,13 +646,27 @@ fn refuse_typed_script(
         };
         match name.as_str() {
             "lang" => {
-                let lang = match attr.value {
-                    Some([AttributeValue::Text(text)]) => text.data(source).into_owned(),
-                    _ => String::new(),
+                // The oracle treats `lang="js"` and `lang=""` as plain JS
+                // (probe-verified identical output to no attribute) — allow
+                // exactly those two; every other value (or a bare /
+                // expression-valued `lang`) stays refused.
+                let allowed = match attr.value {
+                    Some([AttributeValue::Text(text)]) => {
+                        let v = text.data(source);
+                        v.is_empty() || v == "js"
+                    }
+                    Some([]) => true,
+                    _ => false,
                 };
-                return Err(unsupported(format!(
-                    "lang=\"{lang}\" instance script (type stripping not implemented)"
-                )));
+                if !allowed {
+                    let lang = match attr.value {
+                        Some([AttributeValue::Text(text)]) => text.data(source).into_owned(),
+                        _ => String::new(),
+                    };
+                    return Err(unsupported(format!(
+                        "lang=\"{lang}\" instance script (type stripping not implemented)"
+                    )));
+                }
             }
             "generics" => {
                 return Err(unsupported(
@@ -940,9 +973,13 @@ fn rewrite_script_statement<'arena>(
             }
         }
 
+        let mut new_id = declarator.id.clone();
         let new_init = match rune {
             Some(RuneInit::Props) => {
                 *uses_props = true;
+                if let Some(injected) = inject_props_pattern(b, &declarator.id, has_comments)? {
+                    new_id = injected;
+                }
                 // Span-steal: the synthetic `$$props` takes the replaced
                 // `$props()` call's host span, so the declarator's `=`-gap
                 // comment windows stay exactly the authored ones.
@@ -987,7 +1024,7 @@ fn rewrite_script_statement<'arena>(
             }
         };
         declarations.push(VariableDeclarator {
-            id: declarator.id.clone(),
+            id: new_id,
             init: new_init,
             definite: declarator.definite,
             span: declarator.span,
@@ -999,6 +1036,106 @@ fn rewrite_script_statement<'arena>(
         declare: decl.declare,
         span: decl.span,
     })))
+}
+
+/// The oracle injects `$$slots, $$events` into the `$props()` binding pattern
+/// wherever a rest element captures the remaining props (probe-verified):
+///
+/// - `let {a, ...rest} = $props()` →
+///   `let { a, $$slots, $$events, ...rest } = $$props;` — injected immediately
+///   BEFORE the rest element;
+/// - `let props = $props()` (non-destructured) →
+///   `let { $$slots, $$events, ...props } = $$props;`;
+/// - a plain destructure without a rest element gets NO injection.
+///
+/// Returns the replacement pattern, or `None` to keep the original borrowed
+/// one. Refuses a non-identifier/non-object `$props()` pattern (the oracle
+/// rejects those — props_invalid_identifier) and injection alongside carried
+/// comments (the minted properties' appendix spans between host-span siblings
+/// would sweep host comments).
+fn inject_props_pattern<'arena>(
+    b: &mut Builder<'arena>,
+    id: &'arena Expression<'arena>,
+    has_comments: bool,
+) -> Result<Option<Expression<'arena>>, CompileError> {
+    match id {
+        Expression::ObjectPattern(obj) => {
+            let has_rest = obj
+                .properties
+                .iter()
+                .any(|p| matches!(p, ObjectPatternProperty::RestElement(_)));
+            if !has_rest {
+                return Ok(None);
+            }
+            if has_comments {
+                return Err(unsupported(
+                    "comments in a script with a rest-element $props() (injected $$slots/$$events)",
+                ));
+            }
+            let mut properties: BumpVec<'arena, ObjectPatternProperty<'arena>> =
+                BumpVec::new_in(b.arena);
+            for prop in obj.properties {
+                if matches!(prop, ObjectPatternProperty::RestElement(_)) {
+                    properties.push(shorthand_pattern_prop(b, "$$slots"));
+                    properties.push(shorthand_pattern_prop(b, "$$events"));
+                }
+                properties.push(prop.clone());
+            }
+            Ok(Some(Expression::ObjectPattern(ObjectPattern {
+                properties: properties.into_bump_slice(),
+                optional: obj.optional,
+                type_annotation: obj.type_annotation.clone(),
+                decorators: obj.decorators,
+                span: obj.span,
+            })))
+        }
+        Expression::Identifier(_) => {
+            if has_comments {
+                return Err(unsupported(
+                    "comments in a script with a non-destructured $props() (injected $$slots/$$events)",
+                ));
+            }
+            let mut properties: BumpVec<'arena, ObjectPatternProperty<'arena>> =
+                BumpVec::new_in(b.arena);
+            properties.push(shorthand_pattern_prop(b, "$$slots"));
+            properties.push(shorthand_pattern_prop(b, "$$events"));
+            properties.push(ObjectPatternProperty::RestElement(RestElement {
+                argument: b.arena.alloc(id.clone()),
+                optional: false,
+                type_annotation: None,
+                span: id.span(),
+            }));
+            Ok(Some(Expression::ObjectPattern(ObjectPattern {
+                properties: properties.into_bump_slice(),
+                optional: false,
+                type_annotation: None,
+                decorators: None,
+                span: id.span(),
+            })))
+        }
+        _ => Err(unsupported(
+            "$props() binding pattern (not an identifier or object pattern — the oracle rejects it)",
+        )),
+    }
+}
+
+/// A shorthand `{ name }` pattern property over a synthetic identifier
+/// (interned name; the span is the minted appendix text).
+fn shorthand_pattern_prop<'arena>(
+    b: &mut Builder<'arena>,
+    name: &str,
+) -> ObjectPatternProperty<'arena> {
+    let ident = b.ident(name);
+    let span = ident.span;
+    ObjectPatternProperty::Property(Property {
+        key: Expression::Identifier(ident.clone()),
+        value: Expression::Identifier(ident),
+        kind: PropertyKind::Init,
+        shorthand: true,
+        computed: false,
+        method: false,
+        span,
+    })
 }
 
 /// A statement body under construction: the statements emitted so far plus the

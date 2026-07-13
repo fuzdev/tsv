@@ -29,8 +29,11 @@ project-wide conventions.
     `{#if}`/`{#each}`/`{#await}`/`{#key}` and `{@const}` are covered (see the
     transform_server block emitters below). Shapes the transform does not cover
     yet — client generation, dev mode, components (`<Foo>` / `<Foo.Bar>`, which
-    the oracle emits as `Foo($$renderer, {})` calls), `lang="ts"` / `generics`
-    instance scripts (type stripping not implemented),
+    the oracle emits as `Foo($$renderer, {})` calls), instance-script exports in
+    every form (the oracle compiles `export const`/`function`/`{a}` via
+    `$.bind_props`, not implemented; rejects `export default`/`export let`),
+    non-JS instance scripts — `generics`, or a `lang` other than `"js"`/`""`
+    (type stripping not implemented; `lang="js"`/`lang=""` compile as plain JS),
     `{#snippet}`/`{@render}`/`{@debug}`, directives/spread, top-level `await`,
     `<option>` / populated `<select>`/`<optgroup>` (the oracle emits closure
     calls / `<!>` anchors there), template-expression comments, and every
@@ -84,7 +87,11 @@ project-wide conventions.
   `import` declarations hoisted to module scope in source order — an import
   inside the component function is invalid JS — + the exported component
   function), instance-script statements borrowed with rune rewrites —
-  `$props()` → `$$props` (span-stolen), `$state(v)`/`$state.raw(v)` → `v`
+  `$props()` → `$$props` (span-stolen; a rest element in its pattern gains the
+  oracle's `$$slots, $$events` injection immediately before it, and a
+  non-destructured `let props = $props()` becomes
+  `let { $$slots, $$events, ...props } = $$props` — a plain destructure without
+  a rest gets no injection), `$state(v)`/`$state.raw(v)` → `v`
   (`void 0` argument-less), `$derived(e)` → `$.derived(() => e)`,
   `$derived.by(f)` → `$.derived(f)`, statement-position `$effect`/`$effect.pre`
   dropped — a multi-declarator top-level declaration splitting into one

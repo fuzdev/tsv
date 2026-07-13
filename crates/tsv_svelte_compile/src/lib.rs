@@ -1057,6 +1057,109 @@ mod tests {
     }
 
     #[test]
+    fn compile_refuses_instance_script_exports() {
+        // Every instance-script export form refuses: the oracle compiles
+        // `export const`/`function`/`{a}` via `$.bind_props` (not implemented),
+        // rejects `export default`/`export let` (runes mode), and drops
+        // `export * from` — a verbatim passthrough would nest an `export`
+        // inside the component function (invalid JS).
+        for source in [
+            "<script>export const a = 1;</script>\n<p>x</p>",
+            "<script>export let a = 1;</script>\n<p>x</p>",
+            "<script>export var a = 1;</script>\n<p>x</p>",
+            "<script>export function f() {}</script>\n<p>x</p>",
+            "<script>export class C {}</script>\n<p>x</p>",
+            "<script>let a = 1;\n\texport { a };</script>\n<p>x</p>",
+            "<script>export default 5;</script>\n<p>x</p>",
+            "<script>export * from './x.js';</script>\n<p>x</p>",
+            "<script>export { a } from './x.js';</script>\n<p>x</p>",
+        ] {
+            assert_unsupported(source, "instance-script export");
+        }
+    }
+
+    #[test]
+    fn compile_injects_slots_events_before_props_rest() {
+        // A rest element in the `$props()` pattern gains the oracle's
+        // `$$slots, $$events` injection immediately before it.
+        let js = compile_js("<script>let { a, ...rest } = $props();</script>\n<p>{a}</p>");
+        assert_eq!(
+            js,
+            "import * as $ from 'svelte/internal/server';\n\
+             export default function Input($$renderer, $$props) {\n\
+             \tlet { a, $$slots, $$events, ...rest } = $$props;\n\
+             \t$$renderer.push(`<p>${$.escape(a)}</p>`);\n\
+             }\n"
+        );
+    }
+
+    #[test]
+    fn compile_wraps_non_destructured_props_in_rest_pattern() {
+        // `let props = $props()` becomes the oracle's
+        // `let { $$slots, $$events, ...props } = $$props;`.
+        let js = compile_js("<script>let props = $props();</script>\n<p>x</p>");
+        assert_eq!(
+            js,
+            "import * as $ from 'svelte/internal/server';\n\
+             export default function Input($$renderer, $$props) {\n\
+             \tlet { $$slots, $$events, ...props } = $$props;\n\
+             \t$$renderer.push(`<p>x</p>`);\n\
+             }\n"
+        );
+    }
+
+    #[test]
+    fn compile_plain_props_destructure_gets_no_injection() {
+        // No rest element → no `$$slots`/`$$events` (probe-verified).
+        let js = compile_js("<script>let { a } = $props();</script>\n<p>{a}</p>");
+        assert!(
+            !js.contains("$$slots") && !js.contains("$$events"),
+            "plain destructure must not gain the injection: {js}"
+        );
+    }
+
+    #[test]
+    fn compile_refuses_props_injection_with_comments() {
+        // The injected properties' appendix spans between host-span siblings
+        // would sweep host comments — refuse.
+        assert_unsupported(
+            "<script>\n\t// note\n\tlet { a, ...rest } = $props();\n</script>\n<p>{a}</p>",
+            "rest-element $props()",
+        );
+        assert_unsupported(
+            "<script>\n\t// note\n\tlet props = $props();\n</script>\n<p>x</p>",
+            "non-destructured $props()",
+        );
+    }
+
+    #[test]
+    fn compile_refuses_array_pattern_props() {
+        // The oracle rejects a non-identifier/non-object `$props()` binding
+        // (props_invalid_identifier) — refuse rather than compile it.
+        assert_unsupported(
+            "<script>let [a] = $props();</script>\n<p>x</p>",
+            "$props() binding pattern",
+        );
+    }
+
+    #[test]
+    fn compile_allows_lang_js_and_empty() {
+        // The oracle compiles `lang="js"` and `lang=""` exactly like no lang
+        // attribute; other values stay refused.
+        for source in [
+            "<script lang=\"js\">let x = 5;</script>\n<p>text</p>",
+            "<script lang=\"\">let x = 5;</script>\n<p>text</p>",
+        ] {
+            compile(source, &CompileOptions::default())
+                .unwrap_or_else(|e| panic!("{source} must compile: {e:?}"));
+        }
+        assert_unsupported(
+            "<script lang=\"coffee\">let x = 5;</script>\n<p>text</p>",
+            "lang=\"coffee\"",
+        );
+    }
+
+    #[test]
     fn compile_rejects_option_and_populated_select() {
         // The oracle compiles <option> into $$renderer.option closures, and a
         // populated <select>/<optgroup> gets a `<!>` anchor — static emission
