@@ -1,0 +1,769 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 544,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Line comment between the object and the `[` of a computed access: it trails",
+			"start": 20,
+			"end": 98,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the object and the bracket drops to its own line.",
+			"start": 100,
+			"end": 152,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 53
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 168,
+			"end": 173,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 15
+				},
+				"end": {
+					"line": 4,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Two comments in the same gap stay distinct — the first trails the object,",
+			"start": 183,
+			"end": 259,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the second keeps its own line.",
+			"start": 261,
+			"end": 294,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 34
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 310,
+			"end": 315,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 15
+				},
+				"end": {
+					"line": 9,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 318,
+			"end": 323,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 2
+				},
+				"end": {
+					"line": 10,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Chained computed accesses break at every bracket.",
+			"start": 333,
+			"end": 385,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 53
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 407,
+			"end": 412,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 6
+				},
+				"end": {
+					"line": 15,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A call in the chain: a comment inside the brackets stays inside them.",
+			"start": 422,
+			"end": 494,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 518,
+			"end": 523,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 3
+				},
+				"end": {
+					"line": 21,
+					"column": 8
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 543,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 534,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 24,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 154,
+					"end": 180,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 160,
+							"end": 179,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 5,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 160,
+								"end": 161,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "MemberExpression",
+								"start": 164,
+								"end": 179,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 11
+									},
+									"end": {
+										"line": 5,
+										"column": 5
+									}
+								},
+								"object": {
+									"type": "Identifier",
+									"start": 164,
+									"end": 167,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 11
+										},
+										"end": {
+											"line": 4,
+											"column": 14
+										}
+									},
+									"name": "arr",
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c1",
+											"start": 168,
+											"end": 173
+										}
+									]
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 177,
+									"end": 178,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 3
+										},
+										"end": {
+											"line": 5,
+											"column": 4
+										}
+									},
+									"name": "i"
+								},
+								"computed": true,
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Line comment between the object and the `[` of a computed access: it trails",
+							"start": 20,
+							"end": 98
+						},
+						{
+							"type": "Line",
+							"value": " the object and the bracket drops to its own line.",
+							"start": 100,
+							"end": 152
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 296,
+					"end": 330,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 302,
+							"end": 329,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 7
+								},
+								"end": {
+									"line": 11,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 302,
+								"end": 303,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 7
+									},
+									"end": {
+										"line": 9,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "MemberExpression",
+								"start": 306,
+								"end": 329,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 11
+									},
+									"end": {
+										"line": 11,
+										"column": 5
+									}
+								},
+								"object": {
+									"type": "Identifier",
+									"start": 306,
+									"end": 309,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 11
+										},
+										"end": {
+											"line": 9,
+											"column": 14
+										}
+									},
+									"name": "arr",
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c2",
+											"start": 310,
+											"end": 315
+										}
+									]
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 327,
+									"end": 328,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 3
+										},
+										"end": {
+											"line": 11,
+											"column": 4
+										}
+									},
+									"name": "i",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c3",
+											"start": 318,
+											"end": 323
+										}
+									]
+								},
+								"computed": true,
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Two comments in the same gap stay distinct — the first trails the object,",
+							"start": 183,
+							"end": 259
+						},
+						{
+							"type": "Line",
+							"value": " the second keeps its own line.",
+							"start": 261,
+							"end": 294
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 387,
+					"end": 419,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 393,
+							"end": 418,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 7
+								},
+								"end": {
+									"line": 16,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 393,
+								"end": 394,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 7
+									},
+									"end": {
+										"line": 14,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "MemberExpression",
+								"start": 397,
+								"end": 418,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 11
+									},
+									"end": {
+										"line": 16,
+										"column": 5
+									}
+								},
+								"object": {
+									"type": "MemberExpression",
+									"start": 397,
+									"end": 406,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 11
+										},
+										"end": {
+											"line": 15,
+											"column": 5
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 397,
+										"end": 400,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 11
+											},
+											"end": {
+												"line": 14,
+												"column": 14
+											}
+										},
+										"name": "arr"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 404,
+										"end": 405,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 3
+											},
+											"end": {
+												"line": 15,
+												"column": 4
+											}
+										},
+										"name": "i"
+									},
+									"computed": true,
+									"optional": false,
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c4",
+											"start": 407,
+											"end": 412
+										}
+									]
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 416,
+									"end": 417,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 3
+										},
+										"end": {
+											"line": 16,
+											"column": 4
+										}
+									},
+									"name": "j"
+								},
+								"computed": true,
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Chained computed accesses break at every bracket.",
+							"start": 333,
+							"end": 385
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 496,
+					"end": 533,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 4
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 502,
+							"end": 532,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 7
+								},
+								"end": {
+									"line": 23,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 502,
+								"end": 503,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 7
+									},
+									"end": {
+										"line": 19,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "MemberExpression",
+								"start": 508,
+								"end": 532,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 2
+									},
+									"end": {
+										"line": 23,
+										"column": 3
+									}
+								},
+								"object": {
+									"type": "CallExpression",
+									"start": 508,
+									"end": 513,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 2
+										},
+										"end": {
+											"line": 20,
+											"column": 7
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 508,
+										"end": 511,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 2
+											},
+											"end": {
+												"line": 20,
+												"column": 5
+											}
+										},
+										"name": "foo"
+									},
+									"arguments": [],
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 527,
+									"end": 528,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 3
+										},
+										"end": {
+											"line": 22,
+											"column": 4
+										}
+									},
+									"name": "i",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c5",
+											"start": 518,
+											"end": 523
+										}
+									]
+								},
+								"computed": true,
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A call in the chain: a comment inside the brackets stays inside them.",
+							"start": 422,
+							"end": 494
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

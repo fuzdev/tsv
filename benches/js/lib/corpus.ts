@@ -554,6 +554,35 @@ export async function corpus_missing_entries(
 }
 
 /**
+ * The present, on-disk **directory** entries of a view — the paths to hand a
+ * Rust-side tool that does its own walking (`tsv_debug`'s `fuzz` /
+ * `roundtrip_audit` / `swallow_audit` all take dirs). `files_from` entries (the
+ * test262 path list) have no directory to walk and are skipped.
+ *
+ * Absent entries are skipped with a warning rather than failing the run: these
+ * are sibling dev-repo checkouts, legitimately machine-dependent, and a sweep
+ * over what IS present is still worth running. A gate that grades a corpus must
+ * use `stream()` (fail-fast) instead — a silently smaller corpus can't be
+ * allowed to pass a gate.
+ */
+export async function corpus_present_dirs(
+	view: CorpusView,
+	logger: Logger = console.log,
+): Promise<string[]> {
+	const tiers = TIERS_BY_VIEW[view];
+	const dirs: string[] = [];
+	for (const entry of CORPUS_ENTRIES.filter((e) => tiers.includes(e.tier))) {
+		if (entry.path === undefined) continue;
+		if (await fs_exists(resolve(entry.path))) {
+			dirs.push(entry.path);
+		} else {
+			logger(`  ⚠ corpus entry missing, skipped: ${entry.path}`);
+		}
+	}
+	return dirs;
+}
+
+/**
  * Loads one view of `CORPUS_ENTRIES`.
  * Paths are relative to cwd. Missing entries FAIL FAST (before any file is
  * yielded) unless the entry is `optional` (the derived harvest caches, warned)

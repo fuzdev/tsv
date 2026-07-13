@@ -1558,8 +1558,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 ))
             }
             TokenKind::Hash => {
-                // Private identifier as standalone expression (for brand check: #field in obj)
+                // ecma262 `RelationalExpression : PrivateIdentifier in ShiftExpression` — a
+                // private name is an expression ONLY as the left side of a brand check
+                // (`#field in obj`). Anywhere else (`const x = #a`) it is a syntax error,
+                // and the canonical parser rejects it, so require the `in` here rather than
+                // handing a bare `#a` to the binary-expression machinery. Without the guard
+                // tsv over-accepted; in a Svelte attribute value that surfaced as `{#a}`
+                // parsing as an expression the canonical parser refuses.
                 let private_id = self.parse_private_identifier()?;
+                if !matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::In)) {
+                    return Err(Box::new(self.error_expected_after("'in'", "private name")));
+                }
                 let end = private_id.span.end_usize();
                 let start = private_id.span.start;
                 Ok(ParsedExpr::with_start_end(self.arena,

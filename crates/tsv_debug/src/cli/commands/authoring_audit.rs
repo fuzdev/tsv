@@ -78,6 +78,7 @@ use super::profile::resolve_files;
 /// `tests/fixtures` when no paths are given. Svelte (`.svelte`) only.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "authoring_audit")]
+#[allow(clippy::struct_excessive_bools)] // independent CLI flags
 pub struct AuthoringAuditCommand {
     /// emit JSON
     #[argh(switch)]
@@ -599,9 +600,17 @@ impl AuthoringAuditCommand {
             print_human(&report, self.verbose, self.prettier);
         }
 
-        // Exit non-zero on any hard finding (non-idempotency, or — when triaged —
-        // an (a) bug). (c)/(b)/untriaged divergences are not gate failures here.
-        let hard = report.count(Bucket::BugA) + report.count(Bucket::NonIdempotent);
+        // Exit non-zero on any hard finding: a base-non-idempotent file (F1 — the core
+        // invariant — broken on the file as it stands, before any authoring probe), a
+        // site-level non-idempotency, or — when triaged — an (a) bug. (c)/(b)/untriaged
+        // divergences are not gate failures here. A base-non-idempotent file is excluded
+        // from the *authoring* analysis (its fixed point is undefined, so the
+        // converge/diverge verdict is meaningless), but excluding it from the analysis is
+        // not a reason to pass the run — that is how a whole-file reflow could sit here
+        // reported-but-green.
+        let hard = report.count(Bucket::BugA)
+            + report.count(Bucket::NonIdempotent)
+            + report.files_base_non_idempotent;
         if hard > 0 {
             Err(CliError::Failed)
         } else {
@@ -883,7 +892,8 @@ fn print_human(report: &Report, verbose: bool, triaged: bool) {
 
     if !report.base_non_idempotent_paths.is_empty() {
         println!();
-        println!("  base-non-idempotent files (pre-existing, excluded):");
+        println!("  ✗ base-non-idempotent files (F1 broken — excluded from the authoring");
+        println!("    analysis, but a failure in their own right):");
         for p in report.base_non_idempotent_paths.iter().take(20) {
             println!("    {p}");
         }

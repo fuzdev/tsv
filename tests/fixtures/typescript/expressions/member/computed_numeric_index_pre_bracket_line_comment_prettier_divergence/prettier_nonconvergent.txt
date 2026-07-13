@@ -1,0 +1,3 @@
+prettier never reaches a fixed point on this input: it relocates the gap comment
+INSIDE the brackets (`foo.bar().baz()[// c1` with `0];` on the next line), and
+re-formatting that output moves it again — the chain does not converge.
