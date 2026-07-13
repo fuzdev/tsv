@@ -189,6 +189,7 @@ deno task conformance:audit:compiler # compile-fixture divergence integrity: any
 deno task canonicalize:audit         # canonicalize_js idempotence + output validity over tests/fixtures + tests/fixtures_compile (pure Rust; gated in `deno task check`) — point the command at real corpora on demand; see Debug Tooling
 deno task compile:fixtures:init      # create/reinit a compile fixture (oracle-compiles + canonicalizes; tests/fixtures_compile)
 deno task compile:fixtures:validate  # validate compile fixtures: oracle freshness + expected idempotence + ours parity (all gating; the sidecar-free slice also gates in cargo test)
+deno task compile:corpus:compare     # compile-parity wide net over real repos + the Svelte suites: per-file parity/refused/oracle-rejected buckets; MISMATCH = always a bug by the refusal contract (sidecar-dependent, on demand — kept out of `deno task check`); see Debug Tooling
 deno task pins:audit                 # canonical-oracle version sync (gated in `deno task check`): (1) pin agreement — sidecar.ts VERSIONS + npm: imports, benches/js/package.json, actor.rs acorn import-map must be identical; (2) checkout alignment — a PRESENT ../svelte or ../acorn-typescript checkout must match its pin (absent → skipped, so clean machines pass)
 deno task scan:audit                 # guard against new raw find/rfind/match_indices substring scans over source (gated in `deno task check`); see Debug Tooling
 deno task fanout:audit               # guard against super-linear doc-node fanout (the per-layout-candidate rebuild blowup); gated in `deno task check`; see Debug Tooling
@@ -728,6 +729,16 @@ cargo run -p tsv_debug compile_fixture_init tests/fixtures_compile/feature/case 
 # compile() needs no Deno) also runs sidecar-free in
 # `cargo test --workspace --test compile_fixtures_tests`, the offline parity gate.
 cargo run -p tsv_debug compile_fixtures_validate [pattern...]
+# Also: --list, --json.
+
+# compile_corpus_compare - the compile-parity wide net: compile every .svelte under the given roots
+# with the canonical compiler (oracle) AND tsv, comparing the canonical reprints of both sides.
+# Buckets per file: parity / refused (sub-bucketed by refusal reason — a clean "not yet", never a
+# bug) / oracle-rejected (legacy mode, invalid syntax; out of scope) / MISMATCH (both compiled,
+# canonical forms differ — always a bug by the refusal contract) / error (harness failure).
+# Exit codes: 0 clean, 1 mismatch, 2 harness error. Sidecar-dependent — kept out of `deno task
+# check`; the `compile:corpus:compare` deno task points it at the real-repo corpus + Svelte suites.
+cargo run -p tsv_debug compile_corpus_compare <paths...>
 # Also: --list, --json.
 
 # format_prettier - format using prettier (shows line widths by default; --no-line-widths to hide)

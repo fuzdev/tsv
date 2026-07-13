@@ -61,6 +61,13 @@ project-wide conventions.
   - `canonicalize_js(source) -> Result<String, CanonicalizeError>` — the
     canonicalizer (below). Lives here because the compiler's own output
     idempotence checks and the oracle comparison both consume it.
+- `refusal.rs` — the typed catalog of refusal reasons: every declined shape is
+  a `Refusal` variant carried by `CompileError::Unsupported`, with a `Display`
+  message (the human-readable reason `docs/checklist_svelte_compiler.md`
+  quotes) and a stable `bucket_key` the corpus runner groups by directly
+  (user-chosen names collapse to a `{placeholder}` so e.g. every event
+  attribute shares one bucket). The single source of truth for the refusal
+  contract.
 - `build.rs` — synthetic-AST constructors over the **hybrid appendix buffer**:
   the print buffer is the host `.svelte` source plus an appendix of minted
   lexemes. Borrowed user subtrees keep their real host spans; minted
@@ -105,6 +112,18 @@ project-wide conventions.
   an instance binding and a nested local is ambiguous and refuses. Hoistability is
   a fixpoint over snippet-to-snippet references. Also collects every snippet name
   (render-callee classification, generated-name collisions).
+- `attr_refs.rs` — the shared element-attribute reference traversal: the single
+  definition of "reference-bearing attribute expression", delegated to by BOTH
+  `snippet.rs` and `needs_context.rs` (they previously hand-wrote the same
+  iteration and drifted). Two views: `each_attribute_expression`, the
+  emitted-path view (skips the positions refused at emission — element spreads,
+  directives, `{@attach}` — because that refusal keeps their references out of
+  output), and `each_reference_bearing_attribute_expression` (+ the
+  directive-name and special-element entry points), the dropped-fragment view
+  for a `{:catch}` the emitter discards without walking — no emission refusal
+  fires there, so every attribute reference must be counted to match the
+  oracle. An attribute shape that newly reaches emission must be added HERE so
+  every analysis sees it at once.
 - `transform_server.rs` — the SSR transform: module scaffold
   (`import * as $ from 'svelte/internal/server'`, then any instance-script
   `import` declarations hoisted to module scope in source order — an import
