@@ -10,6 +10,7 @@ pub mod check;
 pub mod compare;
 pub mod compile_compare;
 pub mod compile_conformance_audit;
+pub mod compile_corpus_compare;
 pub mod compile_fixture_init;
 pub mod compile_fixtures_validate;
 pub mod conformance_audit;
@@ -139,43 +140,50 @@ pub fn collect_rs_files(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-/// The order [`spawn_fixture_stream`] yields results in.
+/// The order [`spawn_work_stream`] yields results in.
 pub enum ResultOrder {
-    /// Fixture (input) order — deterministic progress lines (`buffered`).
-    Fixture,
+    /// Input order — deterministic progress lines (`buffered`).
+    Input,
     /// Completion order — results arrive as tasks finish (`buffer_unordered`).
     Completion,
 }
 
-/// A stream of joined fixture-task results, as produced by [`spawn_fixture_stream`].
-type FixtureTaskStream<T> = Pin<Box<dyn Stream<Item = Result<T, JoinError>>>>;
+/// A stream of joined work-task results, as produced by [`spawn_work_stream`].
+type WorkTaskStream<T> = Pin<Box<dyn Stream<Item = Result<T, JoinError>>>>;
 
-/// Spawn `work(fixture)` for every fixture on the bulk sidecar pool, returning a
+/// Spawn `work(item)` for every item on the bulk sidecar pool, returning a
 /// stream of join results — join each with [`task_result`].
+///
+/// Generic over the work item (a [`Fixture`], a [`CompileFixture`], a corpus
+/// `PathBuf`, …) so every bulk sidecar command shares one fan-out shape.
 ///
 /// Each task is `tokio::spawn`ed so the CPU-bound Rust work (parse, format,
 /// serde, diff) runs across all runtime workers: `buffered`/`buffer_unordered`
 /// alone only interleaves at await points on the single stream-driving task,
-/// which would serialize that work on one core. The JS side (prettier/parsers)
-/// is spread over the small sidecar pool sized by `init_bulk_pool`. `order`
-/// picks fixture order (deterministic progress lines) vs completion order.
+/// which would serialize that work on one core. The JS side (prettier/parsers/
+/// the compile oracle) is spread over the small sidecar pool sized by
+/// `init_bulk_pool`. `order` picks input order (deterministic progress lines)
+/// vs completion order.
+///
+/// [`CompileFixture`]: crate::compile_fixtures::CompileFixture
 ///
 /// The stream is boxed to unify the two combinator types behind one return; the
-/// per-item vtable poll is negligible against each fixture's parse/format cost.
-pub fn spawn_fixture_stream<F, Fut>(
-    fixtures: Vec<Fixture>,
+/// per-item vtable poll is negligible against each item's parse/format cost.
+pub fn spawn_work_stream<I, F, Fut>(
+    items: Vec<I>,
     order: ResultOrder,
     work: F,
-) -> FixtureTaskStream<Fut::Output>
+) -> WorkTaskStream<Fut::Output>
 where
-    F: Fn(Fixture) -> Fut + 'static,
+    I: Send + 'static,
+    F: Fn(I) -> Fut + 'static,
     Fut: Future + Send + 'static,
     Fut::Output: Send + 'static,
 {
     let concurrency = crate::deno::init_bulk_pool();
-    let tasks = stream::iter(fixtures).map(move |fixture| tokio::spawn(work(fixture)));
+    let tasks = stream::iter(items).map(move |item| tokio::spawn(work(item)));
     match order {
-        ResultOrder::Fixture => Box::pin(tasks.buffered(concurrency)),
+        ResultOrder::Input => Box::pin(tasks.buffered(concurrency)),
         ResultOrder::Completion => Box::pin(tasks.buffer_unordered(concurrency)),
     }
 }
