@@ -132,6 +132,20 @@ pub trait ChainPrinter: SymbolLookup {
     /// Check if there are any comments between two positions
     fn has_comments_between(&self, start: u32, end: u32) -> bool;
 
+    /// Whether the chain currently being built contains any comment anywhere in its
+    /// span. Set once per chain (save/restore) at [`build_chain_doc`] and read by the
+    /// print path to skip per-member comment classification on comment-free chains.
+    fn chain_has_comments(&self) -> bool;
+
+    /// Set the chain-comment flag, returning the prior value to restore. Called at the
+    /// top of each `build_chain_doc`; nested chains (call args / base) save/restore so
+    /// the flag always reflects the innermost chain being built.
+    fn set_chain_has_comments(&self, has_comments: bool) -> bool;
+
+    /// Restore the chain-comment flag to the parent chain's value on leaving a
+    /// `build_chain_doc`.
+    fn restore_chain_has_comments(&self, prev: bool);
+
     /// Classify all comments in a range by position and type in a single pass.
     ///
     /// Returns comments organized into 4 buckets (trailing_block, trailing_line,
@@ -341,6 +355,20 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
             } else {
                 raw_inner
             };
+
+            // Chain-level zero-comment gate: a comment-free chain span has no comment in
+            // or around these brackets, so emit the flat `[…]` / `?.[…]` directly —
+            // skipping find_bracket_position (a source scan) and every pre/inside-bracket
+            // comment classification. Byte-identical: those paths all collapse to the
+            // same flat brackets around `inner` when the range is comment-free.
+            if !printer.chain_has_comments() {
+                return if *optional {
+                    d.concat(&[d.text("?.["), inner, d.text("]")])
+                } else {
+                    d.brackets(inner)
+                };
+            }
+
             let prop_span = printer.get_property_span(expr);
 
             // Find the opening bracket position by scanning from object_end,
@@ -557,6 +585,15 @@ fn print_member_access<P: ChainPrinter>(
     };
 
     if skip_comments {
+        return member_doc;
+    }
+
+    // Chain-level zero-comment gate: when the whole chain span is comment-free (the
+    // common case), no member gap can carry a comment — each gap (object_end,
+    // property_start) lies within the chain span — so skip the per-member
+    // classification and its 5-child comment concat entirely. Byte-identical: an empty
+    // classification renders every comment slot to nothing, leaving just member_doc.
+    if !printer.chain_has_comments() {
         return member_doc;
     }
 

@@ -37,6 +37,20 @@ pub(crate) fn push_gap_comments_and_break<P: ChainPrinter>(
     property_start: u32,
     use_hardline: bool,
 ) {
+    // Chain-level zero-comment gate: a comment-free chain span has no comment in this
+    // gap (gap ⊆ span), so the only non-empty part below is the line break — the
+    // classification and its four empty comment pushes collapse to nothing. Emit just
+    // the break. Byte-identical (empty comment slots render to nothing).
+    if !printer.chain_has_comments() {
+        parts.push(build_chain_line_break(
+            printer,
+            object_end,
+            property_start,
+            use_hardline,
+        ));
+        return;
+    }
+
     // Classify all comments in one pass (single binary search)
     let classified = printer.classify_comments(object_end, property_start);
 
