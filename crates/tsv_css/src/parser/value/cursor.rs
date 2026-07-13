@@ -4,6 +4,7 @@
 // args) while respecting parenthesis and quote nesting, tracking byte position
 // during parsing.
 
+use crate::parser::value::scan::is_value_structural;
 use crate::whitespace::is_css_whitespace;
 
 /// Position-tracking cursor for parsing CSS values
@@ -21,7 +22,7 @@ use crate::whitespace::is_css_whitespace;
 ///
 /// // Parse first value
 /// let start = cursor.skip_whitespace();
-/// let (_, end) = cursor.consume_until(|c| c == ',');
+/// let (_, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP);
 /// assert_eq!(&source[start..end], "red 01%");
 /// ```
 #[derive(Debug)]
@@ -104,16 +105,22 @@ impl<'a> ValueCursor<'a> {
     ///
     /// # Arguments
     /// * `is_delimiter` - Predicate to check if character is a delimiter
+    /// * `skip` - The caller's [`value_skip_table!`](super::scan::value_skip_table) for
+    ///   `is_delimiter`. It has to be the caller's, because `is_delimiter` is opaque
+    ///   here — so the table and the predicate it mirrors are declared side by side at
+    ///   the call site, and the `debug_assert` below re-derives every skip from the
+    ///   predicate itself. A table that disagrees fails the test suite (which runs in
+    ///   debug) rather than silently changing a split.
     ///
     /// # Returns
     /// `(start, end)` - Byte positions of consumed text (not including delimiter)
     ///
     /// # Example
     /// ```ignore
-    /// let (start, end) = cursor.consume_until(|c| c == ',');
+    /// let (start, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP);
     /// // Parses "rgba(1, 2, 3)" correctly - commas inside parens don't stop parsing
     /// ```
-    pub fn consume_until<F>(&mut self, is_delimiter: F) -> (usize, usize)
+    pub fn consume_until<F>(&mut self, is_delimiter: F, skip: &[bool; 256]) -> (usize, usize)
     where
         F: Fn(char) -> bool,
     {
@@ -131,6 +138,20 @@ impl<'a> ValueCursor<'a> {
         // identical to the previous `char_indices` loop.
         while i < bytes.len() {
             let b = bytes[i];
+
+            // Most of a value's bytes are inert content — not a delimiter, not an
+            // escape, not a nesting or quote trigger. One L1 load retires them
+            // before the decode, the escape probe, the predicate call, and
+            // `update_state`'s match chain.
+            if skip[b as usize] {
+                debug_assert!(
+                    b < 0x80 && !is_value_structural(b) && !is_delimiter(b as char),
+                    "consume_until skip table disagrees with its delimiter predicate at {b:#04x}"
+                );
+                i += 1;
+                continue;
+            }
+
             let (ch, width) = if b < 0x80 {
                 (b as char, 1)
             } else {
@@ -206,6 +227,18 @@ impl<'a> ValueCursor<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::parser::value::scan::value_skip_table;
+
+    /// Skip table for `|c| c == ','`, the comma delimiter these tests drive.
+    const COMMA_SKIP: [bool; 256] = value_skip_table!(|b| b == b',');
+
+    /// Skip table for `char::is_whitespace`, whose ASCII half is CSS whitespace plus
+    /// U+000B (vertical tab). No production delimiter uses it — it is here precisely to
+    /// exercise `consume_until` against a predicate that also treats *non*-ASCII chars
+    /// as delimiters, proving the table's ASCII-only rule keeps them on the decode path.
+    const UNICODE_WS_SKIP: [bool; 256] =
+        value_skip_table!(|b| b.is_ascii_whitespace() || b == 0x0B);
+
     use super::*;
 
     #[test]
@@ -269,7 +302,7 @@ mod tests {
         let source = "red, blue";
         let mut cursor = ValueCursor::new(source);
 
-        let (start, end) = cursor.consume_until(|c| c == ',');
+        let (start, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP);
         assert_eq!(start, 0);
         assert_eq!(end, 3);
         assert_eq!(&source[start..end], "red");
@@ -280,7 +313,7 @@ mod tests {
         let source = "rgba(1, 2, 3), blue";
         let mut cursor = ValueCursor::new(source);
 
-        let (start, end) = cursor.consume_until(|c| c == ',');
+        let (start, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP);
         assert_eq!(start, 0);
         assert_eq!(end, 13);
         assert_eq!(&source[start..end], "rgba(1, 2, 3)");
@@ -291,7 +324,7 @@ mod tests {
         let source = r#""foo, bar", baz"#;
         let mut cursor = ValueCursor::new(source);
 
-        let (start, end) = cursor.consume_until(|c| c == ',');
+        let (start, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP);
         assert_eq!(start, 0);
         assert_eq!(end, 10);
         assert_eq!(&source[start..end], r#""foo, bar""#);
@@ -302,7 +335,7 @@ mod tests {
         let source = "red blue";
         let mut cursor = ValueCursor::new(source);
 
-        let (start, end) = cursor.consume_until(|c| c == ',');
+        let (start, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP);
         assert_eq!(start, 0);
         assert_eq!(end, 8);
         assert_eq!(&source[start..end], "red blue");
@@ -335,7 +368,7 @@ mod tests {
         let source = "calc(10px + calc(5px + 2px)), blue";
         let mut cursor = ValueCursor::new(source);
 
-        let (start, end) = cursor.consume_until(|c| c == ',');
+        let (start, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP);
         assert_eq!(start, 0);
         assert_eq!(end, 28);
         assert_eq!(&source[start..end], "calc(10px + calc(5px + 2px))");
@@ -346,7 +379,7 @@ mod tests {
         let source = r#"'foo "bar" baz', "qux 'quux'""#;
         let mut cursor = ValueCursor::new(source);
 
-        let (start, end) = cursor.consume_until(|c| c == ',');
+        let (start, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP);
         assert_eq!(start, 0);
         assert_eq!(end, 15);
         assert_eq!(&source[start..end], r#"'foo "bar" baz'"#);
@@ -407,7 +440,7 @@ mod tests {
         let mut cursor = ValueCursor::new(source);
 
         // consume_until whitespace should split at the space between "(" and b
-        let (start, end) = cursor.consume_until(char::is_whitespace);
+        let (start, end) = cursor.consume_until(char::is_whitespace, &UNICODE_WS_SKIP);
         assert_eq!(&source[start..end], r#""(""#);
         assert_eq!(cursor.paren_depth, 0);
     }
