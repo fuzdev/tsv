@@ -93,8 +93,12 @@
     `flags.rs` (the `FlowFlags` bitset), `graph.rs` (`FlowGraph`'s SoA
     storage + read API, plus the `FlowSwitchClause`/`FlowReduceLabel`
     payload types), `product.rs` (the owned `FlowProduct`/`FlowStats` +
-    the `render_flow_dot` DOT renderer), `build.rs` (`FlowBuilder` + the
-    `pub fn build_flow` entry point + the pure AST predicates the walk
+    the `render_flow_dot` DOT renderer), `build/` (`FlowBuilder` + the
+    `pub fn build_flow` entry point, itself a directory-module split by the
+    AST shape each visitor descends: `mod.rs` holds the struct and the
+    flow-node/container/statement-list driver, `statements.rs` and
+    `expressions.rs` each contribute an `impl FlowBuilder` block of per-node
+    visitors, and `predicates.rs` holds the pure AST predicates the walk
     dispatches on), and `tests.rs`. The per-file control-flow graph
     (`build_flow`) is a faithful port of tsgo's binder flow construction
     (`bind`/`bindContainer`/`bindChildren` + the per-statement flow shapers).
