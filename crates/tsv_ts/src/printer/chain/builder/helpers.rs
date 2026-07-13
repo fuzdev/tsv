@@ -4,108 +4,12 @@
 // - ChainPartsBuilder: Builder for constructing chain parts with comments
 
 use super::super::printing::{
-    ChainPrinter, build_chain_line_break, print_group, print_group_expanded,
+    ChainPrinter, group_comment_gap, print_group, print_group_expanded,
     print_group_expanded_skip_first_comments, print_group_skip_first_comments,
+    push_gap_comments_and_break,
 };
 use super::super::types::ChainGroup;
 use tsv_lang::doc::{DocBuf, arena::DocId};
-use tsv_lang::printing::has_blank_line_between_strict;
-
-/// Emit a chain gap's comments and the line break into `parts`, for the gap
-/// between `object_end` and `property_start` (i.e. before a `.member`).
-///
-/// Order: trailing block comments (`prev /* c */`), trailing line comments (same
-/// line, via `line_suffix`), the line break (blank-line aware), then leading block
-/// and line comments on their own lines — with blank-line preservation around the
-/// leading run. Uses single-pass classification (one binary search).
-///
-/// This is the single definition of "how a forced chain break renders the comments
-/// in its gap", shared by the call-chain group path ([`ChainPartsBuilder`]) and the
-/// member-only breaking path, so the two cannot drift (the historical member-only
-/// `line_suffix`-everything approach was exactly such a drift — it merged/reversed
-/// consecutive mid-chain line comments).
-// The same-line/later-line classification (`classify_comments` →
-// `tsv_lang::ClassifiedComments`) is shared with `conditional.rs`
-// split_pre_operator_comments and `calls/arg_comments.rs` PartitionedComments, so the
-// "same-line trails, later-line breaks, never merge" rule lives in one place. Only the
-// emission differs per shape — dot (here) / operator / comma — which is intentional
-// (this dot path also owns blank-line preservation around the leading run).
-pub(crate) fn push_gap_comments_and_break<P: ChainPrinter>(
-    parts: &mut DocBuf,
-    printer: &P,
-    object_end: u32,
-    property_start: u32,
-    use_hardline: bool,
-) {
-    // Chain-level zero-comment gate: a comment-free chain span has no comment in this
-    // gap (gap ⊆ span), so the only non-empty part below is the line break — the
-    // classification and its four empty comment pushes collapse to nothing. Emit just
-    // the break. Byte-identical (empty comment slots render to nothing).
-    if !printer.chain_has_comments() {
-        parts.push(build_chain_line_break(
-            printer,
-            object_end,
-            property_start,
-            use_hardline,
-        ));
-        return;
-    }
-
-    // Classify all comments in one pass (single binary search)
-    let classified = printer.classify_comments(object_end, property_start);
-
-    // Trailing block comments (same line as previous element): `method() /* c */`
-    parts.push(printer.build_trailing_block_doc(&classified.trailing_block));
-    // Trailing line comments (same line as previous element), via line_suffix
-    parts.push(printer.build_trailing_line_doc(&classified.trailing_line));
-    // Line break with blank line preservation
-    parts.push(build_chain_line_break(
-        printer,
-        object_end,
-        property_start,
-        use_hardline,
-    ));
-
-    // When comments exist, build_chain_line_break skips blank line detection.
-    // Check for blank lines before the first comment and after the last comment.
-    let has_leading_comments =
-        !classified.leading_block.is_empty() || !classified.leading_line.is_empty();
-
-    // Blank line before first leading comment
-    if use_hardline && has_leading_comments {
-        let first_start = classified
-            .leading_block
-            .first()
-            .map(|c| c.span.start)
-            .into_iter()
-            .chain(classified.leading_line.first().map(|c| c.span.start))
-            .min();
-        if let Some(start) = first_start
-            && has_blank_line_between_strict(printer.get_source(), object_end, start)
-        {
-            parts.push(printer.arena().hardline());
-        }
-    }
-
-    // Leading block comments (on their own line)
-    parts.push(printer.build_leading_comments_doc(&classified.leading_block));
-    // Leading line comments (on their own line)
-    parts.push(printer.build_leading_comments_doc(&classified.leading_line));
-
-    // Blank line after last leading comment (before property)
-    if use_hardline && has_leading_comments {
-        let last_end = classified
-            .leading_line
-            .last()
-            .or_else(|| classified.leading_block.last())
-            .map(|c| c.span.end);
-        if let Some(end) = last_end
-            && has_blank_line_between_strict(printer.get_source(), end, property_start)
-        {
-            parts.push(printer.arena().hardline());
-        }
-    }
-}
 
 /// Builder for constructing chain parts with proper comment handling.
 ///
@@ -164,7 +68,7 @@ impl<'a, 'p, P: ChainPrinter> ChainPartsBuilder<'a, 'p, P> {
     /// (e.g., after `=`), which requires structural transformation beyond what
     /// this function handles.
     fn add_trailing_comments_only(&mut self, group: &ChainGroup<'_>) {
-        if let Some((object_end, property_start)) = group.first_member_range() {
+        if let Some((object_end, property_start)) = group_comment_gap(group, self.printer) {
             let classified = self.printer.classify_comments(object_end, property_start);
 
             // Trailing block comments (same line as previous element)
@@ -191,7 +95,7 @@ impl<'a, 'p, P: ChainPrinter> ChainPartsBuilder<'a, 'p, P> {
     /// Delegates to the shared [`push_gap_comments_and_break`] so this group path
     /// and the member-only breaking path render gap comments identically.
     fn add_comments_and_break(&mut self, group: &ChainGroup<'_>) {
-        if let Some((object_end, property_start)) = group.first_member_range() {
+        if let Some((object_end, property_start)) = group_comment_gap(group, self.printer) {
             push_gap_comments_and_break(
                 self.parts,
                 self.printer,
@@ -245,7 +149,7 @@ pub(crate) fn build_rest_parts_with_comments<'a, P: ChainPrinter>(
     // own line. Only trailing block comments can stay inline.
     let last_has_break_forcing_comments = last_is_simple_member
         && rest_groups.last().is_some_and(|g| {
-            if let Some((object_end, property_start)) = g.first_member_range() {
+            if let Some((object_end, property_start)) = group_comment_gap(g, printer) {
                 let classified = printer.classify_comments(object_end, property_start);
                 // Any line comments or leading comments force a break
                 !classified.trailing_line.is_empty()

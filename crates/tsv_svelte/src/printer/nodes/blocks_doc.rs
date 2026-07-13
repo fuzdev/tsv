@@ -184,11 +184,11 @@ impl<'a> Printer<'a> {
             .is_some_and(|c| !c.is_block)
     }
 
-    /// Whether a wrapped block head may dangle its `}` (and expand its body) here. The
-    /// head expression is allowed to break (`allow_wrapping` or a multiline context) AND
-    /// the context permits the dangle — false only inside a whitespace-significant element
-    /// (`<pre>` / `<textarea>`), gated by [`Printer::block_dangle_allowed`]. Gating it off
-    /// only hugs the `}`; the expression still wraps to respect printWidth either way.
+    /// Whether a wrapped block head may dangle its `}` here. The head expression is
+    /// allowed to break (`allow_wrapping` or a multiline context) AND the context permits
+    /// the dangle — false only inside a whitespace-significant element (`<pre>` /
+    /// `<textarea>`), gated by [`Printer::block_dangle_allowed`]. Gating it off only hugs
+    /// the `}`; the expression still wraps to respect printWidth either way.
     fn block_head_can_wrap(&self, allow_wrapping: bool, in_multiline_context: bool) -> bool {
         (allow_wrapping || in_multiline_context) && self.block_dangle_allowed()
     }

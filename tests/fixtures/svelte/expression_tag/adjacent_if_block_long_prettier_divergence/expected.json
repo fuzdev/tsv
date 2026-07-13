@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 679,
+	"end": 704,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -310,24 +310,24 @@
 			{
 				"type": "Comment",
 				"start": 256,
-				"end": 320,
-				"data": " 101 chars - inner fn() args break (exceeds print_width) "
+				"end": 339,
+				"data": " 101 chars - the block body expands onto its own line (exceeds print_width) "
 			},
 			{
 				"type": "Text",
-				"start": 320,
-				"end": 321,
+				"start": 339,
+				"end": 340,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "ExpressionTag",
-				"start": 321,
-				"end": 345,
+				"start": 340,
+				"end": 364,
 				"expression": {
 					"type": "CallExpression",
-					"start": 322,
-					"end": 344,
+					"start": 341,
+					"end": 363,
 					"loc": {
 						"start": {
 							"line": 9,
@@ -340,8 +340,8 @@
 					},
 					"callee": {
 						"type": "Identifier",
-						"start": 322,
-						"end": 324,
+						"start": 341,
+						"end": 343,
 						"loc": {
 							"start": {
 								"line": 9,
@@ -357,8 +357,8 @@
 					"arguments": [
 						{
 							"type": "LogicalExpression",
-							"start": 325,
-							"end": 343,
+							"start": 344,
+							"end": 362,
 							"loc": {
 								"start": {
 									"line": 9,
@@ -371,8 +371,8 @@
 							},
 							"left": {
 								"type": "Identifier",
-								"start": 325,
-								"end": 331,
+								"start": 344,
+								"end": 350,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -388,8 +388,8 @@
 							"operator": "||",
 							"right": {
 								"type": "Identifier",
-								"start": 335,
-								"end": 343,
+								"start": 354,
+								"end": 362,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -410,12 +410,12 @@
 			{
 				"type": "IfBlock",
 				"elseif": false,
-				"start": 345,
-				"end": 425,
+				"start": 364,
+				"end": 444,
 				"test": {
 					"type": "LogicalExpression",
-					"start": 350,
-					"end": 391,
+					"start": 369,
+					"end": 410,
 					"loc": {
 						"start": {
 							"line": 9,
@@ -428,8 +428,8 @@
 					},
 					"left": {
 						"type": "LogicalExpression",
-						"start": 350,
-						"end": 368,
+						"start": 369,
+						"end": 387,
 						"loc": {
 							"start": {
 								"line": 9,
@@ -442,8 +442,8 @@
 						},
 						"left": {
 							"type": "Identifier",
-							"start": 350,
-							"end": 356,
+							"start": 369,
+							"end": 375,
 							"loc": {
 								"start": {
 									"line": 9,
@@ -459,8 +459,8 @@
 						"operator": "&&",
 						"right": {
 							"type": "Identifier",
-							"start": 360,
-							"end": 368,
+							"start": 379,
+							"end": 387,
 							"loc": {
 								"start": {
 									"line": 9,
@@ -477,8 +477,8 @@
 					"operator": "&&",
 					"right": {
 						"type": "BinaryExpression",
-						"start": 372,
-						"end": 391,
+						"start": 391,
+						"end": 410,
 						"loc": {
 							"start": {
 								"line": 9,
@@ -491,8 +491,8 @@
 						},
 						"left": {
 							"type": "Identifier",
-							"start": 372,
-							"end": 378,
+							"start": 391,
+							"end": 397,
 							"loc": {
 								"start": {
 									"line": 9,
@@ -508,8 +508,8 @@
 						"operator": "!==",
 						"right": {
 							"type": "Identifier",
-							"start": 383,
-							"end": 391,
+							"start": 402,
+							"end": 410,
 							"loc": {
 								"start": {
 									"line": 9,
@@ -529,19 +529,19 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 392,
-							"end": 404,
+							"start": 411,
+							"end": 423,
 							"raw": "\n\t, updated ",
 							"data": "\n\t, updated "
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 404,
-							"end": 419,
+							"start": 423,
+							"end": 438,
 							"expression": {
 								"type": "CallExpression",
-								"start": 405,
-								"end": 418,
+								"start": 424,
+								"end": 437,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -554,8 +554,8 @@
 								},
 								"callee": {
 									"type": "Identifier",
-									"start": 405,
-									"end": 407,
+									"start": 424,
+									"end": 426,
 									"loc": {
 										"start": {
 											"line": 10,
@@ -571,8 +571,8 @@
 								"arguments": [
 									{
 										"type": "Identifier",
-										"start": 408,
-										"end": 417,
+										"start": 427,
+										"end": 436,
 										"loc": {
 											"start": {
 												"line": 10,
@@ -591,8 +591,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 419,
-							"end": 420,
+							"start": 438,
+							"end": 439,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -602,32 +602,32 @@
 			},
 			{
 				"type": "Text",
-				"start": 425,
-				"end": 427,
+				"start": 444,
+				"end": 446,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 427,
-				"end": 495,
-				"data": " 176 chars - first fn() args break, text content also breaks "
+				"start": 446,
+				"end": 520,
+				"data": " 176 chars - the first fn() args break, and the block body expands "
 			},
 			{
 				"type": "Text",
-				"start": 495,
-				"end": 496,
+				"start": 520,
+				"end": 521,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "ExpressionTag",
-				"start": 496,
-				"end": 545,
+				"start": 521,
+				"end": 570,
 				"expression": {
 					"type": "CallExpression",
-					"start": 497,
-					"end": 544,
+					"start": 522,
+					"end": 569,
 					"loc": {
 						"start": {
 							"line": 14,
@@ -640,8 +640,8 @@
 					},
 					"callee": {
 						"type": "Identifier",
-						"start": 497,
-						"end": 499,
+						"start": 522,
+						"end": 524,
 						"loc": {
 							"start": {
 								"line": 14,
@@ -657,8 +657,8 @@
 					"arguments": [
 						{
 							"type": "LogicalExpression",
-							"start": 502,
-							"end": 542,
+							"start": 527,
+							"end": 567,
 							"loc": {
 								"start": {
 									"line": 15,
@@ -671,8 +671,8 @@
 							},
 							"left": {
 								"type": "Identifier",
-								"start": 502,
-								"end": 520,
+								"start": 527,
+								"end": 545,
 								"loc": {
 									"start": {
 										"line": 15,
@@ -688,8 +688,8 @@
 							"operator": "||",
 							"right": {
 								"type": "Identifier",
-								"start": 524,
-								"end": 542,
+								"start": 549,
+								"end": 567,
 								"loc": {
 									"start": {
 										"line": 15,
@@ -710,12 +710,12 @@
 			{
 				"type": "IfBlock",
 				"elseif": false,
-				"start": 545,
-				"end": 678,
+				"start": 570,
+				"end": 703,
 				"test": {
 					"type": "LogicalExpression",
-					"start": 550,
-					"end": 635,
+					"start": 575,
+					"end": 660,
 					"loc": {
 						"start": {
 							"line": 16,
@@ -728,8 +728,8 @@
 					},
 					"left": {
 						"type": "LogicalExpression",
-						"start": 550,
-						"end": 590,
+						"start": 575,
+						"end": 615,
 						"loc": {
 							"start": {
 								"line": 16,
@@ -742,8 +742,8 @@
 						},
 						"left": {
 							"type": "Identifier",
-							"start": 550,
-							"end": 568,
+							"start": 575,
+							"end": 593,
 							"loc": {
 								"start": {
 									"line": 16,
@@ -759,8 +759,8 @@
 						"operator": "&&",
 						"right": {
 							"type": "Identifier",
-							"start": 572,
-							"end": 590,
+							"start": 597,
+							"end": 615,
 							"loc": {
 								"start": {
 									"line": 16,
@@ -777,8 +777,8 @@
 					"operator": "&&",
 					"right": {
 						"type": "BinaryExpression",
-						"start": 594,
-						"end": 635,
+						"start": 619,
+						"end": 660,
 						"loc": {
 							"start": {
 								"line": 16,
@@ -791,8 +791,8 @@
 						},
 						"left": {
 							"type": "Identifier",
-							"start": 594,
-							"end": 612,
+							"start": 619,
+							"end": 637,
 							"loc": {
 								"start": {
 									"line": 16,
@@ -808,8 +808,8 @@
 						"operator": "!==",
 						"right": {
 							"type": "Identifier",
-							"start": 617,
-							"end": 635,
+							"start": 642,
+							"end": 660,
 							"loc": {
 								"start": {
 									"line": 16,
@@ -829,19 +829,19 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 636,
-							"end": 648,
+							"start": 661,
+							"end": 673,
 							"raw": "\n\t, updated ",
 							"data": "\n\t, updated "
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 648,
-							"end": 672,
+							"start": 673,
+							"end": 697,
 							"expression": {
 								"type": "CallExpression",
-								"start": 649,
-								"end": 671,
+								"start": 674,
+								"end": 696,
 								"loc": {
 									"start": {
 										"line": 17,
@@ -854,8 +854,8 @@
 								},
 								"callee": {
 									"type": "Identifier",
-									"start": 649,
-									"end": 651,
+									"start": 674,
+									"end": 676,
 									"loc": {
 										"start": {
 											"line": 17,
@@ -871,8 +871,8 @@
 								"arguments": [
 									{
 										"type": "Identifier",
-										"start": 652,
-										"end": 670,
+										"start": 677,
+										"end": 695,
 										"loc": {
 											"start": {
 												"line": 17,
@@ -891,8 +891,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 672,
-							"end": 673,
+							"start": 697,
+							"end": 698,
 							"raw": "\n",
 							"data": "\n"
 						}
