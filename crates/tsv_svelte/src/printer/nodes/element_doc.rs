@@ -356,13 +356,16 @@ impl<'a> Printer<'a> {
         if attr_docs.is_empty() {
             d.concat(&[d.text("<"), d.symbol(tag_sym)])
         } else {
-            let trailing = if hug_start && !is_empty {
-                d.empty()
+            // A hugged non-empty open tag has no trailing break — emit the attribute concat
+            // alone rather than padding it with an empty child the render and fits walks
+            // would still step through.
+            let inner = if hug_start && !is_empty {
+                d.concat(attr_docs)
             } else {
                 let sl = d.softline();
-                d.dedent(sl)
+                let trailing = d.dedent(sl);
+                d.concat(&[d.concat(attr_docs), trailing])
             };
-            let inner = d.concat(&[d.concat(attr_docs), trailing]);
             let attr_group = if force_break {
                 d.group_break(inner)
             } else {
@@ -951,6 +954,21 @@ impl<'a> Printer<'a> {
         is_html: bool,
     ) {
         let d = self.d();
+
+        // Every gap this fn probes — each attribute's leading range and the trailing range
+        // after the last one — lies inside `[first_range_start, open_tag_end]`. A comment
+        // lands in `has_comments_in_range` only when it sits fully inside the queried range,
+        // so a comment-free open tag means every one of those gaps is comment-free: each
+        // would take the bare-separator branch below and the trailing block would emit
+        // nothing. Answer that with one probe instead of one per attribute plus one.
+        if !tsv_lang::has_comments_in_range(self.comments, first_range_start, open_tag_end) {
+            for attr in attrs {
+                docs.push(separator);
+                docs.push(self.build_attribute_node_doc(attr, is_html));
+            }
+            return;
+        }
+
         for (i, attr) in attrs.iter().enumerate() {
             // Check for JS comments before this attribute
             let range_start = if i == 0 {

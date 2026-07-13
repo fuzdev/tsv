@@ -197,23 +197,30 @@ impl<'a> Lexer<'a> {
         if matches!(self.source[i..].chars().next(), Some('"' | '\'')) {
             return None;
         }
-        // Opaque scan from just inside `(` to the matching unescaped `)` (or EOF).
+        // Opaque scan from just inside `(` to the matching unescaped `)` (or EOF). The two
+        // scan targets, `\` and `)`, are ASCII, so neither can occur as a UTF-8
+        // continuation byte — a multi-byte code point's trailing bytes are all >= 0x80 and
+        // fall through the run, landing on the same `)` the former per-char decode found.
+        let bytes = self.source.as_bytes();
+        let len = bytes.len();
         let mut j = after_paren;
         loop {
-            match self.source[j..].chars().next() {
-                None => break, // EOF before `)` — unterminated; take what we have
-                Some('\\') => {
-                    // Escaped code point: the `\` and the next char are both content.
-                    j += 1;
-                    if let Some(esc) = self.source[j..].chars().next() {
-                        j += esc.len_utf8();
-                    }
-                }
-                Some(')') => {
-                    j += 1; // include the closing `)`
-                    break;
-                }
-                Some(ch) => j += ch.len_utf8(),
+            while j < len && bytes[j] != b'\\' && bytes[j] != b')' {
+                j += 1;
+            }
+            if j >= len {
+                break; // EOF before `)` — unterminated; take what we have
+            }
+            if bytes[j] == b')' {
+                j += 1; // include the closing `)`
+                break;
+            }
+            // Escaped code point: the `\` and what it escapes are both content. Stepping
+            // one byte past the `\` is enough — the escaped char's continuation bytes can
+            // match neither target, so the run passes over them.
+            j += 1;
+            if j < len {
+                j += 1;
             }
         }
         self.pos = j;
