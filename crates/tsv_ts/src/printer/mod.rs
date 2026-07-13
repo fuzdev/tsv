@@ -214,6 +214,16 @@ pub struct Printer<'a> {
     /// Keyed by span (unique per source position); nested expand-last calls
     /// save/restore, so only the node currently being reused ever matches.
     pub(crate) arrow_body_inject: Cell<Option<(u32, DocId)>>,
+    /// Whether the member chain currently being built has any comment anywhere in its
+    /// span. Set once per `build_chain_doc` (save/restore, so a nested chain in a call
+    /// arg / base restores the parent's value on exit — re-entrancy-safe like
+    /// [`Self::chain_arg_share`]). The chain print path reads it to skip per-member
+    /// comment classification when the whole chain is comment-free (the common case).
+    /// Safe by construction: the flag only *enables* a skip whose soundness is
+    /// span-containment (a member's comment gap ⊆ the chain span), so a stale value can
+    /// only cause more work, never a dropped comment. Defaults `true` (do the full
+    /// classify) so any member print reached without a preceding set is fail-safe.
+    pub(crate) chain_has_comments: Cell<bool>,
 }
 
 impl<'a> Printer<'a> {
@@ -251,6 +261,7 @@ impl<'a> Printer<'a> {
             chain_arg_share: RefCell::new(HashMap::new()),
             chain_arg_share_active: Cell::new(false),
             arrow_body_inject: Cell::new(None),
+            chain_has_comments: Cell::new(true),
         }
     }
 
