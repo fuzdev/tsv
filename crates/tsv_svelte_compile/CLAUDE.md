@@ -39,10 +39,9 @@ project-wide conventions.
     `export default`/`export let` — a *type-only* export erases away and
     compiles), `generics`, a `lang` other than `"ts"`/`"js"`/`""` (the oracle's
     TypeScript flag tests `lang === 'ts'` exactly, so `lang="typescript"` is
-    plain JS to it — tsv refuses rather than guess), TypeScript in a **template**
-    expression (the script `Program` is erased; the template's borrow points are
-    a later slice) or in a document with no `ts` flag (tsv's parser is
-    TS-permissive where the oracle parse-errors — an over-acceptance), a comment
+    plain JS to it — tsv refuses rather than guess), TypeScript in a document
+    with no `ts` flag (tsv's parser is TS-permissive where the oracle
+    parse-errors — an over-acceptance), a comment
     inside an erased TypeScript region, the refuse-don't-erase TypeScript set
     (`enum` incl. `declare enum`, a value `namespace`, a constructor parameter
     property, a decorator, an `accessor` field, an `abstract` *property*, a
@@ -75,6 +74,10 @@ project-wide conventions.
     self-check: `erase` is re-run over the finished program, and its
     `None`-means-unchanged contract makes "no change" a *proof* that no
     TypeScript-only node survived (`CompileError::TypeErasureLeak` otherwise).
+    Both halves of the erasure — the script `Program` and each template
+    expression at its borrow point — run before it, so **any** survivor is a
+    compiler bug; it is what makes a missed borrow point loud rather than
+    silent.
   - `canonicalize_js(source) -> Result<String, CanonicalizeError>` — the
     canonicalizer (below). Lives here because the compiler's own output
     idempotence checks and the oracle comparison both consume it.
@@ -110,8 +113,14 @@ project-wide conventions.
   comment would otherwise print anyway, twice for `implements`). A whole-statement
   drop deliberately does **not** reach backward: a JSDoc above an erased `interface`
   survives onto the next statement, exactly where the oracle puts it.
-  `erase_expression` is the per-expression entry point for the template's borrow
-  points (a later slice; until then a TypeScript template expression refuses).
+  `erase_expression` is the per-expression entry point the **template's borrow
+  points** use (`transform_server`'s `EmitEnv::erase`): every TypeScript-bearing
+  markup position is a `tsv_ts` `Expression` reached through a small set of
+  borrows, so erasure applies at the borrow and **the Svelte AST is never
+  rebuilt**. The erased node is what every consumer of that borrow reads — the
+  emitted argument, the static-fold gate beside it (a raw `x as T` would fold to
+  UNKNOWN where the oracle folds `x`: a silent under-fold, not a refusal), and
+  the shape predicates that switch on a node's variant.
 - `build.rs` — synthetic-AST constructors over the **hybrid appendix buffer**:
   the print buffer is the host `.svelte` source plus an appendix of minted
   lexemes. Borrowed user subtrees keep their real host spans; minted
@@ -156,18 +165,31 @@ project-wide conventions.
   an instance binding and a nested local is ambiguous and refuses. Hoistability is
   a fixpoint over snippet-to-snippet references. Also collects every snippet name
   (render-callee classification, generated-name collisions).
-- `attr_refs.rs` — the shared element-attribute reference traversal: the single
-  definition of "reference-bearing attribute expression", delegated to by BOTH
-  `snippet.rs` and `needs_context.rs` (they previously hand-wrote the same
-  iteration and drifted). Two views: `each_attribute_expression`, the
-  emitted-path view (skips the positions refused at emission — element spreads,
-  directives, `{@attach}` — because that refusal keeps their references out of
-  output), and `each_reference_bearing_attribute_expression` (+ the
-  directive-name and special-element entry points), the dropped-fragment view
-  for a `{:catch}` the emitter discards without walking — no emission refusal
-  fires there, so every attribute reference must be counted to match the
-  oracle. An attribute shape that newly reaches emission must be added HERE so
-  every analysis sees it at once.
+- `attr_refs.rs` — the **shared template traversals**, so no analysis hand-writes
+  its own walk and drifts (which is how the component-spread arm once existed in
+  one and not the other). Two levels:
+  - the element-attribute pair — `each_attribute_expression`, the emitted-path
+    view (skips the positions refused at emission: element spreads, directives,
+    `{@attach}` — that refusal is what keeps their references out of output), and
+    `each_reference_bearing_attribute_expression` (+ the directive-name and
+    special-element entry points), the **dropped-fragment** view, which includes
+    them. An attribute shape that newly reaches emission must be added HERE so
+    every analysis sees it at once;
+  - `each_template_item`, the whole-fragment walk over the dropped-fragment view,
+    yielding every borrowed expression (plus a `{#snippet}`'s `<T>` clause, which
+    is TypeScript with no expression to yield). Its two consumers ask what a
+    region *contains* rather than what it *emits* — the document-wide TypeScript
+    gate and the rune guard over a dropped `{:catch}`. Exhaustively matched: a new
+    template shape fails compilation rather than slipping past both.
+  The SSR output **drops** four regions without visiting them — the `{#each}`
+  key, the `{#key}` expression, an event-handler attribute, and the whole
+  `{:catch}` branch — so no emission refusal can fire inside them. But the oracle
+  decides TypeScript at *parse* time and rune placement at *analysis* time, both
+  before it chooses what to emit, and it counts references wherever they sit. So
+  a dropped region still gets all three walks (`transform_server`'s
+  `refuse_template_typescript` / `guard_dropped_fragment`, and the analyses'
+  dropped-fragment view) — but **not** the emission refusals, and not the
+  derived-read rule, which is an emission rewrite rather than a validity rule.
 - `transform_server.rs` — the SSR transform: module scaffold
   (`import * as $ from 'svelte/internal/server'`, then any instance-script
   `import` declarations hoisted to module scope in source order — an import
