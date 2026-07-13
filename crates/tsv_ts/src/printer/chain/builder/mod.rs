@@ -103,16 +103,19 @@ pub fn build_chain_doc<'a, P: ChainPrinter>(
     // every `conditional_group` candidate share one recursive arg build instead of
     // rebuilding — the member-chain rebuild fix.
     let was_active = printer.enter_chain_arg_share();
-    let result = build_chain_doc_impl(groups, chain_span, printer);
+    // Compute the chain-level comment presence ONCE and stash it (save/restore, so a
+    // nested chain in a call arg / base restores the parent's value on exit). The print
+    // path reads this to skip per-member comment classification on comment-free chains,
+    // and `build_chain_doc_impl` reads it below instead of recomputing the search.
+    let prev_has_comments = printer
+        .set_chain_has_comments(printer.has_comments_between(chain_span.start, chain_span.end));
+    let result = build_chain_doc_impl(groups, printer);
+    printer.restore_chain_has_comments(prev_has_comments);
     printer.exit_chain_arg_share(was_active);
     result
 }
 
-fn build_chain_doc_impl<'a, P: ChainPrinter>(
-    groups: &[ChainGroup<'a>],
-    chain_span: Span,
-    printer: &P,
-) -> DocId {
+fn build_chain_doc_impl<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: &P) -> DocId {
     let d = printer.arena();
     if groups.is_empty() {
         return d.empty();
@@ -139,8 +142,10 @@ fn build_chain_doc_impl<'a, P: ChainPrinter>(
     // check, each of which otherwise runs a comment lookup per chain node. Sound
     // because every per-node comment sub-range lies within the chain's span, so no
     // comment anywhere in the window means every sub-query is empty. Chains are
-    // comment-sparse between segments, so the gate nearly always fires.
-    let chain_has_comments = printer.has_comments_between(chain_span.start, chain_span.end);
+    // comment-sparse between segments, so the gate nearly always fires. `build_chain_doc`
+    // already computed this and stashed it (also feeding the print path), so read it back
+    // rather than repeating the search.
+    let chain_has_comments = printer.chain_has_comments();
 
     // Prettier's logic (member-chain.js:351-359):
     // If groups.length <= cutoff && !nodeHasComment:
