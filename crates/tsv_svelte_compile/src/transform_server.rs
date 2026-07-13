@@ -2329,13 +2329,15 @@ fn emit_attribute<'arena>(
     out: &mut BodyBuilder<'arena>,
 ) -> Result<(), CompileError> {
     // The oracle lowercases attribute names outside foreign namespaces (svg
-    // refuses above).
-    let name = env
+    // refuses above) — at EMISSION only. The event-handler decision below tests
+    // the RAW authored name, so both are kept.
+    let raw_name = env
         .b
         .interner
         .borrow()
         .resolve_infallible(attr.name)
-        .to_ascii_lowercase();
+        .to_string();
+    let name = raw_name.to_ascii_lowercase();
 
     // `value` on <textarea> becomes child content, on <select> it is omitted
     // with select_value bookkeeping — neither shape is implemented.
@@ -2390,16 +2392,23 @@ fn emit_attribute<'arena>(
             Ok(())
         }
         [AttributeValue::ExpressionTag(tag)] => {
-            // An `on`-prefixed single-expression attribute is an event handler
-            // (`is_event_attribute`, server `element.js:71`): the oracle omits
-            // it from SSR output. The handler expression still feeds
+            // An `on`-prefixed single-expression attribute is an event handler —
+            // tested on the RAW authored name, exactly like the oracle
+            // (`is_event_attribute`, server `element.js:71`, runs before any
+            // lowercasing): `onClick` drops, but `ONCLICK`/`oNclick` are NOT
+            // events and emit as regular `$.attr('onclick', …)` attributes
+            // (probe-verified). A dropped handler's expression still feeds
             // `needs_context` (walked up front in `needs_context.rs`), so a
             // `new`/prop-rooted member or call inside it still forces the
-            // wrapper — only the attribute markup is dropped. `onload`/`onerror`
-            // on a load-error element are the exception (the oracle injects an
-            // `on{name}="this.__e=event"` capture attribute), refused for now.
-            if name.starts_with("on") {
-                if (name == "onload" || name == "onerror") && is_load_error_element(element_name) {
+            // wrapper — only the attribute markup is dropped. Raw `onload`/
+            // `onerror` (exact match — `onLoad` on `<img>` is a plain drop,
+            // probe-verified) on a load-error element are the exception (the
+            // oracle injects an `on{name}="this.__e=event"` capture attribute),
+            // refused for now.
+            if raw_name.starts_with("on") {
+                if (raw_name == "onload" || raw_name == "onerror")
+                    && is_load_error_element(element_name)
+                {
                     return Err(unsupported(Refusal::EventCaptureAttribute { name }));
                 }
                 return Ok(());
@@ -2411,7 +2420,17 @@ fn emit_attribute<'arena>(
             let quoted = preceded_by_quote(env.source, tag.span.start);
             emit_dynamic_attribute(env, &name, &tag.expression, quoted, out)
         }
-        _ => emit_mixed_attribute(env, &name, values, out),
+        _ => {
+            // A mixed-value attribute whose RAW name starts with `on` is an
+            // event attribute the oracle rejects as input
+            // (`attribute_invalid_event_handler`) — refuse rather than guess.
+            // `ONCLICK="a {h}"` is NOT an event (raw test) and emits through the
+            // normal mixed path (probe-verified).
+            if raw_name.starts_with("on") {
+                return Err(unsupported(Refusal::EventAttribute { name }));
+            }
+            emit_mixed_attribute(env, &name, values, out)
+        }
     }
 }
 
@@ -2535,11 +2554,8 @@ fn emit_mixed_attribute<'arena>(
     values: &'arena [AttributeValue<'arena>],
     out: &mut BodyBuilder<'arena>,
 ) -> Result<(), CompileError> {
-    if name.starts_with("on") {
-        return Err(unsupported(Refusal::EventAttribute {
-            name: name.to_string(),
-        }));
-    }
+    // Event attributes (RAW name starting `on`) are refused by the dispatch in
+    // `emit_attribute` before this is reached.
     if env.has_comments {
         return Err(unsupported(Refusal::CommentsAlongsideExprAttributes));
     }

@@ -1445,6 +1445,57 @@ mod tests {
     }
 
     #[test]
+    fn compile_event_handler_decision_uses_raw_name() {
+        // The oracle's `is_event_attribute` tests the RAW authored name
+        // (case-sensitive `startsWith('on')`); lowercasing happens at emission
+        // only. So `onClick` drops but `ONCLICK` emits `$.attr('onclick', …)`.
+        let out = compile(
+            "<script>let { h } = $props();</script><button ONCLICK={h}>x</button>",
+            &CompileOptions::default(),
+        )
+        .unwrap();
+        assert!(
+            out.js.contains("$.attr('onclick', h)"),
+            "ONCLICK must emit, not drop: {}",
+            out.js
+        );
+        let out = compile(
+            "<script>let { h } = $props();</script><button onClick={h}>x</button>",
+            &CompileOptions::default(),
+        )
+        .unwrap();
+        assert!(
+            out.js.contains("`<button>x</button>`") && !out.js.contains("onclick"),
+            "onClick must drop: {}",
+            out.js
+        );
+        // Raw `onLoad` on a load-error element is a plain drop (the capture
+        // exception matches the raw name exactly).
+        let out = compile(
+            "<script>let { h } = $props();</script><img onLoad={h} src=\"a\" />",
+            &CompileOptions::default(),
+        )
+        .unwrap();
+        assert!(
+            out.js.contains("`<img src=\"a\"/>`"),
+            "onLoad on img must plain-drop: {}",
+            out.js
+        );
+        // A mixed-value `ONCLICK` is not an event (raw test) and emits through
+        // the normal interpolated-attribute path.
+        let out = compile(
+            "<script>let { h } = $props();</script><button ONCLICK=\"a {h}\">x</button>",
+            &CompileOptions::default(),
+        )
+        .unwrap();
+        assert!(
+            out.js.contains("$.attr('onclick'"),
+            "mixed ONCLICK must emit: {}",
+            out.js
+        );
+    }
+
+    #[test]
     fn compile_rejects_load_error_event_capture() {
         // `onload`/`onerror` on a load-error element needs `this.__e=event`
         // capture markup, not a clean drop.
