@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 351,
+		"end": 475,
 		"attributes": [],
 		"children": [
 			{
@@ -254,18 +254,118 @@
 				},
 				"start": 296,
 				"end": 342
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 382,
+					"end": 396,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 382,
+							"end": 396,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 382,
+											"end": 396,
+											"name": "lang",
+											"matcher": "|=",
+											"value": "en",
+											"flags": "i"
+										}
+									],
+									"start": 382,
+									"end": 396
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 397,
+					"end": 423,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 401,
+							"end": 419,
+							"property": "font-style",
+							"value": "italic"
+						}
+					]
+				},
+				"start": 382,
+				"end": 423
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 425,
+					"end": 439,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 425,
+							"end": 439,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 425,
+											"end": 439,
+											"name": "lang",
+											"matcher": "|=",
+											"value": "en",
+											"flags": "s"
+										}
+									],
+									"start": 425,
+									"end": 439
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 440,
+					"end": 466,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 444,
+							"end": 462,
+							"property": "font-style",
+							"value": "normal"
+						}
+					]
+				},
+				"start": 425,
+				"end": 466
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 343,
-			"styles": "\n\t/* Case-insensitive flag */\n\t[attr='value' i] {\n\t\tcolor: red;\n\t}\n\n\t/* Case-sensitive flag */\n\t[attr='value' s] {\n\t\tcolor: blue;\n\t}\n\n\t/* No flag (default) */\n\t[attr='value'] {\n\t\tcolor: green;\n\t}\n\n\t/* Flag with different operators */\n\t[href^='https' i] {\n\t\ttext-decoration: underline;\n\t}\n\t[title*='example' s] {\n\t\tfont-weight: bold;\n\t}\n",
+			"end": 467,
+			"styles": "\n\t/* Case-insensitive flag */\n\t[attr='value' i] {\n\t\tcolor: red;\n\t}\n\n\t/* Case-sensitive flag */\n\t[attr='value' s] {\n\t\tcolor: blue;\n\t}\n\n\t/* No flag (default) */\n\t[attr='value'] {\n\t\tcolor: green;\n\t}\n\n\t/* Flag with different operators */\n\t[href^='https' i] {\n\t\ttext-decoration: underline;\n\t}\n\t[title*='example' s] {\n\t\tfont-weight: bold;\n\t}\n\n\t/* Dash-match operator with flag */\n\t[lang|='en' i] {\n\t\tfont-style: italic;\n\t}\n\t[lang|='en' s] {\n\t\tfont-style: normal;\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 352,
+	"end": 476,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

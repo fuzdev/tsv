@@ -54,6 +54,30 @@ impl<'a> Printer<'a> {
         parts.push(self.build_decorator_expression_doc(decorator));
     }
 
+    /// Classify a comment authored between two decorators. Unlike the generic
+    /// `classify_comment` (which prioritises *trailing* the previous node), a
+    /// between-decorator comment prefers to **lead the next decorator**: prettier
+    /// attaches such a comment to the following decorator (its tree walk visits the
+    /// decorated key before the decorators), so a comment sharing the next
+    /// decorator's line leads it inline even when it also touches the previous
+    /// decorator's line (`@a /* c */ @b` → `@a⏎/* c */ @b`). Only a comment that
+    /// sits on the previous decorator's line without reaching the next
+    /// (`@a /* c */⏎@b`) trails; anything fully on its own line is own-line.
+    fn classify_between_decorator_comment(
+        &self,
+        comment: &tsv_lang::Comment,
+        prev_end: u32,
+        next_start: u32,
+    ) -> CommentPosition {
+        if self.is_same_line(comment.span.end, next_start) {
+            CommentPosition::LeadingInline
+        } else if self.is_same_line(prev_end, comment.span.start) {
+            CommentPosition::Trailing
+        } else {
+            CommentPosition::LeadingOwnLine
+        }
+    }
+
     /// prettier's `hasNewlineBetweenOrAfterDecorators`: true when any decorator is
     /// followed (skipping spaces/tabs) by a newline before the next token, so the
     /// decorators break onto their own lines. Comments between the decorator and
@@ -193,7 +217,16 @@ impl<'a> Printer<'a> {
             // decorator* prefixes that decorator.
             let mut own_line_segments: DocBuf = DocBuf::new();
             for comment in comments_in_range(self.comments, decorator.span.end, boundary) {
-                match classify_comment(comment, decorator.span.end, boundary, self.source) {
+                // Same classification as `build_class_member_decorators_doc`:
+                // between two decorators prefer leading the next decorator, and at
+                // the last boundary classify against the binding (a `LeadingInline`
+                // one before the binding drops to its own line — the match arm below).
+                let position = if is_last {
+                    classify_comment(comment, decorator.span.end, boundary, self.source)
+                } else {
+                    self.classify_between_decorator_comment(comment, decorator.span.end, boundary)
+                };
+                match position {
                     CommentPosition::Trailing => {
                         seg.push(d.text(" "));
                         seg.push(self.build_comment_doc(comment));
@@ -229,19 +262,53 @@ impl<'a> Printer<'a> {
         }
         let d = self.d();
         let mut parts = DocBuf::new();
+        // A block comment that leads the *next* decorator inline (`@a⏎/* c */ @b`)
+        // is carried across the iteration boundary and prefixes that decorator.
+        let mut pending_leading: DocBuf = DocBuf::new();
         for (i, decorator) in decorators.iter().enumerate() {
+            let is_last = i == decorators.len() - 1;
+            for leading in std::mem::take(&mut pending_leading) {
+                parts.push(leading);
+                parts.push(d.text(" "));
+            }
             self.push_decorator_head(&mut parts, decorator);
-            // Check for trailing comments after decorator: `@expr /* c */`
-            // Boundary is next decorator's start, or next_token_start for the last one
+            // Boundary is the next decorator's start, or next_token_start (the
+            // decorated class keyword) for the last one.
             let boundary = decorators
                 .get(i + 1)
                 .map_or(next_token_start, |next| next.span.start);
-            if self.has_comments_between(decorator.span.end, boundary) {
-                let comment_doc =
-                    self.build_inline_comments_between_doc(decorator.span.end, boundary);
-                parts.push(comment_doc);
+            let mut own_line: DocBuf = DocBuf::new();
+            for comment in comments_in_range(self.comments, decorator.span.end, boundary) {
+                // Between two decorators, prefer leading the next decorator; at the
+                // decorator→class boundary a same-line comment trails the decorator
+                // and everything else drops to its own line (prettier never
+                // inline-leads the class keyword).
+                let position = if is_last {
+                    match classify_comment(comment, decorator.span.end, boundary, self.source) {
+                        CommentPosition::Trailing => CommentPosition::Trailing,
+                        _ => CommentPosition::LeadingOwnLine,
+                    }
+                } else {
+                    self.classify_between_decorator_comment(comment, decorator.span.end, boundary)
+                };
+                match position {
+                    CommentPosition::Trailing => {
+                        parts.push(d.text(" "));
+                        parts.push(self.build_comment_doc(comment));
+                    }
+                    CommentPosition::LeadingInline => {
+                        pending_leading.push(self.build_comment_doc(comment));
+                    }
+                    CommentPosition::LeadingOwnLine => {
+                        own_line.push(self.build_comment_doc(comment));
+                    }
+                }
             }
             parts.push(d.hardline());
+            for comment_doc in own_line {
+                parts.push(comment_doc);
+                parts.push(d.hardline());
+            }
         }
         Some(d.concat(&parts))
     }
@@ -301,46 +368,32 @@ impl<'a> Printer<'a> {
             self.push_decorator_head(&mut dec_parts, decorator);
 
             // Handle comments between this decorator and the next boundary.
-            // Comments between two decorators: ALL treated as leading on the next
-            // decorator (matches prettier's comment attachment which visits `key`
-            // before `decorators` in the tree walk).
-            // Comments between the last decorator and the member: use classify_comment
-            // to determine position (trailing stays inline, own-line gets own line).
+            // Between two decorators, prefer leading the *next* decorator (prettier
+            // attaches the comment to the following decorator — its tree walk visits
+            // `key` before `decorators`), so a same-line-as-next comment leads it
+            // inline, a same-line-as-prev-only comment trails, and an own-line one
+            // stays own-line. At the last decorator, classify against the member.
             let is_last = i == decorators.len() - 1;
             let mut own_line_comments: DocBuf = DocBuf::new();
             for comment in comments_in_range(self.comments, decorator.span.end, boundary) {
                 if !comment.is_block {
                     has_line_comment = true;
                 }
-                if !is_last {
-                    // Between decorators: line comments stay trailing on the
-                    // current decorator (they take the rest of the line).
-                    // Block comments: if on the same line as the next decorator,
-                    // they're leading inline; otherwise, on their own line.
-                    if !comment.is_block {
-                        // Line comment: trailing on current decorator
+                let position = if is_last {
+                    classify_comment(comment, decorator.span.end, boundary, self.source)
+                } else {
+                    self.classify_between_decorator_comment(comment, decorator.span.end, boundary)
+                };
+                match position {
+                    CommentPosition::Trailing => {
                         dec_parts.push(d.text(" "));
                         dec_parts.push(self.build_comment_doc(comment));
-                    } else if self.is_same_line(comment.span.end, boundary) {
-                        pending_leading.push(self.build_comment_doc(comment));
-                    } else {
-                        own_line_comments.push(self.build_comment_doc(comment));
                     }
-                } else {
-                    // Last decorator: classify comment position
-                    let position =
-                        classify_comment(comment, decorator.span.end, boundary, self.source);
-                    match position {
-                        CommentPosition::Trailing => {
-                            dec_parts.push(d.text(" "));
-                            dec_parts.push(self.build_comment_doc(comment));
-                        }
-                        CommentPosition::LeadingInline => {
-                            pending_leading.push(self.build_comment_doc(comment));
-                        }
-                        CommentPosition::LeadingOwnLine => {
-                            own_line_comments.push(self.build_comment_doc(comment));
-                        }
+                    CommentPosition::LeadingInline => {
+                        pending_leading.push(self.build_comment_doc(comment));
+                    }
+                    CommentPosition::LeadingOwnLine => {
+                        own_line_comments.push(self.build_comment_doc(comment));
                     }
                 }
             }
