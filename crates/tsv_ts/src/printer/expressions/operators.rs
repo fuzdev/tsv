@@ -715,6 +715,17 @@ impl<'a> Printer<'a> {
     ) -> bool {
         let d = self.d();
 
+        // Zero-comment fast path: the operand→operator gap holds no comment (the
+        // ubiquitous case), so emit just the operator — no empty comment node in the
+        // parts concat, and no per-gap comment scan at all. Byte-identical: the gap is
+        // comment-free, so the general path below would build `empty()` here (renders to
+        // nothing). The gap ⊆ the binary span, so this can only skip work, never a comment.
+        if !self.has_comments_between(operand_end, op_start) {
+            parts.push(d.text(" "));
+            parts.push(d.text(op_str));
+            return false;
+        }
+
         if !self.has_line_comments_between(operand_end, op_start) {
             // No line comment — inline gap (block comments stay inline, as before).
             parts.push(self.build_inline_comments_between_doc(operand_end, op_start));
@@ -1166,6 +1177,13 @@ impl<'a> Printer<'a> {
         let n = seq.expressions.len();
         let mut parts = DocBuf::with_capacity(n * 3 + 4);
 
+        // Whole-sequence comment gate: the inter-operand gaps (after/before each comma)
+        // all lie within `seq.span`, so with no comment there, every per-operand gap is
+        // empty. Skip the per-operand comma scans + the `empty()` comment children on the
+        // comment-free common path. Byte-identical (the line-comment path already branched
+        // off above, so a present comment here is a block, handled by the full path).
+        let seq_has_comments = self.has_comments_between(seq.span.start, seq.span.end);
+
         // First operand's leading-edge comments float OUT, before the opening `(`.
         let first_start = seq.expressions[0].span().start;
         self.append_floated_leading_comments(&mut parts, seq.span.start, first_start);
@@ -1181,13 +1199,15 @@ impl<'a> Printer<'a> {
                 // Leading comments of this operand: the gap after the previous comma.
                 // Redundant operand parens are stripped, so a comment the user wrote
                 // inside them (`(/* c */ b)`) is preserved inline before the operand.
-                let prev_end = seq.expressions[i - 1].span().end;
-                if let Some(comma) = self.find_comma_after(prev_end) {
-                    parts.push(self.build_comments_between(
-                        comma + 1,
-                        expr_start,
-                        CommentSpacing::Trailing,
-                    ));
+                if seq_has_comments {
+                    let prev_end = seq.expressions[i - 1].span().end;
+                    if let Some(comma) = self.find_comma_after(prev_end) {
+                        parts.push(self.build_comments_between(
+                            comma + 1,
+                            expr_start,
+                            CommentSpacing::Trailing,
+                        ));
+                    }
                 }
             }
 
@@ -1201,7 +1221,10 @@ impl<'a> Printer<'a> {
             parts.push(inner);
 
             // Trailing comments of this operand: the gap before the next comma.
-            if !is_last && let Some(comma) = self.find_comma_after(expr_end) {
+            if seq_has_comments
+                && !is_last
+                && let Some(comma) = self.find_comma_after(expr_end)
+            {
                 parts.push(self.build_comments_between(expr_end, comma, CommentSpacing::Leading));
             }
         }

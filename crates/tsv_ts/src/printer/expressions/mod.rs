@@ -557,8 +557,11 @@ impl<'a> Printer<'a> {
         let type_start = type_annotation.span().start;
         let keyword_pos = self.find_keyword_in_range(expr_end, type_start, keyword);
 
-        // Comments between expression and keyword → place before the keyword
-        if let Some(kw_pos) = keyword_pos {
+        // Comments between expression and keyword → place before the keyword. Skip the
+        // `empty()` child on the comment-free `expr as` gap (ubiquitous). Byte-identical.
+        if let Some(kw_pos) = keyword_pos
+            && self.has_comments_between(expr_end, kw_pos)
+        {
             parts.push(self.build_inline_comments_between_doc(expr_end, kw_pos));
         }
 
@@ -611,7 +614,14 @@ impl<'a> Printer<'a> {
         // (uniform for every cast type, including `as const`).
         if let Some(kw_pos) = keyword_pos {
             let kw_end = kw_pos + keyword.len() as u32;
-            parts.push(self.build_comments_between(kw_end, type_start, CommentSpacing::Trailing));
+            // Skip the `empty()` child on the comment-free `as Type` gap. Byte-identical.
+            if self.has_comments_between(kw_end, type_start) {
+                parts.push(self.build_comments_between(
+                    kw_end,
+                    type_start,
+                    CommentSpacing::Trailing,
+                ));
+            }
             parts.push(self.build_type_doc_with_wrapping_type_args(type_annotation));
         } else {
             parts.push(self.build_type_doc_with_wrapping_type_args(type_annotation));
