@@ -48,7 +48,8 @@ pub struct CompileCorpusCompareCommand {
 enum Bucket {
     /// Both sides compiled and the canonical forms matched.
     Parity,
-    /// tsv refused (`Unsupported`), keyed on the normalized refusal reason.
+    /// tsv refused (`Unsupported`), keyed on the refusal's stable
+    /// [`Refusal::bucket_key`](tsv_svelte_compile::Refusal::bucket_key).
     Refused(String),
     /// The oracle rejected the source, keyed on the Svelte error code (or the
     /// error's first line when no code is present).
@@ -201,7 +202,7 @@ async fn classify(source: &str) -> Bucket {
     let ours = match compile(source, &CompileOptions::default()) {
         Ok(o) => o,
         Err(CompileError::Unsupported(reason)) => {
-            return Bucket::Refused(normalize_refusal_reason(&reason));
+            return Bucket::Refused(reason.bucket_key().into_owned());
         }
         Err(CompileError::Parse(e)) => return Bucket::Error("tsv-parse", e.to_string()),
         Err(CompileError::CorruptOutput(e)) => {
@@ -297,79 +298,6 @@ fn first_line(s: &str) -> String {
         .unwrap_or("")
         .trim();
     truncate(first, 160)
-}
-
-/// Collapse a `CompileError::Unsupported` reason to a stable bucket key.
-///
-/// Variable *identifiers/literals* the user chose (attribute/binding/class
-/// names, `lang` values, component tags, runes) collapse to a `{placeholder}`
-/// so, e.g., `event attribute onclick` and `event attribute onkeydown` share one
-/// bucket. Closed-set *feature discriminants* (`template node {kind}`, `binding
-/// pattern shape ({kind})`) are left intact — they name distinct unsupported
-/// features, and keeping them apart is the useful signal. Static reasons pass
-/// through verbatim (they are already the bucket).
-fn normalize_refusal_reason(reason: &str) -> String {
-    // Nested static-eval `Gray` messages — collapse to the outer template.
-    if reason.starts_with("static evaluation not portable") {
-        return "static evaluation not portable".to_string();
-    }
-    if reason.starts_with("static fold not portable") {
-        return "static fold not portable".to_string();
-    }
-    // Rune-shaped refusals.
-    if reason.starts_with("rune ") {
-        return "rune {name}".to_string();
-    }
-    if reason.starts_with("$-prefixed identifier ") {
-        return "$-prefixed identifier {name}".to_string();
-    }
-    if reason.starts_with("read of derived binding ") {
-        return "read of derived binding {name}".to_string();
-    }
-    if reason.starts_with("member/call rooted at prop/import ") {
-        return "member/call rooted at prop/import {name} also bound in a nested scope".to_string();
-    }
-    if reason.starts_with("block-scope binding ") && reason.ends_with(" shadows a $derived binding")
-    {
-        return "block-scope binding {name} shadows a $derived binding".to_string();
-    }
-    if reason.starts_with("css selector .") && reason.contains("matches no element") {
-        return "css selector .{class} matches no element".to_string();
-    }
-    if reason.starts_with("lang=\"") && reason.contains("instance script") {
-        return "lang=\"{lang}\" instance script".to_string();
-    }
-    if reason.starts_with("generated name ") && reason.ends_with(" collides with a user binding") {
-        return "generated name {name} collides with a user binding".to_string();
-    }
-    if reason.starts_with("interpolated ") && reason.ends_with(" attribute on a styled component") {
-        return "interpolated {name} attribute on a styled component".to_string();
-    }
-    if reason.starts_with("event attribute ") {
-        return "event attribute {name}".to_string();
-    }
-    // `<name> …` element-tag interpolations.
-    if reason.starts_with('<') {
-        if reason.ends_with(" component (component rendering not implemented)") {
-            return "<{name}> component".to_string();
-        }
-        if reason.ends_with(" (foreign namespace)") {
-            return "<{name}> (foreign namespace)".to_string();
-        }
-        if reason.ends_with(" with children (oracle emits a `<!>` anchor)") {
-            return "<{name}> with children".to_string();
-        }
-    }
-    if reason.starts_with("template-level <") {
-        return "template-level <{name}>".to_string();
-    }
-    if reason.starts_with("children on void element <") {
-        return "children on void element <{name}>".to_string();
-    }
-    if reason.starts_with("value attribute on <") {
-        return "value attribute on <{name}>".to_string();
-    }
-    reason.to_string()
 }
 
 /// Truncate `s` to `max` chars (char-boundary safe), appending `…` when cut.
@@ -730,59 +658,6 @@ fn print_reasons(title: &str, reasons: &[ReasonCount], limit: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn normalizer_collapses_name_interpolations() {
-        // The motivating case: distinct event-handler names share one bucket.
-        assert_eq!(
-            normalize_refusal_reason("event attribute onclick"),
-            "event attribute {name}"
-        );
-        assert_eq!(
-            normalize_refusal_reason("event attribute onkeydown"),
-            "event attribute {name}"
-        );
-        assert_eq!(normalize_refusal_reason("rune $state"), "rune {name}");
-        assert_eq!(normalize_refusal_reason("rune $foo"), "rune {name}");
-        assert_eq!(
-            normalize_refusal_reason(
-                "lang=\"ts\" instance script (type stripping not implemented)"
-            ),
-            "lang=\"{lang}\" instance script"
-        );
-        assert_eq!(
-            normalize_refusal_reason("<Foo.Bar> component (component rendering not implemented)"),
-            "<{name}> component"
-        );
-        assert_eq!(
-            normalize_refusal_reason("children on void element <br>"),
-            "children on void element <{name}>"
-        );
-        assert_eq!(
-            normalize_refusal_reason("static evaluation not portable: string-to-number coercion"),
-            "static evaluation not portable"
-        );
-    }
-
-    #[test]
-    fn normalizer_preserves_feature_kinds_and_static_reasons() {
-        // Closed-set feature discriminants stay distinct.
-        assert_eq!(
-            normalize_refusal_reason("template node special element"),
-            "template node special element"
-        );
-        assert_eq!(
-            normalize_refusal_reason("template node {#snippet} block"),
-            "template node {#snippet} block"
-        );
-        // Static reasons are already the bucket.
-        assert_eq!(
-            normalize_refusal_reason(
-                "instance-script export (component exports / $.bind_props not implemented)"
-            ),
-            "instance-script export (component exports / $.bind_props not implemented)"
-        );
-    }
 
     #[test]
     fn oracle_reject_code_requires_svelte_code() {

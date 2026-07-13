@@ -71,7 +71,7 @@ use crate::analyze::{
 };
 use crate::build::{Builder, escape_template_text};
 use crate::rune_guard::{WalkCtx, walk_expression_guarded, walk_statement_guarded};
-use crate::{CompileError, CompileOutput};
+use crate::{CompileError, CompileOutput, Refusal};
 
 /// The deterministic scoping class — the fixed `cssHash` the oracle sidecar
 /// compiles with, so outputs are byte-comparable across runs.
@@ -162,9 +162,9 @@ impl<'arena> EmitEnv<'arena, '_> {
     ) -> Result<(), CompileError> {
         for name in entries.keys() {
             if self.derived_names.contains(name) {
-                return Err(unsupported(format!(
-                    "block-scope binding {name} shadows a $derived binding"
-                )));
+                return Err(unsupported(Refusal::BlockScopeShadowsDerived {
+                    name: name.clone(),
+                }));
             }
         }
         self.overlays.push(entries);
@@ -207,10 +207,10 @@ pub(crate) fn compile_server<'arena>(
     let mut b = Builder::new(arena, source, std::rc::Rc::clone(&root.interner));
 
     if root.module.is_some() {
-        return Err(unsupported("module <script context=\"module\">"));
+        return Err(unsupported(Refusal::ModuleScript));
     }
     if root.options.is_some() {
-        return Err(unsupported("<svelte:options>"));
+        return Err(unsupported(Refusal::SvelteOptions));
     }
     // TS instance scripts pass type annotations through verbatim (type stripping
     // isn't implemented), and `generics` implies TS — refuse both at the entry,
@@ -240,9 +240,7 @@ pub(crate) fn compile_server<'arena>(
     // resulting comment-window placement is unprobed — refuse rather than risk a
     // misplaced comment.
     if has_comments && fragment_contains_block(&root.fragment) {
-        return Err(unsupported(
-            "comments in a script alongside template blocks (placement not carried through yet)",
-        ));
+        return Err(unsupported(Refusal::CommentsAlongsideTemplateBlocks));
     }
 
     // 3. Script analysis pass: the top-level binding table (evaluator input)
@@ -260,9 +258,7 @@ pub(crate) fn compile_server<'arena>(
     if has_comments && !derived_names.is_empty() {
         // The `$.derived(() => …)` wrapper and `d()` reads bridge host and
         // appendix spans in ways whose comment windows sweep wrongly.
-        return Err(unsupported(
-            "comments in a script that uses $derived (not carried through yet)",
-        ));
+        return Err(unsupported(Refusal::CommentsWithDerived));
     }
 
     // 4. Script rewrite pass: rune rewrites, guard walks, mutation/shadow
@@ -294,9 +290,7 @@ pub(crate) fn compile_server<'arena>(
                     | Statement::TSNamespaceExportDeclaration(_)
                     | Statement::TSExportAssignment(_)
             ) {
-                return Err(unsupported(
-                    "instance-script export (component exports / $.bind_props not implemented)",
-                ));
+                return Err(unsupported(Refusal::InstanceScriptExport));
             }
             if matches!(stmt, Statement::ImportDeclaration(_)) {
                 user_imports.push(stmt.clone());
@@ -329,10 +323,7 @@ pub(crate) fn compile_server<'arena>(
             match rewritten {
                 Statement::VariableDeclaration(decl) if decl.declarations.len() > 1 => {
                     if has_comments {
-                        return Err(unsupported(
-                            "comments in a script alongside a multi-declarator declaration \
-                             (the oracle re-anchors comments inside the split)",
-                        ));
+                        return Err(unsupported(Refusal::CommentsAlongsideMultiDeclarator));
                     }
                     for declarator in decl.declarations {
                         body.push(Statement::VariableDeclaration(VariableDeclaration {
@@ -351,9 +342,7 @@ pub(crate) fn compile_server<'arena>(
     // comment list while its import node prints in a separate module-scope
     // program — a placement this transform doesn't reconcile yet.
     if has_comments && !user_imports.is_empty() {
-        return Err(unsupported(
-            "comments in a script alongside imports (placement around hoisted imports not carried through yet)",
-        ));
+        return Err(unsupported(Refusal::CommentsAlongsideImports));
     }
     for name in &updated {
         bindings.mark_updated(name);
@@ -375,9 +364,7 @@ pub(crate) fn compile_server<'arena>(
     for comment in &script_comments {
         for region in &dropped_regions {
             if comment.span.start >= region.start && comment.span.end <= region.end {
-                return Err(unsupported(
-                    "comment inside a rewritten rune region (dropped by the transform)",
-                ));
+                return Err(unsupported(Refusal::CommentInRewrittenRuneRegion));
             }
         }
     }
@@ -444,9 +431,9 @@ pub(crate) fn compile_server<'arena>(
     if let Some(scope) = &env.scope {
         for class in &scope.class_names {
             if !env.matched_classes.contains(class) {
-                return Err(unsupported(format!(
-                    "css selector .{class} matches no element (pruning not implemented)"
-                )));
+                return Err(unsupported(Refusal::CssSelectorNoMatch {
+                    class: class.clone(),
+                }));
             }
         }
     }
@@ -564,9 +551,7 @@ fn collect_script_comments(
         return Ok(Vec::new());
     }
     let Some(script) = root.instance else {
-        return Err(unsupported(
-            "template comments (only instance-script comments are carried through)",
-        ));
+        return Err(unsupported(Refusal::TemplateComments));
     };
     let content = script.content.span;
     // A comment after the LAST script statement diverges: the oracle's printer
@@ -591,41 +576,33 @@ fn collect_script_comments(
     let mut comments = Vec::with_capacity(root.comments.len());
     for comment in &root.comments {
         if comment.span.start < content.start || comment.span.end > content.end {
-            return Err(unsupported(
-                "template comments (only instance-script comments are carried through)",
-            ));
+            return Err(unsupported(Refusal::TemplateComments));
         }
         if comment.span.start >= last_stmt_end {
-            return Err(unsupported(
-                "comment after the last script statement (the oracle re-attaches it into the template)",
-            ));
+            return Err(unsupported(Refusal::CommentAfterLastStatement));
         }
         if comment.span.end <= first_stmt_start {
             let gap = &source[content.start as usize..comment.span.start as usize];
             if !gap.contains('\n') {
-                return Err(unsupported(
-                    "leading comment glued to the <script> line (no newline before it)",
-                ));
+                return Err(unsupported(Refusal::LeadingCommentGluedToScript));
             }
         }
         let text = comment.content(source);
         if text.contains("prettier-ignore") || text.contains("format-ignore") {
-            return Err(unsupported("format-ignore directive comment in script"));
+            return Err(unsupported(Refusal::FormatIgnoreComment));
         }
         comments.push(comment.clone());
     }
     for node in root.fragment.nodes {
         if node.span().start < content.end {
-            return Err(unsupported(
-                "comments with template markup before the script (window ordering)",
-            ));
+            return Err(unsupported(Refusal::CommentsWithTemplateBeforeScript));
         }
     }
     Ok(comments)
 }
 
-fn unsupported(what: impl Into<String>) -> CompileError {
-    CompileError::Unsupported(what.into())
+fn unsupported(reason: Refusal) -> CompileError {
+    CompileError::Unsupported(reason)
 }
 
 /// Refuse a `<script>` that carries a `lang` (TypeScript) or `generics`
@@ -663,15 +640,11 @@ fn refuse_typed_script(
                         Some([AttributeValue::Text(text)]) => text.data(source).into_owned(),
                         _ => String::new(),
                     };
-                    return Err(unsupported(format!(
-                        "lang=\"{lang}\" instance script (type stripping not implemented)"
-                    )));
+                    return Err(unsupported(Refusal::LangInstanceScript { lang }));
                 }
             }
             "generics" => {
-                return Err(unsupported(
-                    "generics attribute on instance script (implies TypeScript)",
-                ));
+                return Err(unsupported(Refusal::GenericsAttribute));
             }
             _ => {}
         }
@@ -792,7 +765,7 @@ fn analyze_declarator<'arena>(
         }
         Some(RuneInit::State(arg)) => {
             let name = identifier_binding_name(&declarator.id, source)
-                .ok_or_else(|| unsupported("destructuring a $state declarator"))?;
+                .ok_or_else(|| unsupported(Refusal::DestructuringState))?;
             bindings.insert(
                 name,
                 Binding {
@@ -805,7 +778,7 @@ fn analyze_declarator<'arena>(
         }
         Some(RuneInit::Derived(expr)) => {
             let name = identifier_binding_name(&declarator.id, source)
-                .ok_or_else(|| unsupported("destructuring a $derived declarator"))?;
+                .ok_or_else(|| unsupported(Refusal::DestructuringDerived))?;
             derived_names.insert(name.clone());
             bindings.insert(
                 name,
@@ -819,7 +792,7 @@ fn analyze_declarator<'arena>(
         }
         Some(RuneInit::DerivedBy(f)) => {
             let name = identifier_binding_name(&declarator.id, source)
-                .ok_or_else(|| unsupported("destructuring a $derived.by declarator"))?;
+                .ok_or_else(|| unsupported(Refusal::DestructuringDerivedBy))?;
             derived_names.insert(name.clone());
             // The oracle evaluates through an expression-bodied arrow.
             use tsv_ts::ast::internal::ArrowFunctionBody;
@@ -999,9 +972,7 @@ fn rewrite_script_statement<'arena>(
                     if has_comments {
                         // `void 0` mints an appendix literal; the declarator's
                         // init windows would then sweep host comments.
-                        return Err(unsupported(
-                            "comments in a script with an argument-less $state()",
-                        ));
+                        return Err(unsupported(Refusal::CommentsWithArglessState));
                     }
                     Some(b.void_zero())
                 }
@@ -1068,9 +1039,7 @@ fn inject_props_pattern<'arena>(
                 return Ok(None);
             }
             if has_comments {
-                return Err(unsupported(
-                    "comments in a script with a rest-element $props() (injected $$slots/$$events)",
-                ));
+                return Err(unsupported(Refusal::CommentsWithRestProps));
             }
             let mut properties: BumpVec<'arena, ObjectPatternProperty<'arena>> =
                 BumpVec::new_in(b.arena);
@@ -1091,9 +1060,7 @@ fn inject_props_pattern<'arena>(
         }
         Expression::Identifier(_) => {
             if has_comments {
-                return Err(unsupported(
-                    "comments in a script with a non-destructured $props() (injected $$slots/$$events)",
-                ));
+                return Err(unsupported(Refusal::CommentsWithNonDestructuredProps));
             }
             let mut properties: BumpVec<'arena, ObjectPatternProperty<'arena>> =
                 BumpVec::new_in(b.arena);
@@ -1113,9 +1080,7 @@ fn inject_props_pattern<'arena>(
                 span: id.span(),
             })))
         }
-        _ => Err(unsupported(
-            "$props() binding pattern (not an identifier or object pattern — the oracle rejects it)",
-        )),
+        _ => Err(unsupported(Refusal::PropsBindingPattern)),
     }
 }
 
@@ -1356,18 +1321,15 @@ fn emit_fragment<'arena>(
             FragmentNode::KeyBlock(block) => list.push(CleanNode::Key(block)),
             FragmentNode::ConstTag(tag) => {
                 if ctx.is_component_root {
-                    return Err(unsupported(
-                        "{@const} at the component root (only valid inside a block)",
-                    ));
+                    return Err(unsupported(Refusal::ConstTagAtRoot));
                 }
                 const_tags.push(tag);
             }
             FragmentNode::Comment(_) => {}
             other => {
-                return Err(unsupported(format!(
-                    "template node {}",
-                    fragment_node_kind(other)
-                )));
+                return Err(unsupported(Refusal::TemplateNode {
+                    kind: fragment_node_kind(other),
+                }));
             }
         }
     }
@@ -1499,9 +1461,9 @@ fn guard_dropped<'arena>(
 /// would then pick a different suffix, which this port doesn't replicate.
 fn check_name_free(env: &EmitEnv<'_, '_>, name: &str) -> Result<(), CompileError> {
     if env.bindings.contains(name) {
-        return Err(unsupported(format!(
-            "generated name {name} collides with a user binding"
-        )));
+        return Err(unsupported(Refusal::GeneratedNameCollision {
+            name: name.to_string(),
+        }));
     }
     Ok(())
 }
@@ -1550,12 +1512,10 @@ fn emit_const_tag<'arena>(
     // whose init folds would have the oracle fold each read, which this port
     // can't reproduce per-binding — refuse rather than risk a silent mismatch.
     let Expression::Identifier(id) = &tag.id else {
-        return Err(unsupported(
-            "destructured {@const} (only `{@const name = …}`)",
-        ));
+        return Err(unsupported(Refusal::DestructuredConstTag));
     };
     let Some(name) = plain_identifier_name(id, env.source) else {
-        return Err(unsupported("{@const} with a non-plain binding name"));
+        return Err(unsupported(Refusal::ConstTagNonPlainName));
     };
     // A `{@const}` that shadows a top-level `$derived` binding is refused, the
     // same as an each/await binding (see `push_overlay`): the derived-read
@@ -1563,9 +1523,7 @@ fn emit_const_tag<'arena>(
     // `name()` call. `emit_const_tag` inserts into the overlay directly, so it
     // must repeat that check here.
     if env.derived_names.contains(&name) {
-        return Err(unsupported(format!(
-            "block-scope binding {name} shadows a $derived binding"
-        )));
+        return Err(unsupported(Refusal::BlockScopeShadowsDerived { name }));
     }
     // Guard + wrap the init (bare derived → d(), refuse runes/mutations).
     let init = wrap_single(env, &tag.init)?;
@@ -1586,7 +1544,7 @@ fn emit_const_tag<'arena>(
         }
         None => {
             // Unreachable: root-level `{@const}` already refused in emit_fragment.
-            return Err(unsupported("{@const} outside a block scope"));
+            return Err(unsupported(Refusal::ConstTagOutsideBlock));
         }
     }
     Ok(())
@@ -1696,9 +1654,7 @@ fn emit_each_block<'arena>(
     ctx: &FragmentCtx<'_>,
 ) -> Result<(), CompileError> {
     if env.in_each {
-        return Err(unsupported(
-            "nested {#each} (the oracle's unique-name allocation order is not reproducible)",
-        ));
+        return Err(unsupported(Refusal::NestedEach));
     }
     let arena = env.b.arena;
     let preserve = ctx.preserve_whitespace;
@@ -1977,15 +1933,15 @@ fn emit_expression_tag<'arena>(
 
     // The fold gate: a known evaluation folds into the static text.
     let evaluated = evaluate(expr, &env.value_scope(), env.source, 0)
-        .map_err(|g| unsupported(format!("static evaluation not portable: {}", g.0)))?;
+        .map_err(|g| unsupported(Refusal::StaticEvalNotPortable(g.0)))?;
     if let Some(value) = evaluated.known_value() {
         if !escape {
             // A statically-known `{@html}` would fold through the oracle's html
             // path — not probed/ported, refuse rather than guess.
-            return Err(unsupported("{@html} with a statically-known value"));
+            return Err(unsupported(Refusal::HtmlTagStaticValue));
         }
-        let text = stringify_value(value)
-            .map_err(|g| unsupported(format!("static fold not portable: {}", g.0)))?;
+        let text =
+            stringify_value(value).map_err(|g| unsupported(Refusal::StaticFoldNotPortable(g.0)))?;
         out.push_text(&escape_template_text(&escape_html_text(&text)));
         return Ok(());
     }
@@ -2025,7 +1981,7 @@ fn wrap_value_expr<'arena>(
     if !updated.is_empty() {
         // A mutation here would postdate the binding analysis the fold already
         // consulted — refuse rather than fold stale.
-        return Err(unsupported("mutation inside a template expression"));
+        return Err(unsupported(Refusal::MutationInTemplateExpr));
     }
     Ok(std::slice::from_ref(expr))
 }
@@ -2103,22 +2059,28 @@ fn emit_element<'arena>(
     match element.kind {
         ElementKind::Html => {}
         ElementKind::Component => {
-            return Err(unsupported(format!(
-                "<{name}> component (component rendering not implemented)"
-            )));
+            return Err(unsupported(Refusal::ComponentElement {
+                name: name.clone(),
+            }));
         }
     }
     match name.as_str() {
         // Namespace-dependent whitespace/emission rules not implemented.
-        "svg" | "math" => return Err(unsupported(format!("<{name}> (foreign namespace)"))),
+        "svg" | "math" => {
+            return Err(unsupported(Refusal::ForeignNamespace {
+                name: name.clone(),
+            }));
+        }
         // Template-level <script>/<style> have special semantics in the oracle.
-        "script" | "style" => return Err(unsupported(format!("template-level <{name}>"))),
+        "script" | "style" => {
+            return Err(unsupported(Refusal::TemplateLevelElement {
+                name: name.clone(),
+            }));
+        }
         // The oracle compiles every <option> into `$$renderer.option(…)`
         // closure calls — static markup would be a divergent compile.
         "option" => {
-            return Err(unsupported(
-                "<option> (oracle emits $$renderer.option closures)",
-            ));
+            return Err(unsupported(Refusal::OptionElement));
         }
         // A populated <select>/<optgroup> gets a `<!>` anchor after its
         // children in the oracle's output (probe-verified; empty ones emit
@@ -2130,9 +2092,9 @@ fn emit_element<'arena>(
                 .iter()
                 .any(|n| !matches!(n, FragmentNode::Text(t) if t.is_ascii_ws_only)) =>
         {
-            return Err(unsupported(format!(
-                "<{name}> with children (oracle emits a `<!>` anchor)"
-            )));
+            return Err(unsupported(Refusal::ElementWithChildren {
+                name: name.clone(),
+            }));
         }
         _ => {}
     }
@@ -2140,7 +2102,7 @@ fn emit_element<'arena>(
     out.push_text(&format!("<{name}"));
     for attr_node in element.attributes {
         let AttributeNode::Attribute(attr) = attr_node else {
-            return Err(unsupported("non-plain attribute (directive/spread)"));
+            return Err(unsupported(Refusal::NonPlainAttribute));
         };
         emit_attribute(env, attr, &name, out)?;
     }
@@ -2149,7 +2111,9 @@ fn emit_element<'arena>(
         // XHTML-compliant self-close, matching the oracle.
         out.push_text("/>");
         if !element.fragment.nodes.is_empty() {
-            return Err(unsupported(format!("children on void element <{name}>")));
+            return Err(unsupported(Refusal::VoidElementChildren {
+                name: name.clone(),
+            }));
         }
         return Ok(());
     }
@@ -2193,7 +2157,9 @@ fn emit_attribute<'arena>(
     // `value` on <textarea> becomes child content, on <select> it is omitted
     // with select_value bookkeeping — neither shape is implemented.
     if name == "value" && (element_name == "textarea" || element_name == "select") {
-        return Err(unsupported(format!("value attribute on <{element_name}>")));
+        return Err(unsupported(Refusal::ValueAttribute {
+            name: element_name.to_string(),
+        }));
     }
 
     let Some(values) = attr.value else {
@@ -2313,23 +2279,21 @@ fn emit_dynamic_attribute<'arena>(
     // The oracle omits expression-valued event handlers from SSR output —
     // implement nothing rather than emit a wrong attribute.
     if name.starts_with("on") {
-        return Err(unsupported(format!("event attribute {name}")));
+        return Err(unsupported(Refusal::EventAttribute {
+            name: name.to_string(),
+        }));
     }
     // The `$.attr` family interleaves minted (appendix) and borrowed (host)
     // argument spans; with host comments present their windows would sweep.
     if env.has_comments {
-        return Err(unsupported(
-            "comments in a script alongside expression-valued attributes",
-        ));
+        return Err(unsupported(Refusal::CommentsAlongsideExprAttributes));
     }
     // A string-literal expression value takes the oracle's inline-literal path
     // (pre-escaped static emission) — refuse rather than guess its edge rules.
     if matches!(expr, Expression::Literal(lit)
         if matches!(lit.value, tsv_ts::ast::internal::LiteralValue::String(_)))
     {
-        return Err(unsupported(
-            "string-literal expression attribute value (inline-literal path)",
-        ));
+        return Err(unsupported(Refusal::StringLiteralExprAttribute));
     }
 
     let wrapped = wrap_value_expr(env, expr)?;
@@ -2338,7 +2302,7 @@ fn emit_dynamic_attribute<'arena>(
         // pruning) — supported only on unstyled components.
         "class" => {
             if env.scope.is_some() {
-                return Err(unsupported("dynamic class attribute on a styled component"));
+                return Err(unsupported(Refusal::DynamicClassOnStyled));
             }
             if class_needs_clsx(expr, quoted) {
                 let clsx = env.b.member_call("$", "clsx", wrapped);
@@ -2352,7 +2316,7 @@ fn emit_dynamic_attribute<'arena>(
         }
         "style" => {
             if env.scope.is_some() {
-                return Err(unsupported("dynamic style attribute on a styled component"));
+                return Err(unsupported(Refusal::DynamicStyleOnStyled));
             }
             env.b.member_call("$", "attr_style", wrapped)
         }
@@ -2380,17 +2344,17 @@ fn emit_mixed_attribute<'arena>(
     out: &mut BodyBuilder<'arena>,
 ) -> Result<(), CompileError> {
     if name.starts_with("on") {
-        return Err(unsupported(format!("event attribute {name}")));
+        return Err(unsupported(Refusal::EventAttribute {
+            name: name.to_string(),
+        }));
     }
     if env.has_comments {
-        return Err(unsupported(
-            "comments in a script alongside expression-valued attributes",
-        ));
+        return Err(unsupported(Refusal::CommentsAlongsideExprAttributes));
     }
     if (name == "class" || name == "style") && env.scope.is_some() {
-        return Err(unsupported(format!(
-            "interpolated {name} attribute on a styled component"
-        )));
+        return Err(unsupported(Refusal::InterpolatedAttrOnStyled {
+            name: name.to_string(),
+        }));
     }
     let trim_whitespace = name == "class" || name == "style";
 
@@ -2423,12 +2387,12 @@ fn emit_mixed_attribute<'arena>(
                 // Guard first — never fold an oracle-invalid expression.
                 let wrapped = wrap_value_expr(env, &tag.expression)?;
                 let evaluated = evaluate(&tag.expression, &env.value_scope(), env.source, 0)
-                    .map_err(|g| unsupported(format!("static evaluation not portable: {}", g.0)))?;
+                    .map_err(|g| unsupported(Refusal::StaticEvalNotPortable(g.0)))?;
                 if let Some(value) = evaluated.known_value() {
                     // Folds into the quasi — plain `(value ?? '') + ''`, no
                     // HTML escaping in the template-value path.
                     let text = stringify_value(value)
-                        .map_err(|g| unsupported(format!("static fold not portable: {}", g.0)))?;
+                        .map_err(|g| unsupported(Refusal::StaticFoldNotPortable(g.0)))?;
                     raw.push_str(&text);
                     #[allow(clippy::unwrap_used)]
                     texts
@@ -2546,21 +2510,19 @@ fn analyze_style(style: &Style<'_>, source: &str) -> Result<ScopeInfo, CompileEr
     };
     for node in style.css_stylesheet.nodes {
         let CssNode::Rule(rule) = node else {
-            return Err(unsupported("css at-rule in <style>"));
+            return Err(unsupported(Refusal::CssAtRule));
         };
         for child in rule.declarations {
             if matches!(child, CssBlockChild::Rule(_) | CssBlockChild::Atrule(_)) {
-                return Err(unsupported("nested css rule in <style>"));
+                return Err(unsupported(Refusal::CssNestedRule));
             }
         }
         for complex in rule.selector.selectors {
             let [relative] = complex.children else {
-                return Err(unsupported("css combinator selector in <style>"));
+                return Err(unsupported(Refusal::CssCombinatorSelector));
             };
             let [SimpleSelector::Class { span }] = relative.selectors else {
-                return Err(unsupported(
-                    "non-class css selector in <style> (only `.class` is supported)",
-                ));
+                return Err(unsupported(Refusal::CssNonClassSelector));
             };
             // Span text includes the leading `.`.
             let name = &span.extract(source)[1..];

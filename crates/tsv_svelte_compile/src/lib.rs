@@ -18,8 +18,11 @@
 mod analyze;
 mod build;
 mod needs_context;
+mod refusal;
 mod rune_guard;
 mod transform_server;
+
+pub use refusal::Refusal;
 
 use tsv_ts::Goal;
 
@@ -78,9 +81,10 @@ pub enum CompileError {
     #[error("failed to parse Svelte component: {0}")]
     Parse(#[from] tsv_lang::ParseError),
     /// The component parsed, but uses a shape the compiler does not cover yet.
-    /// Always a clear refusal — never guessed output.
+    /// Always a clear refusal — never guessed output. The [`Refusal`] carries
+    /// both the human-readable message and a stable corpus bucket key.
     #[error("not yet supported by the Svelte compiler: {0}")]
-    Unsupported(String),
+    Unsupported(Refusal),
     /// The generated JS failed to reparse — a divergent shape slipped every
     /// guard and the transform emitted invalid JavaScript. Always a compiler
     /// bug; surfaced loudly instead of returning the corrupt module (the same
@@ -118,10 +122,10 @@ pub enum CanonicalizeError {
 /// compiler whose refusal contract depends on never shipping guessed output.
 pub fn compile(source: &str, options: &CompileOptions) -> Result<CompileOutput, CompileError> {
     if options.generate == Generate::Client {
-        return Err(CompileError::Unsupported("client generation".to_string()));
+        return Err(CompileError::Unsupported(Refusal::ClientGeneration));
     }
     if options.dev {
-        return Err(CompileError::Unsupported("dev mode output".to_string()));
+        return Err(CompileError::Unsupported(Refusal::DevMode));
     }
     let arena = bumpalo::Bump::new();
     let root = tsv_svelte::parse(source, &arena)?;
@@ -714,7 +718,7 @@ mod tests {
     fn assert_unsupported(source: &str, what: &str) {
         let err = compile(source, &CompileOptions::default()).unwrap_err();
         assert!(
-            matches!(&err, CompileError::Unsupported(msg) if msg.contains(what)),
+            matches!(&err, CompileError::Unsupported(reason) if reason.to_string().contains(what)),
             "expected Unsupported({what}), got {err:?} for:\n{source}"
         );
     }

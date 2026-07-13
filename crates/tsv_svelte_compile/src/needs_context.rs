@@ -40,8 +40,8 @@ use tsv_ts::ast::internal::{
     VariableDeclaration,
 };
 
-use crate::CompileError;
 use crate::analyze::{NameSet, RuneInit, classify_rune_init, pattern_binding_names};
+use crate::{CompileError, Refusal};
 
 /// The accumulating analysis state.
 struct Nc<'a> {
@@ -55,7 +55,7 @@ struct Nc<'a> {
     /// Set by a `new` expression or a non-identifier member/call root.
     needs: bool,
     /// A shape whose classification isn't portable (an escaped identifier root).
-    refuse: Option<String>,
+    refuse: Option<Refusal>,
 }
 
 /// Whether the component needs the `$$renderer.component(…)` wrapper.
@@ -83,15 +83,14 @@ pub(crate) fn component_needs_context(root: &Root<'_>, source: &str) -> Result<b
     }
     walk_fragment(&root.fragment, &mut nc);
 
-    if let Some(what) = nc.refuse {
-        return Err(unsupported(what));
+    if let Some(reason) = nc.refuse {
+        return Err(unsupported(reason));
     }
     for name in &nc.member_roots {
         if nc.shadowed.contains(name) {
-            return Err(unsupported(format!(
-                "member/call rooted at prop/import `{name}` that is also bound in a nested scope \
-                 (needs_context classification ambiguous)"
-            )));
+            return Err(unsupported(Refusal::MemberCallAmbiguousRoot {
+                name: name.clone(),
+            }));
         }
     }
     if !nc.member_roots.is_empty() {
@@ -100,8 +99,8 @@ pub(crate) fn component_needs_context(root: &Root<'_>, source: &str) -> Result<b
     Ok(nc.needs)
 }
 
-fn unsupported(what: impl Into<String>) -> CompileError {
-    CompileError::Unsupported(what.into())
+fn unsupported(reason: Refusal) -> CompileError {
+    CompileError::Unsupported(reason)
 }
 
 /// The plain (non-escaped) name of an identifier, `None` for a unicode-escaped
@@ -207,10 +206,7 @@ fn check_root(access: &Expression<'_>, nc: &mut Nc<'_>) {
             }
             None => {
                 if nc.refuse.is_none() {
-                    nc.refuse = Some(
-                        "member/call rooted at an escaped identifier (classification not ported)"
-                            .to_string(),
-                    );
+                    nc.refuse = Some(Refusal::MemberCallEscapedRoot);
                 }
             }
         },

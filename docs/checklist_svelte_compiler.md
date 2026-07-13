@@ -9,12 +9,12 @@ The compiler targets **server (SSR) output for runes-mode components**, measured
 **The refusal contract**: every component shape is exactly one of
 
 - **Supported** — compiles, and the canonical form matches the oracle's byte-for-byte;
-- **Refused** — `compile` returns `CompileError::Unsupported` with a stable reason string, never guessed output;
+- **Refused** — `compile` returns `CompileError::Unsupported(Refusal)`, a typed refusal from the inventory in `crates/tsv_svelte_compile/src/refusal.rs`, never guessed output;
 - **a bug** — both sides compile and the canonical forms differ (`compile_corpus_compare`'s MISMATCH bucket), or generated JS fails its reparse self-validation (`CompileError::CorruptOutput`).
 
 Inputs the oracle itself rejects (legacy-mode syntax, invalid JS, TypeScript in a plain script) are out of scope for parity — the corpus runner buckets them ORACLE_REJECTED.
 
-The **Refused** entries below quote the exact `Unsupported` reason strings (interpolated names shown as `{name}`); these are also the bucket keys `compile_corpus_compare` reports, so this document maps one-to-one onto corpus runs.
+The **Refused** entries below quote each `Refusal`'s stable **bucket key** (user-chosen identifiers shown as `{name}`); `compile_corpus_compare` reports these keys directly (via `Refusal::bucket_key`), so this document maps one-to-one onto corpus runs. Each variant also carries a human-readable `Display` message that substitutes the real name — the two are deliberately decoupled so a message can be reworded without shifting corpus buckets.
 
 **Verification**: `cargo run -p tsv_debug compile_fixtures_validate` (fixture parity, oracle freshness, canonicalize fixed points) and `deno task compile:corpus:compare` (corpus-scale bucketing over real repos + the Svelte test suites).
 

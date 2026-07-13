@@ -29,7 +29,7 @@ use std::collections::{HashMap, HashSet};
 
 use tsv_ts::ast::internal::{ArrowFunctionBody, BinaryOperator, Expression, UnaryOperator};
 
-use crate::CompileError;
+use crate::{CompileError, Refusal};
 
 /// How a top-level script binding behaves under evaluation and read rewriting.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -741,10 +741,9 @@ pub(crate) fn pattern_binding_names(
         }
         Expression::AssignmentPattern(assign) => pattern_binding_names(assign.left, source, out),
         Expression::RestElement(rest) => pattern_binding_names(rest.argument, source, out),
-        other => Err(CompileError::Unsupported(format!(
-            "binding pattern shape ({})",
-            expression_kind(other)
-        ))),
+        other => Err(CompileError::Unsupported(Refusal::BindingPatternShape {
+            kind: expression_kind(other),
+        })),
     }
 }
 

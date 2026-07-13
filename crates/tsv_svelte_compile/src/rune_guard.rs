@@ -33,8 +33,8 @@ use tsv_ts::ast::internal::{
     ForInit, FunctionExpression, ObjectPatternProperty, ObjectProperty, Statement,
 };
 
-use crate::CompileError;
 use crate::analyze::pattern_binding_names;
+use crate::{CompileError, Refusal};
 
 /// The walk's shared state: the source names resolve against, the collection
 /// sinks, and the refusal set.
@@ -125,7 +125,9 @@ fn dollar_callee_root<'s>(callee: &Expression<'_>, source: &'s str) -> Option<&'
 }
 
 fn rune_error(name: &str) -> CompileError {
-    CompileError::Unsupported(format!("rune {name}"))
+    CompileError::Unsupported(Refusal::Rune {
+        name: name.to_string(),
+    })
 }
 
 /// Record the root identifier(s) of an assignment target (through member
@@ -315,9 +317,9 @@ fn walk_statement(
         | Statement::TSDeclareFunction(_) => Ok(()),
         // Enum/module bodies can carry initializer expressions; walking their
         // internals isn't wired yet, so refuse rather than under-guard.
-        Statement::TSEnumDeclaration(_) | Statement::TSModuleDeclaration(_) => Err(
-            CompileError::Unsupported("TS enum/module declaration in instance script".to_string()),
-        ),
+        Statement::TSEnumDeclaration(_) | Statement::TSModuleDeclaration(_) => {
+            Err(CompileError::Unsupported(Refusal::TsEnumOrModule))
+        }
         Statement::TSExportAssignment(s) => walk_expression(&s.expression, ctx),
     }
 }
@@ -437,16 +439,18 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
         // (non-computed member properties / object keys) are never walked.
         Expression::Identifier(id) => {
             if let Some(name) = dollar_identifier_name(id, ctx.source) {
-                return Err(CompileError::Unsupported(format!(
-                    "$-prefixed identifier {name}"
-                )));
+                return Err(CompileError::Unsupported(
+                    Refusal::DollarPrefixedIdentifier {
+                        name: name.to_string(),
+                    },
+                ));
             }
             if let Some(name) = identifier_name(id, ctx.source)
                 && ctx.derived_names.contains(name)
             {
-                return Err(CompileError::Unsupported(format!(
-                    "read of derived binding {name} (supported only as a bare template expression)"
-                )));
+                return Err(CompileError::Unsupported(Refusal::DerivedBindingRead {
+                    name: name.to_string(),
+                }));
             }
             Ok(())
         }
@@ -522,9 +526,7 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
         // a nested function it is ordinary code and passes through.
         Expression::AwaitExpression(a) => {
             if ctx.fn_depth == 0 {
-                return Err(CompileError::Unsupported(
-                    "top-level await (async component output not implemented)".to_string(),
-                ));
+                return Err(CompileError::Unsupported(Refusal::TopLevelAwait));
             }
             walk_expression(a.argument, ctx)
         }
