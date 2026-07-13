@@ -162,7 +162,11 @@ async fn classify_file(group: usize, path: PathBuf) -> FileOutcome {
         Ok(source) => classify(&source).await,
         Err(e) => Bucket::Error("read", e.to_string()),
     };
-    FileOutcome { group, path, bucket }
+    FileOutcome {
+        group,
+        path,
+        bucket,
+    }
 }
 
 /// The per-file compile-parity pipeline. Oracle-first: an oracle rejection is
@@ -594,10 +598,7 @@ impl Report {
         }
 
         if !self.errors.is_empty() || self.errors_truncated > 0 {
-            println!(
-                "\nErrors ({}):",
-                self.totals.error
-            );
+            println!("\nErrors ({}):", self.totals.error);
             for e in &self.errors {
                 let detail = if e.detail.is_empty() {
                     String::new()
@@ -699,7 +700,10 @@ mod tests {
     #[test]
     fn normalizer_collapses_name_interpolations() {
         // The motivating case: distinct event-handler names share one bucket.
-        assert_eq!(normalize_refusal_reason("event attribute onclick"), "event attribute {name}");
+        assert_eq!(
+            normalize_refusal_reason("event attribute onclick"),
+            "event attribute {name}"
+        );
         assert_eq!(
             normalize_refusal_reason("event attribute onkeydown"),
             "event attribute {name}"
@@ -707,7 +711,9 @@ mod tests {
         assert_eq!(normalize_refusal_reason("rune $state"), "rune {name}");
         assert_eq!(normalize_refusal_reason("rune $foo"), "rune {name}");
         assert_eq!(
-            normalize_refusal_reason("lang=\"ts\" instance script (type stripping not implemented)"),
+            normalize_refusal_reason(
+                "lang=\"ts\" instance script (type stripping not implemented)"
+            ),
             "lang=\"{lang}\" instance script"
         );
         assert_eq!(
@@ -737,7 +743,9 @@ mod tests {
         );
         // Static reasons are already the bucket.
         assert_eq!(
-            normalize_refusal_reason("instance-script export (component exports / $.bind_props not implemented)"),
+            normalize_refusal_reason(
+                "instance-script export (component exports / $.bind_props not implemented)"
+            ),
             "instance-script export (component exports / $.bind_props not implemented)"
         );
     }

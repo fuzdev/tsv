@@ -106,11 +106,10 @@ impl CompileFixturesValidateCommand {
         // so concurrent fixtures can't interleave output and the printed order
         // stays deterministic.
         let count = fixtures.len();
-        let mut stream = super::spawn_work_stream(
-            fixtures,
-            super::ResultOrder::Input,
-            |fixture| async move { validate_fixture(&fixture).await },
-        );
+        let mut stream =
+            super::spawn_work_stream(fixtures, super::ResultOrder::Input, |fixture| async move {
+                validate_fixture(&fixture).await
+            });
         let mut reports = Vec::with_capacity(count);
         while let Some(joined) = stream.next().await {
             reports.push(super::task_result(joined, "compile-validation")?);
