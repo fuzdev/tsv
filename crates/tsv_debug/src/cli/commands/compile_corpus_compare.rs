@@ -183,13 +183,18 @@ async fn classify(source: &str) -> Bucket {
 
     // tsv side. `Unsupported` is the honest refusal contract; a `Parse` error
     // means tsv's Svelte parser rejected a component the oracle compiled — a
-    // parser gap worth surfacing loudly, not a silent skip.
+    // parser gap worth surfacing loudly, not a silent skip. `CorruptOutput` is
+    // the compile self-validation firing: a divergent shape slipped every
+    // guard and emitted unparseable JS — always a compiler bug.
     let ours = match compile(source, &CompileOptions::default()) {
         Ok(o) => o,
         Err(CompileError::Unsupported(reason)) => {
             return Bucket::Refused(normalize_refusal_reason(&reason));
         }
         Err(CompileError::Parse(e)) => return Bucket::Error("tsv-parse", e.to_string()),
+        Err(CompileError::CorruptOutput(e)) => {
+            return Bucket::Error("tsv-corrupt-output", e.to_string());
+        }
     };
 
     // Both compiled — compare the canonical reprints (the parity bar).

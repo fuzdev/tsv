@@ -45,6 +45,14 @@ project-wide conventions.
     prop/import that is also shadowed in a nested scope (`needs_context`
     classification ambiguous), a leading comment glued to the `<script>` line,
     and any block alongside carried script comments also refuse.
+    The output is **self-validated by reparse** before it returns: generated JS
+    that `tsv_ts` rejects surfaces as `CompileError::CorruptOutput` (a compiler
+    bug — a divergent shape slipped every guard), never a silently invalid
+    module. Always on — the reparse costs ~13% of the compile itself (release,
+    measured over the fixture corpus; single-digit microseconds per component).
+    Reach: it catches output the parser *rejects* (nested `export`, mis-built
+    syntax); output that parses as TypeScript (a passed-through annotation)
+    is not a parse rejection and is caught at parity-comparison time instead.
   - `canonicalize_js(source) -> Result<String, CanonicalizeError>` — the
     canonicalizer (below). Lives here because the compiler's own output
     idempotence checks and the oracle comparison both consume it.

@@ -81,6 +81,12 @@ pub enum CompileError {
     /// Always a clear refusal — never guessed output.
     #[error("not yet supported by the Svelte compiler: {0}")]
     Unsupported(String),
+    /// The generated JS failed to reparse — a divergent shape slipped every
+    /// guard and the transform emitted invalid JavaScript. Always a compiler
+    /// bug; surfaced loudly instead of returning the corrupt module (the same
+    /// contract as [`CanonicalizeError::CorruptOutput`]).
+    #[error("generated JS failed to reparse (compiler bug): {0}")]
+    CorruptOutput(tsv_lang::ParseError),
 }
 
 /// An error from [`canonicalize_js`].
@@ -104,6 +110,12 @@ pub enum CanonicalizeError {
 /// (it prints through `tsv_ts::format_canonical`), so
 /// `canonicalize_js(output.js)` is a fixed point. Client generation and dev
 /// mode are not implemented yet ([`CompileError::Unsupported`]).
+///
+/// The output is self-validated by reparse before it is returned — generated JS
+/// the parser rejects surfaces as [`CompileError::CorruptOutput`] instead of a
+/// silently invalid module. Always on: the reparse costs ~13% of the compile
+/// itself (microseconds per component), cheap insurance for a dev-stage
+/// compiler whose refusal contract depends on never shipping guessed output.
 pub fn compile(source: &str, options: &CompileOptions) -> Result<CompileOutput, CompileError> {
     if options.generate == Generate::Client {
         return Err(CompileError::Unsupported("client generation".to_string()));
@@ -113,7 +125,21 @@ pub fn compile(source: &str, options: &CompileOptions) -> Result<CompileOutput, 
     }
     let arena = bumpalo::Bump::new();
     let root = tsv_svelte::parse(source, &arena)?;
-    transform_server::compile_server(&root, source, &arena)
+    let output = transform_server::compile_server(&root, source, &arena)?;
+    validate_output_js(&output.js)?;
+    Ok(output)
+}
+
+/// The self-validation seam: assert `js` reparses as a strict module.
+///
+/// Split from [`compile`] so the corrupt-output path is unit-testable without
+/// weakening the public API (no test-only hooks on `compile` itself).
+fn validate_output_js(js: &str) -> Result<(), CompileError> {
+    let arena = bumpalo::Bump::new();
+    match tsv_ts::parse_with_goal(js, Goal::Module, &arena) {
+        Ok(_) => Ok(()),
+        Err(err) => Err(CompileError::CorruptOutput(err)),
+    }
 }
 
 /// Reprint JavaScript with newline-derived authoring intent erased — the
@@ -1307,5 +1333,32 @@ mod tests {
             matches!(err, CanonicalizeError::Parse(_)),
             "expected Parse, got {err:?}"
         );
+    }
+
+    #[test]
+    fn validate_output_js_rejects_corrupt_output_loudly() {
+        // The self-validation seam: hypothetical corrupt generated JS (the
+        // divergent-shape-slipped-every-guard class, e.g. a nested `export`)
+        // must surface as CorruptOutput, not as a silently invalid module.
+        // Note the net's reach: it catches output the parser REJECTS; output
+        // that parses as TypeScript (a passed-through type annotation) is not
+        // a parse rejection and is caught at parity-comparison time instead.
+        for corrupt in [
+            // Invalid nesting the transform must never emit.
+            "export default function Input($$renderer) {\n\texport const a = 1;\n}\n",
+            // A hard syntax error.
+            "export default function Input($$renderer) {\n\tconst x = ;\n}\n",
+        ] {
+            let err = validate_output_js(corrupt).unwrap_err();
+            assert!(
+                matches!(err, CompileError::CorruptOutput(_)),
+                "expected CorruptOutput for {corrupt:?}, got {err:?}"
+            );
+        }
+        // Valid generated-shaped JS passes.
+        validate_output_js(
+            "import * as $ from 'svelte/internal/server';\nexport default function Input($$renderer) {\n\t$$renderer.push(`<p>x</p>`);\n}\n",
+        )
+        .expect("valid output must validate");
     }
 }
