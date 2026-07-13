@@ -60,9 +60,9 @@ use tsv_svelte::ast::internal::{
 use tsv_ts::ast::internal::{
     ArrayExpression, BinaryOperator, BlockStatement, ExportDefaultDeclaration, ExportDefaultValue,
     Expression, ExpressionStatement, ForInit, ForStatement, FunctionDeclaration, IfStatement,
-    ObjectExpression, ObjectPattern, ObjectPatternProperty, ObjectProperty, Property, PropertyKind,
-    RestElement, Statement, UpdateOperator, VariableDeclaration, VariableDeclarationKind,
-    VariableDeclarator,
+    ImportDeclaration, ImportSpecifier, LiteralValue, ModuleExportName, ObjectExpression,
+    ObjectPattern, ObjectPatternProperty, ObjectProperty, Property, PropertyKind, RestElement,
+    Statement, UpdateOperator, VariableDeclaration, VariableDeclarationKind, VariableDeclarator,
 };
 
 use std::collections::HashMap;
@@ -366,7 +366,8 @@ pub(crate) fn compile_server<'arena>(
             ) {
                 return Err(unsupported(Refusal::InstanceScriptExport));
             }
-            if matches!(stmt, Statement::ImportDeclaration(_)) {
+            if let Statement::ImportDeclaration(import) = stmt {
+                refuse_runes_invalid_import(import, source)?;
                 user_imports.push(stmt.clone());
                 continue;
             }
@@ -898,6 +899,48 @@ fn plain_identifier_name(
     Some(source[start..start + id.name_len as usize].to_string())
 }
 
+/// Mirror the oracle's runes-mode import rules (its analyze-phase
+/// `ImportDeclaration` visitor): any `svelte/internal*` source is forbidden
+/// (private runtime code), and `beforeUpdate`/`afterUpdate` cannot be
+/// imported from `svelte`. A string-literal imported name is skipped exactly
+/// as the oracle skips it (its check matches `Identifier` names only); an
+/// escaped identifier imported from `svelte` refuses conservatively — the
+/// oracle compares the DECODED name, which this raw-span read can't see.
+fn refuse_runes_invalid_import(
+    import: &ImportDeclaration<'_>,
+    source: &str,
+) -> Result<(), CompileError> {
+    let LiteralValue::String(cooked) = &import.source.value else {
+        return Ok(());
+    };
+    let specifier = cooked.resolve(import.source.span, source);
+    if specifier.starts_with("svelte/internal") {
+        return Err(unsupported(Refusal::SvelteInternalImport));
+    }
+    if specifier == "svelte" {
+        for spec in import.specifiers {
+            let ImportSpecifier::Named(named) = spec else {
+                continue;
+            };
+            let ModuleExportName::Identifier(imported) = &named.imported else {
+                continue;
+            };
+            match plain_identifier_name(imported, source) {
+                Some(name) if name == "beforeUpdate" || name == "afterUpdate" => {
+                    return Err(unsupported(Refusal::RunesInvalidImport { name }));
+                }
+                Some(_) => {}
+                None => {
+                    return Err(unsupported(Refusal::RunesInvalidImport {
+                        name: "escaped identifier".to_string(),
+                    }));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Classify one top-level declarator into the binding table.
 fn analyze_declarator<'arena>(
     declarator: &'arena VariableDeclarator<'arena>,
@@ -1050,6 +1093,24 @@ fn rewrite_script_statement<'arena>(
     uses_slots: bool,
     dropped_regions: &mut Vec<Span>,
 ) -> Result<Option<Statement<'arena>>, CompileError> {
+    // A top-level `$:` label is a legacy reactive statement — invalid in
+    // runes mode (the oracle rejects it with legacy_reactive_statement_invalid),
+    // so cloning it through would emit a dead label with no reactivity, a
+    // silent mis-compile. Only the top level refuses: the oracle accepts a
+    // `$` label inside a function (an ordinary JS label) and clones it
+    // through, as does the fallback below. An escaped label name can't be
+    // classified from its raw span, so it refuses conservatively.
+    if let Statement::LabeledStatement(labeled) = stmt {
+        let label = &labeled.label;
+        let is_dollar = label.escaped_name.is_some() || {
+            let start = label.span.start as usize;
+            &source[start..start + label.name_len as usize] == "$"
+        };
+        if is_dollar {
+            return Err(unsupported(Refusal::LegacyReactiveStatement));
+        }
+    }
+
     // Statement-position effects are dropped (and force the wrapper); their
     // callback is still guard-walked so stray runes inside refuse.
     if let Statement::ExpressionStatement(expr_stmt) = stmt
@@ -3552,7 +3613,7 @@ fn emit_dynamic_attribute<'arena>(
     // A string-literal expression value takes the oracle's inline-literal path
     // (pre-escaped static emission) — refuse rather than guess its edge rules.
     if matches!(expr, Expression::Literal(lit)
-        if matches!(lit.value, tsv_ts::ast::internal::LiteralValue::String(_)))
+        if matches!(lit.value, LiteralValue::String(_)))
     {
         return Err(unsupported(Refusal::StringLiteralExprAttribute));
     }

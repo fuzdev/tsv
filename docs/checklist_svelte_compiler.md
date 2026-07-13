@@ -116,6 +116,9 @@ Instance-script statements are borrowed verbatim (with the rune rewrites applied
 - **Supported**: `lang="js"` and `lang=""` (compile exactly like no `lang` attribute).
 - **Refused**: `instance-script export (component exports / $.bind_props not implemented)` — every export form: the oracle compiles `export const`/`function`/`{ a }` via `$.bind_props`, rejects `export default`/`export let` (runes mode), and drops `export * from`; a verbatim passthrough would nest an `export` inside the component function.
 - **Refused**: `module <script context="module">`
+- **Refused**: `` legacy reactive statement `$:` (invalid in runes mode) `` — a **top-level** `$`-labeled statement (the oracle rejects it in runes mode; cloning it through would emit a dead label with no reactivity). A `$` label inside a function, and plain labels anywhere, are ordinary JS the oracle clones through — supported. An escaped top-level label name refuses conservatively (can't be classified from its raw span).
+- **Refused**: `import from svelte/internal (forbidden)` — any import whose source starts with `svelte/internal` (the oracle's runes-mode rule; private runtime code)
+- **Refused**: `runes-invalid import of {name} from svelte` — a named `beforeUpdate`/`afterUpdate` import from `svelte` (the oracle rejects them in runes mode); an escaped imported name from `svelte` refuses conservatively. A string-literal imported name is skipped exactly as the oracle skips it (its check matches identifier names only).
 - **Refused**: `lang="{lang}" instance script (type stripping not implemented)` — any `lang` other than `js`/empty
 - **Refused**: `generics attribute on instance script (implies TypeScript)`
 - **Refused**: `TS enum/module declaration in instance script`

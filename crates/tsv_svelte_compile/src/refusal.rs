@@ -44,6 +44,24 @@ pub enum Refusal {
     /// Any instance-script `export` form (the oracle uses `$.bind_props`).
     #[error("instance-script export (component exports / $.bind_props not implemented)")]
     InstanceScriptExport,
+    /// A top-level `$:` legacy reactive statement. Invalid in runes mode (the
+    /// oracle rejects it), and cloning it through would emit a dead JS label
+    /// with no reactivity — a silent mis-compile. Nested `$` labels and plain
+    /// labels stay ordinary JS the oracle clones through.
+    #[error("legacy reactive statement `$:` (invalid in runes mode)")]
+    LegacyReactiveStatement,
+    /// An import from `svelte/internal*` — private runtime code the oracle
+    /// forbids in runes mode.
+    #[error("import from svelte/internal (forbidden)")]
+    SvelteInternalImport,
+    /// A named import from `svelte` that is invalid in runes mode
+    /// (`beforeUpdate`/`afterUpdate`; also an escaped imported name, which
+    /// can't be classified from its raw span and refuses conservatively).
+    #[error("runes-invalid import of {name} from svelte")]
+    RunesInvalidImport {
+        /// The offending imported name.
+        name: String,
+    },
     /// A `generics` attribute on the instance script (implies TypeScript).
     #[error("generics attribute on instance script (implies TypeScript)")]
     GenericsAttribute,
@@ -479,6 +497,13 @@ impl Refusal {
             Self::InstanceScriptExport => Cow::Borrowed(
                 "instance-script export (component exports / $.bind_props not implemented)",
             ),
+            Self::LegacyReactiveStatement => {
+                Cow::Borrowed("legacy reactive statement `$:` (invalid in runes mode)")
+            }
+            Self::SvelteInternalImport => Cow::Borrowed("import from svelte/internal (forbidden)"),
+            Self::RunesInvalidImport { .. } => {
+                Cow::Borrowed("runes-invalid import of {name} from svelte")
+            }
             Self::GenericsAttribute => {
                 Cow::Borrowed("generics attribute on instance script (implies TypeScript)")
             }

@@ -736,6 +736,9 @@ cargo run -p tsv_debug compile_fixtures_validate [pattern...]
 # Buckets per file: parity / refused (sub-bucketed by refusal reason — a clean "not yet", never a
 # bug) / oracle-rejected (legacy mode, invalid syntax; out of scope) / MISMATCH (both compiled,
 # canonical forms differ — always a bug by the refusal contract) / error (harness failure).
+# Every oracle-rejected file is also probed with tsv's compile(): a success is reported in a loud
+# OVER-ACCEPTANCE section (nothing invalid in runes mode may compile — a refusal-contract gap),
+# without affecting the exit code.
 # Exit codes: 0 clean, 1 mismatch, 2 harness error. Sidecar-dependent — kept out of `deno task
 # check`; the `compile:corpus:compare` deno task points it at the real-repo corpus + Svelte suites.
 cargo run -p tsv_debug compile_corpus_compare <paths...>

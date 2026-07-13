@@ -1566,6 +1566,65 @@ mod tests {
     }
 
     #[test]
+    fn compile_refuses_top_level_legacy_reactive_statement() {
+        // A top-level `$:` label is a legacy reactive statement — the oracle
+        // rejects it in runes mode (legacy_reactive_statement_invalid), so
+        // cloning it through as a dead JS label would be a silent mis-compile.
+        for source in [
+            "<script>let c = 1;\n\t$: doubled = c * 2;</script>\n<p>{c}</p>",
+            "<script>let c = 1;\n\t$: { console.log(c); }</script>\n<p>{c}</p>",
+            "<script>let c = 1;\n\t$: if (c) c = 0;</script>\n<p>{c}</p>",
+        ] {
+            assert_unsupported(source, "legacy reactive statement");
+        }
+    }
+
+    #[test]
+    fn compile_refuses_runes_invalid_imports() {
+        // The oracle's runes-mode import rules: `svelte/internal*` sources are
+        // forbidden outright; `beforeUpdate`/`afterUpdate` cannot be imported
+        // from `svelte`. Other `svelte` imports stay valid.
+        for source in [
+            "<script>import { get } from 'svelte/internal/client';</script>\n<p>x</p>",
+            "<script>import * as i from 'svelte/internal';</script>\n<p>x</p>",
+        ] {
+            assert_unsupported(source, "import from svelte/internal");
+        }
+        for source in [
+            "<script>import { beforeUpdate } from 'svelte';</script>\n<p>x</p>",
+            "<script>import { afterUpdate as au } from 'svelte';</script>\n<p>x</p>",
+        ] {
+            assert_unsupported(source, "runes-invalid import");
+        }
+        let js = compile_js("<script>import { mount } from 'svelte';</script>\n<p>x</p>");
+        assert!(
+            js.contains("import { mount } from 'svelte';"),
+            "valid svelte import must hoist through: {js}"
+        );
+    }
+
+    #[test]
+    fn compile_clones_plain_and_nested_dollar_labels() {
+        // A plain label anywhere, and a `$` label INSIDE a function, are
+        // ordinary JS the oracle accepts and clones through verbatim — only
+        // the top-level `$:` form is the legacy reactive statement.
+        let js = compile_js(
+            "<script>\n\touter: for (let i = 0; i < 1; i += 1) {\n\t\tbreak outer;\n\t}\n</script>\n<p>x</p>",
+        );
+        assert!(
+            js.contains("outer: for"),
+            "plain label must clone through: {js}"
+        );
+        let js = compile_js(
+            "<script>\n\tlet c = 1;\n\tfunction f() {\n\t\t$: y = c;\n\t\treturn y;\n\t}\n</script>\n<p>{c}</p>",
+        );
+        assert!(
+            js.contains("$: y = c;"),
+            "nested $ label must clone through: {js}"
+        );
+    }
+
+    #[test]
     fn compile_injects_slots_events_before_props_rest() {
         // A rest element in the `$props()` pattern gains the oracle's
         // `$$slots, $$events` injection immediately before it.

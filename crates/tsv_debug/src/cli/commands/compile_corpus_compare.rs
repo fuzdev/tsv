@@ -19,7 +19,10 @@ use tsv_svelte_compile::{CompileError, CompileOptions, canonicalize_js, compile}
 /// - **refused** — tsv returned `Unsupported` (sub-bucketed by reason). A clean
 ///   "not yet," never a bug.
 /// - **oracle-rejected** — the oracle rejected the source (legacy mode, invalid
-///   syntax, TypeScript in a plain script). Out of scope for parity.
+///   syntax, TypeScript in a plain script). Out of scope for parity. Each such
+///   file is also probed with tsv's `compile()`: a success is reported in the
+///   OVER-ACCEPTANCE section (a refusal-contract gap — nothing invalid in
+///   runes mode may compile), without affecting the exit code.
 /// - **mismatch** — both compiled but the canonical forms differ. By the refusal
 ///   contract this is always a bug.
 /// - **error** — a harness failure (sidecar, canonicalize, tsv parse rejection,
@@ -52,8 +55,14 @@ enum Bucket {
     /// [`Refusal::bucket_key`](tsv_svelte_compile::Refusal::bucket_key).
     Refused(String),
     /// The oracle rejected the source, keyed on the Svelte error code (or the
-    /// error's first line when no code is present).
-    OracleRejected(String),
+    /// error's first line when no code is present). `tsv_over_accepts` records
+    /// whether tsv's `compile()` nevertheless succeeded on it — always a gap
+    /// (nothing invalid in runes mode may compile), reported loudly, though
+    /// the bucket itself stays out of the exit gate.
+    OracleRejected {
+        code: String,
+        tsv_over_accepts: bool,
+    },
     /// Both sides compiled but the canonical forms differ (a bug); the bounded
     /// diff is carried for the report.
     Mismatch(String),
@@ -187,7 +196,13 @@ async fn classify(source: &str) -> Bucket {
         Ok(o) => o,
         Err(DenoError::ToolError { message }) => {
             return match oracle_reject_code(&message) {
-                Some(code) => Bucket::OracleRejected(code),
+                // Over-acceptance probe: an oracle-rejected component that tsv
+                // compiles anyway is a refusal-contract gap (the `$:` class) —
+                // cheap to check here since tsv's compile is pure Rust.
+                Some(code) => Bucket::OracleRejected {
+                    code,
+                    tsv_over_accepts: compile(source, &CompileOptions::default()).is_ok(),
+                },
                 None => Bucket::Error("oracle-tool", first_line(&message)),
             };
         }
@@ -438,6 +453,7 @@ struct Report {
     groups: Vec<(String, Stats)>,
     refusal_reasons: Vec<ReasonCount>,
     oracle_rejected_reasons: Vec<ReasonCount>,
+    over_acceptance: Vec<ReasonCount>,
     mismatches: Vec<MismatchEntry>,
     errors: Vec<ErrorEntry>,
     errors_truncated: usize,
@@ -457,6 +473,7 @@ impl Report {
 
         let mut refusal: BTreeMap<String, ReasonAgg> = BTreeMap::new();
         let mut oracle_rej: BTreeMap<String, ReasonAgg> = BTreeMap::new();
+        let mut over_accept: BTreeMap<String, ReasonAgg> = BTreeMap::new();
         let mut mismatches = Vec::new();
         let mut errors = Vec::new();
         let mut errors_truncated = 0;
@@ -476,10 +493,16 @@ impl Report {
                     gs.refused += 1;
                     refusal.entry(reason.clone()).or_default().add(&path);
                 }
-                Bucket::OracleRejected(reason) => {
+                Bucket::OracleRejected {
+                    code,
+                    tsv_over_accepts,
+                } => {
                     totals.oracle_rejected += 1;
                     gs.oracle_rejected += 1;
-                    oracle_rej.entry(reason.clone()).or_default().add(&path);
+                    oracle_rej.entry(code.clone()).or_default().add(&path);
+                    if *tsv_over_accepts {
+                        over_accept.entry(code.clone()).or_default().add(&path);
+                    }
                 }
                 Bucket::Mismatch(diff) => {
                     totals.mismatch += 1;
@@ -520,6 +543,7 @@ impl Report {
                 .collect(),
             refusal_reasons: sort_reasons(refusal),
             oracle_rejected_reasons: sort_reasons(oracle_rej),
+            over_acceptance: sort_reasons(over_accept),
             mismatches,
             errors,
             errors_truncated,
@@ -548,6 +572,13 @@ impl Report {
             &self.oracle_rejected_reasons,
             usize::MAX,
         );
+        if !self.over_acceptance.is_empty() {
+            let total: usize = self.over_acceptance.iter().map(|r| r.count).sum();
+            println!(
+                "\nOVER-ACCEPTANCE ({total}) — oracle-rejected but tsv compiles; each is a refusal-contract gap:"
+            );
+            print_reasons("By oracle code", &self.over_acceptance, usize::MAX);
+        }
 
         if !self.mismatches.is_empty() {
             println!("\nMISMATCHES ({}) — each is a bug:", self.mismatches.len());
@@ -589,6 +620,7 @@ impl Report {
             groups: Vec<GroupJson<'a>>,
             refusal_reasons: &'a [ReasonCount],
             oracle_rejected_reasons: &'a [ReasonCount],
+            over_acceptance: &'a [ReasonCount],
             mismatches: &'a [MismatchEntry],
             errors: &'a [ErrorEntry],
             errors_truncated: usize,
@@ -602,6 +634,7 @@ impl Report {
                 .collect(),
             refusal_reasons: &self.refusal_reasons,
             oracle_rejected_reasons: &self.oracle_rejected_reasons,
+            over_acceptance: &self.over_acceptance,
             mismatches: &self.mismatches,
             errors: &self.errors,
             errors_truncated: self.errors_truncated,
