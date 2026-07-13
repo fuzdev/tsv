@@ -6,10 +6,32 @@
 use crate::ast::internal::CssValue;
 use crate::parser::value::cursor::ValueCursor;
 use crate::parser::value::lists::{ValueSeparator, classify_separators};
+use crate::parser::value::scan::value_skip_table;
 use crate::whitespace::is_css_whitespace;
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
+
+/// [`ValueParser::fast_scan`]'s skip table. Beyond the structural set it must see the
+/// comment introducer (`/`), and both separators it classifies on — the comma and
+/// ASCII whitespace.
+///
+/// The exhaustiveness argument, which is what makes the skip byte-identical: a skipped
+/// byte reaches no arm of the loop. It is not `/` (comment probe), not `\` (escape
+/// probe), not a paren or quote (nesting), not `,` and not whitespace (the separators)
+/// — and the one remaining arm, the in-quote close (`b == quote_char`), can't match it
+/// either, because `quote_char` only ever holds `'` or `"`, both structural.
+const FAST_SCAN_SKIP: [bool; 256] =
+    value_skip_table!(|b| b == b'/' || b == b',' || b.is_ascii_whitespace());
+
+/// Skip table for the comma-list split's delimiter, `|c| c == ','`.
+const COMMA_SKIP: [bool; 256] = value_skip_table!(|b| b == b',');
+
+/// Skip table for the whitespace-list split's delimiter, [`is_css_whitespace`] — which
+/// is `char::is_ascii_whitespace`, so the table is total over it. Note this deliberately
+/// does **not** mirror `char::is_whitespace`, whose ASCII half also includes U+000B
+/// (vertical tab).
+const CSS_WS_SKIP: [bool; 256] = value_skip_table!(|b| b.is_ascii_whitespace());
 
 /// Position-tracking parser for CSS values
 ///
@@ -236,6 +258,14 @@ impl<'a> ValueParser<'a> {
         while i < bytes.len() {
             let b = bytes[i];
 
+            // Most of a value's bytes are inert content, which no arm below can act
+            // on (see `FAST_SCAN_SKIP`). One L1 load retires them ahead of the whole
+            // comment/escape/nesting/separator branch chain.
+            if FAST_SCAN_SKIP[b as usize] {
+                i += 1;
+                continue;
+            }
+
             // A block comment outside quotes: the comment-blind split below would
             // treat the `,`/space inside it as separators, so hand the whole value
             // to the comment-aware fallback instead.
@@ -341,7 +371,7 @@ impl<'a> ValueParser<'a> {
     /// Parse comma-separated values: "a, b, c"
     fn parse_comma_separated<'arena>(&self, arena: &'arena Bump) -> CssValue<'arena> {
         CssValue::CommaSeparated {
-            values: self.split_top_level(arena, |c| c == ','),
+            values: self.split_top_level(arena, |c| c == ',', &COMMA_SKIP),
             span: self.absolute_span(),
         }
     }
@@ -349,7 +379,7 @@ impl<'a> ValueParser<'a> {
     /// Parse space-separated values: "a b c"
     fn parse_space_separated<'arena>(&self, arena: &'arena Bump) -> CssValue<'arena> {
         CssValue::List {
-            values: self.split_top_level(arena, is_css_whitespace),
+            values: self.split_top_level(arena, is_css_whitespace, &CSS_WS_SKIP),
             span: self.absolute_span(),
         }
     }
@@ -368,6 +398,7 @@ impl<'a> ValueParser<'a> {
         &self,
         arena: &'arena Bump,
         is_delimiter: F,
+        skip: &[bool; 256],
     ) -> &'arena [CssValue<'arena>]
     where
         F: Fn(char) -> bool,
@@ -382,7 +413,7 @@ impl<'a> ValueParser<'a> {
                 break;
             }
 
-            let (value_start, value_end_raw) = cursor.consume_until(&is_delimiter);
+            let (value_start, value_end_raw) = cursor.consume_until(&is_delimiter, skip);
             let value_end = self.trimmed_end(text, value_start, value_end_raw);
 
             if value_end > value_start {

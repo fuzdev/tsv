@@ -153,11 +153,6 @@ const ALLOW: &[Allow] = &[
         "comment-marker",
     ),
     (
-        "tsv_css/src/printer/value_normalization/numbers.rs",
-        "let Some(e_idx) = num.find(['e', 'E']) else {",
-        "number-literal",
-    ),
-    (
         "tsv_css/src/printer/value_normalization/splitting.rs",
         "let func_start = source.find(func_name)?;",
         "css-value",

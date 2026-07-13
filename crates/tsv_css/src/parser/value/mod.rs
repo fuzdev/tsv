@@ -9,6 +9,7 @@ pub mod dimensions;
 pub mod functions;
 pub mod lists;
 pub(crate) mod parser;
+pub(crate) mod scan;
 pub mod strings;
 
 use crate::ast::internal::CssValue;
