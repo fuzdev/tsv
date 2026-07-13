@@ -10,8 +10,20 @@
 // more readable/debuggable factoring and carries no per-token UTF-8-decode tax the inline
 // approach would save — `next_token` dispatches byte-first (see `cur_byte`), decoding a
 // `char` only at the non-ASCII branches, and the per-identifier decode allocation is lazy
-// (see `read_identifier`). The remaining CSS-parse hotspot is elsewhere: the value parser's
-// repeated structural re-scan (`ValueParser::parse` and the `contains_*` walks).
+// (see `read_identifier`).
+//
+// One caller deliberately does NOT pull tokens: a declaration's value. Its text is re-parsed
+// from source by `parser::value` regardless, so tokenizing it merely to find its `;`/`}`
+// boundary asked the lexer for a token stream nobody kept. `parser::decl_scan` scans those
+// bytes directly instead — which makes it a SECOND reader of this grammar, and the one place
+// a lexer change can silently break something far away. It mirrors the rules that decide a
+// token's extent: `url(…)` opacity (and the identifier-token-start test that gates it),
+// strings, comments, escapes, and what counts as whitespace. It reuses this module's own
+// `IDENT_CONTINUE_LUT` and `is_ascii_css_whitespace` rather than re-spelling them, and it
+// declines (falling back to a real token walk) on anything it does not fully model, so it
+// never has to reproduce a lexer *error*. A debug-only assertion re-derives its every result
+// from the token walk, so a lexer change that outruns it fails the test suite rather than
+// corrupting a parse — but read `decl_scan` before changing token extents here.
 //
 // Pros of separate lexer:
 //   - Easier to debug (can inspect token stream)
@@ -31,6 +43,7 @@ mod strings;
 pub mod token;
 
 use comments::read_comment;
+pub(crate) use identifiers::IDENT_CONTINUE_LUT;
 use identifiers::{is_ascii_identifier_start, is_identifier_start, read_identifier};
 use numbers::read_number;
 use strings::read_string;
@@ -391,7 +404,10 @@ impl<'a> Lexer<'a> {
 /// `<SP>` U+0020 — the Unicode `White_Space` code points below U+0080. Deliberately
 /// **not** `u8::is_ascii_whitespace()`, which omits `<VT>` (U+000B) and so would
 /// diverge from the char dispatch this replaces.
+///
+/// Shared with the declaration value's boundary scan, which trims a value's span back to
+/// its last non-whitespace token — a trim that is only exact if it means whitespace here.
 #[inline]
-const fn is_ascii_css_whitespace(b: u8) -> bool {
+pub(crate) const fn is_ascii_css_whitespace(b: u8) -> bool {
     matches!(b, b'\t' | b'\n' | 0x0B | 0x0C | b'\r' | b' ')
 }

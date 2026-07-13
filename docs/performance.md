@@ -60,6 +60,19 @@ rate — e.g. `../prettier/tests/format/css` holds per-directory `.js` test
 drivers beside its `.css` fixtures. Copy only the target extension into a
 scratch directory and profile that.
 
+**There is no CSS corpus in the list above, and the obvious guess is a trap.**
+`~/dev/fuz_css/src` is a CSS *framework*, but by bytes it is ~92% TypeScript —
+profiling it measures the TS path and reads a CSS change as noise, which is
+exactly how a real CSS win gets mistaken for a placement artifact (and a CSS
+*regression* gets missed). Build a genuine `.css`-only corpus instead: run
+`deno task bench:harvest:svelte-styles` to extract real `<style>` blocks into
+`benches/js/.cache/svelte_styles/`, and add the authored stylesheets scattered
+across the ecosystem and the spec checkouts (`fuz_css/src/lib/{theme,style}.css`,
+`../csswg-drafts`, `../wpt/css`). That lands ~1 MB of real CSS, enough to hold a
+sub-percent read steady. For attribution in the other direction, a **pure-`.ts`**
+corpus (no `.svelte` — a `.svelte` file's `<style>` block routes through the CSS
+parser) is the control that must read ~0.000% for a CSS-only change.
+
 ## Tooling
 
 Four tools, in order of use:
