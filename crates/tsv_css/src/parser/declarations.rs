@@ -218,8 +218,10 @@ pub(crate) fn parse_declaration<'arena>(
     let value_start_raw = parser.current_start;
     let facts = super::decl_scan::scan_value(parser, value_start_raw)?;
 
-    // Land on the terminator the scan found — the lexer never tokenized the value.
-    parser.seek_to(facts.terminator)?;
+    // Land on the terminator the scan found — the lexer never tokenized the value, and it
+    // does not tokenize the terminator either: the scan stopped *on* it, so it knows which
+    // token it is.
+    parser.seat_at_terminator(facts.terminator, facts.terminator_kind);
 
     let has_value_comment = facts.has_comment;
     let important_end = facts.important_end.map(|end| parser.span_pos(end));

@@ -1,5 +1,5 @@
 use crate::ast::internal::{AngleUnit, Color, ColorChannel};
-use phf::phf_set;
+use crate::keyword_set::ascii_keyword_set;
 
 /// Parse a color value: hex, named, rgb(), hsl(), etc.
 ///
@@ -26,12 +26,17 @@ pub fn parse_color(s: &str) -> Option<Color> {
 
 /// Parse color function: rgb(r, g, b), rgba(r, g, b, a), hsl(...), hsla(...)
 ///
-/// Only constructs the `Rgb`/`Hsl` variants.
+/// Only constructs the `Rgb`/`Hsl` variants. `name` is matched ASCII-case-insensitively —
+/// CSS function names are ASCII case-insensitive, and this runs on *every* function value
+/// the parser builds (`var`, `calc`, `clamp`, …), the overwhelming majority of which are
+/// not color functions at all, so it must not cost an allocation to say "no".
 pub fn parse_color_function(name: &str, args_str: &str) -> Option<Color> {
-    match name {
-        "rgb" | "rgba" => parse_rgb(args_str),
-        "hsl" | "hsla" => parse_hsl(args_str),
-        _ => None,
+    if name.eq_ignore_ascii_case("rgb") || name.eq_ignore_ascii_case("rgba") {
+        parse_rgb(args_str)
+    } else if name.eq_ignore_ascii_case("hsl") || name.eq_ignore_ascii_case("hsla") {
+        parse_hsl(args_str)
+    } else {
+        None
     }
 }
 
@@ -171,17 +176,17 @@ fn parse_hsl(args_str: &str) -> Option<Color> {
     })
 }
 
-/// Check if string is a named CSS color (case-insensitive, O(1) lookup)
-fn is_named_color(s: &str) -> bool {
-    // Fast path: names arrive lowercase, so probe the set directly and only
-    // allocate a lowercased copy when the input actually has uppercase ASCII.
-    NAMED_COLORS.contains(s)
-        || (s.bytes().any(|b| b.is_ascii_uppercase())
-            && NAMED_COLORS.contains(s.to_ascii_lowercase().as_str()))
-}
+ascii_keyword_set! {
+    /// The CSS named colors (148 standard + 5 keywords), compiled at build time.
+    static NAMED_COLORS;
 
-/// Static set of CSS named colors (148 standard + 5 keywords) - compiled at build time
-static NAMED_COLORS: phf::Set<&'static str> = phf_set! {
+    /// Is `s` a named CSS color (ASCII-case-insensitive)?
+    ///
+    /// Hot: the value parser asks this of every identifier-ish leaf it builds, so almost
+    /// every call is a `var` / `auto` / `solid` / `--custom-property` that no hash needs to
+    /// touch. `ascii_keyword_set!` puts the shape pre-filter in front — see `keyword_set`.
+    fn is_named_color;
+
     // Standard colors
     "aliceblue",
     "antiquewhite",
@@ -336,4 +341,4 @@ static NAMED_COLORS: phf::Set<&'static str> = phf_set! {
     "inherit",
     "initial",
     "unset",
-};
+}
