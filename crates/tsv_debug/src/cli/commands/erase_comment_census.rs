@@ -368,32 +368,18 @@ fn collect(
     }
 }
 
-/// Position of the next surviving token at or after `from`: skips ASCII
-/// whitespace and both comment forms, so a comment glued to an erased span's
-/// tail sits inside the refusal window.
+/// The refusal window's forward edge — the compiler's own rule, not a copy of it
+/// (`tsv_svelte_compile::next_token_pos`): skips whitespace and both comment
+/// forms, so a comment glued to an erased span's tail sits inside the window.
+///
+/// The compiler additionally extends a *detached* region's window BACKWARD to
+/// its preceding token (a `return_type` after `)`, an `implements` clause). This
+/// census works from the wire JSON, which carries no such anchors, so it
+/// measures the forward rule only — an under-count, and the reason its figure is
+/// a lower bound on the haircut.
 fn next_token_pos(source: &str, from: usize) -> usize {
-    let bytes = source.as_bytes();
-    let mut pos = from.min(bytes.len());
-    loop {
-        while pos < bytes.len() && bytes[pos].is_ascii_whitespace() {
-            pos += 1;
-        }
-        if pos + 1 < bytes.len() && bytes[pos] == b'/' && bytes[pos + 1] == b'/' {
-            while pos < bytes.len() && bytes[pos] != b'\n' {
-                pos += 1;
-            }
-            continue;
-        }
-        if pos + 1 < bytes.len() && bytes[pos] == b'/' && bytes[pos + 1] == b'*' {
-            pos += 2;
-            while pos + 1 < bytes.len() && !(bytes[pos] == b'*' && bytes[pos + 1] == b'/') {
-                pos += 1;
-            }
-            pos = (pos + 2).min(bytes.len());
-            continue;
-        }
-        return pos;
-    }
+    let from = u32::try_from(from).unwrap_or(u32::MAX);
+    tsv_svelte_compile::next_token_pos(source, from) as usize
 }
 
 #[allow(clippy::cast_precision_loss)]

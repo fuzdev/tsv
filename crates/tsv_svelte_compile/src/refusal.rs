@@ -106,10 +106,18 @@ pub enum Refusal {
     /// IIFE). A **type-only** namespace erases away cleanly and compiles.
     #[error("TS namespace/module with a value member (the oracle rejects it)")]
     TsNamespaceWithValue,
-    /// A constructor parameter property (`constructor(public x: number)`) —
-    /// real TypeScript synthesizes `this.x = x` into the body, so unwrapping to
-    /// the bare parameter would drop behavior. The oracle rejects it.
-    #[error("TS parameter property (constructor(public x) — the oracle rejects it)")]
+    /// A dotted `namespace A.B { … }`. The oracle's strip visitor assumes a block
+    /// body and calls `node.body.body.map(…)` on the nested module declaration —
+    /// it **throws** (`node.body.body.map is not a function`), at any body
+    /// content. Not a compilable shape, so refuse rather than guess.
+    #[error("dotted TS namespace A.B (the oracle crashes on it)")]
+    TsDottedNamespace,
+    /// A constructor parameter property carrying `readonly` or an accessibility
+    /// modifier (`constructor(public x: number)`) — real TypeScript synthesizes
+    /// `this.x = x` into the body, so unwrapping to the bare parameter would drop
+    /// behavior. Exactly the oracle's rule: a lone `override`, or a modifier
+    /// outside a constructor, is unwrapped instead and compiles.
+    #[error("TS parameter property with readonly/accessibility (the oracle rejects it)")]
     TsParameterProperty,
     /// A decorator. The oracle rejects every decorator
     /// (`typescript_invalid_feature`), and without `lang="ts"` it is a plain-JS
@@ -591,6 +599,7 @@ impl Refusal {
             | Self::CommentInErasedTypeRegion
             | Self::TsEnum
             | Self::TsNamespaceWithValue
+            | Self::TsDottedNamespace
             | Self::TsParameterProperty
             | Self::Decorator
             | Self::TsAccessorField

@@ -100,12 +100,18 @@ project-wide conventions.
   check that catches a missed erase, which the output reparse cannot (a surviving
   annotation still parses). Refuse-don't-erase for the runtime-bearing constructs
   and the ones the oracle mis-compiles (see `refusal.rs`); every erased source
-  region is recorded, and a comment intersecting one — window extended to the next
-  surviving *token*, so `let x: Foo /* c */ = v` counts — refuses, because the
+  region is recorded, and a comment intersecting one refuses — because the
   oracle's surviving-comment placement is an emergent artifact of its printer's
-  flush points over stale spans, not a portable rule. `erase_expression` is the
-  per-expression entry point for the template's borrow points (a later slice; until
-  then a TypeScript template expression refuses).
+  flush points over stale spans, not a portable rule. The window widens on **both**
+  sides: forward to the next surviving token (so `let x: Foo /* c */ = v` counts),
+  and backward to the previous one for a region *detached* from it (a `return_type`
+  after `)`, an `implements` clause, a `<T>` list — the printer never queries the
+  erased node's range, but the enclosing node's gap window still spans it, so the
+  comment would otherwise print anyway, twice for `implements`). A whole-statement
+  drop deliberately does **not** reach backward: a JSDoc above an erased `interface`
+  survives onto the next statement, exactly where the oracle puts it.
+  `erase_expression` is the per-expression entry point for the template's borrow
+  points (a later slice; until then a TypeScript template expression refuses).
 - `build.rs` — synthetic-AST constructors over the **hybrid appendix buffer**:
   the print buffer is the host `.svelte` source plus an appendix of minted
   lexemes. Borrowed user subtrees keep their real host spans; minted
@@ -172,7 +178,11 @@ project-wide conventions.
   non-destructured `let props = $props()` becomes
   `let { $$slots, $$events, ...props } = $$props` — a plain destructure without
   a rest gets no injection), `$state(v)`/`$state.raw(v)` → `v`
-  (`void 0` argument-less), `$derived(e)` → `$.derived(() => e)`,
+  (`void 0` argument-less), `$derived(e)` → `$.derived(() => e)` — but the
+  oracle's `b.thunk` runs `unthunk`, which collapses the arrow when its body is
+  a call on a bare identifier whose arguments match its (empty) parameter list,
+  so an argument-less call passes straight through
+  (`$derived(get_library())` → `$.derived(get_library)`) —
   `$derived.by(f)` → `$.derived(f)`, statement-position `$effect`/`$effect.pre`
   dropped — a multi-declarator top-level declaration splitting into one
   declaration per declarator, source order (the oracle's shape; nested

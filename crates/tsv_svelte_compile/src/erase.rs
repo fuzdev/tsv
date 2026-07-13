@@ -30,11 +30,17 @@
 //! **Comments.** Erasure deletes source regions, and the oracle's surviving-comment
 //! placement is emergent (a stale-span artifact of its printer's flush points),
 //! not a rule tsv can port. So every erased region is recorded in
-//! [`Erased::regions`] and a comment falling in one refuses. The refusal
-//! **window** is wider than the erased span — it runs to the start of the next
-//! surviving token, so a comment past an erased annotation
-//! (`let x: Foo /* c */ = v`, which the oracle re-anchors onto the initializer)
-//! is caught too. See [`Erased::refusal_windows`].
+//! [`Erased::regions`] and a comment intersecting one refuses. The refusal
+//! **window** is wider than the erased span on both sides:
+//!
+//! - **forward**, to the start of the next surviving token — so a comment past an
+//!   erased annotation (`let x: Foo /* c */ = v`, which the oracle re-anchors onto
+//!   the initializer) is caught ([`next_token_pos`]);
+//! - **backward**, to the end of the previous surviving token, but *only* for a
+//!   region detached from it — a `return_type` after `)`, an `implements` clause, a
+//!   `<T>` list ([`prev_token_end`], [`Eraser::drop_region_from`]). A whole-statement
+//!   drop deliberately does **not** reach backward: a JSDoc above an erased
+//!   `interface` survives onto the next statement, exactly where the oracle puts it.
 
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
@@ -43,10 +49,10 @@ use tsv_ts::ast::internal::{
     ArrayPattern, ArrowFunctionBody, ArrowFunctionExpression, AssignmentPattern, BlockStatement,
     CatchClause, ClassBody, ClassDeclaration, ClassExpression, ClassMember, EmptyStatement,
     ExportDefaultValue, ExportKind, Expression, ForInOfLeft, ForInit, FunctionDeclaration,
-    FunctionExpression, Identifier, ImportKind, ImportSpecifier, MethodDefinition, ObjectPattern,
-    ObjectPatternProperty, ObjectProperty, Property, PropertyDefinition, PropertyModifier,
-    RestElement, Statement, StaticBlock, SwitchCase, TSModuleDeclarationBody, TemplateLiteral,
-    VariableDeclaration, VariableDeclarator,
+    FunctionExpression, Identifier, ImportKind, ImportSpecifier, MethodDefinition, MethodKind,
+    ObjectPattern, ObjectPatternProperty, ObjectProperty, Property, PropertyDefinition,
+    PropertyModifier, RestElement, Statement, StaticBlock, SwitchCase, TSModuleDeclarationBody,
+    TemplateLiteral, VariableDeclaration, VariableDeclarator,
 };
 
 use crate::CompileError;
@@ -56,26 +62,18 @@ use crate::refusal::Refusal;
 pub(crate) struct Erased<'arena> {
     /// The type-free statements — the input slice itself when nothing changed.
     pub(crate) body: &'arena [Statement<'arena>],
-    /// Every erased source region, in walk order. Empty exactly when
-    /// [`Self::changed`] is false.
+    /// Every erased source region, already extended to its comment-refusal
+    /// window (see [`Eraser::drop_region`]). In walk order.
     pub(crate) regions: Vec<Span>,
-    /// Whether anything was erased. `false` proves the input carried no
-    /// TypeScript-only node — the property the self-check asserts of the
-    /// finished program.
+    /// Whether the tree was rebuilt at all. `false` proves the input carried no
+    /// TypeScript-only node **and** no `JsdocCast` — the property the self-check
+    /// asserts of the finished program.
     pub(crate) changed: bool,
-}
-
-impl Erased<'_> {
-    /// The comment-refusal windows: each erased region extended to the start of
-    /// the next surviving token, so a comment glued to an erased region's tail
-    /// (`let x: Foo /* c */ = v`) falls inside. A comment **intersecting** a
-    /// window refuses.
-    pub(crate) fn refusal_windows(&self, source: &str) -> Vec<Span> {
-        self.regions
-            .iter()
-            .map(|region| Span::new(region.start, next_token_pos(source, region.end)))
-            .collect()
-    }
+    /// Whether TypeScript-only *syntax* was erased. Distinct from
+    /// [`Self::changed`]: unwrapping a `JsdocCast` (`/** @type {T} */ (x)`) is a
+    /// compile-path normalization of **valid JavaScript**, so it must not make a
+    /// `lang`-less script look like TypeScript.
+    pub(crate) typescript: bool,
 }
 
 /// Erase every TypeScript-only construct from a statement list.
@@ -84,19 +82,15 @@ pub(crate) fn erase_statements<'arena>(
     source: &str,
     stmts: &'arena [Statement<'arena>],
 ) -> Result<Erased<'arena>, CompileError> {
-    let mut eraser = Eraser {
-        arena,
-        source,
-        regions: Vec::new(),
-    };
+    let mut eraser = Eraser::new(arena, source);
     let erased = eraser.statements(stmts)?;
-    debug_assert_eq!(
-        erased.is_some(),
-        !eraser.regions.is_empty(),
-        "every rebuild must record its erased region (the refusal window depends on it)"
+    debug_assert!(
+        !eraser.typescript || !eraser.regions.is_empty(),
+        "every TypeScript erasure must record its region (the refusal window depends on it)"
     );
     Ok(Erased {
         changed: erased.is_some(),
+        typescript: eraser.typescript,
         body: erased.unwrap_or(stmts),
         regions: eraser.regions,
     })
@@ -120,20 +114,21 @@ pub(crate) fn erase_expression<'arena>(
     source: &str,
     expr: &Expression<'arena>,
 ) -> Result<(Option<Expression<'arena>>, Vec<Span>), CompileError> {
-    let mut eraser = Eraser {
-        arena,
-        source,
-        regions: Vec::new(),
-    };
+    let mut eraser = Eraser::new(arena, source);
     let erased = eraser.expr(expr)?;
     Ok((erased, eraser.regions))
 }
 
 /// Position of the next surviving token at or after `from`: skips whitespace and
-/// both comment forms via the trivia-aware cursor (never a raw `find`), so a
-/// comment sitting between an erased region and the next real token is inside
-/// the refusal window.
-fn next_token_pos(source: &str, from: u32) -> u32 {
+/// both comment forms via the trivia-aware cursor (never a raw `find`).
+///
+/// This is the **forward** half of an erased region's comment-refusal window: a
+/// comment glued to the region's tail (`let x: Foo /* c */ = v`, which the
+/// oracle re-anchors onto the initializer) sits inside it. Public so the
+/// `erase_comment_census` diagnostic measures the same rule the compiler
+/// enforces.
+#[must_use]
+pub fn next_token_pos(source: &str, from: u32) -> u32 {
     let bytes = source.as_bytes();
     let end = bytes.len();
     let mut pos = (from as usize).min(end);
@@ -148,8 +143,61 @@ fn next_token_pos(source: &str, from: u32) -> u32 {
     }
 }
 
+/// End of the last surviving token strictly before `to`, scanning forward from
+/// `anchor` (a position known to be outside trivia) with the trivia-aware
+/// cursor. A string literal counts as a token; a comment does not.
+///
+/// This is the **backward** half of the window, and it is why the window can be
+/// anchored on the AST rather than on a backward byte scan. An erased region
+/// whose start is not glued to its preceding token — a `return_type` (preceded
+/// by `)`), an `implements` clause, a `<T>` parameter/argument list — would
+/// otherwise leak the comment sitting immediately before it: the printer never
+/// queries that byte range through the erased node (it is gone), but the
+/// *enclosing* node's gap window still spans it, so the comment prints — in the
+/// `implements` case, **twice**.
+fn prev_token_end(source: &str, anchor: u32, to: u32) -> u32 {
+    let bytes = source.as_bytes();
+    let end = (to as usize).min(bytes.len());
+    let mut pos = (anchor as usize).min(end);
+    let mut last = pos as u32;
+    while pos < end {
+        // A comment is trivia (skip, don't count); a string literal is a token.
+        let is_comment = bytes[pos] == b'/';
+        if let Some(next) = skip_trivia(bytes, pos, end, TriviaProfile::JS)
+            && next > pos
+        {
+            if !is_comment {
+                last = u32::try_from(next).unwrap_or(to).min(to);
+            }
+            pos = next;
+            continue;
+        }
+        if !bytes[pos].is_ascii_whitespace() {
+            last = u32::try_from(pos + 1).unwrap_or(to);
+        }
+        pos += 1;
+    }
+    last
+}
+
 fn unsupported<T>(reason: Refusal) -> Result<T, CompileError> {
     Err(CompileError::Unsupported(reason))
+}
+
+/// The end of a binding's erased TypeScript tail (`?` / `: T`).
+///
+/// The node's own span is usually tail-anchored over the annotation — but not
+/// always: a Svelte **block pattern** (`{#each x as y: T}`, `{@const a: T = v}`)
+/// is parsed by `tsv_svelte`, which leaves the binding's span on the bare name
+/// and hangs the annotation off it as a sibling. Taking the max covers both
+/// span models, so the erased region is never empty (an empty one would record
+/// no refusal window at all).
+fn tail_end(
+    span: Span,
+    type_annotation: Option<&tsv_ts::ast::internal::TSTypeAnnotation<'_>>,
+) -> u32 {
+    span.end
+        .max(type_annotation.map_or(0, |annotation| annotation.span.end))
 }
 
 /// The rebuilt-list accumulator, materialized lazily: until the first change is
@@ -185,10 +233,33 @@ enum MemberOut<'arena> {
     Drop,
 }
 
+/// The erasable parts of a class header, shared by `ClassDeclaration` and
+/// `ClassExpression` (which differ only in whether `declare` exists).
+struct ClassHead<'a, 'arena> {
+    span: Span,
+    r#abstract: bool,
+    /// End of the class name, when it has one — the backward bound for a
+    /// name-less `implements` clause.
+    id_end: Option<u32>,
+    type_parameters: Option<Span>,
+    /// End of the `extends` expression, when there is one.
+    super_class_end: Option<u32>,
+    super_type_parameters: Option<Span>,
+    implements: &'a [tsv_ts::ast::internal::TSInterfaceHeritage<'arena>],
+}
+
 struct Eraser<'arena, 'src> {
     arena: &'arena bumpalo::Bump,
     source: &'src str,
+    /// Erased regions, already extended to their comment-refusal windows.
     regions: Vec<Span>,
+    /// Set by every TypeScript-only erasure (never by the `JsdocCast` unwrap).
+    typescript: bool,
+    /// Whether the parameter list currently being erased is a **constructor's**.
+    /// The oracle rejects a parameter property only there, and only when it
+    /// carries `readonly`/an accessibility modifier — see
+    /// [`Eraser::parameter_property`].
+    constructor_params: bool,
 }
 
 /// Rebuild a slice through a per-item eraser method, sharing the original when
@@ -213,10 +284,46 @@ macro_rules! map_slice {
     }};
 }
 
+impl<'arena, 'src> Eraser<'arena, 'src> {
+    fn new(arena: &'arena bumpalo::Bump, source: &'src str) -> Self {
+        Self {
+            arena,
+            source,
+            regions: Vec::new(),
+            typescript: false,
+            constructor_params: false,
+        }
+    }
+}
+
 impl<'arena> Eraser<'arena, '_> {
+    /// Record an erased TypeScript region, extending it forward to the next
+    /// surviving token — the comment-refusal window. Use for a region that
+    /// **starts at** its preceding surviving token (a whole statement, an
+    /// identifier's `: T` tail, an `as T` tail): the comment before it belongs
+    /// to the enclosing context and legitimately survives (a JSDoc above an
+    /// erased `interface` lands on the next statement, exactly as the oracle
+    /// places it).
     fn drop_region(&mut self, span: Span) {
-        if span.end > span.start {
-            self.regions.push(span);
+        self.typescript = true;
+        self.push_window(span.start, span.end);
+    }
+
+    /// Record an erased TypeScript region whose start is **detached** from the
+    /// preceding token (a `return_type` after `)`, an `implements` clause, a
+    /// `<T>` list), extending the window backward to that token's end as well as
+    /// forward. `anchor` is any position before the region and outside trivia —
+    /// the enclosing node's start serves.
+    fn drop_region_from(&mut self, anchor: u32, span: Span) {
+        self.typescript = true;
+        let start = prev_token_end(self.source, anchor, span.start);
+        self.push_window(start.min(span.start), span.end);
+    }
+
+    fn push_window(&mut self, start: u32, end: u32) {
+        if end > start {
+            let window_end = next_token_pos(self.source, end);
+            self.regions.push(Span::new(start, window_end.max(end)));
         }
     }
 
@@ -319,11 +426,17 @@ impl<'arena> Eraser<'arena, '_> {
             }
 
             // ── Ordinary statements ────────────────────────────────────────
-            Statement::VariableDeclaration(decl) => match self.variable_declaration(decl)? {
-                None => StmtOut::Keep,
-                Some(None) => StmtOut::Drop,
-                Some(Some(new)) => StmtOut::Replace(Statement::VariableDeclaration(new)),
-            },
+            Statement::VariableDeclaration(decl) => {
+                // `declare const x: T;` is ambient — dropped whole.
+                if decl.declare {
+                    self.drop_region(decl.span);
+                    return Ok(StmtOut::Drop);
+                }
+                match self.variable_declaration(decl)? {
+                    None => StmtOut::Keep,
+                    Some(new) => StmtOut::Replace(Statement::VariableDeclaration(new)),
+                }
+            }
             Statement::ExpressionStatement(stmt) => match self.expr(&stmt.expression)? {
                 None => StmtOut::Keep,
                 Some(expression) => StmtOut::Replace(Statement::ExpressionStatement(
@@ -691,8 +804,13 @@ impl<'arena> Eraser<'arena, '_> {
                     Some(erased) => erased.is_empty(),
                 }
             }
-            Some(TSModuleDeclarationBody::TSModuleDeclaration(nested)) => {
-                self.module_body_is_type_only(nested.body.as_ref())?
+            // `namespace A.B { … }` — the dotted form nests a module declaration
+            // where the oracle's visitor assumes a block, then calls
+            // `node.body.body.map(…)` on it and THROWS. Not a compilable shape at
+            // any body content, so refuse rather than guess (same class as
+            // `import =` / `export as namespace` / a class index signature).
+            Some(TSModuleDeclarationBody::TSModuleDeclaration(_)) => {
+                return unsupported(Refusal::TsDottedNamespace);
             }
         })
     }
@@ -702,12 +820,9 @@ impl<'arena> Eraser<'arena, '_> {
         init: &ForInit<'arena>,
     ) -> Result<Option<ForInit<'arena>>, CompileError> {
         Ok(match init {
-            ForInit::VariableDeclaration(decl) => match self.variable_declaration(decl)? {
-                // A `declare` in a for-head is not legal input; keep it rather
-                // than synthesize an empty head.
-                None | Some(None) => None,
-                Some(Some(new)) => Some(ForInit::VariableDeclaration(new)),
-            },
+            ForInit::VariableDeclaration(decl) => self
+                .variable_declaration(decl)?
+                .map(ForInit::VariableDeclaration),
             ForInit::Expression(expr) => self.expr(expr)?.map(ForInit::Expression),
         })
     }
@@ -717,10 +832,9 @@ impl<'arena> Eraser<'arena, '_> {
         left: &ForInOfLeft<'arena>,
     ) -> Result<Option<ForInOfLeft<'arena>>, CompileError> {
         Ok(match left {
-            ForInOfLeft::VariableDeclaration(decl) => match self.variable_declaration(decl)? {
-                None | Some(None) => None,
-                Some(Some(new)) => Some(ForInOfLeft::VariableDeclaration(new)),
-            },
+            ForInOfLeft::VariableDeclaration(decl) => self
+                .variable_declaration(decl)?
+                .map(ForInOfLeft::VariableDeclaration),
             ForInOfLeft::Pattern(pattern) => self.expr(pattern)?.map(ForInOfLeft::Pattern),
         })
     }
@@ -773,23 +887,30 @@ impl<'arena> Eraser<'arena, '_> {
         }))
     }
 
-    /// `Ok(None)` = unchanged; `Ok(Some(None))` = dropped (`declare`);
-    /// `Ok(Some(Some(_)))` = rebuilt.
-    #[allow(clippy::option_option)]
+    /// Erase a variable declaration **in place** — the `declare` keyword is
+    /// cleared, not dropped. The whole-statement drop for an ambient `declare
+    /// const x: T;` belongs to the statement arm, which is the only position
+    /// where dropping is meaningful; a for-head can't hold one, but clearing the
+    /// keyword here keeps the transformation total (no silent hole in the
+    /// "`changed == false` proves no TypeScript" invariant).
     fn variable_declaration(
         &mut self,
         decl: &VariableDeclaration<'arena>,
-    ) -> Result<Option<Option<VariableDeclaration<'arena>>>, CompileError> {
+    ) -> Result<Option<VariableDeclaration<'arena>>, CompileError> {
         if decl.declare {
-            self.drop_region(decl.span);
-            return Ok(Some(None));
+            self.drop_region(Span::new(
+                decl.span.start,
+                decl.span.start + "declare".len() as u32,
+            ));
         }
         let declarations = map_slice!(self, decl.declarations, variable_declarator);
-        Ok(declarations.map(|declarations| {
-            Some(VariableDeclaration {
-                declarations,
-                ..decl.clone()
-            })
+        if !decl.declare && declarations.is_none() {
+            return Ok(None);
+        }
+        Ok(Some(VariableDeclaration {
+            declarations: declarations.unwrap_or(decl.declarations),
+            declare: false,
+            ..decl.clone()
         }))
     }
 
@@ -829,19 +950,41 @@ impl<'arena> Eraser<'arena, '_> {
     /// (`function f(this: T, x)` → `function f(x)`) — the oracle's
     /// `remove_this_param`, which applies to function declarations and function
     /// expressions only, never to arrows.
+    ///
+    /// `anchor` is the `(` offset (the backward window bound for the dropped
+    /// `this`); `constructor` says whether a parameter property here is the
+    /// oracle's rejected shape (see [`Self::parameter_property`]).
     fn params(
         &mut self,
         params: &'arena [Expression<'arena>],
+        anchor: u32,
+        drop_this: bool,
+        constructor: bool,
+    ) -> Result<Option<&'arena [Expression<'arena>]>, CompileError> {
+        // Save/restore: a default-value arrow inside a constructor parameter list
+        // erases its own (non-constructor) params without clearing the flag for
+        // the sibling parameters that follow.
+        let saved = std::mem::replace(&mut self.constructor_params, constructor);
+        let result = self.params_inner(params, anchor, drop_this);
+        self.constructor_params = saved;
+        result
+    }
+
+    fn params_inner(
+        &mut self,
+        params: &'arena [Expression<'arena>],
+        anchor: u32,
         drop_this: bool,
     ) -> Result<Option<&'arena [Expression<'arena>]>, CompileError> {
         let drop_first = drop_this && params.first().is_some_and(|p| self.is_this_param(p));
         if !drop_first {
             return Ok(map_slice!(self, params, expr));
         }
-        // The dropped `this` takes its trailing comma with it.
+        // The dropped `this` takes its trailing comma with it, and the window
+        // reaches back over the `(` so a comment before it can't leak.
         let this = params[0].span();
         let region_end = params.get(1).map_or(this.end, |next| next.span().start);
-        self.drop_region(Span::new(this.start, region_end));
+        self.drop_region_from(anchor, Span::new(this.start, region_end));
         let rest = &params[1..];
         let erased = map_slice!(self, rest, expr);
         Ok(Some(erased.unwrap_or_else(|| {
@@ -865,12 +1008,12 @@ impl<'arena> Eraser<'arena, '_> {
         func: &FunctionDeclaration<'arena>,
     ) -> Result<Option<FunctionDeclaration<'arena>>, CompileError> {
         if let Some(type_parameters) = &func.type_parameters {
-            self.drop_region(type_parameters.span);
+            self.drop_region_from(func.span.start, type_parameters.span);
         }
         if let Some(return_type) = &func.return_type {
-            self.drop_region(return_type.span);
+            self.drop_region_from(func.params_start, return_type.span);
         }
-        let params = self.params(func.params, true)?;
+        let params = self.params(func.params, func.params_start, true, false)?;
         let body = self.block(&func.body)?;
         if func.type_parameters.is_none()
             && func.return_type.is_none()
@@ -891,14 +1034,15 @@ impl<'arena> Eraser<'arena, '_> {
     fn function_expression(
         &mut self,
         func: &FunctionExpression<'arena>,
+        constructor: bool,
     ) -> Result<Option<FunctionExpression<'arena>>, CompileError> {
         if let Some(type_parameters) = &func.type_parameters {
-            self.drop_region(type_parameters.span);
+            self.drop_region_from(func.span.start, type_parameters.span);
         }
         if let Some(return_type) = &func.return_type {
-            self.drop_region(return_type.span);
+            self.drop_region_from(func.params_start, return_type.span);
         }
-        let params = self.params(func.params, true)?;
+        let params = self.params(func.params, func.params_start, true, constructor)?;
         let body = self.block(&func.body)?;
         if func.type_parameters.is_none()
             && func.return_type.is_none()
@@ -920,15 +1064,16 @@ impl<'arena> Eraser<'arena, '_> {
         &mut self,
         arrow: &ArrowFunctionExpression<'arena>,
     ) -> Result<Option<ArrowFunctionExpression<'arena>>, CompileError> {
+        let params_start = arrow.params_start.unwrap_or(arrow.span.start);
         if let Some(type_parameters) = &arrow.type_parameters {
-            self.drop_region(type_parameters.span);
+            self.drop_region_from(arrow.span.start, type_parameters.span);
         }
         if let Some(return_type) = &arrow.return_type {
-            self.drop_region(return_type.span);
+            self.drop_region_from(params_start, return_type.span);
         }
         // An arrow keeps a leading `this` binding — it is an ordinary parameter
         // name there, and the oracle's `remove_this_param` never visits arrows.
-        let params = self.params(arrow.params, false)?;
+        let params = self.params(arrow.params, params_start, false, false)?;
         let body = match &arrow.body {
             ArrowFunctionBody::Expression(expr) => {
                 self.expr_ref(expr)?.map(ArrowFunctionBody::Expression)
@@ -958,14 +1103,15 @@ impl<'arena> Eraser<'arena, '_> {
         class: &ClassDeclaration<'arena>,
     ) -> Result<Option<ClassDeclaration<'arena>>, CompileError> {
         self.refuse_decorators(class.decorators)?;
-        let erased_head = self.class_head(
-            class.span,
-            class.r#abstract,
-            class.type_parameters.as_ref().map(|tp| tp.span),
-            class.super_type_parameters.as_ref().map(|tp| tp.span),
-            class.implements,
-            class.body.span,
-        );
+        let erased_head = self.class_head(&ClassHead {
+            span: class.span,
+            r#abstract: class.r#abstract,
+            id_end: class.id.as_ref().map(|id| id.span.end),
+            type_parameters: class.type_parameters.as_ref().map(|tp| tp.span),
+            super_class_end: class.super_class.map(|s| s.span().end),
+            super_type_parameters: class.super_type_parameters.as_ref().map(|tp| tp.span),
+            implements: class.implements,
+        });
         let super_class = match class.super_class {
             Some(expr) => self.expr_ref(expr)?.map(Some),
             None => None,
@@ -990,14 +1136,15 @@ impl<'arena> Eraser<'arena, '_> {
         class: &ClassExpression<'arena>,
     ) -> Result<Option<ClassExpression<'arena>>, CompileError> {
         self.refuse_decorators(class.decorators)?;
-        let erased_head = self.class_head(
-            class.span,
-            class.r#abstract,
-            class.type_parameters.as_ref().map(|tp| tp.span),
-            class.super_type_parameters.as_ref().map(|tp| tp.span),
-            class.implements,
-            class.body.span,
-        );
+        let erased_head = self.class_head(&ClassHead {
+            span: class.span,
+            r#abstract: class.r#abstract,
+            id_end: class.id.as_ref().map(|id| id.span.end),
+            type_parameters: class.type_parameters.as_ref().map(|tp| tp.span),
+            super_class_end: class.super_class.map(|s| s.span().end),
+            super_type_parameters: class.super_type_parameters.as_ref().map(|tp| tp.span),
+            implements: class.implements,
+        });
         let super_class = match class.super_class {
             Some(expr) => self.expr_ref(expr)?.map(Some),
             None => None,
@@ -1020,39 +1167,40 @@ impl<'arena> Eraser<'arena, '_> {
     /// Record the erased regions of a class header (`abstract`, `<T>`,
     /// `extends Base<T>`'s type arguments, `implements …`). Returns whether
     /// anything was erased.
-    fn class_head(
-        &mut self,
-        class_span: Span,
-        r#abstract: bool,
-        type_parameters: Option<Span>,
-        super_type_parameters: Option<Span>,
-        implements: &[tsv_ts::ast::internal::TSInterfaceHeritage<'arena>],
-        body_span: Span,
-    ) -> bool {
-        // `abstract` has no span of its own; it leads the declaration, so the
-        // header up to `class` is the window.
-        if r#abstract {
+    fn class_head(&mut self, class: &ClassHead<'_, 'arena>) -> bool {
+        // `abstract` has no span of its own; it LEADS the declaration, so its
+        // window must not reach backward — a JSDoc above the class survives onto
+        // the emitted class, exactly as the oracle places it.
+        if class.r#abstract {
             self.drop_region(Span::new(
-                class_span.start,
-                class_span.start + "abstract".len() as u32,
+                class.span.start,
+                class.span.start + "abstract".len() as u32,
             ));
         }
-        if let Some(span) = type_parameters {
-            self.drop_region(span);
+        if let Some(span) = class.type_parameters {
+            self.drop_region_from(class.span.start, span);
         }
-        if let Some(span) = super_type_parameters {
-            self.drop_region(span);
+        if let Some(span) = class.super_type_parameters {
+            self.drop_region_from(class.span.start, span);
         }
-        if let (Some(first), Some(last)) = (implements.first(), implements.last()) {
-            // The `implements` keyword itself carries no span; its clause runs
-            // from the first heritage entry to the class body.
-            let _ = body_span;
-            self.drop_region(Span::new(first.span.start, last.span.end));
+        if let Some(last) = class.implements.last() {
+            // The `implements` KEYWORD carries no span, so the clause's window
+            // runs from the end of the last SURVIVING header token — the
+            // superclass if there is one, else the class name. Starting it at the
+            // first heritage entry instead leaves the keyword, and any comment
+            // around it, outside every window: the class then prints without its
+            // `implements`, but the enclosing gap windows still sweep the comment
+            // — two of them do, so it emits TWICE.
+            let header_end = class
+                .super_class_end
+                .or(class.id_end)
+                .unwrap_or(class.span.start);
+            self.drop_region(Span::new(header_end, last.span.end));
         }
-        r#abstract
-            || type_parameters.is_some()
-            || super_type_parameters.is_some()
-            || !implements.is_empty()
+        class.r#abstract
+            || class.type_parameters.is_some()
+            || class.super_type_parameters.is_some()
+            || !class.implements.is_empty()
     }
 
     fn class_body(
@@ -1136,7 +1284,7 @@ impl<'arena> Eraser<'arena, '_> {
             }
         }
         let key = self.expr(&method.key)?;
-        let value = self.function_expression(func)?;
+        let value = self.function_expression(func, method.kind == MethodKind::Constructor)?;
         if !erased_head && key.is_none() && value.is_none() {
             return Ok(MemberOut::Keep);
         }
@@ -1236,11 +1384,12 @@ impl<'arena> Eraser<'arena, '_> {
     ///
     /// The five TypeScript wrappers **unwrap to their inner expression**
     /// (`x as T` → `x`, `x!` → `x`, `x satisfies T` → `x`, `<T>x` → `x`,
-    /// `f<T>` → `f`); patterns and binding identifiers **field-drop** their
-    /// annotations and `?`/`!` markers; `TSParameterProperty`
-    /// (`constructor(public x)`) **refuses** — it synthesizes `this.x = x` at
-    /// runtime, so unwrapping it would silently drop behavior (and the oracle
-    /// rejects it outright).
+    /// `f<T>` → `f`), and so does the internal `JsdocCast` wrapper — the oracle's
+    /// AST has no such node (it parses without `preserveParens`), so
+    /// `/** @type {T} */ (1)` is simply `1` with a leading comment there; keeping
+    /// tsv's wrapper would print the parens the oracle drops *and* block the
+    /// static fold. Patterns and binding identifiers **field-drop** their
+    /// annotations and `?`/`!` markers.
     ///
     /// Parens are not a hazard: `tsv_ts` parses with `preserve_parens: false`
     /// and re-derives them from precedence, exactly as the oracle's printer
@@ -1289,8 +1438,7 @@ impl<'arena> Eraser<'arena, '_> {
                 )
             }
 
-            // ── Refuse: runtime semantics an erase would delete ────────────
-            Expression::TSParameterProperty(_) => return unsupported(Refusal::TsParameterProperty),
+            Expression::TSParameterProperty(node) => Some(self.parameter_property(node)?),
 
             // ── Binding identifiers ────────────────────────────────────────
             Expression::Identifier(id) => self.identifier(id)?.map(Expression::Identifier),
@@ -1298,9 +1446,11 @@ impl<'arena> Eraser<'arena, '_> {
             // ── Patterns ───────────────────────────────────────────────────
             Expression::ObjectPattern(pattern) => {
                 self.refuse_decorators(pattern.decorators)?;
-                self.pattern_tail(pattern.span, pattern.optional, || {
-                    pattern.type_annotation.as_ref().map(|t| t.span)
-                });
+                self.pattern_tail(
+                    pattern.span,
+                    pattern.optional,
+                    pattern.type_annotation.as_ref(),
+                );
                 let properties = map_slice!(self, pattern.properties, object_pattern_property);
                 let erased = pattern.optional || pattern.type_annotation.is_some();
                 if !erased && properties.is_none() {
@@ -1316,9 +1466,11 @@ impl<'arena> Eraser<'arena, '_> {
             }
             Expression::ArrayPattern(pattern) => {
                 self.refuse_decorators(pattern.decorators)?;
-                self.pattern_tail(pattern.span, pattern.optional, || {
-                    pattern.type_annotation.as_ref().map(|t| t.span)
-                });
+                self.pattern_tail(
+                    pattern.span,
+                    pattern.optional,
+                    pattern.type_annotation.as_ref(),
+                );
                 let elements = map_slice!(self, pattern.elements, opt_expr);
                 let erased = pattern.optional || pattern.type_annotation.is_some();
                 if !erased && elements.is_none() {
@@ -1346,28 +1498,14 @@ impl<'arena> Eraser<'arena, '_> {
                     }))
                 }
             }
-            Expression::RestElement(rest) => {
-                self.pattern_tail(rest.span, rest.optional, || {
-                    rest.type_annotation.as_ref().map(|t| t.span)
-                });
-                let argument = self.expr_ref(rest.argument)?;
-                let erased = rest.optional || rest.type_annotation.is_some();
-                if !erased && argument.is_none() {
-                    None
-                } else {
-                    Some(Expression::RestElement(RestElement {
-                        argument: argument.unwrap_or(rest.argument),
-                        optional: false,
-                        type_annotation: None,
-                        span: rest.span,
-                    }))
-                }
-            }
+            Expression::RestElement(rest) => self.rest_element(rest)?.map(Expression::RestElement),
 
             // ── Calls carry type arguments ─────────────────────────────────
             Expression::CallExpression(call) => {
                 if let Some(type_arguments) = &call.type_arguments {
-                    self.drop_region(type_arguments.span);
+                    // `f /* c */ <T>(x)` — the `<T>` list is detached from the
+                    // callee, so the window reaches back to it.
+                    self.drop_region_from(call.callee.span().start, type_arguments.span);
                 }
                 let callee = self.expr_ref(call.callee)?;
                 let arguments = map_slice!(self, call.arguments, expr);
@@ -1386,7 +1524,7 @@ impl<'arena> Eraser<'arena, '_> {
             }
             Expression::NewExpression(new) => {
                 if let Some(type_arguments) = &new.type_arguments {
-                    self.drop_region(type_arguments.span);
+                    self.drop_region_from(new.callee.span().start, type_arguments.span);
                 }
                 let callee = self.expr_ref(new.callee)?;
                 let arguments = map_slice!(self, new.arguments, expr);
@@ -1405,7 +1543,7 @@ impl<'arena> Eraser<'arena, '_> {
             }
             Expression::TaggedTemplateExpression(tagged) => {
                 if let Some(type_arguments) = &tagged.type_arguments {
-                    self.drop_region(type_arguments.span);
+                    self.drop_region_from(tagged.tag.span().start, type_arguments.span);
                 }
                 let tag = self.expr_ref(tagged.tag)?;
                 let quasi = self.template_literal(&tagged.quasi)?;
@@ -1428,7 +1566,7 @@ impl<'arena> Eraser<'arena, '_> {
                 self.arrow(arrow)?.map(Expression::ArrowFunctionExpression)
             }
             Expression::FunctionExpression(func) => self
-                .function_expression(func)?
+                .function_expression(func, false)?
                 .map(Expression::FunctionExpression),
             Expression::ClassExpression(class) => self
                 .class_expression(class)?
@@ -1576,12 +1714,17 @@ impl<'arena> Eraser<'arena, '_> {
                     ))
                 }
             }
-            Expression::JsdocCast(cast) => self.expr_ref(cast.inner)?.map(|inner| {
-                Expression::JsdocCast(tsv_ts::ast::internal::JsdocCast {
-                    inner,
-                    span: cast.span,
-                })
-            }),
+            // `/** @type {T} */ (expr)` — an internal-only wrapper recording the
+            // cast's semantically-required parens. The oracle has NO such node
+            // (it parses without `preserveParens`), so its AST is the inner
+            // expression carrying the JSDoc as a detached leading comment: it
+            // prints `= /** @type {T} */ 1` and folds the `1`. Unwrap to match on
+            // both counts. Valid JavaScript, so this is NOT a TypeScript erasure
+            // — it records no region and never trips the `lang="ts"` gate; the
+            // JSDoc sits before the wrapper's own span and survives untouched.
+            Expression::JsdocCast(cast) => {
+                Some(self.expr(cast.inner)?.unwrap_or_else(|| cast.inner.clone()))
+            }
             Expression::ParenthesizedExpression(paren) => {
                 self.expr_ref(paren.expression)?.map(|expression| {
                     Expression::ParenthesizedExpression(
@@ -1623,7 +1766,10 @@ impl<'arena> Eraser<'arena, '_> {
         if !id.optional && id.type_annotation().is_none() {
             return Ok(None);
         }
-        self.drop_region(Span::new(id.name_span().end, id.span.end));
+        self.drop_region(Span::new(
+            id.name_span().end,
+            tail_end(id.span, id.type_annotation()),
+        ));
         Ok(Some(Identifier {
             optional: false,
             extra: None,
@@ -1631,28 +1777,66 @@ impl<'arena> Eraser<'arena, '_> {
         }))
     }
 
-    /// Record the erased tail of a destructuring pattern in a parameter position
-    /// (`{a}?: T`): the `?` and the annotation both trail the pattern's closing
-    /// bracket, inside its span.
+    /// Record the erased tail of a destructuring pattern (`{a}?: T`): the `?` and
+    /// the annotation both trail the pattern's closing bracket. The window reaches
+    /// back over any trivia to that bracket, so a comment between them
+    /// (`{a} /* c */ : T`) can't leak.
     fn pattern_tail(
         &mut self,
         span: Span,
         optional: bool,
-        type_annotation: impl FnOnce() -> Option<Span>,
+        type_annotation: Option<&tsv_ts::ast::internal::TSTypeAnnotation<'arena>>,
     ) {
-        let annotation = type_annotation();
-        if !optional && annotation.is_none() {
+        if !optional && type_annotation.is_none() {
             return;
         }
-        let start = annotation.map_or(span.end, |a| a.start);
-        // The `?` sits before the annotation; take the whole tail from wherever
-        // the annotation starts, backing up over the marker when there is one.
-        let tail_start = if optional {
-            start.saturating_sub(1).max(span.start)
-        } else {
-            start
-        };
-        self.drop_region(Span::new(tail_start, span.end));
+        let end = tail_end(span, type_annotation);
+        // The `?` sits before the annotation; without one it is the tail's last byte.
+        let start = type_annotation.map_or_else(
+            || end.saturating_sub(1).max(span.start),
+            |annotation| annotation.span.start,
+        );
+        self.drop_region_from(span.start, Span::new(start, end));
+    }
+
+    /// A constructor parameter property (`constructor(public x: number)`).
+    ///
+    /// The oracle rejects it **only** when it carries `readonly` or an
+    /// accessibility modifier *and* sits in a constructor
+    /// (`remove_typescript_nodes.js` `TSParameterProperty`) — those synthesize
+    /// `this.x = x` into the body, so unwrapping to the bare parameter would
+    /// silently drop behavior. Every other shape (a lone `override`, or a
+    /// modifier outside a constructor) the oracle simply **unwraps**;
+    /// probe-confirmed: `constructor(override x: number)` compiles to
+    /// `constructor(x)`.
+    fn parameter_property(
+        &mut self,
+        node: &tsv_ts::ast::internal::TSParameterProperty<'arena>,
+    ) -> Result<Expression<'arena>, CompileError> {
+        if self.constructor_params && (node.readonly || node.accessibility.is_some()) {
+            return unsupported(Refusal::TsParameterProperty);
+        }
+        self.drop_region(Span::new(node.span.start, node.parameter.span().start));
+        Ok(self
+            .expr(node.parameter)?
+            .unwrap_or_else(|| node.parameter.clone()))
+    }
+
+    fn rest_element(
+        &mut self,
+        rest: &RestElement<'arena>,
+    ) -> Result<Option<RestElement<'arena>>, CompileError> {
+        self.pattern_tail(rest.span, rest.optional, rest.type_annotation.as_ref());
+        let argument = self.expr_ref(rest.argument)?;
+        if !rest.optional && rest.type_annotation.is_none() && argument.is_none() {
+            return Ok(None);
+        }
+        Ok(Some(RestElement {
+            argument: argument.unwrap_or(rest.argument),
+            optional: false,
+            type_annotation: None,
+            span: rest.span,
+        }))
     }
 
     /// An array/array-pattern element slot — `None` is a hole (`[a, , b]`). The
@@ -1694,14 +1878,9 @@ impl<'arena> Eraser<'arena, '_> {
             ObjectPatternProperty::Property(prop) => {
                 self.property(prop)?.map(ObjectPatternProperty::Property)
             }
-            ObjectPatternProperty::RestElement(rest) => {
-                match self.expr(&Expression::RestElement(rest.clone()))? {
-                    Some(Expression::RestElement(new)) => {
-                        Some(ObjectPatternProperty::RestElement(new))
-                    }
-                    _ => None,
-                }
-            }
+            ObjectPatternProperty::RestElement(rest) => self
+                .rest_element(rest)?
+                .map(ObjectPatternProperty::RestElement),
         })
     }
 

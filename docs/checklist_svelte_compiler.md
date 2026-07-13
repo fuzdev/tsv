@@ -85,7 +85,7 @@ Sanctioned rewrites (all Supported, at parity):
 | --- | --- |
 | `$props()` | `$$props` (plus the rest injection above) |
 | `$state(v)` / `$state.raw(v)` | `v` (`void 0` when argument-less) |
-| `$derived(e)` | `$.derived(() => e)` |
+| `$derived(e)` | `$.derived(() => e)` — but the oracle's `b.thunk` runs `unthunk` (`utils/builders.js`), which **collapses** the arrow when its body is a call whose callee is a bare identifier and whose arguments match the (empty) parameter list one-for-one. At a thunk's arity that means an argument-less, non-optional call on an identifier: `$derived(get_library())` emits `$.derived(get_library)`. `$derived(f(a))` and `$derived(o.m())` keep the arrow. |
 | `$derived.by(f)` | `$.derived(f)` |
 | statement-position `$effect(…)` / `$effect.pre(…)` | dropped (and forces the context wrapper) |
 
@@ -136,6 +136,8 @@ The oracle's flag is **document-wide**: its parser regexes the raw source for th
 | `import type { X }` / `export type { X }` / `export interface X {}` | dropped |
 | inline `import { type X, Y }` | the type-only specifiers are filtered out; a list that filters to **empty** drops the whole statement (the oracle's `if (specifiers.length === 0) return b.empty` — not `import {}`, not a bare side-effect import) |
 | `x as T` / `x satisfies T` / `x!` / `<T>x` / `f<T>` | unwrapped to the inner expression (`as const` included) |
+| `/** @type {T} */ (x)` (a JSDoc cast — valid JS, not TypeScript) | unwrapped: the oracle parses without `preserveParens` and has no such node, so it prints the JSDoc as a detached leading comment, drops the parens, and folds the value |
+| `constructor(override x: number)` | unwrapped — the oracle rejects a parameter property **only** for `readonly`/an accessibility modifier in a constructor (those synthesize `this.x = x`) |
 | `f<T>(x)` / `new C<T>()` / tagged-template type args | type arguments dropped |
 | `<T>` type parameters (function / arrow / class / method) | dropped |
 | `declare` variable / function / class / class field | dropped |
@@ -154,13 +156,14 @@ Parens are not a hazard: `tsv_ts` parses with `preserve_parens: false` and re-de
 
 - **Refused**: `TypeScript syntax without lang="ts" (the oracle parse-errors)` — tsv's parser accepts TypeScript in any script; the oracle does not. Compiling it would be an over-acceptance.
 - **Refused**: `TypeScript in a template expression (erasure at the template borrow points not implemented)` — `{x as T}`, `{x!}`, `{f<T>()}`, typed `{#each}`/`{:then}` patterns, generic `{#snippet}`. The script `Program` is erased; the template's borrow points are a later slice.
-- **Refused**: `comment inside an erased TypeScript region` — the oracle's surviving-comment placement is an *emergent* artifact of its printer's flush points reading pre-erasure spans (RHS-leading for a declarator, statement-trailing for an `as`, argument-leading for a call type argument, hoisted-to-the-next-statement for a deleted `interface`), not a rule with a portable shape. The refusal **window** runs from the erased region's start to the start of the next surviving token, so `let x: Foo /* c */ = v` — which the oracle re-anchors onto the initializer — is caught too. A *leading* comment (a JSDoc above an erased `interface`) sits outside the window, survives, and lands where the oracle puts it.
+- **Refused**: `comment inside an erased TypeScript region` — the oracle's surviving-comment placement is an *emergent* artifact of its printer's flush points reading pre-erasure spans (RHS-leading for a declarator, statement-trailing for an `as`, argument-leading for a call type argument, hoisted-to-the-next-statement for a deleted `interface`), not a rule with a portable shape. The refusal **window** is wider than the erased span on both sides: **forward** to the start of the next surviving token (so `let x: Foo /* c */ = v` — which the oracle re-anchors onto the initializer — is caught), and **backward** to the end of the previous surviving token for a region *detached* from it (a `return_type` after `)`, an `implements` clause, a `<T>` list — the printer never queries the erased node's byte range, but the enclosing node's gap window still spans it, so the comment would print anyway). A whole-statement drop deliberately does **not** reach backward: a *leading* JSDoc above an erased `interface` survives and lands on the next statement, exactly where the oracle puts it.
 
 **Refuse-don't-erase.** Constructs with runtime semantics an erasure would silently delete, plus the ones the oracle itself mis-compiles. Zero occurrences across the real-world corpus.
 
 - **Refused**: `TS enum (the oracle rejects it)` — lowers to an object plus a reverse mapping. The oracle's visitor has **no `declare` carve-out**, so `declare enum` is rejected too.
 - **Refused**: `TS namespace/module with a value member (the oracle rejects it)` — lowers to an IIFE (the oracle's any-value→reject fork).
-- **Refused**: `TS parameter property (constructor(public x) — the oracle rejects it)` — real TypeScript synthesizes `this.x = x`.
+- **Refused**: `dotted TS namespace A.B (the oracle crashes on it)` — the strip visitor assumes a block body and calls `node.body.body.map(…)` on the nested module declaration; it throws, at any body content.
+- **Refused**: `TS parameter property with readonly/accessibility (the oracle rejects it)` — real TypeScript synthesizes `this.x = x`. Exactly the oracle's rule: a lone `override`, or a modifier outside a constructor, is unwrapped and compiles.
 - **Refused**: `decorator (the oracle rejects it)` — a `typescript_invalid_feature` hard error in the oracle, and a plain-JS parse error without `lang="ts"`.
 - **Refused**: `accessor class field (the oracle rejects it)` — likewise a hard error.
 

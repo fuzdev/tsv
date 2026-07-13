@@ -252,12 +252,13 @@ pub(crate) fn compile_server<'arena>(
             // The oracle gates the TypeScript *grammar* on the document-wide
             // `ts` flag: without it, a `: T` / `as T` / `x!` is a plain-JS parse
             // error. tsv's parser is TS-permissive and would silently accept —
-            // an over-acceptance the refusal contract forbids.
-            if erased.changed && !ts_document {
+            // an over-acceptance the refusal contract forbids. (The eraser also
+            // unwraps `JsdocCast`, which is valid JavaScript, so the gate reads
+            // `typescript`, not `changed`.)
+            if erased.typescript && !ts_document {
                 return Err(unsupported(Refusal::TypeScriptWithoutLangTs));
             }
-            let windows = erased.refusal_windows(source);
-            (erased.body, windows)
+            (erased.body, erased.regions)
         }
         None => (&[][..], Vec::new()),
     };
@@ -354,70 +355,68 @@ pub(crate) fn compile_server<'arena>(
     // for inputs that trip both, so the `?` stays at the original position.
     let component = crate::needs_context::analyze_component(root, source, instance_body);
     let uses_slots = component.as_ref().is_ok_and(|c| c.uses_slots);
-    {
-        for stmt in instance_body {
-            // Instance-script exports refuse — every form. The oracle compiles
-            // `export const`/`function`/`{a}` into a trailing
-            // `$.bind_props($$props, { … })` (not implemented), rejects
-            // `export default` and `export let` (runes mode), and drops
-            // `export * from`; passing any of them through verbatim would nest
-            // an `export` inside the component function (invalid JS).
-            if matches!(
-                stmt,
-                Statement::ExportNamedDeclaration(_)
-                    | Statement::ExportDefaultDeclaration(_)
-                    | Statement::ExportAllDeclaration(_)
-                    | Statement::TSNamespaceExportDeclaration(_)
-                    | Statement::TSExportAssignment(_)
-            ) {
-                return Err(unsupported(Refusal::InstanceScriptExport));
-            }
-            if let Statement::ImportDeclaration(import) = stmt {
-                refuse_runes_invalid_import(import, source)?;
-                user_imports.push(stmt.clone());
-                continue;
-            }
-            let rewritten = rewrite_script_statement(
-                &mut b,
-                stmt,
-                source,
-                &derived_names,
-                &mut updated,
-                &mut nested_declared,
-                &mut uses_props,
-                &mut has_effects,
-                has_comments,
-                uses_slots,
-                &mut dropped_regions,
-            )?;
-            let Some(rewritten) = rewritten else {
-                continue;
-            };
-            // The oracle splits a multi-declarator top-level declaration into
-            // one declaration per declarator, source order (probe-verified for
-            // let/const/var, no-init, dependent, destructured, and mixed
-            // rune+plain declarators; the per-declarator rune rewrites above
-            // compose with the split). Declarations in nested scopes (function
-            // bodies, blocks, for-heads) stay joined — borrowed passthrough
-            // already matches that. Comments refuse: the oracle re-anchors a
-            // comment *inside* the split (`let // c` then the declarator on the
-            // next line), a placement this transform can't reproduce.
-            match rewritten {
-                Statement::VariableDeclaration(decl) if decl.declarations.len() > 1 => {
-                    if has_comments {
-                        return Err(unsupported(Refusal::CommentsAlongsideMultiDeclarator));
-                    }
-                    for declarator in decl.declarations {
-                        body.push(Statement::VariableDeclaration(VariableDeclaration {
-                            kind: decl.kind,
-                            declarations: std::slice::from_ref(declarator),
-                            declare: decl.declare,
-                            span: declarator.span,
-                        }));
-                    }
+    for stmt in instance_body {
+        // Instance-script exports refuse — every form. The oracle compiles
+        // `export const`/`function`/`{a}` into a trailing
+        // `$.bind_props($$props, { … })` (not implemented), rejects
+        // `export default` and `export let` (runes mode), and drops
+        // `export * from`; passing any of them through verbatim would nest
+        // an `export` inside the component function (invalid JS).
+        if matches!(
+            stmt,
+            Statement::ExportNamedDeclaration(_)
+                | Statement::ExportDefaultDeclaration(_)
+                | Statement::ExportAllDeclaration(_)
+                | Statement::TSNamespaceExportDeclaration(_)
+                | Statement::TSExportAssignment(_)
+        ) {
+            return Err(unsupported(Refusal::InstanceScriptExport));
+        }
+        if let Statement::ImportDeclaration(import) = stmt {
+            refuse_runes_invalid_import(import, source)?;
+            user_imports.push(stmt.clone());
+            continue;
+        }
+        let rewritten = rewrite_script_statement(
+            &mut b,
+            stmt,
+            source,
+            &derived_names,
+            &mut updated,
+            &mut nested_declared,
+            &mut uses_props,
+            &mut has_effects,
+            has_comments,
+            uses_slots,
+            &mut dropped_regions,
+        )?;
+        let Some(rewritten) = rewritten else {
+            continue;
+        };
+        // The oracle splits a multi-declarator top-level declaration into
+        // one declaration per declarator, source order (probe-verified for
+        // let/const/var, no-init, dependent, destructured, and mixed
+        // rune+plain declarators; the per-declarator rune rewrites above
+        // compose with the split). Declarations in nested scopes (function
+        // bodies, blocks, for-heads) stay joined — borrowed passthrough
+        // already matches that. Comments refuse: the oracle re-anchors a
+        // comment *inside* the split (`let // c` then the declarator on the
+        // next line), a placement this transform can't reproduce.
+        match rewritten {
+            Statement::VariableDeclaration(decl) if decl.declarations.len() > 1 => {
+                if has_comments {
+                    return Err(unsupported(Refusal::CommentsAlongsideMultiDeclarator));
                 }
-                other => body.push(other),
+                for declarator in decl.declarations {
+                    body.push(Statement::VariableDeclaration(VariableDeclaration {
+                        kind: decl.kind,
+                        declarations: std::slice::from_ref(declarator),
+                        declare: decl.declare,
+                        span: declarator.span,
+                    }));
+                }
             }
+            other => body.push(other),
         }
     }
     // A comment sitting among hoisted imports would land in the export program's
@@ -599,11 +598,24 @@ pub(crate) fn compile_server<'arena>(
         let call = env
             .b
             .member_call("$$renderer", "component", std::slice::from_ref(arrow_alloc));
-        let span = call.span();
         let mut outer: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
+        // A FICTIONAL span, low start + appendix end — not the call's own span.
+        //
+        // The wrapper is the function body's only statement, so the printer's
+        // comment windows for it are `(function_block.start … this.start)` before
+        // and `(this.end … function_block.end)` after. The call's real span starts
+        // in the appendix (past every host comment), so the LEADING window would
+        // cover the whole script and sweep every carried comment — which the
+        // arrow's own block, anchored on the same script start, then sweeps
+        // AGAIN. The comment prints twice.
+        //
+        // A zero start inverts the leading window to empty; an appendix end keeps
+        // the trailing window inside the appendix, where no host comment lives.
+        // The arrow's block is then the sole owner — the oracle's placement,
+        // inside the wrapper.
         outer.push(Statement::ExpressionStatement(ExpressionStatement {
             expression: call,
-            span,
+            span: Span::new(0, env.b.buffer.len() as u32),
             is_directive: false,
         }));
         outer.into_bump_slice()
@@ -804,6 +816,31 @@ fn collect_script_comments(
 
 fn unsupported(reason: Refusal) -> CompileError {
     CompileError::Unsupported(reason)
+}
+
+/// The oracle's `unthunk` peephole, at the only arity a thunk can have.
+///
+/// `b.thunk(value)` builds `arrow([], value)` and immediately runs it through
+/// `unthunk`, which returns the call's **callee** when the arrow is non-async,
+/// its body is a `CallExpression` with an `Identifier` callee, and its
+/// parameters match the call's arguments one-for-one by name
+/// (`utils/builders.js`). A thunk's parameter list is always empty, so the
+/// name-matching clause reduces to "the call takes no arguments":
+///
+/// - `$derived(get_library())` → `$.derived(get_library)`
+/// - `$derived(f(a))` → `$.derived(() => f(a))` (an argument survives)
+/// - `$derived(o.m())` → `$.derived(() => o.m())` (the callee is not an identifier)
+///
+/// An optional call (`f?.()`) is a `ChainExpression` in the oracle's AST, never a
+/// bare `CallExpression`, so it never collapses either.
+fn unthunk_callee<'arena>(expr: &Expression<'arena>) -> Option<&'arena Expression<'arena>> {
+    let Expression::CallExpression(call) = expr else {
+        return None;
+    };
+    if !call.arguments.is_empty() || call.optional {
+        return None;
+    }
+    matches!(call.callee, Expression::Identifier(_)).then_some(call.callee)
 }
 
 /// Assert no TypeScript-only node survived into the emitted program.
@@ -1290,9 +1327,21 @@ fn rewrite_script_statement<'arena>(
             },
             Some(RuneInit::Derived(expr)) => {
                 walk_expression_guarded(expr, &mut ctx)?;
-                let arrow = b.arrow_expr(expr);
-                let arrow_alloc = b.arena.alloc(arrow);
-                Some(b.member_call("$", "derived", std::slice::from_ref(arrow_alloc)))
+                // The oracle wraps the value with `b.thunk`, which is
+                // `unthunk(arrow([], value))` — and `unthunk` COLLAPSES the arrow
+                // when its body is a plain call whose callee is a bare identifier
+                // and whose arguments match the parameter list one-for-one by
+                // name (`utils/builders.js`; call site
+                // `3-transform/server/visitors/VariableDeclaration.js`). With the
+                // empty parameter list a thunk always has, that reduces to an
+                // argument-less, non-optional call on an identifier — so
+                // `$derived(get_library())` emits `$.derived(get_library)`, not
+                // `$.derived(() => get_library())`.
+                let argument = match unthunk_callee(expr) {
+                    Some(callee) => callee,
+                    None => &*b.arena.alloc(b.arrow_expr(expr)),
+                };
+                Some(b.member_call("$", "derived", std::slice::from_ref(argument)))
             }
             Some(RuneInit::DerivedBy(f)) => {
                 walk_expression_guarded(f, &mut ctx)?;
@@ -1471,23 +1520,26 @@ impl<'arena> BodyBuilder<'arena> {
 
     /// Append an already template-escaped chunk to the current static part.
     ///
-    /// Cross-chunk `${` seam invariant: each chunk is template-escaped
-    /// independently, so a literal `$` ending one chunk followed by a literal
-    /// `{` starting the next would slip through unescaped. That pairing is
-    /// unreachable — a decoded text run is always a single chunk (the parser
-    /// yields one `Text` node per run, entities included), and every other
-    /// chunk this transform appends starts with `<`, `/`, `>`, a space, or an
-    /// anchor comment (`<!…`) — but assert it so a future emitter change fails
-    /// loudly.
+    /// **The cross-chunk `${` seam.** Each chunk is template-escaped on its own
+    /// (`escape_template_text` rewrites `$` to `\$` only when it sees the `{`
+    /// itself), so a literal `$` *ending* one chunk and a literal `{` *starting*
+    /// the next slip through as a live interpolation — the emitted
+    /// `` $$renderer.push(`… ${NAME} …`) `` would then evaluate `NAME`, or fail to
+    /// parse. Real: `ssh ${'{'}DEPLOY_USER}` writes a shell variable by folding a
+    /// `'{'` string literal into the text right after a `$`. The oracle escapes it
+    /// (it assembles the whole string before escaping); tsv joins the seam here.
     fn push_text(&mut self, chunk: &str) {
         // Every element of `texts` exists by construction (starts with one entry;
         // `push_expr` appends the follower).
         #[allow(clippy::unwrap_used)]
         let current = self.texts.last_mut().unwrap();
-        debug_assert!(
-            !(current.ends_with('$') && chunk.starts_with('{')),
-            "cross-chunk `${{` would defeat template escaping"
-        );
+        if current.ends_with('$') && chunk.starts_with('{') {
+            // The trailing `$` is raw (any preceding backslash was already
+            // doubled), so escaping it here is the identity escape `\$` — the
+            // rendered text is unchanged, the interpolation is not.
+            current.pop();
+            current.push_str("\\$");
+        }
         current.push_str(chunk);
     }
 

@@ -19,6 +19,11 @@ mod analyze;
 mod attr_refs;
 mod build;
 mod erase;
+
+/// The forward half of an erased TypeScript region's comment-refusal window (see
+/// `erase`). Exported so the `erase_comment_census` diagnostic sizes the rule the
+/// compiler actually enforces, rather than a hand-rolled copy of it.
+pub use erase::next_token_pos;
 mod needs_context;
 mod refusal;
 mod rune_guard;
@@ -1606,6 +1611,93 @@ mod tests {
                 "<script lang=\"ts\">\n\t/** doc */\n\tinterface Props {\n\t\ta: string;\n\t}\n\tlet { a }: Props = $props();\n</script>\n<p>{a}</p>"
             ),
             "import * as $ from 'svelte/internal/server';\nexport default function Input($$renderer, $$props) {\n\t/** doc */\n\tlet { a } = $$props;\n\t$$renderer.push(`<p>${$.escape(a)}</p>`);\n}\n"
+        );
+    }
+
+    #[test]
+    fn compile_refuses_comment_before_a_detached_erased_region() {
+        // The window reaches BACKWARD too, for a region whose start is detached
+        // from its preceding token. Without that, the printer never queries the
+        // erased node's byte range (it is gone) but the ENCLOSING node's gap
+        // window still spans it — so the comment prints anyway, and for
+        // `implements` two windows find it and it prints TWICE.
+        for source in [
+            // `implements` — the keyword itself carries no span.
+            "<script lang=\"ts\">\n\tinterface I {\n\t\tx: number;\n\t}\n\tclass C implements /* c */ I {\n\t\tx = 1;\n\t}\n\tlet v = new C().x;\n</script>\n<p>{v}</p>",
+            // A return type, preceded by `)`.
+            "<script lang=\"ts\">\n\tfunction f(a: number) /* c */ : number {\n\t\treturn a;\n\t}\n\tlet v = f(1);\n</script>\n<p>{v}</p>",
+            // A `<T>` type-parameter list, preceded by the function name.
+            "<script lang=\"ts\">\n\tfunction f /* c */ <T>(a: T) {\n\t\treturn a;\n\t}\n\tlet v = f(1);\n</script>\n<p>{v}</p>",
+            // A `<T>` type-argument list, preceded by the callee.
+            "<script lang=\"ts\">\n\tfunction f<T>(a: T) {\n\t\treturn a;\n\t}\n\tlet v = f /* c */ <number>(1);\n</script>\n<p>{v}</p>",
+        ] {
+            assert_unsupported(source, "comment inside an erased TypeScript region");
+        }
+    }
+
+    #[test]
+    fn compile_carries_comments_through_the_context_wrapper() {
+        // A comment plus `needs_context` used to print TWICE: the wrapper
+        // statement's appendix span left the function body's leading-comment
+        // window spanning the whole script, and the arrow's own block — anchored
+        // on the same script start — swept it again. The wrapper's fictional span
+        // makes the arrow's block the sole owner, which is the oracle's placement.
+        assert_eq!(
+            compile_js(
+                "<script>\n\t/** doc */\n\tclass A {\n\t\ty = 1;\n\t}\n\tlet v = new A().y;\n</script>\n<p>{v}</p>"
+            ),
+            "import * as $ from 'svelte/internal/server';\nexport default function Input($$renderer, $$props) {\n\t$$renderer.component(($$renderer) => {\n\t\t/** doc */\n\t\tclass A {\n\t\t\ty = 1;\n\t\t}\n\t\tlet v = new A().y;\n\t\t$$renderer.push(`<p>${$.escape(v)}</p>`);\n\t});\n}\n"
+        );
+    }
+
+    #[test]
+    fn compile_unthunks_derived_of_an_argumentless_call() {
+        // The oracle's `b.thunk` runs `unthunk`, which collapses `() => f()` to
+        // `f` when the callee is a bare identifier and the (empty) parameter list
+        // matches the arguments — so an argument-less call passes straight
+        // through. An argument, or a member callee, keeps the arrow.
+        let js = compile_js(
+            "<script>\n\timport { get_library, f, o } from './m.ts';\n\tconst a = $derived(get_library());\n\tconst b = $derived(f(1));\n\tconst c = $derived(o.m());\n</script>\n<p>{a}{b}{c}</p>",
+        );
+        assert!(js.contains("const a = $.derived(get_library);"), "{js}");
+        assert!(js.contains("const b = $.derived(() => f(1));"), "{js}");
+        assert!(js.contains("const c = $.derived(() => o.m());"), "{js}");
+    }
+
+    #[test]
+    fn compile_unwraps_a_jsdoc_cast() {
+        // `/** @type {T} */ (expr)` is an internal-only wrapper for the cast's
+        // parens. The oracle has no such node — it prints the JSDoc as a detached
+        // leading comment, drops the parens, and FOLDS the inner value. Valid
+        // JavaScript, so it must not trip the `lang="ts"` gate either.
+        assert_eq!(
+            compile_js("<script>\n\tconst x = /** @type {number} */ (1);\n</script>\n<p>{x}</p>"),
+            "import * as $ from 'svelte/internal/server';\nexport default function Input($$renderer) {\n\tconst x = /** @type {number} */ 1;\n\t$$renderer.push(`<p>1</p>`);\n}\n"
+        );
+    }
+
+    #[test]
+    fn compile_narrows_the_parameter_property_refusal() {
+        // The oracle rejects a parameter property ONLY when it carries
+        // `readonly`/an accessibility modifier AND sits in a constructor — those
+        // synthesize `this.x = x`. A lone `override` is unwrapped and compiles.
+        assert_unsupported(
+            "<script lang=\"ts\">\n\tclass C {\n\t\tconstructor(readonly x: number) {}\n\t}\n\tlet v = new C(1).x;\n</script>\n<p>{v}</p>",
+            "TS parameter property with readonly/accessibility",
+        );
+        let js = compile_js(
+            "<script lang=\"ts\">\n\tclass B {\n\t\tx = 0;\n\t}\n\tclass C extends B {\n\t\tconstructor(override x: number) {\n\t\t\tsuper();\n\t\t}\n\t}\n\tlet v = new C(1).x;\n</script>\n<p>{v}</p>",
+        );
+        assert!(js.contains("constructor(x) {"), "{js}");
+    }
+
+    #[test]
+    fn compile_refuses_a_dotted_namespace() {
+        // `namespace A.B { … }` nests a module declaration where the oracle's
+        // strip visitor assumes a block — it throws outright, at any body content.
+        assert_unsupported(
+            "<script lang=\"ts\">\n\tnamespace A.B {\n\t\texport type T = number;\n\t}\n\tlet v = 1;\n</script>\n<p>{v}</p>",
+            "dotted TS namespace",
         );
     }
 
