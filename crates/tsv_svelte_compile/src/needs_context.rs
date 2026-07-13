@@ -246,16 +246,32 @@ fn declare_ident(id: &tsv_ts::ast::internal::Identifier<'_>, nc: &mut Nc<'_>) {
     }
 }
 
-/// Peel `MemberExpression.object` and `ParenthesizedExpression` to the root node
-/// — Svelte's `is_safe_identifier` walks `.object` down member chains, and tsv's
-/// AST additionally carries parenthesization the oracle's ESTree view doesn't,
-/// so both are peeled to reach the same root.
+/// Peel to the root node Svelte's `is_safe_identifier` would see: `.object` down
+/// member chains, plus the wrappers tsv's AST carries that the oracle's ESTree
+/// view does not.
+///
+/// The TypeScript wrappers are **not** defense in depth here, they are
+/// load-bearing: this walk runs over the raw `root.fragment` (the Svelte AST is
+/// never rebuilt — template erasure happens per-expression at the emitter's
+/// borrow points), so a template member/call still carries them when
+/// `needs_context` classifies it. Missing an arm makes a *safe* root (a plain
+/// local, a `$state` binding, a block local, a global) read as a non-identifier
+/// and spuriously fire `needs_context` — wrapping the whole body in
+/// `$$renderer.component(…)` the oracle never emits. A silent MISMATCH, not a
+/// refusal. `JsdocCast` is the sixth transparent wrapper (valid JavaScript, and
+/// the oracle has no such node at all).
 fn root_of<'e>(expr: &'e Expression<'e>) -> &'e Expression<'e> {
     let mut node = expr;
     loop {
         match node {
             Expression::MemberExpression(m) => node = m.object,
             Expression::ParenthesizedExpression(p) => node = p.expression,
+            Expression::TSAsExpression(t) => node = t.expression,
+            Expression::TSSatisfiesExpression(t) => node = t.expression,
+            Expression::TSNonNullExpression(t) => node = t.expression,
+            Expression::TSTypeAssertion(t) => node = t.expression,
+            Expression::TSInstantiationExpression(t) => node = t.expression,
+            Expression::JsdocCast(j) => node = j.inner,
             _ => return node,
         }
     }

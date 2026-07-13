@@ -145,9 +145,13 @@ pub(crate) fn assign_target_roots(target: &Expression<'_>, source: &str, out: &m
         }
         Expression::MemberExpression(m) => assign_target_roots(m.object, source, out),
         // All four TypeScript assignment-target wrappers the parser accepts
-        // (`expression_assignable.rs`). Type erasure unwraps them before this
-        // walk runs, so these are defense in depth — but a missing arm would
-        // silently lose a reassignment root (and fold a mutated binding).
+        // (`expression_assignable.rs`). LOAD-BEARING, not defense in depth: the
+        // script's statements are erased before this walk, but the TEMPLATE's are
+        // not — the Svelte AST is never rebuilt, so erasure happens per-expression
+        // at the emitter's borrow points, and `needs_context`'s whole-component
+        // reassignment collection walks the raw fragment. A missing arm silently
+        // loses a reassignment root (`(x as any).y = 1` in a handler) and then
+        // statically folds a mutated binding.
         Expression::TSNonNullExpression(t) => assign_target_roots(t.expression, source, out),
         Expression::TSAsExpression(t) => assign_target_roots(t.expression, source, out),
         Expression::TSSatisfiesExpression(t) => assign_target_roots(t.expression, source, out),
