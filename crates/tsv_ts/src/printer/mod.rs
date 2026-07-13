@@ -920,52 +920,6 @@ impl<'a> Printer<'a> {
         .map(|i| (i + keyword.len()) as u32)
     }
 
-    /// Find the `=>` token position for an arrow function.
-    ///
-    /// Computes the signature end from the arrow's structure and scans for `=>`.
-    /// Returns the position of `=` in `=>`, or the body start as fallback.
-    pub(crate) fn find_arrow_token_for(
-        &self,
-        arrow: &internal::ArrowFunctionExpression<'_>,
-    ) -> u32 {
-        let body_start = arrow.body.span().start;
-        let sig_end = if let Some(rt) = &arrow.return_type {
-            rt.span.end
-        } else if let Some(ps) = arrow.params_start {
-            self.find_closing_paren(ps, body_start)
-                .unwrap_or(body_start)
-        } else {
-            arrow
-                .params
-                .last()
-                .map_or(arrow.span.start, |p| p.span().end)
-        };
-        self.find_arrow_token(sig_end, body_start)
-            .unwrap_or(body_start)
-    }
-
-    /// Find the `=>` token between a start position and end boundary.
-    ///
-    /// Scans the source to find `=>`. Returns the position OF the `=` character
-    /// (the start of the arrow token). Skips over comments and strings.
-    pub(crate) fn find_arrow_token(&self, start: u32, end: u32) -> Option<u32> {
-        let source = self.source.as_bytes();
-        let end = (end as usize).min(source.len());
-        let mut i = start as usize;
-
-        while i + 1 < end {
-            if let Some(past) = skip_trivia(source, i, end, TriviaProfile::JS) {
-                i = past;
-                continue;
-            }
-            if source[i] == b'=' && source[i + 1] == b'>' {
-                return Some(i as u32);
-            }
-            i += 1;
-        }
-        None
-    }
-
     /// Find a keyword between a start position and end boundary.
     ///
     /// Returns the position of the first character of the keyword if found.

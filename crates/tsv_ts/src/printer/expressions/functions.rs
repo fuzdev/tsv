@@ -216,12 +216,10 @@ impl<'a> Printer<'a> {
                 .map_or(arrow.span.start, |p| p.span().end)
         };
 
-        // Find the `=>` token position to distinguish:
+        // The `=>` token position (parser-recorded) distinguishes:
         // - Comments between sig_end and `=>` → print BEFORE `=>`
         // - Comments between `=>` and body → print AFTER `=>`
-        let arrow_pos = self
-            .find_arrow_token(sig_end, arrow.body.span().start)
-            .unwrap_or_else(|| arrow.body.span().start);
+        let arrow_pos = arrow.arrow_token;
         let arrow_end = arrow_pos + "=>".len() as u32;
 
         // Build the signature (async + type params + params + return type) via the
@@ -340,7 +338,7 @@ impl<'a> Printer<'a> {
         // Check if body arrow has trailing param comments (forces break)
         let body_arrow_has_trailing_param_comments =
             if let internal::Expression::ArrowFunctionExpression(body_arrow) = expr {
-                let arrow_token = self.find_arrow_token_for(body_arrow);
+                let arrow_token = body_arrow.arrow_token;
                 arrow_has_trailing_param_comments(body_arrow, arrow_token, |start, end| {
                     self.has_comments_between(start, end)
                 })
