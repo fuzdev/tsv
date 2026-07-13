@@ -1177,6 +1177,13 @@ impl<'a> Printer<'a> {
         let n = seq.expressions.len();
         let mut parts = DocBuf::with_capacity(n * 3 + 4);
 
+        // Whole-sequence comment gate: the inter-operand gaps (after/before each comma)
+        // all lie within `seq.span`, so with no comment there, every per-operand gap is
+        // empty. Skip the per-operand comma scans + the `empty()` comment children on the
+        // comment-free common path. Byte-identical (the line-comment path already branched
+        // off above, so a present comment here is a block, handled by the full path).
+        let seq_has_comments = self.has_comments_between(seq.span.start, seq.span.end);
+
         // First operand's leading-edge comments float OUT, before the opening `(`.
         let first_start = seq.expressions[0].span().start;
         self.append_floated_leading_comments(&mut parts, seq.span.start, first_start);
@@ -1192,13 +1199,15 @@ impl<'a> Printer<'a> {
                 // Leading comments of this operand: the gap after the previous comma.
                 // Redundant operand parens are stripped, so a comment the user wrote
                 // inside them (`(/* c */ b)`) is preserved inline before the operand.
-                let prev_end = seq.expressions[i - 1].span().end;
-                if let Some(comma) = self.find_comma_after(prev_end) {
-                    parts.push(self.build_comments_between(
-                        comma + 1,
-                        expr_start,
-                        CommentSpacing::Trailing,
-                    ));
+                if seq_has_comments {
+                    let prev_end = seq.expressions[i - 1].span().end;
+                    if let Some(comma) = self.find_comma_after(prev_end) {
+                        parts.push(self.build_comments_between(
+                            comma + 1,
+                            expr_start,
+                            CommentSpacing::Trailing,
+                        ));
+                    }
                 }
             }
 
@@ -1212,7 +1221,10 @@ impl<'a> Printer<'a> {
             parts.push(inner);
 
             // Trailing comments of this operand: the gap before the next comma.
-            if !is_last && let Some(comma) = self.find_comma_after(expr_end) {
+            if seq_has_comments
+                && !is_last
+                && let Some(comma) = self.find_comma_after(expr_end)
+            {
                 parts.push(self.build_comments_between(expr_end, comma, CommentSpacing::Leading));
             }
         }
