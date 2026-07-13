@@ -509,7 +509,10 @@ mod tests {
             collapse_whitespace_runs("[data-x=\"a\tb\"]"),
             "[data-x=\"a\tb\"]"
         );
-        assert_eq!(collapse_whitespace_runs(".a  /* c  d */  .b"), ".a /* c  d */ .b");
+        assert_eq!(
+            collapse_whitespace_runs(".a  /* c  d */  .b"),
+            ".a /* c  d */ .b"
+        );
         // An escaped quote does not end the string early.
         assert_eq!(
             collapse_whitespace_runs(r"[x='a\'  b']  .c"),

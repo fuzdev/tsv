@@ -39,9 +39,17 @@ const STABLE: &str = "function f() {
 /// pass (the fixed-point invariant the regression violated).
 #[test]
 fn for_header_block_comment_is_idempotent() {
-    assert_eq!(format(STABLE), STABLE, "for-header block comment must be a fixed point");
+    assert_eq!(
+        format(STABLE),
+        STABLE,
+        "for-header block comment must be a fixed point"
+    );
     // Second pass, to be explicit that it does not drift after the first.
-    assert_eq!(format(&format(STABLE)), STABLE, "still stable on the second pass");
+    assert_eq!(
+        format(&format(STABLE)),
+        STABLE,
+        "still stable on the second pass"
+    );
 }
 
 /// The continuation line is preserved verbatim at a single leading tab — proof the
