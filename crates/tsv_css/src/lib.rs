@@ -5,6 +5,7 @@
 
 pub mod ast;
 mod escapes;
+mod keyword_set;
 mod lexer;
 mod number;
 mod parser;

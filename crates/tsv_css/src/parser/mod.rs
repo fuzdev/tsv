@@ -13,6 +13,7 @@ use crate::ast::internal::{Comment, CssNode, CssStyleSheet};
 use crate::lexer::{Lexer, Token, TokenKind};
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
+use decl_scan::TerminatorKind;
 use tsv_lang::{ParseError, Span};
 
 pub(crate) struct CssParser<'a, 'arena> {
@@ -141,16 +142,46 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         Ok(())
     }
 
-    /// Re-seat the lexer at a raw `source` offset and make the token there current,
-    /// dropping any lookahead (which was lexed from before the jump).
+    /// Make a declaration value's terminator the current token, without lexing it.
     ///
-    /// The counterpart to a scan that ran ahead of the parser: the declaration value's
-    /// boundary scan finds its terminator by walking bytes, then lands the parser on that
-    /// terminator token without the lexer having tokenized anything in between.
-    pub(crate) fn seek_to(&mut self, raw_pos: usize) -> Result<(), ParseError> {
+    /// The counterpart to a scan that ran ahead of the parser: the value's boundary scan
+    /// walks bytes to its terminator, and in stopping there it already established which
+    /// token that is. Re-lexing the byte would only re-derive the kind and the extent that
+    /// [`TerminatorKind`] already pins, so seat the token directly and leave the lexer just
+    /// past it, exactly where `advance()` would have. Any lookahead is dropped: it was
+    /// lexed from before the jump.
+    ///
+    /// Under debug the terminator is re-lexed and checked against the seated token, so the
+    /// test suite re-proves that a construction still agrees with the lexer it replaces.
+    pub(in crate::parser) fn seat_at_terminator(
+        &mut self,
+        terminator: usize,
+        terminator_kind: TerminatorKind,
+    ) {
+        let (kind, width) = terminator_kind.token();
+        let end = terminator + width;
+
+        #[cfg(debug_assertions)]
+        {
+            let mut probe = Lexer::new(self.source());
+            probe.seek(terminator);
+            let relexed = probe.next_token();
+            assert!(
+                relexed.as_ref().is_ok_and(|token| token.kind == kind
+                    && token.start as usize == terminator
+                    && token.end as usize == end),
+                "seated terminator disagreed with the lexer at {terminator}: seated \
+                 {kind:?} [{terminator}, {end}), lexer said {relexed:?}"
+            );
+        }
+
         self.peek = None;
-        self.lexer.seek(raw_pos);
-        self.advance()
+        // `seek` also drops the lexer's parked decode — a `;` / `}` / EOF never carries one.
+        self.lexer.seek(end);
+        self.current_kind = kind;
+        self.current_start = terminator;
+        self.current_end = end;
+        self.current_decoded = None;
     }
 
     /// Peek at the next token's kind without consuming it. Returns the kind by

@@ -23,6 +23,30 @@ use super::CssParser;
 use crate::lexer::{IDENT_CONTINUE_LUT, Lexer, TokenKind, is_ascii_css_whitespace};
 use tsv_lang::ParseError;
 
+/// The token that closes a declaration's value. Exactly three can, so the scan reports
+/// which one rather than a general `TokenKind`: `CssParser::seat_at_terminator` builds that
+/// token instead of lexing it, and a narrow type is what stops it from ever building one of
+/// the wrong width. A `TokenKind` there would need a catch-all arm covering ~30 variants
+/// that cannot occur — and would silently mis-seat any that later did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum TerminatorKind {
+    Semicolon,
+    RightBrace,
+    Eof,
+}
+
+impl TerminatorKind {
+    /// The lexer token this stands for, and its width in bytes: `;` and `}` are one byte,
+    /// and the EOF token is zero-width at end-of-source.
+    pub(super) fn token(self) -> (TokenKind, usize) {
+        match self {
+            Self::Semicolon => (TokenKind::Semicolon, 1),
+            Self::RightBrace => (TokenKind::RightBrace, 1),
+            Self::Eof => (TokenKind::Eof, 0),
+        }
+    }
+}
+
 /// Everything the declaration node needs from its value's text. Offsets are raw
 /// `source` offsets (the caller shifts them into host coordinates).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -30,6 +54,9 @@ pub(super) struct ValueFacts {
     /// Where the value's terminator token begins: the `;` / `}` that closes it at depth
     /// zero, or end-of-source. The parser re-seats its lexer here.
     pub(super) terminator: usize,
+    /// Which token that is. Both walks branch on it to stop, so the parser seats it
+    /// directly rather than lexing the byte a second time.
+    pub(super) terminator_kind: TerminatorKind,
     /// End of the value's span — the end of its last non-whitespace token, already rolled
     /// back past a trailing `!important` when there is one.
     pub(super) value_end: usize,
@@ -290,17 +317,17 @@ fn scan_value_bytes(source: &str, value_start: usize) -> Option<ValueFacts> {
     // (or followed by anything but `important`) is rejected by the forward check below.
     let mut last_bang: Option<usize> = None;
 
-    let terminator = loop {
+    let (terminator, terminator_kind) = loop {
         while i < len && SKIP[bytes[i] as usize] {
             i += 1;
         }
         if i >= len {
-            break len;
+            break (len, TerminatorKind::Eof);
         }
         let at_top = paren == 0 && brace == 0 && bracket == 0;
         match bytes[i] {
-            b';' if at_top => break i,
-            b'}' if at_top => break i,
+            b';' if at_top => break (i, TerminatorKind::Semicolon),
+            b'}' if at_top => break (i, TerminatorKind::RightBrace),
             b';' => i += 1,
             b'}' => {
                 brace = brace.saturating_sub(1);
@@ -380,6 +407,7 @@ fn scan_value_bytes(source: &str, value_start: usize) -> Option<ValueFacts> {
 
     Some(ValueFacts {
         terminator,
+        terminator_kind,
         value_end,
         important_end,
         has_comment,
@@ -556,18 +584,18 @@ fn scan_value_tokens(source: &str, value_start: usize) -> Result<ValueFacts, Par
 
     // The terminator token's own start — where the parser re-seats its lexer. At EOF the
     // token is zero-width at end-of-source, so the same field serves both exits.
-    let terminator = loop {
+    let (terminator, terminator_kind) = loop {
         let token = lexer.next_token().map_err(|err| *err)?;
         let decoded = lexer.take_decoded();
         if token.kind == TokenKind::Eof {
-            break token.start as usize;
+            break (token.start as usize, TerminatorKind::Eof);
         }
-        if paren == 0
-            && brace == 0
-            && bracket == 0
-            && matches!(token.kind, TokenKind::Semicolon | TokenKind::RightBrace)
-        {
-            break token.start as usize;
+        if paren == 0 && brace == 0 && bracket == 0 {
+            match token.kind {
+                TokenKind::Semicolon => break (token.start as usize, TerminatorKind::Semicolon),
+                TokenKind::RightBrace => break (token.start as usize, TerminatorKind::RightBrace),
+                _ => {}
+            }
         }
 
         match token.kind {
@@ -641,6 +669,7 @@ fn scan_value_tokens(source: &str, value_start: usize) -> Result<ValueFacts, Par
 
     Ok(ValueFacts {
         terminator,
+        terminator_kind,
         value_end,
         important_end,
         has_comment,
