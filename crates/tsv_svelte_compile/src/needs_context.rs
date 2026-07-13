@@ -60,6 +60,16 @@ struct Nc<'a> {
     /// same walk so mutations inside dropped event handlers still mark a binding
     /// updated (and so it is not statically folded).
     reassigned: NameSet,
+    /// Names declared anywhere inside a function-like subtree (params + local
+    /// declarations; `fn_depth > 0`). An assignment target inside such a subtree
+    /// may resolve to the local, not the component binding, so a component
+    /// binding in this set must go `Opaque` (refuse-on-read) rather than trust
+    /// the shadow-naive `reassigned` mark — the same envelope the script side
+    /// uses for its `nested_declared` names.
+    fn_declared: NameSet,
+    /// Current function-like nesting depth (arrows, function expressions and
+    /// declarations, class methods, static blocks).
+    fn_depth: u32,
     /// Set by any `$$slots` reference (the oracle's `uses_slots`): the component
     /// gains `const $$slots = $.sanitize_slots($$props)` and the `$$props` param.
     uses_slots: bool,
@@ -72,6 +82,11 @@ pub(crate) struct ComponentContext {
     /// Names reassigned anywhere in the component (script + template, including
     /// inside dropped event handlers).
     pub reassigned: NameSet,
+    /// Names declared inside function-like subtrees anywhere in the component.
+    /// A same-named component binding must be marked `Opaque` — a `reassigned`
+    /// mark for it may belong to the shadowing local, and folding OR escaping on
+    /// that guess would each miscompile some shape, so reads refuse instead.
+    pub fn_declared: NameSet,
     /// Whether the component references `$$slots` (oracle's `uses_slots`).
     pub uses_slots: bool,
 }
@@ -100,6 +115,8 @@ pub(crate) fn analyze_component(
         needs: false,
         refuse: None,
         reassigned: NameSet::default(),
+        fn_declared: NameSet::default(),
+        fn_depth: 0,
         uses_slots: false,
     };
 
@@ -126,6 +143,7 @@ pub(crate) fn analyze_component(
     Ok(ComponentContext {
         needs_context: nc.needs,
         reassigned: nc.reassigned,
+        fn_declared: nc.fn_declared,
         uses_slots: nc.uses_slots,
     })
 }
@@ -191,19 +209,27 @@ fn collect_context_roots(root: &Root<'_>, source: &str, out: &mut NameSet) {
 
 /// Add every name a binding pattern declares to `shadowed` (best-effort — a
 /// pattern shape `pattern_binding_names` can't collect just records nothing, so
-/// the set stays a superset of the true nested bindings).
+/// the set stays a superset of the true nested bindings). Inside a function-like
+/// subtree the names also join `fn_declared` (see the field docs).
 fn declare_pattern(pattern: &Expression<'_>, nc: &mut Nc<'_>) {
     let mut names = Vec::new();
     if pattern_binding_names(pattern, nc.source, &mut names).is_ok() {
         for name in names {
+            if nc.fn_depth > 0 {
+                nc.fn_declared.insert(name.clone());
+            }
             nc.shadowed.insert(name);
         }
     }
 }
 
-/// Add a single identifier's name to `shadowed`.
+/// Add a single identifier's name to `shadowed` (and `fn_declared` inside a
+/// function-like subtree).
 fn declare_ident(id: &tsv_ts::ast::internal::Identifier<'_>, nc: &mut Nc<'_>) {
     if let Some(name) = plain_name(id, nc.source) {
+        if nc.fn_depth > 0 {
+            nc.fn_declared.insert(name.to_string());
+        }
         nc.shadowed.insert(name.to_string());
     }
 }
@@ -282,6 +308,7 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
         // Nested function scopes: their params/bindings shadow the component
         // scope, so record them and walk the body (always nested).
         Expression::ArrowFunctionExpression(a) => {
+            nc.fn_depth += 1;
             for param in a.params {
                 declare_pattern(param, nc);
                 walk_expr(param, nc);
@@ -294,6 +321,7 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
                     }
                 }
             }
+            nc.fn_depth -= 1;
         }
         Expression::FunctionExpression(f) => walk_function_expression(f, nc),
         Expression::ClassExpression(c) => walk_class_body(&c.body, nc),
@@ -398,6 +426,7 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
 }
 
 fn walk_function_expression(f: &FunctionExpression<'_>, nc: &mut Nc<'_>) {
+    nc.fn_depth += 1;
     if let Some(id) = &f.id {
         declare_ident(id, nc);
     }
@@ -408,6 +437,7 @@ fn walk_function_expression(f: &FunctionExpression<'_>, nc: &mut Nc<'_>) {
     for stmt in f.body.body {
         walk_stmt(stmt, nc, true);
     }
+    nc.fn_depth -= 1;
 }
 
 fn walk_class_body(body: &ClassBody<'_>, nc: &mut Nc<'_>) {
@@ -426,9 +456,11 @@ fn walk_class_body(body: &ClassBody<'_>, nc: &mut Nc<'_>) {
                 walk_opt(p.value.as_ref(), nc);
             }
             ClassMember::StaticBlock(b) => {
+                nc.fn_depth += 1;
                 for stmt in b.body {
                     walk_stmt(stmt, nc, true);
                 }
+                nc.fn_depth -= 1;
             }
             ClassMember::IndexSignature(_) => {}
         }
@@ -464,6 +496,7 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
             if shadow && let Some(id) = &f.id {
                 declare_ident(id, nc);
             }
+            nc.fn_depth += 1;
             for param in f.params {
                 declare_pattern(param, nc);
                 walk_expr(param, nc);
@@ -471,6 +504,7 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
             for s in f.body.body {
                 walk_stmt(s, nc, true);
             }
+            nc.fn_depth -= 1;
         }
         Statement::ClassDeclaration(c) => {
             if shadow && let Some(id) = &c.id {
@@ -558,6 +592,7 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
         Statement::ExportDefaultDeclaration(s) => match &s.declaration {
             ExportDefaultValue::Expression(e) => walk_expr(e, nc),
             ExportDefaultValue::FunctionDeclaration(f) => {
+                nc.fn_depth += 1;
                 for param in f.params {
                     declare_pattern(param, nc);
                     walk_expr(param, nc);
@@ -565,6 +600,7 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
                 for stmt in f.body.body {
                     walk_stmt(stmt, nc, true);
                 }
+                nc.fn_depth -= 1;
             }
             ExportDefaultValue::ClassDeclaration(c) => walk_class_body(&c.body, nc),
             ExportDefaultValue::TSDeclareFunction(_)

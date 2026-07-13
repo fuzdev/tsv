@@ -385,6 +385,15 @@ pub(crate) fn compile_server<'arena>(
     for name in &nested_declared {
         bindings.mark_opaque(name);
     }
+    // Names declared inside function-like subtrees anywhere in the component
+    // (template event handlers included — the script side's `nested_declared`
+    // already covers the script). A same-named component binding goes Opaque:
+    // an assignment target inside such a subtree may resolve to the shadowing
+    // local, so neither folding nor escaping the outer binding is provable —
+    // reads refuse instead (the script side's exact envelope).
+    for name in &component.fn_declared {
+        bindings.mark_opaque(name);
+    }
 
     let needs_context = has_effects || component.needs_context;
     if needs_context {
@@ -1579,6 +1588,11 @@ const COMPILE_FILENAME: &str = "input.svelte";
 
 /// Port of Svelte's `hash` (`utils.js`): strip carriage returns, then a djb2-xor
 /// fold over the code units in reverse, rendered base-36. Used for `$.head`.
+///
+/// Folds over `chars()` (code points) where the oracle uses `charCodeAt` (UTF-16
+/// code units) — identical for BMP input, divergent for astral characters. Safe
+/// at the only call site (the ASCII [`COMPILE_FILENAME`] constant); revisit if a
+/// real filename ever feeds this.
 fn svelte_hash(s: &str) -> String {
     let mut hash: u32 = 5381;
     for ch in s.chars().rev() {

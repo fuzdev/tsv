@@ -1496,6 +1496,47 @@ mod tests {
     }
 
     #[test]
+    fn compile_handler_shadow_never_masks_the_outer_fold_wrongly() {
+        // A handler-local binding (param, destructured/default param, let-decl,
+        // function-expr param, nested-arrow param) may own the mutation target,
+        // so the outer binding goes Opaque: reads REFUSE (the script side's
+        // shadow envelope) rather than fold or escape on a guess.
+        for source in [
+            "<script>let a = 1;</script><p>{a}</p><button onclick={(a) => a++}>x</button>",
+            "<script>let a = 1;</script><p>{a}</p><button onclick={({ a }) => (a = 2)}>x</button>",
+            "<script>let a = 1;</script><p>{a}</p><button onclick={(a = 1) => a++}>x</button>",
+            "<script>let a = 1;</script><p>{a}</p><button onclick={() => { let a = 0; a++; }}>x</button>",
+            "<script>let a = 1;</script><p>{a}</p><button onclick={() => { const f = (a) => a++; f(0); }}>x</button>",
+        ] {
+            assert_unsupported(source, "binding a is not statically modeled");
+        }
+        // The non-shadow direction still masks: `(x) => a++` reassigns the
+        // OUTER `a`, so its read escapes instead of folding.
+        let out = compile(
+            "<script>let a = 1;</script><p>{a}</p><button onclick={(x) => a++}>x</button>",
+            &CompileOptions::default(),
+        )
+        .unwrap();
+        assert!(
+            out.js.contains("$.escape(a)"),
+            "outer mutation must escape: {}",
+            out.js
+        );
+        // Partial shadow: the shadowed name refuses only when read; the
+        // non-shadowed co-mutated name still masks.
+        let out = compile(
+            "<script>let a = 1;\n\tlet b = 2;</script><p>{b}</p><button onclick={(a) => { a++; b++; }}>x</button>",
+            &CompileOptions::default(),
+        )
+        .unwrap();
+        assert!(
+            out.js.contains("$.escape(b)"),
+            "co-mutated b must escape: {}",
+            out.js
+        );
+    }
+
+    #[test]
     fn compile_rejects_load_error_event_capture() {
         // `onload`/`onerror` on a load-error element needs `this.__e=event`
         // capture markup, not a clean drop.
