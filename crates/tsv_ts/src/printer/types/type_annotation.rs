@@ -64,16 +64,19 @@ impl<'a> Printer<'a> {
             match self.unwrap_redundant_parens(annotation.type_annotation) {
                 TSType::Union(u) => {
                     let type_doc = self.build_union_type_doc(u);
-                    // Extract comments between `:` and the union type (e.g., `: /* c */ A | B`)
-                    let comments_doc = self.build_comments_between(
-                        colon_end,
-                        type_start,
-                        CommentSpacing::Trailing,
-                    );
-                    d.concat(&[
-                        d.text(":"),
-                        hang_after_operator(d, d.concat(&[comments_doc, type_doc])),
-                    ])
+                    // Comments between `:` and the union type (e.g., `: /* c */ A | B`);
+                    // omit the empty child on the comment-free common path. Byte-identical.
+                    let hung = if self.has_comments_between(colon_end, type_start) {
+                        let comments_doc = self.build_comments_between(
+                            colon_end,
+                            type_start,
+                            CommentSpacing::Trailing,
+                        );
+                        d.concat(&[comments_doc, type_doc])
+                    } else {
+                        type_doc
+                    };
+                    d.concat(&[d.text(":"), hang_after_operator(d, hung)])
                 }
                 TSType::Intersection(i) => {
                     // Build intersection with proper indentation for type annotation context:
@@ -105,7 +108,17 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let mut parts: DocBuf = smallvec![d.text(": ")];
-        parts.push(self.build_comments_between(colon_end, type_start, CommentSpacing::Trailing));
+        // Skip the `empty()` comment child on the comment-free `: Type` gap — type
+        // annotations are one of the most frequent TS constructs, so a wasted child here
+        // (walked by render + every fits pass) is ubiquitous. Byte-identical: the gap is
+        // comment-free, so the comment doc would be `empty()`.
+        if self.has_comments_between(colon_end, type_start) {
+            parts.push(self.build_comments_between(
+                colon_end,
+                type_start,
+                CommentSpacing::Trailing,
+            ));
+        }
         parts.push(self.build_type_doc(ty));
         d.concat(&parts)
     }
