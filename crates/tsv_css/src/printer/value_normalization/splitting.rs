@@ -49,13 +49,18 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> Cow<'_, str> {
     }
 
     let mut result = String::with_capacity(s.len());
-    let mut chars = s.chars().peekable();
+    // `char_indices`, not `chars`: the escape arm below needs the byte offset to ask
+    // `escape_len` how far the escape reaches (the single definition of that rule).
+    let mut chars = s.char_indices().map(|(_, c)| c).peekable();
+    let mut byte_pos = 0usize;
     let mut in_string = false;
     let mut string_delim = '\0';
     let mut in_comment = false;
     let mut pending_space = false;
 
     while let Some(ch) = chars.next() {
+        let ch_start = byte_pos;
+        byte_pos += ch.len_utf8();
         // Check for comment start (outside strings)
         if !in_string && !in_comment && ch == '/' && chars.peek() == Some(&'*') {
             // Add space before comment if preceded by non-whitespace (except `(`)
@@ -66,6 +71,7 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> Cow<'_, str> {
             pending_space = false;
             result.push('/');
             chars.next(); // consume '*'
+            byte_pos += 1;
             result.push('*');
             in_comment = true;
             continue;
@@ -75,6 +81,7 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> Cow<'_, str> {
         if in_comment && ch == '*' && chars.peek() == Some(&'/') {
             result.push('*');
             chars.next(); // consume '/'
+            byte_pos += 1;
             result.push('/');
             in_comment = false;
             pending_space = true; // Space needed before next token
@@ -112,21 +119,30 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> Cow<'_, str> {
             continue;
         }
 
-        // A CSS escape (`\` + code point). Its payload is value **content**, never a
-        // separator — `\` followed by whitespace is a valid escape whose escaped code
-        // point IS that whitespace (CSS Syntax 3 §4.3.4 / §4.3.7). Copy the pair
-        // verbatim so it can't reach the whitespace branch below: collapsing or
-        // trimming the payload strands the backslash, which then escapes the next
-        // delimiter (`;`, `)`, `!`) and the output no longer parses.
-        if ch == '\\' {
+        // A CSS escape is opaque: copy it WHOLE and verbatim, so none of its interior
+        // can reach the whitespace branch below (`crate::escapes::escape_len`).
+        //
+        // Its payload is value **content**, never a separator: `\` followed by
+        // whitespace is a valid escape whose escaped code point IS that whitespace
+        // (CSS Syntax 3 §4.3.4 / §4.3.7). Collapsing or trimming the payload strands
+        // the backslash, which then escapes the next delimiter (`;`, `)`, `!`) and the
+        // output no longer parses. A hex escape's whitespace *terminator* is part of
+        // the escape too (`\41 2px` is one ident), so collapsing a run there would
+        // fuse two tokens into one.
+        if ch == '\\'
+            && let Some(len) = crate::escapes::escape_len(s, ch_start)
+        {
             if pending_space && !result.is_empty() {
                 result.push(' ');
             }
             pending_space = false;
-            result.push(ch);
-            if let Some(escaped) = chars.next() {
-                result.push(escaped);
+            let escape = &s[ch_start..ch_start + len];
+            result.push_str(escape);
+            // The `\` is already consumed; step the iterator over the escape's tail.
+            for _ in 0..escape.chars().count() - 1 {
+                chars.next();
             }
+            byte_pos = ch_start + len;
             continue;
         }
 
@@ -141,6 +157,7 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> Cow<'_, str> {
             // Unicode whitespace are value content, not separators).
             while chars.peek().is_some_and(|&c| is_css_whitespace(c)) {
                 chars.next();
+                byte_pos += 1;
             }
             continue;
         }
@@ -362,15 +379,23 @@ pub(crate) fn split_args_by_comma(content: &str) -> Vec<&str> {
 }
 
 /// Split `content` at top-level bytes matching `is_sep`, preserving content inside
-/// parentheses, quotes (`'`/`"`), and block comments (`/* */`).
+/// parentheses, quotes (`'`/`"`), block comments (`/* */`), and **escapes**.
 ///
 /// The shared scanner behind `split_by_space_preserving_parens` and
 /// `split_args_by_comma`: a byte state machine tracking paren depth, quote state,
-/// and comment state, splitting only on a separator byte found at depth 0 outside
-/// quotes/comments. `is_sep` selects the separator(s); `trim` selects the emit
+/// comment state, and escapes, splitting only on a separator byte found at depth 0
+/// outside all of them. `is_sep` selects the separator(s); `trim` selects the emit
 /// policy via `push_segment` — `true` trims each segment and drops empties
 /// (whitespace-value splitting), `false` keeps segments raw including empties
 /// (comma-arg splitting).
+///
+/// **Escapes are stepped over whole** (`crate::escapes::escape_len`). A separator byte
+/// *inside* an escape is not structure — it is the escaped character (`x\,y` is one
+/// ident containing a comma, `xxxxx\ yyyyy` one ident containing a space) or a hex
+/// escape's whitespace terminator (`\41 2px` is one ident). Splitting there tears a
+/// token in half: the comma path rejoins with `", "`, inserting a space *inside* the
+/// ident; the whitespace path lets the value wrap at that point, and `\` before a
+/// newline is not a valid escape (§4.3.4) — so the output no longer re-parses.
 fn split_top_level(content: &str, is_sep: impl Fn(u8) -> bool, trim: bool) -> Vec<&str> {
     let mut parts = Vec::new();
     let mut depth: u32 = 0;
@@ -401,6 +426,16 @@ fn split_top_level(content: &str, is_sep: impl Fn(u8) -> bool, trim: bool) -> Ve
         }
         if in_comment {
             i += 1;
+            continue;
+        }
+
+        // An escape is opaque: step over it whole, so neither a separator nor a
+        // quote delimiter *inside* it can be read as structure. (A `\` in a comment
+        // is literal, which is why this sits below the comment arms.)
+        if bytes[i] == b'\\'
+            && let Some(len) = crate::escapes::escape_len(content, i)
+        {
+            i += len;
             continue;
         }
 
@@ -443,9 +478,12 @@ fn split_top_level(content: &str, is_sep: impl Fn(u8) -> bool, trim: bool) -> Ve
 
 /// Emit one segment under the active policy: when `trim`, trim it and skip if empty;
 /// otherwise push it verbatim (including empty segments).
+///
+/// The trailing trim spares an escape's payload (`crate::escapes::trim_end_preserving_escape`):
+/// a segment can legitimately end in an escaped space, which is content, not padding.
 fn push_segment<'a>(parts: &mut Vec<&'a str>, segment: &'a str, trim: bool) {
     if trim {
-        let trimmed = segment.trim();
+        let trimmed = crate::escapes::trim_end_preserving_escape(segment.trim_start());
         if !trimmed.is_empty() {
             parts.push(trimmed);
         }

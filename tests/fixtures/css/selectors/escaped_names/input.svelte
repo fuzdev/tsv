@@ -45,4 +45,25 @@
 	:\41 :\42 {
 		color: olive;
 	}
+	/* a LITERAL escape's whitespace is the opposite of a hex terminator: the space is
+	   the escape's PAYLOAD (the class is named `a `), so it must survive. Dropping it
+	   strands the backslash onto the next separator, merging the descendant combinator
+	   into the compound (`.a\  .b` would re-parse as one compound, losing the space) */
+	.a\  .b {
+		color: maroon;
+	}
+	/* the same escape with NO combinator after it: one compound (class `a ` and .b) */
+	.a\ .b {
+		color: lime;
+	}
+	/* and before a selector-list comma / the block, where a stranded backslash would
+	   escape the `,` / `{` instead. Before `{` the payload space IS the separator, so
+	   no second one is added (the literal-escape twin of the hex-terminator rule) */
+	.a\ ,
+	.c {
+		color: aqua;
+	}
+	.a\ {
+		color: silver;
+	}
 </style>

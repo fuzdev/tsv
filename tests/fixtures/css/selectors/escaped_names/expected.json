@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 1276,
+		"end": 2067,
 		"attributes": [],
 		"children": [
 			{
@@ -555,18 +555,252 @@
 				},
 				"start": 1237,
 				"end": 1267
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 1608,
+					"end": 1615,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 1608,
+							"end": 1615,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "a\\ ",
+											"start": 1608,
+											"end": 1612
+										}
+									],
+									"start": 1608,
+									"end": 1612
+								},
+								{
+									"type": "RelativeSelector",
+									"combinator": {
+										"type": "Combinator",
+										"name": " ",
+										"start": 1612,
+										"end": 1613
+									},
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "b",
+											"start": 1613,
+											"end": 1615
+										}
+									],
+									"start": 1612,
+									"end": 1615
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 1616,
+					"end": 1637,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 1620,
+							"end": 1633,
+							"property": "color",
+							"value": "maroon"
+						}
+					]
+				},
+				"start": 1608,
+				"end": 1637
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 1724,
+					"end": 1730,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 1724,
+							"end": 1730,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "a\\ ",
+											"start": 1724,
+											"end": 1728
+										},
+										{
+											"type": "ClassSelector",
+											"name": "b",
+											"start": 1728,
+											"end": 1730
+										}
+									],
+									"start": 1724,
+									"end": 1730
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 1731,
+					"end": 1750,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 1735,
+							"end": 1746,
+							"property": "color",
+							"value": "lime"
+						}
+					]
+				},
+				"start": 1724,
+				"end": 1750
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 2002,
+					"end": 2011,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 2002,
+							"end": 2006,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "a\\ ",
+											"start": 2002,
+											"end": 2006
+										}
+									],
+									"start": 2002,
+									"end": 2006
+								}
+							]
+						},
+						{
+							"type": "ComplexSelector",
+							"start": 2009,
+							"end": 2011,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "c",
+											"start": 2009,
+											"end": 2011
+										}
+									],
+									"start": 2009,
+									"end": 2011
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 2012,
+					"end": 2031,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 2016,
+							"end": 2027,
+							"property": "color",
+							"value": "aqua"
+						}
+					]
+				},
+				"start": 2002,
+				"end": 2031
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 2033,
+					"end": 2037,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 2033,
+							"end": 2037,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "a\\ ",
+											"start": 2033,
+											"end": 2037
+										}
+									],
+									"start": 2033,
+									"end": 2037
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 2037,
+					"end": 2058,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 2041,
+							"end": 2054,
+							"property": "color",
+							"value": "silver"
+						}
+					]
+				},
+				"start": 2033,
+				"end": 2058
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 1268,
-			"styles": "\n\t/* identity escapes keep the backslash in the AST name */\n\t#\\? {\n\t\tcolor: red;\n\t}\n\t.\\@ {\n\t\tcolor: blue;\n\t}\n\ta\\+b {\n\t\tcolor: green;\n\t}\n\t/* hex escapes decode (with optional whitespace terminator) */\n\t#\\3A b {\n\t\tcolor: orange;\n\t}\n\t/* mixed identity and hex in one name */\n\t.a\\?\\41 b {\n\t\tcolor: purple;\n\t}\n\t/* astral-plane (>BMP) hex escape decodes to a multi-byte char in the AST name\n\t   (exercises surrogate-pair / 4-byte offset translation); formatter keeps it raw */\n\t.\\1F600 b {\n\t\tcolor: teal;\n\t}\n\t/* a hex escape's terminator whitespace right before the block is part of the\n\t   selector token, but the formatter must not re-emit it as a doubled separator */\n\t.\\41 {\n\t\tcolor: brown;\n\t}\n\t/* the same terminator before a combinator is consumed once, not doubled — and\n\t   the single space inside the compound `.\\41 .b` (two simple selectors) stays */\n\t.\\41 .b > c\\64 e {\n\t\tcolor: navy;\n\t}\n\t/* pseudo-class and pseudo-element names keep hex escapes raw too — Svelte\n\t   decodes them in the AST `name`, but the formatter preserves the source */\n\t:\\41 {\n\t\tcolor: pink;\n\t}\n\t::\\41 b {\n\t\tcolor: gray;\n\t}\n\t/* the terminator between two escaped pseudos in a compound stays; only the\n\t   trailing one (before the block) is dropped */\n\t:\\41 :\\42 {\n\t\tcolor: olive;\n\t}\n",
+			"end": 2059,
+			"styles": "\n\t/* identity escapes keep the backslash in the AST name */\n\t#\\? {\n\t\tcolor: red;\n\t}\n\t.\\@ {\n\t\tcolor: blue;\n\t}\n\ta\\+b {\n\t\tcolor: green;\n\t}\n\t/* hex escapes decode (with optional whitespace terminator) */\n\t#\\3A b {\n\t\tcolor: orange;\n\t}\n\t/* mixed identity and hex in one name */\n\t.a\\?\\41 b {\n\t\tcolor: purple;\n\t}\n\t/* astral-plane (>BMP) hex escape decodes to a multi-byte char in the AST name\n\t   (exercises surrogate-pair / 4-byte offset translation); formatter keeps it raw */\n\t.\\1F600 b {\n\t\tcolor: teal;\n\t}\n\t/* a hex escape's terminator whitespace right before the block is part of the\n\t   selector token, but the formatter must not re-emit it as a doubled separator */\n\t.\\41 {\n\t\tcolor: brown;\n\t}\n\t/* the same terminator before a combinator is consumed once, not doubled — and\n\t   the single space inside the compound `.\\41 .b` (two simple selectors) stays */\n\t.\\41 .b > c\\64 e {\n\t\tcolor: navy;\n\t}\n\t/* pseudo-class and pseudo-element names keep hex escapes raw too — Svelte\n\t   decodes them in the AST `name`, but the formatter preserves the source */\n\t:\\41 {\n\t\tcolor: pink;\n\t}\n\t::\\41 b {\n\t\tcolor: gray;\n\t}\n\t/* the terminator between two escaped pseudos in a compound stays; only the\n\t   trailing one (before the block) is dropped */\n\t:\\41 :\\42 {\n\t\tcolor: olive;\n\t}\n\t/* a LITERAL escape's whitespace is the opposite of a hex terminator: the space is\n\t   the escape's PAYLOAD (the class is named `a `), so it must survive. Dropping it\n\t   strands the backslash onto the next separator, merging the descendant combinator\n\t   into the compound (`.a\\  .b` would re-parse as one compound, losing the space) */\n\t.a\\  .b {\n\t\tcolor: maroon;\n\t}\n\t/* the same escape with NO combinator after it: one compound (class `a ` and .b) */\n\t.a\\ .b {\n\t\tcolor: lime;\n\t}\n\t/* and before a selector-list comma / the block, where a stranded backslash would\n\t   escape the `,` / `{` instead. Before `{` the payload space IS the separator, so\n\t   no second one is added (the literal-escape twin of the hex-terminator rule) */\n\t.a\\ ,\n\t.c {\n\t\tcolor: aqua;\n\t}\n\t.a\\ {\n\t\tcolor: silver;\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 1277,
+	"end": 2068,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

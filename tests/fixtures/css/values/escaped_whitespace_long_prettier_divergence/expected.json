@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 151,
+		"end": 411,
 		"attributes": [],
 		"children": [
 			{
@@ -38,66 +38,38 @@
 				"block": {
 					"type": "Block",
 					"start": 13,
-					"end": 142,
+					"end": 402,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 17,
-							"end": 30,
-							"property": "width",
-							"value": "50px\\"
+							"start": 112,
+							"end": 207,
+							"property": "grid-template-areas",
+							"value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbb cccc dddd xxxxx\\ yyyyy"
 						},
 						{
 							"type": "Declaration",
-							"start": 34,
-							"end": 58,
-							"property": "height",
-							"value": "var(--a, 50px\\ )"
-						},
-						{
-							"type": "Declaration",
-							"start": 62,
-							"end": 81,
-							"property": "margin",
-							"value": "calc(1px\\ )"
-						},
-						{
-							"type": "Declaration",
-							"start": 85,
-							"end": 96,
-							"property": "color",
-							"value": "a\\ b"
-						},
-						{
-							"type": "Declaration",
-							"start": 100,
-							"end": 123,
-							"property": "padding",
-							"value": "var(--b, x\\,y)"
-						},
-						{
-							"type": "Declaration",
-							"start": 127,
-							"end": 138,
-							"property": "inset",
-							"value": "a\\+b"
+							"start": 299,
+							"end": 398,
+							"property": "grid-template-areas",
+							"value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbb cccc dddd\n\t\t\txxxxx\\ yyyyy"
 						}
 					]
 				},
 				"start": 9,
-				"end": 142
+				"end": 402
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 143,
-			"styles": "\n\tdiv {\n\t\twidth: 50px\\ ;\n\t\theight: var(--a, 50px\\ );\n\t\tmargin: calc(1px\\ );\n\t\tcolor: a\\ b;\n\t\tpadding: var(--b, x\\,y);\n\t\tinset: a\\+b;\n\t}\n",
+			"end": 403,
+			"styles": "\n\tdiv {\n\t\t/* 100 chars: fits exactly, stays inline (the escaped space is content, not a wrap point) */\n\t\tgrid-template-areas: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbb cccc dddd xxxxx\\ yyyyy;\n\n\t\t/* 101 chars: must break — but NOT on the escaped space, which is inside an ident */\n\t\tgrid-template-areas: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbb cccc dddd\n\t\t\txxxxx\\ yyyyy;\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 152,
+	"end": 412,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

@@ -452,8 +452,8 @@ impl<'a> Printer<'a> {
     /// (type / class / id / pseudo-without-args) extracted verbatim from source so
     /// escapes are preserved.
     ///
-    /// A CSS hex escape consumes one following whitespace as its terminator, which
-    /// the lexer captures into the selector's span (`.\1F600 ` before `{`). When
+    /// A CSS **hex** escape consumes one following whitespace as its *terminator*,
+    /// which the lexer captures into the selector's span (`.\1F600 ` before `{`). When
     /// this is the last simple selector in its compound, whatever follows is a
     /// structural separator (a combinator's space, `,`, `)`, or the block `{`) that
     /// terminates the escape on its own, so the captured terminator is dropped to
@@ -461,10 +461,19 @@ impl<'a> Printer<'a> {
     /// compound, or the first of `:\41 :\42`) is kept — it separates the escape from
     /// the next simple selector. This single leaf rule replaces the old
     /// buffer-popping `pop_selector_terminator`.
+    ///
+    /// A **literal** escape's whitespace is the opposite case and must NOT be trimmed:
+    /// in `.a\ ` the space is the escape's *payload* (the class is named `a `), not a
+    /// terminator, so dropping it strands the backslash — which then escapes the
+    /// separator that follows, silently **merging a descendant combinator into the
+    /// compound** (`.a\␣␣.b` would print as `.a\␣.b`, which re-parses as one compound,
+    /// losing the `Combinator`). `trim_end_preserving_escape` draws exactly that line:
+    /// a whitespace preceded by an odd-length backslash run is a payload and stays;
+    /// anything else (a hex terminator, ordinary padding) still goes.
     fn span_leaf_doc(&self, span: Span, is_last_in_compound: bool) -> DocId {
         let raw = span.extract(self.source);
         let text = if is_last_in_compound {
-            raw.trim_end()
+            crate::escapes::trim_end_preserving_escape(raw)
         } else {
             raw
         };

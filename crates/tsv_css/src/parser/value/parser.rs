@@ -246,17 +246,24 @@ impl<'a> ValueParser<'a> {
 
             // Delimiter tests use the nesting level as of *before* this byte, then
             // the byte updates the nesting — the same order `ValueCursor` uses.
-            // An escaped paren (`\(` / `\)`) is a content code point (css-syntax §4.3.7 — the
-            // char after `\` is an escaped code point), NOT a nesting delimiter, so it must not
-            // change `in_parens`: otherwise an escaped `)` inside an unquoted `url()`
-            // (`url(  a\)b  )`) drops the depth to 0, exposing the interior whitespace as a
-            // false top-level separator and mis-splitting the opaque url-token (which then
-            // gains/loses whitespace on format). Skip both bytes. Other escapes (`\,` …) fall
-            // through unchanged — they don't affect paren depth, and matching prettier's
-            // escape-blind comma/whitespace splitting there is deliberate. Kept identical in the
-            // twin `ValueCursor` / `classify_separators` trackers (the fused-pass invariant).
-            if b == b'\\' && matches!(bytes.get(i + 1), Some(b'(' | b')')) {
-                i += 2;
+            //
+            // An escape is OPAQUE: step over it whole (`crate::escapes::escape_len`), so
+            // nothing inside it reads as structure. Every byte it can hide is one this
+            // scanner would otherwise act on — an escaped paren (`url(  a\)b  )` would drop
+            // the depth to 0 and expose the interior whitespace as a false top-level
+            // separator, mis-splitting the opaque url-token); an escaped comma (`x\,y`)
+            // would split one ident in two, which the comma path then rejoins with `", "`,
+            // inserting a space *inside* the ident; an escaped space (`xxxxx\ yyyyy`) would
+            // become a wrap point, and `\` before a newline is not a valid escape (§4.3.4),
+            // so the output stops re-parsing. A hex escape's whitespace terminator is part
+            // of the escape too (`\41 2px` is ONE ident, §4.3.7).
+            //
+            // Kept identical in the twin `ValueCursor` / `classify_separators` trackers
+            // (the fused-pass invariant).
+            if b == b'\\'
+                && let Some(len) = crate::escapes::escape_len(text, i)
+            {
+                i += len;
                 continue;
             }
             let top = in_parens == 0 && !in_quote;

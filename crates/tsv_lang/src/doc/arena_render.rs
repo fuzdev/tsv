@@ -56,7 +56,7 @@ fn trim_last_line_in_place(s: &mut String) {
         .iter()
         .rposition(|&b| b == b'\n')
         .map_or(0, |i| i + 1);
-    let trimmed_len = trimmable_end(&s[trim_start..]);
+    let trimmed_len = s[trim_start..].trim_end_matches([' ', '\t']).len();
     s.truncate(trim_start + trimmed_len);
 }
 
@@ -164,34 +164,8 @@ fn remaining_width(pos: usize, render: &RenderConfig, embed: &EmbedContext) -> i
 /// non-literal newline to strip trailing indentation/spaces from code lines.
 #[inline]
 pub(super) fn trim_trailing_whitespace(output: &mut String) {
-    output.truncate(trimmable_end(output));
-}
-
-/// The length `output` keeps after trailing spaces/tabs are trimmed — **except an
-/// escaped one**.
-///
-/// A trailing space/tab preceded by an odd-length `\` run is that escape's payload,
-/// not layout whitespace: it is *content*, and trimming it strands the backslash
-/// onto whatever the caller appends next. In CSS a value may legitimately end in
-/// one (`width: 50px\ ;` — CSS Syntax 3 §4.3.4/§4.3.7 make `\` + whitespace a valid
-/// escape), and dropping it turns the following `;` into an escaped character, so
-/// the output no longer parses.
-///
-/// An even-length run is a completed `\\`, so the whitespace after it is ordinary
-/// padding and still goes; only the escape's single payload character survives.
-#[inline]
-fn trimmable_end(output: &str) -> usize {
-    let trimmed = output.trim_end_matches([' ', '\t']);
-    if trimmed.len() == output.len() {
-        return output.len();
-    }
-    let backslashes = trimmed.bytes().rev().take_while(|&b| b == b'\\').count();
-    if backslashes % 2 == 0 {
-        trimmed.len()
-    } else {
-        // Keep the escape's one payload character (a space or tab — both 1 byte).
-        trimmed.len() + 1
-    }
+    let trimmed_len = output.trim_end_matches([' ', '\t']).len();
+    output.truncate(trimmed_len);
 }
 
 /// Render a line break.
