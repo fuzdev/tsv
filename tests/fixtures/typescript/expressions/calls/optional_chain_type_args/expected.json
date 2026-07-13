@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 400,
+	"end": 584,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -73,24 +73,56 @@
 					"column": 66
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " optional typed call whose callee is itself a call — acorn-typescript marks the",
+			"start": 392,
+			"end": 473,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " callee CallExpression node optional too (the force-optional spine)",
+			"start": 475,
+			"end": 544,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 70
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 399,
+		"end": 583,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 390,
+			"end": 574,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 15,
+					"line": 20,
 					"column": 9
 				}
 			},
@@ -1231,6 +1263,326 @@
 								"name": "b"
 							},
 							"computed": false,
+							"optional": true
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 546,
+					"end": 557,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 12
+						}
+					},
+					"expression": {
+						"type": "ChainExpression",
+						"start": 546,
+						"end": 556,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 1
+							},
+							"end": {
+								"line": 18,
+								"column": 11
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 546,
+							"end": 556,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 1
+								},
+								"end": {
+									"line": 18,
+									"column": 11
+								}
+							},
+							"callee": {
+								"type": "CallExpression",
+								"start": 546,
+								"end": 549,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 1
+									},
+									"end": {
+										"line": 18,
+										"column": 4
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 546,
+									"end": 547,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 1
+										},
+										"end": {
+											"line": 18,
+											"column": 2
+										}
+									},
+									"name": "g"
+								},
+								"arguments": [],
+								"optional": true
+							},
+							"arguments": [],
+							"typeArguments": {
+								"type": "TSTypeParameterInstantiation",
+								"start": 551,
+								"end": 554,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 6
+									},
+									"end": {
+										"line": 18,
+										"column": 9
+									}
+								},
+								"params": [
+									{
+										"type": "TSTypeReference",
+										"start": 552,
+										"end": 553,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 7
+											},
+											"end": {
+												"line": 18,
+												"column": 8
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 552,
+											"end": 553,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 7
+												},
+												"end": {
+													"line": 18,
+													"column": 8
+												}
+											},
+											"name": "T"
+										}
+									}
+								]
+							},
+							"optional": true
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " optional typed call whose callee is itself a call — acorn-typescript marks the",
+							"start": 392,
+							"end": 473
+						},
+						{
+							"type": "Line",
+							"value": " callee CallExpression node optional too (the force-optional spine)",
+							"start": 475,
+							"end": 544
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 559,
+					"end": 573,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 15
+						}
+					},
+					"expression": {
+						"type": "ChainExpression",
+						"start": 559,
+						"end": 572,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 1
+							},
+							"end": {
+								"line": 19,
+								"column": 14
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 559,
+							"end": 572,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 1
+								},
+								"end": {
+									"line": 19,
+									"column": 14
+								}
+							},
+							"callee": {
+								"type": "CallExpression",
+								"start": 559,
+								"end": 564,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 1
+									},
+									"end": {
+										"line": 19,
+										"column": 6
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 559,
+									"end": 562,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 1
+										},
+										"end": {
+											"line": 19,
+											"column": 4
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 559,
+										"end": 560,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 1
+											},
+											"end": {
+												"line": 19,
+												"column": 2
+											}
+										},
+										"name": "a"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 561,
+										"end": 562,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 3
+											},
+											"end": {
+												"line": 19,
+												"column": 4
+											}
+										},
+										"name": "b"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": true
+							},
+							"arguments": [
+								{
+									"type": "Identifier",
+									"start": 570,
+									"end": 571,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 12
+										},
+										"end": {
+											"line": 19,
+											"column": 13
+										}
+									},
+									"name": "c"
+								}
+							],
+							"typeArguments": {
+								"type": "TSTypeParameterInstantiation",
+								"start": 566,
+								"end": 569,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 8
+									},
+									"end": {
+										"line": 19,
+										"column": 11
+									}
+								},
+								"params": [
+									{
+										"type": "TSTypeReference",
+										"start": 567,
+										"end": 568,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 9
+											},
+											"end": {
+												"line": 19,
+												"column": 10
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 567,
+											"end": 568,
+											"loc": {
+												"start": {
+													"line": 19,
+													"column": 9
+												},
+												"end": {
+													"line": 19,
+													"column": 10
+												}
+											},
+											"name": "T"
+										}
+									}
+								]
+							},
 							"optional": true
 						}
 					}
