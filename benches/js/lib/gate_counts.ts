@@ -61,6 +61,35 @@
 
 import type { Language } from './types.ts';
 
+/**
+ * The sibling checkouts the counts below were measured against, by git commit.
+ *
+ * The counts are only meaningful relative to the inputs that produced them, and an
+ * upstream `package.json` version bumps only at RELEASE — so commits landing between
+ * releases change the graded suite without changing the version. `pins:audit`'s version
+ * check is blind to that window, which is exactly how these pins went stale silently: a
+ * `../svelte` pull added three test inputs at the same declared `5.56.4`, and `../kit` +
+ * `../svelte.dev` moved under the corpus pins with no version signal at all.
+ *
+ * So `pins:audit` also compares each checkout's HEAD against the commit recorded here and
+ * WARNS on a move. That is deliberately a warning, not a failure: the count pins are the
+ * gate (they fail on any real move in what's graded), and this exists to make a count-pin
+ * trip *diagnosable* — "the corpus moved" vs "tsv regressed" is otherwise a reverse-
+ * engineering exercise. An absent checkout, or one that isn't a git repo, is skipped, so
+ * clean machines and CI still pass.
+ *
+ * Re-record a commit in the same change that re-pins the counts it explains.
+ */
+export const GATE_CHECKOUT_COMMITS: Record<string, { commit: string; pins: string }> = {
+	'../svelte': { commit: 'b4d1583ae', pins: 'SVELTE_FIXTURES_PINS, CORPUS_FORMAT_*, CORPUS_PARSE_*' },
+	'../acorn-typescript': { commit: '312d079', pins: 'TS_FIXTURES_PINS' },
+	'../typescript': { commit: '637d5746b', pins: 'TS_REPO_PINS' },
+	'../kit': { commit: 'da5b08ea7', pins: 'CORPUS_FORMAT_*, CORPUS_PARSE_*' },
+	'../svelte.dev': { commit: 'c21c2d0f0', pins: 'CORPUS_FORMAT_*, CORPUS_PARSE_*' },
+	'../prettier': { commit: '1dcd0b05d', pins: 'CORPUS_FORMAT_*, CORPUS_PARSE_*' },
+	'../prettier-plugin-svelte': { commit: '7809486', pins: 'CORPUS_FORMAT_*, CORPUS_PARSE_*' },
+};
+
 /** Exact expected counts for a fixtures parse-conformance gate (`lib/fixtures_gate.ts`). */
 export interface GatePins {
 	/** Suite inputs discovered under the default root. */
@@ -84,7 +113,23 @@ export interface GatePins {
  * both_accept 3273→3274: leading-symbol attribute names (`<p }>`) now parse (svelte-attr-name gap fixed),
  * so `validator/samples/attribute-invalid-name` moved from over-rejection to both-accept.
  */
-export const SVELTE_FIXTURES_PINS: GatePins = { scanned: 3375, both_accept: 3280 };
+export const SVELTE_FIXTURES_PINS: GatePins = { scanned: 3378, both_accept: 3283 };
+// scanned 3375→3378, both_accept 3280→3283 (2026-07-13, ../svelte b4d1583ae, svelte@5.56.4,
+// oracle svelte@5.56.4). NO tsv behavior change — `scanned` is a raw count of the suite's
+// canonical `.svelte` inputs, so no code change can move it. The suite grew by exactly three
+// inputs as ../svelte advanced 8fb7ceeba→b4d1583ae, all within the same declared 5.56.4
+// (which is why the version-string check stayed green and the count pin is what caught it —
+// pins:audit now compares the checkout COMMIT as well):
+//
+// - `runtime-runes/samples/async-batch-derived/main.svelte` (svelte bfbb026f2, #18525)
+// - `runtime-runes/samples/each-keyed-computed-destructuring-key/main.svelte` (b4d1583ae, #18521)
+// - `sourcemaps/samples/sourcemap-empty-source/input.svelte` (5edd8b060, #18518)
+//
+// A fourth new file, `each-keyed-computed-destructuring-key/Child.svelte`, is NOT counted —
+// `input_basenames` is {input,main,index}.svelte. All three are ordinary valid Svelte 5
+// components, so both parsers accept all three and both_accept moves by the same +3. Verdict
+// parity is unchanged and clean: 0 unexpected over-rejections, 0 known gaps, 0 undocumented
+// AST-shape groups.
 
 /** conformance:ts-fixtures — measured 2026-07-08: ../acorn-typescript at 312d079 (v1.0.11), oracle @sveltejs/acorn-typescript@1.0.11. */
 export const TS_FIXTURES_PINS: GatePins = { scanned: 207, both_accept: 186 };
@@ -213,9 +258,38 @@ export const CORPUS_PARSE_TSV_ERRORS_PIN: Record<Language, number> = {
  */
 export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	svelte: 1101,
-	typescript: 4164,
+	typescript: 4168,
 	css: 125,
 };
+// typescript 4164→4168 (2026-07-13, ../svelte b4d1583ae, ../kit da5b08ea7, ../svelte.dev
+// c21c2d0f0, ../prettier 1dcd0b05d, ../prettier-plugin-svelte 7809486, oracle
+// acorn-typescript 1.0.11); svelte + css unchanged, SAFETY 0.
+//
+// NOT a clean +4: on today's checkouts the PRE-change binary measures 4162, i.e. the 4164
+// pin was already stale by −2 from live-corpus movement — ../kit (5c38e515d→da5b08ea7) and
+// ../svelte.dev (93a400d→c21c2d0f0) both moved since the pin was taken (../svelte and
+// ../prettier did not). That drift is a CORPUS change, not a tsv regression: the HEAD binary
+// reproduces 4162 on today's checkouts. The pins:audit commit check added alongside this
+// exists so that kind of movement stops being silent.
+//
+// From that 4162 baseline the computed-lookup work is a clean +6, fully attributed by
+// formatting the whole `gates` corpus with the pre-change binary and with this one and
+// diffing the per-file output sets (only 8 files change output at all; 6 of them flip into
+// `match`, −3 `known` / −3 `unknown`):
+//
+// - +3 (`known`→`match`), ../svelte: `src/index-client.js`, `src/legacy/legacy-client.js`,
+//   `src/internal/client/dom/legacy/misc.js` — a computed lookup on a JSDoc-cast base no
+//   longer breaks before `?.[`.
+// - +2 (`unknown`→`match`), ../prettier suites: `js/assignment/issue-15534`,
+//   `js/method-chain/assignment-lhs` — an unbreakable template RHS now breaks after the `=`
+//   when the LHS can break, instead of splitting the assignment target.
+// - +1 (`unknown`→`match`), ../kit: `src/runtime/server/page/data_serializer.js` — same
+//   assignment rule.
+//
+// The other 2 files that move stay divergent and so don't touch a count:
+// `js/binary-expressions/comment` and `js/ternaries/indent-after-paren` (both closer to
+// prettier — the brackets now break as prettier's do — but each retains a separate,
+// pre-existing binary/ternary indent divergence).
 
 /**
  * corpus:compare:format --all — EXACT per-language `unknown` + `partial`
@@ -230,9 +304,14 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	svelte: 7,
-	typescript: 141,
+	typescript: 139,
 	css: 22,
 };
+// typescript 141→139 (2026-07-13, checkouts as in CORPUS_FORMAT_MATCH_MIN above). The
+// pre-change binary measures 142 on today's checkouts — the 141 pin was stale by +1 from
+// the same ../kit + ../svelte.dev movement — and the computed-lookup work then removes 3
+// (`issue-15534`, `method-chain/assignment-lhs`, kit's `data_serializer.js`, all
+// `unknown`→`match`). See the attribution block on CORPUS_FORMAT_MATCH_MIN.
 // typescript 142→141 (2026-07-13, ../svelte b4d1583ae, ../kit 5c38e515d, ../svelte.dev
 // 93a400d, ../prettier 1dcd0b0, ../prettier-plugin-svelte 7809486, oracle
 // acorn-typescript 1.0.11). Net −1, but it is NOT a clean −1: on today's checkouts the
@@ -358,9 +437,14 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 // one file moved (0 new unknowns, match/unknown unmoved, SAFETY 0). svelte/css unmoved.
 export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	svelte: 4,
-	typescript: 63,
+	typescript: 61,
 	css: 9,
 };
+// typescript 63→61 (2026-07-13, checkouts as in CORPUS_FORMAT_MATCH_MIN above). Pure
+// live-corpus drift, NOT a behavior change: the pre-change binary already measures 61 on
+// today's checkouts, and this branch's computed-lookup work moves the bucket by 0. The −2
+// came in with the ../kit (5c38e515d→da5b08ea7) + ../svelte.dev (93a400d→c21c2d0f0)
+// movement since the pin was taken — the drift the new pins:audit commit check now surfaces.
 // typescript 63 (net unchanged 2026-07-12, composition shifted): on main the #422
 // consecutive-line-comment break added two comment_position partials (63→65), and this
 // branch's two formatter fixes resolved two others back to match — js/for/parentheses.js
