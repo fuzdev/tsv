@@ -75,11 +75,16 @@
     collapse (documented at the site; revisited at multi-file). A
     directory-module split by concern (unchanged responsibilities): `mod.rs`
     (the `SymbolBinder` struct, its lifecycle — `new`/`bind_program`/`finish`
-    — the table/symbol/atom primitives both descendants share, and the
-    member-key resolver), `walk.rs` (the bind-descent methods —
-    `visit_statement`/`visit_expression` and everything they call into —
-    plus the functions-first statement-list ordering), and `declare.rs` (the
-    `declareSymbolEx` cascade and the container routing).
+    — the table/symbol/atom primitives every descendant shares, the
+    member-key resolver, the functions-first statement-list driver
+    (`bind_statement_list`), and the scope helpers
+    (`with_function_scope`/`with_block_scope`) every descendant calls into),
+    `statement.rs` (the statement-shaped bind-descent — `visit_statement` and
+    every `bind_*_statement`, the param/binding helpers, and the
+    module/import/export-specifier binds), `expression.rs`
+    (`visit_expression` and `bind_object_expression`), `members.rs` (the
+    class/interface/type-literal/enum member and type descents), and
+    `declare.rs` (the `declareSymbolEx` cascade and the container routing).
   - `symbols.rs` — `Symbol`, `SymbolFlags` + the `*Excludes` conflict-mask
     const tables (ported bit-for-bit from tsgo's `symbolflags.go`), pooled
     declaration lists, `TableId` symbol tables.

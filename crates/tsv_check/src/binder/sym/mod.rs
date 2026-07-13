@@ -46,16 +46,23 @@
 //! `declare module "X"` augmentations) runs in [`crate::merge`] over the
 //! [`FileMerge`] product this bind returns.
 //!
-//! Split for locality across three files: this module (`mod.rs`) keeps the
+//! Split for locality across four files: this module (`mod.rs`) keeps the
 //! `SymbolBinder` struct, its lifecycle (`new`/`bind_program`/`finish`), the
-//! table/symbol/atom primitives both descendants share, and the member-key
-//! resolver; `walk.rs` holds the bind-descent methods (`visit_statement`/
-//! `visit_expression` and everything they call into); `declare.rs` holds the
-//! `declareSymbolEx` cascade and the container routing. No behavior distinction
-//! between the three.
+//! table/symbol/atom primitives every descendant shares, the member-key
+//! resolver, the functions-first statement-list driver (`bind_statement_list`),
+//! and the scope helpers (`with_function_scope`/`with_block_scope`) every
+//! descendant calls into; `statement.rs` holds the statement-shaped
+//! bind-descent (`visit_statement` and every `bind_*_statement`, the
+//! param/binding helpers, and the module/import/export-specifier binds);
+//! `expression.rs` holds `visit_expression` and `bind_object_expression`;
+//! `members.rs` holds the class/interface/type-literal/enum member and type
+//! descents; `declare.rs` holds the `declareSymbolEx` cascade and the container
+//! routing. No behavior distinction between the four.
 
 mod declare;
-mod walk;
+mod expression;
+mod members;
+mod statement;
 
 use super::atoms::{Atom, Atoms};
 use super::symbols::{Symbol, SymbolFlags, SymbolId, TableId};
@@ -67,7 +74,10 @@ use crate::merge::{FileMerge, MergeDecl, MergeSymbol, ModuleAug};
 use string_interner::DefaultStringInterner;
 use tsv_lang::Span;
 use tsv_ts::ast::Program;
-use tsv_ts::ast::internal::{Expression, Identifier, Literal, LiteralValue, ModuleExportName};
+use tsv_ts::ast::internal::{
+    ExportDefaultValue, Expression, Identifier, Literal, LiteralValue, ModuleExportName, Statement,
+    TSTypeParameterDeclaration,
+};
 
 /// The container kinds that route member declarations (a subset of tsgo's node
 /// kinds, enough to dispatch `declareSymbolAndAddToSymbolTable`).
@@ -119,6 +129,13 @@ struct DeclInput {
     exported: bool,
     /// The declaration node's best-effort dense id (via the SoA address map).
     node: NodeId,
+}
+
+/// Modifiers threaded from an `export` wrapper into the wrapped declaration.
+#[derive(Clone, Copy, Default)]
+struct DeclMods {
+    exported: bool,
+    default: bool,
 }
 
 /// The symbol bind for one file.
@@ -205,6 +222,61 @@ impl<'a> SymbolBinder<'a> {
     /// Bind the program body, then return.
     pub(super) fn bind_program(&mut self, program: &Program<'a>) {
         self.bind_statement_list(program.body, true);
+    }
+
+    // --- statement lists (functions-first) -----------------------------------
+
+    // tsgo: internal/binder/binder.go bindEachStatementFunctionsFirst (functions-first)
+    fn bind_statement_list(&mut self, stmts: &[Statement<'a>], functions_first: bool) {
+        if functions_first {
+            for stmt in stmts {
+                if is_function_statement(stmt) {
+                    self.declare_hoisted_function(stmt);
+                }
+            }
+        }
+        for stmt in stmts {
+            let skip = functions_first && is_function_statement(stmt);
+            self.visit_statement(stmt, DeclMods::default(), skip);
+        }
+    }
+
+    // --- scopes ---------------------------------------------------------------
+
+    fn with_function_scope(
+        &mut self,
+        type_params: Option<&TSTypeParameterDeclaration<'a>>,
+        f: impl FnOnce(&mut Self),
+    ) {
+        let saved = (self.container, self.block_scope);
+        let locals = self.new_table();
+        let scope = Scope {
+            kind: ContainerKind::Locals,
+            symbol: None,
+            locals: Some(locals),
+            is_external_module: false,
+            is_export_context: false,
+        };
+        self.container = scope;
+        self.block_scope = scope;
+        self.bind_type_params(type_params);
+        f(self);
+        self.container = saved.0;
+        self.block_scope = saved.1;
+    }
+
+    fn with_block_scope(&mut self, f: impl FnOnce(&mut Self)) {
+        let saved = self.block_scope;
+        let locals = self.new_table();
+        self.block_scope = Scope {
+            kind: ContainerKind::Locals,
+            symbol: None,
+            locals: Some(locals),
+            is_external_module: false,
+            is_export_context: false,
+        };
+        f(self);
+        self.block_scope = saved;
     }
 
     /// Finish, returning the collected bind diagnostics and the merge product.
@@ -432,4 +504,23 @@ struct KeyInfo {
     key: Atom,
     display: Atom,
     span: Span,
+}
+
+/// Whether a statement is a function declaration (possibly `export`-wrapped) —
+/// the set tsgo's `bindEachStatementFunctionsFirst` binds first.
+fn is_function_statement(stmt: &Statement<'_>) -> bool {
+    match stmt {
+        Statement::FunctionDeclaration(_) | Statement::TSDeclareFunction(_) => true,
+        Statement::ExportNamedDeclaration(e) => e.declaration.is_some_and(|inner| {
+            matches!(
+                inner,
+                Statement::FunctionDeclaration(_) | Statement::TSDeclareFunction(_)
+            )
+        }),
+        Statement::ExportDefaultDeclaration(e) => matches!(
+            e.declaration,
+            ExportDefaultValue::FunctionDeclaration(_) | ExportDefaultValue::TSDeclareFunction(_)
+        ),
+        _ => false,
+    }
 }
