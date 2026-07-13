@@ -411,7 +411,7 @@
 				"type": "IfBlock",
 				"elseif": false,
 				"start": 345,
-				"end": 427,
+				"end": 425,
 				"test": {
 					"type": "LogicalExpression",
 					"start": 350,
@@ -530,40 +530,40 @@
 						{
 							"type": "Text",
 							"start": 392,
-							"end": 402,
-							"raw": ", updated ",
-							"data": ", updated "
+							"end": 404,
+							"raw": "\n\t, updated ",
+							"data": "\n\t, updated "
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 402,
-							"end": 422,
+							"start": 404,
+							"end": 419,
 							"expression": {
 								"type": "CallExpression",
-								"start": 403,
-								"end": 421,
+								"start": 405,
+								"end": 418,
 								"loc": {
 									"start": {
-										"line": 9,
-										"column": 82
+										"line": 10,
+										"column": 12
 									},
 									"end": {
-										"line": 11,
-										"column": 2
+										"line": 10,
+										"column": 25
 									}
 								},
 								"callee": {
 									"type": "Identifier",
-									"start": 403,
-									"end": 405,
+									"start": 405,
+									"end": 407,
 									"loc": {
 										"start": {
-											"line": 9,
-											"column": 82
+											"line": 10,
+											"column": 12
 										},
 										"end": {
-											"line": 9,
-											"column": 84
+											"line": 10,
+											"column": 14
 										}
 									},
 									"name": "fn"
@@ -571,16 +571,16 @@
 								"arguments": [
 									{
 										"type": "Identifier",
-										"start": 409,
-										"end": 418,
+										"start": 408,
+										"end": 417,
 										"loc": {
 											"start": {
 												"line": 10,
-												"column": 2
+												"column": 15
 											},
 											"end": {
 												"line": 10,
-												"column": 11
+												"column": 24
 											}
 										},
 										"name": "bbbbbbbbb"
@@ -588,6 +588,13 @@
 								],
 								"optional": false
 							}
+						},
+						{
+							"type": "Text",
+							"start": 419,
+							"end": 420,
+							"raw": "\n",
+							"data": "\n"
 						}
 					]
 				},
@@ -595,32 +602,32 @@
 			},
 			{
 				"type": "Text",
-				"start": 427,
-				"end": 429,
+				"start": 425,
+				"end": 427,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 429,
-				"end": 497,
+				"start": 427,
+				"end": 495,
 				"data": " 176 chars - first fn() args break, text content also breaks "
 			},
 			{
 				"type": "Text",
-				"start": 497,
-				"end": 498,
+				"start": 495,
+				"end": 496,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "ExpressionTag",
-				"start": 498,
-				"end": 547,
+				"start": 496,
+				"end": 545,
 				"expression": {
 					"type": "CallExpression",
-					"start": 499,
-					"end": 546,
+					"start": 497,
+					"end": 544,
 					"loc": {
 						"start": {
 							"line": 14,
@@ -633,8 +640,8 @@
 					},
 					"callee": {
 						"type": "Identifier",
-						"start": 499,
-						"end": 501,
+						"start": 497,
+						"end": 499,
 						"loc": {
 							"start": {
 								"line": 14,
@@ -650,8 +657,8 @@
 					"arguments": [
 						{
 							"type": "LogicalExpression",
-							"start": 504,
-							"end": 544,
+							"start": 502,
+							"end": 542,
 							"loc": {
 								"start": {
 									"line": 15,
@@ -664,8 +671,8 @@
 							},
 							"left": {
 								"type": "Identifier",
-								"start": 504,
-								"end": 522,
+								"start": 502,
+								"end": 520,
 								"loc": {
 									"start": {
 										"line": 15,
@@ -681,8 +688,8 @@
 							"operator": "||",
 							"right": {
 								"type": "Identifier",
-								"start": 526,
-								"end": 544,
+								"start": 524,
+								"end": 542,
 								"loc": {
 									"start": {
 										"line": 15,
@@ -703,12 +710,12 @@
 			{
 				"type": "IfBlock",
 				"elseif": false,
-				"start": 547,
+				"start": 545,
 				"end": 678,
 				"test": {
 					"type": "LogicalExpression",
-					"start": 552,
-					"end": 637,
+					"start": 550,
+					"end": 635,
 					"loc": {
 						"start": {
 							"line": 16,
@@ -721,8 +728,8 @@
 					},
 					"left": {
 						"type": "LogicalExpression",
-						"start": 552,
-						"end": 592,
+						"start": 550,
+						"end": 590,
 						"loc": {
 							"start": {
 								"line": 16,
@@ -735,8 +742,8 @@
 						},
 						"left": {
 							"type": "Identifier",
-							"start": 552,
-							"end": 570,
+							"start": 550,
+							"end": 568,
 							"loc": {
 								"start": {
 									"line": 16,
@@ -752,8 +759,8 @@
 						"operator": "&&",
 						"right": {
 							"type": "Identifier",
-							"start": 574,
-							"end": 592,
+							"start": 572,
+							"end": 590,
 							"loc": {
 								"start": {
 									"line": 16,
@@ -770,8 +777,8 @@
 					"operator": "&&",
 					"right": {
 						"type": "BinaryExpression",
-						"start": 596,
-						"end": 637,
+						"start": 594,
+						"end": 635,
 						"loc": {
 							"start": {
 								"line": 16,
@@ -784,8 +791,8 @@
 						},
 						"left": {
 							"type": "Identifier",
-							"start": 596,
-							"end": 614,
+							"start": 594,
+							"end": 612,
 							"loc": {
 								"start": {
 									"line": 16,
@@ -801,8 +808,8 @@
 						"operator": "!==",
 						"right": {
 							"type": "Identifier",
-							"start": 619,
-							"end": 637,
+							"start": 617,
+							"end": 635,
 							"loc": {
 								"start": {
 									"line": 16,
@@ -822,41 +829,41 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 638,
-							"end": 649,
-							"raw": ",\n\tupdated ",
-							"data": ",\n\tupdated "
+							"start": 636,
+							"end": 648,
+							"raw": "\n\t, updated ",
+							"data": "\n\t, updated "
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 649,
-							"end": 673,
+							"start": 648,
+							"end": 672,
 							"expression": {
 								"type": "CallExpression",
-								"start": 650,
-								"end": 672,
+								"start": 649,
+								"end": 671,
 								"loc": {
 									"start": {
 										"line": 17,
-										"column": 10
+										"column": 12
 									},
 									"end": {
 										"line": 17,
-										"column": 32
+										"column": 34
 									}
 								},
 								"callee": {
 									"type": "Identifier",
-									"start": 650,
-									"end": 652,
+									"start": 649,
+									"end": 651,
 									"loc": {
 										"start": {
 											"line": 17,
-											"column": 10
+											"column": 12
 										},
 										"end": {
 											"line": 17,
-											"column": 12
+											"column": 14
 										}
 									},
 									"name": "fn"
@@ -864,16 +871,16 @@
 								"arguments": [
 									{
 										"type": "Identifier",
-										"start": 653,
-										"end": 671,
+										"start": 652,
+										"end": 670,
 										"loc": {
 											"start": {
 												"line": 17,
-												"column": 13
+												"column": 15
 											},
 											"end": {
 												"line": 17,
-												"column": 31
+												"column": 33
 											}
 										},
 										"name": "bbbbbbbbbbbbbbbbbb"
@@ -881,6 +888,13 @@
 								],
 								"optional": false
 							}
+						},
+						{
+							"type": "Text",
+							"start": 672,
+							"end": 673,
+							"raw": "\n",
+							"data": "\n"
 						}
 					]
 				},

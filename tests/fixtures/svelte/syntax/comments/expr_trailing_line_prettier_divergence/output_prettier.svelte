@@ -5,7 +5,11 @@
 {#if cond}
 	yes
 {/if}
-{#if a}a{:else if b}b{/if}
+{#if a}
+	a
+{:else if b}
+	b
+{/if}
 {#each items as item}
 	{item}
 {/each}
@@ -16,7 +20,9 @@
 {#key expr}
 	text
 {/key}
-{#each list as it}{@const y = it)}{it}{/each} // c
+{#each list as it}
+	{@const y = it)}{it} // c
+{/each}
 <div {...expr}></div>
 <input bind:value={val} />
 <div {@attach fn}></div>

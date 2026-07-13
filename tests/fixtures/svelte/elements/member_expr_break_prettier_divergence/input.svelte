@@ -10,13 +10,15 @@
 	<section>
 		<table>
 			<tbody>
-				{#each items as item}<tr>
+				{#each items as item}
+					<tr>
 						<td>
 							<a href={fn(`/${aa.bb.ccccccxyyyy}`)}>
 								{aa.bb.ccccccxyyyy}{#if aa.bb.ddddddxyy.eeeeee}text{aa.bb.ddddddxyy.eeeeee}{/if}
 							</a>
 						</td>
-					</tr>{/each}
+					</tr>
+				{/each}
 			</tbody>
 		</table>
 	</section>
@@ -27,13 +29,15 @@
 	<section>
 		<table>
 			<tbody>
-				{#each items as item}<tr>
+				{#each items as item}
+					<tr>
 						<td>
 							<a href={fn(`/${aa.bb.ccccccxyyyyy}`)}>
 								{aa.bb.ccccccxyyyyy}{#if aa.bb.ddddddxyy.eeeeee}text{aa.bb.ddddddxyy.eeeeee}{/if}
 							</a>
 						</td>
-					</tr>{/each}
+					</tr>
+				{/each}
 			</tbody>
 		</table>
 	</section>
