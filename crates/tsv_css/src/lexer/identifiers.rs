@@ -22,8 +22,10 @@ fn is_non_ascii_identifier_codepoint(ch: char) -> bool {
 /// at the first non-ASCII byte and the char loop decodes it — byte-identical.
 ///
 /// Shared with `read_number`'s dimension-unit body loop: a unit (`px`, `rem`) is an
-/// identifier, so it continues on exactly this predicate.
-pub(super) const IDENT_CONTINUE_LUT: [bool; 256] = {
+/// identifier, so it continues on exactly this predicate — and with the declaration
+/// value's boundary scan, which decides whether a `url` is a token start (and so opens an
+/// opaque url-token) from the single byte before it.
+pub(crate) const IDENT_CONTINUE_LUT: [bool; 256] = {
     let mut t = [false; 256];
     let mut i = 0;
     while i < 256 {
