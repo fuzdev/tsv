@@ -23,8 +23,8 @@
 use std::collections::HashMap;
 
 use tsv_svelte::ast::internal::{
-    AwaitBlock, ConstTag, DebugTag, DeclarationTag, EachBlock, Element, Fragment, FragmentNode,
-    HtmlTag, IfBlock, KeyBlock, RenderTag, Root, SnippetBlock, SpecialElement,
+    AttributeNode, AwaitBlock, ConstTag, DebugTag, DeclarationTag, EachBlock, Element, Fragment,
+    FragmentNode, HtmlTag, IfBlock, KeyBlock, RenderTag, Root, SnippetBlock, SpecialElement,
 };
 use tsv_ts::ast::internal::{
     ArrowFunctionBody, ClassBody, ClassMember, Expression, ForInOfLeft, ForInit,
@@ -33,7 +33,10 @@ use tsv_ts::ast::internal::{
 };
 
 use crate::analyze::{NameSet, pattern_binding_names};
-use crate::attr_refs::{each_attribute_expression, each_reference_bearing_attribute_expression};
+use crate::attr_refs::{
+    each_attribute_expression, each_reference_bearing_attribute_expression,
+    each_reference_bearing_directive_name, special_element_reference_expression,
+};
 use crate::{CompileError, Refusal};
 
 /// The snippet analysis product consumed by the server transform.
@@ -368,9 +371,10 @@ impl<'s> Collector<'s> {
         // binding is a runtime ReferenceError). Inside a dropped `{:catch}` the
         // emitter never walks the fragment, so the emission refusals that let the
         // default traversal skip element spreads / directives / `{@attach}` never
-        // fire — there every attribute reference must be counted.
+        // fire — there every attribute reference must be counted, including the
+        // directive names (`use:`/`transition:`/`animate:`) that name a binding.
         if self.in_dropped_catch {
-            each_reference_bearing_attribute_expression(element, &mut |expr| self.expr(expr));
+            self.dropped_attribute_refs(element.attributes);
         } else {
             each_attribute_expression(element, &mut |expr| self.expr(expr));
         }
@@ -378,7 +382,37 @@ impl<'s> Collector<'s> {
     }
 
     fn special_element(&mut self, se: &SpecialElement<'_>) {
+        // A special element is refused at emission everywhere else, so its own
+        // references (the `this={…}` expression, attributes, directive names) are
+        // reachable only through a dropped `{:catch}` — count them there.
+        if self.in_dropped_catch {
+            if let Some(expr) = special_element_reference_expression(se) {
+                self.expr(expr);
+            }
+            self.dropped_attribute_refs(se.attributes);
+        }
         self.fragment(&se.fragment);
+    }
+
+    /// Count every reference in an attribute list on the dropped-`{:catch}` path:
+    /// each reference-bearing attribute expression, plus each value-binding
+    /// directive name.
+    fn dropped_attribute_refs(&mut self, attributes: &[AttributeNode<'_>]) {
+        each_reference_bearing_attribute_expression(attributes, &mut |expr| self.expr(expr));
+        let source = self.source;
+        each_reference_bearing_directive_name(attributes, source, &mut |name| {
+            self.directive_name_ref(name);
+        });
+    }
+
+    /// Record a value-binding directive name (`use:`/`transition:`/`animate:`) as a
+    /// free reference. The name may be a member path (`use:a.b`); the referenced
+    /// binding is the root identifier, matching the oracle.
+    fn directive_name_ref(&mut self, name: &str) {
+        let root = name.split(['.', '[']).next().unwrap_or(name);
+        if !root.is_empty() {
+            self.refs.insert(root.to_string());
+        }
     }
 
     fn html_tag(&mut self, tag: &HtmlTag<'_>) {

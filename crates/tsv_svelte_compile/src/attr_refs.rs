@@ -17,10 +17,16 @@
 //! their references out of output. `each_reference_bearing_attribute_expression`
 //! is the **dropped-fragment** view (a `{:catch}` branch the emitter discards
 //! without walking): there no emission refusal fires, so every attribute
-//! reference must be counted to match the oracle.
+//! reference must be counted to match the oracle. The dropped-fragment view has
+//! two more entry points for the same reason — `each_reference_bearing_directive_name`
+//! (a directive whose *name* is a value binding) and
+//! `special_element_reference_expression` (a `<svelte:element>`/`<svelte:component>`
+//! `this={…}`); every special element is refused at emission elsewhere, so its
+//! references, too, are only reachable through the dropped-fragment path.
 
 use tsv_svelte::ast::internal::{
-    AttributeNode, AttributeValue, Element, ElementKind, StyleDirectiveValue,
+    AttributeNode, AttributeValue, Element, ElementKind, SpecialElement, SpecialElementKind,
+    StyleDirectiveValue,
 };
 use tsv_ts::ast::internal::Expression;
 
@@ -76,17 +82,19 @@ pub(crate) fn each_attribute_expression<'a, 'arena>(
 ///
 /// A directive's **name** (`use:`/`transition:`/`in:`/`out:`/`animate:`) is also a
 /// binding reference the oracle counts, but tsv stores it as a verbatim name span
-/// rather than an `Expression`, so an expression traversal cannot reach it; that
-/// residual affects only the snippet-hoist decision (a bare name never triggers
-/// `needs_context`) and is not covered here.
+/// rather than an `Expression`, so an expression traversal cannot reach it — it is
+/// surfaced separately by `each_reference_bearing_directive_name`.
 ///
 /// `LetDirective` binds a name (a slot prop) and contributes no free reference, so
 /// it is excluded.
+///
+/// Takes `&[AttributeNode]` (not `&Element`) so it also serves a special element's
+/// attributes on the dropped path.
 pub(crate) fn each_reference_bearing_attribute_expression<'a, 'arena>(
-    element: &'a Element<'arena>,
+    attributes: &'a [AttributeNode<'arena>],
     f: &mut impl FnMut(&'a Expression<'arena>),
 ) {
-    for attr_node in element.attributes {
+    for attr_node in attributes {
         match attr_node {
             AttributeNode::Attribute(attr) => {
                 if let Some(values) = attr.value {
@@ -134,5 +142,47 @@ pub(crate) fn each_reference_bearing_attribute_expression<'a, 'arena>(
             }
             AttributeNode::LetDirective(_) => {}
         }
+    }
+}
+
+/// Visit the NAME of every directive whose name is a value-binding reference:
+/// `use:` (action), `transition:`/`in:`/`out:` (transition fn), `animate:`
+/// (animation fn). These name a binding the oracle counts; the other directives'
+/// names are event / DOM-property / class / CSS names (not references) and `let:`
+/// binds a name. tsv stores the name as a verbatim `name_span` rather than an
+/// `Expression` — and it may be a member path (`use:a.b`) — so the raw slice is
+/// surfaced for the consumer to reduce to its root identifier.
+///
+/// Consumed only by the snippet-hoist analysis on the dropped-`{:catch}` path: a
+/// bare name reference never triggers `needs_context` (which fires on `new` /
+/// member-call roots only), and on the emitted path these directives refuse.
+pub(crate) fn each_reference_bearing_directive_name<'s>(
+    attributes: &[AttributeNode<'_>],
+    source: &'s str,
+    f: &mut impl FnMut(&'s str),
+) {
+    for attr_node in attributes {
+        let name_span = match attr_node {
+            AttributeNode::UseDirective(d) => d.name_span,
+            AttributeNode::TransitionDirective(d) => d.name_span,
+            AttributeNode::AnimateDirective(d) => d.name_span,
+            _ => continue,
+        };
+        f(name_span.extract(source));
+    }
+}
+
+/// The `this={…}` expression a special element carries as a binding reference:
+/// `<svelte:element this={tag}>` and `<svelte:component this={Component}>`. The
+/// other special-element kinds carry no such expression (their references live in
+/// attributes / children). Used only on the dropped-`{:catch}` path — every
+/// special element is refused at emission elsewhere.
+pub(crate) fn special_element_reference_expression<'a, 'arena>(
+    se: &'a SpecialElement<'arena>,
+) -> Option<&'a Expression<'arena>> {
+    match &se.kind {
+        SpecialElementKind::SvelteElement { tag } => Some(tag),
+        SpecialElementKind::SvelteComponent { expression } => Some(expression),
+        _ => None,
     }
 }
