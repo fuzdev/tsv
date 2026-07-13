@@ -85,6 +85,55 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
+    /// Append the block comments sitting *after* the `|`/`&` separator and before the
+    /// member that follows it (`A | /* c */ B`), appending nothing when there are none.
+    ///
+    /// The separator's source position is needed only to bound that range — the printed
+    /// `|`/`&` is static text — so the caller gates on its whole-union/intersection
+    /// window first and this runs only when a comment is actually in play.
+    fn push_post_separator_block_comments(
+        &self,
+        parts: &mut DocBuf,
+        prev_member_end: u32,
+        member_start: u32,
+        separator: u8,
+    ) {
+        if let Some(sep_pos) =
+            find_separator_position(self.source, prev_member_end, member_start, separator)
+            && let Some(comments) = self.build_comments_between_filtered_opt(
+                sep_pos + 1,
+                member_start,
+                CommentSpacing::Trailing,
+                CommentFilter::BlockOnly,
+            )
+        {
+            parts.push(comments);
+        }
+    }
+
+    /// Append the block comments sitting *before* the `|`/`&` separator that follows a
+    /// member (`A /* c */ | B`), appending nothing when there are none. The separator
+    /// counterpart of `push_post_separator_block_comments`; same gating contract.
+    fn push_pre_separator_block_comments(
+        &self,
+        parts: &mut DocBuf,
+        member_end: u32,
+        next_member_start: u32,
+        separator: u8,
+    ) {
+        if let Some(sep_pos) =
+            find_separator_position(self.source, member_end, next_member_start, separator)
+            && let Some(comments) = self.build_comments_between_filtered_opt(
+                member_end,
+                sep_pos,
+                CommentSpacing::Leading,
+                CommentFilter::BlockOnly,
+            )
+        {
+            parts.push(comments);
+        }
+    }
+
     /// Build a union member's type doc with Prettier's per-member `align(2, …)`
     /// offset (`union-type.js`) rendered as one indent level (a whole tab,
     /// tabs-only — see `docs/conformance_prettier.md`).
@@ -138,6 +187,18 @@ impl<'a> Printer<'a> {
             return d.empty();
         }
 
+        // One window search over the union gates every comment query below. All of them
+        // — the leading `|`→first-member gap, the gaps either side of each separator, the
+        // trailing gap, and the line-comment probes (including those that look inside a
+        // parenthesized member) — are bounded inside `union.span`, and a comment only
+        // counts when it lies fully inside the queried range. So a comment-free union
+        // provably has none in any of them: the searches are skipped, the `empty()`
+        // children they would feed into the member list are never pushed, and — the
+        // larger cost — the per-separator `find_separator_position` byte scans never run.
+        // Those scans exist only to bound the comment ranges; the printed `|` is static
+        // text. Byte-identical, and unions are the most common non-trivial TS type.
+        let has_comments = self.has_comments_between(union.span.start, union.span.end);
+
         // A single-member union collapses to its member — Prettier drops
         // single-element `TSUnionType`/`TSIntersectionType` nodes in postprocess
         // (`parse/postprocess/index.js`). The member prints in the union's own
@@ -159,17 +220,22 @@ impl<'a> Printer<'a> {
         // nested *inside* a member (e.g. `{ /* c */ a: 1 }`) attaches to a child
         // node, not the member, so it must not block the hug — the member's own
         // doc renders it.
-        if !self.union_has_comments_between_members(union) && should_hug_union_type(union) {
+        if (!has_comments || !self.union_has_comments_between_members(union))
+            && should_hug_union_type(union)
+        {
             let mut parts = DocBuf::new();
             // Extract leading block comments before the first type
             // (e.g., `| /* c */ A` — comment between leading `|` and first member)
-            if let Some(first) = union.types.first() {
-                parts.push(self.build_comments_between_filtered(
+            if has_comments
+                && let Some(first) = union.types.first()
+                && let Some(leading) = self.build_comments_between_filtered_opt(
                     union.span.start,
                     first.span().start,
                     CommentSpacing::Trailing,
                     CommentFilter::BlockOnly,
-                ));
+                )
+            {
+                parts.push(leading);
             }
             for (i, t) in union.types.iter().enumerate() {
                 if i > 0 {
@@ -185,17 +251,19 @@ impl<'a> Printer<'a> {
         // - Before the first member (`| // c\n  A | B`)
         // - Inside a member's stripped paren (`A | (// c\n  B)`) — these are
         //   relocated to trail the previous member in the multiline path.
-        let first_type_start = union.types.first().map(|t| t.span().start);
-        let has_leading_line_comments = first_type_start
-            .is_some_and(|start| self.has_line_comments_between(union.span.start, start));
-        let has_paren_inner_leading_line_comments = union.types.iter().any(
-            |t| matches!(t, TSType::Parenthesized(p) if self.paren_has_leading_line_comment(p)),
-        );
-        if has_leading_line_comments
-            || self.union_has_own_line_member_comment(union)
-            || has_paren_inner_leading_line_comments
-        {
-            return self.build_union_type_doc_with_line_comments(union);
+        if has_comments {
+            let first_type_start = union.types.first().map(|t| t.span().start);
+            let has_leading_line_comments = first_type_start
+                .is_some_and(|start| self.has_line_comments_between(union.span.start, start));
+            let has_paren_inner_leading_line_comments = union.types.iter().any(
+                |t| matches!(t, TSType::Parenthesized(p) if self.paren_has_leading_line_comment(p)),
+            );
+            if has_leading_line_comments
+                || self.union_has_own_line_member_comment(union)
+                || has_paren_inner_leading_line_comments
+            {
+                return self.build_union_type_doc_with_line_comments(union);
+            }
         }
 
         // A single-member union has no `|` of its own: prettier drops single-element
@@ -212,6 +280,9 @@ impl<'a> Printer<'a> {
         // level up.
         if union.types.len() == 1 {
             let member = &union.types[0];
+            if !has_comments {
+                return self.build_type_doc_maybe_parens(member, member_parens);
+            }
             let leading =
                 self.build_member_leading_block_comments(union.span.start, member.span().start);
             let member_doc = self.build_type_doc_maybe_parens(member, member_parens);
@@ -242,16 +313,14 @@ impl<'a> Printer<'a> {
                 // of `union_infix_pipe_line_comment`. tsv keeps it leading this
                 // member; changing the separator here would only reshape that
                 // already-divergent form, not match Prettier.
-                let prev_type_end = union.types[i - 1].span().end;
-                if let Some(pipe_pos) =
-                    find_separator_position(self.source, prev_type_end, type_start, b'|')
-                {
-                    parts.push(self.build_comments_between_filtered(
-                        pipe_pos + 1,
+                if has_comments {
+                    let prev_type_end = union.types[i - 1].span().end;
+                    self.push_post_separator_block_comments(
+                        &mut parts,
+                        prev_type_end,
                         type_start,
-                        CommentSpacing::Trailing,
-                        CommentFilter::BlockOnly,
-                    ));
+                        b'|',
+                    );
                 }
             } else {
                 // First type: "| " when broken, nothing when flat
@@ -259,7 +328,11 @@ impl<'a> Printer<'a> {
 
                 // Extract leading block comments before the first type
                 // (e.g., `| /* c */ A | B` — comment between leading `|` and first member)
-                parts.push(self.build_member_leading_block_comments(union.span.start, type_start));
+                if has_comments {
+                    parts.push(
+                        self.build_member_leading_block_comments(union.span.start, type_start),
+                    );
+                }
             }
 
             // Apply Prettier's per-member `align(2, …)` offset (rendered as one
@@ -267,26 +340,24 @@ impl<'a> Printer<'a> {
             parts.push(self.build_union_member_offset_doc(t, member_parens));
 
             // Add trailing block comments after this type (before the next `|` separator)
-            if i + 1 < union.types.len() {
-                let next_type_start = union.types[i + 1].span().start;
-                if let Some(pipe_pos) =
-                    find_separator_position(self.source, type_end, next_type_start, b'|')
-                {
-                    parts.push(self.build_comments_between_filtered(
+            if has_comments {
+                if i + 1 < union.types.len() {
+                    let next_type_start = union.types[i + 1].span().start;
+                    self.push_pre_separator_block_comments(
+                        &mut parts,
                         type_end,
-                        pipe_pos,
-                        CommentSpacing::Leading,
-                        CommentFilter::BlockOnly,
-                    ));
-                }
-            } else {
-                // Last type - include all trailing comments up to union span end
-                parts.push(self.build_comments_between_filtered(
+                        next_type_start,
+                        b'|',
+                    );
+                } else if let Some(trailing) = self.build_comments_between_filtered_opt(
+                    // Last type - include all trailing comments up to union span end
                     type_end,
                     union.span.end,
                     CommentSpacing::Leading,
                     CommentFilter::BlockOnly,
-                ));
+                ) {
+                    parts.push(trailing);
+                }
             }
         }
 
@@ -713,6 +784,15 @@ impl<'a> Printer<'a> {
             return d.empty();
         }
 
+        // One window search over the intersection, exactly as `build_union_type_doc`
+        // does: every comment query below (the leading `&` gap, the gaps either side of
+        // each separator, the trailing gap, the paren-hoist probe, and the line-comment
+        // layout check) is bounded inside `intersection.span`, so a comment-free `A & B`
+        // provably has none — no search, no empty child, and no `find_separator_position`
+        // byte scan (the printed `&` is static text).
+        let has_comments =
+            self.has_comments_between(intersection.span.start, intersection.span.end);
+
         // A single-member intersection collapses to its member — see the matching
         // note in `build_union_type_doc`. The lone member needs no precedence
         // parens (the parent context supplies any), while comment-aware paths
@@ -723,7 +803,8 @@ impl<'a> Printer<'a> {
         // OUT of the intersection (e.g., `(// c\n a) & b` → `// c\n a & b`).
         // The comment goes on its own line BEFORE the intersection so the
         // intersection content itself can still fit inline.
-        if let Some(TSType::Parenthesized(first_paren)) = intersection.types.first() {
+        if has_comments && let Some(TSType::Parenthesized(first_paren)) = intersection.types.first()
+        {
             let first_paren_leading = self.paren_leading_line_comments(first_paren);
             if !first_paren_leading.is_empty() {
                 // The compact inline body can't represent an *isolated* between-member
@@ -731,7 +812,8 @@ impl<'a> Printer<'a> {
                 // the line-comment path with the first member's (now-hoisted) paren-leading
                 // stripped, so the other comments aren't dropped. Otherwise stay compact
                 // inline (block comments emitted in place).
-                let inner = if self.intersection_needs_line_comment_layout(intersection) {
+                let line_comment_layout = self.intersection_needs_line_comment_layout(intersection);
+                let inner = if line_comment_layout {
                     self.build_intersection_type_doc_with_line_comments(intersection, true)
                 } else {
                     self.build_intersection_type_doc_with_first_paren_leading_stripped(
@@ -745,11 +827,21 @@ impl<'a> Printer<'a> {
                     parts.push(d.hardline());
                 }
                 parts.push(inner);
-                return d.concat(&parts);
+                let body = d.concat(&parts);
+                // The compact inline body renders flush-left; indent the hoisted
+                // comment(s) + intersection under the alias `=` so continuation lines
+                // align (`type T = // c⏎⇥A & B`) and the form stays idempotent —
+                // without it, pass 2 re-indents the reparsed, no-longer-parenthesized
+                // body. The line-comment layout already self-indents per member.
+                return if line_comment_layout {
+                    body
+                } else {
+                    d.indent(body)
+                };
             }
         }
 
-        if self.intersection_needs_line_comment_layout(intersection) {
+        if has_comments && self.intersection_needs_line_comment_layout(intersection) {
             let doc = self.build_intersection_type_doc_with_line_comments(intersection, false);
             // The line-comment layout self-indents per member (mirroring the no-comment
             // loop and Prettier's `printIntersectionType`), so no outer indent is added.
@@ -777,37 +869,41 @@ impl<'a> Printer<'a> {
 
         // Extract leading block comments before the first type
         // (e.g., `& /* c */ A & B` — comment between leading `&` and first member)
-        first_parts.push(self.build_comments_between_filtered(
-            intersection.span.start,
-            first_type_start,
-            CommentSpacing::Trailing,
-            CommentFilter::BlockOnly,
-        ));
+        if has_comments
+            && let Some(leading) = self.build_comments_between_filtered_opt(
+                intersection.span.start,
+                first_type_start,
+                CommentSpacing::Trailing,
+                CommentFilter::BlockOnly,
+            )
+        {
+            first_parts.push(leading);
+        }
 
         first_parts.push(self.build_type_doc_maybe_parens(first_type, member_parens));
 
         // Add trailing block comments after first type
         if intersection.types.len() > 1 {
-            let next_type_start = intersection.types[1].span().start;
-            if let Some(amp_pos) =
-                find_separator_position(self.source, first_type_end, next_type_start, b'&')
-            {
-                first_parts.push(self.build_comments_between_filtered(
+            if has_comments {
+                let next_type_start = intersection.types[1].span().start;
+                self.push_pre_separator_block_comments(
+                    &mut first_parts,
                     first_type_end,
-                    amp_pos,
-                    CommentSpacing::Leading,
-                    CommentFilter::BlockOnly,
-                ));
+                    next_type_start,
+                    b'&',
+                );
             }
             first_parts.push(d.text(" &"));
-        } else {
-            // Single type - include trailing comments
-            first_parts.push(self.build_comments_between_filtered(
+        } else if has_comments
+            && let Some(trailing) = self.build_comments_between_filtered_opt(
+                // Single type - include trailing comments
                 first_type_end,
                 intersection.span.end,
                 CommentSpacing::Leading,
                 CommentFilter::BlockOnly,
-            ));
+            )
+        {
+            first_parts.push(trailing);
         }
 
         // Special case: expanding first type with 3+ members
@@ -884,7 +980,7 @@ impl<'a> Printer<'a> {
             };
 
             let mut member: DocBuf = smallvec![sep];
-            member.extend(self.build_intersection_member_body_doc(intersection, i));
+            member.extend(self.build_intersection_member_body_doc(intersection, i, has_comments));
             if indent_member {
                 parts.push(d.indent(d.concat(&member)));
             } else {
@@ -1179,10 +1275,15 @@ impl<'a> Printer<'a> {
     ///
     /// Returns: leading comments + type doc + trailing comments/`&` separator.
     /// Used by both the normal and expanding-first-type paths.
+    ///
+    /// `has_comments` is the caller's whole-intersection window answer: `false` proves
+    /// both gaps around this member are bare, so neither is searched and the `&` byte
+    /// scan that would bound them never runs.
     fn build_intersection_member_body_doc(
         &self,
         intersection: &TSIntersectionType<'_>,
         i: usize,
+        has_comments: bool,
     ) -> DocBuf {
         let t = &intersection.types[i];
         let type_start = t.span().start;
@@ -1191,40 +1292,29 @@ impl<'a> Printer<'a> {
         let mut parts = DocBuf::new();
 
         // Leading block comments (after the `&` separator)
-        let prev_type_end = intersection.types[i - 1].span().end;
-        if let Some(amp_pos) = find_separator_position(self.source, prev_type_end, type_start, b'&')
-        {
-            parts.push(self.build_comments_between_filtered(
-                amp_pos + 1,
-                type_start,
-                CommentSpacing::Trailing,
-                CommentFilter::BlockOnly,
-            ));
+        if has_comments {
+            let prev_type_end = intersection.types[i - 1].span().end;
+            self.push_post_separator_block_comments(&mut parts, prev_type_end, type_start, b'&');
         }
 
         parts.push(self.build_type_doc_maybe_parens(t, type_needs_parens_in_union_or_intersection));
 
         // Trailing block comments + `&` separator (or end-of-intersection comments)
         if !is_last {
-            let next_type_start = intersection.types[i + 1].span().start;
-            if let Some(amp_pos) =
-                find_separator_position(self.source, type_end, next_type_start, b'&')
-            {
-                parts.push(self.build_comments_between_filtered(
-                    type_end,
-                    amp_pos,
-                    CommentSpacing::Leading,
-                    CommentFilter::BlockOnly,
-                ));
+            if has_comments {
+                let next_type_start = intersection.types[i + 1].span().start;
+                self.push_pre_separator_block_comments(&mut parts, type_end, next_type_start, b'&');
             }
             parts.push(self.d().text(" &"));
-        } else {
-            parts.push(self.build_comments_between_filtered(
+        } else if has_comments
+            && let Some(trailing) = self.build_comments_between_filtered_opt(
                 type_end,
                 intersection.span.end,
                 CommentSpacing::Leading,
                 CommentFilter::BlockOnly,
-            ));
+            )
+        {
+            parts.push(trailing);
         }
 
         parts

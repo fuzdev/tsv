@@ -50,7 +50,7 @@ impl<'a> Printer<'a> {
     ) {
         let d = self.d();
         let body_start = body.span().start;
-        let body_doc = self.build_statement_doc(body);
+        let body_doc = self.build_statement_doc(body, false);
 
         if !self.has_comments_between(paren_end, body_start) {
             parts.push(d.text(")"));
@@ -122,7 +122,7 @@ impl<'a> Printer<'a> {
         let header_doc = self.build_for_header_doc(stmt);
         if matches!(stmt.body, Statement::EmptyStatement(_)) {
             // No space before empty statement: `for (...);`
-            d.concat(&[header_doc, self.build_statement_doc(stmt.body)])
+            d.concat(&[header_doc, self.build_statement_doc(stmt.body, false)])
         } else if let Statement::BlockStatement(block) = stmt.body {
             // Block body: `for (...) { ... }`
             // Note: Unlike for-in/for-of, standard for loops keep empty blocks inline `{}`
@@ -139,7 +139,7 @@ impl<'a> Printer<'a> {
             // the outer group breaks and the body drops to its own indented line;
             // the inner header group still decides its own flat/break, so a
             // width-only overflow keeps the header flat (matching Prettier).
-            let body_doc = self.build_statement_doc(stmt.body);
+            let body_doc = self.build_statement_doc(stmt.body, false);
             d.group(d.concat(&[header_doc, d.indent_line(body_doc)]))
         }
     }
@@ -429,7 +429,12 @@ impl<'a> Printer<'a> {
                 init_end,
                 has_init,
             );
-        } else if has_update {
+        } else {
+            // No test clause: still emit the post-`;` separator (a space when flat) so
+            // the header isn't collapsed to `;;`. Prettier keeps it whenever the header
+            // isn't fully empty — `for (x = 0; ;)`, not `for (x = 0;;)` (the fully-empty
+            // `for (;;)` is handled by the early return above). Covers init-only,
+            // update-only, and init+update alike.
             inner_parts.push(d.line());
         }
 
@@ -1198,7 +1203,8 @@ impl<'a> Printer<'a> {
             // comment hardline propagates) or the whole thing overflows — while the
             // header group still decides its own flat/break.
             let is_block_body = matches!(stmt.body, Statement::BlockStatement(_));
-            let body_doc = self.build_statement_doc(stmt.body);
+            // A C-style `for` collapses its empty block body (`for (…) {}`).
+            let body_doc = self.build_collapsing_body_doc(stmt.body);
 
             let (tail, group_it) = if self.has_comments_between(header_end, body_start) {
                 if has_line_comment && !is_block_body {

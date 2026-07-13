@@ -216,12 +216,10 @@ impl<'a> Printer<'a> {
                 .map_or(arrow.span.start, |p| p.span().end)
         };
 
-        // Find the `=>` token position to distinguish:
+        // The `=>` token position (parser-recorded) distinguishes:
         // - Comments between sig_end and `=>` → print BEFORE `=>`
         // - Comments between `=>` and body → print AFTER `=>`
-        let arrow_pos = self
-            .find_arrow_token(sig_end, arrow.body.span().start)
-            .unwrap_or_else(|| arrow.body.span().start);
+        let arrow_pos = arrow.arrow_token;
         let arrow_end = arrow_pos + "=>".len() as u32;
 
         // Build the signature (async + type params + params + return type) via the
@@ -340,7 +338,7 @@ impl<'a> Printer<'a> {
         // Check if body arrow has trailing param comments (forces break)
         let body_arrow_has_trailing_param_comments =
             if let internal::Expression::ArrowFunctionExpression(body_arrow) = expr {
-                let arrow_token = self.find_arrow_token_for(body_arrow);
+                let arrow_token = body_arrow.arrow_token;
                 arrow_has_trailing_param_comments(body_arrow, arrow_token, |start, end| {
                     self.has_comments_between(start, end)
                 })
@@ -1125,11 +1123,12 @@ impl<'a> Printer<'a> {
                 .type_parameters
                 .as_ref()
                 .map_or(func.params_start, |tp| tp.span.start);
-            parts.push(self.build_name_to_type_params_comments(
+            self.push_name_to_type_params_comments(
+                &mut parts,
                 id.span.end,
                 comment_end,
                 CommentSpacing::for_type_params(func.type_parameters.is_some()),
-            ));
+            );
         }
 
         // Space before type params or params if no name: `function <T>` or `function ()`
@@ -1724,19 +1723,21 @@ impl<'a> Printer<'a> {
             // Comments between name and type params: `class A/* c */ <T> {}`
             // Line comments get a hardline to prevent absorbing type params as comment text
             if let Some(type_params) = &class_expr.type_parameters {
-                parts.push(self.build_name_to_type_params_comments(
+                self.push_name_to_type_params_comments(
+                    &mut parts,
                     id.span.end,
                     type_params.span.start,
                     CommentSpacing::Trailing,
-                ));
+                );
             } else if positions.first_heritage_start.is_none() {
                 // No type params, no heritage: comments between name and body `class A /* c */ {}`
                 // Heritage path handles name→heritage comments when heritage exists
-                parts.push(self.build_name_to_type_params_comments(
+                self.push_name_to_type_params_comments(
+                    &mut parts,
                     id.span.end,
                     class_expr.body.span.start,
                     CommentSpacing::Leading,
-                ));
+                );
             }
         } else if class_expr.type_parameters.is_none()
             && class_expr.super_class.is_none()

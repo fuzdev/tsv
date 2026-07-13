@@ -316,8 +316,17 @@ impl<'a> Printer<'a> {
             return None;
         }
 
-        // Build docs for matching comments
+        // Build docs for matching comments.
+        //
+        // A line comment ends its line, so whatever follows it (another comment, or
+        // the caller's next token) must start a new line — else two line comments
+        // merge onto one (`// c1 // c2` reparses as a single comment: boundary loss)
+        // and a trailing line comment swallows the following token. So a `hardline`,
+        // not the spacing separator, sits across any line-comment boundary. A block
+        // comment keeps the inline spacing.
         let mut parts = DocBuf::new();
+        let mut prev_was_line = false;
+        let mut first = true;
         for comment in self.comments[first_idx..]
             .iter()
             .take_while(|c| c.span.end <= end)
@@ -329,17 +338,36 @@ impl<'a> Printer<'a> {
 
             match spacing {
                 CommentSpacing::Leading => {
-                    parts.push(d.text(" "));
+                    // Separator before this comment: the surrounding-indent `hardline`
+                    // after a line comment (no leading space — it starts the line),
+                    // else the inline leading space.
+                    if !first && prev_was_line {
+                        parts.push(d.hardline());
+                    } else {
+                        parts.push(d.text(" "));
+                    }
                     parts.push(self.build_comment_doc(comment));
                 }
                 CommentSpacing::Trailing => {
                     parts.push(self.build_comment_doc(comment));
-                    parts.push(d.text(" "));
+                    // Separator after this comment (before the next comment / the
+                    // caller's token): a line comment forces the following content
+                    // onto a new line, a block comment keeps the inline trailing space.
+                    if comment.is_block {
+                        parts.push(d.text(" "));
+                    } else {
+                        parts.push(d.hardline());
+                    }
                 }
                 CommentSpacing::None => {
+                    if !first && prev_was_line {
+                        parts.push(d.hardline());
+                    }
                     parts.push(self.build_comment_doc(comment));
                 }
             }
+            prev_was_line = !comment.is_block;
+            first = false;
         }
         Some(d.concat(&parts))
     }
@@ -449,6 +477,27 @@ impl<'a> Printer<'a> {
         end: u32,
     ) -> DocId {
         self.build_comments_between(start, end, CommentSpacing::Trailing)
+    }
+
+    /// Build a Doc for inline comments (trailing space), returning `None` if no comments.
+    ///
+    /// The `_opt` sibling of `build_inline_comments_between_doc_trailing_space`, matching
+    /// the ones the other two spacings already have. Callers that push into a parts
+    /// buffer want this rather than the `DocId` form: the `empty()` it would otherwise
+    /// return is not free — `concat` keeps it as a child slot for the renderer and every
+    /// `fits` pass to walk.
+    #[inline]
+    pub(crate) fn build_inline_comments_between_doc_trailing_space_opt(
+        &self,
+        start: u32,
+        end: u32,
+    ) -> Option<DocId> {
+        self.build_comments_between_filtered_opt(
+            start,
+            end,
+            CommentSpacing::Trailing,
+            CommentFilter::All,
+        )
     }
 
     /// Build inline comments between two positions with line-comment-safe trailing spacing.

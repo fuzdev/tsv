@@ -16,7 +16,7 @@ mod try_jump;
 
 use smallvec::SmallVec;
 
-use crate::ast::internal::{Expression, UnaryOperator};
+use crate::ast::internal::{Expression, Statement, UnaryOperator};
 use crate::printer::{CommentVec, Printer};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -24,6 +24,24 @@ use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{Comment, comments_in_range};
 
 impl<'a> Printer<'a> {
+    /// Build a control-flow *body* whose empty block form collapses (`do {} while (cond)`,
+    /// C-style `for (…) {}`). The generic `build_statement_doc` dispatch EXPANDS a
+    /// statement-position empty block to `{\n}`, so a collapse-context body must build a
+    /// `BlockStatement` directly via the collapse path; a non-block body keeps the generic
+    /// dispatch (a non-empty block is identical either way — `expand_empty` only affects the
+    /// empty case). The `while` handler and `catch` inline their own block builds (extra
+    /// close-paren handling / an always-block body), so they don't route through here.
+    fn build_collapsing_body_doc(&self, body: &Statement<'_>) -> DocId {
+        if let Statement::BlockStatement(block) = body {
+            self.build_block_statement_doc(block)
+        } else {
+            // Non-block body: its container is the control-flow statement
+            // itself, never Program/BlockStatement, so a bare string statement
+            // here is never directive-prologue eligible.
+            self.build_statement_doc(body, false)
+        }
+    }
+
     /// Partition comments between two positions into inline vs own-line.
     ///
     /// Returns `(inline_with_prev, own_line, inline_with_next)` where:

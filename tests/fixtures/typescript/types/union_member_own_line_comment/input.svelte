@@ -56,4 +56,12 @@
 		| 'x'
 		/* i2 */
 		| 'y';
+
+	// blank line between two own-line member line comments is preserved (line-comment analog of G)
+	type J =
+		| 'x'
+		// j1
+
+		// j2
+		| 'y';
 </script>

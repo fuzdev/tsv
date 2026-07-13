@@ -43,6 +43,7 @@ catalog entry.
 - Attribute namespaces `[ns|attr]` — Not supported — [namespace](../tests/fixtures/css/selectors/attribute/namespace_svelte_divergence/)
 - No-namespace `|element` — Not supported — [no_namespace](../tests/fixtures/css/selectors/namespace/no_namespace_svelte_divergence/)
 - Forgiving :is()/:where() — Strict parsing (should be forgiving); tsv drops both syntactically invalid items (`.`, `[`) and contextually invalid ones (known syntax in the wrong place — e.g. an `An+B`/`of S` term, valid only in `:nth-*()`, so `:is(2n of)` → empty), while Svelte fails the whole parse — [forgiving_is_where](../tests/fixtures/css/selectors/forgiving_is_where_svelte_divergence/)
+- Forgiving :is()/:where() dropped-item newline — the formatter side of the row above: a dropped invalid item spanning a newline (`:is(.a > .⏎> .b)`) has its preserved verbatim text's whitespace runs (including the newline) collapsed to single spaces, matching prettier (which collapses whitespace inside a selector) — the same rule tsv applies to every other selector-argument position. Parser behavior is unchanged from the row above (the item is still dropped from the AST) — [forgiving_is_where_newline](../tests/fixtures/css/selectors/forgiving_is_where_newline_svelte_divergence/)
 - Empty-after-comment declarations — Rejected (`css_empty_declaration`) — [comment_empty_value](../tests/fixtures/css/tokens/comments/comment_empty_value_svelte_divergence/)
 - `;` inside a function value (`prop: fn(a; b)`) — Rejected (`css_empty_declaration`); the inner `;` is truncated as a declaration terminator, but per CSS Syntax 3 a `;` inside a `fn(…)` simple block is block content — tsv (and prettier) keep the declaration whole — [function_semicolon](../tests/fixtures/css/values/function_semicolon_svelte_divergence/)
 - `;` inside a simple block or `var()` fallback (`(x;y)`, `[x;y]`, `var(--d, ;)`) — Rejected (`css_empty_declaration`); the same class as the function case, extended to `()` / `[]` simple blocks and the `var()` fallback — all balanced units per CSS Syntax 3, so an inner `;` is content — tsv (and prettier) keep the declaration whole — [balanced_semicolon](../tests/fixtures/css/values/balanced_semicolon_svelte_divergence/)
@@ -206,6 +207,22 @@ Svelte ❌ / Prettier ✅ / tsv ✅ in every case below:
 **`using` keyword-name comments**: Both acorn and tsv reject comments between `using` and the binding name (`using /* c */ x = fn()`), and between `await` and `using` (`await /* c */ using x = fn()`). Per the ECMAScript spec, comments behave like white space and are discarded between any two tokens (§12.4), so these should be valid. However, since `using` is a contextual keyword requiring lookahead disambiguation, both parsers check the next token before comment processing. tsv matches acorn's behavior here. If acorn adds support, tsv should follow.
 
 **Async generic arrow params**: acorn-typescript drops all function parameters from `async` arrow functions that have type parameters (`async <T,>(x: T) => x` → `params: []`). Non-async generic arrows are unaffected. This is semantic corruption — tools consuming the AST would see zero-argument functions. **Upstream candidate**: acorn-typescript async arrow parsing.
+
+**Import-phase proposals (forward-looking, ungated).** tsv accepts the TC39
+import-phase syntax — `import defer * as ns from '…'` / `import source x from '…'`
+and the dynamic `import.defer(…)` / `import.source(…)` — and emits a `phase` field
+(`'defer'` / `'source'`) on the `ImportDeclaration` / `ImportExpression` wire node
+(declared in `crates/tsv_wasm/types/tsv_ast.d.ts`). Unlike every case above, this one
+is **un-fixturable**: acorn-typescript **and** Svelte's parser both *reject*
+import-phase, so no canonical `expected.json` exists to gate the shape against (a
+`_svelte_divergence` fixture needs the oracle to *accept*, which it does not), and the
+syntax is not yet in the finished ECMAScript standard. prettier is no oracle here
+either — it drops the `defer` keyword and rejects `import source`. The emitted `phase`
+shape mirrors the TC39 proposals' AST; because there is no oracle, it is a deliberate
+extension rather than a drop-in guarantee, and **if acorn-typescript later implements
+import-phase with a different shape, tsv should re-align to it**. Emitted from
+`crates/tsv_ts/src/ast/convert/write/statements.rs` (declaration) and
+`crates/tsv_ts/src/ast/convert/write/expressions.rs` (expression).
 
 Its one accept-side consequence is a *reverse* divergence — tsv **over-rejects** here. A parameter decorator is invalid on an arrow in every form (tsc + prettier + acorn all reject `(@dec a) => a`, `<T>(@dec a) => a`, `async (@dec a) => a` — the drop-in rejections pinned by the `input_invalid_*` cases in [decorators/parameter_arrow](../tests/fixtures/typescript/typescript_specific/decorators/parameter_arrow/)). But in the async-generic form acorn *accepts* `async <T>(@dec a) => a`, only because the param-drop bug above silently discards the parameter and its decorator. tsc still rejects the decorator, so tsv rejects too — matching every other arrow form and diverging from acorn's lossy accept (a `tsv_rejects.txt` fixture).
 

@@ -1,7 +1,6 @@
 //! Call-argument and arrow shape predicates shared by the call, new, and chain printers.
 
 use crate::ast::internal::{self, Expression};
-use tsv_lang::printing::has_newline_between_fast;
 
 /// Check if an argument is "hopefully short" enough to stay inline
 ///
@@ -98,8 +97,38 @@ where
         Expression::ArrayExpression(arr) if has_comments(arr.span.start, arr.span.end) => false,
         // Truly empty {} and [] are short
         Expression::ObjectExpression(_) | Expression::ArrayExpression(_) => true,
+        // TS cast wrappers (`as` / `satisfies` / `<T>`, never `!`): mirror prettier's
+        // couldExpandArg, which looks through the cast to a non-empty (or commented)
+        // object/array and expands all args rather than expand-first.
+        Expression::TSAsExpression(_)
+        | Expression::TSSatisfiesExpression(_)
+        | Expression::TSTypeAssertion(_)
+            if cast_wraps_expandable_object_or_array(arg, &has_comments) =>
+        {
+            false
+        }
         // Other args: check if "hopefully short"
         _ => is_hopefully_short_arg(arg),
+    }
+}
+
+/// Whether a TS cast-wrapped arg (`as` / `satisfies` / `<T>`, never non-null) wraps an
+/// object or array prettier's `couldExpandArg` would expand — a non-empty, or
+/// comment-bearing, object/array. Such a second arg forces expand-all rather than
+/// expand-first, mirroring `!couldExpandArg`. An empty, uncommented wrapped collection
+/// (`{} as T`) stays "short" and still expands-first, matching prettier.
+fn cast_wraps_expandable_object_or_array<F>(arg: &Expression<'_>, has_comments: &F) -> bool
+where
+    F: Fn(u32, u32) -> bool,
+{
+    match unwrap_ts_type_wrappers(arg) {
+        Expression::ObjectExpression(obj) => {
+            !obj.properties.is_empty() || has_comments(obj.span.start, obj.span.end)
+        }
+        Expression::ArrayExpression(arr) => {
+            !arr.elements.is_empty() || has_comments(arr.span.start, arr.span.end)
+        }
+        _ => false,
     }
 }
 
@@ -139,8 +168,8 @@ pub(in crate::printer) fn is_ternary_arrow_body(body: &Expression<'_>) -> bool {
 /// Does NOT include comments between `=>` and the body — those are body comments,
 /// not trailing param comments.
 ///
-/// `arrow_token_pos` is the byte offset of `=>` in the source. Callers should obtain
-/// this via `printer.find_arrow_token_for(arrow)`.
+/// `arrow_token_pos` is the byte offset of `=>` in the source — the parser-recorded
+/// `arrow.arrow_token`.
 pub(crate) fn arrow_has_trailing_param_comments<F>(
     arrow: &internal::ArrowFunctionExpression<'_>,
     arrow_token_pos: u32,
@@ -196,21 +225,6 @@ fn get_ts_type_wrapper_inner<'a>(expr: &'a Expression<'a>) -> Option<&'a Express
         Expression::TSNonNullExpression(e) => Some(e.expression),
         _ => None,
     }
-}
-
-/// Check if preceding args allow the "expand last arg" conditional group pattern.
-///
-/// Only checks for multiline objects — the conditional group's fits() mechanism
-/// handles width naturally. If preceding args don't fit on one line, the inline
-/// state fails and we fall through to expand-all.
-///
-/// Matches Prettier's `shouldExpandLastArg` which doesn't check preceding arg complexity.
-#[inline]
-pub(in crate::printer) fn preceding_args_allow_expand_last(
-    arguments: &[Expression<'_>],
-    line_breaks: &[u32],
-) -> bool {
-    !has_multiline_object_before_last(arguments, line_breaks)
 }
 
 /// Check if an expression is a function with a block body.
@@ -365,10 +379,8 @@ pub fn is_simple_call_argument(expr: &Expression<'_>, depth: usize) -> bool {
         // Update expressions (++x, x++)
         Expression::UpdateExpression(update) => is_simple_call_argument(update.argument, depth),
 
-        // Spread elements are NOT simple (matches prettier — no SpreadElement case)
-        Expression::SpreadElement(_) => false,
-
-        // Everything else is not simple (arrow functions, function expressions, etc.)
+        // Everything else is not simple: arrow functions, function expressions, and
+        // spread elements (matches prettier — no SpreadElement case), etc.
         _ => false,
     }
 }
@@ -514,38 +526,6 @@ pub(in crate::printer) fn is_function_composition_args(arguments: &[Expression<'
     }
 
     false
-}
-
-/// Check if an expression is an object with newlines inside it.
-///
-/// Prettier preserves multiline object formatting and expands all call args
-/// when any preceding arg is a multiline object in source.
-pub(in crate::printer) fn is_multiline_object(expr: &Expression<'_>, line_breaks: &[u32]) -> bool {
-    if let Expression::ObjectExpression(obj) = expr {
-        if obj.properties.is_empty() {
-            return false;
-        }
-        // Check if there's a newline after the opening brace
-        let first_prop_start = obj.properties[0].span().start;
-        has_newline_between_fast(line_breaks, obj.span.start + 1, first_prop_start)
-    } else {
-        false
-    }
-}
-
-/// Check if any argument (except the last) is a multiline object.
-///
-/// When true, the call should use hard expansion instead of the hug pattern.
-pub(in crate::printer) fn has_multiline_object_before_last(
-    args: &[Expression<'_>],
-    line_breaks: &[u32],
-) -> bool {
-    if args.len() < 2 {
-        return false;
-    }
-    args[..args.len() - 1]
-        .iter()
-        .any(|arg| is_multiline_object(arg, line_breaks))
 }
 
 #[cfg(test)]

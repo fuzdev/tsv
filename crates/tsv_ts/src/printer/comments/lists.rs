@@ -253,10 +253,19 @@ impl<'a> Printer<'a> {
     /// to append directly before the target node.
     ///
     /// Used by: class body members, block statement bodies, interface members, type literals.
+    ///
+    /// `force_non_inline`: when true, the *last* comment never glues to
+    /// `target_start` (no trailing space, no trailing hardline) — used when
+    /// `target_start` doesn't correspond to a node that will actually be
+    /// printed next (e.g. comments orphaned by a dropped `EmptyStatement`).
+    /// The caller's own next emission supplies the separator hardline; only a
+    /// blank line, which that caller can't rediscover on its own, is still
+    /// recorded here (as a bare `literalline`, so the caller's hardline completes it).
     pub(crate) fn build_leading_comments_with_blank_lines(
         &self,
         comments: &[&internal::Comment],
         target_start: u32,
+        force_non_inline: bool,
     ) -> DocBuf {
         if comments.is_empty() {
             return DocBuf::new();
@@ -306,7 +315,15 @@ impl<'a> Printer<'a> {
 
             docs.push(self.build_comment_doc(comment));
 
-            if !comment.is_block {
+            if force_non_inline && is_last_comment {
+                // Nothing glues to `target_start` here — defer the separator
+                // to the caller's next emission. Only a blank line needs
+                // recording (the caller's own gap check starts later in the
+                // source and can't see it).
+                if has_blank_after {
+                    docs.push(d.literalline());
+                }
+            } else if !comment.is_block {
                 // Line comment: add hardline after unless there's a blank line after
                 // (the blank line separator will handle it)
                 if !has_blank_after {
@@ -323,7 +340,7 @@ impl<'a> Printer<'a> {
         }
 
         // Add blank line after last comment if present
-        if has_blank_after_last_comment {
+        if has_blank_after_last_comment && !force_non_inline {
             docs.push(d.literalline());
             docs.push(d.hardline());
         }
@@ -690,6 +707,24 @@ impl<'a> Printer<'a> {
         pair: &'static str,
         sep: DocId,
     ) -> DocId {
+        let opening = self.d().text(&pair[..1]);
+        self.build_empty_bracketed_with_comments_doc(span_start, span_end, opening, &pair[1..], sep)
+    }
+
+    /// Like [`Self::build_empty_inline_with_comments_doc`] but with an arbitrary
+    /// `opening` doc (which may carry a prefix, e.g. a parenthesized-intersection
+    /// `(A & {`) and a static `closing` string (`}`, `]`, `})`). The empty body
+    /// stays delimiter-tight when comment-free (`{}` not `{ }`), so a union-member
+    /// or paren-intersection object type that reaches the alignment path prints
+    /// with no spurious bracket space and preserves any interior comment.
+    pub(crate) fn build_empty_bracketed_with_comments_doc(
+        &self,
+        span_start: u32,
+        span_end: u32,
+        opening: DocId,
+        closing: &'static str,
+        sep: DocId,
+    ) -> DocId {
         let d = self.d();
         let body_start = span_start + 1; // After opening delimiter
         let body_end = span_end.saturating_sub(1); // Before closing delimiter
@@ -702,7 +737,7 @@ impl<'a> Printer<'a> {
             .collect();
 
         if comments.is_empty() {
-            return d.text(pair);
+            return d.concat(&[opening, d.text(closing)]);
         }
 
         // Dangling comments join with hardline (prettier `printDanglingComments`).
@@ -721,10 +756,10 @@ impl<'a> Printer<'a> {
         let close_sep = if has_line { d.hardline() } else { sep };
 
         d.group(d.concat(&[
-            d.text(&pair[..1]),
+            opening,
             d.indent(d.concat(&[sep, d.concat(&comment_parts)])),
             close_sep,
-            d.text(&pair[1..]),
+            d.text(closing),
         ]))
     }
 

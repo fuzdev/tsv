@@ -8,7 +8,6 @@
 // - Rest elements: `...rest`
 
 use crate::ast::internal::{self, ArrowFunctionBody, Expression, ObjectPatternProperty};
-use crate::printer::CommentSpacing;
 use crate::printer::{
     CommentVec, ParenContext, PatternContext, Printer, object_pattern_should_expand,
 };
@@ -307,11 +306,16 @@ impl<'a> Printer<'a> {
                 let mut prev_end = obj.span.start + 1;
 
                 for (i, prop) in obj.properties.iter().enumerate() {
-                    // Check for leading comments before this property
+                    // Check for leading comments before this property. Gated on the
+                    // object-wide comment flag: with no comment in the pattern span, the
+                    // per-property gap is empty too, so skip the `empty()` leading child
+                    // (render + every fits pass would still walk it). Byte-identical.
                     let prop_start = prop.span().start;
-                    let leading_comments =
-                        self.build_inline_comments_between_doc_trailing_space(prev_end, prop_start);
-                    parts.push(leading_comments);
+                    if has_comments {
+                        let leading_comments = self
+                            .build_inline_comments_between_doc_trailing_space(prev_end, prop_start);
+                        parts.push(leading_comments);
+                    }
 
                     parts.push(self.build_object_pattern_property_doc(prop));
 
@@ -605,9 +609,11 @@ impl<'a> Printer<'a> {
                 CommentVec::new()
             };
 
-            prop_parts.extend(
-                self.build_leading_comments_with_blank_lines(&leading_comments, prop_start),
-            );
+            prop_parts.extend(self.build_leading_comments_with_blank_lines(
+                &leading_comments,
+                prop_start,
+                false,
+            ));
 
             // A preceding format-ignore directive keeps the property's source verbatim
             // (trailing comment/comma handled normally)
@@ -750,28 +756,41 @@ impl<'a> Printer<'a> {
                     };
                     // Comments between key and value, split at `:`
                     // e.g., `{[x] /* c1 */: /* c2 */ a}` → before `:` and after `:`
+                    //
+                    // The `: ` is static text, so the `:` byte scan exists only to split
+                    // the two comment ranges — a comment-free `{a: b}` neither scans nor
+                    // pushes an empty child.
                     let value_start = p.value.span().start;
-                    #[allow(clippy::expect_used)]
-                    // Parser guarantees `:` exists in destructuring property
-                    let colon_pos = find_char_skipping_comments(
-                        self.source.as_bytes(),
-                        key_region_end as usize,
-                        value_start as usize,
-                        b':',
-                    )
-                    .expect(": not found in destructuring property")
-                        as u32;
-                    let pre_colon_comments =
-                        self.build_inline_comments_between_doc(key_region_end, colon_pos);
-                    let mut parts: DocBuf = smallvec![key_doc, pre_colon_comments];
-                    parts.push(d.text(": "));
-                    // Comments after `:`
-                    let after_colon_comments = self
-                        .build_inline_comments_between_doc_trailing_space(
-                            colon_pos + 1,
-                            value_start,
-                        );
-                    parts.push(after_colon_comments);
+                    let mut parts: DocBuf = smallvec![key_doc];
+                    if self.has_comments_between(key_region_end, value_start) {
+                        #[allow(clippy::expect_used)]
+                        // Parser guarantees `:` exists in destructuring property
+                        let colon_pos = find_char_skipping_comments(
+                            self.source.as_bytes(),
+                            key_region_end as usize,
+                            value_start as usize,
+                            b':',
+                        )
+                        .expect(": not found in destructuring property")
+                            as u32;
+                        if let Some(pre_colon_comments) =
+                            self.build_inline_comments_between_doc_opt(key_region_end, colon_pos)
+                        {
+                            parts.push(pre_colon_comments);
+                        }
+                        parts.push(d.text(": "));
+                        // Comments after `:`
+                        if let Some(after_colon_comments) = self
+                            .build_inline_comments_between_doc_trailing_space_opt(
+                                colon_pos + 1,
+                                value_start,
+                            )
+                        {
+                            parts.push(after_colon_comments);
+                        }
+                    } else {
+                        parts.push(d.text(": "));
+                    }
                     parts.push(self.build_expression_doc(&p.value));
                     d.concat(&parts)
                 }
@@ -793,9 +812,8 @@ impl<'a> Printer<'a> {
             .type_annotation
             .as_ref()
             .map_or(arr.span.end, |t| t.span.start);
-        let (has_line_comments, has_own_line_block) = if self
-            .has_comments_between(arr.span.start, boundary)
-        {
+        let has_comments = self.has_comments_between(arr.span.start, boundary);
+        let (has_line_comments, has_own_line_block) = if has_comments {
             // Flatten once (skip holes) and share across both scans.
             let non_null: SmallVec<[_; 8]> = arr.elements.iter().flatten().collect();
             let has_line_comments = self
@@ -816,7 +834,7 @@ impl<'a> Printer<'a> {
         if has_line_comments || has_own_line_block {
             self.build_expanded_array_pattern_doc(arr)
         } else {
-            self.build_grouped_array_pattern_doc(arr)
+            self.build_grouped_array_pattern_doc(arr, has_comments)
         }
     }
 
@@ -837,8 +855,15 @@ impl<'a> Printer<'a> {
         d.concat(&[body_doc, tail])
     }
 
-    /// Build grouped array pattern doc (width-based expansion)
-    fn build_grouped_array_pattern_doc(&self, arr: &internal::ArrayPattern<'_>) -> DocId {
+    /// Build grouped array pattern doc (width-based expansion). `has_comments` is the
+    /// caller's whole-pattern comment pre-check (threaded to avoid re-scanning): when
+    /// false, the per-element leading gap is empty, so the `empty()` leading child is
+    /// skipped (render + fits would still walk it). Byte-identical.
+    fn build_grouped_array_pattern_doc(
+        &self,
+        arr: &internal::ArrayPattern<'_>,
+        has_comments: bool,
+    ) -> DocId {
         let d = self.d();
         let mut parts = d.pooled_docbuf();
         let mut prev_end = arr.span.start + 1;
@@ -849,9 +874,11 @@ impl<'a> Printer<'a> {
             if let Some(e) = elem {
                 // Check for leading comments before this element
                 let elem_start = e.span().start;
-                let leading_comments =
-                    self.build_inline_comments_between_doc_trailing_space(prev_end, elem_start);
-                parts.push(leading_comments);
+                if has_comments {
+                    let leading_comments =
+                        self.build_inline_comments_between_doc_trailing_space(prev_end, elem_start);
+                    parts.push(leading_comments);
+                }
 
                 parts.push(self.build_expression_doc(e));
 
@@ -937,9 +964,11 @@ impl<'a> Printer<'a> {
                                     .is_some_and(|dpos| self.comment_on_delimiter_line(dpos, c)))
                         })
                         .collect();
-                parts.extend(
-                    self.build_leading_comments_with_blank_lines(&leading_comments, elem_start),
-                );
+                parts.extend(self.build_leading_comments_with_blank_lines(
+                    &leading_comments,
+                    elem_start,
+                    false,
+                ));
 
                 parts.push(self.build_expression_doc(e));
 
@@ -1019,6 +1048,12 @@ impl<'a> Printer<'a> {
         // bare. Same rule as an assignment expression's left.
         let left_doc = if self.needs_parens(pattern.left, ParenContext::AssignmentTarget) {
             d.parens(self.build_expression_doc(pattern.left))
+        } else if let Expression::ObjectPattern(obj) = pattern.left {
+            // A destructuring default's left object pattern does NOT expand on nesting
+            // — prettier's shouldBreak excludes an AssignmentPattern parent (object.js),
+            // so `{ a: { b } = {} }` (and deeper) stays inline. Width-based breaking
+            // still applies. (Array-pattern lefts don't expand on nesting.)
+            self.build_object_pattern_doc_with_context(obj, PatternContext::AssignmentDefault)
         } else {
             self.build_expression_doc(pattern.left)
         };
@@ -1069,16 +1104,18 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a rest element
     pub(super) fn build_rest_element_doc(&self, rest: &internal::RestElement<'_>) -> DocId {
         let d = self.d();
-        // Comments between `...` and the argument (e.g., `.../* c */ args`)
+        // Comments between `...` and the argument (e.g., `.../* c */ args`). Skipped on
+        // the comment-free path — rest/spread elements are everywhere (`f(...xs)`,
+        // `{a, ...rest}`, `(...args) =>`) and a comment inside the `...` gap is not.
         let dots_end = rest.span.start + "...".len() as u32;
         let arg_start = rest.argument.span().start;
-        let comments_doc =
-            self.build_comments_between(dots_end, arg_start, CommentSpacing::Trailing);
-        let mut parts: DocBuf = smallvec![
-            d.text("..."),
-            comments_doc,
-            self.build_expression_doc(rest.argument),
-        ];
+        let mut parts: DocBuf = smallvec![d.text("...")];
+        if let Some(comments_doc) =
+            self.build_inline_comments_between_doc_trailing_space_opt(dots_end, arg_start)
+        {
+            parts.push(comments_doc);
+        }
+        parts.push(self.build_expression_doc(rest.argument));
         // Optional rest parameter `...a?` — the `?` is carried on the rest element
         // (not `argument`), between the binding and any annotation. See `RestElement`.
         if rest.optional {

@@ -27,6 +27,19 @@ pub(crate) fn skip_identifier_at(bytes: &[u8], pos: usize, end: usize) -> usize 
     i
 }
 
+/// Whether a `{ }`-delimited statement list prints no visible content.
+///
+/// A body containing only standalone `EmptyStatement`s (bare `;`) prints
+/// nothing — Prettier's `printStatementSequence` drops them — so it's treated
+/// the same as a genuinely empty body (comments attached to those statements
+/// are picked up separately, by scanning the full brace range rather than the
+/// statement list). Used by block-statement and namespace/module bodies to
+/// decide between the empty-body and normal rendering paths.
+pub(crate) fn is_effectively_empty_body(body: &[internal::Statement<'_>]) -> bool {
+    body.iter()
+        .all(|s| matches!(s, internal::Statement::EmptyStatement(_)))
+}
+
 /// Check if an expression is a module path call that should use fluid assignment wrapping
 /// (break after `=` if too long, keeping the call together).
 ///
@@ -178,6 +191,11 @@ pub(crate) enum PatternContext {
     FunctionParameter,
     /// Pattern in standalone context (variable declaration, assignment)
     Standalone,
+    /// The left of a destructuring default (`{ a } = …`). Prettier's `shouldBreak`
+    /// excludes an `AssignmentPattern` parent (object.js), so such a pattern never
+    /// expands on nesting — `{ a: { b } = {} }` stays inline (width-based breaking
+    /// still applies elsewhere).
+    AssignmentDefault,
 }
 
 /// Check if an object pattern should expand (print across multiple lines).
@@ -197,6 +215,9 @@ pub(crate) fn object_pattern_should_expand(
     match context {
         PatternContext::FunctionParameter => depth >= 3,
         PatternContext::Standalone => depth >= 2,
+        // A destructuring default's left never expands on nesting (prettier
+        // excludes AssignmentPattern parents from shouldBreak).
+        PatternContext::AssignmentDefault => false,
     }
 }
 
@@ -217,15 +238,14 @@ fn pattern_nesting_depth(obj: &internal::ObjectPattern<'_>) -> usize {
                     internal::Expression::ArrayPattern(nested_arr) => {
                         1 + array_pattern_nesting_depth(nested_arr)
                     }
-                    internal::Expression::AssignmentPattern(ap) => match ap.left {
-                        internal::Expression::ObjectPattern(nested_obj) => {
-                            1 + pattern_nesting_depth(nested_obj)
-                        }
-                        internal::Expression::ArrayPattern(nested_arr) => {
-                            1 + array_pattern_nesting_depth(nested_arr)
-                        }
-                        _ => 1,
-                    },
+                    // A property with a DEFAULT (`x: { y } = …`) does NOT count its
+                    // nested pattern toward the expansion depth — prettier's shouldBreak
+                    // fires only on a value that is *directly* an Object/Array pattern and
+                    // excludes an `AssignmentPattern` parent (object.js), so
+                    // `{ a: { b } = {} }` stays inline. Treat it as depth 1, same as a
+                    // plain binding (the `_ => 1` arm). (Surfaced by cargo-mutants: the
+                    // recurse-into-`ap.left` arms survived because no fixture covered a
+                    // defaulted nested pattern — the survivor was a real over-expansion bug.)
                     _ => 1,
                 };
                 max_depth = max_depth.max(nested_depth);
@@ -249,15 +269,9 @@ fn array_pattern_nesting_depth(arr: &internal::ArrayPattern<'_>) -> usize {
             internal::Expression::ArrayPattern(nested_arr) => {
                 1 + array_pattern_nesting_depth(nested_arr)
             }
-            internal::Expression::AssignmentPattern(ap) => match ap.left {
-                internal::Expression::ObjectPattern(nested_obj) => {
-                    1 + pattern_nesting_depth(nested_obj)
-                }
-                internal::Expression::ArrayPattern(nested_arr) => {
-                    1 + array_pattern_nesting_depth(nested_arr)
-                }
-                _ => 1,
-            },
+            // A defaulted element (`[{ y } = …]`) doesn't count its nested pattern
+            // toward the expansion depth — see the object-pattern counterpart above
+            // (prettier's shouldBreak excludes `AssignmentPattern` parents).
             _ => 1,
         };
         max_depth = max_depth.max(nested_depth);

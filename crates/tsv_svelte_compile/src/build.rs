@@ -18,6 +18,15 @@
 //! - Keywords/punctuation are printer statics and need no buffer text; the
 //!   skeleton around them is minted anyway so node spans cover plausible text.
 //!
+//! **Print-time position facts** (`params_start`, `arrow_token`) are chosen so the
+//! printer's comment windows around them come out *empty*, not so they point at the
+//! minted glyph. The printer reads them as window endpoints, and a window running from
+//! a borrowed host span to an appendix span would sweep every comment in between —
+//! hoisting carried script comments into a synthetic arrow's parameter list. So a
+//! synthetic arrow's `arrow_token` anchors on its body start (where the printer's own
+//! signature-end math lands when the paren scan finds nothing), collapsing both the
+//! signature and body windows to empty.
+//!
 //! Construction discipline: child collections are built as arena slices
 //! (`bumpalo::collections::Vec` → `into_bump_slice`), single children via
 //! `arena.alloc`. Borrowed nodes are never deep-copied; where a *wrapper* node
@@ -273,6 +282,7 @@ impl<'arena> Builder<'arena> {
             return_type: None,
             r#async: false,
             params_start: Some(header.start),
+            arrow_token: body.span().start,
             span: Span::new(header.start, body.span().end),
         })
     }
@@ -303,6 +313,7 @@ impl<'arena> Builder<'arena> {
             return_type: None,
             r#async: false,
             params_start: Some(params_start),
+            arrow_token: block_span.start,
             span: Span::new(start, end),
         })
     }

@@ -209,6 +209,18 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Parse attributes, extracting `this` for SvelteElement and SvelteComponent
         let (attributes, tag_expr, component_expr) = self.parse_special_element_attributes(tag)?;
 
+        // `<svelte:element>` requires a `this` attribute *with a value* — Svelte's
+        // parser rejects it otherwise, and tsv is a drop-in for that parser. Without
+        // this reject the missing `this` was fabricated as a zero-span placeholder
+        // literal that panics when formatted (`format_string_literal_from_ast` slices
+        // the empty span `""[1..len-1]`) and injects a spurious `this=""` on output.
+        if tag == SpecialElementTag::SvelteElement && tag_expr.is_none() {
+            return Err(self.error_msg_at(
+                "`<svelte:element>` must have a 'this' attribute with a value",
+                name_span.start as usize,
+            ));
+        }
+
         // Construct the final SpecialElementKind with associated data
         let kind = self.build_special_element_kind(tag, tag_expr, component_expr);
 
@@ -278,11 +290,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     ) -> SpecialElementKind<'arena> {
         match tag {
             SpecialElementTag::SvelteElement => {
-                // For svelte:element, we need the `this` attribute
-                // If missing, create a placeholder (parser should have validated).
-                // Use a `Decoded("")` empty-string cooked value so `resolve` reads
-                // the arena bytes directly (a `Verbatim` form would slice the span
-                // minus quotes and underflow on this zero-length placeholder span).
+                // `parse_special_element_body` rejects a `this`-less `<svelte:element>`
+                // upstream, so `tag_expr` is always `Some` here. This fallback stays
+                // as a defensive belt-and-suspenders (a `Decoded("")` cooked value, not
+                // a `Verbatim` span slice that would underflow on the zero-length span).
                 let tag = tag_expr.unwrap_or_else(|| {
                     tsv_ts::ast::internal::Expression::Literal(tsv_ts::ast::internal::Literal {
                         value: tsv_ts::ast::internal::LiteralValue::String(

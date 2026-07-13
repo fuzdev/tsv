@@ -139,7 +139,9 @@ impl<'a> Printer<'a> {
                     return d.concat(&[dec_doc, d.text(export_keyword), tail]);
                 }
             }
-            let continuation = self.build_statement_doc(declaration);
+            // `declaration` is always a declaration form (never an
+            // ExpressionStatement), so `in_program_or_block` is never consulted here.
+            let continuation = self.build_statement_doc(declaration, true);
             let tail = self.build_keyword_to_name_continuation(
                 export_keyword_end,
                 decl_start,

@@ -71,7 +71,7 @@ impl<'a> Printer<'a> {
             // - When broken: line becomes newline + indent -> `while (cond)\n\ta;`
             let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
             let body_start = stmt.body.span().start;
-            let body_doc = self.build_statement_doc(stmt.body);
+            let body_doc = self.build_statement_doc(stmt.body, false);
 
             let mut head_parts: DocBuf = smallvec![d.text("while")];
             if let Some(kc) = &keyword_comments {
@@ -98,6 +98,9 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let is_block = matches!(stmt.body, Statement::BlockStatement(_));
 
+        // A loop body collapses its empty block form (`do {} while (cond)`).
+        let body_doc = self.build_collapsing_body_doc(stmt.body);
+
         // Check for comments between `do` keyword and body
         let do_end = stmt.span.start + "do".len() as u32;
         let body_start = stmt.body.span().start;
@@ -105,7 +108,6 @@ impl<'a> Printer<'a> {
             let has_line = self.has_line_comments_between(do_end, body_start);
             let comment_doc =
                 self.build_inline_comments_between_doc_no_leading_space(do_end, body_start);
-            let body_doc = self.build_statement_doc(stmt.body);
             let mut p = smallvec![d.text("do")];
             if has_line && !is_block {
                 // Line comment with non-block body: indent comment + body
@@ -127,9 +129,9 @@ impl<'a> Printer<'a> {
         } else if matches!(stmt.body, Statement::EmptyStatement(_)) {
             // Prettier's `adjustClause` returns `";"` directly for an empty body
             // → `do;`, not `do ;`.
-            smallvec![d.text("do"), self.build_statement_doc(stmt.body)]
+            smallvec![d.text("do"), body_doc]
         } else {
-            smallvec![d.text("do "), self.build_statement_doc(stmt.body)]
+            smallvec![d.text("do "), body_doc]
         };
 
         // Find the while keyword position for comment handling

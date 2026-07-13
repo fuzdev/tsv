@@ -5,15 +5,14 @@
 
 use super::super::{ParenContext, Printer, has_multiline_content};
 use super::arg_comments::{
-    PartitionedComments, any_comment_forces_expansion, first_arg_has_any_comments,
-    has_blank_line_between_args, has_inter_argument_comments, has_trailing_comments_on_args,
-    last_arg_has_comments, should_force_expansion_for_comments,
+    PartitionedComments, any_comment_forces_expansion, build_after_comma_leading_comments,
+    first_arg_has_any_comments, has_blank_line_between_args, has_inter_argument_comments,
+    has_trailing_comments_on_args, last_arg_has_comments, should_force_expansion_for_comments,
 };
 use super::arg_predicates::{
     arrow_body_is_call_through_non_null, arrow_has_trailing_param_comments,
     is_array_or_object_unwrapped, is_concise_numeric_array, is_curried_arrow,
     is_function_composition_args, is_ternary_arrow_body, last_arg_is_array_or_object,
-    preceding_args_allow_expand_last,
 };
 use super::arg_wrapping::{
     append_type_args_with_gap_comments, arg_needs_soft_wrap, build_args_joined_with_comments,
@@ -271,11 +270,20 @@ pub(super) fn build_call_doc_with_wrapping(
     {
         let first_arg_doc = printer.build_expression_doc(&call.arguments[0]);
 
-        // Build tail args (everything after first)
+        // Build tail args (everything after first), carrying any inline block comment
+        // that leads a tail arg after its comma (`}, /* c */ arg`) so it isn't dropped —
+        // matching prettier's expand-first, which keeps the comment inline.
         let mut tail_parts = DocBuf::new();
+        let mut prev_end = call.arguments[0].span().end;
         for arg in call.arguments.iter().skip(1) {
             tail_parts.push(d.text(", "));
+            if let Some(leading) =
+                build_after_comma_leading_comments(printer, prev_end, arg.span().start)
+            {
+                tail_parts.push(leading);
+            }
             tail_parts.push(printer.build_expression_doc(arg));
+            prev_end = arg.span().end;
         }
 
         // Prettier: if (tailArgs.some(willBreak)) return allArgsBrokenOut()
@@ -713,7 +721,7 @@ fn build_block_arrow_hug_states(
 
     // If the arrow has trailing param comments, the params will be multiline,
     // so we should force the wrapped state (prettier behavior)
-    let arrow_token = printer.find_arrow_token_for(arrow);
+    let arrow_token = arrow.arrow_token;
     let has_trailing_param_comments =
         arrow_has_trailing_param_comments(arrow, arrow_token, |start, end| {
             printer.has_comments_between(start, end)
@@ -746,7 +754,7 @@ fn build_block_arrow_hug_states(
         // 'none'). Matches Prettier's expandLastArg behavior where the arrow
         // is reprinted with a softline appended.
         let body_start = body_expr.span().start;
-        let arrow_token = printer.find_arrow_token_for(arrow);
+        let arrow_token = arrow.arrow_token;
         if printer.has_own_line_post_arrow_comment(arrow_token, body_start) {
             // group_break forces the arrow to break. The softline after it
             // causes `\n)` when the group breaks.
@@ -897,7 +905,6 @@ fn try_expand_last_function_arg(
     );
 
     if last_is_function
-        && preceding_args_allow_expand_last(call.arguments, printer.line_breaks)
         && !(call_has_comments && any_comment_forces_expansion(call, printer, paren_open))
         && !(call_has_comments
             && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
@@ -1066,7 +1073,6 @@ fn try_expand_last_array_object_arg(
     if call.arguments.len() >= 2
         && last_arg_is_array_or_object(call.arguments)
         && !call.arguments.last().is_some_and(is_concise_numeric_array)
-        && preceding_args_allow_expand_last(call.arguments, printer.line_breaks)
         && !(call_has_comments && any_comment_forces_expansion(call, printer, paren_open))
         && !(call_has_comments
             && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))

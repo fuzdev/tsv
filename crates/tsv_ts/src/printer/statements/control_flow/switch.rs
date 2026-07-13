@@ -8,7 +8,7 @@ use smallvec::smallvec;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::source_scan::{TriviaProfile, find_char, find_char_skipping_comments};
+use tsv_lang::source_scan::{TriviaProfile, find_char};
 
 impl<'a> Printer<'a> {
     /// Build a doc for a switch statement with proper line-width wrapping
@@ -173,6 +173,28 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Collect leading comments for a case-consequent statement (or a dropped
+    /// `EmptyStatement` standing in for one), filtering out whatever's already
+    /// claimed: a trailing same-line comment of the previous statement, or —
+    /// for the first statement, which has no previous statement — an inline
+    /// comment on the case label's own line (already handled by the caller).
+    fn collect_case_leading_comments(
+        &self,
+        prev_end: u32,
+        boundary: u32,
+        prev_stmt_end: Option<u32>,
+        case_label_end: u32,
+    ) -> CommentVec<'_> {
+        let comments: CommentVec<'_> =
+            comments_in_range(self.comments, prev_end, boundary).collect();
+        let anchor = prev_stmt_end.unwrap_or(case_label_end);
+        comments
+            .iter()
+            .filter(|c| !self.is_same_line(anchor, c.span.start))
+            .copied()
+            .collect()
+    }
+
     /// Build a doc for a switch case (without outer indent - that's handled by switch)
     ///
     /// `inline_comment_boundary` is the position up to which we should look for inline comments
@@ -191,31 +213,27 @@ impl<'a> Printer<'a> {
         if let Some(test) = &case.test {
             parts.push(d.text("case "));
             parts.push(self.build_expression_doc(test));
-            // Comments between expression and colon: `case 1 /* c */:`
+            // Comments between expression and colon: `case 1 /* c */:`. The colon sits
+            // exactly one byte before the label end, which `get_case_label_end` already
+            // located as colon+1, so no second scan is needed.
             let test_end = test.span().end;
-            let colon_pos = find_char_skipping_comments(
-                self.source.as_bytes(),
-                test_end as usize,
-                case_label_end as usize,
-                b':',
-            )
-            .unwrap_or(case_label_end as usize - 1);
-            parts.push(self.build_inline_comments_between_doc(test_end, colon_pos as u32));
+            let colon_pos = case_label_end - 1;
+            if let Some(comments) = self.build_inline_comments_between_doc_opt(test_end, colon_pos)
+            {
+                parts.push(comments);
+            }
             parts.push(d.text(":"));
         } else {
-            // Comments between `default` keyword and colon: `default /* c */:`
+            // Comments between `default` keyword and colon: `default /* c */:`. The colon
+            // sits one byte before the label end located by `get_case_label_end`.
             let default_keyword_end = case.span.start + "default".len() as u32;
-            let colon_pos = find_char_skipping_comments(
-                self.source.as_bytes(),
-                default_keyword_end as usize,
-                case_label_end as usize,
-                b':',
-            )
-            .unwrap_or(case_label_end as usize - 1);
+            let colon_pos = case_label_end - 1;
             parts.push(d.text("default"));
-            parts.push(
-                self.build_inline_comments_between_doc(default_keyword_end, colon_pos as u32),
-            );
+            if let Some(comments) =
+                self.build_inline_comments_between_doc_opt(default_keyword_end, colon_pos)
+            {
+                parts.push(comments);
+            }
             parts.push(d.text(":"));
         }
 
@@ -251,27 +269,60 @@ impl<'a> Printer<'a> {
         for (i, stmt) in case.consequent.iter().enumerate() {
             let stmt_start = stmt.span().start;
 
-            // Check for comments between previous position and this statement
-            let comments: CommentVec<'_> =
-                comments_in_range(self.comments, prev_end, stmt_start).collect();
+            // Standalone EmptyStatements are dropped entirely (Prettier's
+            // `printStatementSequence` never prints them), but any comments
+            // attached to one must survive — printed as orphaned comments with
+            // nothing following them in this iteration to glue to. The next
+            // iteration's own unconditional leading hardline supplies the
+            // separator (mirroring `build_statement_list_docs_into`).
+            if matches!(stmt, Statement::EmptyStatement(_)) {
+                let stmt_end = stmt.span().end;
+                let next_bound = case
+                    .consequent
+                    .get(i + 1)
+                    .map_or(inline_comment_boundary, |s| s.span().start);
+                let search_end = self
+                    .find_end_with_trailing_comments(stmt_end)
+                    .min(next_bound);
 
-            // Filter out:
-            // 1. Trailing same-line comments from the previous statement
-            // 2. Inline comments after the case label (already handled above)
-            let leading_comments: CommentVec<'_> = if let Some(prev_stmt) = prev_stmt_end {
-                comments
-                    .iter()
-                    .filter(|c| !self.is_same_line(prev_stmt, c.span.start))
-                    .copied()
-                    .collect()
-            } else {
-                // For first statement, filter out inline comments after case label
-                comments
-                    .iter()
-                    .filter(|c| !self.is_same_line(case_label_end, c.span.start))
-                    .copied()
-                    .collect()
-            };
+                let leading_comments = self.collect_case_leading_comments(
+                    prev_end,
+                    search_end,
+                    prev_stmt_end,
+                    case_label_end,
+                );
+
+                if !leading_comments.is_empty() {
+                    let mut stmt_parts: DocBuf = smallvec![d.hardline()];
+                    if prev_stmt_end.is_some() {
+                        let check_end = leading_comments[0].span.start;
+                        if self.has_blank_line_between(prev_end, check_end) {
+                            stmt_parts.push(d.hardline());
+                        }
+                    }
+                    stmt_parts.extend(self.build_leading_comments_with_blank_lines(
+                        &leading_comments,
+                        search_end,
+                        true,
+                    ));
+                    parts.push(d.indent(d.concat(&stmt_parts)));
+                    prev_stmt_end = Some(stmt_end);
+                }
+
+                prev_end = search_end;
+                continue;
+            }
+
+            // Comments between the previous position and this statement, minus
+            // whatever's already claimed (a trailing same-line comment of the
+            // previous statement, or — for the first statement — an inline
+            // comment on the case label's own line, handled above).
+            let leading_comments = self.collect_case_leading_comments(
+                prev_end,
+                stmt_start,
+                prev_stmt_end,
+                case_label_end,
+            );
 
             // Trailing same-line comments on THIS statement (mirrors the block
             // statement joiner `build_statement_list_docs_into`). Without this the
@@ -301,13 +352,16 @@ impl<'a> Printer<'a> {
                         parts.push(self.build_comment_doc(comment));
                     }
                     parts.push(d.text(" "));
-                    parts.push(self.build_statement_doc(stmt));
+                    // A SwitchCase consequent isn't a Program/BlockStatement, so a
+                    // bare string statement here is never directive-prologue
+                    // eligible — see `Printer::needs_avoid_directive_parens`.
+                    parts.push(self.build_statement_doc(stmt, false));
                     parts.extend(trailing);
                 } else if has_inline_line_comment && leading_comments.is_empty() {
                     // Inline line comment, no leading: `case 'a': // comment\n{`
                     // Block at case level (no indent)
                     parts.push(d.hardline());
-                    parts.push(self.build_statement_doc(stmt));
+                    parts.push(self.build_statement_doc(stmt, false));
                     parts.extend(trailing);
                 } else {
                     // Leading comments exist - indent both comments and block
@@ -317,7 +371,7 @@ impl<'a> Printer<'a> {
                         stmt_parts.push(self.build_comment_doc(comment));
                         stmt_parts.push(d.hardline());
                     }
-                    stmt_parts.push(self.build_statement_doc(stmt));
+                    stmt_parts.push(self.build_statement_doc(stmt, false));
                     stmt_parts.extend(trailing);
                     parts.push(d.indent(d.concat(&stmt_parts)));
                 }
@@ -350,7 +404,7 @@ impl<'a> Printer<'a> {
                     }
                 }
 
-                stmt_parts.push(self.build_statement_doc(stmt));
+                stmt_parts.push(self.build_statement_doc(stmt, false));
                 stmt_parts.extend(trailing);
 
                 parts.push(d.indent(d.concat(&stmt_parts)));

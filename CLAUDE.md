@@ -193,6 +193,7 @@ deno task pins:audit                 # canonical-oracle version sync (gated in `
 deno task scan:audit                 # guard against new raw find/rfind/match_indices substring scans over source (gated in `deno task check`); see Debug Tooling
 deno task fanout:audit               # guard against super-linear doc-node fanout (the per-layout-candidate rebuild blowup); gated in `deno task check`; see Debug Tooling
 deno task roundtrip:audit            # cheap tripwire that format(tests/fixtures) reparses (pure-Rust phase 1, no *_unreparseable output; gated in `deno task check`) — real yield is external corpora; see Debug Tooling
+deno task fuzz:audit                 # seeded mutational fuzzer over tests/fixtures (fixed --seed 0 --iterations 5000; pure Rust, no sidecar; gated in `deno task check`) — asserts no-panic + idempotency + structural-reparse on mutated input; see Debug Tooling
 ```
 
 For direct `cargo run -p tsv_debug` usage, see [Debug Tooling](#debug-tooling).
@@ -987,6 +988,30 @@ cargo run -p tsv_debug roundtrip_audit --gate --canonical-all ../prettier/tests/
 # (non-gate) run is a diagnostic — the divergent bucket over tests/fixtures is
 # Svelte-reflow-noisy vs render_normalize's simpler whitespace model.
 cargo run -p tsv_debug roundtrip_audit --canonical-all --verbose ../prettier/tests/format/typescript
+```
+
+**Seeded Mutational Fuzzer (panic / idempotency / structural-reparse safety):**
+
+```bash
+# fuzz - dep-free seeded mutational fuzzer (the coverage-trifecta fuzzing leg). A
+# SplitMix64 PRNG + byte-level mutation operators over a seed corpus (default
+# tests/fixtures); every valid-UTF-8 mutant is driven through parse+format+reparse
+# under catch_unwind. Asserts three properties nothing else guards on ARBITRARY
+# input: (1) no panic — the parser must never crash (prod WASM is panic=abort → a
+# panic is a DoS; the corpus profile only catches panics on real code); (2) format
+# idempotency (the F1 fixed point); (3) structural reparse (reusing roundtrip_audit's
+# skeleton compare). Deterministic per --seed + corpus, so a finding reproduces
+# exactly. Pure Rust, no sidecar. Not the differential (tsv-vs-canonical) leg.
+# The `fuzz:audit` deno task (fixed --seed 0 --iterations 5000 over tests/fixtures) is
+# gated in `deno task check` — a cheap standing tripwire for the three invariants.
+cargo run -p tsv_debug fuzz                                    # 2000 iters over tests/fixtures
+cargo run -p tsv_debug fuzz --seed 7 --iterations 20000 --dump-dir /tmp/fz  # discovery
+# HARD findings (exit 1): panic / unreparseable / non_idempotent / format_error —
+# always real bugs. SOFT findings (reported, non-fatal): structural_divergence — the
+# render-model-noisy bucket that needs canonical confirmation (roundtrip_audit
+# --canonical-all), like roundtrip_audit --gate. --strict fails on soft too.
+# Also: --parser not applicable (per-file extension), --max-mutations N, --limit N,
+# --max-findings N (HARD only), --json.
 ```
 
 ## Architectural Notes

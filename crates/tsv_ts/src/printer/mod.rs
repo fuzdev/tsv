@@ -44,9 +44,9 @@ use analysis::needs_isolation_for_hugging;
 pub use analysis::conditional_should_break_after_op;
 pub(crate) use analysis::{
     PatternContext, build_entity_name_doc, has_multiline_content, has_newline_before_position,
-    is_brace_block_multiline, is_module_path_fluid_call, is_multiline_string_literal,
-    is_multiline_template_expression, is_pure_property_chain, is_string_literal,
-    object_pattern_should_expand, template_literal_has_newlines,
+    is_brace_block_multiline, is_effectively_empty_body, is_module_path_fluid_call,
+    is_multiline_string_literal, is_multiline_template_expression, is_pure_property_chain,
+    is_string_literal, object_pattern_should_expand, template_literal_has_newlines,
 };
 pub(crate) use comments::{
     CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue,
@@ -233,6 +233,16 @@ pub struct Printer<'a> {
     /// Keyed by span (unique per source position); nested expand-last calls
     /// save/restore, so only the node currently being reused ever matches.
     pub(crate) arrow_body_inject: Cell<Option<(u32, DocId)>>,
+    /// Whether the member chain currently being built has any comment anywhere in its
+    /// span. Set once per `build_chain_doc` (save/restore, so a nested chain in a call
+    /// arg / base restores the parent's value on exit — re-entrancy-safe like
+    /// [`Self::chain_arg_share`]). The chain print path reads it to skip per-member
+    /// comment classification when the whole chain is comment-free (the common case).
+    /// Safe by construction: the flag only *enables* a skip whose soundness is
+    /// span-containment (a member's comment gap ⊆ the chain span), so a stale value can
+    /// only cause more work, never a dropped comment. Defaults `true` (do the full
+    /// classify) so any member print reached without a preceding set is fail-safe.
+    pub(crate) chain_has_comments: Cell<bool>,
 }
 
 impl<'a> Printer<'a> {
@@ -275,6 +285,7 @@ impl<'a> Printer<'a> {
             chain_arg_share: RefCell::new(HashMap::new()),
             chain_arg_share_active: Cell::new(false),
             arrow_body_inject: Cell::new(None),
+            chain_has_comments: Cell::new(true),
         }
     }
 
@@ -975,52 +986,6 @@ impl<'a> Printer<'a> {
             TriviaProfile::JS,
         )
         .map(|i| (i + keyword.len()) as u32)
-    }
-
-    /// Find the `=>` token position for an arrow function.
-    ///
-    /// Computes the signature end from the arrow's structure and scans for `=>`.
-    /// Returns the position of `=` in `=>`, or the body start as fallback.
-    pub(crate) fn find_arrow_token_for(
-        &self,
-        arrow: &internal::ArrowFunctionExpression<'_>,
-    ) -> u32 {
-        let body_start = arrow.body.span().start;
-        let sig_end = if let Some(rt) = &arrow.return_type {
-            rt.span.end
-        } else if let Some(ps) = arrow.params_start {
-            self.find_closing_paren(ps, body_start)
-                .unwrap_or(body_start)
-        } else {
-            arrow
-                .params
-                .last()
-                .map_or(arrow.span.start, |p| p.span().end)
-        };
-        self.find_arrow_token(sig_end, body_start)
-            .unwrap_or(body_start)
-    }
-
-    /// Find the `=>` token between a start position and end boundary.
-    ///
-    /// Scans the source to find `=>`. Returns the position OF the `=` character
-    /// (the start of the arrow token). Skips over comments and strings.
-    pub(crate) fn find_arrow_token(&self, start: u32, end: u32) -> Option<u32> {
-        let source = self.source.as_bytes();
-        let end = (end as usize).min(source.len());
-        let mut i = start as usize;
-
-        while i + 1 < end {
-            if let Some(past) = skip_trivia(source, i, end, TriviaProfile::JS) {
-                i = past;
-                continue;
-            }
-            if source[i] == b'=' && source[i + 1] == b'>' {
-                return Some(i as u32);
-            }
-            i += 1;
-        }
-        None
     }
 
     /// Find a keyword between a start position and end boundary.

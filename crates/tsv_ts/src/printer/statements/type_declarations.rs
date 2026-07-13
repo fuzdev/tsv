@@ -1,7 +1,7 @@
 // Type declaration printing (type aliases, interfaces, enums, namespaces, declare functions)
 // plus shared entity-name helpers
 
-use super::{Printer, build_entity_name_doc, should_hug_union_type};
+use super::{Printer, build_entity_name_doc, is_effectively_empty_body, should_hug_union_type};
 use crate::ast::internal::{self, TSType};
 use crate::printer::layout::hang_after_operator;
 use crate::printer::{CommentFilter, CommentSpacing, CommentVec, HeritageKeyword};
@@ -80,12 +80,12 @@ impl<'a> Printer<'a> {
         parts.push(d.text("type"));
         // Comments between keyword and name: `type /* c */ A = string`
         parts.push(d.text(" "));
-        parts.push(
-            self.build_inline_comments_between_doc_trailing_space(
-                decl.span.start,
-                decl.id.span.start,
-            ),
-        );
+        if let Some(comments) = self.build_inline_comments_between_doc_trailing_space_opt(
+            decl.span.start,
+            decl.id.span.start,
+        ) {
+            parts.push(comments);
+        }
         parts.push(self.identifier_name_doc(&decl.id));
 
         // Check if type parameters are complex (>1 param with constraints/defaults)
@@ -108,11 +108,12 @@ impl<'a> Printer<'a> {
             .type_parameters
             .as_ref()
             .map_or(decl.id.span.end, |tp| tp.span.start);
-        parts.push(self.build_name_to_type_params_comments(
+        self.push_name_to_type_params_comments(
+            &mut parts,
             decl.id.span.end,
             comment_end,
             CommentSpacing::for_type_params(decl.type_parameters.is_some()),
-        ));
+        );
 
         if let Some(type_params) = &decl.type_parameters {
             parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
@@ -419,22 +420,23 @@ impl<'a> Printer<'a> {
         header_parts.push(d.text("interface"));
         // Comments between keyword and name: `interface /* c */ A {}`
         header_parts.push(d.text(" "));
-        header_parts.push(
-            self.build_inline_comments_between_doc_trailing_space(
-                decl.span.start,
-                decl.id.span.start,
-            ),
-        );
+        if let Some(comments) = self.build_inline_comments_between_doc_trailing_space_opt(
+            decl.span.start,
+            decl.id.span.start,
+        ) {
+            header_parts.push(comments);
+        }
         header_parts.push(self.identifier_name_doc(&decl.id));
 
         // Comments between name and type params: `interface A/* c */ <T> {}`
         // Line comments get a hardline to prevent absorbing type params as comment text
         if let Some(type_params) = &decl.type_parameters {
-            header_parts.push(self.build_name_to_type_params_comments(
+            self.push_name_to_type_params_comments(
+                &mut header_parts,
                 decl.id.span.end,
                 type_params.span.start,
                 CommentSpacing::Trailing,
-            ));
+            );
         }
 
         // Build extends doc, with comments between `extends` keyword and first item
@@ -590,11 +592,12 @@ impl<'a> Printer<'a> {
             .type_parameters
             .as_ref()
             .map_or_else(|| paren_pos.unwrap_or(decl.id.span.end), |tp| tp.span.start);
-        tail.push(self.build_name_to_type_params_comments(
+        self.push_name_to_type_params_comments(
+            &mut tail,
             decl.id.span.end,
             comment_end,
             CommentSpacing::for_type_params(decl.type_parameters.is_some()),
-        ));
+        );
 
         // Type parameters with wrapping support
         if let Some(type_params) = &decl.type_parameters {
@@ -732,9 +735,11 @@ impl<'a> Printer<'a> {
             parts.push(d.hardline());
 
             // Print leading comments with blank line preservation
-            parts.extend(
-                self.build_leading_comments_with_blank_lines(&leading_comments, member_start),
-            );
+            parts.extend(self.build_leading_comments_with_blank_lines(
+                &leading_comments,
+                member_start,
+                false,
+            ));
 
             // A preceding format-ignore directive keeps the member's source verbatim.
             // The member span includes its trailing `;`.
@@ -1168,7 +1173,11 @@ impl<'a> Printer<'a> {
                 }
                 parts.push(d.text(" "));
 
-                if block.body.is_empty() {
+                // Comments attached to a body whose only statements are
+                // dropped `EmptyStatement`s are still picked up by
+                // `build_empty_body_with_comments_doc`, which scans the full
+                // brace range rather than the statement list.
+                if is_effectively_empty_body(block.body) {
                     // Empty namespace body - handle comments inside
                     parts.push(self.build_empty_body_with_comments_doc(block.span));
                 } else {
@@ -1187,17 +1196,20 @@ impl<'a> Printer<'a> {
 
                     // Shared per-statement walk (leading comments, blank-line
                     // separators, format-ignore, trailing same-line comments) —
-                    // same as block-statement bodies.
+                    // same as block-statement bodies. A `TSModuleBlock` isn't a
+                    // Program/BlockStatement, so its bare string statements are
+                    // never directive-prologue eligible — see
+                    // `Printer::needs_avoid_directive_parens`.
                     let body_start = block.span.start + 1; // After opening '{'
                     let body_end = block.span.end.saturating_sub(1); // Before '}'
                     let mut stmt_parts = d.pooled_docbuf();
                     let (prev_end, _prev_stmt_end) = self.build_statement_list_docs_into(
                         &mut stmt_parts,
                         block.body,
-                        body_start,
-                        body_end,
+                        Span::new(body_start, body_end),
                         false,
                         delimiter_pull_pos,
+                        false,
                     );
 
                     // Handle own-line trailing comments after the last statement

@@ -140,6 +140,8 @@ impl<'a> Printer<'a> {
                 // `content` is already verbatim (internal whitespace + comments preserved,
                 // outer-trimmed, `url()` inner-trimmed) from the parser's non-normalized
                 // raw path, so it matches prettier as-is — no comment-spacing rewrite.
+                // Embedded newlines survive under Svelte `<style>` because the CSS renders
+                // at its final indent (no post-hoc line re-indent to compound them).
                 self.write(" ");
                 self.write(content);
             }
@@ -286,7 +288,9 @@ impl<'a> Printer<'a> {
         let d = self.d();
         // Normalize numbers + string quotes in the raw prelude (`.5px` → `0.5px`,
         // `"x"` → `'x'`), matching the declaration-value path. Comments preserved.
-        let content = value_normalization::normalize_value_text(content);
+        // Hex case is preserved (`lowercase_hex` off) — prettier only lowercases hex
+        // in `@supports` condition declarations, not `@media` feature values.
+        let content = value_normalization::normalize_value_text(content, false);
         // Lowercase media-feature *names* (`(MIN-WIDTH: …)` → `(min-width: …)`),
         // matching prettier; media types, `and`/`or`/`not`/`only`, and feature values
         // are preserved (see `lowercase_media_feature_names`). Keep the already-owned
@@ -439,11 +443,17 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let parts = condition.parts;
 
-        // `@supports` values are number-normalized (`.5px` → `0.5px`); `@container`
-        // is emitted verbatim, both matching prettier.
+        // `@supports` values are number-normalized (`.5px` → `0.5px`) and their hex
+        // colors lowercased (`#FFF` → `#fff`); `@container` is emitted verbatim, both
+        // matching prettier.
         let content_doc = |part: &internal::ConditionPart<'_>| {
             if kind.normalizes() {
-                d.text_pooled(&value_normalization::normalize_value_text(part.content))
+                // Only `@supports` reaches here (the sole `normalizes()` kind), so hex
+                // lowercasing is on.
+                d.text_pooled(&value_normalization::normalize_value_text(
+                    part.content,
+                    true,
+                ))
             } else {
                 d.text_pooled(part.content)
             }
@@ -639,7 +649,9 @@ impl<'a> Printer<'a> {
     /// `at_line_start` divergence kept for Svelte), so nested doc fills can't
     /// reproduce prettier's layout. Confirmed: the list does **not** map to `fill()`.
     fn print_import_media_query(&mut self, content: &str) {
-        let normalized = value_normalization::normalize_value_text(content);
+        // `@import`'s prelude is a media query (feature values), so hex case is
+        // preserved like `@media` — only `@supports` conditions lowercase hex.
+        let normalized = value_normalization::normalize_value_text(content, false);
         let queries: Vec<&str> = value_normalization::split_args_by_comma(&normalized)
             .into_iter()
             .map(str::trim)

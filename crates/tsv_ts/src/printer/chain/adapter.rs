@@ -170,6 +170,20 @@ impl<'a> ChainPrinter for Printer<'a> {
             .is_some()
     }
 
+    fn chain_has_comments(&self) -> bool {
+        self.chain_has_comments.get()
+    }
+
+    fn set_chain_has_comments(&self, has_comments: bool) -> bool {
+        let prev = self.chain_has_comments.get();
+        self.chain_has_comments.set(has_comments);
+        prev
+    }
+
+    fn restore_chain_has_comments(&self, prev: bool) {
+        self.chain_has_comments.set(prev);
+    }
+
     fn classify_comments(&self, start: u32, end: u32) -> ClassifiedComments<'_> {
         ClassifiedComments::from_range(self.comments, start, end, self.comment_line_breaks)
     }

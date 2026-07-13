@@ -16,13 +16,16 @@ mod type_declarations;
 mod variable;
 
 // Re-export for submodules to use `super::Printer` instead of `super::super::Printer`
-pub(super) use super::{Printer, build_entity_name_doc, should_hug_union_type};
+pub(super) use super::{
+    Printer, build_entity_name_doc, is_effectively_empty_body, should_hug_union_type,
+};
 
 use super::ParenContext;
 use super::class_expr_has_decorators;
 use super::expressions::literals::format_directive;
+use super::is_string_literal;
 use super::needs_parens::leftmost_no_lookahead;
-use crate::ast::internal::{self, Expression, LiteralValue, Statement};
+use crate::ast::internal::{self, Expression, Statement};
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::comments_in_range;
@@ -67,15 +70,34 @@ fn is_statement_ambiguous_keyword(name: &str) -> bool {
 }
 
 impl<'a> Printer<'a> {
-    /// Build a Doc for a statement
-    pub(super) fn build_statement_doc(&self, statement: &Statement<'_>) -> DocId {
+    /// Build a Doc for a statement.
+    ///
+    /// `in_program_or_block` is Prettier's own-terms grandparent check for the
+    /// "avoid becoming a directive" rule (see
+    /// [`Printer::needs_avoid_directive_parens`]) — `true` when `statement`'s
+    /// immediate container is a `Program` or `BlockStatement` (plain blocks,
+    /// control-flow bodies, function/catch bodies), `false` for the containers
+    /// that use a different AST node (`SwitchCase`, `StaticBlock`,
+    /// `TSModuleBlock`). Only the `ExpressionStatement` arm consults it.
+    pub(super) fn build_statement_doc(
+        &self,
+        statement: &Statement<'_>,
+        in_program_or_block: bool,
+    ) -> DocId {
         let d = self.d();
         match statement {
-            Statement::ExpressionStatement(stmt) => self.build_expression_statement_doc(stmt),
+            Statement::ExpressionStatement(stmt) => {
+                self.build_expression_statement_doc(stmt, in_program_or_block)
+            }
             Statement::VariableDeclaration(decl) => self.build_variable_declaration_doc(decl, true),
             Statement::TSTypeAliasDeclaration(decl) => self.build_type_alias_declaration_doc(decl),
             Statement::ReturnStatement(ret) => self.build_return_statement_doc(ret),
-            Statement::BlockStatement(block) => self.build_block_statement_doc(block),
+            // A statement-position block (bare `{ }`, a labeled block's body, or a
+            // block nested directly in another block) expands its empty form to `{\n}`,
+            // matching prettier. Only control-flow *bodies* (while/for/do/catch) and
+            // function/class bodies collapse to `{}`, and those are built by their own
+            // parents — never through this dispatch.
+            Statement::BlockStatement(block) => self.build_block_statement_expand_empty_doc(block),
             Statement::FunctionDeclaration(decl) => self.build_function_declaration_doc(decl),
             Statement::ClassDeclaration(decl) => self.build_class_declaration_doc(decl),
             Statement::ExportNamedDeclaration(decl) => {
@@ -119,9 +141,15 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for an expression statement
     ///
-    /// Handles parentheses for object patterns and comments before semicolon.
-    /// Preserves source parens around string literals: `('hello');` stays parenthesized.
-    fn build_expression_statement_doc(&self, stmt: &internal::ExpressionStatement<'_>) -> DocId {
+    /// Handles parentheses for object patterns and the "avoid becoming a
+    /// directive" rule for bare string literals (see
+    /// [`Printer::needs_avoid_directive_parens`]); `in_program_or_block` is
+    /// threaded from [`Printer::build_statement_doc`].
+    fn build_expression_statement_doc(
+        &self,
+        stmt: &internal::ExpressionStatement<'_>,
+        in_program_or_block: bool,
+    ) -> DocId {
         let d = self.d();
 
         let mut parts = DocBuf::new();
@@ -133,11 +161,12 @@ impl<'a> Printer<'a> {
             let raw = stmt.expression.span().extract(self.source);
             parts.push(d.text_pooled(&format_directive(raw)));
         } else {
-            // Parens required for correctness (object expressions, object pattern assignments)
-            // OR preserved from source for string literals (matches Prettier behavior)
+            // Parens required for correctness (object expressions, object pattern
+            // assignments) OR to avoid a bare string statement being read as a
+            // directive (recomputed fresh, not preserved from source).
             let needs_parens = self
                 .needs_parens(&stmt.expression, ParenContext::ExpressionStatement)
-                || self.has_expression_statement_source_parens(stmt);
+                || self.needs_avoid_directive_parens(stmt, in_program_or_block);
 
             // An own-line comment between a source `(` and the expression
             // (`(// c⏎ expr)` / `(/* c */⏎ expr)` — e.g. a bare parenthesized
@@ -146,8 +175,7 @@ impl<'a> Printer<'a> {
             // comment (never inline) or a block comment with a newline before it; a
             // same-line block comment (`(/* c */ expr)`) is a separate, rarer case
             // (inline) left to the default flow. `stmt.span.start < expr_start` means
-            // a real source `(` precedes the expression (see
-            // `has_expression_statement_source_parens`). prettier hoists the comment
+            // a real source `(` precedes the expression. prettier hoists the comment
             // before `(` — a divergence (`decorated_expr_open_paren_comment`).
             // TODO: a same-line block comment after `(` is still dropped here.
             let expr_start = stmt.expression.span().start;
@@ -241,23 +269,28 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    /// Check if an expression statement had parentheses in the source that should be preserved.
+    /// Whether a bare string-literal expression statement needs synthetic parens
+    /// to avoid being read as a directive-prologue entry.
     ///
-    /// Prettier preserves parens around string literal expression statements:
-    /// `('hello');` stays as-is, not stripped to `'hello';`.
-    /// Detected via span: if ExpressionStatement.span.start < Expression.span.start,
-    /// the source had a `(` before the expression.
-    fn has_expression_statement_source_parens(
+    /// Mirrors Prettier's `needs-parentheses.js` `StringLiteral`/`Literal` case:
+    /// recomputed fresh from AST structure, never preserved from source. A
+    /// non-directive string statement gets parens exactly when its immediate
+    /// container is a `Program` or `BlockStatement` (`in_program_or_block`) —
+    /// plain blocks, `if`/`for`/`while`/`try`/`catch` bodies, and function/arrow/
+    /// method bodies all qualify; `SwitchCase`, `StaticBlock`, and
+    /// `TSModuleBlock` (namespace) bodies don't. Because this is recomputed
+    /// rather than preserved, redundant source parens are stripped in an
+    /// ineligible container (`static { ('x'); }` → `'x';`) and any number of
+    /// source parens collapse to exactly one where they're needed.
+    ///
+    /// Only called from the `!stmt.is_directive` branch of
+    /// `build_expression_statement_doc`, so a real directive never reaches here.
+    fn needs_avoid_directive_parens(
         &self,
         stmt: &internal::ExpressionStatement<'_>,
+        in_program_or_block: bool,
     ) -> bool {
-        if stmt.span.start >= stmt.expression.span().start {
-            return false;
-        }
-        matches!(
-            &stmt.expression,
-            Expression::Literal(lit) if matches!(lit.value, LiteralValue::String { .. })
-        )
+        in_program_or_block && is_string_literal(&stmt.expression)
     }
 
     /// Build a Doc for a return statement.
@@ -588,14 +621,30 @@ impl<'a> Printer<'a> {
 
         // Broken: keyword (\n  expr\n);
         // Flat: keyword expr;
-        let broken_doc = d.concat(&[
-            d.text(" ("),
-            d.indent(d.concat(&[d.softline(), d.group(expr_doc), trailing_comments_doc])),
-            d.softline(),
-            d.text(")"),
-        ]);
-
-        let flat_doc = d.concat(&[d.text(" "), expr_doc, trailing_comments_doc]);
+        // The trailing-comment doc is `empty()` when the terminator gap has no comment
+        // (the common case) — omit it so neither `if_break` branch (both are materialized)
+        // carries a wasted empty child. Byte-identical: an empty child renders to nothing.
+        let (broken_doc, flat_doc) = if inline_trailing.is_empty() {
+            (
+                d.concat(&[
+                    d.text(" ("),
+                    d.indent(d.concat(&[d.softline(), d.group(expr_doc)])),
+                    d.softline(),
+                    d.text(")"),
+                ]),
+                d.concat(&[d.text(" "), expr_doc]),
+            )
+        } else {
+            (
+                d.concat(&[
+                    d.text(" ("),
+                    d.indent(d.concat(&[d.softline(), d.group(expr_doc), trailing_comments_doc])),
+                    d.softline(),
+                    d.text(")"),
+                ]),
+                d.concat(&[d.text(" "), expr_doc, trailing_comments_doc]),
+            )
+        };
 
         let mut inner_parts: DocBuf = smallvec![
             d.text(keyword),

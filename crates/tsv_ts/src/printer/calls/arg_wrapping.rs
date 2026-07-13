@@ -27,7 +27,8 @@ use tsv_lang::doc::arena::{DocArena, DocId};
 ///
 /// Used when we want the signature to stay on one line (e.g., `(x) =>`).
 /// Does NOT include the ` =>` - caller adds that.
-/// Only handles untyped arrows (no type params, no return type, no param types).
+/// Handles arrows with no type parameters and no return type; param-level type
+/// annotations are fine (emitted via `build_function_parameter_doc`).
 pub(crate) fn build_arrow_inline_signature(
     printer: &Printer<'_>,
     arrow: &internal::ArrowFunctionExpression<'_>,
@@ -74,7 +75,7 @@ pub(crate) fn build_arrow_sig_doc(
     printer: &Printer<'_>,
     arrow: &internal::ArrowFunctionExpression<'_>,
 ) -> DocId {
-    if arrow_has_type_annotations(arrow) {
+    if arrow_has_return_or_type_params(arrow) {
         printer.d().group(printer.build_arrow_signature_doc(arrow))
     } else {
         build_arrow_inline_signature(printer, arrow)
@@ -93,7 +94,7 @@ pub(crate) fn prepend_arrow_body_comments(
     body_start: u32,
     body_doc: DocId,
 ) -> DocId {
-    let arrow_end = printer.find_arrow_token_for(arrow) + "=>".len() as u32;
+    let arrow_end = arrow.arrow_token + "=>".len() as u32;
 
     // Prepend inline comments between `=>` and body. Glued: a single-line block
     // hugged to `=>` stays with the body across a source newline, matching the main
@@ -243,35 +244,17 @@ pub(super) fn classify_chain_arg(arg: &internal::Expression<'_>) -> ChainArgKind
     }
 }
 
-/// Check if an arrow function has any type annotations (return type, type params, or param types).
+/// Check if an arrow function has a return type or type parameters.
 ///
-/// Used to determine formatting behavior - arrows with type annotations often need
-/// different breaking strategies than untyped arrows.
-pub(crate) fn arrow_has_type_annotations(arrow: &internal::ArrowFunctionExpression<'_>) -> bool {
-    arrow.return_type.is_some()
-        || arrow.type_parameters.is_some()
-        || arrow.params.iter().any(param_has_type_annotation)
-}
-
-/// Check if a function parameter has a type annotation.
-///
-/// Handles all parameter patterns: Identifier, ArrayPattern, ObjectPattern, AssignmentPattern.
-fn param_has_type_annotation(param: &internal::Expression<'_>) -> bool {
-    match param {
-        internal::Expression::Identifier(id) => id.type_annotation().is_some(),
-        internal::Expression::ArrayPattern(arr) => arr.type_annotation.is_some(),
-        internal::Expression::ObjectPattern(obj) => obj.type_annotation.is_some(),
-        internal::Expression::AssignmentPattern(assign) => {
-            // Assignment patterns wrap another pattern/identifier
-            match assign.left {
-                internal::Expression::Identifier(id) => id.type_annotation().is_some(),
-                internal::Expression::ArrayPattern(arr) => arr.type_annotation.is_some(),
-                internal::Expression::ObjectPattern(obj) => obj.type_annotation.is_some(),
-                _ => false,
-            }
-        }
-        _ => false,
-    }
+/// These are the parts `build_arrow_inline_signature` can't render, so an arrow
+/// carrying either needs the full grouped signature. A param-level type annotation
+/// does NOT need it — the inline signature emits param types too (via
+/// `build_function_parameter_doc`), so a params-only-typed arrow renders identically
+/// either way.
+pub(crate) fn arrow_has_return_or_type_params(
+    arrow: &internal::ArrowFunctionExpression<'_>,
+) -> bool {
+    arrow.return_type.is_some() || arrow.type_parameters.is_some()
 }
 
 /// Classify how an arrow function body should be formatted in chain context.
@@ -844,10 +827,13 @@ pub(super) fn should_expand_first_arg(
         return false;
     }
 
-    // Prettier's couldExpandArg returns true for objects/arrays with hasComment(node),
-    // which includes leading comments. This makes !couldExpandArg(secondArg) = false,
-    // blocking shouldExpandFirstArg. Without this check, the expand-first path also
-    // drops the leading comment (SAFETY).
+    // Prettier's couldExpandArg returns true for a bare object/array with a leading
+    // comment (`hasComment(node)`), so `!couldExpandArg(secondArg)` is false and it
+    // breaks all args. tsv matches by blocking expand-first here. A cast-wrapped
+    // collection (`/* c */ {} as T`) is deliberately NOT blocked — prettier's comment
+    // attaches to the cast, `couldExpandArg` stays false, and it expand-firsts; the
+    // expand-first path carries the inter-arg leading comment via
+    // `build_after_comma_leading_comments`.
     if matches!(
         &args[1],
         internal::Expression::ObjectExpression(_) | internal::Expression::ArrayExpression(_)

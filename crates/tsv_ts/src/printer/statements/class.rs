@@ -161,11 +161,12 @@ impl<'a> Printer<'a> {
             // Comments between name and type params: `class A/* c */ <T> {}`
             // Line comments get a hardline to prevent absorbing type params as comment text
             if let Some(type_params) = &decl.type_parameters {
-                header_parts.push(self.build_name_to_type_params_comments(
+                self.push_name_to_type_params_comments(
+                    &mut header_parts,
                     id.span.end,
                     type_params.span.start,
                     CommentSpacing::Trailing,
-                ));
+                );
                 // Type params get their own group - break independently of heritage.
                 header_parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
             }
@@ -292,8 +293,11 @@ impl<'a> Printer<'a> {
             }
 
             // Process comments before this member (with blank line preservation)
-            member_parts
-                .extend(self.build_leading_comments_with_blank_lines(&comments, member_start));
+            member_parts.extend(self.build_leading_comments_with_blank_lines(
+                &comments,
+                member_start,
+                false,
+            ));
 
             // A preceding format-ignore directive keeps the member's source verbatim.
             // The member span includes its trailing `;`.
@@ -366,6 +370,12 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a static initialization block
+    // TODO: `StaticBlock` reuses `BlockStatement`'s doc-building machinery via
+    // this synthetic wrapper purely to save duplicating the body-printing logic,
+    // but a `StaticBlock` isn't a `BlockStatement` (see `build_static_block_body_doc`
+    // and its `in_program_or_block=false` carve-out) — a second such divergent
+    // property would need a second bolt-on. Worth a real `StaticBlock`-native path
+    // (or an explicit node-kind tag) if that happens.
     fn build_static_block_doc(&self, block: &internal::StaticBlock<'_>) -> DocId {
         let d = self.d();
         // Create a BlockStatement wrapper to reuse existing doc building logic
@@ -375,7 +385,7 @@ impl<'a> Printer<'a> {
         };
         d.concat(&[
             d.text("static "),
-            self.build_block_statement_doc(&block_stmt),
+            self.build_static_block_body_doc(&block_stmt),
         ])
     }
 
@@ -707,11 +717,12 @@ impl<'a> Printer<'a> {
             .type_parameters
             .as_ref()
             .map_or(method.value.params_start, |tp| tp.span.start);
-        parts.push(self.build_name_to_type_params_comments(
+        self.push_name_to_type_params_comments(
+            &mut parts,
             after_key,
             next_after_key,
             CommentSpacing::for_type_params(method.value.type_parameters.is_some()),
-        ));
+        );
 
         // Type parameters if present: method<T>()
         if let Some(type_params) = &method.value.type_parameters {

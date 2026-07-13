@@ -1,0 +1,203 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 146,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Instantiated class expression: parens required (else `class {}` is a declaration)",
+			"start": 20,
+			"end": 104,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 85
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 145,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 136,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 4,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExportDefaultDeclaration",
+					"start": 106,
+					"end": 135,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 30
+						}
+					},
+					"exportKind": "value",
+					"declaration": {
+						"type": "TSInstantiationExpression",
+						"start": 122,
+						"end": 133,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 17
+							},
+							"end": {
+								"line": 3,
+								"column": 28
+							}
+						},
+						"expression": {
+							"type": "ClassExpression",
+							"start": 122,
+							"end": 130,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 17
+								},
+								"end": {
+									"line": 3,
+									"column": 25
+								}
+							},
+							"id": null,
+							"superClass": null,
+							"body": {
+								"type": "ClassBody",
+								"start": 128,
+								"end": 130,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 23
+									},
+									"end": {
+										"line": 3,
+										"column": 25
+									}
+								},
+								"body": []
+							}
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 130,
+							"end": 133,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 25
+								},
+								"end": {
+									"line": 3,
+									"column": 28
+								}
+							},
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 131,
+									"end": 132,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 26
+										},
+										"end": {
+											"line": 3,
+											"column": 27
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 131,
+										"end": 132,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 26
+											},
+											"end": {
+												"line": 3,
+												"column": 27
+											}
+										},
+										"name": "T"
+									}
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Instantiated class expression: parens required (else `class {}` is a declaration)",
+							"start": 20,
+							"end": 104
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

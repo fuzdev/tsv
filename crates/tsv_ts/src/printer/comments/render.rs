@@ -100,57 +100,44 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a multi-line *non-indentable* block comment (at least one line does
-    /// not begin with `*`) — preserved with its original interior layout rather
-    /// than reindented.
+    /// not begin with `*`) — its interior layout preserved **verbatim**.
     ///
-    /// The comment's own leading indentation is stripped, then re-applied via
-    /// `hardline` for `/**`-prefixed comments or comments whose lines were
-    /// indented; other comments preserve their lines at column 0 (`literalline`).
+    /// Every continuation line renders through `literalline` (a newline with **no**
+    /// context indent), so the comment's interior columns are kept exactly as
+    /// authored, matching prettier's non-indentable-block-comment handling. This is
+    /// idempotent by construction: because no context indent is added, a comment
+    /// whose source interior is indented never compounds that indentation one level
+    /// per format pass. (The former behavior re-applied context indent via
+    /// `hardline` after stripping the comment's *start-line* indent — but when the
+    /// comment renders at a different depth than its source line, e.g. a multi-line
+    /// comment in a `for(…)` header that breaks, the stripped amount and the
+    /// re-applied context indent differ, so the interior grew a tab every pass — an
+    /// F1 non-idempotency.)
     fn build_preserved_block_comment_doc(&self, comment: &internal::Comment) -> DocId {
         let d = self.d();
         let content = comment.content(self.source);
-        let stripped =
-            printing::strip_comment_indentation(self.source, content, comment.span.start);
-
-        // A `/**`-prefixed comment that reached here is only partially starred
-        // (some line lacks `*`); it still gets context indent. Otherwise use
-        // context indent only when the comment's lines were indented.
-        let use_context_indent = content.starts_with('*') || stripped.len() != content.len();
 
         // ≥2 lines: `build_comment_doc` only routes newline-containing content here.
-        let lines: CommentLines<'_> = stripped.split('\n').collect();
-        #[allow(clippy::unreachable)] // stripped retains the newline ⇒ split yields ≥2 lines
+        let lines: CommentLines<'_> = content.split('\n').collect();
+        #[allow(clippy::unreachable)] // content retains the newline ⇒ split yields ≥2 lines
         let [first, middle @ .., last] = lines.as_slice() else {
             unreachable!("multi-line comment");
         };
 
-        // Frame directly: the `/*<first>` opener, each continuation line on its
-        // own line (context-indented `hardline`, or column-0 `literalline` for
-        // blank lines and non-context-indented comments), then the `*/` closer.
-        // Unlike the indentable path this mixes line kinds, so it stays a
-        // per-line `concat` rather than a `MultilineText`.
+        // Frame directly: the `/*<first>` opener, each continuation line preserved
+        // verbatim at its authored column via a `literalline` (no context indent),
+        // then the `*/` closer. Trailing whitespace is trimmed on each interior
+        // line (matches prettier); the final line keeps its content before `*/`.
         let mut docs = DocBuf::with_capacity((middle.len() + 1) * 2 + 2);
         let mut opener = d.pool_writer();
         opener.push_str("/*");
         opener.push_str(first.trim_end());
         docs.push(opener.finish_text());
         for line in middle {
-            // Blank lines stay truly empty (column 0); otherwise apply context
-            // indent. Trailing whitespace is trimmed (matches prettier).
-            docs.push(if line.is_empty() || !use_context_indent {
-                d.literalline()
-            } else {
-                d.hardline()
-            });
+            docs.push(d.literalline());
             docs.push(d.text_pooled(line.trim_end()));
         }
-        // Closing line gets context indent; its content (the space before `*/`)
-        // is preserved verbatim.
-        docs.push(if use_context_indent {
-            d.hardline()
-        } else {
-            d.literalline()
-        });
+        docs.push(d.literalline());
         docs.push(d.text_pooled(last));
         docs.push(d.text("*/"));
         d.concat(&docs)
