@@ -57,7 +57,12 @@ fn split_number_and_unit(raw: &str) -> (&str, &str) {
 /// borrow invariant (`Cow::Borrowed` ⟺ output byte-identical to `num`) trivially
 /// sound without a canonical-exponent check.
 pub(crate) fn normalize_css_number(num: &str) -> Cow<'_, str> {
-    let Some(e_idx) = num.find(['e', 'E']) else {
+    // A byte scan, not `num.find(['e', 'E'])`: the char-array pattern decodes a
+    // char per step, and this runs once per number — the densest construct in a
+    // stylesheet — for an exponent that is almost never there. `e`/`E` are ASCII,
+    // so neither can occur as a UTF-8 continuation byte and the byte index is the
+    // same char boundary the char search would report.
+    let Some(e_idx) = num.as_bytes().iter().position(|&b| b == b'e' || b == b'E') else {
         // No exponent: the number is exactly its mantissa, so its Cow is the whole
         // number's Cow (borrows `num` unchanged when already canonical).
         return normalize_decimal_preserving_prefix(num);
