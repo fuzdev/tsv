@@ -114,15 +114,62 @@ Instance-script statements are borrowed verbatim (with the rune rewrites applied
 
 - **Supported**: declarations, functions, classes, expression statements, control flow — any statement shape the guard walk covers, with comments carried through losslessly (host-absolute spans).
 - **Supported**: `lang="js"` and `lang=""` (compile exactly like no `lang` attribute).
-- **Refused**: `instance-script export (component exports / $.bind_props not implemented)` — every export form: the oracle compiles `export const`/`function`/`{ a }` via `$.bind_props`, rejects `export default`/`export let` (runes mode), and drops `export * from`; a verbatim passthrough would nest an `export` inside the component function.
+- **Refused**: `instance-script export (component exports / $.bind_props not implemented)` — every export form: the oracle compiles `export const`/`function`/`{ a }` via `$.bind_props`, rejects `export default`/`export let` (runes mode), and drops `export * from`; a verbatim passthrough would nest an `export` inside the component function. A **type-only** export (`export type { X }`, `export interface X {}`, `export declare const x`) erases away before this refusal and compiles.
 - **Refused**: `module <script context="module">`
 - **Refused**: `` legacy reactive statement `$:` (invalid in runes mode) `` — a **top-level** `$`-labeled statement (the oracle rejects it in runes mode; cloning it through would emit a dead label with no reactivity). A `$` label inside a function, and plain labels anywhere, are ordinary JS the oracle clones through — supported. An escaped top-level label name refuses conservatively (can't be classified from its raw span).
 - **Refused**: `import from svelte/internal (forbidden)` — any import whose source starts with `svelte/internal` (the oracle's runes-mode rule; private runtime code)
 - **Refused**: `runes-invalid import of {name} from svelte` — a named `beforeUpdate`/`afterUpdate` import from `svelte` (the oracle rejects them in runes mode); an escaped imported name from `svelte` refuses conservatively. A string-literal imported name is skipped exactly as the oracle skips it (its check matches identifier names only).
-- **Refused**: `lang="{lang}" instance script (type stripping not implemented)` — any `lang` other than `js`/empty
-- **Refused**: `generics attribute on instance script (implies TypeScript)`
-- **Refused**: `TS enum/module declaration in instance script`
+- **Refused**: `lang="{lang}" instance script (only ts/js supported)` — any `lang` other than `ts`/`js`/empty. The oracle's TypeScript flag tests `lang === 'ts'` **exactly** (case-sensitive), so `lang="typescript"` / `lang="TS"` are plain JS to it; rather than compile them as JS on a guess, tsv refuses.
+- **Refused**: `generics attribute on instance script (implies TypeScript)` — an open type-parameter *binding*, not annotation erasure (a separate slice).
 - **Refused**: `generated name {name} collides with a user binding` — a user binding named `each_array`/`$$index`-family
+
+### TypeScript — Supported
+
+`<script lang="ts">` compiles: type erasure runs as a pre-pass over the instance script's `Program` (`erase.rs`), matching the oracle's phase-1 `remove_typescript_nodes` (`1-parse/remove_typescript_nodes.js`), which runs before its analysis phases (`index.js:41-53`). The Svelte AST is never rebuilt — a **type-free** statement list flows into every analysis and into codegen.
+
+The oracle's flag is **document-wide**: its parser regexes the raw source for the *first* `<script>` carrying a `lang` attribute and tests `=== 'ts'` exactly. That one flag selects the TypeScript grammar for every `<script>` **and** every template mustache, block pattern, and snippet `<T>` clause — so tsv makes one document-level decision too.
+
+| Construct | Behavior |
+| --- | --- |
+| `: T` annotations (bindings, params, properties, return types) | erased |
+| `interface` / `type` aliases | dropped |
+| `import type { X }` / `export type { X }` / `export interface X {}` | dropped |
+| inline `import { type X, Y }` | the type-only specifiers are filtered out; a list that filters to **empty** drops the whole statement (the oracle's `if (specifiers.length === 0) return b.empty` — not `import {}`, not a bare side-effect import) |
+| `x as T` / `x satisfies T` / `x!` / `<T>x` / `f<T>` | unwrapped to the inner expression (`as const` included) |
+| `f<T>(x)` / `new C<T>()` / tagged-template type args | type arguments dropped |
+| `<T>` type parameters (function / arrow / class / method) | dropped |
+| `declare` variable / function / class / class field | dropped |
+| overload signatures (`TSDeclareFunction`) | dropped |
+| `abstract` class + `abstract` **method** (no body) | dropped |
+| `readonly` / `public` / `private` / `protected` / `override` / `?` / `!` modifiers | dropped |
+| `implements` clause, `extends Base<T>` type arguments | dropped |
+| leading `this: T` parameter (function declarations/expressions only, never arrows — the oracle's `remove_this_param`) | dropped |
+| **type-only** `namespace`/`module` | dropped (the oracle's all-type→drop fork) |
+
+Parens are not a hazard: `tsv_ts` parses with `preserve_parens: false` and re-derives them from precedence, exactly as the oracle's printer does — `(x as T).y` erases to `x.y`, and `(a + b as T) * c` keeps the parens it needs.
+
+**The self-check.** `compile`'s output-reparse validation **cannot** catch a missed erase: tsv's parser is TypeScript-permissive (see the root `CLAUDE.md` §Strict Mode Only), so a surviving annotation still parses, flows through the pipeline, and prints verbatim. The eraser is therefore re-run over the *finished* program: by its `None`-means-unchanged contract, reporting no change **proves** no TypeScript-only node survived. A hit from inside the script is a compiler bug (`CompileError::TypeErasureLeak`, surfaced loudly, never emitted); a hit from the template is the known Stage-gap below.
+
+### TypeScript — Refused
+
+- **Refused**: `TypeScript syntax without lang="ts" (the oracle parse-errors)` — tsv's parser accepts TypeScript in any script; the oracle does not. Compiling it would be an over-acceptance.
+- **Refused**: `TypeScript in a template expression (erasure at the template borrow points not implemented)` — `{x as T}`, `{x!}`, `{f<T>()}`, typed `{#each}`/`{:then}` patterns, generic `{#snippet}`. The script `Program` is erased; the template's borrow points are a later slice.
+- **Refused**: `comment inside an erased TypeScript region` — the oracle's surviving-comment placement is an *emergent* artifact of its printer's flush points reading pre-erasure spans (RHS-leading for a declarator, statement-trailing for an `as`, argument-leading for a call type argument, hoisted-to-the-next-statement for a deleted `interface`), not a rule with a portable shape. The refusal **window** runs from the erased region's start to the start of the next surviving token, so `let x: Foo /* c */ = v` — which the oracle re-anchors onto the initializer — is caught too. A *leading* comment (a JSDoc above an erased `interface`) sits outside the window, survives, and lands where the oracle puts it.
+
+**Refuse-don't-erase.** Constructs with runtime semantics an erasure would silently delete, plus the ones the oracle itself mis-compiles. Zero occurrences across the real-world corpus.
+
+- **Refused**: `TS enum (the oracle rejects it)` — lowers to an object plus a reverse mapping. The oracle's visitor has **no `declare` carve-out**, so `declare enum` is rejected too.
+- **Refused**: `TS namespace/module with a value member (the oracle rejects it)` — lowers to an IIFE (the oracle's any-value→reject fork).
+- **Refused**: `TS parameter property (constructor(public x) — the oracle rejects it)` — real TypeScript synthesizes `this.x = x`.
+- **Refused**: `decorator (the oracle rejects it)` — a `typescript_invalid_feature` hard error in the oracle, and a plain-JS parse error without `lang="ts"`.
+- **Refused**: `accessor class field (the oracle rejects it)` — likewise a hard error.
+
+The next four are cases where the oracle's strip pass has **no visitor case**, so the construct survives into its output: tsv refuses rather than reproduce a broken module (the same stance as `import = require`, and the refusal contract covers it — no divergence-catalog entry).
+
+- **Refused**: `abstract class property (the oracle emits invalid JS)` — the oracle prints `abstract x;`. (An `abstract` *method* is dropped — the split is by node kind, never by body-presence.)
+- **Refused**: `bodiless class method (overload signature — the oracle rejects it)` — the signature survives and collides with the implementation (`duplicate_class_field`).
+- **Refused**: `index signature in a class body (the oracle crashes on it)` — a pure type construct, but the oracle's transform throws.
+- **Refused**: `import x = require(…) (the oracle emits invalid JS)` / `export = … (the oracle emits invalid JS)` / `export as namespace … (the oracle emits invalid JS)` — all three land inside the component function verbatim.
 
 ### Comment placement classes
 
@@ -177,7 +224,7 @@ The oracle's normalization (`3-transform/utils.js:126` `clean_nodes`, `escape_ht
 **Hoisting** (`3-transform/server/visitors/SnippetBlock.js`, `2-analyze/visitors/SnippetBlock.js:37-118`). A `{#snippet}` hoists to its nearest enclosing **block scope** (component root, a block body, a `<svelte:head>` closure), bubbling *through* elements (which share the block's `init`). A **top-level** snippet (a direct child of the root fragment) whose free references all resolve to module scope hoists further, to true module scope (a `function` between the imports and the component); any free reference to an instance binding (a prop, `$state`/`$derived`, or a plain top-level `const`/`let`/`function`/`class` — **imports and globals do not disqualify**) keeps it in the component body. Hoistability is a fixpoint over snippet-to-snippet references (`snippet.rs` ports `can_hoist_snippet` name-based).
 
 - **Supported**: parameter-less and parameter-bearing snippets (destructured params, defaults); hoistable and body-local; snippets nested in elements/blocks; forward references (`{@render}` before `{#snippet}`); a `new`/prop-rooted access inside a snippet body still drives `needs_context`. Parameters mask to UNKNOWN, so their reads never fold.
-- **Refused**: `typed or generic {#snippet} (implies TypeScript)` — a `<T>` generic or a `: Type`/`?` parameter annotation (oracle-rejected without `lang="ts"`; a `lang="ts"` component is refused at the entry).
+- **Refused**: `typed or generic {#snippet} (implies TypeScript)` — a `<T>` generic or a `: Type`/`?` parameter annotation. Snippet parameters are a template borrow point, so they wait on the template-side erasure slice (see [TypeScript — Refused](#typescript--refused)); without `lang="ts"` they are oracle-rejected input.
 - **Refused**: `{#snippet} {name} hoist classification ambiguous` — a referenced name is both an instance binding and a nested (non-parameter) local, so free-vs-shadowed can't be told apart under the flat name model (also an escaped snippet name or reference).
 - **Refused**: `{#snippet} alongside a {@const}/<svelte:head> in the same fragment (hoist order)` — the relative hoist order across kinds isn't reproduced.
 - **Refused**: `duplicate {#snippet} {name} (the oracle rejects it)`.

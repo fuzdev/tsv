@@ -144,8 +144,14 @@ pub(crate) fn assign_target_roots(target: &Expression<'_>, source: &str, out: &m
             }
         }
         Expression::MemberExpression(m) => assign_target_roots(m.object, source, out),
+        // All four TypeScript assignment-target wrappers the parser accepts
+        // (`expression_assignable.rs`). Type erasure unwraps them before this
+        // walk runs, so these are defense in depth — but a missing arm would
+        // silently lose a reassignment root (and fold a mutated binding).
         Expression::TSNonNullExpression(t) => assign_target_roots(t.expression, source, out),
         Expression::TSAsExpression(t) => assign_target_roots(t.expression, source, out),
+        Expression::TSSatisfiesExpression(t) => assign_target_roots(t.expression, source, out),
+        Expression::TSTypeAssertion(t) => assign_target_roots(t.expression, source, out),
         Expression::ParenthesizedExpression(p) => assign_target_roots(p.expression, source, out),
         Expression::ObjectPattern(obj) => {
             for prop in obj.properties {
@@ -319,10 +325,13 @@ fn walk_statement(
         | Statement::TSTypeAliasDeclaration(_)
         | Statement::TSInterfaceDeclaration(_)
         | Statement::TSDeclareFunction(_) => Ok(()),
-        // Enum/module bodies can carry initializer expressions; walking their
-        // internals isn't wired yet, so refuse rather than under-guard.
-        Statement::TSEnumDeclaration(_) | Statement::TSModuleDeclaration(_) => {
-            Err(CompileError::Unsupported(Refusal::TsEnumOrModule))
+        // Unreachable in practice — type erasure runs first and either drops
+        // these (a type-only namespace) or refuses them. Kept as defense in
+        // depth: their bodies can carry initializer expressions the guard walk
+        // isn't wired for, so refuse rather than under-guard.
+        Statement::TSEnumDeclaration(_) => Err(CompileError::Unsupported(Refusal::TsEnum)),
+        Statement::TSModuleDeclaration(_) => {
+            Err(CompileError::Unsupported(Refusal::TsNamespaceWithValue))
         }
         Statement::TSExportAssignment(s) => walk_expression(&s.expression, ctx),
     }

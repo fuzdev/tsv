@@ -74,7 +74,7 @@ use crate::analyze::{
 use crate::build::{Builder, escape_template_text};
 use crate::rune_guard::{WalkCtx, walk_expression_guarded, walk_statement_guarded};
 use crate::snippet::{SnippetAnalysis, snippet_name};
-use crate::{CompileError, CompileOutput, Refusal};
+use crate::{CompileError, CompileOutput, Refusal, erase};
 
 /// The deterministic scoping class — the fixed `cssHash` the oracle sidecar
 /// compiles with, so outputs are byte-comparable across runs.
@@ -240,12 +240,27 @@ pub(crate) fn compile_server<'arena>(
     if root.options.is_some() {
         return Err(unsupported(Refusal::SvelteOptions));
     }
-    // TS instance scripts pass type annotations through verbatim (type stripping
-    // isn't implemented), and `generics` implies TS — refuse both at the entry,
-    // before any divergent output could emit.
-    if let Some(script) = root.instance {
-        refuse_typed_script(script, source)?;
-    }
+    // TypeScript erasure — the oracle's phase-1 `remove_typescript_nodes`, run
+    // BEFORE every analysis pass (`analyze_script`, `analyze_snippets`,
+    // `needs_context`) and before the codegen loop. `instance_body` is the
+    // type-free statement list from here on; NOTHING below may read
+    // `root.instance.content.body` (the un-erased tree still carries TS).
+    let ts_document = document_ts_flag(root, source)?;
+    let (instance_body, erased_windows) = match root.instance {
+        Some(script) => {
+            let erased = erase::erase_statements(arena, source, script.content.body)?;
+            // The oracle gates the TypeScript *grammar* on the document-wide
+            // `ts` flag: without it, a `: T` / `as T` / `x!` is a plain-JS parse
+            // error. tsv's parser is TS-permissive and would silently accept —
+            // an over-acceptance the refusal contract forbids.
+            if erased.changed && !ts_document {
+                return Err(unsupported(Refusal::TypeScriptWithoutLangTs));
+            }
+            let windows = erased.refusal_windows(source);
+            (erased.body, windows)
+        }
+        None => (&[][..], Vec::new()),
+    };
 
     // CSS scoping analysis (no minting): which class names are scoped, and
     // where the hash class splices into the style text.
@@ -261,7 +276,7 @@ pub(crate) fn compile_server<'arena>(
     // program (their spans are host-absolute, so the detached-comment machinery
     // works against the buffer). Classes whose placement can't be made to
     // converge refuse — see `collect_script_comments`.
-    let script_comments = collect_script_comments(root, source)?;
+    let script_comments = collect_script_comments(root, source, instance_body)?;
     let has_comments = !script_comments.is_empty();
     // Comments alongside template blocks refuse: a block splits the template
     // into multiple pushes and moves content into branch bodies, and the
@@ -281,14 +296,7 @@ pub(crate) fn compile_server<'arena>(
     // and the derived-name set (read rewriting / refusal).
     let mut bindings = Bindings::empty();
     let mut derived_names = NameSet::default();
-    if let Some(script) = root.instance {
-        analyze_script(
-            script.content.body,
-            source,
-            &mut bindings,
-            &mut derived_names,
-        )?;
-    }
+    analyze_script(instance_body, source, &mut bindings, &mut derived_names)?;
     if has_comments && !derived_names.is_empty() {
         // The `$.derived(() => …)` wrapper and `d()` reads bridge host and
         // appendix spans in ways whose comment windows sweep wrongly.
@@ -298,10 +306,8 @@ pub(crate) fn compile_server<'arena>(
     // 3b. Snippet hoist analysis: which top-level `{#snippet}`s go to module
     // scope. Imports don't disqualify hoisting, so the instance-binding set the
     // analysis subtracts is the binding table minus the import locals.
-    let import_names: NameSet = root
-        .instance
-        .into_iter()
-        .flat_map(|script| script.content.body)
+    let import_names: NameSet = instance_body
+        .iter()
         .filter_map(|stmt| match stmt {
             Statement::ImportDeclaration(import) => Some(import),
             _ => None,
@@ -346,10 +352,10 @@ pub(crate) fn compile_server<'arena>(
     // a duplicate `$$slots` lexical declaration would be invalid JS). Its error
     // is NOT propagated here: the script-loop refusals below must keep winning
     // for inputs that trip both, so the `?` stays at the original position.
-    let component = crate::needs_context::analyze_component(root, source);
+    let component = crate::needs_context::analyze_component(root, source, instance_body);
     let uses_slots = component.as_ref().is_ok_and(|c| c.uses_slots);
-    if let Some(script) = root.instance {
-        for stmt in script.content.body {
+    {
+        for stmt in instance_body {
             // Instance-script exports refuse — every form. The oracle compiles
             // `export const`/`function`/`{a}` into a trailing
             // `$.bind_props($$props, { … })` (not implemented), rejects
@@ -470,25 +476,35 @@ pub(crate) fn compile_server<'arena>(
                 return Err(unsupported(Refusal::CommentInRewrittenRuneRegion));
             }
         }
+        // Type erasure deletes source regions too, and the oracle's
+        // surviving-comment placement there is emergent (its printer claims
+        // comments at scattered flush points using pre-erasure spans) — not a
+        // rule this transform can port. A comment *intersecting* an erased
+        // region's window refuses. The window runs past the erased span to the
+        // next surviving token, so `let x: Foo /* c */ = v` — which the oracle
+        // re-anchors onto the initializer — is caught too.
+        for window in &erased_windows {
+            if comment.span.start < window.end && comment.span.end > window.start {
+                return Err(unsupported(Refusal::CommentInErasedTypeRegion));
+            }
+        }
     }
 
     // Top-level `$state`/`$state.raw` binding names — a component named after one
     // is dynamic (see `component_dynamic`).
     let mut state_names = NameSet::default();
-    if let Some(script) = root.instance {
-        for stmt in script.content.body {
-            if let Statement::VariableDeclaration(decl) = stmt {
-                for declarator in decl.declarations {
-                    if matches!(
-                        declarator
-                            .init
-                            .as_ref()
-                            .and_then(|init| classify_rune_init(init, source)),
-                        Some(RuneInit::State(_))
-                    ) && let Some(name) = identifier_binding_name(&declarator.id, source)
-                    {
-                        state_names.insert(name);
-                    }
+    for stmt in instance_body {
+        if let Statement::VariableDeclaration(decl) = stmt {
+            for declarator in decl.declarations {
+                if matches!(
+                    declarator
+                        .init
+                        .as_ref()
+                        .and_then(|init| classify_rune_init(init, source)),
+                    Some(RuneInit::State(_))
+                ) && let Some(name) = identifier_binding_name(&declarator.id, source)
+                {
+                    state_names.insert(name);
                 }
             }
         }
@@ -680,6 +696,26 @@ pub(crate) fn compile_server<'arena>(
         goal: tsv_ts::Goal::Module,
     };
 
+    // 8b. The mandatory type-erasure self-check, run on the FINISHED program.
+    //
+    // `compile`'s output-reparse validation cannot catch a missed erase: tsv's
+    // parser is TypeScript-permissive, so a surviving annotation still parses,
+    // flows through the pipeline untouched, and prints verbatim — a silent
+    // mis-compile. Re-running the eraser is the check: by its `None`-means-
+    // unchanged contract, `changed == false` PROVES the program holds no
+    // TypeScript-only node. One walk, and the inventory it checks against is the
+    // same one that did the erasing — nothing to drift.
+    self_check_no_typescript(
+        arena,
+        &env.b.buffer,
+        root.instance.map(|script| script.content.span),
+        &[
+            import_program.body,
+            hoisted_program.as_ref().map_or(&[][..], |p| p.body),
+            export_program.body,
+        ],
+    )?;
+
     let mut js = tsv_ts::format_canonical(&import_program, &env.b.buffer);
     if let Some(hoisted_program) = &hoisted_program {
         js.push_str(&tsv_ts::format_canonical(hoisted_program, &env.b.buffer));
@@ -710,6 +746,7 @@ pub(crate) fn compile_server<'arena>(
 fn collect_script_comments(
     root: &Root<'_>,
     source: &str,
+    instance_body: &[Statement<'_>],
 ) -> Result<Vec<tsv_lang::Comment>, CompileError> {
     if root.comments.is_empty() {
         return Ok(Vec::new());
@@ -718,13 +755,15 @@ fn collect_script_comments(
         return Err(unsupported(Refusal::TemplateComments));
     };
     let content = script.content.span;
+    // The statement bounds are read from the ERASED body: an erased statement
+    // prints nothing, so the printer's first/last emitted statement is the first
+    // and last *surviving* one.
+    //
     // A comment after the LAST script statement diverges: the oracle's printer
     // re-attaches it as a leading comment of the next emitted node (inside the
     // template's `$.escape(…)` argument), a placement this transform can't
     // reproduce — refuse the class.
-    let last_stmt_end = script
-        .content
-        .body
+    let last_stmt_end = instance_body
         .last()
         .map_or(content.start, |stmt| stmt.span().end);
     // A leading comment glued to the `<script>` line (no newline before it) shares
@@ -732,9 +771,7 @@ fn collect_script_comments(
     // trails it after the `{` instead of onto its own line — refuse the class
     // (prettier-formatted input always puts a leading comment on its own line, so
     // the covered fixtures are unaffected).
-    let first_stmt_start = script
-        .content
-        .body
+    let first_stmt_start = instance_body
         .first()
         .map_or(content.end, |stmt| stmt.span().start);
     let mut comments = Vec::with_capacity(root.comments.len());
@@ -769,14 +806,59 @@ fn unsupported(reason: Refusal) -> CompileError {
     CompileError::Unsupported(reason)
 }
 
-/// Refuse a `<script>` that carries a `lang` (TypeScript) or `generics`
-/// attribute: the transform emits the script body verbatim, so a TS annotation
-/// would leak into the generated JS. Mirrors the attribute walk in the parser's
-/// `detect_script_context` — only plain `Attribute` nodes carry a name here.
-fn refuse_typed_script(
-    script: &tsv_svelte::ast::internal::Script<'_>,
-    source: &str,
+/// Assert no TypeScript-only node survived into the emitted program.
+///
+/// A hit is classified by where the offending node came from. The Svelte
+/// template's borrow points are not erased yet, so a node whose span lies
+/// *outside* the instance script's content is that known gap — a refusal. A node
+/// from inside the script means the erase pass missed a case: a compiler bug,
+/// surfaced loudly as [`CompileError::TypeErasureLeak`] rather than emitted.
+/// (Minted nodes are never TypeScript, so every hit carries a real host span.)
+fn self_check_no_typescript<'arena>(
+    arena: &'arena bumpalo::Bump,
+    buffer: &str,
+    script_span: Option<Span>,
+    programs: &[&'arena [Statement<'arena>]],
 ) -> Result<(), CompileError> {
+    for body in programs {
+        let checked = erase::erase_statements(arena, buffer, body)?;
+        if !checked.changed {
+            continue;
+        }
+        let leak = checked
+            .regions
+            .first()
+            .copied()
+            .unwrap_or_else(|| Span::new(0, 0));
+        let from_script =
+            script_span.is_some_and(|span| leak.start >= span.start && leak.end <= span.end);
+        return Err(if from_script {
+            CompileError::TypeErasureLeak(leak)
+        } else {
+            unsupported(Refusal::TypeScriptInTemplate)
+        });
+    }
+    Ok(())
+}
+
+/// The oracle's **document-wide** TypeScript flag.
+///
+/// Svelte's parser regexes the raw source for the *first* `<script>` carrying a
+/// `lang` attribute and tests its value `=== 'ts'` **exactly** — case-sensitive,
+/// so `lang="typescript"` and `lang="TS"` are NOT TypeScript (they become
+/// plain-JS parse errors). That one flag then selects the TypeScript grammar for
+/// **every** `<script>` *and* every template mustache, block pattern, and snippet
+/// `<T>` clause. So the decision belongs to the document, not to a `<script>` tag.
+///
+/// A module `<script>` is refused before this runs, so the instance script is the
+/// only lang-bearing script here. `generics` is refused outright (an open
+/// type-parameter *binding*, not annotation erasure), as is any `lang` other than
+/// `ts`/`js`/empty.
+fn document_ts_flag(root: &Root<'_>, source: &str) -> Result<bool, CompileError> {
+    let Some(script) = root.instance else {
+        return Ok(false);
+    };
+    let mut ts = false;
     for attr_node in script.attributes {
         let AttributeNode::Attribute(attr) = attr_node else {
             continue;
@@ -786,34 +868,36 @@ fn refuse_typed_script(
             interner.resolve_infallible(attr.name).to_string()
         };
         match name.as_str() {
-            "lang" => {
-                // The oracle treats `lang="js"` and `lang=""` as plain JS
-                // (probe-verified identical output to no attribute) — allow
-                // exactly those two; every other value (or a bare /
-                // expression-valued `lang`) stays refused.
-                let allowed = match attr.value {
-                    Some([AttributeValue::Text(text)]) => {
-                        let v = text.data(source);
-                        v.is_empty() || v == "js"
+            "lang" => match attr.value {
+                // A bare `lang` (no value) never matches the oracle's regex —
+                // plain JS, like no attribute at all.
+                Some([]) | None => {}
+                Some([AttributeValue::Text(text)]) => {
+                    let lang = text.data(source);
+                    match lang.as_ref() {
+                        "ts" => ts = true,
+                        "js" | "" => {}
+                        _ => {
+                            return Err(unsupported(Refusal::LangInstanceScript {
+                                lang: lang.into_owned(),
+                            }));
+                        }
                     }
-                    Some([]) => true,
-                    _ => false,
-                };
-                if !allowed {
-                    let lang = match attr.value {
-                        Some([AttributeValue::Text(text)]) => text.data(source).into_owned(),
-                        _ => String::new(),
-                    };
-                    return Err(unsupported(Refusal::LangInstanceScript { lang }));
                 }
-            }
+                // An expression-valued `lang` can't be classified.
+                _ => {
+                    return Err(unsupported(Refusal::LangInstanceScript {
+                        lang: String::new(),
+                    }));
+                }
+            },
             "generics" => {
                 return Err(unsupported(Refusal::GenericsAttribute));
             }
             _ => {}
         }
     }
-    Ok(())
+    Ok(ts)
 }
 
 /// Analysis pass: populate the top-level binding table and the derived-name

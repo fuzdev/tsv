@@ -34,11 +34,21 @@ project-wide conventions.
     directives refuse) are covered (see the transform_server block emitters
     below). Shapes
     the transform does not cover yet — client generation, dev mode,
-    instance-script exports in every form (the oracle compiles
+    instance-script exports in every *value* form (the oracle compiles
     `export const`/`function`/`{a}` via `$.bind_props`, not implemented; rejects
-    `export default`/`export let`), non-JS instance scripts — `generics`, or a
-    `lang` other than `"js"`/`""` (type stripping not implemented;
-    `lang="js"`/`lang=""` compile as plain JS), top-level `$:` legacy reactive
+    `export default`/`export let` — a *type-only* export erases away and
+    compiles), `generics`, a `lang` other than `"ts"`/`"js"`/`""` (the oracle's
+    TypeScript flag tests `lang === 'ts'` exactly, so `lang="typescript"` is
+    plain JS to it — tsv refuses rather than guess), TypeScript in a **template**
+    expression (the script `Program` is erased; the template's borrow points are
+    a later slice) or in a document with no `ts` flag (tsv's parser is
+    TS-permissive where the oracle parse-errors — an over-acceptance), a comment
+    inside an erased TypeScript region, the refuse-don't-erase TypeScript set
+    (`enum` incl. `declare enum`, a value `namespace`, a constructor parameter
+    property, a decorator, an `accessor` field, an `abstract` *property*, a
+    bodiless class method, a class index signature, `import =`/`export =`/`export
+    as namespace` — the last four are shapes the oracle mis-compiles into invalid
+    JS), top-level `$:` legacy reactive
     statements (invalid in runes mode — a nested `$` label or a plain label is
     ordinary JS and clones through), `svelte/internal*` imports and
     `beforeUpdate`/`afterUpdate` imports from `svelte` (the oracle's runes-mode
@@ -60,8 +70,11 @@ project-wide conventions.
     module. Always on — the reparse costs ~13% of the compile itself (release,
     measured over the fixture corpus; single-digit microseconds per component).
     Reach: it catches output the parser *rejects* (nested `export`, mis-built
-    syntax); output that parses as TypeScript (a passed-through annotation)
-    is not a parse rejection and is caught at parity-comparison time instead.
+    syntax). Output that parses as TypeScript (a passed-through annotation) is
+    NOT a parse rejection — that class is caught by the second, independent
+    self-check: `erase` is re-run over the finished program, and its
+    `None`-means-unchanged contract makes "no change" a *proof* that no
+    TypeScript-only node survived (`CompileError::TypeErasureLeak` otherwise).
   - `canonicalize_js(source) -> Result<String, CanonicalizeError>` — the
     canonicalizer (below). Lives here because the compiler's own output
     idempotence checks and the oracle comparison both consume it.
@@ -72,6 +85,27 @@ project-wide conventions.
   (user-chosen names collapse to a `{placeholder}` so e.g. every event
   attribute shares one bucket). The single source of truth for the refusal
   contract.
+- `erase.rs` — **TypeScript type erasure**, the compiler's `remove_typescript_nodes`:
+  a tree→tree pre-pass over the instance script's `Program` producing a type-free
+  statement list, run BEFORE every analysis pass and before codegen (the oracle's
+  phase-1 placement). Structural sharing via an `Option<T>` return — `None` means
+  *unchanged*, so a subtree with no TypeScript beneath it is never rebuilt and
+  nothing is allocated; a rebuilt node shallow-clones (children are `&'arena T`,
+  so pointers move, never subtrees). The `Statement` and `Expression` matches are
+  **exhaustive, no catch-all** — a new AST variant fails compilation here rather
+  than silently passing TypeScript through, and `TSType`'s 21 variants are never
+  visited (they hang off the dropped `Option` fields). That exhaustiveness plus
+  the `None` contract is the whole safety argument: re-running the eraser over the
+  *finished* program and getting no change PROVES no TypeScript survived — the one
+  check that catches a missed erase, which the output reparse cannot (a surviving
+  annotation still parses). Refuse-don't-erase for the runtime-bearing constructs
+  and the ones the oracle mis-compiles (see `refusal.rs`); every erased source
+  region is recorded, and a comment intersecting one — window extended to the next
+  surviving *token*, so `let x: Foo /* c */ = v` counts — refuses, because the
+  oracle's surviving-comment placement is an emergent artifact of its printer's
+  flush points over stale spans, not a portable rule. `erase_expression` is the
+  per-expression entry point for the template's borrow points (a later slice; until
+  then a TypeScript template expression refuses).
 - `build.rs` — synthetic-AST constructors over the **hybrid appendix buffer**:
   the print buffer is the host `.svelte` source plus an appendix of minted
   lexemes. Borrowed user subtrees keep their real host spans; minted
@@ -209,7 +243,8 @@ project-wide conventions.
 
 Types: `CompileOptions { generate: Generate, dev: bool }` (default: `Server`,
 non-dev), `CompileOutput { js, css, warnings }`, `CompileWarning { code, message }`
-(minimal for now), and the two error enums.
+(minimal for now), and the two error enums (`CompileError`'s two bug variants —
+`CorruptOutput` and `TypeErasureLeak` — are the compiler's two self-checks firing).
 
 ## The Canonicalizer Contract
 

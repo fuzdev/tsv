@@ -62,18 +62,96 @@ pub enum Refusal {
         /// The offending imported name.
         name: String,
     },
-    /// A `generics` attribute on the instance script (implies TypeScript).
+    /// A `generics` attribute on the instance script (an open type-parameter
+    /// binding, not annotation erasure — a separate slice).
     #[error("generics attribute on instance script (implies TypeScript)")]
     GenericsAttribute,
-    /// An instance script with a `lang` other than `js`/empty.
-    #[error("lang=\"{lang}\" instance script (type stripping not implemented)")]
+    /// An instance script with a `lang` other than `ts`/`js`/empty. The oracle's
+    /// TypeScript flag tests `lang === 'ts'` **exactly**, so `lang="typescript"`
+    /// and `lang="TS"` are not TypeScript to it; rather than compile them as
+    /// plain JS on a guess, tsv refuses.
+    #[error("lang=\"{lang}\" instance script (only ts/js supported)")]
     LangInstanceScript {
         /// The declared `lang` attribute value.
         lang: String,
     },
-    /// A TypeScript `enum`/`module` declaration in the instance script.
-    #[error("TS enum/module declaration in instance script")]
-    TsEnumOrModule,
+
+    // ── TypeScript: refuse-don't-erase ─────────────────────────────────────
+    /// TypeScript syntax in a script the oracle does **not** parse as
+    /// TypeScript (no `<script lang="ts">` anywhere in the document). tsv's
+    /// parser is TypeScript-permissive and would accept it silently; the oracle
+    /// hits a plain-JS parse error, so compiling it would be an over-acceptance.
+    #[error("TypeScript syntax without lang=\"ts\" (the oracle parse-errors)")]
+    TypeScriptWithoutLangTs,
+    /// TypeScript surviving in a template expression — the erase pass covers the
+    /// script `Program`; the template's borrow points are a later slice.
+    #[error(
+        "TypeScript in a template expression (erasure at the template borrow points not implemented)"
+    )]
+    TypeScriptInTemplate,
+    /// A comment inside an erased TypeScript region (or glued to its tail,
+    /// before the next surviving token). The oracle's surviving-comment
+    /// placement is an emergent artifact of its printer's flush points over
+    /// stale spans — not a rule this transform can reproduce, so the class
+    /// refuses rather than diverge.
+    #[error("comment inside an erased TypeScript region")]
+    CommentInErasedTypeRegion,
+    /// A TypeScript `enum`. Lowers to an object plus a reverse mapping at
+    /// runtime, so erasure would silently delete behavior — and the oracle
+    /// rejects every enum outright (`typescript_invalid_feature`), `declare
+    /// enum` included.
+    #[error("TS enum (the oracle rejects it)")]
+    TsEnum,
+    /// A TypeScript `namespace`/`module` with any value member (it lowers to an
+    /// IIFE). A **type-only** namespace erases away cleanly and compiles.
+    #[error("TS namespace/module with a value member (the oracle rejects it)")]
+    TsNamespaceWithValue,
+    /// A constructor parameter property (`constructor(public x: number)`) —
+    /// real TypeScript synthesizes `this.x = x` into the body, so unwrapping to
+    /// the bare parameter would drop behavior. The oracle rejects it.
+    #[error("TS parameter property (constructor(public x) — the oracle rejects it)")]
+    TsParameterProperty,
+    /// A decorator. The oracle rejects every decorator
+    /// (`typescript_invalid_feature`), and without `lang="ts"` it is a plain-JS
+    /// parse error.
+    #[error("decorator (the oracle rejects it)")]
+    Decorator,
+    /// An `accessor` class field (the ES decorator proposal) — a
+    /// `typescript_invalid_feature` hard error in the oracle.
+    #[error("accessor class field (the oracle rejects it)")]
+    TsAccessorField,
+    /// An `abstract` class *property*. The oracle's strip pass has no case for
+    /// it: the member survives and prints as `abstract x;` — invalid JS. tsv
+    /// refuses rather than reproduce a broken module. (An `abstract` *method* is
+    /// dropped, matching the oracle — the split is by node kind.)
+    #[error("abstract class property (the oracle emits invalid JS)")]
+    TsAbstractProperty,
+    /// A bodiless, non-`abstract` class method — an overload signature, or an
+    /// ambient member outside a `declare` class. The oracle's strip pass has no
+    /// case for it, so it survives and collides with the implementation
+    /// (`duplicate_class_field`) or prints as invalid JS.
+    #[error("bodiless class method (overload signature — the oracle rejects it)")]
+    TsOverloadSignature,
+    /// A class-body index signature (`[key: string]: T`). A pure type construct,
+    /// but the oracle's strip pass has no case for it and its transform then
+    /// crashes outright.
+    #[error("index signature in a class body (the oracle crashes on it)")]
+    TsIndexSignature,
+    /// `import x = require('y')` / `import x = A.B`. CommonJS interop with
+    /// runtime semantics that don't map to ESM; the oracle has no strip case, so
+    /// it emits the statement verbatim inside the component function — invalid
+    /// runtime JS. tsv refuses rather than reproduce it.
+    #[error("import x = require(…) (the oracle emits invalid JS)")]
+    TsImportEquals,
+    /// `export = value`. Same class as [`Self::TsImportEquals`] — the oracle
+    /// emits it verbatim inside the component function.
+    #[error("export = … (the oracle emits invalid JS)")]
+    TsExportAssignment,
+    /// `export as namespace Foo`. Same class — no strip case in the oracle, so
+    /// it lands inside the component function as invalid JS.
+    #[error("export as namespace … (the oracle emits invalid JS)")]
+    TsNamespaceExport,
+
     /// A generated block name (`each_array`/`$$index`/…) collides with a user
     /// binding, so the oracle would pick a different suffix.
     #[error("generated name {name} collides with a user binding")]
@@ -507,7 +585,21 @@ impl Refusal {
             Self::GenericsAttribute => {
                 Cow::Borrowed("generics attribute on instance script (implies TypeScript)")
             }
-            Self::TsEnumOrModule => Cow::Borrowed("TS enum/module declaration in instance script"),
+            // TypeScript — closed-set discriminants, the message is the bucket.
+            Self::TypeScriptWithoutLangTs
+            | Self::TypeScriptInTemplate
+            | Self::CommentInErasedTypeRegion
+            | Self::TsEnum
+            | Self::TsNamespaceWithValue
+            | Self::TsParameterProperty
+            | Self::Decorator
+            | Self::TsAccessorField
+            | Self::TsAbstractProperty
+            | Self::TsOverloadSignature
+            | Self::TsIndexSignature
+            | Self::TsImportEquals
+            | Self::TsExportAssignment
+            | Self::TsNamespaceExport => Cow::Owned(self.to_string()),
             Self::PropsBindingPattern => Cow::Borrowed(
                 "$props() binding pattern (not an identifier or object pattern — the oracle rejects it)",
             ),
@@ -634,10 +726,10 @@ mod tests {
         );
         assert_eq!(
             Refusal::LangInstanceScript {
-                lang: "ts".to_string()
+                lang: "typescript".to_string()
             }
             .to_string(),
-            "lang=\"ts\" instance script (type stripping not implemented)"
+            "lang=\"typescript\" instance script (only ts/js supported)"
         );
         assert_eq!(
             Refusal::DynamicComponent {

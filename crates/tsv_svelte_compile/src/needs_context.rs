@@ -111,12 +111,17 @@ pub(crate) struct ComponentContext {
 /// member/call, or an escaped root). `reassigned` names every binding mutated
 /// anywhere in the component — including inside dropped event handlers, which
 /// the server transform needs so a mutated binding is not statically folded.
+///
+/// `instance_body` is the **type-erased** instance-script statement list (see
+/// `erase`), not `root.instance.content.body` — the un-erased tree still carries
+/// TypeScript nodes the walk must never see.
 pub(crate) fn analyze_component(
     root: &Root<'_>,
     source: &str,
+    instance_body: &[Statement<'_>],
 ) -> Result<ComponentContext, CompileError> {
     let mut context_roots = NameSet::default();
-    collect_context_roots(root, source, &mut context_roots);
+    collect_context_roots(instance_body, source, &mut context_roots);
 
     let mut nc = Nc {
         source,
@@ -132,10 +137,8 @@ pub(crate) fn analyze_component(
         in_dropped_catch: false,
     };
 
-    if let Some(script) = root.instance {
-        for stmt in script.content.body {
-            walk_stmt(stmt, &mut nc, false);
-        }
+    for stmt in instance_body {
+        walk_stmt(stmt, &mut nc, false);
     }
     walk_fragment(&root.fragment, &mut nc);
 
@@ -176,11 +179,8 @@ fn plain_name<'s>(id: &tsv_ts::ast::internal::Identifier<'_>, source: &'s str) -
 
 /// Collect the top-level prop (incl. rest-prop) and import names into
 /// `context_roots` — the roots whose member/call access sets `needs_context`.
-fn collect_context_roots(root: &Root<'_>, source: &str, out: &mut NameSet) {
-    let Some(script) = root.instance else {
-        return;
-    };
-    for stmt in script.content.body {
+fn collect_context_roots(instance_body: &[Statement<'_>], source: &str, out: &mut NameSet) {
+    for stmt in instance_body {
         match stmt {
             Statement::ImportDeclaration(import) => {
                 use tsv_ts::ast::internal::ImportSpecifier;

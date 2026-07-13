@@ -83,6 +83,13 @@ impl CompileProfileCommand {
                     corrupt += 1;
                     eprintln!("COMPILER BUG (CorruptOutput) {}: {err}", path.display());
                 }
+                Ok(Outcome::TypeErasureLeak(span)) => {
+                    corrupt += 1;
+                    eprintln!(
+                        "COMPILER BUG (TypeErasureLeak) {}: TypeScript survived erasure at {span:?}",
+                        path.display()
+                    );
+                }
                 Err(err) => {
                     eprintln!("Error profiling {}: {err}", path.display());
                     arena.reset();
@@ -140,6 +147,8 @@ enum Outcome {
     Refused,
     ParseFailed,
     CorruptOutput(tsv_lang::ParseError),
+    /// The type-erasure self-check fired — a compiler bug, like `CorruptOutput`.
+    TypeErasureLeak(tsv_lang::Span),
 }
 
 /// Timing results for one compiled file.
@@ -180,6 +189,7 @@ fn profile_compile_file(
         Err(CompileError::Unsupported(_)) => return Ok(Outcome::Refused),
         Err(CompileError::Parse(_)) => return Ok(Outcome::ParseFailed),
         Err(CompileError::CorruptOutput(err)) => return Ok(Outcome::CorruptOutput(err)),
+        Err(CompileError::TypeErasureLeak(span)) => return Ok(Outcome::TypeErasureLeak(span)),
     }
 
     let mut compile_times = Vec::with_capacity(iterations);

@@ -498,6 +498,20 @@ pub(crate) fn evaluate(
         // Values the oracle carries but this port cannot stringify/compare.
         Expression::RegexLiteral(_) => gray("regex literal value"),
 
+        // The five TypeScript wrappers evaluate through to their inner
+        // expression — the oracle erases them in phase 1, so its evaluator only
+        // ever sees the inner node and folds it. Type erasure unwraps them
+        // before this runs, so these are defense in depth: falling into the
+        // `default: UNKNOWN` arm below would *under-fold* (a parity divergence,
+        // not a refusal).
+        Expression::TSAsExpression(e) => evaluate(e.expression, scope, source, depth + 1),
+        Expression::TSSatisfiesExpression(e) => evaluate(e.expression, scope, source, depth + 1),
+        Expression::TSNonNullExpression(e) => evaluate(e.expression, scope, source, depth + 1),
+        Expression::TSTypeAssertion(e) => evaluate(e.expression, scope, source, depth + 1),
+        Expression::TSInstantiationExpression(e) => {
+            evaluate(e.expression, scope, source, depth + 1)
+        }
+
         // Everything else is the oracle's `default: UNKNOWN` — portable.
         _ => Ok(Evaluation::single(Entry::Unknown)),
     }

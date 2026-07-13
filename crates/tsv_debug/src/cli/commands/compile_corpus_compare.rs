@@ -223,6 +223,12 @@ async fn classify(source: &str) -> Bucket {
         Err(CompileError::CorruptOutput(e)) => {
             return Bucket::Error("tsv-corrupt-output", e.to_string());
         }
+        // The type-erasure self-check firing: a TypeScript-only node survived
+        // into the emitted program — a missed erase case, always a compiler bug
+        // (and one the output reparse cannot see, since the annotation parses).
+        Err(CompileError::TypeErasureLeak(span)) => {
+            return Bucket::Error("tsv-type-erasure-leak", format!("at {span:?}"));
+        }
     };
 
     // Both compiled — compare the canonical reprints (the parity bar).

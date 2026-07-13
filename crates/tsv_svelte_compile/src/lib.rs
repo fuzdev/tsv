@@ -18,6 +18,7 @@
 mod analyze;
 mod attr_refs;
 mod build;
+mod erase;
 mod needs_context;
 mod refusal;
 mod rune_guard;
@@ -93,6 +94,14 @@ pub enum CompileError {
     /// contract as [`CanonicalizeError::CorruptOutput`]).
     #[error("generated JS failed to reparse (compiler bug): {0}")]
     CorruptOutput(tsv_lang::ParseError),
+    /// A TypeScript-only node survived type erasure into the emitted program —
+    /// the erase pass missed a case. Always a compiler bug, and one
+    /// [`Self::CorruptOutput`] **cannot** catch: a surviving annotation still
+    /// parses (tsv's parser is TypeScript-permissive), so the reparse check
+    /// passes while the output carries TypeScript verbatim. Surfaced loudly
+    /// instead of returning the mis-compiled module.
+    #[error("TypeScript survived erasure into the generated JS (compiler bug) at {0:?}")]
+    TypeErasureLeak(tsv_lang::Span),
 }
 
 /// An error from [`canonicalize_js`].
@@ -1454,24 +1463,150 @@ mod tests {
     }
 
     #[test]
-    fn compile_refuses_typed_script() {
-        // A `lang="ts"` instance script passes type annotations through verbatim
-        // (type stripping not implemented) — refuse at the entry, before output.
+    fn compile_refuses_unrecognized_lang() {
+        // The oracle's TypeScript flag tests `lang === 'ts'` EXACTLY, so
+        // `lang="typescript"` is plain JS to it — rather than compile it as JS
+        // on a guess, refuse.
         assert_unsupported(
-            "<script lang=\"ts\">let x: number = 5;</script>\n<p>text</p>",
-            "lang=\"ts\" instance script",
+            "<script lang=\"typescript\">let x = 5;</script>\n<p>text</p>",
+            "lang=\"typescript\" instance script",
         );
-        // `generics` implies TS — refuse it too.
+        // `generics` is an open type-parameter binding, not annotation erasure.
         assert_unsupported(
             "<script generics=\"T\">let x = 5;</script>\n<p>text</p>",
             "generics attribute",
         );
-        // A plain instance script still compiles.
-        compile(
+        // `lang="js"` / `lang=""` / no attribute all compile as plain JS.
+        for source in [
             "<script>let x = 5;</script>\n<p>text</p>",
-            &CompileOptions::default(),
-        )
-        .expect("plain script compiles");
+            "<script lang=\"js\">let x = 5;</script>\n<p>text</p>",
+            "<script lang=\"\">let x = 5;</script>\n<p>text</p>",
+        ] {
+            compile(source, &CompileOptions::default()).expect("plain script compiles");
+        }
+    }
+
+    #[test]
+    fn compile_erases_typescript() {
+        // The headline Svelte-5 TypeScript idiom: a `Props` interface plus an
+        // annotated `$props()` destructure.
+        assert_eq!(
+            compile_js(
+                "<script lang=\"ts\">\n\tinterface Props {\n\t\ta: string;\n\t}\n\tlet { a }: Props = $props();\n</script>\n<p>{a}</p>"
+            ),
+            "import * as $ from 'svelte/internal/server';\nexport default function Input($$renderer, $$props) {\n\tlet { a } = $$props;\n\t$$renderer.push(`<p>${$.escape(a)}</p>`);\n}\n"
+        );
+    }
+
+    #[test]
+    fn compile_refuses_typescript_without_lang_ts() {
+        // tsv's parser is TypeScript-permissive, so it happily parses an
+        // annotation in a plain `<script>`; the ORACLE hits a JS parse error
+        // there. Compiling it would be an over-acceptance.
+        for source in [
+            "<script>let x: number = 5;</script>\n<p>text</p>",
+            "<script lang=\"js\">let x = 5 as number;</script>\n<p>text</p>",
+            "<script>interface P { a: string }\n\tlet x = 1;</script>\n<p>{x}</p>",
+        ] {
+            assert_unsupported(source, "TypeScript syntax without lang=\"ts\"");
+        }
+    }
+
+    #[test]
+    fn compile_refuses_typescript_in_template() {
+        // Template expressions are erased at their borrow points — a later
+        // slice. Until then a TypeScript template expression refuses rather than
+        // print its annotation verbatim.
+        assert_unsupported(
+            "<script lang=\"ts\">\n\tlet x: any = { n: 1 };\n</script>\n<p>{(x as { n: number }).n}</p>",
+            "TypeScript in a template expression",
+        );
+    }
+
+    #[test]
+    fn compile_refuses_runtime_typescript_features() {
+        // Constructs with runtime semantics an erasure would silently delete —
+        // and the ones the oracle itself mis-compiles into invalid JS.
+        let cases: [(&str, &str); 10] = [
+            ("enum E {\n\t\tA\n\t}", "TS enum"),
+            ("declare enum E {\n\t\tA\n\t}", "TS enum"),
+            (
+                "namespace N {\n\t\texport const v = 1;\n\t}",
+                "TS namespace/module with a value member",
+            ),
+            (
+                "class C {\n\t\tconstructor(public x: number) {}\n\t}",
+                "TS parameter property",
+            ),
+            ("import X = require('m');", "import x = require"),
+            ("const v = 1;\n\texport = v;", "export = "),
+            ("export as namespace Foo;", "export as namespace"),
+            (
+                "abstract class A {\n\t\tabstract x: number;\n\t}",
+                "abstract class property",
+            ),
+            (
+                "class C {\n\t\taccessor x = 1;\n\t}",
+                "accessor class field",
+            ),
+            (
+                "class C {\n\t\t[key: string]: unknown;\n\t}",
+                "index signature in a class body",
+            ),
+        ];
+        for (script, what) in cases {
+            assert_unsupported(
+                &format!("<script lang=\"ts\">\n\t{script}\n</script>\n<p>text</p>"),
+                what,
+            );
+        }
+        // A decorator is a hard error in the oracle, TypeScript or not.
+        assert_unsupported(
+            "<script lang=\"ts\">\n\tfunction dec(v: any, c: any) {\n\t\treturn v;\n\t}\n\tclass C {\n\t\t@dec\n\t\tm() {}\n\t}\n</script>\n<p>text</p>",
+            "decorator",
+        );
+        // A bodiless, non-abstract class method (an overload signature).
+        assert_unsupported(
+            "<script lang=\"ts\">\n\tclass C {\n\t\tm(x: number): void;\n\t\tm(x: any) {}\n\t}\n</script>\n<p>text</p>",
+            "bodiless class method",
+        );
+    }
+
+    #[test]
+    fn compile_drops_type_only_namespace() {
+        // A namespace whose whole body erases away vanishes silently — the
+        // oracle's all-type→drop / any-value→reject fork.
+        assert_eq!(
+            compile_js(
+                "<script lang=\"ts\">\n\tnamespace N {\n\t\texport type Foo = number;\n\t}\n\tlet a = 1;\n</script>\n<p>{a}</p>"
+            ),
+            "import * as $ from 'svelte/internal/server';\nexport default function Input($$renderer) {\n\tlet a = 1;\n\t$$renderer.push(`<p>1</p>`);\n}\n"
+        );
+    }
+
+    #[test]
+    fn compile_refuses_comment_in_erased_type_region() {
+        // The refusal WINDOW runs past the erased span to the next surviving
+        // token, so a comment after an erased annotation — which the oracle
+        // re-anchors onto the initializer (`let x = /* c */ 1`) — is caught.
+        assert_unsupported(
+            "<script lang=\"ts\">\n\tlet x: number /* c */ = 1;\n</script>\n<p>{x}</p>",
+            "comment inside an erased TypeScript region",
+        );
+        // …and so is one strictly inside an erased declaration's body.
+        assert_unsupported(
+            "<script lang=\"ts\">\n\tinterface Props {\n\t\t/* c */\n\t\ta: string;\n\t}\n\tlet { a }: Props = $props();\n</script>\n<p>{a}</p>",
+            "comment inside an erased TypeScript region",
+        );
+        // A LEADING comment sits before the erased region's start — outside the
+        // window — and survives, landing on the next surviving statement exactly
+        // as the oracle places it.
+        assert_eq!(
+            compile_js(
+                "<script lang=\"ts\">\n\t/** doc */\n\tinterface Props {\n\t\ta: string;\n\t}\n\tlet { a }: Props = $props();\n</script>\n<p>{a}</p>"
+            ),
+            "import * as $ from 'svelte/internal/server';\nexport default function Input($$renderer, $$props) {\n\t/** doc */\n\tlet { a } = $$props;\n\t$$renderer.push(`<p>${$.escape(a)}</p>`);\n}\n"
+        );
     }
 
     #[test]
