@@ -3,6 +3,7 @@
 mod atrules;
 pub(crate) use atrules::is_keyframes_atrule;
 mod attributes;
+mod decl_scan;
 mod declarations;
 mod pseudo;
 mod selectors;
@@ -137,6 +138,18 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         self.current_end = token.end as usize;
         self.current_decoded = self.lexer.take_decoded().map(|b| *b);
         Ok(())
+    }
+
+    /// Re-seat the lexer at a raw `source` offset and make the token there current,
+    /// dropping any lookahead (which was lexed from before the jump).
+    ///
+    /// The counterpart to a scan that ran ahead of the parser: the declaration value's
+    /// boundary scan finds its terminator by walking bytes, then lands the parser on that
+    /// terminator token without the lexer having tokenized anything in between.
+    pub(crate) fn seek_to(&mut self, raw_pos: usize) -> Result<(), ParseError> {
+        self.peek = None;
+        self.lexer.seek(raw_pos);
+        self.advance()
     }
 
     /// Peek at the next token's kind without consuming it. Returns the kind by
