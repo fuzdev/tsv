@@ -136,7 +136,7 @@ const ALLOW: &[Allow] = &[
     ),
     (
         "tsv_css/src/printer/value_normalization/mod.rs",
-        "if let Some(comment_start) = property_part.find(\"/*\") {",
+        "if has_block_comment && let Some(comment_start) = property_part.find(\"/*\") {",
         "comment-marker",
     ),
     (
