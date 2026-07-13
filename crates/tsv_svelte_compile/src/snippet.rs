@@ -33,7 +33,7 @@ use tsv_ts::ast::internal::{
 };
 
 use crate::analyze::{NameSet, pattern_binding_names};
-use crate::attr_refs::each_attribute_expression;
+use crate::attr_refs::{each_attribute_expression, each_reference_bearing_attribute_expression};
 use crate::{CompileError, Refusal};
 
 /// The snippet analysis product consumed by the server transform.
@@ -202,6 +202,12 @@ struct Collector<'s> {
     locals: NameSet,
     params: NameSet,
     opaque: bool,
+    /// Whether the walk is inside a **dropped** `{:catch}` subtree, where the
+    /// emitter never walks the fragment so the emission refusals that
+    /// `each_attribute_expression` relies on never fire. There every attribute
+    /// reference (element spreads, directive expressions, `{@attach}`) must be
+    /// counted to match the oracle. Sticky for the whole catch subtree.
+    in_dropped_catch: bool,
 }
 
 impl<'s> Collector<'s> {
@@ -212,6 +218,7 @@ impl<'s> Collector<'s> {
             locals: NameSet::default(),
             params: NameSet::default(),
             opaque: false,
+            in_dropped_catch: false,
         }
     }
 
@@ -358,8 +365,15 @@ impl<'s> Collector<'s> {
         // are reference-bearing — including component `{...spread}` expressions,
         // whose free references must disqualify hoisting exactly like a plain
         // attribute value's (a module-hoisted snippet referencing an instance
-        // binding is a runtime ReferenceError).
-        each_attribute_expression(element, &mut |expr| self.expr(expr));
+        // binding is a runtime ReferenceError). Inside a dropped `{:catch}` the
+        // emitter never walks the fragment, so the emission refusals that let the
+        // default traversal skip element spreads / directives / `{@attach}` never
+        // fire — there every attribute reference must be counted.
+        if self.in_dropped_catch {
+            each_reference_bearing_attribute_expression(element, &mut |expr| self.expr(expr));
+        } else {
+            each_attribute_expression(element, &mut |expr| self.expr(expr));
+        }
         self.fragment(&element.fragment);
     }
 
@@ -404,11 +418,17 @@ impl<'s> Collector<'s> {
         if let Some(error) = &block.error {
             self.bind_pattern(error);
         }
-        for frag in [&block.pending, &block.then, &block.catch]
-            .into_iter()
-            .flatten()
-        {
+        // Pending/then are emitted (so their skipped attribute positions refuse at
+        // emission); the `{:catch}` branch is dropped, so it is walked with the
+        // inclusive attribute traversal. The flag is scoped to the catch subtree.
+        for frag in [&block.pending, &block.then].into_iter().flatten() {
             self.fragment(frag);
+        }
+        if let Some(catch) = &block.catch {
+            let prev = self.in_dropped_catch;
+            self.in_dropped_catch = true;
+            self.fragment(catch);
+            self.in_dropped_catch = prev;
         }
     }
 

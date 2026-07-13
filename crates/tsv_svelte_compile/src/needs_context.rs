@@ -41,7 +41,7 @@ use tsv_ts::ast::internal::{
 };
 
 use crate::analyze::{NameSet, RuneInit, classify_rune_init, pattern_binding_names};
-use crate::attr_refs::each_attribute_expression;
+use crate::attr_refs::{each_attribute_expression, each_reference_bearing_attribute_expression};
 use crate::{CompileError, Refusal};
 
 /// The accumulating analysis state.
@@ -74,6 +74,13 @@ struct Nc<'a> {
     /// Set by any `$$slots` reference (the oracle's `uses_slots`): the component
     /// gains `const $$slots = $.sanitize_slots($$props)` and the `$$props` param.
     uses_slots: bool,
+    /// Whether the walk is inside a **dropped** `{:catch}` subtree, where the
+    /// emitter never walks the fragment so the emission refusals that let the
+    /// default attribute traversal skip element spreads / directives / `{@attach}`
+    /// never fire. There a `new`/prop-rooted access in such a position must still
+    /// trigger the wrapper, so those positions are walked. Sticky for the whole
+    /// catch subtree.
+    in_dropped_catch: bool,
 }
 
 /// The whole-component analysis product consumed by the server transform.
@@ -119,6 +126,7 @@ pub(crate) fn analyze_component(
         fn_declared: NameSet::default(),
         fn_depth: 0,
         uses_slots: false,
+        in_dropped_catch: false,
     };
 
     if let Some(script) = root.instance {
@@ -692,8 +700,15 @@ fn walk_element(element: &Element<'_>, nc: &mut Nc<'_>) {
     // The shared traversal (`attr_refs`) defines which attribute expressions are
     // reference-bearing: plain attribute values on any element, plus component
     // `{...spread}` expressions (emitted as `$.spread_props` elements); element
-    // spreads and directives are refused at emission and not visited.
-    each_attribute_expression(element, &mut |expr| walk_expr(expr, nc));
+    // spreads and directives are refused at emission and not visited. Inside a
+    // dropped `{:catch}` the emitter never walks the fragment, so those emission
+    // refusals never fire — there a `new`/prop-rooted access in a skipped position
+    // must still trigger the wrapper, so every attribute reference is walked.
+    if nc.in_dropped_catch {
+        each_reference_bearing_attribute_expression(element, &mut |expr| walk_expr(expr, nc));
+    } else {
+        each_attribute_expression(element, &mut |expr| walk_expr(expr, nc));
+    }
     walk_fragment(&element.fragment, nc);
 }
 
@@ -737,6 +752,9 @@ fn walk_await_block(block: &AwaitBlock<'_>, nc: &mut Nc<'_>) {
         declare_pattern(error, nc);
         walk_expr(error, nc);
     }
+    // Pending/then are emitted (their skipped attribute positions refuse at
+    // emission); the `{:catch}` branch is dropped, so it is walked with the
+    // inclusive attribute traversal. The flag is scoped to the catch subtree.
     if let Some(pending) = &block.pending {
         walk_fragment(pending, nc);
     }
@@ -744,7 +762,10 @@ fn walk_await_block(block: &AwaitBlock<'_>, nc: &mut Nc<'_>) {
         walk_fragment(then, nc);
     }
     if let Some(catch) = &block.catch {
+        let prev = nc.in_dropped_catch;
+        nc.in_dropped_catch = true;
         walk_fragment(catch, nc);
+        nc.in_dropped_catch = prev;
     }
 }
 
