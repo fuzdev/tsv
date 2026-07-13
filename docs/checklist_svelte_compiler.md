@@ -150,7 +150,8 @@ The oracle's flag is **document-wide**: its parser regexes the raw source for th
 | leading `this: T` parameter (function declarations/expressions only, never arrows — the oracle's `remove_this_param`) | dropped |
 | **type-only** `namespace`/`module` | dropped (the oracle's all-type→drop fork) |
 | template `{x as T}` / `{x!}` / `{x satisfies T}` / `{f<T>(x)}`, in a tag, an attribute value, a component prop or spread, a block test, a `{@render}` argument | erased at the borrow point (then folded/guarded like any expression) |
-| typed block patterns — `{#each xs as x: T}`, `{#await p then v: T}`, `{:catch e: T}`, `{@const a: T = v}` | erased at the borrow point (a `{:catch}` binding never reaches output at all — the oracle drops the branch from SSR) |
+| typed block patterns — `{#each xs as x: T}`, `{#await p then v: T}`, `{@const a: T = v}` — identifier **and** destructuring forms | erased at the borrow point |
+| `{:catch e: T}` | **not erased — never reaches output.** The oracle drops the whole `{:catch}` branch from SSR, so its binding is emitted nowhere. (Its TypeScript is still *seen*: without `lang="ts"` the dropped-region sweep refuses it.) |
 | typed and **generic** `{#snippet s<T>(x: T)}` | erased: the oracle emits `function s($$renderer, x)`, the `<T>` simply gone — a snippet's type parameters are type-level only, so *not reading them* is the erasure |
 
 Parens are not a hazard: `tsv_ts` parses with `preserve_parens: false` and re-derives them from precedence, exactly as the oracle's printer does — `(x as T).y` erases to `x.y`, and `(a + b as T) * c` keeps the parens it needs.
