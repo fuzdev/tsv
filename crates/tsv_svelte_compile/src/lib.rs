@@ -1220,14 +1220,68 @@ mod tests {
     }
 
     #[test]
-    fn compile_refuses_component_children() {
-        // Children (implicit `children` / named snippet props) are a later slice;
-        // an empty or whitespace-only component body is NOT children.
-        assert_unsupported("<Foo>text</Foo>", "<Foo> component with children");
-        assert_unsupported("<Foo><p>x</p></Foo>", "<Foo> component with children");
-        compile("<Foo></Foo>", &CompileOptions::default()).expect("empty children compiles");
-        compile("<Foo>   </Foo>", &CompileOptions::default())
-            .expect("whitespace-only children compiles");
+    fn compile_component_children_snippet_prop() {
+        // Default-slot children compile to a `children: ($$renderer) => {…}`
+        // snippet prop plus `$$slots: { default: true }`. A text-first body gets
+        // the `<!---->` marker.
+        let js = compile_js("<Foo><p>hi</p></Foo>");
+        assert_eq!(
+            js,
+            "import * as $ from 'svelte/internal/server';\n\
+             export default function Input($$renderer) {\n\
+             \tFoo($$renderer, {\n\
+             \t\tchildren: ($$renderer) => {\n\
+             \t\t\t$$renderer.push(`<p>hi</p>`);\n\
+             \t\t},\n\
+             \t\t$$slots: { default: true }\n\
+             \t});\n\
+             }\n"
+        );
+        // Text-first children get the `<!---->` anchor inside the arrow.
+        let js = compile_js("<Foo>hi <b>x</b></Foo>");
+        assert!(
+            js.contains("$$renderer.push(`<!---->hi <b>x</b>`);"),
+            "{js}"
+        );
+        // An empty / whitespace-only body is NOT children (no `children` prop).
+        let js = compile_js("<Foo></Foo>");
+        assert_eq!(js.matches("children").count(), 0, "{js}");
+        let js = compile_js("<Foo>   </Foo>");
+        assert_eq!(js.matches("children").count(), 0, "{js}");
+    }
+
+    #[test]
+    fn compile_component_children_after_attrs_and_spread() {
+        // The `children` prop appends after attribute props.
+        let js = compile_js("<Foo a=\"x\"><p>hi</p></Foo>");
+        assert!(
+            js.contains("a: 'x'") && js.contains("children: ($$renderer) =>"),
+            "{js}"
+        );
+        // With a trailing spread the children go to their own object element.
+        let js = compile_js("<script>let { r } = $props();</script>\n<Foo {...r}><p>hi</p></Foo>");
+        assert!(js.contains("$.spread_props(["), "{js}");
+        assert!(js.contains("children: ($$renderer) =>"), "{js}");
+        assert!(js.contains("$$slots: { default: true }"), "{js}");
+    }
+
+    #[test]
+    fn compile_refuses_deferred_component_children() {
+        // A `{#snippet}` child (named snippet prop) and a `slot="…"` child (named
+        // slot) are later slices; an explicit `children` prop + default children
+        // is the oracle's `$$slots.default` divergence.
+        assert_unsupported(
+            "<Foo>{#snippet header()}<h1>t</h1>{/snippet}</Foo>",
+            "named snippet child on <Foo> component",
+        );
+        assert_unsupported(
+            "<Foo><p slot=\"header\">hi</p></Foo>",
+            "named slot on <Foo> component",
+        );
+        assert_unsupported(
+            "<script>let { c } = $props();</script>\n<Foo children={c}><p>hi</p></Foo>",
+            "both a children prop and default children",
+        );
     }
 
     #[test]

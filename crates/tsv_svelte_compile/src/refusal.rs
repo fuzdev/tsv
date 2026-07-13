@@ -313,10 +313,23 @@ pub enum Refusal {
         /// The component tag as written.
         name: String,
     },
-    /// A component with children (the implicit `children` snippet prop and named
-    /// snippet props are a later slice).
-    #[error("<{name}> component with children")]
-    ComponentChildren {
+    /// A `{#snippet}` child on a component (a named snippet prop — a later slice).
+    #[error("named snippet child on <{name}> component (snippet props not implemented)")]
+    ComponentSnippetChild {
+        /// The component tag as written.
+        name: String,
+    },
+    /// A `slot="…"` (named slot) on a component's child (the oracle groups it into
+    /// a `$$slots.<name>` closure).
+    #[error("named slot on <{name}> component")]
+    ComponentNamedSlot {
+        /// The component tag as written.
+        name: String,
+    },
+    /// A component with both an explicit `children` prop and default children (the
+    /// oracle routes the children to `$$slots.default` with a `children` error).
+    #[error("<{name}> component with both a children prop and default children")]
+    ComponentChildrenPropConflict {
         /// The component tag as written.
         name: String,
     },
@@ -446,7 +459,13 @@ impl Refusal {
             Self::DynamicComponent { .. } => {
                 Cow::Borrowed("dynamic <{name}> component (member or reactive binding)")
             }
-            Self::ComponentChildren { .. } => Cow::Borrowed("<{name}> component with children"),
+            Self::ComponentSnippetChild { .. } => {
+                Cow::Borrowed("named snippet child on <{name}> component")
+            }
+            Self::ComponentNamedSlot { .. } => Cow::Borrowed("named slot on <{name}> component"),
+            Self::ComponentChildrenPropConflict { .. } => {
+                Cow::Borrowed("<{name}> component with both a children prop and default children")
+            }
             Self::ComponentCustomProperty { .. } => {
                 Cow::Borrowed("--custom-property attribute on <{name}> component")
             }

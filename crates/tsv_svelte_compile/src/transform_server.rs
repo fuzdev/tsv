@@ -2763,14 +2763,59 @@ fn component_is_standalone_eligible(env: &EmitEnv<'_, '_>, element: &Element<'_>
     })
 }
 
-/// Whether the component fragment has renderable children (any non-whitespace
-/// text or non-comment node) — the implicit `children` / named-snippet props are
-/// a later slice, so a component with children refuses.
-fn component_has_children(element: &Element<'_>) -> bool {
-    element.fragment.nodes.iter().any(|node| match node {
-        FragmentNode::Text(text) => !text.is_ascii_ws_only,
-        FragmentNode::Comment(_) => false,
-        _ => true,
+/// Classify a component's children: returns whether it has renderable
+/// *default-slot* children (feeding the implicit `children` snippet prop), or an
+/// `Err` for the shapes deferred to a later slice — a `{#snippet}` child (named
+/// snippet prop), a `slot="…"` child (named slot), or a `children` prop
+/// alongside default children (the oracle's `$$slots.default` divergence).
+fn check_component_children<'arena>(
+    env: &EmitEnv<'arena, '_>,
+    element: &'arena Element<'arena>,
+    name: &str,
+) -> Result<bool, CompileError> {
+    let mut has_default = false;
+    for node in element.fragment.nodes {
+        match node {
+            FragmentNode::SnippetBlock(_) => {
+                return Err(unsupported(Refusal::ComponentSnippetChild {
+                    name: name.to_string(),
+                }));
+            }
+            FragmentNode::Comment(_) => {}
+            FragmentNode::Text(text) if text.is_ascii_ws_only => {}
+            FragmentNode::Element(child) if child_slot_attribute(env, child) => {
+                return Err(unsupported(Refusal::ComponentNamedSlot {
+                    name: name.to_string(),
+                }));
+            }
+            _ => has_default = true,
+        }
+    }
+    // A `children` prop AND default children route through `$$slots.default` with
+    // a `children` error in the oracle — a divergent shape; refuse.
+    if has_default && component_has_named_attribute(env, element, "children") {
+        return Err(unsupported(Refusal::ComponentChildrenPropConflict {
+            name: name.to_string(),
+        }));
+    }
+    Ok(has_default)
+}
+
+/// Whether a component child element carries a `slot="…"` attribute (a named
+/// slot).
+fn child_slot_attribute(env: &EmitEnv<'_, '_>, element: &Element<'_>) -> bool {
+    component_has_named_attribute(env, element, "slot")
+}
+
+/// Whether an element carries a plain attribute with the given (case-sensitive)
+/// name.
+fn component_has_named_attribute(env: &EmitEnv<'_, '_>, element: &Element<'_>, name: &str) -> bool {
+    element.attributes.iter().any(|attr_node| {
+        let AttributeNode::Attribute(attr) = attr_node else {
+            return false;
+        };
+        let interner = env.b.interner.borrow();
+        interner.resolve_infallible(attr.name) == name
     })
 }
 
@@ -2806,14 +2851,9 @@ fn emit_component<'arena>(
             name: name.to_string(),
         }));
     }
-    // Children (the implicit `children` / named snippet props) are a later slice.
-    if component_has_children(element) {
-        return Err(unsupported(Refusal::ComponentChildren {
-            name: name.to_string(),
-        }));
-    }
 
-    // Build the props/spreads expression (a plain object, or `$.spread_props`).
+    // Build the props/spreads expression (a plain object, or `$.spread_props`),
+    // including the implicit `children` snippet prop for default-slot children.
     let props_expr = build_component_props(env, element, name)?;
 
     // `Name($$renderer, props)`. The callee is the component reference (a plain
@@ -2857,6 +2897,10 @@ fn build_component_props<'arena>(
     name: &str,
 ) -> Result<Expression<'arena>, CompileError> {
     let arena = env.b.arena;
+    // Default-slot children feed the implicit `children` snippet prop; the
+    // deferred child shapes (snippet / named slot / children-prop conflict)
+    // refuse here.
+    let children_element = check_component_children(env, element, name)?.then_some(element);
     let mut groups: Vec<PropGroup<'_, 'arena>> = Vec::new();
     for attr_node in element.attributes {
         match attr_node {
@@ -2893,8 +2937,10 @@ fn build_component_props<'arena>(
         }
     }
 
-    // The oracle emits a plain object when there are no groups, or exactly one
-    // props group; otherwise `$.spread_props([...])`.
+    // The oracle emits a plain object when there are no spreads (no groups, or a
+    // single props group); otherwise `$.spread_props([...])`. The `children` prop
+    // appends to the last props group, or a new one when the last group is a
+    // spread (the oracle's `push_prop`).
     let single_object =
         groups.is_empty() || (groups.len() == 1 && matches!(groups[0], PropGroup::Props(_)));
     if single_object {
@@ -2902,19 +2948,33 @@ fn build_component_props<'arena>(
             Some(PropGroup::Props(props)) => props,
             _ => &[],
         };
-        return build_props_object(env, attrs);
+        return build_props_object(env, attrs, children_element);
     }
 
     // `$.spread_props([ obj_or_spread, … ])`. Mint the brackets around the
     // element construction so the array span encloses the minted object spans.
+    let last_is_props = matches!(groups.last(), Some(PropGroup::Props(_)));
     let lbracket = env.b.mint("[").start;
     let mut elements: BumpVec<'arena, Option<Expression<'arena>>> = BumpVec::new_in(arena);
-    for group in &groups {
+    let group_count = groups.len();
+    for (i, group) in groups.iter().enumerate() {
         let element_expr = match group {
-            PropGroup::Props(props) => build_props_object(env, props)?,
+            PropGroup::Props(props) => {
+                // Children join the last props group.
+                let children = if i + 1 == group_count {
+                    children_element
+                } else {
+                    None
+                };
+                build_props_object(env, props, children)?
+            }
             PropGroup::Spread(expr) => wrap_value_expr(env, expr)?[0].clone(),
         };
         elements.push(Some(element_expr));
+    }
+    // A trailing spread with children needs its own props object appended.
+    if !last_is_props && let Some(element) = children_element {
+        elements.push(Some(build_props_object(env, &[], Some(element))?));
     }
     let rbracket = env.b.mint("]").end;
     let array = Expression::ArrayExpression(ArrayExpression {
@@ -2935,6 +2995,7 @@ fn build_component_props<'arena>(
 fn build_props_object<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     attrs: &[&'arena Attribute<'arena>],
+    children: Option<&'arena Element<'arena>>,
 ) -> Result<Expression<'arena>, CompileError> {
     let arena = env.b.arena;
     let obrace = env.b.mint("{").start;
@@ -2944,12 +3005,80 @@ fn build_props_object<'arena>(
             env, attr,
         )?));
     }
+    // The implicit `children` prop (an inline snippet arrow) plus
+    // `$$slots: { default: true }` — appended after the attribute props.
+    if let Some(element) = children {
+        properties.push(ObjectProperty::Property(build_children_prop(env, element)?));
+        properties.push(ObjectProperty::Property(build_default_slots_prop(env)));
+    }
     let cbrace = env.b.mint("}").end;
     Ok(Expression::ObjectExpression(ObjectExpression {
         properties: properties.into_bump_slice(),
         spread_trailing_comma: false,
         span: Span::new(obrace, cbrace),
     }))
+}
+
+/// The implicit `children` prop for a component's default-slot children:
+/// `children: ($$renderer) => { …body… }`. The body reuses the fragment
+/// machinery (text-first eligible, per the oracle's `is_text_first` Component
+/// parent). The key is minted first so the (key-only) property span stays forward.
+fn build_children_prop<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    element: &'arena Element<'arena>,
+) -> Result<Property<'arena>, CompileError> {
+    let arena = env.b.arena;
+    let key = env.b.ident("children");
+    let key_span = key.span;
+    let body = emit_child_body(env, &element.fragment, &[], true, false, HashMap::new())?;
+    let renderer_param = Expression::Identifier(env.b.ident("$$renderer"));
+    let params = std::slice::from_ref(arena.alloc(renderer_param));
+    let block_span = env.b.here();
+    let arrow = env.b.arrow_block(params, body, block_span);
+    Ok(Property {
+        key: Expression::Identifier(key),
+        value: arrow,
+        kind: PropertyKind::Init,
+        shorthand: false,
+        computed: false,
+        method: false,
+        span: key_span,
+    })
+}
+
+/// The `$$slots: { default: true }` prop that accompanies default-slot children.
+fn build_default_slots_prop<'arena>(env: &mut EmitEnv<'arena, '_>) -> Property<'arena> {
+    let arena = env.b.arena;
+    let key = env.b.ident("$$slots");
+    let key_span = key.span;
+    let obrace = env.b.mint("{").start;
+    let default_key = env.b.ident("default");
+    let default_key_span = default_key.span;
+    let default_val = env.b.true_literal();
+    let default_prop = ObjectProperty::Property(Property {
+        key: Expression::Identifier(default_key),
+        value: default_val,
+        kind: PropertyKind::Init,
+        shorthand: false,
+        computed: false,
+        method: false,
+        span: default_key_span,
+    });
+    let cbrace = env.b.mint("}").end;
+    let inner = Expression::ObjectExpression(ObjectExpression {
+        properties: std::slice::from_ref(arena.alloc(default_prop)),
+        spread_trailing_comma: false,
+        span: Span::new(obrace, cbrace),
+    });
+    Property {
+        key: Expression::Identifier(key),
+        value: inner,
+        kind: PropertyKind::Init,
+        shorthand: false,
+        computed: false,
+        method: false,
+        span: key_span,
+    }
 }
 
 /// Build one `key: value` object property from a component attribute. The key is

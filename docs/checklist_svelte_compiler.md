@@ -190,9 +190,13 @@ A **static** component invocation compiles to `Name($$renderer, props)` (`shared
 
 **Prop values** (`build_attribute_value`, `is_component = true`): a static text value is the *decoded* data as a string literal (no HTML escape, no trim); a single expression value passes through with **no fold** (a bare `$derived` read becomes `d()`); a mixed text+expression value is a template literal with `$.stringify` interpolations, folding to a string literal when every part is statically known. A property key is an identifier when it matches the identifier grammar, else a quoted string; `{ n: n }` prints as `{ n }`. An `on*` handler is an ordinary prop (unlike an element handler, which is dropped). Prop-value expressions feed `needs_context` (a `new`/prop-rooted member/call — including inside a `{...spread}` — wraps the body).
 
-- **Supported**: self-closing / prop-only components; string / expression / shorthand / boolean / mixed / non-identifier-key props; consecutive props grouped into objects with `$.spread_props` for spreads; a plain-declaration or import callee; standalone-anchor elision.
+**Default-slot children** compile to an implicit `children: ($$renderer) => { … }` snippet prop plus `$$slots: { default: true }`. The children fragment reuses the normal fragment machinery (whitespace cleaning, control-flow blocks, text-first `<!---->` anchor — the oracle's `is_text_first` Component parent), and the `children` prop appends after the attribute props (into the last props group, or a new one after a trailing spread). An empty or whitespace-only body is not children.
+
+- **Supported**: self-closing / prop-only components; string / expression / shorthand / boolean / mixed / non-identifier-key props; consecutive props grouped into objects with `$.spread_props` for spreads; a plain-declaration or import callee; standalone-anchor elision; default-slot children (markup / blocks / expressions / nested components).
 - **Refused**: `dynamic <{name}> component (member or reactive binding)` — a member component (`<Foo.Bar>`) or a component whose name binding is a prop / `$state` / `$derived` / block-local (the oracle emits an `if (expr) {…}` truthiness guard — a later slice).
-- **Refused**: `<{name}> component with children` — the implicit `children` snippet prop and named snippet props are a later slice (an empty or whitespace-only body is not children).
+- **Refused**: `named snippet child on <{name}> component` — a `{#snippet}` child (a named snippet prop — a later slice).
+- **Refused**: `named slot on <{name}> component` — a `slot="…"` child (grouped into a `$$slots.<name>` closure).
+- **Refused**: `<{name}> component with both a children prop and default children` — the oracle routes the children to `$$slots.default` with a `children` error.
 - **Refused**: `--custom-property attribute on <{name}> component` — the oracle wraps the call in `$.css_props`.
 - **Refused**: `bind: directive on <{name}> component` — the oracle emits a `do…while` settle loop.
 - **Refused**: `directive on <{name}> component` — a non-`bind:` directive (`use:`/`transition:`/…; mostly oracle-rejected input).
