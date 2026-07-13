@@ -247,8 +247,10 @@ What a dropped region does **not** get is the *emission* refusals: a directive, 
 
 `{@render callee(args)}` → `callee($$renderer, ...args)` (or `callee?.($$renderer, …)` when optional). Arguments ride the same value machinery as block tests (a bare `$derived` read becomes `d()`; runes/mutations refuse). The trailing `<!---->` anchor (the oracle's `empty_comment`, `RenderTag.js:42`) is emitted unless the enclosing block's sole trimmed child is this render with a **non-dynamic** callee (`clean_nodes` `is_standalone`; a local snippet is non-dynamic, a snippet prop is dynamic). `is_standalone` is inherited by element children, so an element wrapping the render keeps the anchor.
 
-- **Supported**: `{@render}` of a local snippet (standalone-eligible) or a snippet prop like `{@render children()}` (dynamic — keeps the anchor); optional-chained callee.
-- **Refused**: `{@render} callee is not a resolvable local snippet or snippet prop` — a member callee (`obj.snip()`) or an unresolved identifier.
+**"A `{@render}` holds a call expression" is a *parse*-time rule** (`render_tag_invalid_expression`, raised while the oracle reads the tag) — so it is decided on the **raw** node, before type erasure. The distinction is observable: `{@render (s as T)(x)}` wraps the *callee* and is still a call, so it compiles; `{@render (s(x) as T)}` and `{@render s(x)!}` wrap the *call* and are rejected, even though erasure would reveal a call underneath. Everything downstream — the callee's identity and the arguments — reads the **erased** node instead, `is_standalone` included (a raw `(s as T)(x)` would otherwise read as a non-identifier callee and emit an anchor the oracle elides).
+
+- **Supported**: `{@render}` of a local snippet (standalone-eligible) or a snippet prop like `{@render children()}` (dynamic — keeps the anchor); optional-chained callee; a TypeScript-wrapped callee.
+- **Refused**: `{@render} callee is not a resolvable local snippet or snippet prop` — a member callee (`obj.snip()`), an unresolved identifier, or a non-call expression (the parse-time rule above).
 
 ### Components
 
