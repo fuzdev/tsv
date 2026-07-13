@@ -717,7 +717,7 @@ fn build_block_arrow_hug_states(
 
     // If the arrow has trailing param comments, the params will be multiline,
     // so we should force the wrapped state (prettier behavior)
-    let arrow_token = printer.find_arrow_token_for(arrow);
+    let arrow_token = arrow.arrow_token;
     let has_trailing_param_comments =
         arrow_has_trailing_param_comments(arrow, arrow_token, |start, end| {
             printer.has_comments_between(start, end)
@@ -750,7 +750,7 @@ fn build_block_arrow_hug_states(
         // 'none'). Matches Prettier's expandLastArg behavior where the arrow
         // is reprinted with a softline appended.
         let body_start = body_expr.span().start;
-        let arrow_token = printer.find_arrow_token_for(arrow);
+        let arrow_token = arrow.arrow_token;
         if printer.has_own_line_post_arrow_comment(arrow_token, body_start) {
             // group_break forces the arrow to break. The softline after it
             // causes `\n)` when the group breaks.

@@ -584,6 +584,11 @@ pub struct ArrowFunctionExpression<'arena> {
     /// Position of opening paren for params, if parenthesized.
     /// `Some(pos)` for `(x) => x` or `() => x`, `None` for `x => x`
     pub params_start: Option<u32>,
+    /// Byte offset of the `=` in the arrow's `=>` token, captured by the parser
+    /// when it consumes the arrow (like `params_start`, a print-time position fact,
+    /// not emitted to the wire). Lets the printer split comments around `=>` without
+    /// re-scanning source for it.
+    pub arrow_token: u32,
     pub span: Span,
 }
 

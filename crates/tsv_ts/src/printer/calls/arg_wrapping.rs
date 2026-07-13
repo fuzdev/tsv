@@ -94,7 +94,7 @@ pub(crate) fn prepend_arrow_body_comments(
     body_start: u32,
     body_doc: DocId,
 ) -> DocId {
-    let arrow_end = printer.find_arrow_token_for(arrow) + "=>".len() as u32;
+    let arrow_end = arrow.arrow_token + "=>".len() as u32;
 
     // Prepend inline comments between `=>` and body. Glued: a single-line block
     // hugged to `=>` stays with the body across a source newline, matching the main

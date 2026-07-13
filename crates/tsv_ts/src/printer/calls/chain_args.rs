@@ -834,7 +834,7 @@ fn build_chain_args_single(
         arg
         && !arrow.body.is_expression()
     {
-        let arrow_token = printer.find_arrow_token_for(arrow);
+        let arrow_token = arrow.arrow_token;
         arrow_has_trailing_param_comments(arrow, arrow_token, |start, end| {
             printer.has_comments_between(start, end)
         })

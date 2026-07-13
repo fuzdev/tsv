@@ -44,9 +44,21 @@ impl<'a> Printer<'a> {
         let true_type_end = c.true_type.span().end;
         let false_type_start = c.false_type.span().start;
 
-        // Find ? and : token positions for comment categorization
-        let question_pos = self.find_char_outside_comments(extends_type_end, true_type_start, b'?');
-        let colon_pos = self.find_char_outside_comments(true_type_end, false_type_start, b':');
+        // Find ? and : token positions for comment categorization. These positions only
+        // bound the comment scans below, so a conditional type with no comment anywhere in
+        // the extends→false-branch span skips both position scans — `None` collapses to the
+        // same empty comment docs a comment-free `Some` would (the arm builder emits nothing
+        // for `None`, and every `needs_breaking` term that consults them scans a comment-free
+        // sub-range either way). Paren-leading-line-comment terms below stay independent.
+        let (question_pos, colon_pos) =
+            if self.has_comments_between(extends_type_end, false_type_start) {
+                (
+                    self.find_char_outside_comments(extends_type_end, true_type_start, b'?'),
+                    self.find_char_outside_comments(true_type_end, false_type_start, b':'),
+                )
+            } else {
+                (None, None)
+            };
 
         // Check for comments that force breaking layout.
         // Line comments anywhere in the conditional force breaking (they end the line).
