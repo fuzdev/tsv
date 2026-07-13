@@ -38,7 +38,11 @@ project-wide conventions.
     `export const`/`function`/`{a}` via `$.bind_props`, not implemented; rejects
     `export default`/`export let`), non-JS instance scripts — `generics`, or a
     `lang` other than `"js"`/`""` (type stripping not implemented;
-    `lang="js"`/`lang=""` compile as plain JS), `{@debug}`, directives/spread,
+    `lang="js"`/`lang=""` compile as plain JS), top-level `$:` legacy reactive
+    statements (invalid in runes mode — a nested `$` label or a plain label is
+    ordinary JS and clones through), `svelte/internal*` imports and
+    `beforeUpdate`/`afterUpdate` imports from `svelte` (the oracle's runes-mode
+    import rules), `{@debug}`, directives/spread,
     top-level `await`,
     `<option>` / populated `<select>`/`<optgroup>` (the oracle emits closure
     calls / `<!>` anchors there), template-expression comments, and every
