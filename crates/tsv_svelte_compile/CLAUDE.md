@@ -28,15 +28,20 @@ project-wide conventions.
     (`canonicalize_js(output.js)` is a fixed point). The control-flow blocks
     `{#if}`/`{#each}`/`{#await}`/`{#key}` and `{@const}` are covered (see the
     transform_server block emitters below). Shapes the transform does not cover
-    yet — client generation, dev mode, `{#snippet}`/`{@render}`/`{@debug}`,
-    directives/spread, top-level `await`, `<option>` / populated
-    `<select>`/`<optgroup>` (the oracle emits closure calls / `<!>` anchors
-    there), template-expression comments, and every `$`-prefixed identifier
-    reference or call outside the sanctioned rewrites below — return
-    `CompileError::Unsupported` with a clear description, never guessed output.
-    Within the supported blocks, nested `{#each}` (unreproducible unique-name
-    order), a root-level `{@const}`, a destructured `{@const}`, and any block
-    alongside carried script comments also refuse.
+    yet — client generation, dev mode, components (`<Foo>` / `<Foo.Bar>`, which
+    the oracle emits as `Foo($$renderer, {})` calls), `lang="ts"` / `generics`
+    instance scripts (type stripping not implemented),
+    `{#snippet}`/`{@render}`/`{@debug}`, directives/spread, top-level `await`,
+    `<option>` / populated `<select>`/`<optgroup>` (the oracle emits closure
+    calls / `<!>` anchors there), template-expression comments, and every
+    `$`-prefixed identifier reference or call outside the sanctioned rewrites
+    below — return `CompileError::Unsupported` with a clear description, never
+    guessed output. Within the supported blocks, nested `{#each}` (unreproducible
+    unique-name order), a root-level `{@const}`, a destructured `{@const}`, a
+    `{@const}` shadowing a `$derived` binding, a member/call rooted at a
+    prop/import that is also shadowed in a nested scope (`needs_context`
+    classification ambiguous), a leading comment glued to the `<script>` line,
+    and any block alongside carried script comments also refuse.
   - `canonicalize_js(source) -> Result<String, CanonicalizeError>` — the
     canonicalizer (below). Lives here because the compiler's own output
     idempotence checks and the oracle comparison both consume it.
@@ -66,14 +71,26 @@ project-wide conventions.
   assignment/update roots (`updated`) and nested-scope declarations (shadow
   candidates) for the evaluator. Exhaustive matches on purpose — new AST
   variants fail compilation here instead of silently skipping the guard.
+- `needs_context.rs` — the `needs_context` analysis (ports Svelte's phase-2
+  accumulation): does the component require the
+  `$$renderer.component(($$renderer) => …)` wrapper? Walks the whole un-folded
+  instance + template AST (exhaustive matches) and sets the flag on any `new`
+  expression, or a member/call whose root (`is_safe_identifier`) is not a plain
+  identifier or is a prop/import binding — a plain local, a global, and rune
+  bindings stay safe. A member/call rooted at a prop/import that is *also* bound
+  in a nested scope is ambiguous for this name-based port and refuses.
 - `transform_server.rs` — the SSR transform: module scaffold
-  (`import * as $ from 'svelte/internal/server'` + the exported component
+  (`import * as $ from 'svelte/internal/server'`, then any instance-script
+  `import` declarations hoisted to module scope in source order — an import
+  inside the component function is invalid JS — + the exported component
   function), instance-script statements borrowed with rune rewrites —
   `$props()` → `$$props` (span-stolen), `$state(v)`/`$state.raw(v)` → `v`
   (`void 0` argument-less), `$derived(e)` → `$.derived(() => e)`,
   `$derived.by(f)` → `$.derived(f)`, statement-position `$effect`/`$effect.pre`
-  dropped and forcing the `$$renderer.component(($$renderer) => { … })`
-  wrapper — the template folded into one `$$renderer.push(\`…\`)` with
+  dropped — the whole body wrapping in
+  `$$renderer.component(($$renderer) => { … })` whenever `needs_context` fires (a
+  dropped effect, or the new/member/call analysis above), which also forces the
+  `$$props` parameter — the template folded into one `$$renderer.push(\`…\`)` with
   `{expr}` → `$.escape(expr)` (a bare derived read becomes `d()`; known
   evaluations fold as static text), `{@html expr}` → `$.html(expr)`, dynamic
   and mixed attributes → `$.attr(name, expr[, true])` / `$.attr_class` /

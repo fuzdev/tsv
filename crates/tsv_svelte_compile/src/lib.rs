@@ -17,6 +17,7 @@
 
 mod analyze;
 mod build;
+mod needs_context;
 mod rune_guard;
 mod transform_server;
 
@@ -839,14 +840,161 @@ mod tests {
 
     #[test]
     fn compile_allows_dollar_member_names() {
-        // A `$`-prefixed *name* (non-computed member property) is not a
-        // reference — it must stay compilable.
-        let out = compile(
-            "<script>let { a } = $props();</script>\n<p>{a.$foo}</p>",
+        // A `$`-prefixed *name* (non-computed member property) is not a rune
+        // reference — it stays compilable. The member access roots in the prop
+        // `a`, so `needs_context` wraps the body. Full-string equality (not a
+        // substring check) so the wrapper can't silently regress.
+        let js = compile_js("<script>let { a } = $props();</script>\n<p>{a.$foo}</p>");
+        assert_eq!(
+            js,
+            "import * as $ from 'svelte/internal/server';\n\
+             export default function Input($$renderer, $$props) {\n\
+             \t$$renderer.component(($$renderer) => {\n\
+             \t\tlet { a } = $$props;\n\
+             \t\t$$renderer.push(`<p>${$.escape(a.$foo)}</p>`);\n\
+             \t});\n\
+             }\n"
+        );
+    }
+
+    #[test]
+    fn compile_member_on_prop_wraps() {
+        // A member/call rooted in a prop is `needs_context`-unsafe — the whole
+        // body wraps in `$$renderer.component(($$renderer) => …)`.
+        let js = compile_js("<script>let { a } = $props();</script>\n<p>{a.b}</p>");
+        assert_eq!(
+            js,
+            "import * as $ from 'svelte/internal/server';\n\
+             export default function Input($$renderer, $$props) {\n\
+             \t$$renderer.component(($$renderer) => {\n\
+             \t\tlet { a } = $$props;\n\
+             \t\t$$renderer.push(`<p>${$.escape(a.b)}</p>`);\n\
+             \t});\n\
+             }\n"
+        );
+    }
+
+    #[test]
+    fn compile_member_on_local_does_not_wrap() {
+        // A member rooted in a plain local binding is safe — no wrapper, and the
+        // `$$props` parameter stays absent.
+        let js = compile_js("<script>let a = { b: 1 };</script>\n<p>{a.b}</p>");
+        assert_eq!(
+            js,
+            "import * as $ from 'svelte/internal/server';\n\
+             export default function Input($$renderer) {\n\
+             \tlet a = { b: 1 };\n\
+             \t$$renderer.push(`<p>${$.escape(a.b)}</p>`);\n\
+             }\n"
+        );
+    }
+
+    #[test]
+    fn compile_new_expression_wraps_and_injects_props() {
+        // A `new` expression sets `needs_context` even with no props; the wrapper
+        // and the `$$props` parameter are both injected.
+        let js = compile_js("<p>{new Date()}</p>");
+        assert_eq!(
+            js,
+            "import * as $ from 'svelte/internal/server';\n\
+             export default function Input($$renderer, $$props) {\n\
+             \t$$renderer.component(($$renderer) => {\n\
+             \t\t$$renderer.push(`<p>${$.escape(new Date())}</p>`);\n\
+             \t});\n\
+             }\n"
+        );
+    }
+
+    #[test]
+    fn compile_refuses_member_on_shadowed_prop() {
+        // A prop name reused as a nested binding makes a member/call root
+        // ambiguous for this name-based analysis — refuse rather than guess.
+        assert_unsupported(
+            "<script>let { a } = $props();\n\tfunction f(a) {\n\t\treturn a.b;\n\t}</script>\n<p>{f(1)}</p>",
+            "also bound in a nested scope",
+        );
+    }
+
+    #[test]
+    fn compile_hoists_instance_imports() {
+        // A side-effect import hoists to module scope (an import inside the
+        // component function is invalid JS).
+        let js = compile_js("<script>import './x.js';</script>\n<p>text</p>");
+        assert_eq!(
+            js,
+            "import * as $ from 'svelte/internal/server';\n\
+             import './x.js';\n\
+             export default function Input($$renderer) {\n\
+             \t$$renderer.push(`<p>text</p>`);\n\
+             }\n"
+        );
+    }
+
+    #[test]
+    fn compile_hoists_import_and_wraps_on_member_use() {
+        // A named import hoists to module scope; a member access on the import
+        // root also triggers the wrapper — the two fixes compose.
+        let js = compile_js("<script>import { x } from './x.js';</script>\n<p>{x.y}</p>");
+        assert_eq!(
+            js,
+            "import * as $ from 'svelte/internal/server';\n\
+             import { x } from './x.js';\n\
+             export default function Input($$renderer, $$props) {\n\
+             \t$$renderer.component(($$renderer) => {\n\
+             \t\t$$renderer.push(`<p>${$.escape(x.y)}</p>`);\n\
+             \t});\n\
+             }\n"
+        );
+    }
+
+    #[test]
+    fn compile_refuses_components() {
+        // Components compile to calls (`Foo($$renderer, {})`), not static markup —
+        // component rendering is a later milestone, so they refuse now.
+        assert_unsupported("<Foo />", "<Foo> component");
+        assert_unsupported("<Foo>text</Foo>", "<Foo> component");
+        assert_unsupported("<Foo.Bar />", "component");
+    }
+
+    #[test]
+    fn compile_refuses_const_tag_shadowing_derived() {
+        // A `{@const}` that shadows a top-level `$derived` refuses (the
+        // name-based derived-read rewrite would wrongly call the const as `d()`).
+        assert_unsupported(
+            "<script>\n\tlet a = $state(1);\n\tlet d = $derived(a * 2);\n\tlet { items } = $props();\n\tfunction f() {\n\t\ta++;\n\t}\n</script>\n{#each items as item}{@const d = item.x}<p>{d}</p>{/each}",
+            "shadows a $derived binding",
+        );
+    }
+
+    #[test]
+    fn compile_refuses_typed_script() {
+        // A `lang="ts"` instance script passes type annotations through verbatim
+        // (type stripping not implemented) — refuse at the entry, before output.
+        assert_unsupported(
+            "<script lang=\"ts\">let x: number = 5;</script>\n<p>text</p>",
+            "lang=\"ts\" instance script",
+        );
+        // `generics` implies TS — refuse it too.
+        assert_unsupported(
+            "<script generics=\"T\">let x = 5;</script>\n<p>text</p>",
+            "generics attribute",
+        );
+        // A plain instance script still compiles.
+        compile(
+            "<script>let x = 5;</script>\n<p>text</p>",
             &CompileOptions::default(),
         )
-        .unwrap();
-        assert!(out.js.contains("$.escape(a.$foo)"), "got: {}", out.js);
+        .expect("plain script compiles");
+    }
+
+    #[test]
+    fn compile_refuses_comment_glued_to_script_line() {
+        // A leading comment glued to the `<script>` line (no newline before it)
+        // would trail after the function brace — refuse rather than misplace it.
+        assert_unsupported(
+            "<script>// note\n\tlet { a } = $props();</script>\n<p>{a}</p>",
+            "glued to the <script> line",
+        );
     }
 
     #[test]

@@ -54,7 +54,7 @@ use tsv_css::ast::internal::{CssBlockChild, CssNode, SimpleSelector};
 use tsv_lang::{InfallibleResolve, Span};
 use tsv_svelte::ast::internal::{
     Attribute, AttributeNode, AttributeValue, AwaitBlock, ConstTag, EachBlock, Element,
-    ExpressionTag, Fragment, FragmentNode, HtmlTag, IfBlock, KeyBlock, Root, Style,
+    ElementKind, ExpressionTag, Fragment, FragmentNode, HtmlTag, IfBlock, KeyBlock, Root, Style,
 };
 use tsv_ts::ast::internal::{
     BinaryOperator, BlockStatement, ExportDefaultDeclaration, ExportDefaultValue, Expression,
@@ -211,6 +211,12 @@ pub(crate) fn compile_server<'arena>(
     if root.options.is_some() {
         return Err(unsupported("<svelte:options>"));
     }
+    // TS instance scripts pass type annotations through verbatim (type stripping
+    // isn't implemented), and `generics` implies TS — refuse both at the entry,
+    // before any divergent output could emit.
+    if let Some(script) = root.instance {
+        refuse_typed_script(script, source)?;
+    }
 
     // CSS scoping analysis (no minting): which class names are scoped, and
     // where the hash class splices into the style text.
@@ -263,6 +269,9 @@ pub(crate) fn compile_server<'arena>(
     // wrappers, whole effect statements) — a comment inside a dropped region
     // has nowhere to go, so it refuses.
     let mut body: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
+    // Instance-script `import` statements hoist to module scope (an `import`
+    // inside the component function is invalid JS); the rest stay in the body.
+    let mut user_imports: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
     let mut uses_props = false;
     let mut has_effects = false;
     let mut updated = NameSet::default();
@@ -270,6 +279,10 @@ pub(crate) fn compile_server<'arena>(
     let mut dropped_regions: Vec<Span> = Vec::new();
     if let Some(script) = root.instance {
         for stmt in script.content.body {
+            if matches!(stmt, Statement::ImportDeclaration(_)) {
+                user_imports.push(stmt.clone());
+                continue;
+            }
             let rewritten = rewrite_script_statement(
                 &mut b,
                 stmt,
@@ -287,11 +300,30 @@ pub(crate) fn compile_server<'arena>(
             }
         }
     }
+    // A comment sitting among hoisted imports would land in the export program's
+    // comment list while its import node prints in a separate module-scope
+    // program — a placement this transform doesn't reconcile yet.
+    if has_comments && !user_imports.is_empty() {
+        return Err(unsupported(
+            "comments in a script alongside imports (placement around hoisted imports not carried through yet)",
+        ));
+    }
     for name in &updated {
         bindings.mark_updated(name);
     }
     for name in &nested_declared {
         bindings.mark_opaque(name);
+    }
+
+    // The oracle wraps the whole body in `$$renderer.component(($$renderer) => …)`
+    // whenever its `needs_context` analysis fires (a `new` expression or a
+    // member/call rooted in a prop/import — see `needs_context`). A dropped
+    // `$effect` is one such trigger (already modeled by `has_effects`); the port
+    // covers the rest. `needs_context` also forces the `$$props` parameter (the
+    // oracle's `should_inject_props` includes `should_inject_context`).
+    let needs_context = has_effects || crate::needs_context::component_needs_context(root, source)?;
+    if needs_context {
+        uses_props = true;
     }
     for comment in &script_comments {
         for region in &dropped_regions {
@@ -372,9 +404,10 @@ pub(crate) fn compile_server<'arena>(
         }
     }
 
-    // 7. Effects force the `$$renderer.component(($$renderer) => { … })`
-    // wrapper around the whole body (the effects themselves are dropped).
-    let body = if has_effects {
+    // 7. `needs_context` (a dropped effect, or the ported new/member/call
+    // analysis) forces the `$$renderer.component(($$renderer) => { … })` wrapper
+    // around the whole body.
+    let body = if needs_context {
         let inner_span = Span::new(block_start, env.b.buffer.len() as u32);
         let wrapper_renderer = env.b.ident("$$renderer");
         let mut wrapper_params: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
@@ -425,8 +458,15 @@ pub(crate) fn compile_server<'arena>(
         span: Span::new(0, rbrace_end),
     };
 
+    // The module scaffold: the `$` runtime import, then the user's hoisted
+    // instance-script imports in source order. All are comment-free, so no
+    // low-anchor→appendix window can sweep a host comment (the reason the import
+    // and export programs stay separate).
     let mut import_body: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
     import_body.push(Statement::ImportDeclaration(import));
+    for user_import in user_imports {
+        import_body.push(user_import);
+    }
     let import_program = tsv_ts::ast::internal::Program {
         body: import_body.into_bump_slice(),
         comments: Vec::new(),
@@ -491,6 +531,16 @@ fn collect_script_comments(
         .body
         .last()
         .map_or(content.start, |stmt| stmt.span().end);
+    // A leading comment glued to the `<script>` line (no newline before it) shares
+    // its source line with the function's synthetic opening brace, so the printer
+    // trails it after the `{` instead of onto its own line — refuse the class
+    // (prettier-formatted input always puts a leading comment on its own line, so
+    // the covered fixtures are unaffected).
+    let first_stmt_start = script
+        .content
+        .body
+        .first()
+        .map_or(content.end, |stmt| stmt.span().start);
     let mut comments = Vec::with_capacity(root.comments.len());
     for comment in &root.comments {
         if comment.span.start < content.start || comment.span.end > content.end {
@@ -502,6 +552,14 @@ fn collect_script_comments(
             return Err(unsupported(
                 "comment after the last script statement (the oracle re-attaches it into the template)",
             ));
+        }
+        if comment.span.end <= first_stmt_start {
+            let gap = &source[content.start as usize..comment.span.start as usize];
+            if !gap.contains('\n') {
+                return Err(unsupported(
+                    "leading comment glued to the <script> line (no newline before it)",
+                ));
+            }
         }
         let text = comment.content(source);
         if text.contains("prettier-ignore") || text.contains("format-ignore") {
@@ -521,6 +579,43 @@ fn collect_script_comments(
 
 fn unsupported(what: impl Into<String>) -> CompileError {
     CompileError::Unsupported(what.into())
+}
+
+/// Refuse a `<script>` that carries a `lang` (TypeScript) or `generics`
+/// attribute: the transform emits the script body verbatim, so a TS annotation
+/// would leak into the generated JS. Mirrors the attribute walk in the parser's
+/// `detect_script_context` — only plain `Attribute` nodes carry a name here.
+fn refuse_typed_script(
+    script: &tsv_svelte::ast::internal::Script<'_>,
+    source: &str,
+) -> Result<(), CompileError> {
+    for attr_node in script.attributes {
+        let AttributeNode::Attribute(attr) = attr_node else {
+            continue;
+        };
+        let name = {
+            let interner = script.content.interner.borrow();
+            interner.resolve_infallible(attr.name).to_string()
+        };
+        match name.as_str() {
+            "lang" => {
+                let lang = match attr.value {
+                    Some([AttributeValue::Text(text)]) => text.data(source).into_owned(),
+                    _ => String::new(),
+                };
+                return Err(unsupported(format!(
+                    "lang=\"{lang}\" instance script (type stripping not implemented)"
+                )));
+            }
+            "generics" => {
+                return Err(unsupported(
+                    "generics attribute on instance script (implies TypeScript)",
+                ));
+            }
+            _ => {}
+        }
+    }
+    Ok(())
 }
 
 /// Analysis pass: populate the top-level binding table and the derived-name
@@ -1297,6 +1392,16 @@ fn emit_const_tag<'arena>(
     let Some(name) = plain_identifier_name(id, env.source) else {
         return Err(unsupported("{@const} with a non-plain binding name"));
     };
+    // A `{@const}` that shadows a top-level `$derived` binding is refused, the
+    // same as an each/await binding (see `push_overlay`): the derived-read
+    // rewrite is name-based and would wrongly turn a later `{name}` read into a
+    // `name()` call. `emit_const_tag` inserts into the overlay directly, so it
+    // must repeat that check here.
+    if env.derived_names.contains(&name) {
+        return Err(unsupported(format!(
+            "block-scope binding {name} shadows a $derived binding"
+        )));
+    }
     // Guard + wrap the init (bare derived → d(), refuse runes/mutations).
     let init = wrap_single(env, &tag.init)?;
     let id_expr = tag.id.clone();
@@ -1826,6 +1931,18 @@ fn emit_element<'arena>(
         .borrow()
         .resolve_infallible(element.name)
         .to_string();
+    // The oracle compiles a component (`<Foo>`, `<Foo.Bar>`) into a call
+    // (`Foo($$renderer, {})`), never static markup — component rendering is a
+    // later milestone. Exhaustive over `ElementKind` so a new kind can't silently
+    // fall through to the static-HTML path below.
+    match element.kind {
+        ElementKind::Html => {}
+        ElementKind::Component => {
+            return Err(unsupported(format!(
+                "<{name}> component (component rendering not implemented)"
+            )));
+        }
+    }
     match name.as_str() {
         // Namespace-dependent whitespace/emission rules not implemented.
         "svg" | "math" => return Err(unsupported(format!("<{name}> (foreign namespace)"))),
