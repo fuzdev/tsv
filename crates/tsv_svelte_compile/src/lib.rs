@@ -1290,6 +1290,64 @@ mod tests {
     }
 
     #[test]
+    fn compile_mixed_attribute_full_fold_emits_static() {
+        // Every part of a mixed attribute folding statically emits a STATIC
+        // attribute (oracle-probed), not a $.attr*/$.attr_class call: value
+        // attr-escaped [&"<] (> stays raw), no trim, boolean attributes keep
+        // the folded value, null → ''.
+        let js = compile_js(
+            "<script>\n\tlet a = 1;\n\tlet b = 2;\n</script>\n\n<div class=\"{a}{b}\"></div>\n",
+        );
+        assert!(js.contains("`<div class=\"12\"></div>`"), "{js}");
+        assert!(!js.contains("$.attr_class"), "must be static: {js}");
+        let js = compile_js(
+            "<script>\n\tlet a = `x\"y<z>&w`;\n\tlet b = 1;\n</script>\n\n<div title=\"p{a}q{b}\"></div>\n",
+        );
+        assert!(
+            js.contains("`<div title=\"px&quot;y&lt;z>&amp;wq1\"></div>`"),
+            "folded value must attr-escape [&\"<] with > raw: {js}"
+        );
+        let js = compile_js(
+            "<script>\n\tlet a = null;\n\tlet b = 1;\n</script>\n\n<input disabled=\"x{a}{b}\" />\n",
+        );
+        assert!(
+            js.contains("disabled=\"x1\""),
+            "boolean attr keeps folded value; null folds to '': {js}"
+        );
+        // A folded-empty class stays `class=""` (the empty-class drop is
+        // static-path-only, probe-verified).
+        let js = compile_js(
+            "<script>\n\tlet a = ``;\n\tlet b = ``;\n</script>\n\n<div class=\"{a}{b}\"></div>\n",
+        );
+        assert!(js.contains("`<div class=\"\"></div>`"), "{js}");
+        // One non-foldable part keeps the whole attribute dynamic with the
+        // known parts folded inline (the pre-existing path).
+        let js = compile_js(
+            "<script>\n\tlet a = 1;\n\tlet { b } = $props();\n</script>\n\n<div title=\"x{a}y{b}\"></div>\n",
+        );
+        assert!(
+            js.contains("$.attr('title', `x1y${$.stringify(b)}`)"),
+            "partial fold must stay dynamic: {js}"
+        );
+    }
+
+    #[test]
+    fn compile_empty_class_attribute_drops() {
+        // A static string-valued class that collapses+trims to empty is
+        // dropped entirely (oracle-probed); a bare `class` (boolean form)
+        // keeps `class=""`, and empty style/id stay.
+        let js = compile_js("<div class=\"\"></div>\n<div class=\"   \"></div>\n");
+        assert!(js.contains("`<div></div> <div></div>`"), "{js}");
+        let js = compile_js("<div class></div>\n");
+        assert!(js.contains("`<div class=\"\"></div>`"), "{js}");
+        let js = compile_js("<div id=\"\" style=\"\" class=\"\" title=\"t\"></div>\n");
+        assert!(
+            js.contains("`<div id=\"\" style=\"\" title=\"t\"></div>`"),
+            "only class drops: {js}"
+        );
+    }
+
+    #[test]
     fn compile_void_and_boolean_attributes() {
         let out = compile(
             "<p>text1<br />text2</p>\n<input value=\"value\" disabled />",

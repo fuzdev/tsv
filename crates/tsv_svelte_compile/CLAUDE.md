@@ -113,7 +113,11 @@ project-wide conventions.
   `{expr}` → `$.escape(expr)` (a bare derived read becomes `d()`; known
   evaluations fold as static text), `{@html expr}` → `$.html(expr)`, dynamic
   and mixed attributes → `$.attr(name, expr[, true])` / `$.attr_class` /
-  `$.attr_style` with `$.stringify` interpolations, and minimal CSS scoping
+  `$.attr_style` with `$.stringify` interpolations (a mixed attribute whose
+  every part folds statically emits a *static* attribute instead —
+  attr-escaped `[&"<]`, folded value verbatim: no trim, no empty-class drop,
+  boolean attributes keep the folded value; single-expression attributes never
+  fold), and minimal CSS scoping
   (single class selectors: the `svelte-tsvhash` class appended to matched
   elements and **source-spliced** into the style text — the author's
   whitespace is preserved, not reprinted). Static emission implements the
@@ -124,7 +128,9 @@ project-wide conventions.
   interior whitespace is verbatim; `<pre>`/`<textarea>` preserve everything;
   entities decode then re-escape (`[&<]` in text, `[&"<]` in static
   attributes); boolean attributes emit `name=""`; `class`/`style` values
-  collapse+trim; void elements close `/>`; a text-first fragment (component
+  collapse+trim, and a string-valued `class` that collapses+trims to empty is
+  dropped entirely (static path only — bare `class` keeps `class=""`, empty
+  `style`/`id` stay); void elements close `/>`; a text-first fragment (component
   root or `{#each}` body — the oracle's `is_text_first` parent set) gets a
   `<!---->` prefix. **Control-flow blocks** split the single template into
   multiple `$$renderer.push(…)` statements, each block emitting its own

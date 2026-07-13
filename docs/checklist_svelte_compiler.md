@@ -139,7 +139,7 @@ Instance-script comments carry through by default. The classes where the oracle 
 
 ### Static emission — Supported
 
-The oracle's normalization (`3-transform/utils.js:126` `clean_nodes`, `escape_html`), probe-verified: whitespace-only boundary text drops and edge runs trim per fragment; a text edge run abutting a non-text node collapses to one space (text + `{expr}` count as one text); interior whitespace is verbatim; `<pre>`/`<textarea>` preserve everything; entities decode then re-escape (`[&<]` in text, `[&"<]` in static attributes); boolean attributes emit `name=""`; `class`/`style` values collapse+trim; void elements close `/>`; a text-first fragment (component root or `{#each}` body — `3-transform/utils.js:295` `is_text_first`) gets a `<!---->` prefix.
+The oracle's normalization (`3-transform/utils.js:126` `clean_nodes`, `escape_html`), probe-verified: whitespace-only boundary text drops and edge runs trim per fragment; a text edge run abutting a non-text node collapses to one space (text + `{expr}` count as one text); interior whitespace is verbatim; `<pre>`/`<textarea>` preserve everything; entities decode then re-escape (`[&<]` in text, `[&"<]` in static attributes); boolean attributes emit `name=""`; `class`/`style` values collapse+trim; a string-valued `class` that collapses+trims to empty is dropped entirely (static path only — bare `class` keeps `class=""`, empty `style`/`id` stay, a *folded* mixed class keeps `class=""`); void elements close `/>`; a text-first fragment (component root or `{#each}` body — `3-transform/utils.js:295` `is_text_first`) gets a `<!---->` prefix.
 
 ### Expressions — Supported
 
@@ -171,6 +171,7 @@ The oracle's normalization (`3-transform/utils.js:126` `clean_nodes`, `escape_ht
 | expression (`name={expr}`) → `$.attr(name, expr[, true])` | Supported |
 | dynamic `class`/`style` → `$.attr_class` / `$.attr_style` | Supported (unstyled components) |
 | mixed text+expression (`"t {a} u"`) with `$.stringify` interpolations | Supported (unstyled components) |
+| mixed value whose every part folds statically → a *static* attribute (attr-escape `[&"<]`, folded value verbatim: no trim, no empty-class drop, boolean attributes keep the folded value, null/undefined → `''`; only the chunk-array path folds — a single-expression attribute never does) | Supported |
 | event attributes | **Refused**: `event attribute {name}` (any `on`-prefixed attribute with an expression value) |
 | directives / spread | **Refused**: `non-plain attribute (directive/spread)` |
 | string-literal expression value (`name={'s'}`) | **Refused**: `string-literal expression attribute value (inline-literal path)` |
@@ -197,15 +198,6 @@ Minimal scoping: single class selectors gain the deterministic `svelte-tsvhash` 
 
 - **Supported**: top-level rules whose selectors are single simple class selectors matching at least one element.
 - **Refused**: `css at-rule in <style>`, `nested css rule in <style>`, `css combinator selector in <style>`, ``non-class css selector in <style> (only `.class` is supported)``, `css selector .{class} matches no element (pruning not implemented)`
-
----
-
-## Known Divergences (bugs)
-
-Shapes where both sides currently compile but the canonical forms differ — MISMATCH by the refusal contract, tracked for a fix:
-
-- **Mixed attribute whose every part is statically known**: the oracle folds the whole value into a *static* attribute (`class="{a}{b}"` with known `a`,`b` → `class="12"`, attr-escaped `[&"<]`, no trim, no empty-drop, boolean attributes keep the folded value); tsv emits the dynamic `$.attr_class(`…`)`/`$.attr(…)` call around the folded template.
-- **Static string-valued `class` that collapses+trims to empty**: the oracle drops the attribute entirely (`<div class="">` → `<div>`; whitespace-only likewise); tsv emits `class=""`. Class-specific and static-path-specific: bare `class` keeps `class=""`, `style=""`/`id=""` stay, and a *folded* empty class also stays `class=""`.
 
 ---
 

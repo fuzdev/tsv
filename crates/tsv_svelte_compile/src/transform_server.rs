@@ -2210,6 +2210,15 @@ fn emit_attribute<'arena>(
             } else {
                 decoded.into_owned()
             };
+            // A string-valued `class` that collapses+trims to empty is dropped
+            // entirely (oracle-probed: `class=""` and `class="  "` emit no
+            // attribute). Class-specific and static-path-specific: a bare
+            // `class` (boolean form, handled above) keeps `class=""`, empty
+            // `style`/`id` stay, and a *folded* mixed class keeps `class=""`
+            // (see `emit_mixed_attribute`).
+            if name == "class" && value.is_empty() {
+                return Ok(());
+            }
             if name == "class"
                 && let Some(scope) = &env.scope
             {
@@ -2344,6 +2353,9 @@ fn emit_mixed_attribute<'arena>(
     let trim_whitespace = name == "class" || name == "style";
 
     let mut texts: Vec<String> = vec![String::new()];
+    // The unescaped folded value, in parallel — consumed only when every part
+    // folds statically (the full-fold static emission below).
+    let mut raw = String::new();
     let mut exprs: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(env.b.arena);
     for value in values {
         match value {
@@ -2356,6 +2368,7 @@ fn emit_mixed_attribute<'arena>(
                 } else {
                     decoded.into_owned()
                 };
+                raw.push_str(&chunk);
                 // Attribute templates carry no HTML escaping — the runtime
                 // escapes; only template metachars are escaped here.
                 #[allow(clippy::unwrap_used)]
@@ -2374,6 +2387,7 @@ fn emit_mixed_attribute<'arena>(
                     // HTML escaping in the template-value path.
                     let text = stringify_value(value)
                         .map_err(|g| unsupported(format!("static fold not portable: {}", g.0)))?;
+                    raw.push_str(&text);
                     #[allow(clippy::unwrap_used)]
                     texts
                         .last_mut()
@@ -2390,6 +2404,20 @@ fn emit_mixed_attribute<'arena>(
                 texts.push(String::new());
             }
         }
+    }
+
+    if exprs.is_empty() {
+        // Every part folded statically — the oracle emits a *static* attribute
+        // (oracle-probed rules): attr-escape `[&"<]`, folded value verbatim (no
+        // trim, no empty-class drop, boolean attributes keep the folded value,
+        // null/undefined already stringified to '' by the fold above). Only the
+        // chunk-array path folds; a single-expression attribute never does
+        // (`emit_dynamic_attribute`).
+        out.push_text(&escape_template_text(&format!(
+            " {name}=\"{}\"",
+            escape_html_attr(&raw)
+        )));
+        return Ok(());
     }
 
     let template = env.b.template_literal(&texts, exprs.into_bump_slice());
