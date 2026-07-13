@@ -11,7 +11,10 @@
 // - **helpers.rs**: Shared utilities and ChainPartsBuilder
 
 mod expansion;
-mod helpers;
+// `printing` reaches in for `push_gap_comments_and_break` — the one definition of how a
+// forced chain break renders its gap comments — so a computed member that hangs mid-group
+// (never starting one, so no builder ever owns its gap) renders it identically.
+pub(super) mod helpers;
 mod member_only;
 
 use expansion::{

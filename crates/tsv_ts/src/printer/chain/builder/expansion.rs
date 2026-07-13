@@ -9,7 +9,7 @@
 use crate::ast::internal::{ArrowFunctionBody, Expression};
 use crate::printer::calls::arg_predicates::is_simple_call_argument;
 
-use super::super::printing::ChainPrinter;
+use super::super::printing::{ChainPrinter, node_comment_gap};
 use super::super::types::{ChainGroup, ChainNode};
 use tsv_lang::printing::{self, has_blank_line_between_fast};
 
@@ -52,10 +52,16 @@ pub(super) fn has_comments_forcing_expansion<'a, P: ChainPrinter>(
 
         for (node_idx, node) in group.nodes.iter().enumerate() {
             // Skip the last member node in the last group - its comments are
-            // handled inline via line_suffix, not by forcing expansion
+            // handled inline via line_suffix, not by forcing expansion.
+            //
+            // EXCEPT a computed member whose pre-bracket gap holds a LINE comment: a `//`
+            // must end its line, so `print_node_inner` emits a forced break in that gap
+            // rather than deferring it (see its ComputedMember arm). The chain has to
+            // expand around that break — left flat, the hardline lands in the one-line
+            // variant and the whole chain renders unindented.
             let is_last_node_in_last_group =
                 is_last_group && node_idx == group.nodes.len() - 1 && node.is_member();
-            if is_last_node_in_last_group {
+            if is_last_node_in_last_group && !computed_pre_bracket_line_comment(node, printer) {
                 continue;
             }
 
@@ -67,6 +73,24 @@ pub(super) fn has_comments_forcing_expansion<'a, P: ChainPrinter>(
         }
     }
     false
+}
+
+/// Whether a computed member's pre-bracket gap (`a.b()⏎// c⏎[0]`) carries a **line**
+/// comment — the one gap a chain builder never owns, since a computed member with a
+/// numeric-literal index is glued into the preceding call's group instead of starting
+/// one. `print_node_inner` emits a forced break for it, so the chain must expand.
+fn computed_pre_bracket_line_comment<'a, P: ChainPrinter>(
+    node: &ChainNode<'a>,
+    printer: &P,
+) -> bool {
+    if !matches!(node, ChainNode::ComputedMember { .. }) {
+        return false;
+    }
+    let Some((start, end)) = node_comment_gap(node, printer) else {
+        return false;
+    };
+    let classified = printer.classify_comments(start, end);
+    !classified.trailing_line.is_empty() || !classified.leading_line.is_empty()
 }
 
 /// Check if a call node has complex (non-simple) arguments

@@ -4,7 +4,7 @@
 // - ChainPartsBuilder: Builder for constructing chain parts with comments
 
 use super::super::printing::{
-    ChainPrinter, build_chain_line_break, print_group, print_group_expanded,
+    ChainPrinter, build_chain_line_break, group_comment_gap, print_group, print_group_expanded,
     print_group_expanded_skip_first_comments, print_group_skip_first_comments,
 };
 use super::super::types::ChainGroup;
@@ -164,7 +164,7 @@ impl<'a, 'p, P: ChainPrinter> ChainPartsBuilder<'a, 'p, P> {
     /// (e.g., after `=`), which requires structural transformation beyond what
     /// this function handles.
     fn add_trailing_comments_only(&mut self, group: &ChainGroup<'_>) {
-        if let Some((object_end, property_start)) = group.first_member_range() {
+        if let Some((object_end, property_start)) = group_comment_gap(group, self.printer) {
             let classified = self.printer.classify_comments(object_end, property_start);
 
             // Trailing block comments (same line as previous element)
@@ -191,7 +191,7 @@ impl<'a, 'p, P: ChainPrinter> ChainPartsBuilder<'a, 'p, P> {
     /// Delegates to the shared [`push_gap_comments_and_break`] so this group path
     /// and the member-only breaking path render gap comments identically.
     fn add_comments_and_break(&mut self, group: &ChainGroup<'_>) {
-        if let Some((object_end, property_start)) = group.first_member_range() {
+        if let Some((object_end, property_start)) = group_comment_gap(group, self.printer) {
             push_gap_comments_and_break(
                 self.parts,
                 self.printer,
@@ -245,7 +245,7 @@ pub(crate) fn build_rest_parts_with_comments<'a, P: ChainPrinter>(
     // own line. Only trailing block comments can stay inline.
     let last_has_break_forcing_comments = last_is_simple_member
         && rest_groups.last().is_some_and(|g| {
-            if let Some((object_end, property_start)) = g.first_member_range() {
+            if let Some((object_end, property_start)) = group_comment_gap(g, printer) {
                 let classified = printer.classify_comments(object_end, property_start);
                 // Any line comments or leading comments force a break
                 !classified.trailing_line.is_empty()

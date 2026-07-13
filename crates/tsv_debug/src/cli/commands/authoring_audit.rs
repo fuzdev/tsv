@@ -54,6 +54,7 @@ use super::profile::resolve_files;
 /// Defaults to `tests/fixtures` when no paths are given. Svelte (`.svelte`) only.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "authoring_audit")]
+#[allow(clippy::struct_excessive_bools)] // independent CLI flags
 pub struct AuthoringAuditCommand {
     /// emit JSON
     #[argh(switch)]
@@ -79,6 +80,12 @@ pub struct AuthoringAuditCommand {
     /// finding (non-idempotent, and — with --prettier — bucket-a) into this dir
     #[argh(option)]
     dump_dir: Option<String>,
+
+    /// the check gate: fail on any hard finding EXCEPT a site-level non-idempotency in
+    /// a file on the KNOWN_NON_IDEMPOTENT ledger — and fail if a ledger entry no longer
+    /// reproduces (a stale entry must be deleted, not left to widen the tolerance)
+    #[argh(switch)]
+    gate: bool,
 
     /// file paths, directories, or glob patterns (default: tests/fixtures)
     #[argh(positional)]
@@ -316,8 +323,28 @@ struct Report {
     counts: BTreeMap<Bucket, usize>,
     examples: BTreeMap<Bucket, Vec<Outcome>>,
     base_non_idempotent_paths: Vec<String>,
+    /// Every file with at least one site-level non-idempotency (deduped) — the
+    /// `--gate` ledger is checked against this, so it is not capped like `examples`.
+    non_idempotent_paths: Vec<String>,
     dump_seq: usize,
 }
+
+/// Files with a KNOWN site-level non-idempotency, tolerated by `--gate` so the check
+/// can ratchet (any *new* one fails) while these are outstanding.
+///
+/// All three are the same bug: content-boundary whitespace that carries no newline
+/// (`<span> →…`) survives into the block-style form on the first pass, and is trimmed
+/// on the second — because going block-style *injects* a newline, which flips how the
+/// leading run classifies. `format(format(x)) != format(x)`.
+///
+/// This is a ledger, not a suppression: `--gate` also fails when an entry STOPS
+/// reproducing, so a fix must delete its line here rather than silently widening the
+/// tolerance.
+const KNOWN_NON_IDEMPOTENT: &[&str] = &[
+    "tests/fixtures/svelte/elements/inline_boundary_whitespace/input.svelte",
+    "tests/fixtures/svelte/elements/inline_boundary_whitespace/unformatted_spaces.svelte",
+    "tests/fixtures/svelte/elements/inline_multiline_leading_text_long/input.svelte",
+];
 
 impl Report {
     fn count(&self, b: Bucket) -> usize {
@@ -407,14 +434,104 @@ impl AuthoringAuditCommand {
             print_human(&report, self.verbose, self.prettier);
         }
 
-        // Exit non-zero on any hard finding (non-idempotency, or — when triaged —
-        // an (a) bug). (c)/(b)/untriaged divergences are not gate failures here.
-        let hard = report.count(Bucket::BugA) + report.count(Bucket::NonIdempotent);
+        // Exit non-zero on any hard finding: a base-non-idempotent file (F1 — the core
+        // invariant — broken on the file as it stands, before any authoring probe), a
+        // site-level non-idempotency, or — when triaged — an (a) bug. (c)/(b)/untriaged
+        // divergences are not gate failures here. A base-non-idempotent file is excluded
+        // from the *authoring* analysis (its fixed point is undefined, so the
+        // converge/diverge verdict is meaningless), but excluding it from the analysis is
+        // not a reason to pass the run — that is how the ProjectList reflow sat here
+        // reported-but-green.
+        //
+        // `--gate` (the `deno task check` mode) is the same bar, minus the
+        // KNOWN_NON_IDEMPOTENT ledger — so the check ratchets on a NEW non-idempotency
+        // today instead of waiting on the outstanding ones. Everything else, including a
+        // base-non-idempotent file, still fails.
+        if self.gate {
+            return self.gate_verdict(&report);
+        }
+        let hard = report.count(Bucket::BugA)
+            + report.count(Bucket::NonIdempotent)
+            + report.files_base_non_idempotent;
         if hard > 0 {
             Err(CliError::Failed)
         } else {
             Ok(())
         }
+    }
+
+    /// The `--gate` verdict: hard findings fail, except a site-level non-idempotency in
+    /// a KNOWN_NON_IDEMPOTENT file. A ledger entry that no longer reproduces also fails
+    /// — a fix must delete its line, so the tolerance can never silently outlive the bug
+    /// it was written for.
+    fn gate_verdict(&self, report: &Report) -> Result<(), CliError> {
+        let unexpected: Vec<&String> = report
+            .non_idempotent_paths
+            .iter()
+            .filter(|p| !KNOWN_NON_IDEMPOTENT.contains(&p.as_str()))
+            .collect();
+        let stale: Vec<&&str> = KNOWN_NON_IDEMPOTENT
+            .iter()
+            .filter(|known| {
+                !report
+                    .non_idempotent_paths
+                    .iter()
+                    .any(|p| p.as_str() == **known)
+            })
+            .collect();
+
+        let mut failed = false;
+
+        if !unexpected.is_empty() {
+            println!(
+                "\n✗ {} file(s) with a NEW site-level non-idempotency (F1 broken):",
+                unexpected.len()
+            );
+            for p in &unexpected {
+                println!("    {p}");
+            }
+            println!("  Re-run without --gate (add --dump-dir DIR) for byte-exact repros.");
+            failed = true;
+        }
+
+        if !stale.is_empty() {
+            println!(
+                "\n✗ {} stale KNOWN_NON_IDEMPOTENT entry(ies) — no longer reproduce:",
+                stale.len()
+            );
+            for p in &stale {
+                println!("    {p}");
+            }
+            println!(
+                "  If you fixed these, delete their lines from KNOWN_NON_IDEMPOTENT in\n  \
+                 crates/tsv_debug/src/cli/commands/authoring_audit.rs."
+            );
+            failed = true;
+        }
+
+        if report.files_base_non_idempotent > 0 {
+            println!(
+                "\n✗ {} base-non-idempotent file(s) — never tolerated (see above).",
+                report.files_base_non_idempotent
+            );
+            failed = true;
+        }
+        if report.count(Bucket::BugA) > 0 {
+            println!(
+                "\n✗ {} triaged (a) bug(s) — never tolerated.",
+                report.count(Bucket::BugA)
+            );
+            failed = true;
+        }
+
+        if failed {
+            return Err(CliError::Failed);
+        }
+        println!(
+            "\n✓ gate: no new non-idempotency ({} known, all still reproducing)",
+            KNOWN_NON_IDEMPOTENT.len()
+        );
+        Ok(())
     }
 
     /// Pure-Rust pass: convergence + self-stability only (no prettier).
@@ -566,6 +683,9 @@ impl AuthoringAuditCommand {
     fn record(&self, report: &mut Report, outcome: Outcome) {
         let bucket = outcome.bucket();
         *report.counts.entry(bucket).or_default() += 1;
+        if bucket == Bucket::NonIdempotent && !report.non_idempotent_paths.contains(&outcome.path) {
+            report.non_idempotent_paths.push(outcome.path.clone());
+        }
         if interesting(bucket) {
             let slot = report.examples.entry(bucket).or_default();
             if slot.len() < self.examples {
@@ -653,7 +773,8 @@ fn print_human(report: &Report, verbose: bool, triaged: bool) {
 
     if !report.base_non_idempotent_paths.is_empty() {
         println!();
-        println!("  base-non-idempotent files (pre-existing, excluded):");
+        println!("  ✗ base-non-idempotent files (F1 broken — excluded from the authoring");
+        println!("    analysis, but a failure in their own right):");
         for p in report.base_non_idempotent_paths.iter().take(20) {
             println!("    {p}");
         }

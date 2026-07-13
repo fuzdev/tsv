@@ -502,8 +502,29 @@ impl<'a> Printer<'a> {
                 return;
             }
             if !multiline {
-                // Legacy inline callers: signal the next inline element to lead with a line.
-                *handle_whitespace_of_prev_text = true;
+                // Before a tag the separator is a bare collapsible break — a space while
+                // the fragment fits, a newline once it breaks — exactly as the multiline
+                // arm below emits it. `group([line, tag])` (the inline-element form) would
+                // instead decide the separator on its own width, independently of whether
+                // the parent broke: a compact `<small>{a} {b}</small>` that overflows would
+                // pack `{a} {b}` onto the block-style content line, while the same document
+                // authored across lines splits them. That makes the layout follow the
+                // content-boundary whitespace — which is render-free under Svelte 5, and
+                // which tsv *injects* when it converts an authoring to block-style, so the
+                // emitted form would reflow on the next pass.
+                //
+                // An inline ELEMENT or component keeps `group([line, el])` deliberately: it
+                // carries its own tags, so the group is what lets a wide element drop to its
+                // own line whole instead of breaking its tag in place, and both formatters
+                // settle on a stable (if authoring-dependent) form there — the sanctioned
+                // Tier-2 element-expansion class, not this bug. A tag has no such structure
+                // to protect, so the bare break is strictly better.
+                if next_is_tag {
+                    child_docs.push(d.line());
+                } else {
+                    // Signal the next inline element to lead with a line.
+                    *handle_whitespace_of_prev_text = true;
+                }
                 return;
             }
             // Multiline middle whitespace-only text — mirror prettier-plugin-svelte's

@@ -6,6 +6,7 @@
 // - ChainPrinter trait: Interface for the printer
 
 use super::analysis::SymbolLookup;
+use super::builder::helpers::push_gap_comments_and_break;
 use super::types::{ChainGroup, ChainNode};
 use crate::ast::internal::{self, Expression};
 use crate::printer::{ParenContext, needs_parens};
@@ -375,21 +376,6 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
             // skipping over comments to find the actual `[` (or `?.[` for optional)
             let bracket_open_pos = find_bracket_position(printer, *object_end, prop_span.start);
 
-            // Comments between object and `[` stay OUTSIDE brackets
-            // Comments between `[` and property go INSIDE brackets
-            let pre_bracket = printer.classify_comments(*object_end, bracket_open_pos);
-            let pre_trailing_line =
-                printer.build_line_comments_no_boundary(&pre_bracket.trailing_line);
-            let pre_leading_line =
-                printer.build_line_comments_no_boundary(&pre_bracket.leading_line);
-            // Block comments before the bracket (e.g., `a /* c */[0]`)
-            let pre_bracket_block_doc = printer.build_block_comments_doc(
-                *object_end,
-                bracket_open_pos,
-                crate::printer::CommentSpacing::Leading,
-                true,
-            );
-
             let inside_start = bracket_open_pos + if *optional { 3 } else { 1 };
             let open = if *optional { "?.[" } else { "[" };
 
@@ -452,13 +438,49 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
                 }
             };
 
-            // Emit: pre-bracket line comments, pre-bracket block comments, then brackets
-            d.concat(&[
-                pre_trailing_line,
-                pre_leading_line,
-                pre_bracket_block_doc,
-                bracket_doc,
-            ])
+            // The chain builder owns the gap between the object and the `[`
+            // (`node_comment_gap`) and has already emitted its comments ahead of this
+            // node's line break, so emitting them again here would duplicate them.
+            if skip_comments {
+                return bracket_doc;
+            }
+
+            // Comments between object and `[` stay OUTSIDE brackets
+            // (comments between `[` and the index went INSIDE, above)
+            let pre_bracket = printer.classify_comments(*object_end, bracket_open_pos);
+
+            // A LINE comment in this gap must end its line. Reaching here means no chain
+            // builder owned the gap (`skip_comments` would be set): a computed member with
+            // a numeric-literal index is glued into the preceding call's group rather than
+            // starting one (prettier's `printMemberChain` grouping), so it is the one node
+            // kind that can hang mid-group. Emit through the shared forced-break path, the
+            // single definition of how a chain gap renders — the same one the group and
+            // member-only paths use. The `line_suffix` route below (correct for a block
+            // comment, which can sit inline) would instead defer the `//` to end of line:
+            // `a.b()[0]; // c`, relocating it past the brackets AND the `;`, and merging
+            // consecutive ones onto one line where the first `//` swallows the rest.
+            if !pre_bracket.trailing_line.is_empty() || !pre_bracket.leading_line.is_empty() {
+                let mut parts = DocBuf::new();
+                push_gap_comments_and_break(
+                    &mut parts,
+                    printer,
+                    *object_end,
+                    bracket_open_pos,
+                    true,
+                );
+                parts.push(bracket_doc);
+                return d.concat(&parts);
+            }
+
+            // Block comments before the bracket (e.g., `a /* c */[0]`) stay inline.
+            let pre_bracket_block_doc = printer.build_block_comments_doc(
+                *object_end,
+                bracket_open_pos,
+                crate::printer::CommentSpacing::Leading,
+                true,
+            );
+
+            d.concat(&[pre_bracket_block_doc, bracket_doc])
         }
 
         ChainNode::NonNull => d.text("!"),
@@ -681,6 +703,35 @@ fn find_bracket_position<P: ChainPrinter>(printer: &P, start: u32, end: u32) -> 
 //
 // Helper Functions
 //
+
+/// The **chain-level** comment gap before a node — the source range whose comments the
+/// chain builder owns, emitting them ahead of the line break it puts in front of the node.
+///
+/// For a computed member this stops at the `[` rather than running to the index: comments
+/// *inside* the brackets belong to the bracket builder in [`print_node_inner`], so a chain
+/// builder that scanned past the `[` would emit them a second time (and the arm's
+/// boundary-less `line_suffix` copy would flush at the end of the line, merging consecutive
+/// comments into one). The `[` scan is skipped on a comment-free chain, where every gap
+/// query is empty regardless of the bound.
+pub(crate) fn node_comment_gap<P: ChainPrinter>(
+    node: &ChainNode<'_>,
+    printer: &P,
+) -> Option<(u32, u32)> {
+    let (object_end, property_start) = node.comment_range()?;
+    if matches!(node, ChainNode::ComputedMember { .. }) && printer.chain_has_comments() {
+        let bracket_open = find_bracket_position(printer, object_end, property_start);
+        return Some((object_end, bracket_open));
+    }
+    Some((object_end, property_start))
+}
+
+/// The chain-level comment gap before a group's first node — see [`node_comment_gap`].
+pub(crate) fn group_comment_gap<P: ChainPrinter>(
+    group: &ChainGroup<'_>,
+    printer: &P,
+) -> Option<(u32, u32)> {
+    node_comment_gap(group.nodes.first()?, printer)
+}
 
 /// Build a line break doc with optional blank line preservation
 ///

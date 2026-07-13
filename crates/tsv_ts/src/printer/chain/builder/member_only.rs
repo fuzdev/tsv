@@ -3,7 +3,7 @@
 // Handles chains that contain only member accesses (no calls) using
 // fill() for greedy packing of segments.
 
-use super::super::printing::{ChainPrinter, print_node, print_node_inner};
+use super::super::printing::{ChainPrinter, node_comment_gap, print_node, print_node_inner};
 use super::super::types::{ChainGroup, ChainNode, ChainNodeRefVec};
 use super::helpers::push_gap_comments_and_break;
 use crate::ast::internal::Expression;
@@ -23,7 +23,7 @@ pub(super) fn member_only_has_interior_line_comments<'a, P: ChainPrinter>(
     groups
         .iter()
         .flat_map(|g| g.nodes.iter())
-        .any(|node| match node.comment_range() {
+        .any(|node| match node_comment_gap(node, printer) {
             Some((start, end)) => {
                 let c = printer.classify_comments(start, end);
                 !c.trailing_line.is_empty() || !c.leading_line.is_empty()
@@ -70,9 +70,12 @@ pub(super) fn build_member_only_chain_with_comments_doc<'a, P: ChainPrinter>(
     // print the node skipping its own comments; otherwise just break before it.
     let mut rest = DocBuf::new();
     for node in &all_nodes[first_doc_end..] {
-        match node.comment_range() {
-            Some((obj_end, prop_start)) if printer.has_comments_between(obj_end, prop_start) => {
-                push_gap_comments_and_break(&mut rest, printer, obj_end, prop_start, true);
+        // `gap_end` is the property start for a plain member, but the `[` for a
+        // computed one — the comments inside its brackets belong to the bracket
+        // builder, not to this chain gap. See `node_comment_gap`.
+        match node_comment_gap(node, printer) {
+            Some((obj_end, gap_end)) if printer.has_comments_between(obj_end, gap_end) => {
+                push_gap_comments_and_break(&mut rest, printer, obj_end, gap_end, true);
                 rest.push(print_node_inner(node, printer, false, true));
             }
             _ => {

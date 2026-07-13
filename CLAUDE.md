@@ -181,7 +181,9 @@ deno task pins:audit                 # canonical-oracle version sync (gated in `
 deno task scan:audit                 # guard against new raw find/rfind/match_indices substring scans over source (gated in `deno task check`); see Debug Tooling
 deno task fanout:audit               # guard against super-linear doc-node fanout (the per-layout-candidate rebuild blowup); gated in `deno task check`; see Debug Tooling
 deno task roundtrip:audit            # cheap tripwire that format(tests/fixtures) reparses (pure-Rust phase 1, no *_unreparseable output; gated in `deno task check`) — real yield is external corpora; see Debug Tooling
-deno task fuzz:audit                 # seeded mutational fuzzer over tests/fixtures (fixed --seed 0 --iterations 5000; pure Rust, no sidecar; gated in `deno task check`) — asserts no-panic + idempotency + structural-reparse on mutated input; see Debug Tooling
+deno task authoring:audit            # authoring-independence gate over tests/fixtures (pure Rust, `authoring_audit --gate`): fails on a NEW site-level non-idempotency, on a base-non-idempotent file, and on a STALE ledger entry; the outstanding ones ride the in-code KNOWN_NON_IDEMPOTENT ledger. Gated in `deno task check`; see Debug Tooling
+deno task fuzz:audit                 # seeded mutational fuzzer over tests/fixtures (fixed --seed 0 --iterations 5000; pure Rust, no sidecar; gated in `deno task check`) — asserts no-panic + idempotency + structural-reparse, on every seed file AS AUTHORED and then on mutated input; see Debug Tooling
+deno task idempotency:sweep          # F1 (idempotency) sweep over the real-code corpus (the `perf` view — sibling dev repos + upstream framework source). NOT in `deno task check`: machine-dependent corpus, minutes not seconds. Run at conformance cadence or after a printer change; see Debug Tooling
 ```
 
 For direct `cargo run -p tsv_debug` usage, see [Debug Tooling](#debug-tooling).
@@ -830,6 +832,14 @@ cargo run -p tsv_debug --features swallow_check swallow_audit ~/dev/zzz/src   # 
 # default tsv_debug builds (profile/perf sessions measure production-shaped render
 # code); only the `swallow:audit` deno task needs the feature. Gated in
 # `deno task check` (via `swallow:audit`) over tests/fixtures.
+#
+# Coverage is every render that appends to the output buffer — the main loop AND
+# its sub-renders (fill segments, the line-suffix flush), all driving one
+# per-thread state machine. A `line_suffix` comment is NOT exempt: two of them
+# flushed at the same line break land back-to-back on one line (`x; // c2 // c1`)
+# and the first `//` swallows the second. Comments written straight to the output
+# buffer (the Svelte template buffer path) bypass the doc renderer and stay out
+# of scope.
 ```
 
 **Build-Fanout Audit (exponential-rebuild regression guard):**
@@ -879,8 +889,25 @@ cargo run -p tsv_debug scan_audit --list     # enumerate every scan site
 # under test. Svelte (.svelte) only for now.
 cargo run -p tsv_debug authoring_audit                  # audit tests/fixtures (pure Rust)
 cargo run -p tsv_debug authoring_audit ~/dev/zzz/src    # audit a real codebase
+cargo run -p tsv_debug authoring_audit --gate           # the check gate (see below)
 # Pure-Rust verdict per site: converge / diverge (dual-stable) / diverge
-# (NON-IDEMPOTENT); exits 1 on any non-idempotency. --prettier adds sidecar triage:
+# (NON-IDEMPOTENT); exits 1 on any non-idempotency — site-level, and also a
+# base-non-idempotent FILE (one whose own format isn't a fixed point). Such a file
+# is excluded from the authoring analysis (its fixed point is undefined, so the
+# converge/diverge verdict would be meaningless), but the exclusion is not a reason
+# to pass the run.
+#
+# `--gate` (the `authoring:audit` deno task, gated in `deno task check`) is that same
+# bar minus an in-code KNOWN_NON_IDEMPOTENT ledger, so the check RATCHETS — a new
+# site-level non-idempotency fails while the outstanding ones are tracked. It is a
+# ledger, not a suppression: a stale entry (one that no longer reproduces) fails too,
+# so a fix must delete its line. A base-non-idempotent file and a triaged (a) bug are
+# never tolerated. The three current entries are one bug: content-boundary whitespace
+# with no newline (`<span> →…`) survives into the block-style form on pass 1 and is
+# trimmed on pass 2, because going block-style *injects* a newline that flips how the
+# leading run classifies.
+#
+# --prettier adds sidecar triage:
 # (a) tsv diverges where prettier converges (bug); (b) tsv converges where prettier
 # diverges (a _prettier_divergence to pin, the space_after_block class); (c) both
 # diverge (sanctioned, e.g. Tier-2 element expansion). --dump-dir writes byte-exact
@@ -933,14 +960,40 @@ cargo run -p tsv_debug roundtrip_audit --canonical-all --verbose ../prettier/tes
 # exactly. Pure Rust, no sidecar. Not the differential (tsv-vs-canonical) leg.
 # The `fuzz:audit` deno task (fixed --seed 0 --iterations 5000 over tests/fixtures) is
 # gated in `deno task check` — a cheap standing tripwire for the three invariants.
+#
+# TWO passes. Pass 1 drives every seed file AS AUTHORED (unmutated), pass 2 the
+# mutants. The pristine pass matters because the corpus is the richest source of
+# real, formatter-reachable inputs — and over tests/fixtures it is the ONLY gate
+# that drives the non-`input.*` fixture files: the validator claims F1 on `input.*`
+# alone, so `output_prettier.*` / `variant_*` / `unformatted_*` (all real code)
+# were never themselves formatted twice. A pristine seed's *soft* verdict does not
+# FAIL the run (the corpus deliberately holds mis-formatted `unformatted_*` files whose
+# reflow is the point) but IS reported, with paths — over a real-code corpus there are
+# no such files, so each wants triage, and the seed path is itself the repro (an
+# unmutated file on disk), so it is listed rather than dumped. HARD verdicts fail.
 cargo run -p tsv_debug fuzz                                    # 2000 iters over tests/fixtures
 cargo run -p tsv_debug fuzz --seed 7 --iterations 20000 --dump-dir /tmp/fz  # discovery
+cargo run -p tsv_debug fuzz --iterations 0 ~/dev/zzz/src       # pristine pass only = an F1 sweep
 # HARD findings (exit 1): panic / unreparseable / non_idempotent / format_error —
 # always real bugs. SOFT findings (reported, non-fatal): structural_divergence — the
 # render-model-noisy bucket that needs canonical confirmation (roundtrip_audit
 # --canonical-all), like roundtrip_audit --gate. --strict fails on soft too.
 # Also: --parser not applicable (per-file extension), --max-mutations N, --limit N,
 # --max-findings N (HARD only), --json.
+```
+
+**F1 Idempotency Sweep (real-code corpus):**
+
+```bash
+# The pristine pass above, pointed at the `perf` corpus view (the sibling dev repos
+# + upstream framework source) — `format(format(x)) == format(x)` on every real file.
+# NOT in `deno task check`: the corpus is machine-dependent checkouts and the sweep
+# is minutes. It is a different risk surface from the fixtures — a formatter can be
+# idempotent on every curated fixture and still reflow a real component on pass 2.
+# Run at conformance cadence, or after any printer change.
+deno task idempotency:sweep
+# Absent corpus checkouts are skipped with a warning (not a failure); builds with
+# `--profile corpus` (release + panic=unwind) because the fuzzer needs catch_unwind.
 ```
 
 ## Architectural Notes

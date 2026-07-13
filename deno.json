@@ -25,7 +25,7 @@
 		"typecheck": "cargo check --workspace",
 		"test": "cargo test --workspace",
 		"lint": "cargo clippy --workspace -- -D warnings",
-		"check": "cargo fmt --check && deno task pins:audit && deno task typecheck && deno task conformance:audit && deno task scan:audit && deno task fanout:audit && deno task roundtrip:audit && deno task fuzz:audit && deno task test:deno && deno task test && deno task swallow:audit && deno task check:ast-types && deno task lint",
+		"check": "cargo fmt --check && deno task pins:audit && deno task typecheck && deno task conformance:audit && deno task scan:audit && deno task fanout:audit && deno task roundtrip:audit && deno task authoring:audit && deno task fuzz:audit && deno task test:deno && deno task test && deno task swallow:audit && deno task check:ast-types && deno task lint",
 		"check:ast-types": "deno run --allow-read --allow-write=scripts --allow-run=cargo,deno scripts/check_ast_types.ts",
 		"doctor": "deno run --allow-read --allow-sys --allow-run=deno,node,bun,cargo,wasm-pack,npm --config benches/js/deno.json scripts/doctor.ts",
 
@@ -43,7 +43,9 @@
 		"scan:audit": "cargo run -p tsv_debug --quiet scan_audit",
 		"fanout:audit": "cargo run -p tsv_debug --quiet build_fanout_audit",
 		"roundtrip:audit": "cargo run -p tsv_debug --quiet roundtrip_audit --gate",
+		"authoring:audit": "cargo run -p tsv_debug --quiet authoring_audit --gate",
 		"fuzz:audit": "cargo run -p tsv_debug --quiet fuzz --seed 0 --iterations 5000",
+		"idempotency:sweep": "deno run --allow-read --allow-env --allow-sys --allow-run=cargo --config benches/js/deno.json benches/js/idempotency_sweep.ts",
 		"metrics": "cargo run -p tsv_debug --quiet metrics",
 
 		"bench:install": "node benches/js/install_deps.ts",

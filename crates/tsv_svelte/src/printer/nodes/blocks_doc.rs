@@ -185,13 +185,33 @@ impl<'a> Printer<'a> {
             .is_some_and(|c| !c.is_block)
     }
 
-    /// Whether a wrapped block head may dangle its `}` (and expand its body) here. The
-    /// head expression is allowed to break (`allow_wrapping` or a multiline context) AND
-    /// the context permits the dangle — false only inside a whitespace-significant element
-    /// (`<pre>` / `<textarea>`), gated by [`Printer::block_dangle_allowed`]. Gating it off
-    /// only hugs the `}`; the expression still wraps to respect printWidth either way.
+    /// Whether a wrapped block head may dangle its `}` here. The head expression is
+    /// allowed to break (`allow_wrapping` or a multiline context) AND the context permits
+    /// the dangle — false only inside a whitespace-significant element (`<pre>` /
+    /// `<textarea>`), gated by [`Printer::block_dangle_allowed`]. Gating it off only hugs
+    /// the `}`; the expression still wraps to respect printWidth either way.
     fn block_head_can_wrap(&self, allow_wrapping: bool, in_multiline_context: bool) -> bool {
         (allow_wrapping || in_multiline_context) && self.block_dangle_allowed()
+    }
+
+    /// Whether an inline-authored block **body** may expand onto its own line.
+    ///
+    /// Deliberately NOT [`Self::block_head_can_wrap`]: whether the *head* may wrap its `}`
+    /// and whether the *body* may drop to its own line are different questions, and
+    /// conflating them broke F1. A block denied head-wrapping (`allow_wrapping` false —
+    /// i.e. preceded by breakable content — in an inline run) fell through to a body that
+    /// is merely `indent(fill)`, with no line before it: the fill then renders at the
+    /// column where the over-width head ended and breaks at *every* separator
+    /// (`{#if …}⏎\tx⏎\tupdated`). Formatting that output again re-reads the injected
+    /// newline as authored leading whitespace, takes the multiline path, and settles on a
+    /// DIFFERENT form (`{#if …}⏎\tx updated`) — so `format(format(x)) != format(x)`.
+    ///
+    /// The body-expand path (`build_expanding_construct`) emits that stable form directly,
+    /// as a `conditional_group`, so it is width-driven rather than authoring-driven. Only
+    /// whitespace significance can veto it: inside `<pre>` / `<textarea>` an injected
+    /// newline would change what renders.
+    fn block_body_can_expand(&self) -> bool {
+        self.block_dangle_allowed()
     }
 
     /// Wrap a block-tag head so its closing `}` dangles on its own line when the head wraps.
@@ -572,7 +592,8 @@ impl<'a> Printer<'a> {
         // Inline-authored block (consequent + every alternate branch): expand the
         // whole block — bodies, `{:else if}`/`{:else}` sections, and `{/if}` — onto
         // their own lines when the head wraps (or the construct overflows).
-        if self.if_branches_all_inline(block, in_multiline_context) && can_wrap {
+        if self.if_branches_all_inline(block, in_multiline_context) && self.block_body_can_expand()
+        {
             let pieces = self.build_if_pieces(block);
             let inline_tail = self.compose_if_tail(&pieces, false);
             let multiline_tail = self.compose_if_tail(&pieces, true);
