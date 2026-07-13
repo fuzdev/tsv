@@ -197,9 +197,16 @@ impl<'a> Printer<'a> {
 
         // Split comments around ? and : operators.
         // Comments before ? go after test, comments after ? go before consequent,
-        // comments after : go before alternate.
-        let question_pos = self.find_char_outside_comments(test_end, consequent_start, b'?');
-        let colon_pos = self.find_char_outside_comments(consequent_end, alternate_start, b':');
+        // comments after : go before alternate. These positions only bound the comment
+        // scans below, so a ternary with no comment anywhere skips both position scans.
+        let (question_pos, colon_pos) = if self.has_comments_between(test_end, alternate_start) {
+            (
+                self.find_char_outside_comments(test_end, consequent_start, b'?'),
+                self.find_char_outside_comments(consequent_end, alternate_start, b':'),
+            )
+        } else {
+            (None, None)
+        };
 
         // Comments between test and ?
         let comments_before_question = if let Some(q) = question_pos {

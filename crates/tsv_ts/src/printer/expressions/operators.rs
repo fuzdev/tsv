@@ -42,6 +42,7 @@ enum BinaryChainStyle {
 }
 
 /// Operator position in source, used for comment splitting
+#[derive(Clone, Copy)]
 struct OperatorPosition {
     /// Start position of operator in source
     start: u32,
@@ -530,12 +531,14 @@ impl<'a> Printer<'a> {
         // Build continuation parts
         let mut continuation_parts: DocBuf = DocBuf::new();
 
+        // The operand[i-1]→operand[i] operator gap is located once and carried across
+        // iterations: iteration i's leading gap is either the first gap (i == 1) or the
+        // trailing gap the previous iteration already scanned, so it is never re-scanned.
+        let mut op_pos = first_op_pos;
+
         for i in 1..operands.len() {
             let operand = &operands[i];
             let prev_operand = &operands[i - 1];
-            let op_str = operators[i - 1].as_str();
-            let op_pos =
-                self.find_operator_position(prev_operand.span.end, operand.span.start, op_str);
 
             // shouldInlineLogicalExpression: the last operand (non-empty object/array)
             // uses a space instead of line(), keeping operator and RHS on the same line.
@@ -567,6 +570,9 @@ impl<'a> Printer<'a> {
                     next_op_pos.start,
                     next_op_str,
                 );
+
+                // Carry this trailing gap forward as the next iteration's leading gap.
+                op_pos = next_op_pos;
             }
         }
 
