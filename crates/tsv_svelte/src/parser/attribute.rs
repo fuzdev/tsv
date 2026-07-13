@@ -10,19 +10,19 @@ use tsv_ts::ast::internal::{Expression, IdentName, Identifier};
 use super::expression_tag::scan_to_matching_brace;
 use super::parser_impl::SvelteParser;
 
-/// Does a `{` at byte `pos` begin an expression tag, vs a block/tag construct?
-///
-/// `{#`, `{:`, `{@` (block/tag opens) and `{/word}` (block close) are not
-/// expression tags; `{/*` and `{//` are comments, which are. Mirrors the lexer's
-/// brace dispatch — shared by the quoted and unquoted attribute-value readers so
-/// the two can't drift apart.
-fn brace_starts_expression(bytes: &[u8], pos: usize) -> bool {
-    match bytes.get(pos + 1) {
-        Some(b'#' | b':' | b'@') => false,
-        Some(b'/') => matches!(bytes.get(pos + 2), Some(b'*' | b'/')),
-        _ => true,
-    }
-}
+// In an attribute value a `{` ALWAYS opens an expression tag — there is no block
+// dispatch here. Blocks (`{#if}`, `{:else}`, `{/if}`) and tags (`{@html}`) are
+// *fragment* constructs; Svelte's attribute reader (`read_sequence`) never looks for
+// them and hands everything after the `{` to the JS parser. So `{/a}` is not a block
+// close, it is the expression `/a}`, which fails to parse — likewise `{#a}` / `{:a}` /
+// `{@a}`. All four are errors in Svelte. The comment forms (`{/* c */ x}`, `{// c⏎ x}`)
+// need no special case: they are simply valid JS.
+//
+// A `brace_starts_expression` helper here used to mirror the *lexer's* brace dispatch
+// and read those four as literal text. That over-accepted (the canonical parser rejects
+// all four), and the literal text then round-tripped into output tsv's own parser
+// rejects: an unquoted `a={/a` was re-emitted quoted as `a="{/a"`, where the `{`
+// reopens as an expression and runs unterminated.
 
 /// Svelte's `regex_token_ending_character = /[\s=/>"']/` — the bytes that end an
 /// attribute/directive name run (`read_tag` in `1-parse/state/element.js`). Everything
@@ -959,13 +959,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             }
 
             if pos < content_end && source_bytes[pos] == b'{' {
-                if brace_starts_expression(source_bytes, pos) {
-                    let tag = self.parse_expression_tag_at(pos)?;
-                    pos = tag.span.end as usize;
-                    parts.push(AttributeValue::ExpressionTag(tag));
-                } else {
-                    pos += 1; // literal `{`
-                }
+                let tag = self.parse_expression_tag_at(pos)?;
+                pos = tag.span.end as usize;
+                parts.push(AttributeValue::ExpressionTag(tag));
             }
         }
 
@@ -1055,7 +1051,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
             // An `{expr}` chunk starts a new part. Every `{` is literal text when
             // expressions are disabled (script/style tag attributes).
-            if parse_expressions && bytes[pos] == b'{' && brace_starts_expression(bytes, pos) {
+            if parse_expressions && bytes[pos] == b'{' {
                 flush_text(&mut parts, text_start, pos);
                 // Parse the `{expr}` without disturbing the lexer (it handles nested
                 // braces, strings, comments, and regex that a raw byte scan cannot);

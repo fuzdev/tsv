@@ -1,3 +1,0 @@
-<Comp>
-	  { expr }</Comp
->

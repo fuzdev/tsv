@@ -1,0 +1,229 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 338,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Exactly 100 wide - the block comment stays inline",
+			"start": 10,
+			"end": 62,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 53
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ",
+			"start": 67,
+			"end": 160,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 4
+				},
+				"end": {
+					"line": 3,
+					"column": 97
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 101 wide - the block comment breaks onto its own line",
+			"start": 165,
+			"end": 221,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ",
+			"start": 229,
+			"end": 323,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 2
+				},
+				"end": {
+					"line": 7,
+					"column": 96
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 337,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 328,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 9,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 64,
+					"end": 162,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 99
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 64,
+						"end": 161,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 3,
+								"column": 98
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 64,
+							"end": 66,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 3,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Exactly 100 wide - the block comment stays inline",
+							"start": 10,
+							"end": 62
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 223,
+					"end": 327,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 223,
+						"end": 326,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 1
+							},
+							"end": {
+								"line": 8,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 223,
+							"end": 225,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 1
+								},
+								"end": {
+									"line": 6,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ",
+							"start": 67,
+							"end": 160
+						},
+						{
+							"type": "Line",
+							"value": " 101 wide - the block comment breaks onto its own line",
+							"start": 165,
+							"end": 221
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ",
+							"start": 229,
+							"end": 323
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

@@ -6,380 +6,118 @@
 // - svelte:fragment, svelte:boundary
 // - slot, title
 
-use crate::ast::internal::{self, FragmentNode, SpecialElementKind};
+use crate::ast::internal::{self, SpecialElementKind};
 use crate::printer::Printer;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 
+use super::element_doc::{ElementKind, ElementLayout, ElementParts};
+
 impl<'a> Printer<'a> {
-    /// Build a doc for a special element (svelte:component, svelte:element, etc.)
+    /// Build a doc for a special element (`<svelte:component>`, `<svelte:element>`, `<slot>`, …).
     ///
-    /// Handles all special element formatting modes:
-    /// - Self-closing: `<svelte:component this={C} />`
-    /// - Empty: `<slot></slot>`
-    /// - Inline children: `<slot name="x">text</slot>`
-    /// - Hug mode: attrs fit, children force break
-    /// - Full multiline: attrs wrapped, children on new lines
+    /// Runs the same analyze → layout → build pipeline as regular elements: `svelte:*` elements
+    /// only differ in how their name and attributes are built (a static tag name; a synthesized
+    /// `this={…}`), so everything downstream of [`ElementParts`] is shared. They used to carry
+    /// their own copies of the hug predicates and of the multiline decision, and the copies had
+    /// drifted — `<slot>` never went multiline for block children
+    /// (`<slot><div>a</div><div>b</div></slot>` stayed on one line, where `<span>` expands), and
+    /// the special path still dangled its tag delimiters after regular elements had moved to
+    /// block-style layout.
     pub(crate) fn build_special_element_doc(
         &self,
         element: &internal::SpecialElement<'_>,
     ) -> DocId {
-        let d = self.d();
-
         let tag_name = element.kind.tag_name();
 
-        // Determine element characteristics
-        let is_typically_empty = matches!(
-            element.kind,
-            SpecialElementKind::SvelteWindow
-                | SpecialElementKind::SvelteBody
-                | SpecialElementKind::SvelteDocument
-                | SpecialElementKind::SvelteHead
-                | SpecialElementKind::SvelteComponent { .. }
-                | SpecialElementKind::SvelteElement { .. }
-                | SpecialElementKind::SvelteSelf
-                | SpecialElementKind::SlotElement
-                | SpecialElementKind::SvelteFragment
-                | SpecialElementKind::SvelteBoundary
-                | SpecialElementKind::TitleElement
-        );
-
-        let is_inline_element = matches!(
-            element.kind,
-            SpecialElementKind::SlotElement
-                | SpecialElementKind::SvelteFragment
-                | SpecialElementKind::SvelteSelf
-                | SpecialElementKind::TitleElement
-        );
-
-        let has_snippets = element
-            .fragment
-            .nodes
-            .iter()
-            .any(|n| matches!(n, FragmentNode::SnippetBlock(_)));
-        let is_boundary_without_snippets =
-            matches!(element.kind, SpecialElementKind::SvelteBoundary) && !has_snippets;
-        let is_boundary_with_snippets =
-            matches!(element.kind, SpecialElementKind::SvelteBoundary) && has_snippets;
-
-        // Self-closing detection
-        let is_self_closing = element.fragment.nodes.is_empty()
-            && is_typically_empty
-            && self.span_was_self_closing(element.span);
-
-        // Build attribute docs (including this={...} for component/element)
+        // Attribute docs (including the synthesized `this={…}` for component/element)
         let attr_docs = self.build_special_element_attrs_doc(element, self.d().line());
-        let has_attrs = !attr_docs.is_empty();
 
-        // Check if any attribute doc will break (e.g., multiline string value)
-        let has_multiline = attr_docs.iter().any(|&doc| d.will_break(doc));
-
-        // Handle self-closing elements
-        if is_self_closing {
-            return if !has_attrs {
-                d.concat(&[d.text("<"), d.text(tag_name), d.text(" />")])
-            } else {
-                // Self-closing with attrs - use group for proper wrapping
-                let attr_concat = d.concat(&attr_docs);
-                let inner = d.concat(&[
-                    d.text("<"),
-                    d.text(tag_name),
-                    d.indent(attr_concat),
-                    d.line(),
-                    d.text("/>"),
-                ]);
-
-                if has_multiline {
-                    d.group_break(inner)
-                } else {
-                    d.group(inner)
-                }
-            };
-        }
-
-        // Handle empty elements (not self-closing)
-        if element.fragment.nodes.is_empty() {
-            return if !has_attrs {
-                d.concat(&[
-                    d.text("<"),
-                    d.text(tag_name),
-                    d.text("></"),
-                    d.text(tag_name),
-                    d.text(">"),
-                ])
-            } else {
-                // Empty with attrs - use conditional_group for hug mode
-                let closing = d.concat(&[d.text("></"), d.text(tag_name), d.text(">")]);
-
-                // State 1: All inline
-                let attr_concat_inline = d.concat(&attr_docs);
-                let inline_state = d.concat(&[
-                    d.text("<"),
-                    d.text(tag_name),
-                    d.indent(attr_concat_inline),
-                    closing,
-                ]);
-
-                // State 2: Hug mode - attrs inline (space-separated), > on new line
-                let hug_attrs = self.build_special_element_attrs_doc(element, self.d().text(" "));
-                let hug_attrs_concat = d.concat(&hug_attrs);
-                let hug_state = d.concat(&[
-                    d.text("<"),
-                    d.text(tag_name),
-                    hug_attrs_concat,
-                    d.hardline(),
-                    closing,
-                ]);
-
-                // State 3: Full multiline - attrs on separate lines
-                let attr_concat_multiline = d.concat(&attr_docs);
-                let multiline_state = d.concat(&[
-                    d.text("<"),
-                    d.text(tag_name),
-                    d.indent(attr_concat_multiline),
-                    d.hardline(),
-                    closing,
-                ]);
-
-                d.conditional_group(&[inline_state, hug_state, multiline_state])
-            };
-        }
-
-        // Element with children - determine formatting mode
-        let has_block_children = element.fragment.nodes.iter().any(|n| {
-            matches!(n, FragmentNode::Element(el) if self.is_block_element(el))
-                || matches!(n, FragmentNode::SnippetBlock(_))
-                || matches!(n, FragmentNode::SpecialElement(se)
-                    if matches!(se.kind, SpecialElementKind::SvelteHead))
-        });
-
-        // Simple inline content check
-        let is_simple_content = is_boundary_without_snippets
-            || (!has_block_children
-                && (is_inline_element
-                    || element.fragment.nodes.iter().all(|n| match n {
-                        FragmentNode::Text(_) | FragmentNode::ExpressionTag(_) => true,
-                        FragmentNode::SpecialElement(se) => matches!(
-                            se.kind,
-                            SpecialElementKind::SlotElement | SpecialElementKind::SvelteFragment
-                        ),
-                        _ => false,
-                    })));
-
-        // Check for source multiline layout
-        let source = self.source;
-        let source_has_leading_break = element
-            .fragment
-            .nodes
-            .first()
-            .is_some_and(FragmentNode::is_boundary_break);
-        let source_has_trailing_break = element
-            .fragment
-            .nodes
-            .last()
-            .is_some_and(FragmentNode::is_boundary_break);
-
-        // Check for expanding control flow blocks (if/each/key) or expanding blocks inside await
-        // These force hug mode (not full multiline) for inline special elements like <slot>
-        // BUT only when there's no whitespace around the blocks
-        // NOTE: svelte:boundary NEVER uses hug mode - it always uses normal multiline for expanding blocks
-        let has_expanding_blocks = super::helpers::has_any_expanding_blocks(element.fragment.nodes);
-        // Check if there's whitespace around expanding blocks
-        // e.g., `<slot> {#if c}...{/if} </slot>` has whitespace, should use normal multiline
-        let has_ws_around_expanding = has_expanding_blocks
-            && element
-                .fragment
-                .nodes
-                .iter()
-                .any(|n| matches!(n, FragmentNode::Text(t) if t.is_ascii_ws_only && !t.raw(source).is_empty()));
-        // Only force hug mode when expanding blocks present WITHOUT surrounding whitespace
-        // svelte:boundary never uses hug mode - it always uses normal multiline for expanding blocks
-        let forces_hug_mode =
-            !is_boundary_without_snippets && has_expanding_blocks && !has_ws_around_expanding;
-
-        // Determine if multiline formatting is needed
-        // svelte:boundary with expanding blocks always uses multiline (not hug mode)
-        // Also need multiline when whitespace surrounds expanding blocks
-        let boundary_needs_multiline_for_blocks =
-            is_boundary_without_snippets && has_expanding_blocks;
-        let needs_multiline = boundary_needs_multiline_for_blocks
-            || (!is_boundary_without_snippets
-                && (source_has_leading_break
-                    || source_has_trailing_break
-                    || (has_block_children && !is_inline_element)
-                    || is_boundary_with_snippets
-                    || has_ws_around_expanding));
-
-        // Build children doc based on formatting mode
-        // Special elements are block-level, so always trim boundaries
-        let children_doc_tree = if needs_multiline {
-            self.build_nodes_doc_multiline(element.fragment.nodes)
-        } else if is_simple_content {
-            self.build_nodes_doc_trimmed(element.fragment.nodes, true, false, false)
-        } else {
-            self.build_fragment_doc(&element.fragment)
+        let parts = ElementParts {
+            name: self.d().text(tag_name),
+            // Every special element is block-kind. `ElementKind::Inline` means *HTML inline flow
+            // content*, whose content-boundary whitespace is preserved as a space
+            // (`<span> text </span>`) — and a `svelte:*` element (or `<slot>` / `<title>`) is never
+            // that. Prettier draws the same line from the other side: its `isInlineElement`
+            // requires `node.type === 'RegularElement'`, so a `SlotElement` is neither inline nor
+            // block there and its boundary whitespace is trimmed. Block-kind reproduces exactly
+            // that: boundaries trimmed (`<slot> {x} </slot>` → `<slot>{x}</slot>`) and a leading
+            // boundary break alone expands the element.
+            kind: ElementKind::Block,
+            is_void: false,
+            // Every `svelte:*` kind may print self-closing when the source wrote it that way.
+            can_self_close: true,
+            attributes: element.attributes,
+            nodes: element.fragment.nodes,
+            span: element.span,
         };
-        let children_doc = children_doc_tree;
+        let ctx = self.analyze_element(&parts, &attr_docs);
 
-        // Hug mode detection (like regular elements)
-        // svelte:boundary with snippets disables hug mode
-        // Expanding blocks (if/each/key or those inside await) force hug mode
-        let hug_start = !needs_multiline
-            && !is_boundary_with_snippets
-            && (forces_hug_mode || self.should_hug_start_special(element));
-        let hug_end = !needs_multiline
-            && !is_boundary_with_snippets
-            && (forces_hug_mode || self.should_hug_end_special(element));
-
-        // Build the final doc based on hug mode and attrs
-        if !has_attrs {
-            // No attrs - simpler structure
-            if needs_multiline {
-                let inner = d.concat(&[d.hardline(), children_doc]);
-                d.concat(&[
-                    d.text("<"),
-                    d.text(tag_name),
-                    d.text(">"),
-                    d.indent(inner),
-                    d.hardline(),
-                    d.text("</"),
-                    d.text(tag_name),
-                    d.text(">"),
-                ])
-            } else if forces_hug_mode {
-                // Expanding blocks force hug mode with hardlines
-                // <slot
-                //   >{#if c}text{/if}</slot
-                // >
-                let inner_group =
-                    d.concat(&[d.text(">"), children_doc, d.text("</"), d.text(tag_name)]);
-                let inner_group = d.group(inner_group);
-                let indent_content = d.concat(&[d.hardline(), inner_group]);
-                d.group(d.concat(&[
-                    d.text("<"),
-                    d.text(tag_name),
-                    d.indent(indent_content),
-                    d.hardline(),
-                    d.text(">"),
-                ]))
-            } else if hug_start && hug_end {
-                // Hug both - use group with softlines
-                let inner_group =
-                    d.concat(&[d.text(">"), children_doc, d.text("</"), d.text(tag_name)]);
-                let inner_group = d.group(inner_group);
-                let indent_content = d.concat(&[d.softline(), inner_group]);
-                d.group(d.concat(&[
-                    d.text("<"),
-                    d.text(tag_name),
-                    d.indent(indent_content),
-                    d.softline(),
-                    d.text(">"),
-                ]))
-            } else {
-                // Inline
-                d.concat(&[
-                    d.text("<"),
-                    d.text(tag_name),
-                    d.text(">"),
-                    children_doc,
-                    d.text("</"),
-                    d.text(tag_name),
-                    d.text(">"),
-                ])
+        match self.compute_element_layout(&parts, &ctx) {
+            // Identical shape to a regular element's `<tag … />` — `is_declaration: false`
+            // (`<!DOCTYPE>` is not a `svelte:*` tag).
+            ElementLayout::Void | ElementLayout::SelfClosing => {
+                self.build_void_element_doc(&parts, &attr_docs, false)
             }
-        } else if needs_multiline {
-            // With attrs, multiline children
-            let attr_concat = d.concat(&attr_docs);
-            let sl = d.softline();
-            let trailing = d.dedent(sl);
-            let attr_inner = d.concat(&[attr_concat, trailing]);
-            let attr_group = d.group(attr_inner);
-            let attr_indent = d.indent(attr_group);
-            let inner = d.concat(&[d.hardline(), children_doc]);
-            d.concat(&[
+            ElementLayout::Empty => self.build_special_empty_doc(element, tag_name, &attr_docs),
+            ElementLayout::WithContent(boundary) => {
+                self.build_content_element_doc(&parts, &ctx, &attr_docs, boundary)
+            }
+        }
+    }
+
+    /// Build `<tag></tag>` for a special element with no content, wrapping the attributes in the
+    /// three-state conditional group (all inline / attrs inline + `>` on its own line / attrs
+    /// wrapped) when it has any.
+    fn build_special_empty_doc(
+        &self,
+        element: &internal::SpecialElement<'_>,
+        tag_name: &'static str,
+        attr_docs: &[DocId],
+    ) -> DocId {
+        let d = self.d();
+        if attr_docs.is_empty() {
+            return d.concat(&[
                 d.text("<"),
                 d.text(tag_name),
-                attr_indent,
-                d.text(">"),
-                d.indent(inner),
-                d.hardline(),
-                d.text("</"),
+                d.text("></"),
                 d.text(tag_name),
-                d.text(">"),
-            ])
-        } else if forces_hug_mode {
-            // Expanding blocks force hug mode with hardlines (with attrs)
-            // <slot name="x"
-            //   >{#if c}text{/if}</slot
-            // >
-            let body = d.concat(&[d.text(">"), children_doc, d.text("</"), d.text(tag_name)]);
-
-            let attr_concat = d.concat(&attr_docs);
-            let body_indent = d.concat(&[d.hardline(), body]);
-            d.group(d.concat(&[
-                d.text("<"),
-                d.text(tag_name),
-                d.indent(d.group(attr_concat)),
-                d.indent(body_indent),
-                d.hardline(),
-                d.text(">"),
-            ]))
-        } else if hug_start && hug_end {
-            // With attrs, hug mode - use nested groups like regular elements
-            // Outer group: controls whether content goes on new line
-            // Inner group (around attrs): controls whether attrs break
-            let body = d.concat(&[d.text(">"), children_doc, d.text("</"), d.text(tag_name)]);
-
-            let attr_concat = d.concat(&attr_docs);
-            let attr_group = if has_multiline {
-                d.group_break(attr_concat)
-            } else {
-                d.group(attr_concat)
-            };
-
-            let body_indent_softline = d.indent_softline(body);
-            let inner = d.concat(&[
-                d.text("<"),
-                d.text(tag_name),
-                d.indent(attr_group),
-                d.group(body_indent_softline),
-                d.softline(),
                 d.text(">"),
             ]);
-
-            if has_multiline {
-                d.group_break(inner)
-            } else {
-                d.group(inner)
-            }
-        } else if has_multiline {
-            // With attrs containing multiline value, inline children
-            // Force attrs to break and use hug structure like Prettier
-            let body = d.concat(&[d.text(">"), children_doc, d.text("</"), d.text(tag_name)]);
-
-            let attr_concat = d.concat(&attr_docs);
-            let body_indent_softline = d.indent_softline(body);
-            d.group_break(d.concat(&[
-                d.text("<"),
-                d.text(tag_name),
-                d.indent(attr_concat),
-                d.group(body_indent_softline),
-                d.softline(),
-                d.text(">"),
-            ]))
-        } else {
-            // With attrs, inline children
-            let attr_concat = d.concat(&attr_docs);
-            d.group(d.concat(&[
-                d.text("<"),
-                d.text(tag_name),
-                d.indent(attr_concat),
-                d.text(">"),
-                children_doc,
-                d.text("</"),
-                d.text(tag_name),
-                d.text(">"),
-            ]))
         }
+
+        let closing = d.concat(&[d.text("></"), d.text(tag_name), d.text(">")]);
+
+        // State 1: All inline
+        let attr_concat_inline = d.concat(attr_docs);
+        let inline_state = d.concat(&[
+            d.text("<"),
+            d.text(tag_name),
+            d.indent(attr_concat_inline),
+            closing,
+        ]);
+
+        // State 2: Hug mode - attrs inline (space-separated), > on new line
+        let hug_attrs = self.build_special_element_attrs_doc(element, self.d().text(" "));
+        let hug_attrs_concat = d.concat(&hug_attrs);
+        let hug_state = d.concat(&[
+            d.text("<"),
+            d.text(tag_name),
+            hug_attrs_concat,
+            d.hardline(),
+            closing,
+        ]);
+
+        // State 3: Full multiline - attrs on separate lines
+        let attr_concat_multiline = d.concat(attr_docs);
+        let multiline_state = d.concat(&[
+            d.text("<"),
+            d.text(tag_name),
+            d.indent(attr_concat_multiline),
+            d.hardline(),
+            closing,
+        ]);
+
+        d.conditional_group(&[inline_state, hug_state, multiline_state])
     }
 
     /// Build docs for special element attributes.
@@ -461,31 +199,5 @@ impl<'a> Printer<'a> {
         // Expression (including braced string literals): this={expr}
         let expr_doc_id = self.build_ts_expression_doc_no_comments(expr);
         d.concat(&[d.text("this={"), expr_doc_id, d.text("}")])
-    }
-
-    /// Check if special element should hug the start (no leading whitespace)
-    fn should_hug_start_special(&self, element: &internal::SpecialElement<'_>) -> bool {
-        if element.fragment.nodes.is_empty() {
-            return true;
-        }
-        match &element.fragment.nodes[0] {
-            FragmentNode::Text(text) => !text
-                .raw(self.source)
-                .starts_with(|c: char| c.is_ascii_whitespace()),
-            _ => true,
-        }
-    }
-
-    /// Check if special element should hug the end (no trailing whitespace)
-    fn should_hug_end_special(&self, element: &internal::SpecialElement<'_>) -> bool {
-        if element.fragment.nodes.is_empty() {
-            return true;
-        }
-        match element.fragment.nodes.last() {
-            Some(FragmentNode::Text(text)) => !text
-                .raw(self.source)
-                .ends_with(|c: char| c.is_ascii_whitespace()),
-            _ => true,
-        }
     }
 }

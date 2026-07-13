@@ -8,16 +8,36 @@
 //!
 //! ## What it mutates (safe by construction)
 //!
-//! Only **non-significant boundary whitespace**: an existing ASCII-whitespace run
-//! that sits *between two siblings* (a whitespace-only `Text` node, or the
-//! leading/trailing whitespace of a content `Text` node adjacent to a sibling) in
-//! a fragment that is **not** whitespace-significant (`<pre>`/`<textarea>`, via
-//! `tsv_html::preserves_whitespace`). The toggle is space ↔ single newline, and
-//! never touches a blank-line run (2+ newlines — Tier-1 significant) nor inserts
-//! whitespace where none exists. Toggling space↔newline at such a boundary is
-//! semantics-preserving by HTML whitespace collapse (both forms collapse to one
-//! inter-node space, kept/dropped identically) — the element *expansion* it may
-//! trigger is a layout change, which is exactly the property under test.
+//! Two site families, both confined to fragments that are **not**
+//! whitespace-significant (`<pre>`/`<textarea>`, via `tsv_html::preserves_whitespace`),
+//! and neither ever touching a blank-line run (2+ newlines — Tier-1 significant):
+//!
+//! 1. **Between siblings** — an existing ASCII-whitespace run separating two nodes (a
+//!    whitespace-only `Text` node, or the leading/trailing whitespace of a content
+//!    `Text` node adjacent to a sibling). Inter-node whitespace is render-**significant**
+//!    (it collapses to one space, it does not vanish), so the toggle is space ↔ single
+//!    newline only: never inserting whitespace where none exists, never removing it.
+//!    Both forms collapse to the same single inter-node space, so the mutation is
+//!    semantics-preserving; the element *expansion* it may trigger is the layout change
+//!    under test.
+//!
+//! 2. **At a tag's content boundary** — the whitespace between an element's opening tag
+//!    and its first child, or between its last child and the closing tag. This run is
+//!    render-**free** under Svelte 5 (start/end-of-content whitespace is removed at
+//!    compile: `<p>foo<span> - bar</span></p>` renders `foo- bar`), so here the run may
+//!    be *created and destroyed*, not just reshaped: each boundary is probed at all
+//!    three forms it can take — **hug (zero whitespace) ↔ space ↔ newline**. This is the
+//!    family that catches a formatter letting a render-free character pick the layout.
+//!    Restricted to elements whose content already spans lines in the base, because that is
+//!    where layout is at stake. Be honest about what this excludes: when the content fits on
+//!    one line, tsv *preserves* an authored boundary space (`<span> text </span>` and
+//!    `<span>text</span>` are both stable), so it is authoring-DEPENDENT there too — on a
+//!    character the compiler removes. That is a deliberate, prettier-matching preservation
+//!    choice, pinned by the `inline_boundary_whitespace` fixture and cataloged in
+//!    conformance_prettier.md §Svelte: Inline content block-style; it costs nothing
+//!    structurally, and probing it would bury the layout signal this audit exists to find
+//!    under a wall of sanctioned noise. So: a clean run means no render-free character picks
+//!    a LAYOUT — not that none survives in the output.
 //!
 //! The enumeration reuses the parser's own node structure + `preserves_whitespace`
 //! rather than re-deriving significance (audit *policy* lives here in the caller;
@@ -48,10 +68,11 @@ use super::profile::resolve_files;
 
 /// Audit Svelte boundary-whitespace authoring-independence.
 ///
-/// Toggles non-significant sibling-boundary whitespace (space↔newline) and checks
-/// tsv formats every authoring to one fixed point. Pure Rust for the convergence /
-/// idempotency verdict; `--prettier` adds the (a)/(b)/(c) triage via the sidecar.
-/// Defaults to `tests/fixtures` when no paths are given. Svelte (`.svelte`) only.
+/// Mutates whitespace that cannot change the render — space↔newline between siblings,
+/// and hug↔space↔newline at a tag's content boundary — and checks tsv formats every
+/// authoring to one fixed point. Pure Rust for the convergence / idempotency verdict;
+/// `--prettier` adds the (a)/(b)/(c) triage via the sidecar. Defaults to
+/// `tests/fixtures` when no paths are given. Svelte (`.svelte`) only.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "authoring_audit")]
 #[allow(clippy::struct_excessive_bools)] // independent CLI flags
@@ -81,12 +102,6 @@ pub struct AuthoringAuditCommand {
     #[argh(option)]
     dump_dir: Option<String>,
 
-    /// the check gate: fail on any hard finding EXCEPT a site-level non-idempotency in
-    /// a file on the KNOWN_NON_IDEMPOTENT ledger — and fail if a ledger entry no longer
-    /// reproduces (a stale entry must be deleted, not left to widen the tolerance)
-    #[argh(switch)]
-    gate: bool,
-
     /// file paths, directories, or glob patterns (default: tests/fixtures)
     #[argh(positional)]
     paths: Vec<String>,
@@ -101,6 +116,11 @@ enum SiteKind {
     ContentLeading,
     /// Trailing whitespace of a content `Text` node (a next sibling exists).
     ContentTrailing,
+    /// Between an element's opening tag and its first child — render-free, so probed
+    /// at all three forms (hug / space / newline).
+    BoundaryLeading,
+    /// Between an element's last child and its closing tag — likewise.
+    BoundaryTrailing,
 }
 
 impl SiteKind {
@@ -109,6 +129,8 @@ impl SiteKind {
             Self::WsOnly => "ws-only",
             Self::ContentLeading => "content-leading",
             Self::ContentTrailing => "content-trailing",
+            Self::BoundaryLeading => "boundary-leading",
+            Self::BoundaryTrailing => "boundary-trailing",
         }
     }
 }
@@ -219,6 +241,98 @@ fn is_ascii_ws(c: char) -> bool {
     c.is_ascii_whitespace()
 }
 
+/// The three forms an element's content boundary can take. All render identically
+/// under Svelte 5 (the run is removed at compile), so all three are legal authorings
+/// of one document — and none of them may select the layout.
+const BOUNDARY_FORMS: [&str; 3] = ["", " ", "\n"];
+
+/// Collect the content-boundary sites of one element's fragment: the (possibly empty)
+/// whitespace run between its opening tag and first child, and between its last child
+/// and its closing tag. Each is emitted once per *other* form in [`BOUNDARY_FORMS`], so
+/// a hugged boundary gets probed with a space and a newline spliced in, and vice versa.
+///
+/// Caller must have excluded whitespace-significant subtrees (`<pre>`/`<textarea>`),
+/// where this run is literal content and the mutation would change the render.
+fn collect_boundary_sites(nodes: &[FragmentNode<'_>], src: &str, out: &mut Vec<Site>) {
+    let (Some(first), Some(last)) = (nodes.first(), nodes.last()) else {
+        return;
+    };
+    // An all-whitespace fragment is an EMPTY element, not content with a boundary. (Its
+    // lone space — `<span> </span>` — is a deliberate, prettier-matching preservation.)
+    let has_content = nodes
+        .iter()
+        .any(|n| !matches!(n, FragmentNode::Text(t) if t.raw(src).trim_ascii().is_empty()));
+    if !has_content {
+        return;
+    }
+    let content_start = first.span().start_usize();
+    let content_end = last.span().end_usize();
+    // Probe only where LAYOUT is at stake — content that already spans lines. See the
+    // module doc: for content that fits on one line, both formatters deliberately keep an
+    // authored boundary space, so probing it would only pile up sanctioned divergences.
+    if !src[content_start..content_end].contains('\n') {
+        return;
+    }
+
+    // The leading run lives inside the first child when that child is text; otherwise the
+    // boundary is a hug and the run is the empty span at the content's start. Same, mirrored,
+    // for the trailing run. The two can't overlap: the fragment has non-whitespace content
+    // between them.
+    let lead = match first {
+        FragmentNode::Text(t) => {
+            let raw = t.raw(src);
+            raw.len() - raw.trim_start_matches(is_ascii_ws).len()
+        }
+        _ => 0,
+    };
+    push_boundary_forms(
+        content_start,
+        content_start + lead,
+        src,
+        SiteKind::BoundaryLeading,
+        out,
+    );
+
+    let trail = match last {
+        FragmentNode::Text(t) => {
+            let raw = t.raw(src);
+            raw.len() - raw.trim_end_matches(is_ascii_ws).len()
+        }
+        _ => 0,
+    };
+    push_boundary_forms(
+        content_end - trail,
+        content_end,
+        src,
+        SiteKind::BoundaryTrailing,
+        out,
+    );
+}
+
+/// Emit one site per alternative form of the boundary run `src[start..end]` (which may be
+/// empty — a hugged boundary). A run carrying a blank line is Tier-1 significant and is
+/// left alone, like everywhere else in this audit.
+fn push_boundary_forms(start: usize, end: usize, src: &str, kind: SiteKind, out: &mut Vec<Site>) {
+    let run = &src[start..end];
+    let base = match run.matches('\n').count() {
+        0 if run.is_empty() => "",
+        0 => " ",
+        1 => "\n",
+        _ => return,
+    };
+    for form in BOUNDARY_FORMS {
+        if form != base {
+            out.push(Site {
+                start,
+                end,
+                kind,
+                had_newline: base == "\n",
+                flipped: form,
+            });
+        }
+    }
+}
+
 /// Descend into a node's child fragments, propagating (and entering) whitespace
 /// significance.
 fn recurse_children(node: &FragmentNode<'_>, src: &str, ws_sig: bool, out: &mut Vec<Site>) {
@@ -226,6 +340,11 @@ fn recurse_children(node: &FragmentNode<'_>, src: &str, ws_sig: bool, out: &mut 
         FragmentNode::Element(el) => {
             let tag = el.name_span.extract(src).to_ascii_lowercase();
             let child_ws_sig = ws_sig || tsv_html::preserves_whitespace(&tag);
+            // The content boundary is render-free only outside `<pre>`/`<textarea>`, where
+            // it is literal content and the dangle is mandatory.
+            if !child_ws_sig {
+                collect_boundary_sites(el.fragment.nodes, src, out);
+            }
             collect_sites(el.fragment.nodes, src, child_ws_sig, out);
         }
         FragmentNode::SpecialElement(el) => {
@@ -234,6 +353,9 @@ fn recurse_children(node: &FragmentNode<'_>, src: &str, ws_sig: bool, out: &mut 
             // the tag is dynamic and unknowable statically; treat as non-pre
             // (the conservative miss is a `<svelte:element this="pre">` literal,
             // vanishingly rare and not worth a special case here).
+            if !ws_sig {
+                collect_boundary_sites(el.fragment.nodes, src, out);
+            }
             collect_sites(el.fragment.nodes, src, ws_sig, out);
         }
         FragmentNode::IfBlock(b) => {
@@ -323,28 +445,8 @@ struct Report {
     counts: BTreeMap<Bucket, usize>,
     examples: BTreeMap<Bucket, Vec<Outcome>>,
     base_non_idempotent_paths: Vec<String>,
-    /// Every file with at least one site-level non-idempotency (deduped) — the
-    /// `--gate` ledger is checked against this, so it is not capped like `examples`.
-    non_idempotent_paths: Vec<String>,
     dump_seq: usize,
 }
-
-/// Files with a KNOWN site-level non-idempotency, tolerated by `--gate` so the check
-/// can ratchet (any *new* one fails) while these are outstanding.
-///
-/// All three are the same bug: content-boundary whitespace that carries no newline
-/// (`<span> →…`) survives into the block-style form on the first pass, and is trimmed
-/// on the second — because going block-style *injects* a newline, which flips how the
-/// leading run classifies. `format(format(x)) != format(x)`.
-///
-/// This is a ledger, not a suppression: `--gate` also fails when an entry STOPS
-/// reproducing, so a fix must delete its line here rather than silently widening the
-/// tolerance.
-const KNOWN_NON_IDEMPOTENT: &[&str] = &[
-    "tests/fixtures/svelte/elements/inline_boundary_whitespace/input.svelte",
-    "tests/fixtures/svelte/elements/inline_boundary_whitespace/unformatted_spaces.svelte",
-    "tests/fixtures/svelte/elements/inline_multiline_leading_text_long/input.svelte",
-];
 
 impl Report {
     fn count(&self, b: Bucket) -> usize {
@@ -440,16 +542,8 @@ impl AuthoringAuditCommand {
         // divergences are not gate failures here. A base-non-idempotent file is excluded
         // from the *authoring* analysis (its fixed point is undefined, so the
         // converge/diverge verdict is meaningless), but excluding it from the analysis is
-        // not a reason to pass the run — that is how the ProjectList reflow sat here
+        // not a reason to pass the run — that is how a whole-file reflow could sit here
         // reported-but-green.
-        //
-        // `--gate` (the `deno task check` mode) is the same bar, minus the
-        // KNOWN_NON_IDEMPOTENT ledger — so the check ratchets on a NEW non-idempotency
-        // today instead of waiting on the outstanding ones. Everything else, including a
-        // base-non-idempotent file, still fails.
-        if self.gate {
-            return self.gate_verdict(&report);
-        }
         let hard = report.count(Bucket::BugA)
             + report.count(Bucket::NonIdempotent)
             + report.files_base_non_idempotent;
@@ -458,80 +552,6 @@ impl AuthoringAuditCommand {
         } else {
             Ok(())
         }
-    }
-
-    /// The `--gate` verdict: hard findings fail, except a site-level non-idempotency in
-    /// a KNOWN_NON_IDEMPOTENT file. A ledger entry that no longer reproduces also fails
-    /// — a fix must delete its line, so the tolerance can never silently outlive the bug
-    /// it was written for.
-    fn gate_verdict(&self, report: &Report) -> Result<(), CliError> {
-        let unexpected: Vec<&String> = report
-            .non_idempotent_paths
-            .iter()
-            .filter(|p| !KNOWN_NON_IDEMPOTENT.contains(&p.as_str()))
-            .collect();
-        let stale: Vec<&&str> = KNOWN_NON_IDEMPOTENT
-            .iter()
-            .filter(|known| {
-                !report
-                    .non_idempotent_paths
-                    .iter()
-                    .any(|p| p.as_str() == **known)
-            })
-            .collect();
-
-        let mut failed = false;
-
-        if !unexpected.is_empty() {
-            println!(
-                "\n✗ {} file(s) with a NEW site-level non-idempotency (F1 broken):",
-                unexpected.len()
-            );
-            for p in &unexpected {
-                println!("    {p}");
-            }
-            println!("  Re-run without --gate (add --dump-dir DIR) for byte-exact repros.");
-            failed = true;
-        }
-
-        if !stale.is_empty() {
-            println!(
-                "\n✗ {} stale KNOWN_NON_IDEMPOTENT entry(ies) — no longer reproduce:",
-                stale.len()
-            );
-            for p in &stale {
-                println!("    {p}");
-            }
-            println!(
-                "  If you fixed these, delete their lines from KNOWN_NON_IDEMPOTENT in\n  \
-                 crates/tsv_debug/src/cli/commands/authoring_audit.rs."
-            );
-            failed = true;
-        }
-
-        if report.files_base_non_idempotent > 0 {
-            println!(
-                "\n✗ {} base-non-idempotent file(s) — never tolerated (see above).",
-                report.files_base_non_idempotent
-            );
-            failed = true;
-        }
-        if report.count(Bucket::BugA) > 0 {
-            println!(
-                "\n✗ {} triaged (a) bug(s) — never tolerated.",
-                report.count(Bucket::BugA)
-            );
-            failed = true;
-        }
-
-        if failed {
-            return Err(CliError::Failed);
-        }
-        println!(
-            "\n✓ gate: no new non-idempotency ({} known, all still reproducing)",
-            KNOWN_NON_IDEMPOTENT.len()
-        );
-        Ok(())
     }
 
     /// Pure-Rust pass: convergence + self-stability only (no prettier).
@@ -683,9 +703,6 @@ impl AuthoringAuditCommand {
     fn record(&self, report: &mut Report, outcome: Outcome) {
         let bucket = outcome.bucket();
         *report.counts.entry(bucket).or_default() += 1;
-        if bucket == Bucket::NonIdempotent && !report.non_idempotent_paths.contains(&outcome.path) {
-            report.non_idempotent_paths.push(outcome.path.clone());
-        }
         if interesting(bucket) {
             let slot = report.examples.entry(bucket).or_default();
             if slot.len() < self.examples {
