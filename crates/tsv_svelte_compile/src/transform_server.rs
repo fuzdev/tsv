@@ -2241,9 +2241,43 @@ fn emit_attribute<'arena>(
             Ok(())
         }
         [AttributeValue::ExpressionTag(tag)] => {
-            emit_dynamic_attribute(env, &name, &tag.expression, out)
+            // Quoted (`class="{a}"`) vs bare (`class={a}`): the oracle's AST
+            // represents the quoted form as a one-chunk ARRAY and the bare form
+            // as a plain ExpressionTag (the wire writer's `preceded_by_quote`
+            // discriminant) — the split the class `$.clsx` rule keys on.
+            let quoted = preceded_by_quote(env.source, tag.span.start);
+            emit_dynamic_attribute(env, &name, &tag.expression, quoted, out)
         }
         _ => emit_mixed_attribute(env, &name, values, out),
+    }
+}
+
+/// Whether the byte before `pos` is a quote — the same discriminant the wire
+/// writer uses to emit a quoted single-expression attribute value as an array.
+fn preceded_by_quote(source: &str, pos: u32) -> bool {
+    matches!(
+        (pos as usize)
+            .checked_sub(1)
+            .and_then(|i| source.as_bytes().get(i)),
+        Some(b'"' | b'\'')
+    )
+}
+
+/// The oracle's `needs_clsx` rule (`2-analyze/visitors/Attribute.js`): only a
+/// bare `class={expr}` wraps in `$.clsx`, and only when the expression is not a
+/// `Literal`, `TemplateLiteral`, or ESTree `BinaryExpression`. tsv's internal
+/// AST folds logical operators into `BinaryExpression`, but ESTree types them
+/// `LogicalExpression` (`&&`/`||`/`??` DO wrap — oracle-probed), so the
+/// exclusion is arithmetic/comparison binaries only. The terminal arm mirrors
+/// the oracle's own negative-list rule: everything else wraps.
+fn class_needs_clsx(expr: &Expression<'_>, quoted: bool) -> bool {
+    if quoted {
+        return false;
+    }
+    match expr {
+        Expression::Literal(_) | Expression::TemplateLiteral(_) => false,
+        Expression::BinaryExpression(b) => b.operator.is_logical(),
+        _ => true,
     }
 }
 
@@ -2266,11 +2300,14 @@ fn collapse_attr_whitespace(decoded: &str) -> String {
     collapsed
 }
 
-/// A single-expression attribute value: `title={expr}`.
+/// A single-expression attribute value: `title={expr}` (or quoted,
+/// `title="{expr}"` — `quoted` carries the distinction, which only the class
+/// `$.clsx` rule reads).
 fn emit_dynamic_attribute<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     name: &str,
     expr: &'arena Expression<'arena>,
+    quoted: bool,
     out: &mut BodyBuilder<'arena>,
 ) -> Result<(), CompileError> {
     // The oracle omits expression-valued event handlers from SSR output —
@@ -2303,10 +2340,15 @@ fn emit_dynamic_attribute<'arena>(
             if env.scope.is_some() {
                 return Err(unsupported("dynamic class attribute on a styled component"));
             }
-            let clsx = env.b.member_call("$", "clsx", wrapped);
-            let clsx_alloc = env.b.arena.alloc(clsx);
-            env.b
-                .member_call("$", "attr_class", std::slice::from_ref(clsx_alloc))
+            if class_needs_clsx(expr, quoted) {
+                let clsx = env.b.member_call("$", "clsx", wrapped);
+                let clsx_alloc = env.b.arena.alloc(clsx);
+                env.b
+                    .member_call("$", "attr_class", std::slice::from_ref(clsx_alloc))
+            } else {
+                env.b
+                    .member_call("$", "attr_class", std::slice::from_ref(&wrapped[0]))
+            }
         }
         "style" => {
             if env.scope.is_some() {

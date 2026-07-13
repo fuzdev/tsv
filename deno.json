@@ -42,7 +42,7 @@
 		"canonicalize:audit": "cargo run -p tsv_debug --quiet canonicalize_audit tests/fixtures tests/fixtures_compile",
 		"compile:fixtures:init": "cargo run -p tsv_debug --quiet compile_fixture_init",
 		"compile:fixtures:validate": "cargo run -p tsv_debug --quiet compile_fixtures_validate",
-		"compile:corpus:compare": "cargo run -p tsv_debug --quiet compile_corpus_compare ../fuz_ui ../zzz ../mdz ../visionesdelcaribe.org ../private_fuz_forge ../fuz_app ../ryanatkn.com ../fuz_css ../fuz_gitops ../webdevladder.net ../fuz_docs ../mageguild ../private_talk.fuz.dev ../fuz_code ../fuz_blog ../tsv.fuz.dev ../fuz_mastodon ../gro ../fuz_template ../fuz_util ../private_fuz.dev ../earbetter ../journal ../dealt ../private_zap ../private_fuz_bluesky ../cosmicplayground ../deadfelt ../svelte/packages/svelte/tests/runtime-runes ../svelte/packages/svelte/tests/snapshot ../svelte/packages/svelte/tests/server-side-rendering",
+		"compile:corpus:compare": "cargo run -p tsv_debug --quiet compile_corpus_compare ../fuz_ui ../zzz ../mdz ../visionesdelcaribe.org ../fuz_app ../ryanatkn.com ../fuz_css ../fuz_gitops ../webdevladder.net ../fuz_docs ../mageguild ../fuz_code ../fuz_blog ../tsv.fuz.dev ../fuz_mastodon ../gro ../fuz_template ../fuz_util ../earbetter ../journal ../dealt ../cosmicplayground ../deadfelt ../svelte/packages/svelte/tests/runtime-runes ../svelte/packages/svelte/tests/snapshot ../svelte/packages/svelte/tests/server-side-rendering",
 		"pins:audit": "deno run --allow-read scripts/check_canonical_pins.ts",
 		"swallow:audit": "cargo test -p tsv_lang --features swallow_check --quiet && cargo run -p tsv_debug --features swallow_check --quiet swallow_audit",
 		"scan:audit": "cargo run -p tsv_debug --quiet scan_audit",

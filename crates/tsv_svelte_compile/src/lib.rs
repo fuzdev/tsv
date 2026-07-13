@@ -1332,6 +1332,53 @@ mod tests {
     }
 
     #[test]
+    fn compile_class_clsx_rule() {
+        // The oracle's needs_clsx rule (oracle-probed): only a BARE
+        // `class={expr}` wraps in $.clsx, and only when the expression is not
+        // a Literal, TemplateLiteral, or ESTree BinaryExpression — logical
+        // operators are LogicalExpression there and DO wrap. The quoted form
+        // `class="{expr}"` is a one-chunk array in the oracle's AST and NEVER
+        // wraps. (Quoted shapes live here, not in a fixture — prettier strips
+        // the redundant quotes from fixture inputs.)
+        let wraps = |src: &str| compile_js(src).contains("$.clsx(");
+        // Bare: identifier / conditional / logical / object / array wrap.
+        assert!(wraps(
+            "<script>let a = `f`;</script>\n<div class={a}></div>"
+        ));
+        assert!(wraps(
+            "<script>let { x } = $props();</script>\n<div class={x ? `a` : `b`}></div>"
+        ));
+        assert!(wraps(
+            "<script>let { x } = $props();</script>\n<div class={x ?? `a`}></div>"
+        ));
+        assert!(wraps(
+            "<script>let { x } = $props();</script>\n<div class={{ active: x }}></div>"
+        ));
+        assert!(wraps(
+            "<script>let { x } = $props();</script>\n<div class={[x, `b`]}></div>"
+        ));
+        // Bare exclusions: template literal / arithmetic binary / number literal.
+        assert!(!wraps(
+            "<script>let { x } = $props();</script>\n<div class={`a ${x}`}></div>"
+        ));
+        assert!(!wraps(
+            "<script>let { x } = $props();</script>\n<div class={x + ` y`}></div>"
+        ));
+        assert!(!wraps("<div class={5}></div>"));
+        // Quoted: never wraps, regardless of expression shape.
+        assert!(!wraps(
+            "<script>let a = `f`;</script>\n<div class=\"{a}\"></div>"
+        ));
+        assert!(!wraps(
+            "<script>let { x } = $props();</script>\n<div class=\"{{ active: x }}\"></div>"
+        ));
+        // Non-class dynamic attributes never wrap.
+        assert!(!wraps(
+            "<script>let a = `f`;</script>\n<div title={a}></div>"
+        ));
+    }
+
+    #[test]
     fn compile_empty_class_attribute_drops() {
         // A static string-valued class that collapses+trims to empty is
         // dropped entirely (oracle-probed); a bare `class` (boolean form)

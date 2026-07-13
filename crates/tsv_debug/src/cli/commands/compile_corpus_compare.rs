@@ -82,9 +82,12 @@ impl CompileCorpusCompareCommand {
 
         // Discover in-scope `.svelte` files per group (positional root). Each
         // file carries its group index so per-root stats survive the flattened,
-        // completion-ordered stream.
+        // completion-ordered stream. The visited/seen sets persist across roots:
+        // symlink cycles can't loop the walk, and overlapping roots don't
+        // double-count — the first root to reach a file wins its attribution.
         let mut groups: Vec<GroupInfo> = Vec::new();
         let mut items: Vec<(usize, PathBuf)> = Vec::new();
+        let mut visited = VisitedSet::default();
         for (gi, root) in self.paths.iter().enumerate() {
             let p = Path::new(root);
             if !p.exists() {
@@ -92,7 +95,7 @@ impl CompileCorpusCompareCommand {
                 return Err(CliError::Failed);
             }
             let mut files = Vec::new();
-            collect_svelte_files(p, &mut files);
+            collect_svelte_files(p, &mut visited, &mut files);
             files.sort();
             for f in &files {
                 items.push((gi, f.clone()));
@@ -174,13 +177,18 @@ async fn classify_file(group: usize, path: PathBuf) -> FileOutcome {
 /// before tsv even runs; a tsv refusal short-circuits before either side is
 /// canonicalized. Only both-compiled files reach the canonical-form comparison.
 async fn classify(source: &str) -> Bucket {
-    // Oracle side. A `ToolError` is the Svelte compiler *rejecting* the source
-    // (legacy mode, invalid syntax, TS-in-plain-script); every other DenoError
-    // is a genuine harness/sidecar failure.
+    // Oracle side. A `ToolError` carrying a `svelte.dev/e/{code}` URL is the
+    // Svelte compiler *rejecting* the source (legacy mode, invalid syntax,
+    // TS-in-plain-script); a ToolError WITHOUT a code is a sidecar-internal
+    // failure and must not inflate the oracle_rejected bucket (it would slip
+    // the exit gate). Every other DenoError is a harness/sidecar failure too.
     let oracle = match deno::svelte_compile(source, SvelteGenerate::Server, false).await {
         Ok(o) => o,
         Err(DenoError::ToolError { message }) => {
-            return Bucket::OracleRejected(oracle_reject_reason(&message));
+            return match oracle_reject_code(&message) {
+                Some(code) => Bucket::OracleRejected(code),
+                None => Bucket::Error("oracle-tool", first_line(&message)),
+            };
         }
         Err(e) => return Bucket::Error("oracle-sidecar", e.to_string()),
     };
@@ -266,27 +274,29 @@ fn bound_lines(s: &str, max: usize) -> String {
     out
 }
 
-/// Classify an oracle rejection by its Svelte error code
-/// (`https://svelte.dev/e/{code}` in the message), falling back to the first
-/// non-empty line. The code cleanly separates the buckets — `legacy_*` (legacy
-/// mode), `js_parse_error` (which includes TS-in-a-plain-script), etc.
-fn oracle_reject_reason(message: &str) -> String {
+/// Extract the Svelte error code from a genuine oracle rejection
+/// (`https://svelte.dev/e/{code}` in the message). The code cleanly separates
+/// the buckets — `legacy_*` (legacy mode), `js_parse_error` (which includes
+/// TS-in-a-plain-script), etc. A ToolError without a code is NOT a rejection
+/// (a sidecar-internal failure) — the caller routes it to the error bucket.
+fn oracle_reject_code(message: &str) -> Option<String> {
     const MARKER: &str = "svelte.dev/e/";
-    if let Some(idx) = message.find(MARKER) {
-        let code: String = message[idx + MARKER.len()..]
-            .chars()
-            .take_while(|c| c.is_alphanumeric() || *c == '_')
-            .collect();
-        if !code.is_empty() {
-            return code;
-        }
-    }
-    let first = message
+    let idx = message.find(MARKER)?;
+    let code: String = message[idx + MARKER.len()..]
+        .chars()
+        .take_while(|c| c.is_alphanumeric() || *c == '_')
+        .collect();
+    if code.is_empty() { None } else { Some(code) }
+}
+
+/// The first non-empty line of `s`, bounded — error-detail projection.
+fn first_line(s: &str) -> String {
+    let first = s
         .lines()
         .find(|l| !l.trim().is_empty())
         .unwrap_or("")
         .trim();
-    truncate(first, 80)
+    truncate(first, 160)
 }
 
 /// Collapse a `CompileError::Unsupported` reason to a stable bucket key.
@@ -372,14 +382,38 @@ fn truncate(s: &str, max: usize) -> String {
     }
 }
 
+/// Canonicalized-path identity sets for the corpus walk: `dirs` breaks symlink
+/// cycles (a directory is descended once, ever), `files` dedupes files reached
+/// through multiple roots or links (the first reach wins group attribution).
+#[derive(Default)]
+struct VisitedSet {
+    dirs: std::collections::HashSet<PathBuf>,
+    files: std::collections::HashSet<PathBuf>,
+}
+
+impl VisitedSet {
+    /// Record `path`'s canonical identity in `set`; `false` when already
+    /// present (skip) or the path doesn't canonicalize (dangling link — skip).
+    fn first_visit(set: &mut std::collections::HashSet<PathBuf>, path: &Path) -> bool {
+        match std::fs::canonicalize(path) {
+            Ok(canon) => set.insert(canon),
+            Err(_) => false,
+        }
+    }
+}
+
 /// Recursively collect in-scope `.svelte` files under `path`, skipping the usual
 /// non-source directories (so it can point straight at a repo). `.svelte-kit`
-/// and other dot-directories fall out via the hidden-directory skip.
-fn collect_svelte_files(path: &Path, out: &mut Vec<PathBuf>) {
+/// and other dot-directories fall out via the hidden-directory skip. `visited`
+/// makes the walk cycle-safe and duplicate-free (see [`VisitedSet`]).
+fn collect_svelte_files(path: &Path, visited: &mut VisitedSet, out: &mut Vec<PathBuf>) {
     if path.is_file() {
-        if is_svelte_file(path) {
+        if is_svelte_file(path) && VisitedSet::first_visit(&mut visited.files, path) {
             out.push(path.to_path_buf());
         }
+        return;
+    }
+    if !VisitedSet::first_visit(&mut visited.dirs, path) {
         return;
     }
     let Ok(entries) = std::fs::read_dir(path) else {
@@ -397,8 +431,8 @@ fn collect_svelte_files(path: &Path, out: &mut Vec<PathBuf>) {
             {
                 continue;
             }
-            collect_svelte_files(&child, out);
-        } else if is_svelte_file(&child) {
+            collect_svelte_files(&child, visited, out);
+        } else if is_svelte_file(&child) && VisitedSet::first_visit(&mut visited.files, &child) {
             out.push(child);
         }
     }
@@ -751,11 +785,17 @@ mod tests {
     }
 
     #[test]
-    fn oracle_reject_reason_extracts_svelte_code() {
+    fn oracle_reject_code_requires_svelte_code() {
         let msg = "Cannot use `export let` in runes mode — use `$props()` instead\nhttps://svelte.dev/e/legacy_export_invalid";
-        assert_eq!(oracle_reject_reason(msg), "legacy_export_invalid");
-        // No code URL → first non-empty line (bounded).
-        assert_eq!(oracle_reject_reason("weird failure\n"), "weird failure");
+        assert_eq!(
+            oracle_reject_code(msg).as_deref(),
+            Some("legacy_export_invalid")
+        );
+        // No code URL → not a rejection (the caller buckets it as an ERROR so
+        // sidecar-internal failures can't inflate oracle_rejected).
+        assert_eq!(oracle_reject_code("weird sidecar failure\n"), None);
+        assert_eq!(oracle_reject_code("see svelte.dev/e/"), None);
+        assert_eq!(first_line("\n  weird failure  \nmore"), "weird failure");
     }
 
     #[test]
@@ -770,5 +810,32 @@ mod tests {
         assert!(is_svelte_file(Path::new("Foo.svelte")));
         assert!(!is_svelte_file(Path::new("foo.svelte.ts")));
         assert!(!is_svelte_file(Path::new("foo.ts")));
+    }
+
+    #[test]
+    fn collect_dedupes_overlapping_roots_and_survives_symlink_cycles() {
+        // Overlapping roots (a parent and its child) must not double-count, and
+        // a symlink cycle must not loop the walk.
+        let dir = std::env::temp_dir().join(format!("tsv_corpus_walk_test_{}", std::process::id()));
+        let sub = dir.join("sub");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&sub).unwrap();
+        std::fs::write(dir.join("a.svelte"), "<p>a</p>").unwrap();
+        std::fs::write(sub.join("b.svelte"), "<p>b</p>").unwrap();
+        // A cycle: sub/loop -> the root dir.
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&dir, sub.join("loop")).unwrap();
+
+        let mut visited = VisitedSet::default();
+        let mut first = Vec::new();
+        collect_svelte_files(&dir, &mut visited, &mut first);
+        assert_eq!(first.len(), 2, "cycle must not duplicate: {first:?}");
+
+        // The overlapping second root finds nothing new (first root won).
+        let mut second = Vec::new();
+        collect_svelte_files(&sub, &mut visited, &mut second);
+        assert!(second.is_empty(), "overlap must dedupe: {second:?}");
+
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }
