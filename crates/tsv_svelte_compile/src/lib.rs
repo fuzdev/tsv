@@ -1478,6 +1478,46 @@ mod tests {
     }
 
     #[test]
+    fn compile_slots_with_props_rest_renames_destructured_slots() {
+        // The injected sanitize_slots const owns `$$slots`, so the rest-props
+        // injection deconflicts by renaming: `$$slots: $$slots_` (a shorthand
+        // `$$slots` would be a duplicate lexical declaration — invalid JS).
+        let out = compile(
+            "<script>let {...r} = $props();</script><p>{$$slots}{r}</p>",
+            &CompileOptions::default(),
+        )
+        .unwrap();
+        assert!(
+            out.js.contains("const $$slots = $.sanitize_slots($$props)")
+                && out.js.contains("{ $$slots: $$slots_, $$events, ...r }"),
+            "rest-props $$slots rename wrong: {}",
+            out.js
+        );
+        // Non-destructured `let props = $props()` deconflicts the same way.
+        let out = compile(
+            "<script>let props = $props();</script><p>{$$slots}{props}</p>",
+            &CompileOptions::default(),
+        )
+        .unwrap();
+        assert!(
+            out.js.contains("{ $$slots: $$slots_, $$events, ...props }"),
+            "non-destructured $$slots rename wrong: {}",
+            out.js
+        );
+        // Without a `$$slots` reference the injection stays shorthand.
+        let out = compile(
+            "<script>let {...r} = $props();</script><p>{r}</p>",
+            &CompileOptions::default(),
+        )
+        .unwrap();
+        assert!(
+            out.js.contains("{ $$slots, $$events, ...r }"),
+            "shorthand injection regressed: {}",
+            out.js
+        );
+    }
+
+    #[test]
     fn compile_svelte_head_emits_head_call() {
         // `<svelte:head>` → `$.head('<hash>', $$renderer, closure)`. The hash is
         // the ported `hash("input.svelte")`.

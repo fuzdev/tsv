@@ -287,6 +287,14 @@ pub(crate) fn compile_server<'arena>(
     let mut updated = NameSet::default();
     let mut nested_declared = NameSet::default();
     let mut dropped_regions: Vec<Span> = Vec::new();
+    // The whole-component analysis runs up front because the script rewrite
+    // needs `uses_slots` (the `$props()` rest injection renames its destructured
+    // `$$slots` to `$$slots_` when the injected sanitize_slots binding exists —
+    // a duplicate `$$slots` lexical declaration would be invalid JS). Its error
+    // is NOT propagated here: the script-loop refusals below must keep winning
+    // for inputs that trip both, so the `?` stays at the original position.
+    let component = crate::needs_context::analyze_component(root, source);
+    let uses_slots = component.as_ref().is_ok_and(|c| c.uses_slots);
     if let Some(script) = root.instance {
         for stmt in script.content.body {
             // Instance-script exports refuse — every form. The oracle compiles
@@ -319,6 +327,7 @@ pub(crate) fn compile_server<'arena>(
                 &mut uses_props,
                 &mut has_effects,
                 has_comments,
+                uses_slots,
                 &mut dropped_regions,
             )?;
             let Some(rewritten) = rewritten else {
@@ -365,7 +374,8 @@ pub(crate) fn compile_server<'arena>(
     // oracle's `should_inject_props` includes `should_inject_context`). The same
     // walk collects component-wide reassignments — including mutations inside
     // dropped event handlers — so a mutated binding is not statically folded.
-    let component = crate::needs_context::analyze_component(root, source)?;
+    // (Computed above the script loop for `uses_slots`; its error surfaces here.)
+    let component = component?;
     for name in &component.reassigned {
         updated.insert(name.clone());
     }
@@ -928,6 +938,7 @@ fn rewrite_script_statement<'arena>(
     uses_props: &mut bool,
     has_effects: &mut bool,
     has_comments: bool,
+    uses_slots: bool,
     dropped_regions: &mut Vec<Span>,
 ) -> Result<Option<Statement<'arena>>, CompileError> {
     // Statement-position effects are dropped (and force the wrapper); their
@@ -994,7 +1005,9 @@ fn rewrite_script_statement<'arena>(
         let new_init = match rune {
             Some(RuneInit::Props) => {
                 *uses_props = true;
-                if let Some(injected) = inject_props_pattern(b, &declarator.id, has_comments)? {
+                if let Some(injected) =
+                    inject_props_pattern(b, &declarator.id, has_comments, uses_slots)?
+                {
                     new_id = injected;
                 }
                 // Span-steal: the synthetic `$$props` takes the replaced
@@ -1068,10 +1081,18 @@ fn rewrite_script_statement<'arena>(
 /// rejects those — props_invalid_identifier) and injection alongside carried
 /// comments (the minted properties' appendix spans between host-span siblings
 /// would sweep host comments).
+///
+/// When the component references `$$slots` (`uses_slots`), the injected
+/// sanitize_slots const owns that name, so the destructured prop deconflicts by
+/// renaming: `$$slots: $$slots_` (the oracle's `VariableDeclaration.js:56-73`
+/// rule — always the `_` suffix, unconditional; `$$events` never renames, and a
+/// user `$$slots_`/`$$events` reference or declaration is oracle-rejected input,
+/// so no second-order collision exists).
 fn inject_props_pattern<'arena>(
     b: &mut Builder<'arena>,
     id: &'arena Expression<'arena>,
     has_comments: bool,
+    uses_slots: bool,
 ) -> Result<Option<Expression<'arena>>, CompileError> {
     match id {
         Expression::ObjectPattern(obj) => {
@@ -1089,7 +1110,7 @@ fn inject_props_pattern<'arena>(
                 BumpVec::new_in(b.arena);
             for prop in obj.properties {
                 if matches!(prop, ObjectPatternProperty::RestElement(_)) {
-                    properties.push(shorthand_pattern_prop(b, "$$slots"));
+                    properties.push(slots_pattern_prop(b, uses_slots));
                     properties.push(shorthand_pattern_prop(b, "$$events"));
                 }
                 properties.push(prop.clone());
@@ -1108,7 +1129,7 @@ fn inject_props_pattern<'arena>(
             }
             let mut properties: BumpVec<'arena, ObjectPatternProperty<'arena>> =
                 BumpVec::new_in(b.arena);
-            properties.push(shorthand_pattern_prop(b, "$$slots"));
+            properties.push(slots_pattern_prop(b, uses_slots));
             properties.push(shorthand_pattern_prop(b, "$$events"));
             properties.push(ObjectPatternProperty::RestElement(RestElement {
                 argument: b.arena.alloc(id.clone()),
@@ -1126,6 +1147,31 @@ fn inject_props_pattern<'arena>(
         }
         _ => Err(unsupported(Refusal::PropsBindingPattern)),
     }
+}
+
+/// The injected `$$slots` pattern property: shorthand `{ $$slots }` normally,
+/// renamed `{ $$slots: $$slots_ }` when the sanitize_slots const owns the name
+/// (see `inject_props_pattern`).
+fn slots_pattern_prop<'arena>(
+    b: &mut Builder<'arena>,
+    uses_slots: bool,
+) -> ObjectPatternProperty<'arena> {
+    if !uses_slots {
+        return shorthand_pattern_prop(b, "$$slots");
+    }
+    let key = b.ident("$$slots");
+    b.mint(": ");
+    let value = b.ident("$$slots_");
+    let span = Span::new(key.span.start, value.span.end);
+    ObjectPatternProperty::Property(Property {
+        key: Expression::Identifier(key),
+        value: Expression::Identifier(value),
+        kind: PropertyKind::Init,
+        shorthand: false,
+        computed: false,
+        method: false,
+        span,
+    })
 }
 
 /// A shorthand `{ name }` pattern property over a synthetic identifier
