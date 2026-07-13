@@ -391,8 +391,21 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         Ok((context, index, key, key_span, consumed_end))
     }
 
-    /// Parse a context pattern: identifier or destructuring pattern.
-    /// Like Svelte's read_pattern, this stops at whitespace/comma/paren for identifiers.
+    /// Parse a context pattern: identifier or destructuring pattern, each with an
+    /// optional `: Type` annotation (`{#each xs as x: T}`,
+    /// `{#each xs as { a }: T}`).
+    ///
+    /// Like Svelte's `read_pattern`, this stops at whitespace/comma/paren for
+    /// identifiers and at the matching bracket for a destructuring pattern — the
+    /// bound slice is what keeps `{#each xs as { a } (a.id)}` from parsing
+    /// `{ a } (a.id)` as a *call*. The annotation therefore has to be consumed
+    /// here, after the pattern, rather than by handing the whole remainder to the
+    /// expression parser.
+    ///
+    /// `tsv_ts::attach_pattern_type_annotation` owns the per-kind span convention
+    /// (an identifier's span stays on the bare name; a destructuring pattern's
+    /// extends over its annotation) — one definition, so the two Svelte block
+    /// readers can't drift.
     fn parse_context_pattern(
         &mut self,
         input: &str,
@@ -402,49 +415,37 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let ws_len = input.len() - trimmed.len();
         let adjusted = offset + ws_len;
 
-        if trimmed.starts_with('{') || trimmed.starts_with('[') {
-            // Destructuring pattern - find matching bracket
-            let end = self.find_matching_bracket(trimmed)?;
-            let pattern_str = &trimmed[..end];
-            // Use parse_pattern to get ObjectPattern/ArrayPattern instead of ObjectExpression/ArrayExpression
-            let expr = self.parse_ts_pattern(pattern_str, adjusted)?;
-            Ok((expr, adjusted + end))
+        // The pattern's extent, bounded so the annotation (and any `, index` /
+        // `(key)` tail) stays out of the expression parse.
+        let end = if trimmed.starts_with('{') || trimmed.starts_with('[') {
+            self.find_matching_bracket(trimmed)?
         } else {
-            // Simple identifier - read until non-identifier char
             let end = trimmed
                 .find(|c: char| !is_identifier_continue(c))
                 .unwrap_or(trimmed.len());
             if end == 0 {
                 return Err(self.error_expected_at("identifier or pattern", offset));
             }
-            let ident_str = &trimmed[..end];
-            let mut expr = self.parse_ts_expression(ident_str, adjusted)?;
+            end
+        };
+        // `parse_ts_pattern` yields ObjectPattern/ArrayPattern (not the Object/Array
+        // *Expression* the plain expression parser would).
+        let mut expr = self.parse_ts_pattern(&trimmed[..end], adjusted)?;
 
-            // Check for type annotation (`: Type`) after identifier
-            let after_ident = trimmed[end..].trim_start();
-            if after_ident.starts_with(':') {
-                let ws_before_colon = trimmed.len() - end - after_ident.len();
-                let colon_offset = adjusted + end + ws_before_colon;
-                let (ta, type_end) = tsv_ts::parse_type_annotation_partial(
-                    after_ident,
-                    colon_offset,
-                    Rc::clone(&self.interner),
-                    self.arena,
-                )?;
-                if let Expression::Identifier(id) = &mut expr {
-                    // Re-bind the identifier's binding extra with the parsed type
-                    // annotation, preserving any decorators already present.
-                    let decorators = id.decorators();
-                    id.extra = Some(self.alloc(tsv_ts::ast::internal::IdentifierParamExtra {
-                        type_annotation: Some(ta),
-                        decorators,
-                    }));
-                }
-                Ok((expr, type_end))
-            } else {
-                Ok((expr, adjusted + end))
-            }
+        let after_pattern = trimmed[end..].trim_start();
+        if !after_pattern.starts_with(':') {
+            return Ok((expr, adjusted + end));
         }
+        let ws_before_colon = trimmed.len() - end - after_pattern.len();
+        let colon_offset = adjusted + end + ws_before_colon;
+        let (ta, type_end) = tsv_ts::parse_type_annotation_partial(
+            after_pattern,
+            colon_offset,
+            Rc::clone(&self.interner),
+            self.arena,
+        )?;
+        tsv_ts::attach_pattern_type_annotation(&mut expr, ta, self.arena)?;
+        Ok((expr, type_end))
     }
 
     /// Find the matching closing bracket for a string starting with `{` or `[`,

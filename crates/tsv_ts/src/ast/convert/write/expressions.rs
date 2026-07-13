@@ -286,7 +286,13 @@ pub(super) fn write_expression_inner(
             write_object_pattern(w, obj, ctx);
         }
         internal::Expression::ArrayPattern(arr) => {
-            node_header(w, "ArrayPattern", arr.span, ctx);
+            super::patterns::pattern_header(
+                w,
+                "ArrayPattern",
+                arr.span,
+                arr.type_annotation.as_ref(),
+                ctx,
+            );
             w.raw(",\"elements\":");
             write_expression_holes(w, arr.elements, ctx);
             if arr.optional {

@@ -437,7 +437,48 @@ pub fn parse_pattern_with_comments<'arena>(
         let ta = parser
             .parse_type_annotation_public()
             .map_err(|e| e.with_context(source))?;
-        if let Expression::Identifier(id) = &mut pattern {
+        attach_pattern_type_annotation(&mut pattern, ta, arena)
+            .map_err(|e| e.with_context(source))?;
+    }
+    let comments = parser.take_comments();
+    Ok((pattern, comments))
+}
+
+/// Attach a `: T` annotation to a **Svelte block-position** binding pattern
+/// (`{#each xs as p: T}`, `{:then p: T}`, `{:catch p: T}`, `{@const p: T = v}`).
+///
+/// **The span stays on the bare pattern** — for every kind. That is the canonical
+/// parser's shape, and it is not the same as a *signature* parameter's:
+///
+/// | | `{ a }: T` as a Svelte block binding | `{ a }: T` as a function parameter |
+/// |---|---|---|
+/// | wire `start`/`end` | over the annotation | over the annotation |
+/// | wire `loc` | **bare pattern only** | over the annotation |
+///
+/// Svelte's `read_pattern` (`1-parse/read/context.js`) parses the bare pattern
+/// with acorn, then patches `expression.end = typeAnnotation.end` — and never
+/// touches `expression.loc`. acorn, parsing a real signature, extends both. So a
+/// block pattern's byte range and its line/column range genuinely disagree, and
+/// the internal span cannot encode both.
+///
+/// The span therefore records the **bare** pattern (which `loc` is derived from)
+/// and the wire writer widens `end` to `type_annotation.end` — a `max`, so a
+/// signature parameter, whose span already covers its annotation, is unaffected.
+/// The same convention already holds for an `Identifier`, whose span stays on the
+/// bare name with the annotation hanging off as a sibling.
+///
+/// A kind with no place to put the annotation must never silently swallow it: a
+/// dropped node is an **invisible** node — it vanishes from the wire AST, prints
+/// nowhere (real content loss on a format round-trip), and is unreachable to every
+/// consumer that reasons about TypeScript by walking the tree. So the fallback
+/// **errors** rather than dropping.
+pub fn attach_pattern_type_annotation<'arena>(
+    pattern: &mut Expression<'arena>,
+    ta: TSTypeAnnotation<'arena>,
+    arena: &'arena bumpalo::Bump,
+) -> Result<()> {
+    match pattern {
+        Expression::Identifier(id) => {
             // Re-bind the identifier's binding extra with the parsed type
             // annotation (preserving any decorators already present).
             let decorators = id.decorators();
@@ -446,9 +487,20 @@ pub fn parse_pattern_with_comments<'arena>(
                 decorators,
             }));
         }
+        Expression::ObjectPattern(pattern) => pattern.type_annotation = Some(ta),
+        Expression::ArrayPattern(pattern) => pattern.type_annotation = Some(ta),
+        // The Svelte block grammar admits an identifier or a destructuring
+        // pattern, so nothing else is reachable — and no other `Expression`
+        // variant has an annotation slot to hold it. Reject rather than drop.
+        other => {
+            return Err(tsv_lang::lex_err(
+                "type annotation is not valid on this binding pattern",
+                other.span().start as usize,
+            )
+            .into());
+        }
     }
-    let comments = parser.take_comments();
-    Ok((pattern, comments))
+    Ok(())
 }
 
 /// Parse a type annotation (`: Type`) and return it with the position where parsing stopped.
@@ -577,6 +629,25 @@ pub fn build_type_parameters_doc_with_comments(
 ) -> DocId {
     let printer = make_doc_printer(arena, inputs, *embed);
     printer.build_type_parameter_declaration_doc_wrapping(type_parameters)
+}
+
+/// Build a DocId for a type annotation (`: T`) with comments, in the caller's arena.
+///
+/// Routes the annotation through the same comment-aware printer a real declaration
+/// uses, so a comment between the `:` and the type keeps its place. Used by
+/// `tsv_svelte` for a **destructuring** block binding pattern
+/// (`{#each xs as { a }: T}`, `{:then { a }: T}`), whose braces the Svelte printer
+/// builds itself (its own comment-preserving path) and which therefore has to
+/// append the annotation tail explicitly — an identifier binding gets it for free
+/// from the TypeScript pattern printer.
+pub fn build_type_annotation_doc_with_comments(
+    arena: &DocArena,
+    annotation: &TSTypeAnnotation<'_>,
+    inputs: &PrinterInputs<'_>,
+    embed: &EmbedContext,
+) -> DocId {
+    let printer = make_doc_printer(arena, inputs, *embed);
+    printer.build_type_annotation_doc_public(annotation)
 }
 
 /// Build a DocId for a TypeScript program in the caller's arena.
