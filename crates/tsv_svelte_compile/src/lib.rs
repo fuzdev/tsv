@@ -1266,14 +1266,59 @@ mod tests {
     }
 
     #[test]
-    fn compile_refuses_deferred_component_children() {
-        // A `{#snippet}` child (named snippet prop) and a `slot="…"` child (named
-        // slot) are later slices; an explicit `children` prop + default children
-        // is the oracle's `$$slots.default` divergence.
-        assert_unsupported(
-            "<Foo>{#snippet header()}<h1>t</h1>{/snippet}</Foo>",
-            "named snippet child on <Foo> component",
+    fn compile_component_named_snippet_props() {
+        // A `{#snippet}` child compiles to a `function` in a wrapping block plus a
+        // `{ name }` shorthand prop and a `$$slots: { name: true }` entry.
+        let js = compile_js("<Foo>{#snippet header()}<h1>t</h1>{/snippet}</Foo>");
+        assert_eq!(
+            js,
+            "import * as $ from 'svelte/internal/server';\n\
+             export default function Input($$renderer) {\n\
+             \t{\n\
+             \t\tfunction header($$renderer) {\n\
+             \t\t\t$$renderer.push(`<h1>t</h1>`);\n\
+             \t\t}\n\
+             \t\tFoo($$renderer, { header, $$slots: { header: true } });\n\
+             \t}\n\
+             }\n"
         );
+        // Multiple snippets: functions and slot entries in source order.
+        let js = compile_js(
+            "<Foo>{#snippet a()}<b>1</b>{/snippet}{#snippet b()}<i>2</i>{/snippet}</Foo>",
+        );
+        assert!(
+            js.contains("Foo($$renderer, { a, b, $$slots: { a: true, b: true } });"),
+            "{js}"
+        );
+        // A snippet named `children` keeps the `children` prop but a `default`
+        // slot key.
+        let js = compile_js("<Foo>{#snippet children()}<p>c</p>{/snippet}</Foo>");
+        assert!(
+            js.contains("Foo($$renderer, { children, $$slots: { default: true } });"),
+            "{js}"
+        );
+    }
+
+    #[test]
+    fn compile_component_snippet_and_default_children() {
+        // Mixed named snippet + default children: the `children` arrow holds only
+        // the default children (the snippet is in the wrapping block), and
+        // `$$slots` carries both keys.
+        let js = compile_js("<Foo>text{#snippet header()}<h1>t</h1>{/snippet}</Foo>");
+        assert!(js.contains("function header($$renderer) {"), "{js}");
+        assert!(js.contains("header,"), "{js}");
+        assert!(js.contains("children: ($$renderer) =>"), "{js}");
+        assert!(js.contains("$$renderer.push(`<!---->text`);"), "{js}");
+        assert!(
+            js.contains("$$slots: { header: true, default: true }"),
+            "{js}"
+        );
+    }
+
+    #[test]
+    fn compile_refuses_deferred_component_children() {
+        // A `slot="…"` child (named slot) is a later slice; an explicit `children`
+        // prop + default children is the oracle's `$$slots.default` divergence.
         assert_unsupported(
             "<Foo><p slot=\"header\">hi</p></Foo>",
             "named slot on <Foo> component",

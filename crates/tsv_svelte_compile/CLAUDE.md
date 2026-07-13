@@ -28,9 +28,11 @@ project-wide conventions.
     (`canonicalize_js(output.js)` is a fixed point). The control-flow blocks
     `{#if}`/`{#each}`/`{#await}`/`{#key}`, `{@const}`, `{#snippet}`/`{@render}`,
     and **static component invocations** (`<Foo … />` →
-    `Foo($$renderer, {…props})` / `$.spread_props`; self-closing / prop-only —
-    dynamic/member components, component children, `bind:`/`--css-var`/directives
-    refuse) are covered (see the transform_server block emitters below). Shapes
+    `Foo($$renderer, {…props})` / `$.spread_props`, with default-slot children as
+    the implicit `children` snippet prop and `{#snippet}` children as named
+    snippet props; dynamic/member components, named slots, `bind:`/`--css-var`/
+    directives refuse) are covered (see the transform_server block emitters
+    below). Shapes
     the transform does not cover yet — client generation, dev mode,
     instance-script exports in every form (the oracle compiles
     `export const`/`function`/`{a}` via `$.bind_props`, not implemented; rejects

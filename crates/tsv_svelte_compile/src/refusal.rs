@@ -313,12 +313,6 @@ pub enum Refusal {
         /// The component tag as written.
         name: String,
     },
-    /// A `{#snippet}` child on a component (a named snippet prop — a later slice).
-    #[error("named snippet child on <{name}> component (snippet props not implemented)")]
-    ComponentSnippetChild {
-        /// The component tag as written.
-        name: String,
-    },
     /// A `slot="…"` (named slot) on a component's child (the oracle groups it into
     /// a `$$slots.<name>` closure).
     #[error("named slot on <{name}> component")]
@@ -458,9 +452,6 @@ impl Refusal {
             Self::ValueAttribute { .. } => Cow::Borrowed("value attribute on <{name}>"),
             Self::DynamicComponent { .. } => {
                 Cow::Borrowed("dynamic <{name}> component (member or reactive binding)")
-            }
-            Self::ComponentSnippetChild { .. } => {
-                Cow::Borrowed("named snippet child on <{name}> component")
             }
             Self::ComponentNamedSlot { .. } => Cow::Borrowed("named slot on <{name}> component"),
             Self::ComponentChildrenPropConflict { .. } => {

@@ -2319,6 +2319,26 @@ fn emit_snippet<'arena>(
     out: &mut BodyBuilder<'arena>,
 ) -> Result<(), CompileError> {
     let arena = env.b.arena;
+    let (fn_decl, name) = build_snippet_function(env, snippet)?;
+    // Only a hoistable *top-level* snippet is in the hoistable map; a nested or
+    // body-local snippet (`is_hoisted` false) goes to this block's init.
+    if env.snippets.is_hoisted(&name) {
+        env.hoisted_snippets.push(fn_decl);
+    } else {
+        out.push_statement(&mut env.b, arena, fn_decl);
+    }
+    Ok(())
+}
+
+/// Build a `{#snippet}` as a `function name($$renderer, ...params) { … }`
+/// declaration (with its plain name). Refuses typed/generic snippets and escaped
+/// names. Shared by the template-hoist path ([`emit_snippet`]) and the component
+/// snippet-prop path (where the function lives in the component's wrapping block).
+fn build_snippet_function<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    snippet: &'arena SnippetBlock<'arena>,
+) -> Result<(Statement<'arena>, String), CompileError> {
+    let arena = env.b.arena;
     // A generic or type-annotated snippet implies TypeScript (type stripping is
     // not implemented) — the oracle rejects it without `lang="ts"`, and a
     // `lang="ts"` component is already refused at the entry.
@@ -2362,21 +2382,14 @@ fn emit_snippet<'arena>(
     let fn_decl = env
         .b
         .function_declaration(&name, params.into_bump_slice(), body, block_span);
-
-    // Only a hoistable *top-level* snippet is in the hoistable map; a nested or
-    // body-local snippet (`is_hoisted` false) goes to this block's init.
-    if env.snippets.is_hoisted(&name) {
-        env.hoisted_snippets.push(fn_decl);
-    } else {
-        out.push_statement(&mut env.b, arena, fn_decl);
-    }
-    Ok(())
+    Ok((fn_decl, name))
 }
 
 /// Collect the snippets that hoist to this block scope: the fragment's own
-/// snippets plus those inside descendant **elements** (which share the block's
-/// `init`). Stops at nested blocks and special elements — those are separate
-/// scopes that collect their own.
+/// snippets plus those inside descendant **HTML elements** (which share the
+/// block's `init`). Stops at nested blocks, special elements, and **components** —
+/// those are separate scopes that collect their own (a component's snippet
+/// children become its snippet props, handled by `plan_component_children`).
 fn collect_hoisted_snippets<'arena>(
     fragment: &Fragment<'arena>,
     out: &mut Vec<&'arena SnippetBlock<'arena>>,
@@ -2384,7 +2397,9 @@ fn collect_hoisted_snippets<'arena>(
     for node in fragment.nodes {
         match node {
             FragmentNode::SnippetBlock(snippet) => out.push(snippet),
-            FragmentNode::Element(element) => collect_hoisted_snippets(&element.fragment, out),
+            FragmentNode::Element(element) if element.kind != ElementKind::Component => {
+                collect_hoisted_snippets(&element.fragment, out);
+            }
             _ => {}
         }
     }
@@ -2763,23 +2778,59 @@ fn component_is_standalone_eligible(env: &EmitEnv<'_, '_>, element: &Element<'_>
     })
 }
 
-/// Classify a component's children: returns whether it has renderable
-/// *default-slot* children (feeding the implicit `children` snippet prop), or an
-/// `Err` for the shapes deferred to a later slice — a `{#snippet}` child (named
-/// snippet prop), a `slot="…"` child (named slot), or a `children` prop
-/// alongside default children (the oracle's `$$slots.default` divergence).
-fn check_component_children<'arena>(
-    env: &EmitEnv<'arena, '_>,
+/// The component-children analysis product: the synthetic props to append after
+/// the attribute props, plus the snippet-prop function declarations that go into
+/// the component's wrapping block.
+struct ChildrenPlan<'arena> {
+    /// `function name($$renderer, …) { … }` declarations (source order), placed in
+    /// the component's wrapping block so the snippet props can reference them.
+    snippet_functions: Vec<Statement<'arena>>,
+    /// Snippet prop names (source order) — each emits a `{ name }` shorthand prop.
+    snippet_props: Vec<String>,
+    /// `$$slots` entries (slot keys, source order): snippet slots, then `default`.
+    slot_keys: Vec<String>,
+    /// The default-slot children fragment (direct `{#snippet}` children filtered
+    /// out) → the implicit `children: ($$renderer) => { … }` arrow, if any.
+    default_children: Option<Fragment<'arena>>,
+}
+
+impl ChildrenPlan<'_> {
+    /// Whether the plan contributes any synthetic props (a snippet prop, the
+    /// `children` arrow, or `$$slots`) — `slot_keys` is non-empty exactly then.
+    fn has_content(&self) -> bool {
+        !self.slot_keys.is_empty()
+    }
+}
+
+/// Plan a component's children: build the `{#snippet}` prop functions (in source
+/// order) and the synthetic prop shape, refusing the deferred cases — a `slot="…"`
+/// child (named slot) or a `children` prop alongside default children (the
+/// oracle's `$$slots.default` divergence). A `{#snippet}` child named `children`
+/// keeps the `children` prop name but a `default` slot key (the oracle's rename).
+fn plan_component_children<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
     element: &'arena Element<'arena>,
     name: &str,
-) -> Result<bool, CompileError> {
+) -> Result<ChildrenPlan<'arena>, CompileError> {
+    let arena = env.b.arena;
+    let mut snippet_functions = Vec::new();
+    let mut snippet_props = Vec::new();
+    let mut slot_keys = Vec::new();
     let mut has_default = false;
     for node in element.fragment.nodes {
         match node {
-            FragmentNode::SnippetBlock(_) => {
-                return Err(unsupported(Refusal::ComponentSnippetChild {
-                    name: name.to_string(),
-                }));
+            FragmentNode::SnippetBlock(snippet) => {
+                let (func, snippet_name) = build_snippet_function(env, snippet)?;
+                snippet_functions.push(func);
+                // The oracle serializes a snippet named `children` under the
+                // `default` slot key, but the prop keeps the `children` name.
+                let slot_key = if snippet_name == "children" {
+                    "default".to_string()
+                } else {
+                    snippet_name.clone()
+                };
+                snippet_props.push(snippet_name);
+                slot_keys.push(slot_key);
             }
             FragmentNode::Comment(_) => {}
             FragmentNode::Text(text) if text.is_ascii_ws_only => {}
@@ -2798,7 +2849,28 @@ fn check_component_children<'arena>(
             name: name.to_string(),
         }));
     }
-    Ok(has_default)
+    let default_children = if has_default {
+        // The `children` arrow sees only the default-slot children — direct
+        // `{#snippet}` children live in the wrapping block, not the arrow body.
+        let mut nodes: BumpVec<'arena, FragmentNode<'arena>> = BumpVec::new_in(arena);
+        for node in element.fragment.nodes {
+            if !matches!(node, FragmentNode::SnippetBlock(_)) {
+                nodes.push(node.clone());
+            }
+        }
+        slot_keys.push("default".to_string());
+        Some(Fragment {
+            nodes: nodes.into_bump_slice(),
+        })
+    } else {
+        None
+    };
+    Ok(ChildrenPlan {
+        snippet_functions,
+        snippet_props,
+        slot_keys,
+        default_children,
+    })
 }
 
 /// Whether a component child element carries a `slot="…"` attribute (a named
@@ -2833,9 +2905,10 @@ fn is_valid_js_identifier(name: &str) -> bool {
 
 /// Emit `Name($$renderer, props)` for a component invocation (`<Foo … />`),
 /// followed by a trailing `<!---->` anchor unless the enclosing fragment is
-/// standalone (the oracle's `empty_comment` push). Dynamic components, components
-/// with children, `--custom-property` attributes, and directives are refused —
-/// see the individual refusal sites.
+/// standalone (the oracle's `empty_comment` push). Named-snippet children wrap
+/// the call in a bare `{ function …; Name(…); }` block. Dynamic components, named
+/// slots, `--custom-property` attributes, and directives are refused — see the
+/// individual refusal sites.
 fn emit_component<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     element: &'arena Element<'arena>,
@@ -2852,9 +2925,15 @@ fn emit_component<'arena>(
         }));
     }
 
+    // Children plan: the `{#snippet}` prop functions (for the wrapping block) and
+    // the synthetic props (snippet props, the `children` arrow, `$$slots`). Built
+    // before the props so the snippet functions mint before the props reference
+    // them.
+    let plan = plan_component_children(env, element, name)?;
+
     // Build the props/spreads expression (a plain object, or `$.spread_props`),
-    // including the implicit `children` snippet prop for default-slot children.
-    let props_expr = build_component_props(env, element, name)?;
+    // appending the synthetic children props from the plan.
+    let props_expr = build_component_props(env, element, name, &plan)?;
 
     // `Name($$renderer, props)`. The callee is the component reference (a plain
     // identifier — member components refuse above).
@@ -2864,11 +2943,29 @@ fn emit_component<'arena>(
     args.push(props_expr);
     let call = env.b.call_of(callee, args.into_bump_slice(), false);
     let span = call.span();
-    let stmt = Statement::ExpressionStatement(ExpressionStatement {
+    let call_stmt = Statement::ExpressionStatement(ExpressionStatement {
         expression: call,
         span,
         is_directive: false,
     });
+
+    // Named-snippet children hoist their `function` declarations into a bare block
+    // wrapping the call, so the snippet props resolve (the oracle's
+    // `b.block([...snippet_declarations, statement])`).
+    let stmt = if plan.snippet_functions.is_empty() {
+        call_stmt
+    } else {
+        let mut block_body: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
+        for func in plan.snippet_functions {
+            block_body.push(func);
+        }
+        block_body.push(call_stmt);
+        let block_span = env.b.here();
+        Statement::BlockStatement(BlockStatement {
+            body: block_body.into_bump_slice(),
+            span: block_span,
+        })
+    };
     out.push_statement(&mut env.b, arena, stmt);
 
     // A non-standalone component keeps the `<!---->` anchor so its output doesn't
@@ -2895,12 +2992,13 @@ fn build_component_props<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     element: &'arena Element<'arena>,
     name: &str,
+    plan: &ChildrenPlan<'arena>,
 ) -> Result<Expression<'arena>, CompileError> {
     let arena = env.b.arena;
-    // Default-slot children feed the implicit `children` snippet prop; the
-    // deferred child shapes (snippet / named slot / children-prop conflict)
-    // refuse here.
-    let children_element = check_component_children(env, element, name)?.then_some(element);
+    // The synthetic children props (snippet props, the `children` arrow,
+    // `$$slots`) go into the last props group, or a new one after a trailing
+    // spread.
+    let synthetic = plan.has_content().then_some(plan);
     let mut groups: Vec<PropGroup<'_, 'arena>> = Vec::new();
     for attr_node in element.attributes {
         match attr_node {
@@ -2938,9 +3036,9 @@ fn build_component_props<'arena>(
     }
 
     // The oracle emits a plain object when there are no spreads (no groups, or a
-    // single props group); otherwise `$.spread_props([...])`. The `children` prop
-    // appends to the last props group, or a new one when the last group is a
-    // spread (the oracle's `push_prop`).
+    // single props group); otherwise `$.spread_props([...])`. The synthetic props
+    // append to the last props group, or a new one when the last group is a spread
+    // (the oracle's `push_prop`).
     let single_object =
         groups.is_empty() || (groups.len() == 1 && matches!(groups[0], PropGroup::Props(_)));
     if single_object {
@@ -2948,7 +3046,7 @@ fn build_component_props<'arena>(
             Some(PropGroup::Props(props)) => props,
             _ => &[],
         };
-        return build_props_object(env, attrs, children_element);
+        return build_props_object(env, attrs, synthetic);
     }
 
     // `$.spread_props([ obj_or_spread, … ])`. Mint the brackets around the
@@ -2960,21 +3058,21 @@ fn build_component_props<'arena>(
     for (i, group) in groups.iter().enumerate() {
         let element_expr = match group {
             PropGroup::Props(props) => {
-                // Children join the last props group.
-                let children = if i + 1 == group_count {
-                    children_element
+                // The synthetic props join the last props group.
+                let syn = if i + 1 == group_count {
+                    synthetic
                 } else {
                     None
                 };
-                build_props_object(env, props, children)?
+                build_props_object(env, props, syn)?
             }
             PropGroup::Spread(expr) => wrap_value_expr(env, expr)?[0].clone(),
         };
         elements.push(Some(element_expr));
     }
-    // A trailing spread with children needs its own props object appended.
-    if !last_is_props && let Some(element) = children_element {
-        elements.push(Some(build_props_object(env, &[], Some(element))?));
+    // A trailing spread with synthetic props needs its own props object appended.
+    if !last_is_props && let Some(plan) = synthetic {
+        elements.push(Some(build_props_object(env, &[], Some(plan))?));
     }
     let rbracket = env.b.mint("]").end;
     let array = Expression::ArrayExpression(ArrayExpression {
@@ -2995,7 +3093,7 @@ fn build_component_props<'arena>(
 fn build_props_object<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     attrs: &[&'arena Attribute<'arena>],
-    children: Option<&'arena Element<'arena>>,
+    synthetic: Option<&ChildrenPlan<'arena>>,
 ) -> Result<Expression<'arena>, CompileError> {
     let arena = env.b.arena;
     let obrace = env.b.mint("{").start;
@@ -3005,11 +3103,24 @@ fn build_props_object<'arena>(
             env, attr,
         )?));
     }
-    // The implicit `children` prop (an inline snippet arrow) plus
-    // `$$slots: { default: true }` — appended after the attribute props.
-    if let Some(element) = children {
-        properties.push(ObjectProperty::Property(build_children_prop(env, element)?));
-        properties.push(ObjectProperty::Property(build_default_slots_prop(env)));
+    // The synthetic children props, in the oracle's order: snippet props (source
+    // order), then the implicit `children` arrow, then `$$slots`.
+    if let Some(plan) = synthetic {
+        for snippet_name in &plan.snippet_props {
+            properties.push(ObjectProperty::Property(build_snippet_prop(
+                env,
+                snippet_name,
+            )));
+        }
+        if let Some(fragment) = &plan.default_children {
+            properties.push(ObjectProperty::Property(build_children_prop(
+                env, fragment,
+            )?));
+        }
+        properties.push(ObjectProperty::Property(build_slots_prop(
+            env,
+            &plan.slot_keys,
+        )));
     }
     let cbrace = env.b.mint("}").end;
     Ok(Expression::ObjectExpression(ObjectExpression {
@@ -3019,18 +3130,35 @@ fn build_props_object<'arena>(
     }))
 }
 
+/// A `{ name }` shorthand prop for a named-snippet child — the value references
+/// the `function name(…)` declaration in the component's wrapping block.
+fn build_snippet_prop<'arena>(env: &mut EmitEnv<'arena, '_>, name: &str) -> Property<'arena> {
+    let key = env.b.ident(name);
+    let key_span = key.span;
+    let value = env.b.ident(name);
+    Property {
+        key: Expression::Identifier(key),
+        value: Expression::Identifier(value),
+        kind: PropertyKind::Init,
+        shorthand: true,
+        computed: false,
+        method: false,
+        span: key_span,
+    }
+}
+
 /// The implicit `children` prop for a component's default-slot children:
 /// `children: ($$renderer) => { …body… }`. The body reuses the fragment
 /// machinery (text-first eligible, per the oracle's `is_text_first` Component
 /// parent). The key is minted first so the (key-only) property span stays forward.
 fn build_children_prop<'arena>(
     env: &mut EmitEnv<'arena, '_>,
-    element: &'arena Element<'arena>,
+    fragment: &Fragment<'arena>,
 ) -> Result<Property<'arena>, CompileError> {
     let arena = env.b.arena;
     let key = env.b.ident("children");
     let key_span = key.span;
-    let body = emit_child_body(env, &element.fragment, &[], true, false, HashMap::new())?;
+    let body = emit_child_body(env, fragment, &[], true, false, HashMap::new())?;
     let renderer_param = Expression::Identifier(env.b.ident("$$renderer"));
     let params = std::slice::from_ref(arena.alloc(renderer_param));
     let block_span = env.b.here();
@@ -3046,27 +3174,36 @@ fn build_children_prop<'arena>(
     })
 }
 
-/// The `$$slots: { default: true }` prop that accompanies default-slot children.
-fn build_default_slots_prop<'arena>(env: &mut EmitEnv<'arena, '_>) -> Property<'arena> {
+/// The `$$slots: { key1: true, … }` prop that accompanies component children —
+/// one `true` entry per named-snippet slot plus `default` for default children
+/// (slot names are always valid identifiers). Named-slot arrow values would live
+/// here too, but named slots are refused.
+fn build_slots_prop<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    slot_keys: &[String],
+) -> Property<'arena> {
     let arena = env.b.arena;
     let key = env.b.ident("$$slots");
     let key_span = key.span;
     let obrace = env.b.mint("{").start;
-    let default_key = env.b.ident("default");
-    let default_key_span = default_key.span;
-    let default_val = env.b.true_literal();
-    let default_prop = ObjectProperty::Property(Property {
-        key: Expression::Identifier(default_key),
-        value: default_val,
-        kind: PropertyKind::Init,
-        shorthand: false,
-        computed: false,
-        method: false,
-        span: default_key_span,
-    });
+    let mut inner_props: BumpVec<'arena, ObjectProperty<'arena>> = BumpVec::new_in(arena);
+    for slot_key in slot_keys {
+        let entry_key = env.b.ident(slot_key);
+        let entry_key_span = entry_key.span;
+        let entry_val = env.b.true_literal();
+        inner_props.push(ObjectProperty::Property(Property {
+            key: Expression::Identifier(entry_key),
+            value: entry_val,
+            kind: PropertyKind::Init,
+            shorthand: false,
+            computed: false,
+            method: false,
+            span: entry_key_span,
+        }));
+    }
     let cbrace = env.b.mint("}").end;
     let inner = Expression::ObjectExpression(ObjectExpression {
-        properties: std::slice::from_ref(arena.alloc(default_prop)),
+        properties: inner_props.into_bump_slice(),
         spread_trailing_comma: false,
         span: Span::new(obrace, cbrace),
     });
