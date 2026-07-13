@@ -7,7 +7,7 @@
 
 use smallvec::SmallVec;
 
-use super::super::Printer;
+use super::super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
@@ -40,6 +40,44 @@ impl<'a> Printer<'a> {
         pc.emit_trailing_comments_around_comma(parts, self);
         pc
     }
+}
+
+/// Emit an empty argument list into `parts`: the comments in the gap before the
+/// `(` (`fn<string> /* c */()`), then the parens themselves — closed (`()`) or
+/// enclosing their dangling comments (`fn(/* c */)`, and the broken form a line
+/// comment forces).
+///
+/// `search_from` is where to look for the `(` (the position after the type
+/// arguments, or after the callee when there are none) and `paren_close` the
+/// position past the `)`. `prefix` is the open delimiter — `"("`, or `"?.("` for
+/// an optional call — and `empty_pair` its closed form, used only when no `(` is
+/// found at all (unreachable for valid code).
+///
+/// Shared by the plain call/`new` path and the member-chain path so the empty-args
+/// shape lives in one place: these two drifted apart once already, and the
+/// inline-comment emission that drift preserved let a `//` comment swallow the `)`.
+pub(super) fn push_empty_args(
+    printer: &Printer<'_>,
+    parts: &mut DocBuf,
+    search_from: u32,
+    paren_close: u32,
+    prefix: &'static str,
+    empty_pair: &'static str,
+) {
+    let d = printer.d();
+    let Some(paren_pos) = printer.find_char_outside_comments(search_from, paren_close, b'(') else {
+        parts.push(d.text(empty_pair));
+        return;
+    };
+    if let Some(pre) = printer.build_comments_between_filtered_opt(
+        search_from,
+        paren_pos,
+        CommentSpacing::Leading,
+        CommentFilter::All,
+    ) {
+        parts.push(pre);
+    }
+    parts.push(printer.build_empty_parens_inline_with_comments_doc(paren_pos, paren_close, prefix));
 }
 
 //

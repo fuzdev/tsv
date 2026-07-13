@@ -158,19 +158,39 @@ export const CORPUS_PARSE_TSV_ERRORS_PIN: Record<Language, number> = {
  * 312d079); SAFETY 0. When a fix moves a file or the live corpus grows, re-pin
  * deliberately and put the why in the commit.
  *
- * svelte 1111→1114, typescript 4085→4151 (both rose — re-pinned UP to keep the floor
- * tight): the pinned framework/prettier checkouts are UNCHANGED from the 2026-07-08 pin,
- * so the prettier-suite share of each rise is deterministic tsv behavior — the landed
- * #409–#422 fixes plus this branch's two formatter fixes (empty statement-position blocks
- * expand `{}`→`{\n}`; a `for` init-only header keeps its `; ;` spacing, not `;;`); the
- * remainder is live dev-repo growth. css 126→125: a pre-existing live-dev-repo churn drop
- * first observed 2026-07-11 (not re-pinned then). No CSS formatter change since (the last
- * CSS-crate touch, #401, was a parse over-rejection fix), css unknown/partial both unchanged
- * at their pins and SAFETY 0 — so the dropped file is benign corpus churn, not a regression.
+ * svelte 1114→1107 (re-pinned DOWN — deliberate divergences, not a regression),
+ * typescript 4151→4164 (rose — re-pinned UP to keep the floor tight). Re-measured
+ * 2026-07-13 against ../svelte b4d1583ae, ../kit 5c38e515d, ../svelte.dev 93a400d,
+ * ../prettier 1dcd0b0, ../prettier-plugin-svelte 7809486, oracle acorn-typescript 1.0.11
+ * (../acorn-typescript 312d079); SAFETY 0. Both moves are fully attributed by formatting
+ * the whole `gates` corpus with the pre-change binary and with this one and diffing the
+ * per-file match sets. The svelte baseline re-measures at exactly 1114 — its old pin — so
+ * there is NO svelte corpus churn in this window and the entire −7 is behavior:
+ *
+ * - svelte −7: content-boundary whitespace no longer selects the layout. A multiline
+ *   element lays out block-style (both tags intact) regardless of how the author wrote the
+ *   boundary — hug, space, or newline — since Svelte 5 removes that whitespace at compile;
+ *   and `svelte:*` elements run the same analysis as regular ones. Exactly 7 files flip
+ *   match→divergence, all of them prettier's delimiter dangle becoming block-style: zzz
+ *   `DiskfileMetrics`, fuz_blog `BlogPostFooter`, fuz_css `FontWeightControl`, tsv.fuz.dev
+ *   `BenchmarksGroup`, fuz_ui `Contextmenu` and svelte.dev `routes/blog/Byline` (the two
+ *   `<svelte:element>` cases), and prettier's own `tests/format/html/comments/conditional.html`.
+ *   All 7 land in `known` (svelte `unknown` holds at its pin of 7, once
+ *   `inline_content_block_style`'s dangled-close marker learned that a tag name can carry
+ *   `:`/`.`), prettier keeps tsv's new form stable in every case, and all 7 outputs reparse
+ *   and are idempotent. See conformance_prettier.md §Svelte: Inline content block-style.
+ * - typescript +13 = +3 behavior, +10 corpus: the empty-paren dangling-comment fix flips
+ *   3 prettier-suite files diverge→match (`js/function/dangling-comments`,
+ *   `js/last-argument-expansion/dangling-comment-in-arrow-function`,
+ *   `js/comments/in-list/dangling-comment-in-list`); the baseline re-measures at 4161, so
+ *   the remaining +10 is the ../svelte + ../kit + ../svelte.dev checkouts moving since the
+ *   2026-07-12 pin.
+ *
+ * css 125 unchanged (no CSS-crate change on this branch).
  */
 export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
-	svelte: 1114,
-	typescript: 4151,
+	svelte: 1107,
+	typescript: 4164,
 	css: 125,
 };
 
@@ -187,9 +207,22 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	svelte: 7,
-	typescript: 142,
+	typescript: 141,
 	css: 22,
 };
+// typescript 142→141 (2026-07-13, ../svelte b4d1583ae, ../kit 5c38e515d, ../svelte.dev
+// 93a400d, ../prettier 1dcd0b0, ../prettier-plugin-svelte 7809486, oracle
+// acorn-typescript 1.0.11). Net −1, but it is NOT a clean −1: on today's checkouts the
+// PRE-change binary measures 143, i.e. the 142 pin was already stale by +1 from live-corpus
+// growth. The empty-paren dangling-comment fix then removes 2, landing at 141. A `//`
+// comment alone inside an empty argument or parameter list was emitted INLINE
+// (`fn(// c);`), so it ran to end-of-line and swallowed the `)` — output that did not
+// re-parse. Every empty paren list (call, `new`, member-chain, function/method/arrow
+// params, signature type params) now shares the bracket/brace dangling emitter, so a line
+// comment breaks the list and a fitting block comment still hugs. (The sibling swallow in
+// CALLEE position — `call // c⏎()` → `call // c();` — is a different mechanism and is NOT
+// fixed here; see the TODO in tsv_ts/src/printer/comments/lists.rs.) svelte 7 and css 22
+// unchanged.
 // typescript 144→142 (2026-07-12, ../prettier 1dcd0b0, ../svelte 8fb7ceeba, ../kit
 // 1b4adccf7, ../svelte.dev fb5a4e2, ../prettier-plugin-svelte 7809486, oracle
 // acorn-typescript 1.0.11): the avoid-becoming-a-directive parens fix — Prettier's

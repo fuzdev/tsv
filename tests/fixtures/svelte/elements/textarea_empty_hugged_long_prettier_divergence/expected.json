@@ -1,0 +1,390 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 947,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 502,
+				"data": " An EMPTY <textarea> hugged by an inline <label>. The whitespace-sensitive element has no\n     content, so nothing at the label's boundary is whitespace-significant: the <label> lays out\n     block-style like any other inline element, and only the <textarea>'s own attributes react to\n     print width. Prettier instead dangles the label's closing delimiter, and the `</label` suffix\n     it adds to the textarea line is what pushes the attributes over — see\n     prettier_variant_label_dangle. "
+			},
+			{
+				"type": "Text",
+				"start": 502,
+				"end": 504,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 504,
+				"end": 570,
+				"data": " 100 chars: the textarea line fits, attributes stay inline "
+			},
+			{
+				"type": "Text",
+				"start": 570,
+				"end": 571,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 571,
+				"end": 717,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 9,
+						"column": 1,
+						"character": 572
+					},
+					"end": {
+						"line": 9,
+						"column": 4,
+						"character": 575
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 576,
+							"end": 578,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 578,
+							"end": 710,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 10,
+									"column": 2,
+									"character": 579
+								},
+								"end": {
+									"line": 10,
+									"column": 5,
+									"character": 582
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 583,
+										"end": 586,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "RegularElement",
+										"start": 586,
+										"end": 702,
+										"name": "label",
+										"name_loc": {
+											"start": {
+												"line": 11,
+												"column": 3,
+												"character": 587
+											},
+											"end": {
+												"line": 11,
+												"column": 8,
+												"character": 592
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 593,
+													"end": 597,
+													"raw": "\n\t\t\t",
+													"data": "\n\t\t\t"
+												},
+												{
+													"type": "RegularElement",
+													"start": 597,
+													"end": 691,
+													"name": "textarea",
+													"name_loc": {
+														"start": {
+															"line": 12,
+															"column": 4,
+															"character": 598
+														},
+														"end": {
+															"line": 12,
+															"column": 12,
+															"character": 606
+														}
+													},
+													"attributes": [
+														{
+															"type": "Attribute",
+															"start": 607,
+															"end": 679,
+															"name": "data-attr",
+															"name_loc": {
+																"start": {
+																	"line": 12,
+																	"column": 13,
+																	"character": 607
+																},
+																"end": {
+																	"line": 12,
+																	"column": 22,
+																	"character": 616
+																}
+															},
+															"value": [
+																{
+																	"start": 618,
+																	"end": 678,
+																	"type": "Text",
+																	"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+																	"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+																}
+															]
+														}
+													],
+													"fragment": {
+														"type": "Fragment",
+														"nodes": []
+													}
+												},
+												{
+													"type": "Text",
+													"start": 691,
+													"end": 694,
+													"raw": "\n\t\t",
+													"data": "\n\t\t"
+												}
+											]
+										}
+									},
+									{
+										"type": "Text",
+										"start": 702,
+										"end": 704,
+										"raw": "\n\t",
+										"data": "\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 710,
+							"end": 711,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 717,
+				"end": 719,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 719,
+				"end": 794,
+				"data": " 101 chars: one longer, so the textarea's `>` drops to its own line "
+			},
+			{
+				"type": "Text",
+				"start": 794,
+				"end": 795,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 795,
+				"end": 946,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 18,
+						"column": 1,
+						"character": 796
+					},
+					"end": {
+						"line": 18,
+						"column": 4,
+						"character": 799
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 800,
+							"end": 802,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 802,
+							"end": 939,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 19,
+									"column": 2,
+									"character": 803
+								},
+								"end": {
+									"line": 19,
+									"column": 5,
+									"character": 806
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 807,
+										"end": 810,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "RegularElement",
+										"start": 810,
+										"end": 931,
+										"name": "label",
+										"name_loc": {
+											"start": {
+												"line": 20,
+												"column": 3,
+												"character": 811
+											},
+											"end": {
+												"line": 20,
+												"column": 8,
+												"character": 816
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 817,
+													"end": 821,
+													"raw": "\n\t\t\t",
+													"data": "\n\t\t\t"
+												},
+												{
+													"type": "RegularElement",
+													"start": 821,
+													"end": 920,
+													"name": "textarea",
+													"name_loc": {
+														"start": {
+															"line": 21,
+															"column": 4,
+															"character": 822
+														},
+														"end": {
+															"line": 21,
+															"column": 12,
+															"character": 830
+														}
+													},
+													"attributes": [
+														{
+															"type": "Attribute",
+															"start": 831,
+															"end": 904,
+															"name": "data-attr",
+															"name_loc": {
+																"start": {
+																	"line": 21,
+																	"column": 13,
+																	"character": 831
+																},
+																"end": {
+																	"line": 21,
+																	"column": 22,
+																	"character": 840
+																}
+															},
+															"value": [
+																{
+																	"start": 842,
+																	"end": 903,
+																	"type": "Text",
+																	"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+																	"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+																}
+															]
+														}
+													],
+													"fragment": {
+														"type": "Fragment",
+														"nodes": []
+													}
+												},
+												{
+													"type": "Text",
+													"start": 920,
+													"end": 923,
+													"raw": "\n\t\t",
+													"data": "\n\t\t"
+												}
+											]
+										}
+									},
+									{
+										"type": "Text",
+										"start": 931,
+										"end": 933,
+										"raw": "\n\t",
+										"data": "\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 939,
+							"end": 940,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

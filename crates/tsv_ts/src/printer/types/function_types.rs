@@ -428,48 +428,6 @@ impl<'a> Printer<'a> {
     // Signature Helpers (shared with type members)
     //
 
-    /// Build the doc for an empty parameter list, preserving any dangling block
-    /// comments inside the parens (`(/* c */)`). Returns `()` when there are none.
-    ///
-    /// Shared by function/constructor types (`build_function_params_doc`) and
-    /// the type-member signatures (`build_signature_params_doc`) — without this
-    /// the dangling comment is dropped (content loss).
-    fn build_empty_params_doc(&self, paren_pos: Option<u32>) -> DocId {
-        let d = self.d();
-        if let Some(paren_pos) = paren_pos
-            && let Some(close_pos) = self.matching_close_paren(paren_pos)
-            && self.has_comments_between(paren_pos + 1, close_pos)
-        {
-            // A line comment can't stay inline inside `()` — it would swallow the
-            // `)`. With no parameter to lead, prettier 3.9 (#18623) drops the
-            // comment to its own indented line and breaks the `()`; tsv matches.
-            // (Contrast a *non-empty* list, where a line comment trailing `(`
-            // stays on the `(` line via the open-delimiter divergence
-            // `delimiter_line_comment_prefix` — that path doesn't reach here.)
-            // Block comments stay inline (`(/* c */)`), matching prettier.
-            if self.has_line_comments_between(paren_pos + 1, close_pos) {
-                let mut inner = DocBuf::new();
-                for comment in comments_in_range(self.comments, paren_pos + 1, close_pos) {
-                    inner.push(d.hardline());
-                    inner.push(self.build_comment_doc(comment));
-                }
-                let mut parts: DocBuf = smallvec![d.text("(")];
-                parts.push(d.indent(d.concat(&inner)));
-                parts.push(d.hardline());
-                parts.push(d.text(")"));
-                return d.concat(&parts);
-            }
-            let mut parts: DocBuf = smallvec![d.text("(")];
-            for comment in comments_in_range(self.comments, paren_pos + 1, close_pos) {
-                parts.push(self.build_comment_doc(comment));
-            }
-            parts.push(d.text(")"));
-            d.concat(&parts)
-        } else {
-            d.text("()")
-        }
-    }
-
     /// Emit any comments in the `)`→return-type gap, so the caller can append the
     /// `: type` after this prefix.
     ///
@@ -624,7 +582,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         if params.is_empty() {
             // Handle comments inside empty params (e.g., `a(/* comment */): void`)
-            return self.build_empty_params_doc(paren_pos);
+            return self.build_empty_params_with_comments_doc(paren_pos, self.source.len() as u32);
         }
 
         // Check for line comments or own-line block comments that force multiline
@@ -800,7 +758,9 @@ impl<'a> Printer<'a> {
         .map(|p| p as u32);
 
         if params.is_empty() {
-            parts.push(self.build_empty_params_doc(paren_pos));
+            parts.push(
+                self.build_empty_params_with_comments_doc(paren_pos, self.source.len() as u32),
+            );
         } else {
             // Check for line comments or own-line block comments between/after params (force multiline)
             let close_paren_pos = paren_pos.and_then(|p| self.matching_close_paren(p));

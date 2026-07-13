@@ -46,6 +46,11 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let tag_sym = element.name.to_u32();
+        // Deliberately NOT `ElementKind::is_inline` (and so not `classify_tag`): inside a
+        // whitespace-preserving subtree a *component* counts as inline flow, where the shared
+        // classifier splits `Component` out as its own kind. The two predicates agree on
+        // `<pre>`/`<textarea>` themselves but diverge on a nested `<Comp>`, so this stays its own
+        // question rather than being folded into the shared one.
         let is_inline = self.with_resolved_symbol(element.name, |t| !tsv_html::is_block_element(t));
         let is_html = element.kind == internal::ElementKind::Html;
         let has_content = !element.fragment.nodes.is_empty();

@@ -1,0 +1,1257 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 852,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Call expression - line comment in empty args",
+			"start": 10,
+			"end": 57,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 48
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " dangling",
+			"start": 65,
+			"end": 76,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 2
+				},
+				"end": {
+					"line": 4,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " New expression - line comment in empty args",
+			"start": 83,
+			"end": 129,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " dangling",
+			"start": 140,
+			"end": 151,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 2
+				},
+				"end": {
+					"line": 9,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Optional call - line comment in empty args",
+			"start": 158,
+			"end": 203,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 46
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " dangling",
+			"start": 213,
+			"end": 224,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 2
+				},
+				"end": {
+					"line": 14,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Member chain - line comment in empty args",
+			"start": 231,
+			"end": 275,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 45
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " dangling",
+			"start": 302,
+			"end": 313,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 2
+				},
+				"end": {
+					"line": 19,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Arrow function - line comment in empty params",
+			"start": 320,
+			"end": 368,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 49
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " dangling",
+			"start": 382,
+			"end": 393,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 2
+				},
+				"end": {
+					"line": 24,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Function declaration - line comment in empty params",
+			"start": 406,
+			"end": 460,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 1
+				},
+				"end": {
+					"line": 27,
+					"column": 55
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " dangling",
+			"start": 476,
+			"end": 487,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 2
+				},
+				"end": {
+					"line": 29,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Method - line comment in empty params",
+			"start": 496,
+			"end": 536,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 1
+				},
+				"end": {
+					"line": 32,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " dangling",
+			"start": 557,
+			"end": 568,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 3
+				},
+				"end": {
+					"line": 35,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Multiple line comments - each on its own line",
+			"start": 582,
+			"end": 630,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 1
+				},
+				"end": {
+					"line": 39,
+					"column": 49
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " dangling1",
+			"start": 638,
+			"end": 650,
+			"loc": {
+				"start": {
+					"line": 41,
+					"column": 2
+				},
+				"end": {
+					"line": 41,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " dangling2",
+			"start": 653,
+			"end": 665,
+			"loc": {
+				"start": {
+					"line": 42,
+					"column": 2
+				},
+				"end": {
+					"line": 42,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Block comment then line comment - each on its own line",
+			"start": 672,
+			"end": 729,
+			"loc": {
+				"start": {
+					"line": 45,
+					"column": 1
+				},
+				"end": {
+					"line": 45,
+					"column": 58
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " dangling ",
+			"start": 737,
+			"end": 751,
+			"loc": {
+				"start": {
+					"line": 47,
+					"column": 2
+				},
+				"end": {
+					"line": 47,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " dangling",
+			"start": 754,
+			"end": 765,
+			"loc": {
+				"start": {
+					"line": 48,
+					"column": 2
+				},
+				"end": {
+					"line": 48,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Comment containing close paren character",
+			"start": 772,
+			"end": 815,
+			"loc": {
+				"start": {
+					"line": 51,
+					"column": 1
+				},
+				"end": {
+					"line": 51,
+					"column": 44
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " has ) paren",
+			"start": 823,
+			"end": 837,
+			"loc": {
+				"start": {
+					"line": 53,
+					"column": 2
+				},
+				"end": {
+					"line": 53,
+					"column": 16
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 851,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 842,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 55,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 59,
+					"end": 80,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 59,
+						"end": 79,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 5,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 59,
+							"end": 61,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 3,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Call expression - line comment in empty args",
+							"start": 10,
+							"end": 57
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 131,
+					"end": 155,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 131,
+						"end": 154,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 1
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 135,
+							"end": 136,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 5
+								},
+								"end": {
+									"line": 8,
+									"column": 6
+								}
+							},
+							"name": "A"
+						},
+						"arguments": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " dangling",
+							"start": 65,
+							"end": 76
+						},
+						{
+							"type": "Line",
+							"value": " New expression - line comment in empty args",
+							"start": 83,
+							"end": 129
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 205,
+					"end": 228,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "ChainExpression",
+						"start": 205,
+						"end": 227,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 1
+							},
+							"end": {
+								"line": 15,
+								"column": 2
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 205,
+							"end": 227,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 1
+								},
+								"end": {
+									"line": 15,
+									"column": 2
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 205,
+								"end": 207,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 1
+									},
+									"end": {
+										"line": 13,
+										"column": 3
+									}
+								},
+								"name": "fn"
+							},
+							"arguments": [],
+							"optional": true
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " dangling",
+							"start": 140,
+							"end": 151
+						},
+						{
+							"type": "Line",
+							"value": " Optional call - line comment in empty args",
+							"start": 158,
+							"end": 203
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 277,
+					"end": 317,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 277,
+						"end": 316,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 1
+							},
+							"end": {
+								"line": 20,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 277,
+							"end": 298,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 1
+								},
+								"end": {
+									"line": 18,
+									"column": 22
+								}
+							},
+							"object": {
+								"type": "CallExpression",
+								"start": 277,
+								"end": 290,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 1
+									},
+									"end": {
+										"line": 18,
+										"column": 14
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 277,
+									"end": 288,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 1
+										},
+										"end": {
+											"line": 18,
+											"column": 12
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 277,
+										"end": 280,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 1
+											},
+											"end": {
+												"line": 18,
+												"column": 4
+											}
+										},
+										"name": "obj"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 281,
+										"end": 288,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 5
+											},
+											"end": {
+												"line": 18,
+												"column": 12
+											}
+										},
+										"name": "method1"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 291,
+								"end": 298,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 15
+									},
+									"end": {
+										"line": 18,
+										"column": 22
+									}
+								},
+								"name": "method2"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " dangling",
+							"start": 213,
+							"end": 224
+						},
+						{
+							"type": "Line",
+							"value": " Member chain - line comment in empty args",
+							"start": 231,
+							"end": 275
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 370,
+					"end": 403,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 9
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 374,
+							"end": 402,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 5
+								},
+								"end": {
+									"line": 25,
+									"column": 8
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 374,
+								"end": 375,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 5
+									},
+									"end": {
+										"line": 23,
+										"column": 6
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 378,
+								"end": 402,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 9
+									},
+									"end": {
+										"line": 25,
+										"column": 8
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 400,
+									"end": 402,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 6
+										},
+										"end": {
+											"line": 25,
+											"column": 8
+										}
+									},
+									"body": [],
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " dangling",
+											"start": 382,
+											"end": 393
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " dangling",
+							"start": 302,
+							"end": 313
+						},
+						{
+							"type": "Line",
+							"value": " Arrow function - line comment in empty params",
+							"start": 320,
+							"end": 368
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 462,
+					"end": 493,
+					"loc": {
+						"start": {
+							"line": 28,
+							"column": 1
+						},
+						"end": {
+							"line": 30,
+							"column": 5
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 471,
+						"end": 472,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 10
+							},
+							"end": {
+								"line": 28,
+								"column": 11
+							}
+						},
+						"name": "b"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 491,
+						"end": 493,
+						"loc": {
+							"start": {
+								"line": 30,
+								"column": 3
+							},
+							"end": {
+								"line": 30,
+								"column": 5
+							}
+						},
+						"body": [],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " dangling",
+								"start": 476,
+								"end": 487
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Function declaration - line comment in empty params",
+							"start": 406,
+							"end": 460
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 538,
+					"end": 579,
+					"loc": {
+						"start": {
+							"line": 33,
+							"column": 1
+						},
+						"end": {
+							"line": 37,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 542,
+							"end": 578,
+							"loc": {
+								"start": {
+									"line": 33,
+									"column": 5
+								},
+								"end": {
+									"line": 37,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 542,
+								"end": 543,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 5
+									},
+									"end": {
+										"line": 33,
+										"column": 6
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 546,
+								"end": 578,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 9
+									},
+									"end": {
+										"line": 37,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 550,
+										"end": 575,
+										"loc": {
+											"start": {
+												"line": 34,
+												"column": 2
+											},
+											"end": {
+												"line": 36,
+												"column": 6
+											}
+										},
+										"method": true,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 550,
+											"end": 552,
+											"loc": {
+												"start": {
+													"line": 34,
+													"column": 2
+												},
+												"end": {
+													"line": 34,
+													"column": 4
+												}
+											},
+											"name": "fn"
+										},
+										"value": {
+											"type": "FunctionExpression",
+											"start": 552,
+											"end": 575,
+											"loc": {
+												"start": {
+													"line": 34,
+													"column": 4
+												},
+												"end": {
+													"line": 36,
+													"column": 6
+												}
+											},
+											"id": null,
+											"expression": false,
+											"generator": false,
+											"async": false,
+											"params": [],
+											"body": {
+												"type": "BlockStatement",
+												"start": 573,
+												"end": 575,
+												"loc": {
+													"start": {
+														"line": 36,
+														"column": 4
+													},
+													"end": {
+														"line": 36,
+														"column": 6
+													}
+												},
+												"body": [],
+												"leadingComments": [
+													{
+														"type": "Line",
+														"value": " dangling",
+														"start": 557,
+														"end": 568
+													}
+												]
+											}
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Method - line comment in empty params",
+							"start": 496,
+							"end": 536
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 632,
+					"end": 669,
+					"loc": {
+						"start": {
+							"line": 40,
+							"column": 1
+						},
+						"end": {
+							"line": 43,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 632,
+						"end": 668,
+						"loc": {
+							"start": {
+								"line": 40,
+								"column": 1
+							},
+							"end": {
+								"line": 43,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 632,
+							"end": 634,
+							"loc": {
+								"start": {
+									"line": 40,
+									"column": 1
+								},
+								"end": {
+									"line": 40,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Multiple line comments - each on its own line",
+							"start": 582,
+							"end": 630
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 731,
+					"end": 769,
+					"loc": {
+						"start": {
+							"line": 46,
+							"column": 1
+						},
+						"end": {
+							"line": 49,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 731,
+						"end": 768,
+						"loc": {
+							"start": {
+								"line": 46,
+								"column": 1
+							},
+							"end": {
+								"line": 49,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 731,
+							"end": 733,
+							"loc": {
+								"start": {
+									"line": 46,
+									"column": 1
+								},
+								"end": {
+									"line": 46,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " dangling1",
+							"start": 638,
+							"end": 650
+						},
+						{
+							"type": "Line",
+							"value": " dangling2",
+							"start": 653,
+							"end": 665
+						},
+						{
+							"type": "Line",
+							"value": " Block comment then line comment - each on its own line",
+							"start": 672,
+							"end": 729
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 817,
+					"end": 841,
+					"loc": {
+						"start": {
+							"line": 52,
+							"column": 1
+						},
+						"end": {
+							"line": 54,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 817,
+						"end": 840,
+						"loc": {
+							"start": {
+								"line": 52,
+								"column": 1
+							},
+							"end": {
+								"line": 54,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 817,
+							"end": 819,
+							"loc": {
+								"start": {
+									"line": 52,
+									"column": 1
+								},
+								"end": {
+									"line": 52,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " dangling ",
+							"start": 737,
+							"end": 751
+						},
+						{
+							"type": "Line",
+							"value": " dangling",
+							"start": 754,
+							"end": 765
+						},
+						{
+							"type": "Line",
+							"value": " Comment containing close paren character",
+							"start": 772,
+							"end": 815
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " has ) paren",
+							"start": 823,
+							"end": 837
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

@@ -1,0 +1,232 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 528,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 381,
+				"data": " One document, three authorings of the content boundary. The whitespace between a tag and its\n     content is render-free under Svelte 5, so it must not select the layout: tsv converges all\n     three on the block-style form below (both tags intact, content on its own indented line).\n     Prettier keeps a different stable form for each — see the prettier_variant_* files. "
+			},
+			{
+				"type": "Text",
+				"start": 381,
+				"end": 382,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 382,
+				"end": 527,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 383
+					},
+					"end": {
+						"line": 5,
+						"column": 5,
+						"character": 387
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 389,
+						"end": 410,
+						"name": "prop1",
+						"name_loc": {
+							"start": {
+								"line": 6,
+								"column": 1,
+								"character": 389
+							},
+							"end": {
+								"line": 6,
+								"column": 6,
+								"character": 394
+							}
+						},
+						"value": [
+							{
+								"start": 396,
+								"end": 409,
+								"type": "Text",
+								"raw": "value1 value2",
+								"data": "value1 value2"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 412,
+						"end": 433,
+						"name": "prop2",
+						"name_loc": {
+							"start": {
+								"line": 7,
+								"column": 1,
+								"character": 412
+							},
+							"end": {
+								"line": 7,
+								"column": 6,
+								"character": 417
+							}
+						},
+						"value": [
+							{
+								"start": 419,
+								"end": 432,
+								"type": "Text",
+								"raw": "value3 value4",
+								"data": "value3 value4"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 435,
+						"end": 456,
+						"name": "prop3",
+						"name_loc": {
+							"start": {
+								"line": 8,
+								"column": 1,
+								"character": 435
+							},
+							"end": {
+								"line": 8,
+								"column": 6,
+								"character": 440
+							}
+						},
+						"value": [
+							{
+								"start": 442,
+								"end": 455,
+								"type": "Text",
+								"raw": "value5 value6",
+								"data": "value5 value6"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 458,
+						"end": 479,
+						"name": "prop4",
+						"name_loc": {
+							"start": {
+								"line": 9,
+								"column": 1,
+								"character": 458
+							},
+							"end": {
+								"line": 9,
+								"column": 6,
+								"character": 463
+							}
+						},
+						"value": [
+							{
+								"start": 465,
+								"end": 478,
+								"type": "Text",
+								"raw": "value7 value8",
+								"data": "value7 value8"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 481,
+						"end": 503,
+						"name": "prop5",
+						"name_loc": {
+							"start": {
+								"line": 10,
+								"column": 1,
+								"character": 481
+							},
+							"end": {
+								"line": 10,
+								"column": 6,
+								"character": 486
+							}
+						},
+						"value": [
+							{
+								"start": 488,
+								"end": 502,
+								"type": "Text",
+								"raw": "value9 value10",
+								"data": "value9 value10"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 505,
+							"end": 507,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 507,
+							"end": 519,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 12,
+									"column": 2,
+									"character": 508
+								},
+								"end": {
+									"line": 12,
+									"column": 5,
+									"character": 511
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 512,
+										"end": 513,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 519,
+							"end": 520,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

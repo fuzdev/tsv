@@ -6,13 +6,12 @@
 // `ElementLayout`, `ElementKind`, `ElementContext`) live in `element_doc.rs`
 // alongside the build half that also consumes them.
 
-use crate::ast::internal::{self, FragmentNode};
+use crate::ast::internal::FragmentNode;
 use crate::printer::Printer;
-use tsv_lang::SymbolResolver;
 use tsv_lang::doc::arena::DocId;
 use tsv_ts::ast::internal::Expression;
 
-use super::element_doc::{BoundaryMode, ElementContext, ElementKind, ElementLayout};
+use super::element_doc::{BoundaryMode, ElementContext, ElementKind, ElementLayout, ElementParts};
 
 /// Inputs to the [`Printer::compute_needs_multiline`] decision.
 ///
@@ -231,90 +230,56 @@ impl<'a> Printer<'a> {
         })
     }
 
-    /// Analyze an element to compute all formatting-relevant properties
+    /// Analyze an element to compute all formatting-relevant properties.
+    ///
+    /// Shared by regular and `svelte:*` elements — both project onto [`ElementParts`].
     pub(super) fn analyze_element(
         &self,
-        element: &internal::Element<'_>,
+        parts: &ElementParts<'_>,
         attr_docs: &[DocId],
     ) -> ElementContext {
-        // Resolve the tag once inside the borrow and derive everything that needs
-        // it there — avoids allocating a `String` per element on the hot path.
-        let (is_void, is_foreign, kind) = self.with_resolved_symbol(element.name, |tag_name| {
-            let is_void = tsv_html::is_void_element(tag_name);
-            let is_foreign = tsv_html::is_foreign_element(tag_name);
-
-            // Determine element kind
-            // Matches prettier-plugin-svelte: isInlineElement = !isBlockElement
-            // Elements NOT in the block list (including table cells) use inline formatting.
-            let kind = if tag_name.starts_with(|c: char| c.is_ascii_uppercase())
-                || tag_name.contains(':')
-                || tag_name.contains('.')
-            {
-                ElementKind::Component
-            } else if tsv_html::is_block_element(tag_name) {
-                ElementKind::Block
-            } else {
-                ElementKind::Inline
-            };
-
-            (is_void, is_foreign, kind)
-        });
+        let ElementParts {
+            kind,
+            can_self_close,
+            attributes,
+            nodes,
+            span,
+            ..
+        } = *parts;
 
         // Check if self-closing
-        let is_self_closing = (kind.is_component() || is_foreign)
-            && element.fragment.nodes.is_empty()
-            && self.span_was_self_closing(element.span);
+        let is_self_closing =
+            can_self_close && nodes.is_empty() && self.span_was_self_closing(span);
 
         // Check if empty
-        let is_empty = element.fragment.nodes.is_empty()
-            || element
-                .fragment
-                .nodes
-                .iter()
-                .all(FragmentNode::is_whitespace_only_text);
+        let is_empty = nodes.is_empty() || nodes.iter().all(FragmentNode::is_whitespace_only_text);
 
         // Source boundary breaks
-        let source_has_leading_break = element
-            .fragment
-            .nodes
-            .first()
-            .is_some_and(FragmentNode::is_boundary_break);
-        let source_has_trailing_break = source_has_leading_break
-            && element
-                .fragment
-                .nodes
-                .last()
-                .is_some_and(FragmentNode::is_boundary_break);
+        let source_has_leading_break = nodes.first().is_some_and(FragmentNode::is_boundary_break);
+        let source_has_trailing_break =
+            source_has_leading_break && nodes.last().is_some_and(FragmentNode::is_boundary_break);
 
         // Hug modes
-        let hug_start = self.should_hug_start(element, kind.is_block());
-        let hug_end = self.should_hug_end(element, kind.is_block());
+        let hug_start = self.should_hug_start(nodes, kind.is_block());
+        let hug_end = self.should_hug_end(nodes, kind.is_block());
 
         // Block flow children → whether they force multiline. Computed once here (a non-trivial
         // traversal) and cached, since `will_go_multiline`, `compute_needs_multiline`, and the
         // hug-both `force` all read exactly this combination.
-        let has_block_flow_children = element
-            .fragment
-            .nodes
-            .iter()
-            .any(super::helpers::is_control_flow_block);
+        let has_block_flow_children = nodes.iter().any(super::helpers::is_control_flow_block);
         let block_flow_multiline =
-            has_block_flow_children && self.block_flow_forces_multiline(element);
+            has_block_flow_children && self.block_flow_forces_multiline(nodes);
 
         // Any attribute doc that will_break (forces attr group break + trim_boundaries)
         let has_multiline_attr = attr_docs.iter().any(|&doc| self.d().will_break(doc));
 
         // Check if all content children are text nodes (no elements, expressions, blocks)
-        let only_text_content = !is_empty
-            && element
-                .fragment
-                .nodes
-                .iter()
-                .all(|n| matches!(n, FragmentNode::Text(_)));
+        let only_text_content =
+            !is_empty && nodes.iter().all(|n| matches!(n, FragmentNode::Text(_)));
 
         // Compute needs_multiline
         let needs_multiline = self.compute_needs_multiline(
-            element,
+            nodes,
             MultilineInputs {
                 kind,
                 is_empty,
@@ -327,23 +292,17 @@ impl<'a> Printer<'a> {
         );
 
         // Compute trim_boundaries
-        let will_go_multiline = element.attributes.len() > 1
+        let will_go_multiline = attributes.len() > 1
             || block_flow_multiline
-            || super::helpers::has_nested_block_flow(element.fragment.nodes)
+            || super::helpers::has_nested_block_flow(nodes)
             || has_multiline_attr;
         let trim_boundaries = !kind.is_inline() || will_go_multiline;
 
         ElementContext {
-            kind,
-            is_void,
             is_self_closing,
             is_empty,
-            source_has_leading_break,
-            source_has_trailing_break,
-            hug_start,
-            hug_end,
+            hug_both: hug_start && hug_end,
             needs_multiline,
-            block_flow_multiline,
             trim_boundaries,
             has_multiline_attr,
             only_text_content,
@@ -351,11 +310,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Compute whether children need multiline formatting
-    fn compute_needs_multiline(
-        &self,
-        element: &internal::Element<'_>,
-        inputs: MultilineInputs,
-    ) -> bool {
+    fn compute_needs_multiline(&self, nodes: &[FragmentNode<'_>], inputs: MultilineInputs) -> bool {
         let MultilineInputs {
             kind,
             is_empty,
@@ -371,9 +326,7 @@ impl<'a> Printer<'a> {
         }
 
         // Multiple block children
-        let block_child_count = element
-            .fragment
-            .nodes
+        let block_child_count = nodes
             .iter()
             .filter(|n| self.is_block_element_child(n))
             .count();
@@ -384,7 +337,7 @@ impl<'a> Printer<'a> {
         // Mixed content (block + non-block children)
         let has_block_children = block_child_count > 0;
         if has_block_children {
-            let has_non_block = element.fragment.nodes.iter().any(|n| match n {
+            let has_non_block = nodes.iter().any(|n| match n {
                 FragmentNode::Text(t) => !t.is_ascii_ws_only,
                 FragmentNode::Element(e) => !self.is_block_element(e),
                 FragmentNode::ExpressionTag(_) => true,
@@ -406,7 +359,7 @@ impl<'a> Printer<'a> {
         // based on whether the joined text fits inline.
         if !only_text_content
             && self.has_source_breaks_in_content(
-                element.fragment.nodes,
+                nodes,
                 kind,
                 source_has_leading_break,
                 source_has_trailing_break,
@@ -421,7 +374,7 @@ impl<'a> Printer<'a> {
         // Load-bearing for the component case (`components/multi_expressions_multiline`): without
         // it such a `<Comp>` would stay inline. The only remaining use of
         // `should_split_expressions_in_nodes` now that the sibling-break caller is retired.
-        let should_split = self.should_split_expressions_in_nodes(element.fragment.nodes);
+        let should_split = self.should_split_expressions_in_nodes(nodes);
         let has_trailing_ws = !hug_end;
         if source_has_leading_break && has_trailing_ws && should_split {
             return true;
@@ -433,15 +386,14 @@ impl<'a> Printer<'a> {
         // the children are *built* multiline (one node per line) keeps the expanding block from
         // overshooting printWidth when authored compactly (it would otherwise flow inline).
         // Note: await blocks alone do NOT force expansion.
-        if super::helpers::has_any_expanding_blocks(element.fragment.nodes) {
+        if super::helpers::has_any_expanding_blocks(nodes) {
             return true;
         }
 
         // await/snippet (which don't force-expand on their own) still go multiline when they
         // follow a sibling, so their body-drop matches if/each (via the multiline path) and
         // the sibling-`>` dangle / block-on-own-line separation resolves in one pass.
-        if kind.is_block() && super::helpers::has_control_flow_after_sibling(element.fragment.nodes)
-        {
+        if kind.is_block() && super::helpers::has_control_flow_after_sibling(nodes) {
             return true;
         }
 
@@ -452,8 +404,7 @@ impl<'a> Printer<'a> {
 
         // Text with internal newlines
         // Skip for text-only content — newlines between words are just whitespace
-        if !only_text_content && self.text_has_internal_newlines(element, source_has_leading_break)
-        {
+        if !only_text_content && self.text_has_internal_newlines(nodes, source_has_leading_break) {
             return true;
         }
 
@@ -461,9 +412,9 @@ impl<'a> Printer<'a> {
     }
 
     /// Check if block flow children force parent to multiline
-    fn block_flow_forces_multiline(&self, element: &internal::Element<'_>) -> bool {
+    fn block_flow_forces_multiline(&self, nodes: &[FragmentNode<'_>]) -> bool {
         // Check if any block has non-inline content
-        let has_non_inline_block = element.fragment.nodes.iter().any(|n| match n {
+        let has_non_inline_block = nodes.iter().any(|n| match n {
             FragmentNode::IfBlock(b) => !self.is_inline_fragment(&b.consequent),
             FragmentNode::EachBlock(b) => !self.is_inline_fragment(&b.body),
             FragmentNode::AwaitBlock(b) => {
@@ -482,14 +433,12 @@ impl<'a> Printer<'a> {
 
         // Check if there's whitespace around EXPANDING block flow children (if/each/key)
         // Await and snippet blocks don't force multiline when surrounded by whitespace
-        let has_expanding_blocks = element
-            .fragment
-            .nodes
+        let has_expanding_blocks = nodes
             .iter()
             .any(super::helpers::is_expanding_control_flow_block);
         let source = self.source;
         let has_ws_around_blocks = has_expanding_blocks
-            && element.fragment.nodes.iter().any(|n| {
+            && nodes.iter().any(|n| {
                 matches!(n, FragmentNode::Text(t) if t.is_ascii_ws_only && !t.raw(source).is_empty())
             });
 
@@ -499,24 +448,28 @@ impl<'a> Printer<'a> {
     /// Check if text content has internal newlines
     fn text_has_internal_newlines(
         &self,
-        element: &internal::Element<'_>,
+        nodes: &[FragmentNode<'_>],
         source_has_leading_break: bool,
     ) -> bool {
         let source = self.source;
-        let has_leading_content_break = element.fragment.nodes.first().is_some_and(|n| {
+        let has_leading_content_break = nodes.first().is_some_and(|n| {
             matches!(n, FragmentNode::Text(t) if { let r = t.raw(source); r.starts_with('\n') && !t.is_ascii_ws_only })
         });
 
         (source_has_leading_break || has_leading_content_break)
-            && element.fragment.nodes.iter().any(
+            && nodes.iter().any(
                 |n| matches!(n, FragmentNode::Text(t) if t.raw(source).trim_ascii().contains('\n')),
             )
     }
 
     /// Compute element layout from analyzed context
-    pub(super) fn compute_element_layout(&self, ctx: &ElementContext) -> ElementLayout {
-        if ctx.is_void || ctx.is_self_closing {
-            return if ctx.is_void {
+    pub(super) fn compute_element_layout(
+        &self,
+        parts: &ElementParts<'_>,
+        ctx: &ElementContext,
+    ) -> ElementLayout {
+        if parts.is_void || ctx.is_self_closing {
+            return if parts.is_void {
                 ElementLayout::Void
             } else {
                 ElementLayout::SelfClosing
@@ -527,30 +480,37 @@ impl<'a> Printer<'a> {
             return ElementLayout::Empty;
         }
 
-        // Determine boundary modes
-        // Text-only block content uses soft boundaries so the group can collapse to
-        // inline when content fits (e.g., `<p>text1 text2</p>` instead of multiline).
-        let preserve_breaks = ctx.kind.preserves_boundary_breaks() && !ctx.only_text_content;
-        let start_mode = if ctx.hug_start {
-            BoundaryMode::Hug
-        } else if ctx.needs_multiline || (preserve_breaks && ctx.source_has_leading_break) {
+        // Determine boundary modes.
+        //
+        // Content that goes multiline lays out block-style — both tags intact, content on its own
+        // indented lines — never with a dangled delimiter. Content-boundary whitespace is
+        // render-free under Svelte 5 (start/end-of-tag whitespace is removed at compile), so it
+        // must not decide that layout; if it did, the render-identical authorings of one document
+        // would each settle on a different stable form. Two rules follow:
+        //
+        // 1. Both boundaries move together. Hugging is all-or-nothing (`hug_both`): a ONE-SIDED
+        //    hug used to give prettier's dangle (`<tag⏎\t>content` / `content</tag⏎>`), so a lone
+        //    render-free boundary character selected the layout. A one-sided hug now falls through
+        //    to the same Soft boundaries as no hug at all, which break block-style. Output is
+        //    unchanged when the element fits inline (the Soft boundary reproduces the authored
+        //    space flat); only the broken form converges.
+        // 2. A boundary is Hard only when the content is multiline. A source break at just ONE
+        //    boundary is not an expansion signal on its own — the component rule is
+        //    both-or-neither (`has_source_breaks_in_content`), and a lone leading break used to
+        //    harden the opening while leaving the children built inline, producing a third stable
+        //    form (broken tags, children still flowing on one line).
+        //
+        // `<pre>`/`<textarea>` are dispatched to `build_whitespace_sensitive_element_doc` before
+        // any of this — there boundary whitespace IS render-significant and the dangle is
+        // mandatory. See conformance_prettier.md §Svelte: Inline content block-style.
+        let mode = if ctx.needs_multiline {
             BoundaryMode::Hard
+        } else if ctx.hug_both {
+            BoundaryMode::Hug
         } else {
             BoundaryMode::Soft
         };
 
-        let end_mode = if ctx.hug_end {
-            BoundaryMode::Hug
-        } else if ctx.needs_multiline || (preserve_breaks && ctx.source_has_trailing_break) {
-            BoundaryMode::Hard
-        } else {
-            BoundaryMode::Soft
-        };
-
-        ElementLayout::WithContent {
-            start: start_mode,
-            end: end_mode,
-            multiline_children: ctx.needs_multiline,
-        }
+        ElementLayout::WithContent(mode)
     }
 }

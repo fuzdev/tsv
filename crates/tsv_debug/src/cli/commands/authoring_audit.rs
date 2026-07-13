@@ -8,16 +8,36 @@
 //!
 //! ## What it mutates (safe by construction)
 //!
-//! Only **non-significant boundary whitespace**: an existing ASCII-whitespace run
-//! that sits *between two siblings* (a whitespace-only `Text` node, or the
-//! leading/trailing whitespace of a content `Text` node adjacent to a sibling) in
-//! a fragment that is **not** whitespace-significant (`<pre>`/`<textarea>`, via
-//! `tsv_html::preserves_whitespace`). The toggle is space ↔ single newline, and
-//! never touches a blank-line run (2+ newlines — Tier-1 significant) nor inserts
-//! whitespace where none exists. Toggling space↔newline at such a boundary is
-//! semantics-preserving by HTML whitespace collapse (both forms collapse to one
-//! inter-node space, kept/dropped identically) — the element *expansion* it may
-//! trigger is a layout change, which is exactly the property under test.
+//! Two site families, both confined to fragments that are **not**
+//! whitespace-significant (`<pre>`/`<textarea>`, via `tsv_html::preserves_whitespace`),
+//! and neither ever touching a blank-line run (2+ newlines — Tier-1 significant):
+//!
+//! 1. **Between siblings** — an existing ASCII-whitespace run separating two nodes (a
+//!    whitespace-only `Text` node, or the leading/trailing whitespace of a content
+//!    `Text` node adjacent to a sibling). Inter-node whitespace is render-**significant**
+//!    (it collapses to one space, it does not vanish), so the toggle is space ↔ single
+//!    newline only: never inserting whitespace where none exists, never removing it.
+//!    Both forms collapse to the same single inter-node space, so the mutation is
+//!    semantics-preserving; the element *expansion* it may trigger is the layout change
+//!    under test.
+//!
+//! 2. **At a tag's content boundary** — the whitespace between an element's opening tag
+//!    and its first child, or between its last child and the closing tag. This run is
+//!    render-**free** under Svelte 5 (start/end-of-content whitespace is removed at
+//!    compile: `<p>foo<span> - bar</span></p>` renders `foo- bar`), so here the run may
+//!    be *created and destroyed*, not just reshaped: each boundary is probed at all
+//!    three forms it can take — **hug (zero whitespace) ↔ space ↔ newline**. This is the
+//!    family that catches a formatter letting a render-free character pick the layout.
+//!    Restricted to elements whose content already spans lines in the base, because that is
+//!    where layout is at stake. Be honest about what this excludes: when the content fits on
+//!    one line, tsv *preserves* an authored boundary space (`<span> text </span>` and
+//!    `<span>text</span>` are both stable), so it is authoring-DEPENDENT there too — on a
+//!    character the compiler removes. That is a deliberate, prettier-matching preservation
+//!    choice, pinned by the `inline_boundary_whitespace` fixture and cataloged in
+//!    conformance_prettier.md §Svelte: Inline content block-style; it costs nothing
+//!    structurally, and probing it would bury the layout signal this audit exists to find
+//!    under a wall of sanctioned noise. So: a clean run means no render-free character picks
+//!    a LAYOUT — not that none survives in the output.
 //!
 //! The enumeration reuses the parser's own node structure + `preserves_whitespace`
 //! rather than re-deriving significance (audit *policy* lives here in the caller;
@@ -48,10 +68,11 @@ use super::profile::resolve_files;
 
 /// Audit Svelte boundary-whitespace authoring-independence.
 ///
-/// Toggles non-significant sibling-boundary whitespace (space↔newline) and checks
-/// tsv formats every authoring to one fixed point. Pure Rust for the convergence /
-/// idempotency verdict; `--prettier` adds the (a)/(b)/(c) triage via the sidecar.
-/// Defaults to `tests/fixtures` when no paths are given. Svelte (`.svelte`) only.
+/// Mutates whitespace that cannot change the render — space↔newline between siblings,
+/// and hug↔space↔newline at a tag's content boundary — and checks tsv formats every
+/// authoring to one fixed point. Pure Rust for the convergence / idempotency verdict;
+/// `--prettier` adds the (a)/(b)/(c) triage via the sidecar. Defaults to
+/// `tests/fixtures` when no paths are given. Svelte (`.svelte`) only.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "authoring_audit")]
 pub struct AuthoringAuditCommand {
@@ -94,6 +115,11 @@ enum SiteKind {
     ContentLeading,
     /// Trailing whitespace of a content `Text` node (a next sibling exists).
     ContentTrailing,
+    /// Between an element's opening tag and its first child — render-free, so probed
+    /// at all three forms (hug / space / newline).
+    BoundaryLeading,
+    /// Between an element's last child and its closing tag — likewise.
+    BoundaryTrailing,
 }
 
 impl SiteKind {
@@ -102,6 +128,8 @@ impl SiteKind {
             Self::WsOnly => "ws-only",
             Self::ContentLeading => "content-leading",
             Self::ContentTrailing => "content-trailing",
+            Self::BoundaryLeading => "boundary-leading",
+            Self::BoundaryTrailing => "boundary-trailing",
         }
     }
 }
@@ -212,6 +240,98 @@ fn is_ascii_ws(c: char) -> bool {
     c.is_ascii_whitespace()
 }
 
+/// The three forms an element's content boundary can take. All render identically
+/// under Svelte 5 (the run is removed at compile), so all three are legal authorings
+/// of one document — and none of them may select the layout.
+const BOUNDARY_FORMS: [&str; 3] = ["", " ", "\n"];
+
+/// Collect the content-boundary sites of one element's fragment: the (possibly empty)
+/// whitespace run between its opening tag and first child, and between its last child
+/// and its closing tag. Each is emitted once per *other* form in [`BOUNDARY_FORMS`], so
+/// a hugged boundary gets probed with a space and a newline spliced in, and vice versa.
+///
+/// Caller must have excluded whitespace-significant subtrees (`<pre>`/`<textarea>`),
+/// where this run is literal content and the mutation would change the render.
+fn collect_boundary_sites(nodes: &[FragmentNode<'_>], src: &str, out: &mut Vec<Site>) {
+    let (Some(first), Some(last)) = (nodes.first(), nodes.last()) else {
+        return;
+    };
+    // An all-whitespace fragment is an EMPTY element, not content with a boundary. (Its
+    // lone space — `<span> </span>` — is a deliberate, prettier-matching preservation.)
+    let has_content = nodes
+        .iter()
+        .any(|n| !matches!(n, FragmentNode::Text(t) if t.raw(src).trim_ascii().is_empty()));
+    if !has_content {
+        return;
+    }
+    let content_start = first.span().start_usize();
+    let content_end = last.span().end_usize();
+    // Probe only where LAYOUT is at stake — content that already spans lines. See the
+    // module doc: for content that fits on one line, both formatters deliberately keep an
+    // authored boundary space, so probing it would only pile up sanctioned divergences.
+    if !src[content_start..content_end].contains('\n') {
+        return;
+    }
+
+    // The leading run lives inside the first child when that child is text; otherwise the
+    // boundary is a hug and the run is the empty span at the content's start. Same, mirrored,
+    // for the trailing run. The two can't overlap: the fragment has non-whitespace content
+    // between them.
+    let lead = match first {
+        FragmentNode::Text(t) => {
+            let raw = t.raw(src);
+            raw.len() - raw.trim_start_matches(is_ascii_ws).len()
+        }
+        _ => 0,
+    };
+    push_boundary_forms(
+        content_start,
+        content_start + lead,
+        src,
+        SiteKind::BoundaryLeading,
+        out,
+    );
+
+    let trail = match last {
+        FragmentNode::Text(t) => {
+            let raw = t.raw(src);
+            raw.len() - raw.trim_end_matches(is_ascii_ws).len()
+        }
+        _ => 0,
+    };
+    push_boundary_forms(
+        content_end - trail,
+        content_end,
+        src,
+        SiteKind::BoundaryTrailing,
+        out,
+    );
+}
+
+/// Emit one site per alternative form of the boundary run `src[start..end]` (which may be
+/// empty — a hugged boundary). A run carrying a blank line is Tier-1 significant and is
+/// left alone, like everywhere else in this audit.
+fn push_boundary_forms(start: usize, end: usize, src: &str, kind: SiteKind, out: &mut Vec<Site>) {
+    let run = &src[start..end];
+    let base = match run.matches('\n').count() {
+        0 if run.is_empty() => "",
+        0 => " ",
+        1 => "\n",
+        _ => return,
+    };
+    for form in BOUNDARY_FORMS {
+        if form != base {
+            out.push(Site {
+                start,
+                end,
+                kind,
+                had_newline: base == "\n",
+                flipped: form,
+            });
+        }
+    }
+}
+
 /// Descend into a node's child fragments, propagating (and entering) whitespace
 /// significance.
 fn recurse_children(node: &FragmentNode<'_>, src: &str, ws_sig: bool, out: &mut Vec<Site>) {
@@ -219,6 +339,11 @@ fn recurse_children(node: &FragmentNode<'_>, src: &str, ws_sig: bool, out: &mut 
         FragmentNode::Element(el) => {
             let tag = el.name_span.extract(src).to_ascii_lowercase();
             let child_ws_sig = ws_sig || tsv_html::preserves_whitespace(&tag);
+            // The content boundary is render-free only outside `<pre>`/`<textarea>`, where
+            // it is literal content and the dangle is mandatory.
+            if !child_ws_sig {
+                collect_boundary_sites(el.fragment.nodes, src, out);
+            }
             collect_sites(el.fragment.nodes, src, child_ws_sig, out);
         }
         FragmentNode::SpecialElement(el) => {
@@ -227,6 +352,9 @@ fn recurse_children(node: &FragmentNode<'_>, src: &str, ws_sig: bool, out: &mut 
             // the tag is dynamic and unknowable statically; treat as non-pre
             // (the conservative miss is a `<svelte:element this="pre">` literal,
             // vanishingly rare and not worth a special case here).
+            if !ws_sig {
+                collect_boundary_sites(el.fragment.nodes, src, out);
+            }
             collect_sites(el.fragment.nodes, src, ws_sig, out);
         }
         FragmentNode::IfBlock(b) => {

@@ -1,6 +1,0 @@
-<Comp>
-
-	{
-	  expr
-	}</Comp
->

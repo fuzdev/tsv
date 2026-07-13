@@ -1,55 +1,41 @@
 // Element-specific formatting for Svelte templates
 //
-// Hug-mode helpers shared by the element/special-element doc builders.
+// The content-boundary whitespace probes behind `ElementContext::hug_both`.
 
-use crate::ast::internal::{self, FragmentNode};
+use crate::ast::internal::FragmentNode;
 use crate::printer::Printer;
 
 impl<'a> Printer<'a> {
-    //
-    // Hug mode helpers (used by element_doc.rs and special_doc.rs)
-    //
-
-    /// Check if element should hug the start
+    /// Whether the content touches the opening tag — no collapsible whitespace at the start
+    /// of the fragment.
     ///
-    /// Matches Prettier's shouldHugStart: returns false (don't hug) if:
-    /// - Element is a block element
-    /// - First child is text starting with collapsible (ASCII) whitespace
-    ///
-    /// Non-breaking spaces (U+00A0 / U+202F) are content, not collapsible
-    /// whitespace, so a leading nbsp still hugs (matching prettier-plugin-svelte's
+    /// Matches Prettier's `shouldHugStart`. Non-breaking spaces (U+00A0 / U+202F) are content,
+    /// not collapsible whitespace, so a leading nbsp still hugs (matching prettier-plugin-svelte's
     /// `STARTS_WITH_HTML_COLLAPSE_WHITESPACE_RE = /^[\t\n\f\r ]/`).
-    pub(crate) fn should_hug_start(&self, element: &internal::Element<'_>, is_block: bool) -> bool {
+    ///
+    /// This is a *whitespace probe*, not a layout decision: it says what the author wrote, and
+    /// only [`Printer::compute_element_layout`] decides what that means. Hugging is all-or-nothing
+    /// there — see [`ElementContext::hug_both`](super::element_doc::ElementContext).
+    pub(crate) fn should_hug_start(&self, nodes: &[FragmentNode<'_>], is_block: bool) -> bool {
         if is_block {
             return false;
         }
-        if element.fragment.nodes.is_empty() {
-            return true;
-        }
-        match &element.fragment.nodes[0] {
-            FragmentNode::Text(text) => !text
+        match nodes.first() {
+            Some(FragmentNode::Text(text)) => !text
                 .raw(self.source)
                 .starts_with(|c: char| c.is_ascii_whitespace()),
             _ => true,
         }
     }
 
-    /// Check if element should hug the end
-    ///
-    /// Matches Prettier's shouldHugEnd: returns false (don't hug) if:
-    /// - Element is a block element
-    /// - Last child is text ending with collapsible (ASCII) whitespace
-    ///
-    /// Non-breaking spaces are content, so a trailing nbsp still hugs (matching
+    /// Whether the content touches the closing tag — no collapsible whitespace at the end of
+    /// the fragment. Mirror of [`Self::should_hug_start`] (Prettier's `shouldHugEnd`,
     /// `ENDS_WITH_HTML_COLLAPSE_WHITESPACE_RE = /[\t\n\f\r ]$/`).
-    pub(crate) fn should_hug_end(&self, element: &internal::Element<'_>, is_block: bool) -> bool {
+    pub(crate) fn should_hug_end(&self, nodes: &[FragmentNode<'_>], is_block: bool) -> bool {
         if is_block {
             return false;
         }
-        if element.fragment.nodes.is_empty() {
-            return true;
-        }
-        match element.fragment.nodes.last() {
+        match nodes.last() {
             Some(FragmentNode::Text(text)) => !text
                 .raw(self.source)
                 .ends_with(|c: char| c.is_ascii_whitespace()),
