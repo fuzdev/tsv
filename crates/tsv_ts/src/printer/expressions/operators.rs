@@ -715,6 +715,17 @@ impl<'a> Printer<'a> {
     ) -> bool {
         let d = self.d();
 
+        // Zero-comment fast path: the operand→operator gap holds no comment (the
+        // ubiquitous case), so emit just the operator — no empty comment node in the
+        // parts concat, and no per-gap comment scan at all. Byte-identical: the gap is
+        // comment-free, so the general path below would build `empty()` here (renders to
+        // nothing). The gap ⊆ the binary span, so this can only skip work, never a comment.
+        if !self.has_comments_between(operand_end, op_start) {
+            parts.push(d.text(" "));
+            parts.push(d.text(op_str));
+            return false;
+        }
+
         if !self.has_line_comments_between(operand_end, op_start) {
             // No line comment — inline gap (block comments stay inline, as before).
             parts.push(self.build_inline_comments_between_doc(operand_end, op_start));
