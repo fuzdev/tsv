@@ -239,28 +239,23 @@ impl<'a> Printer<'a> {
                     return d.concat(&parts);
                 }
                 let operand_doc = self.build_type_doc(o.type_annotation);
-                let comments_doc = self.build_comments_between(
+                // `None` on the comment-free `keyof T` / `readonly T[]` — no empty child.
+                let comments_doc = self.build_inline_comments_between_doc_trailing_space_opt(
                     keyword_end,
                     operand_start,
-                    CommentSpacing::Trailing,
                 );
-                if needs_parens {
-                    d.concat(&[
-                        d.text(o.operator.as_str()),
-                        d.text(" "),
-                        comments_doc,
-                        d.text("("),
-                        operand_doc,
-                        d.text(")"),
-                    ])
-                } else {
-                    d.concat(&[
-                        d.text(o.operator.as_str()),
-                        d.text(" "),
-                        comments_doc,
-                        operand_doc,
-                    ])
+                let mut parts: DocBuf = smallvec![d.text(o.operator.as_str()), d.text(" ")];
+                if let Some(comments) = comments_doc {
+                    parts.push(comments);
                 }
+                if needs_parens {
+                    parts.push(d.text("("));
+                    parts.push(operand_doc);
+                    parts.push(d.text(")"));
+                } else {
+                    parts.push(operand_doc);
+                }
+                d.concat(&parts)
             }
             TSType::Import(i) => self.build_import_type_doc(i),
             TSType::TypeQuery(q) => {
@@ -294,11 +289,11 @@ impl<'a> Printer<'a> {
                     return d.concat(&parts);
                 }
                 let mut parts: DocBuf = smallvec![d.text("typeof ")];
-                parts.push(self.build_comments_between(
-                    typeof_end,
-                    expr_start,
-                    CommentSpacing::Trailing,
-                ));
+                if let Some(comments) = self
+                    .build_inline_comments_between_doc_trailing_space_opt(typeof_end, expr_start)
+                {
+                    parts.push(comments);
+                }
                 parts.push(self.build_type_query_expr_name_doc(&q.expr_name));
                 if let Some(type_args) = &q.type_arguments {
                     // Preserve comments: `typeof fn/* c */ <string>`

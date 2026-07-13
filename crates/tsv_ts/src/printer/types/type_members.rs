@@ -202,11 +202,12 @@ impl<'a> Printer<'a> {
             .map(|tp| tp.span.start)
             .or(paren_pos)
             .unwrap_or(key_region_end);
-        parts.push(self.build_name_to_type_params_comments(
+        self.push_name_to_type_params_comments(
+            &mut parts,
             after_key,
             comments_boundary,
             CommentSpacing::for_type_params(method.type_parameters.is_some()),
-        ));
+        );
 
         // Print type parameters if present: `<T>` or `<T, U>`
         if let Some(type_params) = &method.type_parameters {

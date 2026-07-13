@@ -80,12 +80,12 @@ impl<'a> Printer<'a> {
         parts.push(d.text("type"));
         // Comments between keyword and name: `type /* c */ A = string`
         parts.push(d.text(" "));
-        parts.push(
-            self.build_inline_comments_between_doc_trailing_space(
-                decl.span.start,
-                decl.id.span.start,
-            ),
-        );
+        if let Some(comments) = self.build_inline_comments_between_doc_trailing_space_opt(
+            decl.span.start,
+            decl.id.span.start,
+        ) {
+            parts.push(comments);
+        }
         parts.push(self.identifier_name_doc(&decl.id));
 
         // Check if type parameters are complex (>1 param with constraints/defaults)
@@ -108,11 +108,12 @@ impl<'a> Printer<'a> {
             .type_parameters
             .as_ref()
             .map_or(decl.id.span.end, |tp| tp.span.start);
-        parts.push(self.build_name_to_type_params_comments(
+        self.push_name_to_type_params_comments(
+            &mut parts,
             decl.id.span.end,
             comment_end,
             CommentSpacing::for_type_params(decl.type_parameters.is_some()),
-        ));
+        );
 
         if let Some(type_params) = &decl.type_parameters {
             parts.push(self.build_type_parameter_declaration_doc_wrapping(type_params));
@@ -419,22 +420,23 @@ impl<'a> Printer<'a> {
         header_parts.push(d.text("interface"));
         // Comments between keyword and name: `interface /* c */ A {}`
         header_parts.push(d.text(" "));
-        header_parts.push(
-            self.build_inline_comments_between_doc_trailing_space(
-                decl.span.start,
-                decl.id.span.start,
-            ),
-        );
+        if let Some(comments) = self.build_inline_comments_between_doc_trailing_space_opt(
+            decl.span.start,
+            decl.id.span.start,
+        ) {
+            header_parts.push(comments);
+        }
         header_parts.push(self.identifier_name_doc(&decl.id));
 
         // Comments between name and type params: `interface A/* c */ <T> {}`
         // Line comments get a hardline to prevent absorbing type params as comment text
         if let Some(type_params) = &decl.type_parameters {
-            header_parts.push(self.build_name_to_type_params_comments(
+            self.push_name_to_type_params_comments(
+                &mut header_parts,
                 decl.id.span.end,
                 type_params.span.start,
                 CommentSpacing::Trailing,
-            ));
+            );
         }
 
         // Build extends doc, with comments between `extends` keyword and first item
@@ -590,11 +592,12 @@ impl<'a> Printer<'a> {
             .type_parameters
             .as_ref()
             .map_or_else(|| paren_pos.unwrap_or(decl.id.span.end), |tp| tp.span.start);
-        tail.push(self.build_name_to_type_params_comments(
+        self.push_name_to_type_params_comments(
+            &mut tail,
             decl.id.span.end,
             comment_end,
             CommentSpacing::for_type_params(decl.type_parameters.is_some()),
-        ));
+        );
 
         // Type parameters with wrapping support
         if let Some(type_params) = &decl.type_parameters {

@@ -218,7 +218,10 @@ impl<'a> Printer<'a> {
             // located as colon+1, so no second scan is needed.
             let test_end = test.span().end;
             let colon_pos = case_label_end - 1;
-            parts.push(self.build_inline_comments_between_doc(test_end, colon_pos));
+            if let Some(comments) = self.build_inline_comments_between_doc_opt(test_end, colon_pos)
+            {
+                parts.push(comments);
+            }
             parts.push(d.text(":"));
         } else {
             // Comments between `default` keyword and colon: `default /* c */:`. The colon
@@ -226,7 +229,11 @@ impl<'a> Printer<'a> {
             let default_keyword_end = case.span.start + "default".len() as u32;
             let colon_pos = case_label_end - 1;
             parts.push(d.text("default"));
-            parts.push(self.build_inline_comments_between_doc(default_keyword_end, colon_pos));
+            if let Some(comments) =
+                self.build_inline_comments_between_doc_opt(default_keyword_end, colon_pos)
+            {
+                parts.push(comments);
+            }
             parts.push(d.text(":"));
         }
 

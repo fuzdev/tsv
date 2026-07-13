@@ -264,6 +264,18 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = d.pooled_docbuf();
 
+        // One window search over the parameter gates every comment query below. All of
+        // them — the `<`→name gap, the name→`extends` gap, the pre-`=` gap, the trailing
+        // gap, and the keyword→value gaps `append_keyword_value` inspects — are bounded
+        // inside `param.span`, and a comment only counts when it lies fully inside the
+        // queried range. So a comment-free parameter provably has none in any of them:
+        // the searches are skipped, no `empty()` child is pushed, and the `extends` /
+        // `=` byte scans never run. Those scans exist only to bound the comment ranges —
+        // both keywords are re-emitted as static text — which is why a comment-free
+        // parameter can pass `None` for the range. Byte-identical; `<T>` is on every
+        // generic function, class, interface and alias.
+        let has_comments = self.has_comments_between(param.span.start, param.span.end);
+
         // Add modifiers in order: const, in, out
         if param.is_const {
             parts.push(d.text("const "));
@@ -276,11 +288,14 @@ impl<'a> Printer<'a> {
         }
 
         // Comments before name: </* c */ T>
-        parts.push(self.build_comments_between(
-            param.span.start,
-            param.name.span.start,
-            CommentSpacing::Trailing,
-        ));
+        if has_comments
+            && let Some(leading) = self.build_inline_comments_between_doc_trailing_space_opt(
+                param.span.start,
+                param.name.span.start,
+            )
+        {
+            parts.push(leading);
+        }
 
         parts.push(self.identifier_name_doc(&param.name));
 
@@ -288,36 +303,46 @@ impl<'a> Printer<'a> {
         let mut prev_end = param.name.span.end;
 
         if let Some(constraint) = &param.constraint {
-            // Find `extends` keyword between name and constraint. A `TSTypeParameter`
-            // constraint is always spelled `extends` — mapped-type `[K in T]` keys use
-            // `in`, but those take a separate `TSMappedTypeParameter`/`build_mapped_type_doc`
-            // path and never reach here, so the keyword is guaranteed present.
-            #[allow(clippy::expect_used)] // extends always present for a type-parameter constraint
-            let extends_pos = self
-                .find_keyword_in_range(prev_end, constraint.span().start, "extends")
-                .expect("extends keyword must exist when constraint is present");
-            let extends_end = extends_pos + "extends".len() as u32;
-
-            // Comments between name and `extends`: <T /* c */ extends A>
-            parts.push(self.build_comments_between(prev_end, extends_pos, CommentSpacing::Leading));
-
-            parts.push(d.text(" extends"));
             // If the constraint is `(// leading\n T)`, treat the leading line
             // comment inside the parens as if it were between `extends` and the
             // constraint so it forces the indent-and-break layout (matching
             // prettier's paren stripping).
-            let (value_search_end, value_type): (u32, &TSType<'_>) = if let TSType::Parenthesized(p) =
-                constraint
+            let (value_search_end, value_type): (u32, &TSType<'_>) = if has_comments
+                && let TSType::Parenthesized(p) = constraint
                 && self.paren_has_leading_line_comment(p)
             {
                 (p.type_annotation.span().start, p.type_annotation)
             } else {
                 (constraint.span().start, constraint)
             };
-            self.append_keyword_value_with_comments(
+
+            // Find `extends` keyword between name and constraint. A `TSTypeParameter`
+            // constraint is always spelled `extends` — mapped-type `[K in T]` keys use
+            // `in`, but those take a separate `TSMappedTypeParameter`/`build_mapped_type_doc`
+            // path and never reach here, so the keyword is guaranteed present.
+            let comment_range = has_comments.then(|| {
+                #[allow(clippy::expect_used)] // extends always present for a constraint
+                let extends_pos = self
+                    .find_keyword_in_range(prev_end, constraint.span().start, "extends")
+                    .expect("extends keyword must exist when constraint is present");
+                let extends_end = extends_pos + "extends".len() as u32;
+
+                // Comments between name and `extends`: <T /* c */ extends A>
+                if let Some(pre) = self.build_comments_between_filtered_opt(
+                    prev_end,
+                    extends_pos,
+                    CommentSpacing::Leading,
+                    CommentFilter::All,
+                ) {
+                    parts.push(pre);
+                }
+                (extends_end, value_search_end)
+            });
+
+            parts.push(d.text(" extends"));
+            self.append_keyword_value(
                 &mut parts,
-                extends_end,
-                value_search_end,
+                comment_range,
                 value_type,
                 GroupId::TypeParameterConstraint,
             );
@@ -326,25 +351,33 @@ impl<'a> Printer<'a> {
 
         if let Some(default) = &param.default {
             // Find `=` between previous end and default
-            #[allow(clippy::expect_used)] // = must exist when default is present in a valid AST
-            let eq_pos = find_char_skipping_comments(
-                self.source.as_bytes(),
-                prev_end as usize,
-                default.span().start as usize,
-                b'=',
-            )
-            .expect("= must exist when default is present");
-            let eq_end = (eq_pos + 1) as u32;
-            let eq_pos = eq_pos as u32;
+            let comment_range = has_comments.then(|| {
+                #[allow(clippy::expect_used)] // = must exist when a default is present
+                let eq_pos = find_char_skipping_comments(
+                    self.source.as_bytes(),
+                    prev_end as usize,
+                    default.span().start as usize,
+                    b'=',
+                )
+                .expect("= must exist when default is present");
+                let eq_end = (eq_pos + 1) as u32;
 
-            // Comments before `=`: <T extends B /* c */ = C>
-            parts.push(self.build_comments_between(prev_end, eq_pos, CommentSpacing::Leading));
+                // Comments before `=`: <T extends B /* c */ = C>
+                if let Some(pre) = self.build_comments_between_filtered_opt(
+                    prev_end,
+                    eq_pos as u32,
+                    CommentSpacing::Leading,
+                    CommentFilter::All,
+                ) {
+                    parts.push(pre);
+                }
+                (eq_end, default.span().start)
+            });
 
             parts.push(d.text(" ="));
-            self.append_keyword_value_with_comments(
+            self.append_keyword_value(
                 &mut parts,
-                eq_end,
-                default.span().start,
+                comment_range,
                 default,
                 GroupId::TypeParameterDefault,
             );
@@ -352,7 +385,16 @@ impl<'a> Printer<'a> {
         }
 
         // Trailing comments after last part: <T /* c */> or <T extends A /* c */>
-        parts.push(self.build_comments_between(prev_end, param.span.end, CommentSpacing::Leading));
+        if has_comments
+            && let Some(trailing) = self.build_comments_between_filtered_opt(
+                prev_end,
+                param.span.end,
+                CommentSpacing::Leading,
+                CommentFilter::All,
+            )
+        {
+            parts.push(trailing);
+        }
 
         d.concat(&parts)
     }
@@ -368,11 +410,15 @@ impl<'a> Printer<'a> {
     /// `group_id` ties the after-keyword line break to `indent_if_break` so the
     /// value is indented exactly when that break fires — Prettier's
     /// `printTypeParameter` pattern.
-    fn append_keyword_value_with_comments(
+    ///
+    /// `comment_range` is the `(keyword_end, value_start)` gap to search, or `None`
+    /// when the caller has already proven the whole parameter comment-free — the
+    /// keyword's source position is needed for nothing else, so `None` also spares the
+    /// caller the byte scan that would locate it.
+    fn append_keyword_value(
         &self,
         parts: &mut DocBuf,
-        keyword_end: u32,
-        value_start: u32,
+        comment_range: Option<(u32, u32)>,
         value_type: &TSType<'_>,
         group_id: GroupId,
     ) {
@@ -388,37 +434,44 @@ impl<'a> Printer<'a> {
         if matches!(value_type, TSType::Conditional(_))
             && group_id == GroupId::TypeParameterConstraint
         {
-            let comments =
-                self.build_comments_between(keyword_end, value_start, CommentSpacing::Leading);
-            parts.push(d.concat(&[
-                d.text(" ("),
-                comments,
-                self.build_type_doc(value_type),
-                d.text(")"),
-            ]));
+            let mut inner: DocBuf = smallvec![d.text(" (")];
+            if let Some((keyword_end, value_start)) = comment_range
+                && let Some(comments) = self.build_comments_between_filtered_opt(
+                    keyword_end,
+                    value_start,
+                    CommentSpacing::Leading,
+                    CommentFilter::All,
+                )
+            {
+                inner.push(comments);
+            }
+            inner.push(self.build_type_doc(value_type));
+            inner.push(d.text(")"));
+            parts.push(d.concat(&inner));
             return;
         }
-        if self.comments_force_own_line_between(keyword_end, value_start) {
-            // A line comment or multiline block after the keyword hangs the bound type
-            // on its own line (and expands the `<…>` via the gate at :163). A
-            // single-line block comment (own-line, trailing, or glued) collapses inline
-            // and keeps `<…>` collapsed (the fall-through below).
-            let value_doc = self.build_type_doc(value_type);
-            self.append_keyword_value_line_comments(parts, keyword_end, value_start, value_doc);
-            return;
-        }
-        let comments = self.build_comments_between_filtered_opt(
-            keyword_end,
-            value_start,
-            CommentSpacing::Leading,
-            CommentFilter::All,
-        );
-        if let Some(c) = comments {
-            parts.push(c);
-            // Block comment present: keep the value inline after it.
-            parts.push(d.text(" "));
-            parts.push(self.build_type_doc(value_type));
-            return;
+        if let Some((keyword_end, value_start)) = comment_range {
+            if self.comments_force_own_line_between(keyword_end, value_start) {
+                // A line comment or multiline block after the keyword hangs the bound type
+                // on its own line (and expands the `<…>` via the gate at :163). A
+                // single-line block comment (own-line, trailing, or glued) collapses inline
+                // and keeps `<…>` collapsed (the fall-through below).
+                let value_doc = self.build_type_doc(value_type);
+                self.append_keyword_value_line_comments(parts, keyword_end, value_start, value_doc);
+                return;
+            }
+            if let Some(comments) = self.build_comments_between_filtered_opt(
+                keyword_end,
+                value_start,
+                CommentSpacing::Leading,
+                CommentFilter::All,
+            ) {
+                parts.push(comments);
+                // Block comment present: keep the value inline after it.
+                parts.push(d.text(" "));
+                parts.push(self.build_type_doc(value_type));
+                return;
+            }
         }
         // No comments: a non-hugging union breaks after the keyword with a
         // hanging indent (Prettier's shouldIndentUnionType — true for type
@@ -475,11 +528,14 @@ impl<'a> Printer<'a> {
             return d.text("<>");
         }
 
+        // One window search over the `<…>`, threaded into everything below it.
+        let has_comments = self.has_comments_between(inst.span.start, inst.span.end);
+
         // Line comments (anywhere, including a leading `foo<// c\n A>(x)` — which
         // would otherwise fall through to the block-comment-only group path below and
         // be dropped) or own-line block comments force the multiline layout. Shared
-        // predicate with the type-position builder, incl. its zero-comment window gate.
-        if self.type_arguments_force_expansion(inst) {
+        // predicate with the type-position builder.
+        if self.type_arguments_force_expansion(inst, has_comments) {
             return self.build_type_parameter_instantiation_doc_with_line_comments(inst);
         }
 
@@ -513,7 +569,7 @@ impl<'a> Printer<'a> {
         if inst.params.len() == 1
             && (is_simple_type_arg(&inst.params[0]) || is_hugging_union_type_arg(&inst.params[0]))
         {
-            return self.build_single_type_arg_inline(inst);
+            return self.build_single_type_arg_inline(inst, has_comments);
         }
 
         // Build params with commas and line breaks
@@ -531,36 +587,46 @@ impl<'a> Printer<'a> {
             }
 
             // Add leading block comments (after previous comma or `<`)
-            param_parts.push(self.build_comments_between_filtered(
-                prev_end,
-                param_start,
-                CommentSpacing::Trailing,
-                CommentFilter::BlockOnly,
-            ));
+            if has_comments
+                && let Some(leading) = self.build_comments_between_filtered_opt(
+                    prev_end,
+                    param_start,
+                    CommentSpacing::Trailing,
+                    CommentFilter::BlockOnly,
+                )
+            {
+                param_parts.push(leading);
+            }
 
             param_parts.push(self.build_type_doc(param));
 
-            let param_end = param.span().end;
-            if i + 1 < inst.params.len() {
-                // Find comma between this param and next
-                let next_start = inst.params[i + 1].span().start;
-                let comma_pos = self.find_list_comma(param_end, next_start);
-                // Trailing block comments (before comma)
-                param_parts.push(self.build_comments_between_filtered(
-                    param_end,
-                    comma_pos,
-                    CommentSpacing::Leading,
-                    CommentFilter::BlockOnly,
-                ));
-                prev_end = comma_pos + 1; // After comma
-            } else {
-                // Last param: trailing comments before `>`
-                param_parts.push(self.build_comments_between_filtered(
+            // The `,` below is re-emitted as static text, so `find_list_comma` exists
+            // only to bound the comment ranges — a comment-free `<…>` never scans.
+            if has_comments {
+                let param_end = param.span().end;
+                if i + 1 < inst.params.len() {
+                    // Find comma between this param and next
+                    let next_start = inst.params[i + 1].span().start;
+                    let comma_pos = self.find_list_comma(param_end, next_start);
+                    // Trailing block comments (before comma)
+                    if let Some(trailing) = self.build_comments_between_filtered_opt(
+                        param_end,
+                        comma_pos,
+                        CommentSpacing::Leading,
+                        CommentFilter::BlockOnly,
+                    ) {
+                        param_parts.push(trailing);
+                    }
+                    prev_end = comma_pos + 1; // After comma
+                } else if let Some(trailing) = self.build_comments_between_filtered_opt(
+                    // Last param: trailing comments before `>`
                     param_end,
                     inst.span.end - 1,
                     CommentSpacing::Leading,
                     CommentFilter::BlockOnly,
-                ));
+                ) {
+                    param_parts.push(trailing);
+                }
             }
         }
 

@@ -35,18 +35,25 @@ impl<'a> Printer<'a> {
     /// or always-inline). Own-line and line comments are routed to the multiline path
     /// before this runs, so only inline block comments remain to preserve here. Shared by
     /// the type-position builder and the call/`new`/instantiation builder.
+    /// `has_comments` is the caller's whole-`<…>` window answer: `false` proves both
+    /// gaps below are comment-free, so neither is searched.
     pub(in crate::printer) fn build_single_type_arg_inline(
         &self,
         args: &internal::TSTypeParameterInstantiation<'_>,
+        has_comments: bool,
     ) -> DocId {
         let d = self.d();
         let param = &args.params[0];
         let mut parts = smallvec![d.text("<")];
-        let after_open = args.span.start + 1; // After the opening `<`
-        let before_close = args.span.end - 1; // Before the closing `>`
-        self.append_leading_inline_block_comments(&mut parts, after_open, param.span().start);
-        parts.push(self.build_type_doc(param));
-        self.append_trailing_inline_block_comments(&mut parts, param.span().end, before_close);
+        if has_comments {
+            let after_open = args.span.start + 1; // After the opening `<`
+            let before_close = args.span.end - 1; // Before the closing `>`
+            self.append_leading_inline_block_comments(&mut parts, after_open, param.span().start);
+            parts.push(self.build_type_doc(param));
+            self.append_trailing_inline_block_comments(&mut parts, param.span().end, before_close);
+        } else {
+            parts.push(self.build_type_doc(param));
+        }
         parts.push(d.text(">"));
         d.concat(&parts)
     }
@@ -57,17 +64,18 @@ impl<'a> Printer<'a> {
     /// inline. Shared by both type-argument builders (the type-position
     /// `build_type_arguments_doc*` and the call/`new` instantiation
     /// `build_type_parameter_instantiation_doc`).
+    /// `has_comments` is the caller's whole-`<…>` window answer. Every sub-query below
+    /// is bounded within `[args.span.start, args.span.end]`, and `has_comments_between`
+    /// only yields comments fully inside its range — so when no comment lies inside the
+    /// `<…>`, all three are provably false. Callers hold the flag rather than
+    /// recomputing it here, because they gate their own per-argument comment work
+    /// (and its trivia scans) on the same answer.
     pub(in crate::printer) fn type_arguments_force_expansion(
         &self,
         args: &internal::TSTypeParameterInstantiation<'_>,
+        has_comments: bool,
     ) -> bool {
-        // Zero-comment window gate: one binary search over the whole `<…>` span.
-        // Every sub-query below is bounded within `[args.span.start, args.span.end]`,
-        // and `has_comments_between` only yields comments fully inside its range — so
-        // when no comment lies inside the `<…>`, all three are provably false. Skips
-        // them (and their delimited-list trivia scans) on the overwhelmingly common
-        // comment-free type argument (`Foo<T>`, `Map<K, V>`, …).
-        if !self.has_comments_between(args.span.start, args.span.end) {
+        if !has_comments {
             return false;
         }
         let has_leading_line_comment = args.params.first().is_some_and(|first| {
@@ -99,18 +107,21 @@ impl<'a> Printer<'a> {
             return d.text("<>");
         }
 
-        if self.type_arguments_force_expansion(args) {
+        // One window search over the `<…>`, threaded into everything below it.
+        let has_comments = self.has_comments_between(args.span.start, args.span.end);
+
+        if self.type_arguments_force_expansion(args, has_comments) {
             return self.build_type_arguments_doc_with_line_comments(args);
         }
 
         // Single type argument: inline (matches Prettier's shouldInline for len==1)
         if args.params.len() == 1 {
-            return self.build_single_type_arg_inline(args);
+            return self.build_single_type_arg_inline(args, has_comments);
         }
 
         // Multiple type arguments: use group so they can break at print width.
         // Matches Prettier's group([<, indent([softline, join([",", line], args)]), softline, >])
-        self.build_type_arguments_doc_multi_arg(args)
+        self.build_type_arguments_doc_multi_arg(args, has_comments)
     }
 
     /// Build doc for type arguments with width-based wrapping support.
@@ -137,7 +148,10 @@ impl<'a> Printer<'a> {
             return d.text("<>");
         }
 
-        if self.type_arguments_force_expansion(args) {
+        // One window search over the `<…>`, threaded into everything below it.
+        let has_comments = self.has_comments_between(args.span.start, args.span.end);
+
+        if self.type_arguments_force_expansion(args, has_comments) {
             return self.build_type_arguments_doc_with_line_comments(args);
         }
 
@@ -159,11 +173,11 @@ impl<'a> Printer<'a> {
                 || matches!(unwrapped, TSType::TypeLiteral(_) | TSType::Mapped(_))
                 || is_hugging_union_type_arg(&args.params[0]);
             if is_huggable {
-                return self.build_single_type_arg_inline(args);
+                return self.build_single_type_arg_inline(args, has_comments);
             }
         }
 
-        self.build_type_arguments_doc_multi_arg(args)
+        self.build_type_arguments_doc_multi_arg(args, has_comments)
     }
 
     /// Build multi-arg type arguments with group-based breaking.
@@ -171,9 +185,15 @@ impl<'a> Printer<'a> {
     /// Matches Prettier's `group([<, indent([softline, join([",", line], args)]), softline, >])`.
     /// Used by both `build_type_arguments_doc` and `build_type_arguments_doc_wrapping`
     /// for 2+ type arguments (and non-huggable single args in the wrapping variant).
+    /// `has_comments` is the caller's whole-`<…>` window answer. When `false` the whole
+    /// per-argument comment apparatus is dead: every gap is provably comment-free, so
+    /// neither the leading/trailing searches nor the `find_list_comma` byte scan that
+    /// bounds them runs. The scan exists only to bound those ranges — the printed `,` is
+    /// static text — so a comment-free `Map<K, V>` needs no source scanning at all.
     fn build_type_arguments_doc_multi_arg(
         &self,
         args: &internal::TSTypeParameterInstantiation<'_>,
+        has_comments: bool,
     ) -> DocId {
         let d = self.d();
         let mut inner_parts = DocBuf::new();
@@ -185,23 +205,35 @@ impl<'a> Printer<'a> {
 
             let mut arg_parts = DocBuf::new();
 
-            // Add leading block comments before this type argument
-            self.append_leading_inline_block_comments(&mut arg_parts, prev_end, param_start);
+            if has_comments {
+                // Add leading block comments before this type argument
+                self.append_leading_inline_block_comments(&mut arg_parts, prev_end, param_start);
+            }
 
             arg_parts.push(self.build_type_arg_doc(param, true));
 
-            // Add trailing block comments after this type argument (before comma)
-            let param_end = param.span().end;
-            prev_end = if i + 1 < args.params.len() {
-                let next_start = args.params[i + 1].span().start;
-                let comma_pos = self.find_list_comma(param_end, next_start);
-                self.append_trailing_inline_block_comments(&mut arg_parts, param_end, comma_pos);
-                comma_pos + 1 // After comma — leading comments picked up next iteration
-            } else {
-                let before_close = args.span.end - 1;
-                self.append_trailing_inline_block_comments(&mut arg_parts, param_end, before_close);
-                before_close
-            };
+            if has_comments {
+                // Add trailing block comments after this type argument (before comma)
+                let param_end = param.span().end;
+                prev_end = if i + 1 < args.params.len() {
+                    let next_start = args.params[i + 1].span().start;
+                    let comma_pos = self.find_list_comma(param_end, next_start);
+                    self.append_trailing_inline_block_comments(
+                        &mut arg_parts,
+                        param_end,
+                        comma_pos,
+                    );
+                    comma_pos + 1 // After comma — leading comments picked up next iteration
+                } else {
+                    let before_close = args.span.end - 1;
+                    self.append_trailing_inline_block_comments(
+                        &mut arg_parts,
+                        param_end,
+                        before_close,
+                    );
+                    before_close
+                };
+            }
 
             if i > 0 {
                 inner_parts.push(d.line());

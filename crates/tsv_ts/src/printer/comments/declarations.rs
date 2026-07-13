@@ -6,7 +6,7 @@
 // heritage clauses (`extends` / `implements`).
 
 use super::layout::hang_after_operator;
-use super::{CommentFilter, CommentSpacing, CommentVec, Printer};
+use super::{CommentSpacing, CommentVec, Printer};
 use crate::ast::internal;
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::comments_in_range;
@@ -371,6 +371,13 @@ impl<'a> Printer<'a> {
         continuation: DocId,
     ) -> DocId {
         let d = self.d();
+        // One search settles the gap. With no comment there is nothing to emit and
+        // nothing to indent, so the header is just `" " + continuation` — no empty
+        // child, and neither of the per-shape searches below runs. Every declaration in
+        // every file passes through here, so this is the hottest of the gap printers.
+        if !self.has_comments_between(keyword_end, name_start) {
+            return d.concat(&[d.text(" "), continuation]);
+        }
         let has_line = self.has_line_comments_between(keyword_end, name_start);
         let comment_doc = if has_line {
             self.build_name_to_type_params_comments(
@@ -400,6 +407,11 @@ impl<'a> Printer<'a> {
     /// `enum // c\nname`, etc. — any keyword-to-name/code gap.
     pub(crate) fn build_keyword_to_name_comments(&self, start: u32, end: u32) -> DocId {
         let d = self.d();
+        // A comment-free gap is just the leading space — emitting it as a bare text
+        // saves both the empty child and the concat node that would wrap it.
+        if !self.has_comments_between(start, end) {
+            return d.text(" ");
+        }
         if self.has_line_comments_between(start, end) {
             self.build_name_to_type_params_comments(start, end, CommentSpacing::Trailing)
         } else {
@@ -482,6 +494,26 @@ impl<'a> Printer<'a> {
             Some(self.build_name_to_type_params_comments(start, end, block_spacing))
         } else {
             None
+        }
+    }
+
+    /// Append the name→type-params/parens gap comments to `parts`, appending nothing
+    /// when the gap is comment-free.
+    ///
+    /// That is the overwhelmingly common case on a gap every function, method, class and
+    /// interface member emits, and pushing the builder's `empty()` unconditionally would
+    /// leave a child slot for the renderer and every `fits` pass to walk.
+    pub(crate) fn push_name_to_type_params_comments(
+        &self,
+        parts: &mut DocBuf,
+        start: u32,
+        end: u32,
+        block_spacing: CommentSpacing,
+    ) {
+        if let Some(comments) =
+            self.build_name_to_type_params_comments_opt(start, end, block_spacing)
+        {
+            parts.push(comments);
         }
     }
 
@@ -659,18 +691,13 @@ impl<'a> Printer<'a> {
             })
             .collect();
 
-        // Optional comments between keyword and first item: `extends /* c */ Item`
-        let kw_comments = keyword_start
-            .and_then(|kw_start| {
-                let kw_end = kw_start + keyword.as_str().len() as u32;
-                self.build_comments_between_filtered_opt(
-                    kw_end,
-                    items[0].span.start,
-                    CommentSpacing::Trailing,
-                    CommentFilter::All,
-                )
-            })
-            .unwrap_or_else(|| d.empty());
+        // Optional comments between keyword and first item: `extends /* c */ Item`.
+        // Kept as an `Option` so the comment-free heritage clause — every plain
+        // `class X extends Y` / `interface I extends J` — pushes no empty child.
+        let kw_comments = keyword_start.and_then(|kw_start| {
+            let kw_end = kw_start + keyword.as_str().len() as u32;
+            self.build_inline_comments_between_doc_trailing_space_opt(kw_end, items[0].span.start)
+        });
 
         // A line comment or multiline block between the keyword and the first item
         // hangs the items on the next line — mirroring the as/satisfies + type-param
@@ -710,7 +737,10 @@ impl<'a> Printer<'a> {
                     joined_parts.push(item_doc);
                 }
                 let types_joined = d.concat(&joined_parts);
-                let inner = d.indent(d.concat(&[d.hardline(), kw_comments, types_joined]));
+                let inner = d.indent(match kw_comments {
+                    Some(c) => d.concat(&[d.hardline(), c, types_joined]),
+                    None => d.concat(&[d.hardline(), types_joined]),
+                });
                 d.concat(&[d.text(keyword.as_str()), inner])
             } else {
                 // Width-based breaks. An item whose gap baked its comma (a stranded
@@ -729,14 +759,18 @@ impl<'a> Printer<'a> {
                     joined_parts.push(item_doc);
                 }
                 let types_joined = d.concat(&joined_parts);
-                d.concat(&[
-                    d.text(keyword.as_str()),
-                    hang_after_operator(d, d.concat(&[kw_comments, types_joined])),
-                ])
+                let hung = match kw_comments {
+                    Some(c) => d.concat(&[c, types_joined]),
+                    None => types_joined,
+                };
+                d.concat(&[d.text(keyword.as_str()), hang_after_operator(d, hung)])
             }
         } else {
             let keyword_space = keyword.with_space();
-            d.concat(&[d.text(keyword_space), kw_comments, d.join(item_docs, ", ")])
+            match kw_comments {
+                Some(c) => d.concat(&[d.text(keyword_space), c, d.join(item_docs, ", ")]),
+                None => d.concat(&[d.text(keyword_space), d.join(item_docs, ", ")]),
+            }
         }
     }
 

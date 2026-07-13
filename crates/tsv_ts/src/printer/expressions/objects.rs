@@ -459,12 +459,14 @@ impl<'a> Printer<'a> {
                 // Comments between key and params: get [x] /* c */() {}
                 // Line comments get a hardline to prevent absorbing parens as comment text
                 let params_start = func.params_start;
-                let comments = self.build_name_to_type_params_comments(
+                match self.build_name_to_type_params_comments_opt(
                     key_region_end,
                     params_start,
                     CommentSpacing::Leading,
-                );
-                d.concat(&[key_doc, comments, func_doc])
+                ) {
+                    Some(comments) => d.concat(&[key_doc, comments, func_doc]),
+                    None => d.concat(&[key_doc, func_doc]),
+                }
             } else {
                 key_doc
             }
@@ -499,11 +501,12 @@ impl<'a> Printer<'a> {
                     .type_parameters
                     .as_ref()
                     .map_or(func.params_start, |tp| tp.span.start);
-                parts.push(self.build_name_to_type_params_comments(
+                self.push_name_to_type_params_comments(
+                    &mut parts,
                     key_region_end,
                     comment_search_end,
                     CommentSpacing::for_type_params(func.type_parameters.is_some()),
-                ));
+                );
 
                 parts.push(func_doc);
                 d.concat(&parts)

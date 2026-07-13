@@ -164,7 +164,17 @@ impl<'a> Printer<'a> {
         let type_start = return_type.type_annotation.span().start;
         // Use break-for-line variant: line comments must force a hardline before
         // the return type so they don't swallow it (`=> // c\nT`, not `=> // c T`).
-        let comments_doc = self.build_trailing_comments_break_for_line(arrow_end, type_start);
+        // `None` on the comment-free path so none of the five layouts below carries an
+        // empty child — every function type (`() => void`, every callback parameter)
+        // reaches one of them.
+        let comments_doc = self
+            .has_comments_between(arrow_end, type_start)
+            .then(|| self.build_trailing_comments_break_for_line(arrow_end, type_start));
+        // `<lead><comments><type>`, skipping the comment slot when the gap is bare.
+        let joined = |lead: DocId, ty: DocId| match comments_doc {
+            Some(c) => d.concat(&[lead, c, ty]),
+            None => d.concat(&[lead, ty]),
+        };
         // Strip redundant comment-free parens so `($A | $B)` / `($A & $B)` return
         // types get the same hanging layout as the bare form (prettier strips them
         // too). Only union/intersection are unwrapped; other parenthesized types
@@ -181,12 +191,13 @@ impl<'a> Printer<'a> {
             // family), and a member/gap comment disqualifies the hug — those fall
             // through to the break-after-operator layout that matches prettier there.
             if self.union_return_hugs(value_type, u, arrow_end, type_start) {
-                return d.concat(&[d.text(arrow_sp), comments_doc, type_doc]);
+                return joined(d.text(arrow_sp), type_doc);
             }
-            return d.concat(&[
-                d.text(arrow),
-                hang_after_operator(d, d.concat(&[comments_doc, type_doc])),
-            ]);
+            let hung = match comments_doc {
+                Some(c) => d.concat(&[c, type_doc]),
+                None => type_doc,
+            };
+            return d.concat(&[d.text(arrow), hang_after_operator(d, hung)]);
         }
         if let TSType::Intersection(i) = value_type {
             // Delegate to the shared bare hanging printer (same layout the type-alias
@@ -197,7 +208,7 @@ impl<'a> Printer<'a> {
             // isn't double-indented). The old inline `group(indent(type_doc))` for the
             // huggable branch double-indented the object body.
             let wrapped = self.intersection_hanging_with_indent(i);
-            return d.concat(&[d.text(arrow_sp), comments_doc, wrapped]);
+            return joined(d.text(arrow_sp), wrapped);
         }
         match return_type.type_annotation {
             // TypeReference with complex type args (like Promise<Result<...>>):
@@ -210,13 +221,12 @@ impl<'a> Printer<'a> {
                 // Use build_type_doc_inner with wrap_type_args=true to enable
                 // wrapping inside the type reference's type arguments
                 let type_doc = self.build_type_doc_inner(return_type.type_annotation, true);
-                d.concat(&[d.text(arrow_sp), comments_doc, type_doc])
+                joined(d.text(arrow_sp), type_doc)
             }
-            _ => d.concat(&[
+            _ => joined(
                 d.text(arrow_sp),
-                comments_doc,
                 self.build_type_doc(return_type.type_annotation),
-            ]),
+            ),
         }
     }
 
@@ -356,15 +366,26 @@ impl<'a> Printer<'a> {
         // Comments between the close paren and `=>` (e.g. `() /* c */ => void`).
         // Without this they are dropped — the params doc ends at `)` and the
         // return doc begins at `=>`, so nothing else covers the gap.
+        //
+        // The two source scans below serve only that gap, and the `(` scan runs to the
+        // end of the source in the worst case — so ask the cheap question first. Any
+        // `after_close` they could find lies at or past `paren_search_start`, so a
+        // comment-free `[paren_search_start, arrow_start]` window means the `filter`
+        // would reject whatever they returned. Skipping them is byte-identical.
         let arrow_start = return_type.span.start;
-        let after_close = find_char_skipping_comments(
-            self.source.as_bytes(),
-            paren_search_start as usize,
-            self.source.len(),
-            b'(',
-        )
-        .and_then(|open| self.find_closing_paren(open as u32, arrow_start))
-        .filter(|&after_close| self.has_comments_between(after_close, arrow_start));
+        let after_close = self
+            .has_comments_between(paren_search_start, arrow_start)
+            .then(|| {
+                find_char_skipping_comments(
+                    self.source.as_bytes(),
+                    paren_search_start as usize,
+                    self.source.len(),
+                    b'(',
+                )
+                .and_then(|open| self.find_closing_paren(open as u32, arrow_start))
+                .filter(|&after_close| self.has_comments_between(after_close, arrow_start))
+            })
+            .flatten();
 
         // A line comment in the `)`→`=>` gap can't stay inline — it would swallow
         // `=> void` (`() // c => void`). Keep it trailing `)` and force `=>` onto
@@ -381,11 +402,13 @@ impl<'a> Printer<'a> {
             let pre = self.build_trailing_comments_break_for_line(ac, arrow_start);
             d.concat(&[d.text(" "), pre, return_type_doc])
         } else {
-            let pre_arrow_doc = after_close.map_or_else(
-                || d.empty(),
-                |ac| self.build_comments_between(ac, arrow_start, CommentSpacing::Leading),
-            );
-            d.concat(&[pre_arrow_doc, return_type_doc])
+            match after_close {
+                Some(ac) => d.concat(&[
+                    self.build_comments_between(ac, arrow_start, CommentSpacing::Leading),
+                    return_type_doc,
+                ]),
+                None => return_type_doc,
+            }
         };
 
         let params_doc = d.concat(&self.build_function_params_doc(params, paren_search_start));
@@ -878,11 +901,12 @@ impl<'a> Printer<'a> {
                 let colon_end = type_ann.span.start + 1;
                 let type_start = type_ann.type_annotation.span().start;
                 parts.push(d.text(": "));
-                parts.push(self.build_comments_between(
-                    colon_end,
-                    type_start,
-                    CommentSpacing::Trailing,
-                ));
+                if window_has_comments
+                    && let Some(comments) = self
+                        .build_inline_comments_between_doc_trailing_space_opt(colon_end, type_start)
+                {
+                    parts.push(comments);
+                }
                 parts.push(self.build_type_literal_doc_for_function_param(type_literal));
 
                 // Handle trailing comments after the param (between type literal and
