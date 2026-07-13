@@ -33,7 +33,7 @@ use tsv_ts::ast::internal::{
     ForInit, FunctionExpression, ObjectPatternProperty, ObjectProperty, Statement,
 };
 
-use crate::analyze::pattern_binding_names;
+use crate::analyze::{NameSet, pattern_binding_names};
 use crate::{CompileError, Refusal};
 
 /// The walk's shared state: the source names resolve against, the collection
@@ -131,37 +131,41 @@ fn rune_error(name: &str) -> CompileError {
 }
 
 /// Record the root identifier(s) of an assignment target (through member
-/// chains and destructuring patterns) as updated.
-fn collect_assign_target_roots(target: &Expression<'_>, ctx: &mut WalkCtx<'_>) {
+/// chains and destructuring patterns) into `out` as reassigned/updated names.
+///
+/// Shared by the guard walk and the whole-component reassignment collection in
+/// `needs_context` (which must see mutations inside dropped event handlers so a
+/// reassigned binding is never statically folded).
+pub(crate) fn assign_target_roots(target: &Expression<'_>, source: &str, out: &mut NameSet) {
     match target {
         Expression::Identifier(id) => {
-            if let Some(name) = identifier_name(id, ctx.source) {
-                ctx.updated.insert(name.to_string());
+            if let Some(name) = identifier_name(id, source) {
+                out.insert(name.to_string());
             }
         }
-        Expression::MemberExpression(m) => collect_assign_target_roots(m.object, ctx),
-        Expression::TSNonNullExpression(t) => collect_assign_target_roots(t.expression, ctx),
-        Expression::TSAsExpression(t) => collect_assign_target_roots(t.expression, ctx),
-        Expression::ParenthesizedExpression(p) => collect_assign_target_roots(p.expression, ctx),
+        Expression::MemberExpression(m) => assign_target_roots(m.object, source, out),
+        Expression::TSNonNullExpression(t) => assign_target_roots(t.expression, source, out),
+        Expression::TSAsExpression(t) => assign_target_roots(t.expression, source, out),
+        Expression::ParenthesizedExpression(p) => assign_target_roots(p.expression, source, out),
         Expression::ObjectPattern(obj) => {
             for prop in obj.properties {
                 match prop {
                     ObjectPatternProperty::Property(p) => {
-                        collect_assign_target_roots(&p.value, ctx);
+                        assign_target_roots(&p.value, source, out);
                     }
                     ObjectPatternProperty::RestElement(rest) => {
-                        collect_assign_target_roots(rest.argument, ctx);
+                        assign_target_roots(rest.argument, source, out);
                     }
                 }
             }
         }
         Expression::ArrayPattern(arr) => {
             for element in arr.elements.iter().flatten() {
-                collect_assign_target_roots(element, ctx);
+                assign_target_roots(element, source, out);
             }
         }
-        Expression::AssignmentPattern(a) => collect_assign_target_roots(a.left, ctx),
-        Expression::RestElement(r) => collect_assign_target_roots(r.argument, ctx),
+        Expression::AssignmentPattern(a) => assign_target_roots(a.left, source, out),
+        Expression::RestElement(r) => assign_target_roots(r.argument, source, out),
         _ => {}
     }
 }
@@ -352,7 +356,7 @@ fn walk_for_left(
             walk_variable_declaration(decl, ctx, depth + 1)
         }
         ForInOfLeft::Pattern(pattern) => {
-            collect_assign_target_roots(pattern, ctx);
+            assign_target_roots(pattern, ctx.source, ctx.updated);
             walk_expression(pattern, ctx)
         }
     }
@@ -485,7 +489,7 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
         }
         Expression::UnaryExpression(u) => walk_expression(u.argument, ctx),
         Expression::UpdateExpression(u) => {
-            collect_assign_target_roots(u.argument, ctx);
+            assign_target_roots(u.argument, ctx.source, ctx.updated);
             walk_expression(u.argument, ctx)
         }
         Expression::BinaryExpression(b) => {
@@ -536,7 +540,7 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
         },
         Expression::SequenceExpression(s) => walk_expressions(s.expressions, ctx),
         Expression::AssignmentExpression(a) => {
-            collect_assign_target_roots(a.left, ctx);
+            assign_target_roots(a.left, ctx.source, ctx.updated);
             walk_expression(a.left, ctx)?;
             walk_expression(a.right, ctx)
         }

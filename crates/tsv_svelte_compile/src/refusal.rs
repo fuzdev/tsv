@@ -223,10 +223,20 @@ pub enum Refusal {
     StaticFoldNotPortable(String),
 
     // ── Attributes ─────────────────────────────────────────────────────────
-    /// An `on`-prefixed event attribute with an expression value.
+    /// An `on`-prefixed event attribute with an expression value. Retained for
+    /// the mixed-value shape (`onclick="a {b}"`), which the oracle rejects, so
+    /// tsv refuses rather than guess; the single-expression shape is dropped.
     #[error("event attribute {name}")]
     EventAttribute {
         /// The event attribute name.
+        name: String,
+    },
+    /// An `onload`/`onerror` handler on a load-error element (`img`, `iframe`,
+    /// …): the oracle emits an `on{name}="this.__e=event"` capture attribute
+    /// rather than dropping it, which tsv does not yet reproduce.
+    #[error("{name} on a load-error element (event-capture markup not implemented)")]
+    EventCaptureAttribute {
+        /// The event attribute name (`onload` or `onerror`).
         name: String,
     },
     /// A directive or spread attribute.
@@ -347,6 +357,9 @@ impl Refusal {
             Self::StaticEvalNotPortable(_) => Cow::Borrowed("static evaluation not portable"),
             Self::StaticFoldNotPortable(_) => Cow::Borrowed("static fold not portable"),
             Self::EventAttribute { .. } => Cow::Borrowed("event attribute {name}"),
+            Self::EventCaptureAttribute { .. } => {
+                Cow::Borrowed("event capture attribute on a load-error element")
+            }
             Self::InterpolatedAttrOnStyled { .. } => {
                 Cow::Borrowed("interpolated {name} attribute on a styled component")
             }

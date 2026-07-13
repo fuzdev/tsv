@@ -172,7 +172,9 @@ The oracle's normalization (`3-transform/utils.js:126` `clean_nodes`, `escape_ht
 | dynamic `class`/`style` → `$.attr_class` / `$.attr_style` | Supported (unstyled components) |
 | mixed text+expression (`"t {a} u"`) with `$.stringify` interpolations | Supported (unstyled components) |
 | mixed value whose every part folds statically → a *static* attribute (attr-escape `[&"<]`, folded value verbatim: no trim, no empty-class drop, boolean attributes keep the folded value, null/undefined → `''`; only the chunk-array path folds — a single-expression attribute never does) | Supported |
-| event attributes | **Refused**: `event attribute {name}` (any `on`-prefixed attribute with an expression value) |
+| event attributes (`on*` single expression) → **dropped** from SSR output (`is_event_attribute`, server `element.js:71`); the handler still feeds `needs_context`, so a `new`/prop-rooted member or call inside it forces the wrapper | Supported |
+| `onload`/`onerror` on a load-error element (`img`, `iframe`, `object`, …) → the oracle injects `on{name}="this.__e=event"` capture markup | **Refused**: `event capture attribute on a load-error element` |
+| mixed-value `on*` (`onclick="a {b}"`) | oracle-rejected input (`attribute_invalid_event_handler`); tsv refuses `event attribute {name}` |
 | directives / spread | **Refused**: `non-plain attribute (directive/spread)` |
 | string-literal expression value (`name={'s'}`) | **Refused**: `string-literal expression attribute value (inline-literal path)` |
 | dynamic `class`/`style` on a styled component | **Refused**: `dynamic class attribute on a styled component` / `dynamic style attribute on a styled component` / `interpolated {name} attribute on a styled component` |

@@ -87,6 +87,18 @@ const REMOVE_WS_ENTIRELY_PARENTS: &[&str] = &[
     "select", "tr", "table", "tbody", "thead", "tfoot", "colgroup", "datalist",
 ];
 
+/// Elements that emit `load`/`error` events (Svelte's `LOAD_ERROR_ELEMENTS`,
+/// `utils.js`): an `onload`/`onerror` handler on one of these injects an
+/// `on{name}="this.__e=event"` capture attribute instead of being dropped.
+const LOAD_ERROR_ELEMENTS: &[&str] = &[
+    "body", "embed", "iframe", "img", "link", "object", "script", "style", "track",
+];
+
+/// Whether `name` is a load-error element (see [`LOAD_ERROR_ELEMENTS`]).
+fn is_load_error_element(name: &str) -> bool {
+    LOAD_ERROR_ELEMENTS.contains(&name)
+}
+
 /// The DOM boolean attributes (the oracle's `DOM_BOOLEAN_ATTRIBUTES`): a
 /// dynamic value on one of these emits `$.attr(name, value, true)`.
 // TODO: consider a home in tsv_html beside the element classification tables.
@@ -344,6 +356,18 @@ pub(crate) fn compile_server<'arena>(
     if has_comments && !user_imports.is_empty() {
         return Err(unsupported(Refusal::CommentsAlongsideImports));
     }
+    // The oracle wraps the whole body in `$$renderer.component(($$renderer) => …)`
+    // whenever its `needs_context` analysis fires (a `new` expression or a
+    // member/call rooted in a prop/import — see `needs_context`). A dropped
+    // `$effect` is one such trigger (already modeled by `has_effects`); the port
+    // covers the rest. `needs_context` also forces the `$$props` parameter (the
+    // oracle's `should_inject_props` includes `should_inject_context`). The same
+    // walk collects component-wide reassignments — including mutations inside
+    // dropped event handlers — so a mutated binding is not statically folded.
+    let component = crate::needs_context::analyze_component(root, source)?;
+    for name in &component.reassigned {
+        updated.insert(name.clone());
+    }
     for name in &updated {
         bindings.mark_updated(name);
     }
@@ -351,13 +375,7 @@ pub(crate) fn compile_server<'arena>(
         bindings.mark_opaque(name);
     }
 
-    // The oracle wraps the whole body in `$$renderer.component(($$renderer) => …)`
-    // whenever its `needs_context` analysis fires (a `new` expression or a
-    // member/call rooted in a prop/import — see `needs_context`). A dropped
-    // `$effect` is one such trigger (already modeled by `has_effects`); the port
-    // covers the rest. `needs_context` also forces the `$$props` parameter (the
-    // oracle's `should_inject_props` includes `should_inject_context`).
-    let needs_context = has_effects || crate::needs_context::component_needs_context(root, source)?;
+    let needs_context = has_effects || component.needs_context;
     if needs_context {
         uses_props = true;
     }
@@ -2207,6 +2225,20 @@ fn emit_attribute<'arena>(
             Ok(())
         }
         [AttributeValue::ExpressionTag(tag)] => {
+            // An `on`-prefixed single-expression attribute is an event handler
+            // (`is_event_attribute`, server `element.js:71`): the oracle omits
+            // it from SSR output. The handler expression still feeds
+            // `needs_context` (walked up front in `needs_context.rs`), so a
+            // `new`/prop-rooted member or call inside it still forces the
+            // wrapper — only the attribute markup is dropped. `onload`/`onerror`
+            // on a load-error element are the exception (the oracle injects an
+            // `on{name}="this.__e=event"` capture attribute), refused for now.
+            if name.starts_with("on") {
+                if (name == "onload" || name == "onerror") && is_load_error_element(element_name) {
+                    return Err(unsupported(Refusal::EventCaptureAttribute { name }));
+                }
+                return Ok(());
+            }
             // Quoted (`class="{a}"`) vs bare (`class={a}`): the oracle's AST
             // represents the quoted form as a one-chunk ARRAY and the bare form
             // as a plain ExpressionTag (the wire writer's `preceded_by_quote`
@@ -2276,13 +2308,8 @@ fn emit_dynamic_attribute<'arena>(
     quoted: bool,
     out: &mut BodyBuilder<'arena>,
 ) -> Result<(), CompileError> {
-    // The oracle omits expression-valued event handlers from SSR output —
-    // implement nothing rather than emit a wrong attribute.
-    if name.starts_with("on") {
-        return Err(unsupported(Refusal::EventAttribute {
-            name: name.to_string(),
-        }));
-    }
+    // Event handlers (`on*` single-expression attributes) are dropped in
+    // `emit_attribute` before dispatch, so they never reach here.
     // The `$.attr` family interleaves minted (appendix) and borrowed (host)
     // argument spans; with host comments present their windows would sweep.
     if env.has_comments {

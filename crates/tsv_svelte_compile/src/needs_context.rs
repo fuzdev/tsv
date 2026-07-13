@@ -56,14 +56,34 @@ struct Nc<'a> {
     needs: bool,
     /// A shape whose classification isn't portable (an escaped identifier root).
     refuse: Option<Refusal>,
+    /// Names reassigned/updated anywhere in the component — collected during the
+    /// same walk so mutations inside dropped event handlers still mark a binding
+    /// updated (and so it is not statically folded).
+    reassigned: NameSet,
 }
 
-/// Whether the component needs the `$$renderer.component(…)` wrapper.
+/// The whole-component analysis product consumed by the server transform.
+pub(crate) struct ComponentContext {
+    /// Whether the component needs the `$$renderer.component(…)` wrapper.
+    pub needs_context: bool,
+    /// Names reassigned anywhere in the component (script + template, including
+    /// inside dropped event handlers).
+    pub reassigned: NameSet,
+}
+
+/// Analyze the component for the `$$renderer.component(…)` wrapper decision and
+/// the component-wide reassignment set, in one walk.
 ///
-/// Returns `Ok(true)` when a wrapper trigger is proven, `Ok(false)` when proven
-/// absent, and `Err(Unsupported)` when a shape's classification can't be pinned
-/// to the oracle (a shadowed context-root member/call, or an escaped root).
-pub(crate) fn component_needs_context(root: &Root<'_>, source: &str) -> Result<bool, CompileError> {
+/// `needs_context` is `true` when a wrapper trigger is proven, `false` when
+/// proven absent; the walk returns `Err(Unsupported)` when a shape's
+/// classification can't be pinned to the oracle (a shadowed context-root
+/// member/call, or an escaped root). `reassigned` names every binding mutated
+/// anywhere in the component — including inside dropped event handlers, which
+/// the server transform needs so a mutated binding is not statically folded.
+pub(crate) fn analyze_component(
+    root: &Root<'_>,
+    source: &str,
+) -> Result<ComponentContext, CompileError> {
     let mut context_roots = NameSet::default();
     collect_context_roots(root, source, &mut context_roots);
 
@@ -74,6 +94,7 @@ pub(crate) fn component_needs_context(root: &Root<'_>, source: &str) -> Result<b
         member_roots: NameSet::default(),
         needs: false,
         refuse: None,
+        reassigned: NameSet::default(),
     };
 
     if let Some(script) = root.instance {
@@ -96,7 +117,10 @@ pub(crate) fn component_needs_context(root: &Root<'_>, source: &str) -> Result<b
     if !nc.member_roots.is_empty() {
         nc.needs = true;
     }
-    Ok(nc.needs)
+    Ok(ComponentContext {
+        needs_context: nc.needs,
+        reassigned: nc.reassigned,
+    })
 }
 
 fn unsupported(reason: Refusal) -> CompileError {
@@ -295,7 +319,10 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
             }
         }
         Expression::UnaryExpression(u) => walk_expr(u.argument, nc),
-        Expression::UpdateExpression(u) => walk_expr(u.argument, nc),
+        Expression::UpdateExpression(u) => {
+            crate::rune_guard::assign_target_roots(u.argument, nc.source, &mut nc.reassigned);
+            walk_expr(u.argument, nc);
+        }
         Expression::BinaryExpression(b) => {
             walk_expr(b.left, nc);
             walk_expr(b.right, nc);
@@ -315,6 +342,7 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
         Expression::YieldExpression(y) => walk_opt(y.argument, nc),
         Expression::SequenceExpression(s) => walk_exprs(s.expressions, nc),
         Expression::AssignmentExpression(a) => {
+            crate::rune_guard::assign_target_roots(a.left, nc.source, &mut nc.reassigned);
             walk_expr(a.left, nc);
             walk_expr(a.right, nc);
         }

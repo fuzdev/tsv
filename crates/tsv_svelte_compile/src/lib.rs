@@ -1414,6 +1414,48 @@ mod tests {
     }
 
     #[test]
+    fn compile_drops_event_handler_attribute() {
+        // An `on*` single-expression handler is omitted from SSR output.
+        let out = compile(
+            "<script>function go() {}</script><button onclick={go}>x</button>",
+            &CompileOptions::default(),
+        )
+        .unwrap();
+        assert!(
+            out.js.contains("`<button>x</button>`") && !out.js.contains("onclick"),
+            "event handler not dropped: {}",
+            out.js
+        );
+    }
+
+    #[test]
+    fn compile_event_handler_new_forces_wrapper() {
+        // A `new` inside a dropped handler still triggers the component wrapper
+        // (needs_context walks the handler even though its markup is dropped).
+        let out = compile(
+            "<button onclick={() => new Date()}>x</button>",
+            &CompileOptions::default(),
+        )
+        .unwrap();
+        assert!(
+            out.js.contains("$$renderer.component("),
+            "needs_context wrapper missing: {}",
+            out.js
+        );
+    }
+
+    #[test]
+    fn compile_rejects_load_error_event_capture() {
+        // `onload`/`onerror` on a load-error element needs `this.__e=event`
+        // capture markup, not a clean drop.
+        assert_unsupported("<img onload={h} src=\"a\" />", "load-error element");
+        assert_unsupported(
+            "<iframe onerror={h} src=\"a\"></iframe>",
+            "load-error element",
+        );
+    }
+
+    #[test]
     fn compile_rejects_client_generation() {
         let options = CompileOptions {
             generate: Generate::Client,
