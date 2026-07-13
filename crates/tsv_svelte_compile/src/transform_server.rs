@@ -71,6 +71,7 @@ use crate::analyze::{
     Binding, BindingKind, Bindings, Initial, NameSet, RuneInit, Scope, ScopeEntry,
     classify_rune_init, evaluate, is_effect_call, pattern_binding_names, stringify_value,
 };
+use crate::attr_refs::{TemplateItem, each_template_item};
 use crate::build::{Builder, escape_template_text};
 use crate::rune_guard::{WalkCtx, walk_expression_guarded, walk_statement_guarded};
 use crate::snippet::{SnippetAnalysis, snippet_name};
@@ -172,6 +173,10 @@ struct EmitEnv<'arena, 's> {
     /// order — a top-level snippet is visited in order as the root fragment is
     /// walked).
     hoisted_snippets: Vec<Statement<'arena>>,
+    /// Comment-refusal windows of the regions erased from **template** borrow
+    /// points (the script's are collected before emission). See
+    /// [`EmitEnv::erase`].
+    erased_windows: Vec<Span>,
 }
 
 impl<'arena> EmitEnv<'arena, '_> {
@@ -180,6 +185,37 @@ impl<'arena> EmitEnv<'arena, '_> {
             bindings: &self.bindings,
             overlays: &self.overlays,
         }
+    }
+
+    /// Erase TypeScript from a borrowed **template** expression — the template's
+    /// half of the oracle's phase-1 `remove_typescript_nodes`.
+    ///
+    /// Erasure applies per-expression **at the borrow point**; the Svelte AST is
+    /// never rebuilt (every TypeScript-bearing markup position is a `tsv_ts`
+    /// `Expression` reached through one of a small set of borrows). The erased
+    /// node is what every consumer downstream of the borrow must see — not just
+    /// the emitted argument, but the **static-evaluation fold gate beside it**
+    /// (`x as T` would otherwise evaluate to UNKNOWN where the oracle folds `x`
+    /// — a silent under-fold, a parity divergence no refusal catches) and the
+    /// shape predicates (`class_needs_clsx`, the inline-string-literal check, the
+    /// `{ n }` shorthand test) that read the node's variant. So the borrow point
+    /// erases *once*, shadowing the raw node, and hands the erased one to all of
+    /// them.
+    ///
+    /// A missed borrow point cannot ship TypeScript silently: the finished
+    /// program is re-erased ([`self_check_no_typescript`]) and any survivor is a
+    /// loud [`CompileError::TypeErasureLeak`].
+    fn erase(
+        &mut self,
+        expr: &'arena Expression<'arena>,
+    ) -> Result<&'arena Expression<'arena>, CompileError> {
+        let arena = self.b.arena;
+        let erased = erase::erase_expression(arena, self.source, expr)?;
+        self.erased_windows.extend(erased.regions);
+        Ok(match erased.expr {
+            Some(new) => arena.alloc(new),
+            None => expr,
+        })
     }
 
     /// Push a block-scope overlay; refuses names that shadow a derived binding
@@ -262,6 +298,13 @@ pub(crate) fn compile_server<'arena>(
         }
         None => (&[][..], Vec::new()),
     };
+    // The template half of the same document-wide gate. The borrow points
+    // (`EmitEnv::erase`) already erase every template expression that reaches
+    // output, so this sweep exists for the ones that DON'T — see
+    // `refuse_template_typescript`. It runs only without the flag.
+    if !ts_document {
+        refuse_template_typescript(root, source, arena)?;
+    }
 
     // CSS scoping analysis (no minting): which class names are scoped, and
     // where the hash class splices into the style text.
@@ -524,6 +567,7 @@ pub(crate) fn compile_server<'arena>(
         index_count: 0,
         snippets,
         hoisted_snippets: Vec::new(),
+        erased_windows: Vec::new(),
     };
 
     // 5. Function header skeleton. The text is minted for appendix
@@ -570,6 +614,21 @@ pub(crate) fn compile_server<'arena>(
         },
     )?;
     let body = out.finish(&mut env.b, arena);
+
+    // The template's erased regions get the script's comment rule (a comment in
+    // an erased region's window refuses — the oracle's surviving-comment
+    // placement there is emergent, not portable). No carried comment can reach a
+    // template window today: `collect_script_comments` refuses *any* comment
+    // outside the instance script, and refuses a fragment node that starts before
+    // the script ends — so the two ranges are disjoint by construction. The check
+    // stays because the rule, not the geometry, is the contract.
+    for comment in &script_comments {
+        for window in &env.erased_windows {
+            if comment.span.start < window.end && comment.span.end > window.start {
+                return Err(unsupported(Refusal::CommentInErasedTypeRegion));
+            }
+        }
+    }
 
     // A scoped selector that matches no element would be pruned by the oracle —
     // pruning isn't implemented, so refuse rather than emit unpruned CSS.
@@ -720,7 +779,6 @@ pub(crate) fn compile_server<'arena>(
     self_check_no_typescript(
         arena,
         &env.b.buffer,
-        root.instance.map(|script| script.content.span),
         &[
             import_program.body,
             hoisted_program.as_ref().map_or(&[][..], |p| p.body),
@@ -845,35 +903,32 @@ fn unthunk_callee<'arena>(expr: &Expression<'arena>) -> Option<&'arena Expressio
 
 /// Assert no TypeScript-only node survived into the emitted program.
 ///
-/// A hit is classified by where the offending node came from. The Svelte
-/// template's borrow points are not erased yet, so a node whose span lies
-/// *outside* the instance script's content is that known gap — a refusal. A node
-/// from inside the script means the erase pass missed a case: a compiler bug,
-/// surfaced loudly as [`CompileError::TypeErasureLeak`] rather than emitted.
-/// (Minted nodes are never TypeScript, so every hit carries a real host span.)
+/// Both halves of the erasure — the instance script's `Program` and each
+/// template expression at its borrow point — run before this, so **any**
+/// survivor is a compiler bug: an erase case missed, or a borrow point that
+/// never called [`EmitEnv::erase`]. It is surfaced loudly as
+/// [`CompileError::TypeErasureLeak`] rather than emitted.
+///
+/// This is the check the output reparse cannot make: tsv's parser is
+/// TypeScript-permissive, so a surviving annotation parses, flows through the
+/// pipeline untouched, and prints verbatim. The eraser's `None`-means-unchanged
+/// contract makes "no change" a *proof* of no TypeScript — and it is the same
+/// inventory that did the erasing, so there is nothing to drift.
 fn self_check_no_typescript<'arena>(
     arena: &'arena bumpalo::Bump,
     buffer: &str,
-    script_span: Option<Span>,
     programs: &[&'arena [Statement<'arena>]],
 ) -> Result<(), CompileError> {
     for body in programs {
         let checked = erase::erase_statements(arena, buffer, body)?;
-        if !checked.changed {
-            continue;
+        if checked.changed {
+            let leak = checked
+                .regions
+                .first()
+                .copied()
+                .unwrap_or_else(|| Span::new(0, 0));
+            return Err(CompileError::TypeErasureLeak(leak));
         }
-        let leak = checked
-            .regions
-            .first()
-            .copied()
-            .unwrap_or_else(|| Span::new(0, 0));
-        let from_script =
-            script_span.is_some_and(|span| leak.start >= span.start && leak.end <= span.end);
-        return Err(if from_script {
-            CompileError::TypeErasureLeak(leak)
-        } else {
-            unsupported(Refusal::TypeScriptInTemplate)
-        });
     }
     Ok(())
 }
@@ -935,6 +990,46 @@ fn document_ts_flag(root: &Root<'_>, source: &str) -> Result<bool, CompileError>
         }
     }
     Ok(ts)
+}
+
+/// The **template** half of the document-wide TypeScript gate: refuse any
+/// TypeScript in the template of a component with no `lang="ts"`.
+///
+/// Without the flag the oracle's parser rejects TypeScript *anywhere* in the
+/// document — every mustache, block pattern, and snippet `<T>` clause included
+/// (see [`document_ts_flag`]). tsv's parser is TypeScript-permissive everywhere,
+/// so the decision has to be made explicitly here or the component is an
+/// over-acceptance.
+///
+/// The borrow points ([`EmitEnv::erase`]) already erase every template expression
+/// that reaches **output**, so this sweep exists for the ones that do *not*: the
+/// SSR-dropped `{#each}` key, the `{#key}` expression, the `{:catch}` binding and
+/// its whole branch, and event-handler attributes. Their TypeScript never reaches
+/// the emitted program, so the erase self-check cannot see it either.
+///
+/// The eraser stays the single TypeScript inventory — this never re-decides *what
+/// is TypeScript*, it only routes every template item through
+/// [`erase::erase_expression`] and refuses on its `typescript` flag. The traversal
+/// is `attr_refs`'s shared, exhaustively-matched one, so a new template shape fails
+/// compilation rather than slipping past. Runs only when the flag is absent, so the
+/// ordinary TypeScript path pays nothing.
+fn refuse_template_typescript<'arena>(
+    root: &Root<'arena>,
+    source: &str,
+    arena: &'arena bumpalo::Bump,
+) -> Result<(), CompileError> {
+    each_template_item(&root.fragment, &mut |item| {
+        let typescript = match item {
+            TemplateItem::Expression(expr) => {
+                erase::erase_expression(arena, source, expr)?.typescript
+            }
+            TemplateItem::SnippetTypeParameters => true,
+        };
+        if typescript {
+            return Err(unsupported(Refusal::TypeScriptWithoutLangTs));
+        }
+        Ok(())
+    })
 }
 
 /// Analysis pass: populate the top-level binding table and the derived-name
@@ -1957,6 +2052,49 @@ fn guard_dropped<'arena>(
     walk_expression_guarded(expr, &mut ctx)
 }
 
+/// The **rune-only** guard for a region the SSR output drops WITHOUT walking it —
+/// an event-handler attribute, and the `{:catch}` branch (the emitter's two
+/// discard-without-visiting sites).
+///
+/// A misplaced rune must still refuse: the oracle rejects one in its *analysis*
+/// phase, before it decides what to emit, so dropping the region cannot make the
+/// component valid (`{:catch e}{$state(1)}{/await}` is a `state_invalid_placement`
+/// error there). But the derived-read rule is switched **off** — the empty
+/// `derived_names` set: `walk_expression_guarded` refuses every derived read it
+/// sees (the emitted path rewrites a bare one to `d()` before the guard runs), and
+/// the oracle happily *accepts* a derived read it never emits. Refusing here would
+/// cost parity on a shape the oracle compiles.
+fn guard_dropped_runes<'arena>(
+    env: &EmitEnv<'arena, '_>,
+    expr: &'arena Expression<'arena>,
+) -> Result<(), CompileError> {
+    let mut updated = NameSet::default();
+    let mut nested = NameSet::default();
+    // The component-wide reassignment/shadow collection is `needs_context`'s job
+    // (it walks the dropped regions too), so these two are throwaways.
+    let no_derived = NameSet::default();
+    let mut ctx = WalkCtx::new(env.source, &mut updated, &mut nested, &no_derived);
+    walk_expression_guarded(expr, &mut ctx)
+}
+
+/// Guard a whole fragment the SSR output drops (the `{:catch}` branch) — the
+/// dropped-fragment analog of [`guard_dropped_runes`], over `attr_refs`' shared
+/// traversal. Without it a rune anywhere inside a `{:catch}` compiles, which the
+/// oracle rejects: the M4 lesson (an emission-dropped fragment still needs
+/// refusal-equivalent walking), and the property `dropped_fragments_are_walked`
+/// pins.
+fn guard_dropped_fragment<'arena>(
+    env: &EmitEnv<'arena, '_>,
+    fragment: &'arena Fragment<'arena>,
+) -> Result<(), CompileError> {
+    each_template_item(fragment, &mut |item| match item {
+        TemplateItem::Expression(expr) => guard_dropped_runes(env, expr),
+        // A `<T>` clause holds no value reference. TypeScript in a document with
+        // no `lang="ts"` is refused up front by `refuse_template_typescript`.
+        TemplateItem::SnippetTypeParameters => Ok(()),
+    })
+}
+
 /// Refuse if a generated block name (`each_array`, `$$index`, `$$length`) would
 /// collide with a user binding — the oracle's component-scope name generation
 /// would then pick a different suffix, which this port doesn't replicate.
@@ -2093,13 +2231,19 @@ fn emit_const_tag<'arena>(
     tag: &'arena ConstTag<'arena>,
     out: &mut BodyBuilder<'arena>,
 ) -> Result<(), CompileError> {
+    // Two template borrow points: the binding pattern (`{@const a: T = v}`) and
+    // the initializer. The erased init feeds BOTH the emitted declaration and the
+    // evaluator overlay below, so a later `{a}` read folds through the same node
+    // the oracle folds.
+    let id = env.erase(&tag.id)?;
+    let init = env.erase(&tag.init)?;
     // Only a plain-identifier binding is modeled: a destructured `{@const}`
     // whose init folds would have the oracle fold each read, which this port
     // can't reproduce per-binding — refuse rather than risk a silent mismatch.
-    let Expression::Identifier(id) = &tag.id else {
+    let Expression::Identifier(ident) = id else {
         return Err(unsupported(Refusal::DestructuredConstTag));
     };
-    let Some(name) = plain_identifier_name(id, env.source) else {
+    let Some(name) = plain_identifier_name(ident, env.source) else {
         return Err(unsupported(Refusal::ConstTagNonPlainName));
     };
     // A `{@const}` that shadows a top-level `$derived` binding is refused, the
@@ -2111,16 +2255,21 @@ fn emit_const_tag<'arena>(
         return Err(unsupported(Refusal::BlockScopeShadowsDerived { name }));
     }
     // Guard + wrap the init (bare derived → d(), refuse runes/mutations).
-    let init = wrap_single(env, &tag.init)?;
-    let id_expr = tag.id.clone();
+    let wrapped_init = wrap_single(env, init)?;
+    let id_expr = id.clone();
     let arena = env.b.arena;
-    let stmt = declaration_stmt(&env.b, VariableDeclarationKind::Const, id_expr, init);
+    let stmt = declaration_stmt(
+        &env.b,
+        VariableDeclarationKind::Const,
+        id_expr,
+        wrapped_init,
+    );
     out.push_statement(&mut env.b, arena, stmt);
 
     // Enter the innermost overlay so `{name}` reads fold through its init.
     let binding = Binding {
         kind: BindingKind::Normal,
-        initial: Initial::Expr(&tag.init),
+        initial: Initial::Expr(init),
         updated: false,
     };
     match env.overlays.last_mut() {
@@ -2177,6 +2326,7 @@ fn emit_if_block<'arena>(
     // name counters advance in the oracle's order.
     let mut cons_blocks: Vec<(Expression<'arena>, &'arena Statement<'arena>)> = Vec::new();
     for (i, &(test, frag)) in branches.iter().enumerate() {
+        let test = env.erase(test)?;
         let test_expr = wrap_single(env, test)?;
         let anchor = env.b.push_string_stmt(&format!("<!--[{i}-->"));
         let body = emit_child_body(
@@ -2245,16 +2395,26 @@ fn emit_each_block<'arena>(
     let preserve = ctx.preserve_whitespace;
 
     // The key `(key)` and the context pattern are guard-walked (a rune could hide
-    // in either); the key is then dropped — SSR ignores it.
+    // in either); the key is then dropped — SSR ignores it, so its TypeScript
+    // (`{#each xs as x (k as string)}`) never reaches output and needs no erasure.
+    // The guard walk carries its own TypeScript-unwrap arms for exactly this.
     if let Some(key) = &each.key {
         guard_dropped(env, key)?;
     }
-    if let Some(context) = &each.context {
-        guard_dropped(env, context)?;
-    }
+    // The context pattern IS borrowed into the emitted `let CTX = each_array[IDX]`
+    // — a template borrow point (`{#each xs as x: T}`).
+    let context = match &each.context {
+        Some(context) => {
+            let context = env.erase(context)?;
+            guard_dropped(env, context)?;
+            Some(context)
+        }
+        None => None,
+    };
 
     // Collection (guard + bare-derived rewrite).
-    let collection = wrap_single(env, &each.expression)?;
+    let collection_expr = env.erase(&each.expression)?;
+    let collection = wrap_single(env, collection_expr)?;
 
     // Unique names: both counters advance once per each block (lockstep with the
     // oracle's per-each `scope.generate`, so `$$index` advances even when the
@@ -2321,7 +2481,7 @@ fn emit_each_block<'arena>(
     // Body: `let CTX = each_array[IDX]` + the body fragment (text-first marker),
     // with context/index names masked to UNKNOWN in the evaluator.
     let mut overlay: HashMap<String, ScopeEntry<'arena>> = HashMap::new();
-    if let Some(context) = &each.context {
+    if let Some(context) = context {
         let mut names = Vec::new();
         pattern_binding_names(context, env.source, &mut names)?;
         for name in names {
@@ -2330,7 +2490,15 @@ fn emit_each_block<'arena>(
     }
     overlay.insert(index_name.clone(), ScopeEntry::Masked);
     env.in_each = true;
-    let body_result = emit_each_body(env, each, &array_name, &index_name, preserve, overlay);
+    let body_result = emit_each_body(
+        env,
+        each,
+        context,
+        &array_name,
+        &index_name,
+        preserve,
+        overlay,
+    );
     env.in_each = false;
     let body_stmts = body_result?;
 
@@ -2390,10 +2558,12 @@ fn emit_each_block<'arena>(
 }
 
 /// The `{#each}` body: `let CTX = each_array[IDX]` (when `as` is present) then
-/// the body fragment (which gets the text-first `<!---->` marker).
+/// the body fragment (which gets the text-first `<!---->` marker). `context` is
+/// the **erased** binding pattern.
 fn emit_each_body<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     each: &'arena EachBlock<'arena>,
+    context: Option<&'arena Expression<'arena>>,
     array_name: &str,
     index_name: &str,
     preserve: bool,
@@ -2401,7 +2571,7 @@ fn emit_each_body<'arena>(
 ) -> Result<&'arena [Statement<'arena>], CompileError> {
     let arena = env.b.arena;
     let mut pre: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
-    if let Some(context) = &each.context {
+    if let Some(context) = context {
         let arr = env.b.ident_expr(array_name);
         let idx = env.b.ident_expr(index_name);
         let member = env.b.member_computed(arr, idx);
@@ -2428,7 +2598,16 @@ fn emit_await_block<'arena>(
     let arena = env.b.arena;
     let preserve = ctx.preserve_whitespace;
 
-    let expr = wrap_single(env, &await_block.expression)?;
+    let promise = env.erase(&await_block.expression)?;
+    let expr = wrap_single(env, promise)?;
+    // The `{:then value}` binding is borrowed into the then-arrow's parameter list
+    // — a template borrow point (`{#await p then v: T}`). The `{:catch error}`
+    // binding is NOT: the oracle drops the catch branch from SSR entirely, so
+    // `await_block.error` never reaches output and needs no erasure.
+    let value = match &await_block.value {
+        Some(value) => Some(env.erase(value)?),
+        None => None,
+    };
 
     // Pending arrow: `() => { pending }` (empty when there is no pending content).
     let empty: &'arena [Statement<'arena>] = &[];
@@ -2442,17 +2621,17 @@ fn emit_await_block<'arena>(
 
     // Then arrow: `(value?) => { then }`. The `{:then value}` pattern binds one
     // param; its names mask to UNKNOWN in the then body.
-    let then_params: &'arena [Expression<'arena>] = match &await_block.value {
+    let then_params: &'arena [Expression<'arena>] = match value {
         Some(value) => {
             guard_dropped(env, value)?;
-            std::slice::from_ref(arena.alloc(value.clone()))
+            std::slice::from_ref(value)
         }
         None => &[],
     };
     let then_stmts = match &await_block.then {
         Some(frag) => {
             let mut overlay: HashMap<String, ScopeEntry<'arena>> = HashMap::new();
-            if let Some(value) = &await_block.value {
+            if let Some(value) = value {
                 let mut names = Vec::new();
                 pattern_binding_names(value, env.source, &mut names)?;
                 for name in names {
@@ -2465,6 +2644,13 @@ fn emit_await_block<'arena>(
     };
     let then_here = env.b.here();
     let then_arrow = env.b.arrow_block(then_params, then_stmts, then_here);
+
+    // The `{:catch}` branch is dropped from SSR — the emitter never visits it. It
+    // still gets the rune guard, or a misplaced rune inside it would compile where
+    // the oracle's analysis phase rejects.
+    if let Some(catch) = &await_block.catch {
+        guard_dropped_fragment(env, catch)?;
+    }
 
     // `$.await($$renderer, expr, pending, then)`.
     let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
@@ -2536,27 +2722,40 @@ fn build_snippet_function<'arena>(
     snippet: &'arena SnippetBlock<'arena>,
 ) -> Result<(Statement<'arena>, String), CompileError> {
     let arena = env.b.arena;
-    // A generic or type-annotated snippet implies TypeScript (type stripping is
-    // not implemented) — the oracle rejects it without `lang="ts"`, and a
-    // `lang="ts"` component is already refused at the entry.
-    if snippet.type_parameters.is_some()
-        || snippet.type_params_raw.is_some()
-        || snippet.raw_parameters.is_some()
-        || snippet.parameters.iter().any(param_is_typed)
+    // The snippet's signature head (`<T>(params)`) is parsed by wrapping it in a
+    // synthetic `function f<T>(params) {}`. When that inner parse FAILS the AST is
+    // empty and the raw text is kept instead — nothing to erase or emit, so refuse.
+    if snippet.raw_parameters.is_some()
+        || (snippet.type_params_raw.is_some() && snippet.type_parameters.is_none())
     {
-        return Err(unsupported(Refusal::SnippetTyped));
+        return Err(unsupported(Refusal::SnippetSignatureUnparsed));
     }
     let Some(name) = snippet_name(snippet, env.source) else {
         // An escaped snippet name isn't reproducible by this port.
-        return Err(unsupported(Refusal::SnippetTyped));
+        return Err(unsupported(Refusal::SnippetEscapedName));
     };
     let name = name.to_string();
+
+    // A generic `{#snippet s<T>(x: T)}` declares a *type*-level parameter only —
+    // the oracle emits `function s($$renderer, x)`, the `<T>` simply gone. The
+    // clause needs no erasure of its own: the synthetic `function_declaration`
+    // never carries type parameters, so not reading it IS the erasure. (Without
+    // `lang="ts"` the whole shape is refused up front — see
+    // `refuse_template_typescript`.)
+
+    // The parameter list is a template borrow point — the patterns are borrowed
+    // verbatim into the emitted function, so `(x: string)` erases to `(x)` here.
+    let mut params: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
+    for param in snippet.parameters {
+        params.push(env.erase(param)?.clone());
+    }
+    let params = params.into_bump_slice();
 
     // Mask the parameters to UNKNOWN in the body (a parameter read never folds),
     // and refuse a parameter that shadows a `$derived` binding (the overlay push
     // enforces this).
     let mut overlay: HashMap<String, ScopeEntry<'arena>> = HashMap::new();
-    for param in snippet.parameters {
+    for param in params {
         let mut names = Vec::new();
         pattern_binding_names(param, env.source, &mut names)?;
         for name in names {
@@ -2568,17 +2767,15 @@ fn build_snippet_function<'arena>(
     // text-first body gets the leading `<!---->` anchor.
     let body = emit_child_body(env, &snippet.body, &[], true, false, overlay)?;
 
-    // `($$renderer, ...params)` — the synthetic renderer first, borrowed params
-    // verbatim.
-    let mut params: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
-    params.push(Expression::Identifier(env.b.ident("$$renderer")));
-    for param in snippet.parameters {
-        params.push(param.clone());
-    }
+    // `($$renderer, ...params)` — the synthetic renderer first, then the erased
+    // parameter patterns.
+    let mut all_params: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
+    all_params.push(Expression::Identifier(env.b.ident("$$renderer")));
+    all_params.extend_from_slice(params);
     let block_span = env.b.here();
     let fn_decl = env
         .b
-        .function_declaration(&name, params.into_bump_slice(), body, block_span);
+        .function_declaration(&name, all_params.into_bump_slice(), body, block_span);
     Ok((fn_decl, name))
 }
 
@@ -2599,22 +2796,6 @@ fn collect_hoisted_snippets<'arena>(
             }
             _ => {}
         }
-    }
-}
-
-/// Whether a `{#snippet}` parameter pattern carries a type annotation (an
-/// optional `?` marker or `: Type`) — a TypeScript construct.
-fn param_is_typed(param: &Expression<'_>) -> bool {
-    match param {
-        Expression::Identifier(id) => id.type_annotation().is_some() || id.optional,
-        Expression::ObjectPattern(p) => p.properties.iter().any(|prop| match prop {
-            ObjectPatternProperty::Property(prop) => param_is_typed(&prop.value),
-            ObjectPatternProperty::RestElement(rest) => param_is_typed(rest.argument),
-        }),
-        Expression::ArrayPattern(p) => p.elements.iter().flatten().any(param_is_typed),
-        Expression::AssignmentPattern(p) => param_is_typed(p.left),
-        Expression::RestElement(r) => param_is_typed(r.argument),
-        _ => false,
     }
 }
 
@@ -2659,8 +2840,12 @@ fn emit_render_tag<'arena>(
     is_standalone: bool,
 ) -> Result<(), CompileError> {
     let arena = env.b.arena;
+    // The template borrow point: the whole `callee(args)` call is erased once, so
+    // the callee classification and the arguments below both read the type-free
+    // node (`{@render s<T>(x as U)}` → `s(x)`).
+    let expression = env.erase(&tag.expression)?;
     // Unwrap the (possibly optional) call.
-    let call = match &tag.expression {
+    let call = match expression {
         Expression::CallExpression(c) => c,
         Expression::ParenthesizedExpression(p) => match &p.expression {
             Expression::CallExpression(c) => c,
@@ -2670,7 +2855,7 @@ fn emit_render_tag<'arena>(
     };
     // The callee must be a plain identifier resolving to a local snippet or a
     // snippet prop.
-    let Some(name) = render_callee_name(&tag.expression, env.source) else {
+    let Some(name) = render_callee_name(expression, env.source) else {
         return Err(unsupported(Refusal::RenderTagUnsupportedCallee));
     };
     let is_snippet = env.snippets.names.contains(name);
@@ -2712,6 +2897,9 @@ fn emit_expression_tag<'arena>(
     out: &mut BodyBuilder<'arena>,
     escape: bool,
 ) -> Result<(), CompileError> {
+    // The template borrow point: erase TypeScript ONCE, then feed the erased node
+    // to the guard AND the fold gate below (see `EmitEnv::erase`).
+    let expr = env.erase(expr)?;
     // Guard FIRST (stray runes, non-bare derived reads, template mutations
     // refuse) — the evaluator must never fold an oracle-invalid expression.
     let wrapped = wrap_value_expr(env, expr)?;
@@ -3263,7 +3451,11 @@ fn build_component_props<'arena>(
                 };
                 build_props_object(env, props, syn)?
             }
-            PropGroup::Spread(expr) => wrap_value_expr(env, expr)?[0].clone(),
+            PropGroup::Spread(expr) => {
+                // The template borrow point (`<Foo {...(o as any)} />`).
+                let expr = env.erase(expr)?;
+                wrap_value_expr(env, expr)?[0].clone()
+            }
         };
         elements.push(Some(element_expr));
     }
@@ -3474,7 +3666,10 @@ fn build_prop_value<'arena>(
             Ok(env.b.string_literal_expr(&decoded))
         }
         [AttributeValue::ExpressionTag(tag)] => {
-            let wrapped = wrap_value_expr(env, &tag.expression)?;
+            // The template borrow point. The erased node also decides the caller's
+            // `{ n }` shorthand test — `<Foo n={n as T} />` is `{ n }` to the oracle.
+            let expr = env.erase(&tag.expression)?;
+            let wrapped = wrap_value_expr(env, expr)?;
             Ok(wrapped[0].clone())
         }
         _ => build_component_mixed_value(env, values),
@@ -3507,9 +3702,12 @@ fn build_component_mixed_value<'arena>(
                     .push_str(&escape_template_text(&decoded));
             }
             AttributeValue::ExpressionTag(tag) => {
+                // The template borrow point: erase once, then guard AND fold the
+                // erased node (the fold gate is the silent-divergence trap).
+                let expr = env.erase(&tag.expression)?;
                 // Guard first — never fold an oracle-invalid expression.
-                let wrapped = wrap_value_expr(env, &tag.expression)?;
-                let evaluated = evaluate(&tag.expression, &env.value_scope(), env.source, 0)
+                let wrapped = wrap_value_expr(env, expr)?;
+                let evaluated = evaluate(expr, &env.value_scope(), env.source, 0)
                     .map_err(|g| unsupported(Refusal::StaticEvalNotPortable(g.0)))?;
                 if let Some(value) = evaluated.known_value() {
                     let text = stringify_value(value)
@@ -3658,7 +3856,9 @@ fn emit_attribute<'arena>(
                 {
                     return Err(unsupported(Refusal::EventCaptureAttribute { name }));
                 }
-                return Ok(());
+                // Dropped, but still guarded: a misplaced rune inside a handler is
+                // an oracle analysis-phase error, not an emission one.
+                return guard_dropped_runes(env, &tag.expression);
             }
             // Quoted (`class="{a}"`) vs bare (`class={a}`): the oracle's AST
             // represents the quoted form as a one-chunk ARRAY and the bare form
@@ -3746,6 +3946,11 @@ fn emit_dynamic_attribute<'arena>(
     if env.has_comments {
         return Err(unsupported(Refusal::CommentsAlongsideExprAttributes));
     }
+    // The template borrow point. Both shape predicates below read the node's
+    // variant, so they must see the ERASED one: `class={'a' as string}` is a
+    // string literal to the oracle (inline-literal path), and a `TSAsExpression`
+    // left in place would take the `$.clsx` branch instead.
+    let expr = env.erase(expr)?;
     // A string-literal expression value takes the oracle's inline-literal path
     // (pre-escaped static emission) — refuse rather than guess its edge rules.
     if matches!(expr, Expression::Literal(lit)
@@ -3839,9 +4044,12 @@ fn emit_mixed_attribute<'arena>(
                     .push_str(&escape_template_text(&chunk));
             }
             AttributeValue::ExpressionTag(tag) => {
+                // The template borrow point: erase once, then guard AND fold the
+                // erased node (the fold gate is the silent-divergence trap).
+                let expr = env.erase(&tag.expression)?;
                 // Guard first — never fold an oracle-invalid expression.
-                let wrapped = wrap_value_expr(env, &tag.expression)?;
-                let evaluated = evaluate(&tag.expression, &env.value_scope(), env.source, 0)
+                let wrapped = wrap_value_expr(env, expr)?;
+                let evaluated = evaluate(expr, &env.value_scope(), env.source, 0)
                     .map_err(|g| unsupported(Refusal::StaticEvalNotPortable(g.0)))?;
                 if let Some(value) = evaluated.known_value() {
                     // Folds into the quasi — plain `(value ?? '') + ''`, no

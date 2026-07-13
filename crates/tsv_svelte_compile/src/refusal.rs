@@ -83,12 +83,6 @@ pub enum Refusal {
     /// hits a plain-JS parse error, so compiling it would be an over-acceptance.
     #[error("TypeScript syntax without lang=\"ts\" (the oracle parse-errors)")]
     TypeScriptWithoutLangTs,
-    /// TypeScript surviving in a template expression — the erase pass covers the
-    /// script `Program`; the template's borrow points are a later slice.
-    #[error(
-        "TypeScript in a template expression (erasure at the template borrow points not implemented)"
-    )]
-    TypeScriptInTemplate,
     /// A comment inside an erased TypeScript region (or glued to its tail,
     /// before the next surviving token). The oracle's surviving-comment
     /// placement is an emergent artifact of its printer's flush points over
@@ -316,9 +310,15 @@ pub enum Refusal {
     NestedEach,
 
     // ── Snippets / render tags ─────────────────────────────────────────────
-    /// A typed or generic `{#snippet}` (implies TypeScript).
-    #[error("typed or generic {{#snippet}} (implies TypeScript)")]
-    SnippetTyped,
+    /// A `{#snippet}` whose signature head (`<T>(params)`) the parser could not
+    /// parse: it kept the raw text instead of an AST, so there is nothing to
+    /// erase or emit.
+    #[error("{{#snippet}} signature the parser fell back to raw text for")]
+    SnippetSignatureUnparsed,
+    /// A `{#snippet}` whose name is an escaped identifier — the name-based port
+    /// can't reproduce it.
+    #[error("{{#snippet}} with an escaped name")]
+    SnippetEscapedName,
     /// A `{#snippet}` whose hoist classification is ambiguous for the name-based
     /// port: a name it references is both an instance binding and a nested
     /// (non-parameter) local, so free-vs-shadowed can't be told apart.
@@ -595,7 +595,6 @@ impl Refusal {
             }
             // TypeScript — closed-set discriminants, the message is the bucket.
             Self::TypeScriptWithoutLangTs
-            | Self::TypeScriptInTemplate
             | Self::CommentInErasedTypeRegion
             | Self::TsEnum
             | Self::TsNamespaceWithValue
@@ -678,7 +677,10 @@ impl Refusal {
             Self::NestedEach => Cow::Borrowed(
                 "nested {#each} (the oracle's unique-name allocation order is not reproducible)",
             ),
-            Self::SnippetTyped => Cow::Borrowed("typed or generic {#snippet} (implies TypeScript)"),
+            Self::SnippetSignatureUnparsed => {
+                Cow::Borrowed("{#snippet} signature the parser fell back to raw text for")
+            }
+            Self::SnippetEscapedName => Cow::Borrowed("{#snippet} with an escaped name"),
             Self::SnippetHoistAmbiguous { .. } => {
                 Cow::Borrowed("{#snippet} {name} hoist classification ambiguous")
             }

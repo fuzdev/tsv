@@ -784,17 +784,25 @@ mod tests {
     }
 
     #[test]
-    fn compile_rejects_typed_snippet() {
-        // Typed params or generics imply TypeScript (the oracle rejects them
-        // without `lang="ts"`; tsv's permissive parser accepts, so refuse rather
-        // than emit invalid JS).
-        assert_unsupported(
-            "{#snippet foo(x: number)}<p>{x}</p>{/snippet}\n{@render foo(1)}",
-            "typed or generic {#snippet}",
+    fn compile_typed_and_generic_snippet() {
+        // A `: T` parameter annotation and a `<T>` clause are both ordinary
+        // erasure: the oracle emits `function foo($$renderer, x)` either way, the
+        // type-level syntax simply gone.
+        let js = compile_js(
+            "<script lang=\"ts\">\n\tlet { n }: { n: number } = $props();\n</script>\n\
+             {#snippet foo(x: number)}<p>{x}</p>{/snippet}\n{@render foo(n)}",
         );
-        assert_unsupported(
-            "{#snippet foo<T>(x)}<p>{x}</p>{/snippet}\n{@render foo(1)}",
-            "typed or generic {#snippet}",
+        assert!(
+            js.contains("function foo($$renderer, x) {"),
+            "annotated snippet param must erase: {js}"
+        );
+        let generic = compile_js(
+            "<script lang=\"ts\">\n\tlet { n }: { n: number } = $props();\n</script>\n\
+             {#snippet foo<T>(x: T)}<p>{x}</p>{/snippet}\n{@render foo(n)}",
+        );
+        assert!(
+            generic.contains("function foo($$renderer, x) {"),
+            "generic snippet must erase its <T>: {generic}"
         );
     }
 
@@ -1518,13 +1526,158 @@ mod tests {
     }
 
     #[test]
-    fn compile_refuses_typescript_in_template() {
-        // Template expressions are erased at their borrow points — a later
-        // slice. Until then a TypeScript template expression refuses rather than
-        // print its annotation verbatim.
-        assert_unsupported(
+    fn compile_erases_typescript_in_template() {
+        // A template expression is erased at its borrow point, and the erased node
+        // is what the printer sees: `(x as { n: number }).n` → `x.n`, with the
+        // redundant parens re-derived away by precedence (as the oracle does).
+        let js = compile_js(
             "<script lang=\"ts\">\n\tlet x: any = { n: 1 };\n</script>\n<p>{(x as { n: number }).n}</p>",
-            "TypeScript in a template expression",
+        );
+        assert!(
+            js.contains("$.escape(x.n)"),
+            "template `as` must erase, parens included: {js}"
+        );
+        assert!(
+            !js.contains("as { n: number }"),
+            "no TypeScript may survive: {js}"
+        );
+    }
+
+    #[test]
+    fn compile_erases_typescript_in_template_patterns() {
+        // The four pattern borrow points: `{#each}`'s context, `{#await}`'s
+        // `{:then}` value, `{@const}`'s binding, and a `{#snippet}`'s parameters
+        // (covered by `compile_typed_and_generic_snippet`).
+        let each = compile_js(
+            "<script lang=\"ts\">\n\tlet { items }: { items: number[] } = $props();\n</script>\n\
+             {#each items as item: number}<li>{item}</li>{/each}",
+        );
+        assert!(
+            each.contains("let item = each_array[$$index];"),
+            "{{#each}} context annotation must erase: {each}"
+        );
+        let await_block = compile_js(
+            "<script lang=\"ts\">\n\tlet { p }: { p: Promise<number> } = $props();\n</script>\n\
+             {#await p then v: number}<p>{v}</p>{/await}",
+        );
+        assert!(
+            await_block.contains("(v) => {"),
+            "{{:then}} annotation must erase: {await_block}"
+        );
+        let const_tag = compile_js(
+            "<script lang=\"ts\">\n\tlet { a }: { a: number } = $props();\n</script>\n\
+             {#if a}{@const b: number = a}<p>{b}</p>{/if}",
+        );
+        assert!(
+            const_tag.contains("const b = a;"),
+            "{{@const}} annotation must erase: {const_tag}"
+        );
+    }
+
+    #[test]
+    fn compile_template_erasure_feeds_the_fold_gate() {
+        // The designed-in trap: erasing for the guard walk while the static-fold
+        // gate beside it still reads the raw node yields a SILENT under-fold —
+        // `1 as number` evaluating to UNKNOWN where the oracle folds `1` — a parity
+        // divergence no refusal catches. The borrow point erases once, and the fold
+        // gate reads the erased node.
+        let js = compile_js(
+            "<script lang=\"ts\">\n\tconst n: number = 1;\n</script>\n<p>{(n as number) + 1}</p>",
+        );
+        assert!(
+            js.contains("`<p>2</p>`"),
+            "a TypeScript-wrapped constant must still fold: {js}"
+        );
+        assert!(
+            !js.contains("$.escape"),
+            "a folded value must not emit an escape call: {js}"
+        );
+    }
+
+    #[test]
+    fn compile_refuses_template_typescript_without_lang_ts() {
+        // The oracle's `ts` flag is document-wide: without `lang="ts"` its parser
+        // rejects TypeScript in the template too, so accepting it would be an
+        // over-acceptance. Both an EMITTED borrow point…
+        assert_unsupported(
+            "<script>\n\tlet { a } = $props();\n</script>\n<p>{a as string}</p>",
+            "TypeScript syntax without lang=\"ts\"",
+        );
+        // …and the SSR-DROPPED positions the erase self-check can never see (the
+        // `{#key}` expression, the `{#each}` key, an event handler, and the whole
+        // `{:catch}` branch).
+        assert_unsupported(
+            "<script>\n\tlet { a } = $props();\n</script>\n{#key a as string}<p>k</p>{/key}",
+            "TypeScript syntax without lang=\"ts\"",
+        );
+        assert_unsupported(
+            "<script>\n\tlet { items } = $props();\n</script>\n\
+             {#each items as x (x.id as string)}<li>{x}</li>{/each}",
+            "TypeScript syntax without lang=\"ts\"",
+        );
+        assert_unsupported(
+            "<script>\n\tlet { a } = $props();\n</script>\n\
+             <button onclick={() => (a as any)}>b</button>",
+            "TypeScript syntax without lang=\"ts\"",
+        );
+        assert_unsupported(
+            "<script>\n\tlet { p } = $props();\n</script>\n\
+             {#await p then v}<p>{v}</p>{:catch e}<p>{e as string}</p>{/await}",
+            "TypeScript syntax without lang=\"ts\"",
+        );
+        assert_unsupported(
+            "<script>\n\tlet { a } = $props();\n</script>\n\
+             {#snippet foo<T>(x)}<p>{x}</p>{/snippet}\n{@render foo(a)}",
+            "TypeScript syntax without lang=\"ts\"",
+        );
+    }
+
+    #[test]
+    fn dropped_fragments_are_walked() {
+        // The M4 class, pinned. A fragment the emitter DISCARDS without visiting —
+        // today only `{:catch}`, plus an event handler's expression — must still be
+        // walked for everything the oracle decides BEFORE it chooses what to emit:
+        // its reference counting (`needs_context`) and its analysis-phase errors
+        // (a misplaced rune). Dropping the region cannot make the component valid.
+        //
+        // A new emission-dropped fragment that skips that walk fails here (and, for
+        // TypeScript, in `compile_refuses_template_typescript_without_lang_ts`).
+
+        // 1. References inside a dropped `{:catch}` still reach `needs_context`: a
+        //    prop-rooted member access there forces the `$$renderer.component`
+        //    wrapper, exactly as the oracle counts it.
+        let js = compile_js(
+            "<script>\n\tlet { p, obj } = $props();\n</script>\n\
+             {#await p then v}<p>{v}</p>{:catch e}<p>{obj.field}</p>{/await}",
+        );
+        assert!(
+            js.contains("$$renderer.component(($$renderer) => {"),
+            "a prop-rooted access in a dropped {{:catch}} must still fire needs_context: {js}"
+        );
+
+        // 2. An analysis-phase error inside a dropped region still refuses — the
+        //    oracle rejects `{:catch e}{$state(1)}` with `state_invalid_placement`.
+        assert_unsupported(
+            "<script>\n\tlet { p } = $props();\n</script>\n\
+             {#await p then v}<p>{v}</p>{:catch e}<p>{$state(1)}</p>{/await}",
+            "$state",
+        );
+        assert_unsupported(
+            "<script>\n\tlet { a } = $props();\n</script>\n\
+             <button onclick={() => $state(1)}>b</button>",
+            "$state",
+        );
+
+        // 3. …but a shape the oracle merely DROPS must still compile: a derived read
+        //    inside a dropped `{:catch}` is emitted nowhere, so the oracle accepts
+        //    it. Guarding a dropped region must not over-refuse.
+        let derived = compile_js(
+            "<script>\n\tlet { p } = $props();\n\tlet d = $derived(1);\n</script>\n\
+             {#await p then v}<p>{v}</p>{:catch e}<p>{d}</p>{/await}",
+        );
+        assert!(
+            !derived.contains("catch"),
+            "the {{:catch}} branch is dropped from SSR: {derived}"
         );
     }
 

@@ -96,27 +96,38 @@ pub(crate) fn erase_statements<'arena>(
     })
 }
 
+/// The product of erasing a single expression.
+pub(crate) struct ErasedExpr<'arena> {
+    /// The type-free expression — `None` means *unchanged*, so the caller reuses
+    /// the borrow.
+    pub(crate) expr: Option<Expression<'arena>>,
+    /// Every erased source region, already extended to its comment-refusal
+    /// window (see [`Eraser::drop_region`]). In walk order.
+    pub(crate) regions: Vec<Span>,
+    /// Whether TypeScript-only *syntax* was erased — the `lang="ts"` gate, which
+    /// applies to the template exactly as it does to the script (the oracle's
+    /// flag is document-wide). Distinct from `expr.is_some()`: unwrapping a
+    /// `JsdocCast` rebuilds valid JavaScript and must not read as TypeScript.
+    pub(crate) typescript: bool,
+}
+
 /// Erase every TypeScript-only construct from a single expression — the
 /// per-expression entry point for the Svelte template's borrow points (`{expr}`
 /// tags, attribute values, block tests, `{@const}`/`{#each}`/`{#snippet}`
 /// patterns), where the erasure applies at the borrow and the Svelte AST itself
 /// is never rebuilt.
-///
-/// Returns the erased expression (`None` = no TypeScript, reuse the borrow) and
-/// the erased source regions (feed them through the same comment-refusal window
-/// as the script's).
-// TODO: wire into the template borrow points (`wrap_value_expr`'s call sites,
-// the four pattern positions, `SnippetBlock.type_parameters`). Until then the
-// transform refuses TypeScript in a template expression.
-#[allow(dead_code)]
 pub(crate) fn erase_expression<'arena>(
     arena: &'arena bumpalo::Bump,
     source: &str,
     expr: &Expression<'arena>,
-) -> Result<(Option<Expression<'arena>>, Vec<Span>), CompileError> {
+) -> Result<ErasedExpr<'arena>, CompileError> {
     let mut eraser = Eraser::new(arena, source);
-    let erased = eraser.expr(expr)?;
-    Ok((erased, eraser.regions))
+    let expr = eraser.expr(expr)?;
+    Ok(ErasedExpr {
+        expr,
+        regions: eraser.regions,
+        typescript: eraser.typescript,
+    })
 }
 
 /// Position of the next surviving token at or after `from`: skips whitespace and

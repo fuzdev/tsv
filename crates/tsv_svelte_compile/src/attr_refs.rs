@@ -1,4 +1,9 @@
-//! The shared element-attribute reference traversal.
+//! The shared template traversals.
+//!
+//! Two of them, both here for the same reason: an analysis that hand-writes its
+//! own walk drifts from the others, and the drift is silent. [`each_template_item`]
+//! is the whole-fragment walk; the `each_*_attribute_expression` pair below is the
+//! per-element one it and the other analyses share.
 //!
 //! Both the snippet hoist analysis (`snippet.rs`) and the `needs_context` walk
 //! (`needs_context.rs`) must see every attribute expression the compiled output
@@ -25,10 +30,148 @@
 //! references, too, are only reachable through the dropped-fragment path.
 
 use tsv_svelte::ast::internal::{
-    AttributeNode, AttributeValue, Element, ElementKind, SpecialElement, SpecialElementKind,
-    StyleDirectiveValue,
+    AttributeNode, AttributeValue, Element, ElementKind, Fragment, FragmentNode, SpecialElement,
+    SpecialElementKind, StyleDirectiveValue,
 };
 use tsv_ts::ast::internal::Expression;
+
+use crate::CompileError;
+
+/// One TypeScript- or rune-bearing item of a template fragment.
+pub(crate) enum TemplateItem<'a, 'arena> {
+    /// A borrowed expression — the overwhelming majority.
+    Expression(&'a Expression<'arena>),
+    /// A `{#snippet}`'s `<T>` clause. TypeScript with no `Expression` to yield,
+    /// so it gets its own item rather than being missed.
+    SnippetTypeParameters,
+}
+
+/// Visit every TypeScript- or rune-bearing item a template fragment holds,
+/// recursing into every child fragment.
+///
+/// This is the **dropped-fragment** view (it uses
+/// [`each_reference_bearing_attribute_expression`], the widest attribute set, and
+/// visits the SSR-dropped `{#each}` key, `{#key}` expression, `{:catch}` binding
+/// and branch): its two consumers ask what a region *contains*, not what it
+/// *emits*, and a dropped region's contents never reach an emission refusal at
+/// all.
+///
+/// - The **document-wide TypeScript gate** (`refuse_template_typescript`): without
+///   `lang="ts"` the oracle's parser rejects TypeScript anywhere in the document,
+///   dropped positions included.
+/// - The **rune guard over a dropped `{:catch}` branch** (`guard_dropped_fragment`):
+///   the oracle rejects a misplaced rune in its *analysis* phase, before it decides
+///   what to emit, so dropping the branch cannot make the component valid.
+///
+/// The `FragmentNode` match is exhaustive on purpose — a new template shape fails
+/// compilation here instead of slipping silently past both gates.
+pub(crate) fn each_template_item<'a, 'arena>(
+    fragment: &'a Fragment<'arena>,
+    f: &mut impl FnMut(TemplateItem<'a, 'arena>) -> Result<(), CompileError>,
+) -> Result<(), CompileError> {
+    for node in fragment.nodes {
+        each_node_item(node, f)?;
+    }
+    Ok(())
+}
+
+fn each_node_item<'a, 'arena>(
+    node: &'a FragmentNode<'arena>,
+    f: &mut impl FnMut(TemplateItem<'a, 'arena>) -> Result<(), CompileError>,
+) -> Result<(), CompileError> {
+    let mut expr = |e: &'a Expression<'arena>| f(TemplateItem::Expression(e));
+    match node {
+        FragmentNode::Text(_) | FragmentNode::Comment(_) => {}
+        FragmentNode::Element(element) => {
+            each_attribute_item(element.attributes, f)?;
+            each_template_item(&element.fragment, f)?;
+        }
+        FragmentNode::SpecialElement(special) => {
+            if let Some(this) = special_element_reference_expression(special) {
+                expr(this)?;
+            }
+            each_attribute_item(special.attributes, f)?;
+            each_template_item(&special.fragment, f)?;
+        }
+        FragmentNode::ExpressionTag(tag) => expr(&tag.expression)?,
+        FragmentNode::HtmlTag(tag) => expr(&tag.expression)?,
+        FragmentNode::RenderTag(tag) => expr(&tag.expression)?,
+        FragmentNode::DebugTag(tag) => {
+            for identifier in tag.identifiers {
+                expr(identifier)?;
+            }
+        }
+        FragmentNode::ConstTag(tag) => {
+            expr(&tag.id)?;
+            expr(&tag.init)?;
+        }
+        FragmentNode::DeclarationTag(tag) => {
+            for declarator in tag.declaration.declarations {
+                expr(&declarator.id)?;
+                if let Some(init) = &declarator.init {
+                    expr(init)?;
+                }
+            }
+        }
+        FragmentNode::IfBlock(block) => {
+            expr(&block.test)?;
+            each_template_item(&block.consequent, f)?;
+            if let Some(alternate) = &block.alternate {
+                each_template_item(alternate, f)?;
+            }
+        }
+        FragmentNode::EachBlock(block) => {
+            expr(&block.expression)?;
+            for e in block.context.iter().chain(block.key.iter()) {
+                expr(e)?;
+            }
+            each_template_item(&block.body, f)?;
+            if let Some(fallback) = &block.fallback {
+                each_template_item(fallback, f)?;
+            }
+        }
+        FragmentNode::AwaitBlock(block) => {
+            expr(&block.expression)?;
+            for e in block.value.iter().chain(block.error.iter()) {
+                expr(e)?;
+            }
+            for child in [&block.pending, &block.then, &block.catch]
+                .into_iter()
+                .flatten()
+            {
+                each_template_item(child, f)?;
+            }
+        }
+        FragmentNode::KeyBlock(block) => {
+            expr(&block.expression)?;
+            each_template_item(&block.fragment, f)?;
+        }
+        FragmentNode::SnippetBlock(snippet) => {
+            // `type_params_raw` is the raw-text fallback for a `<T>` clause whose
+            // inner parse failed — still TypeScript, still surfaced.
+            if snippet.type_parameters.is_some() || snippet.type_params_raw.is_some() {
+                f(TemplateItem::SnippetTypeParameters)?;
+            }
+            for param in snippet.parameters {
+                f(TemplateItem::Expression(param))?;
+            }
+            each_template_item(&snippet.body, f)?;
+        }
+    }
+    Ok(())
+}
+
+fn each_attribute_item<'a, 'arena>(
+    attributes: &'a [AttributeNode<'arena>],
+    f: &mut impl FnMut(TemplateItem<'a, 'arena>) -> Result<(), CompileError>,
+) -> Result<(), CompileError> {
+    let mut found: Vec<&'a Expression<'arena>> = Vec::new();
+    each_reference_bearing_attribute_expression(attributes, &mut |e| found.push(e));
+    for e in found {
+        f(TemplateItem::Expression(e))?;
+    }
+    Ok(())
+}
 
 /// Visit every attribute expression of `element` that can reach compiled
 /// output:
