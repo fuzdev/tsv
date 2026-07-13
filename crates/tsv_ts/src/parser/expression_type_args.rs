@@ -105,17 +105,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - `[`: disambiguate indexed type vs array access
     /// - `extends`: type constraint
     fn check_identifier_type_arg_pattern(&self, bytes: &[u8], pos: usize) -> bool {
+        // The leading identifier's end is located once and reused by the keyword
+        // dispatch below and by the qualified-name loop's first step.
+        let end = skip_identifier(bytes, pos);
+
         // Leading keyword forms that start a non-reference type. `import` is always
         // a valid type (scan decides); `new`/`abstract new` require the construct
         // shape so `f<new B()>(x)` and `a < new B() > (c)` stay comparisons.
-        match &bytes[pos..skip_identifier(bytes, pos)] {
+        match &bytes[pos..end] {
             b"import" => return scan_for_closing_angle_bracket(bytes, pos),
             b"new" => {
                 return is_construct_type_start(bytes, pos)
                     && scan_for_closing_angle_bracket(bytes, pos);
             }
             b"abstract" => {
-                let after = skip_whitespace_and_comments(bytes, skip_identifier(bytes, pos));
+                let after = skip_whitespace_and_comments(bytes, end);
                 if is_construct_type_start(bytes, after)
                     && scan_for_closing_angle_bracket(bytes, pos)
                 {
@@ -126,17 +130,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             _ => {}
         }
 
-        // Skip identifier and any qualified parts (e.g., Namespace.Type.SubType)
-        let mut pos = pos;
+        // Skip the leading identifier (already located as `end`) and any qualified
+        // parts (e.g., Namespace.Type.SubType).
+        let mut pos = skip_whitespace_and_comments(bytes, end);
         loop {
-            pos = skip_identifier(bytes, pos);
-            pos = skip_whitespace_and_comments(bytes, pos);
-
             // If followed by '.', continue scanning qualified name
             if pos < bytes.len() && bytes[pos] == b'.' {
                 pos += 1;
                 pos = skip_whitespace_and_comments(bytes, pos);
                 if pos < bytes.len() && is_identifier_start(bytes[pos]) {
+                    pos = skip_identifier(bytes, pos);
+                    pos = skip_whitespace_and_comments(bytes, pos);
                     continue;
                 }
             }
