@@ -147,11 +147,20 @@ pub(crate) fn each_reference_bearing_attribute_expression<'a, 'arena>(
 
 /// Visit the NAME of every directive whose name is a value-binding reference:
 /// `use:` (action), `transition:`/`in:`/`out:` (transition fn), `animate:`
-/// (animation fn). These name a binding the oracle counts; the other directives'
-/// names are event / DOM-property / class / CSS names (not references) and `let:`
-/// binds a name. tsv stores the name as a verbatim `name_span` rather than an
-/// `Expression` — and it may be a member path (`use:a.b`) — so the raw slice is
-/// surfaced for the consumer to reduce to its root identifier.
+/// (animation fn), and a `style:` **shorthand** (`style:color` ≡
+/// `style:color={color}` — the name references the same-named binding). These name
+/// a binding the oracle counts; the other directives' names are event /
+/// DOM-property / class / CSS names (not references) and `let:` binds a name. tsv
+/// stores the name as a verbatim `name_span` rather than an `Expression` — and it
+/// may be a member path (`use:a.b`) — so the raw slice is surfaced for the
+/// consumer to reduce to its root identifier.
+///
+/// `style:` is the one directive whose shorthand does NOT auto-generate an
+/// `expression` node (`bind:`/`class:` shorthands do, so their reference already
+/// flows through `each_reference_bearing_attribute_expression`); a non-shorthand
+/// `style:color={…}` / `style:color="a{…}"` names a CSS property (not a reference)
+/// and its expression is handled there too — so only the `True` (shorthand) arm
+/// contributes a name here.
 ///
 /// Consumed only by the snippet-hoist analysis on the dropped-`{:catch}` path: a
 /// bare name reference never triggers `needs_context` (which fires on `new` /
@@ -166,6 +175,9 @@ pub(crate) fn each_reference_bearing_directive_name<'s>(
             AttributeNode::UseDirective(d) => d.name_span,
             AttributeNode::TransitionDirective(d) => d.name_span,
             AttributeNode::AnimateDirective(d) => d.name_span,
+            AttributeNode::StyleDirective(d) if matches!(d.value, StyleDirectiveValue::True) => {
+                d.name_span
+            }
             _ => continue,
         };
         f(name_span.extract(source));
