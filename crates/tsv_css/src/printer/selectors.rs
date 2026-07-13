@@ -662,11 +662,15 @@ impl<'a> Printer<'a> {
                 d.concat(&[d.text_pooled(&name), self.build_pseudo_args_doc(args)])
             }
             None => {
-                // No args: the whole span is the name; drop its escape terminator
-                // when it ends the compound.
+                // No args: the whole span is the name. Drop a hex escape's whitespace
+                // TERMINATOR when it ends the compound (the separator that follows
+                // re-terminates it), but never a literal escape's PAYLOAD — the exact
+                // rule `span_leaf_doc` applies to type/class/id leaves, on the pseudo
+                // path. `:hover\ ` is a pseudo named `hover `; stranding its backslash
+                // would escape the `,` or `{` that follows and destroy the selector list.
                 let name = self.pseudo_name_text(span, false);
                 let text = if is_last_in_compound {
-                    name.trim_end()
+                    crate::escapes::trim_end_preserving_escape(&name)
                 } else {
                     &name
                 };

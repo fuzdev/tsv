@@ -106,6 +106,22 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> Cow<'_, str> {
             continue;
         }
 
+        // Inside a string, a `\` escapes the next code point — so an escaped quote
+        // (`"a\"b"`) must NOT close the string. Copy the pair verbatim, exactly as
+        // `collapse_whitespace_runs` does. (No input reaches here with one today: a
+        // string-valued declaration prints through the string-aware `format_string_value`,
+        // not this normalizer — verified across `content`, custom properties, `url()`,
+        // font lists, `@media` preludes, attribute selectors and `grid-template-areas`.
+        // The arm is here so the invariant does not depend on that routing holding.)
+        if in_string && ch == '\\' {
+            result.push(ch);
+            if let Some(next) = chars.next() {
+                result.push(next);
+                byte_pos += next.len_utf8();
+            }
+            continue;
+        }
+
         if in_string && ch == string_delim {
             in_string = false;
             result.push(ch);
@@ -238,17 +254,23 @@ pub(crate) fn collapse_whitespace_runs(s: &str) -> Cow<'_, str> {
 
     let mut result = String::with_capacity(s.len());
     let mut chars = s.chars().peekable();
+    // The escape arm below needs the byte offset to ask `escape_len` how far the escape
+    // reaches (the single definition of that rule).
+    let mut byte_pos = 0usize;
     let mut in_string = false;
     let mut string_delim = '\0';
     let mut in_comment = false;
 
     while let Some(ch) = chars.next() {
+        let ch_start = byte_pos;
+        byte_pos += ch.len_utf8();
         // Comment interior: copy verbatim (its whitespace is content).
         if in_comment {
             result.push(ch);
             if ch == '*' && chars.peek() == Some(&'/') {
                 result.push('/');
                 chars.next();
+                byte_pos += 1;
                 in_comment = false;
             }
             continue;
@@ -260,6 +282,7 @@ pub(crate) fn collapse_whitespace_runs(s: &str) -> Cow<'_, str> {
             if ch == '\\' {
                 if let Some(next) = chars.next() {
                     result.push(next);
+                    byte_pos += next.len_utf8();
                 }
             } else if ch == string_delim {
                 in_string = false;
@@ -271,6 +294,7 @@ pub(crate) fn collapse_whitespace_runs(s: &str) -> Cow<'_, str> {
             result.push('/');
             result.push('*');
             chars.next();
+            byte_pos += 1;
             in_comment = true;
             continue;
         }
@@ -280,11 +304,30 @@ pub(crate) fn collapse_whitespace_runs(s: &str) -> Cow<'_, str> {
             result.push(ch);
             continue;
         }
+        // An escape is opaque: copy it whole, so its interior never reaches the
+        // whitespace-run branch below. `\<TAB>` is a valid escape whose escaped code
+        // point IS that tab (css-syntax-3 §4.3.4/§4.3.7), so collapsing it to a space
+        // would silently rename `.b\<TAB>c` to the class `b c` — content corruption, not
+        // whitespace normalization. A hex escape's whitespace terminator is part of the
+        // escape too (§4.3.7).
+        if ch == '\\'
+            && let Some(len) = crate::escapes::escape_len(s, ch_start)
+        {
+            let escape = &s[ch_start..ch_start + len];
+            result.push_str(escape);
+            // The `\` is already consumed; step the iterator over the escape's tail.
+            for _ in 0..escape.chars().count() - 1 {
+                chars.next();
+            }
+            byte_pos = ch_start + len;
+            continue;
+        }
         // A whitespace run outside strings/comments: consume it whole and emit one
         // space in its place.
         if is_css_whitespace(ch) {
             while chars.peek().is_some_and(|&next| is_css_whitespace(next)) {
-                chars.next();
+                let next = chars.next().unwrap_or_default();
+                byte_pos += next.len_utf8();
             }
             result.push(' ');
             continue;

@@ -1,5 +1,6 @@
 //! CSS escape sequence decoding.
 
+use crate::whitespace::is_css_whitespace;
 use std::borrow::Cow;
 
 /// Decode CSS escape sequences in a string.
@@ -36,9 +37,11 @@ pub fn decode_escape_sequences(source: &str) -> Cow<'_, str> {
                             _ => break,
                         }
                     }
-                    // Optional whitespace terminator
+                    // Optional whitespace terminator — the same CSS whitespace set
+                    // `escape_len` uses (a hand-rolled subset here once omitted `\r`
+                    // and form feed, disagreeing with every other escape scanner).
                     if let Some(&ws) = chars.peek()
-                        && (ws == ' ' || ws == '\t' || ws == '\n')
+                        && is_css_whitespace(ws)
                     {
                         chars.next();
                     }
@@ -71,19 +74,23 @@ fn ends_with_open_escape(text: &str) -> bool {
     text.bytes().rev().take_while(|&b| b == b'\\').count() % 2 == 1
 }
 
-/// Whether `c` is whitespace a CSS escape can own as its **payload**.
+/// Whether `c` is a character [`trim_end_preserving_escape`] must hand back to an
+/// escape as its **payload**.
 ///
-/// CSS Syntax 3 §4.3.4 "Check if two code points are a valid escape": a `\` followed
-/// by a **newline** is NOT a valid escape (that is the one exclusion), so a newline
-/// is never an escape's payload. Every other whitespace character is.
+/// §4.3.7's final branch escapes *any* code point, so an escape's payload is not
+/// restricted to CSS whitespace — `\<NBSP>` is a perfectly good escape. The set here is
+/// therefore keyed to what the trim can *eat*: `str::trim_end` follows Unicode
+/// `White_Space`, so anything it strips must be recoverable, NBSP included. Using the
+/// narrower [`is_css_whitespace`] here would let the Unicode trim swallow a payload the
+/// rule then refused to restore — the very loss this exists to prevent.
+///
+/// The one exclusion is §4.3.4's: a `\` followed by a **newline** is not a valid escape,
+/// so a newline is never a payload. (A newline *can* terminate a hex escape, which is why
+/// [`escape_len`] uses [`is_css_whitespace`] there instead. Two spec rules, two
+/// predicates — and neither is the duplicate that `whitespace::is_css_whitespace` already
+/// owns.)
 fn is_escapable_whitespace(c: char) -> bool {
     c.is_whitespace() && !matches!(c, '\n' | '\r' | '\x0C')
-}
-
-/// CSS whitespace (Syntax 3 §4.2) — the set that can *terminate* a hex escape.
-/// Unlike an escape's payload, a terminator MAY be a newline.
-fn is_css_whitespace(c: char) -> bool {
-    matches!(c, ' ' | '\t' | '\n' | '\r' | '\x0C')
 }
 
 /// The byte length of the CSS escape starting at `s[i]` (which must be a `\`), or
@@ -100,10 +107,17 @@ fn is_css_whitespace(c: char) -> bool {
 ///   consuming exactly that one code point;
 /// - a `\` before a newline is **not** an escape at all (§4.3.4) — `None`.
 ///
-/// The single definition of "how far does this escape reach", so every scanner that
-/// walks a CSS value — the whitespace normalizer, the top-level splitter — steps over
-/// escapes identically and none of them can mistake an escape's interior for
+/// The single definition of "how far does this escape reach", so every scanner that walks
+/// a CSS value — the whitespace normalizer, the top-level splitter, the value cursor —
+/// steps over escapes identically and none of them can mistake an escape's interior for
 /// structure.
+///
+/// A CRLF terminator is taken as the `\r` only, leaving the `\n` outside the escape. That
+/// is one code point short of §4.2's preprocessing (which folds CRLF to a single newline),
+/// but harmless rather than merely tolerable: the leftover `\n` is then ordinary
+/// whitespace, and every consumer of this function normalizes a whitespace run to one
+/// space, so `\41<CR><LF>2px` still emits `\41 2px` — the same ident `A2px`, which
+/// re-parses identically. The safety comes from that downstream join, not from this arm.
 pub(crate) fn escape_len(s: &str, i: usize) -> Option<usize> {
     debug_assert_eq!(s.as_bytes().get(i), Some(&b'\\'));
     let rest = s.get(i + 1..)?;
@@ -139,14 +153,14 @@ pub(crate) fn escape_len(s: &str, i: usize) -> Option<usize> {
 /// whitespace character is therefore kept when an odd-length backslash run precedes
 /// it; any further whitespace past the escaped one is ordinary padding and still goes.
 ///
-/// A newline is never kept: `\` + newline is the one shape §4.3.4 excludes, so it is
-/// not an escape and the backslash owns nothing. (The lexer rejects that input today,
-/// so this arm is unreachable — but it stops being unreachable the moment CSS error
-/// recovery lands, and a rule that silently disagrees with its own spec citation is
-/// worse than one that never fires.)
+/// A newline is never kept: `\` + newline is the one shape §4.3.4 excludes, so it is not
+/// an escape and the backslash owns nothing. The lexer rejects that input before this is
+/// reached, so the arm never fires today; it exists because the rule, not its
+/// reachability, is what this function encodes.
 ///
-/// The single definition of this rule: the parser's value/argument spans and the
-/// printer's whitespace normalizer both route through it, so they cannot drift.
+/// The single definition of this rule. The parser's value/argument spans, the printer's
+/// whitespace normalizer and top-level splitter, the selector leaf/pseudo printers, and
+/// `url()` trimming all route through it, so they cannot drift.
 pub(crate) fn trim_end_preserving_escape(s: &str) -> &str {
     let trimmed = s.trim_end();
     if trimmed.len() == s.len() || !ends_with_open_escape(trimmed) {

@@ -217,9 +217,13 @@ pub(crate) fn decode_unicode_escape(
         return Err(lex_err("Invalid unicode escape sequence", start));
     }
 
-    // Skip optional whitespace after unicode escape
+    // Skip the hex escape's optional whitespace terminator (§4.3.7). CSS whitespace is
+    // ASCII-only, so this must NOT be `char::is_whitespace` (Unicode `White_Space`):
+    // an NBSP after an escape is ordinary identifier content, and eating it as a
+    // terminator would disagree with `escapes::escape_len`, which every value scanner
+    // steps escapes with.
     if let Some(ch) = source[*pos..].chars().next()
-        && ch.is_whitespace()
+        && crate::whitespace::is_css_whitespace(ch)
     {
         *pos += ch.len_utf8();
     }

@@ -658,33 +658,35 @@ pub(crate) fn lowercase_at_rule_name(name: &str) -> Cow<'_, str> {
     Cow::Owned(name.to_ascii_lowercase())
 }
 
-/// Returns true if `name` ends with a CSS hex escape (`\` + 1..=6 hex digits).
+/// Returns true if `name` ends with a **live** CSS hex escape (`\` + 1..=6 hex digits).
 ///
 /// Such an escape consumes a single following whitespace as its terminator; that
 /// whitespace is part of the identifier token and must be preserved (e.g. the space
 /// before `:` in a property name `\41 : red`). A literal char after the escape
 /// (`ab\44 cd`) or an escaped backslash (`\\41`) does not end with a live escape.
+///
+/// Walks forward through `crate::escapes::escape_len` rather than scanning backward for
+/// hex digits: that is the crate's single definition of how far an escape reaches, so an
+/// escaped backslash (`\\41` — a literal `\` followed by the ordinary text `41`) and a
+/// hex escape that already swallowed its terminator both fall out of the walk instead of
+/// needing their own parity/lookback rules here.
 fn ends_with_hex_escape(name: &str) -> bool {
     let bytes = name.as_bytes();
-    // Consume up to 6 trailing hex digits.
-    let mut i = bytes.len();
-    let mut digits = 0;
-    while i > 0 && digits < 6 && bytes[i - 1].is_ascii_hexdigit() {
-        i -= 1;
-        digits += 1;
+    let mut i = 0;
+    let mut ends_with_escape = false;
+    while i < bytes.len() {
+        if bytes[i] == b'\\'
+            && let Some(len) = crate::escapes::escape_len(name, i)
+        {
+            // A hex escape is the one whose first payload byte is a hex digit.
+            ends_with_escape = bytes[i + 1].is_ascii_hexdigit() && i + len == bytes.len();
+            i += len;
+            continue;
+        }
+        ends_with_escape = false;
+        i += 1;
     }
-    if digits == 0 || i == 0 || bytes[i - 1] != b'\\' {
-        return false;
-    }
-    // The introducing `\` must itself be unescaped: an odd run of backslashes ending
-    // here means the last one starts the escape (`\41` yes, `\\41` no).
-    let mut backslashes = 0;
-    let mut j = i;
-    while j > 0 && bytes[j - 1] == b'\\' {
-        backslashes += 1;
-        j -= 1;
-    }
-    backslashes % 2 == 1
+    ends_with_escape
 }
 
 /// Extract and format string value from declaration source

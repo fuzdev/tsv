@@ -263,7 +263,7 @@ impl<'a> Printer<'a> {
         self.effective_indent() * TAB_WIDTH
     }
 
-    /// Write a DocId to the buffer, accounting for current column and indent level
+    /// Write a value DocId to the buffer, accounting for current column and indent level.
     ///
     /// This handles the common pattern of:
     /// 1. Get current column position (which already includes base_indent_offset after newlines)
@@ -272,24 +272,23 @@ impl<'a> Printer<'a> {
     ///
     /// Note: base_indent_offset is already accounted for in position tracking after newlines
     /// (see doc::render_single_doc line breaks). We should NOT add it again here.
-    /// Renders a **value** doc — the one place a rendered piece's last line can end
-    /// in whitespace that is *content* rather than layout.
     ///
-    /// A CSS escape's payload may be a space (`width: 50px\ ;` — CSS Syntax 3
-    /// §4.3.4/§4.3.7 make `\` + whitespace a valid escape whose escaped code point IS
-    /// that whitespace), and the value renders as its own piece: the terminator
-    /// (`;`, the `!important` tail) is appended to the buffer afterwards by
-    /// `write_declaration_end`, so the escaped space sits at the end of the rendered
-    /// piece. The default entry point's final-line trim would strip it and strand the
-    /// backslash onto the `;`, whose output no longer parses — so the value takes the
-    /// preserve-whitespace entry point instead (the same one HTML `<pre>`/`<textarea>`
-    /// use, for the same reason: trailing whitespace that is content). Interior lines
-    /// are still trimmed inline by `render_line_break`; only the final-line trim is
-    /// skipped, and an ordinary value's rendered piece never ends in whitespace, so
-    /// this is a no-op for every other value.
+    /// # Trailing whitespace is preserved
     ///
-    /// Selectors and at-rule preludes render through `write_arena_doc_with_suffix`
-    /// and keep the default trim.
+    /// A rendered piece's last line can end in whitespace that is **content** rather than
+    /// layout: a CSS escape's payload may be a space (`width: 50px\ ;` — css-syntax-3
+    /// §4.3.4/§4.3.7 make `\` + whitespace a valid escape whose escaped code point IS that
+    /// whitespace). The value renders as its own piece and the terminator (`;`, the
+    /// `!important` tail) is appended to the buffer *afterwards* by `write_declaration_end`,
+    /// so that escaped space sits at the very end of the piece. The default entry point's
+    /// final-line trim would strip it and strand the backslash onto the `;`, whose output no
+    /// longer parses — so this uses the preserve-whitespace entry point (the same one HTML
+    /// `<pre>`/`<textarea>` use, for the same reason).
+    ///
+    /// Interior lines are still trimmed inline by `render_line_break`; only the final-line
+    /// trim is skipped, and an ordinary value's rendered piece never ends in whitespace, so
+    /// this is a no-op everywhere else. [`Self::write_arena_doc_with_suffix`] — selectors and
+    /// at-rule preludes — does the same, for the same reason.
     pub(crate) fn write_arena_doc(&mut self, d: DocId) {
         let current_col = self.current_column();
         // Render into the arena-parked scratch: one warm buffer across the

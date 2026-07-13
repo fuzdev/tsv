@@ -447,6 +447,98 @@ impl<'a> ValueParser<'a> {
 mod tests {
     use super::*;
 
+    /// The **fused-pass invariant**: the three top-level trackers — `fast_scan`,
+    /// `ValueCursor::consume_until`, and `classify_separators` — must agree on what is
+    /// structure and what is the interior of an escape / quote / comment / paren.
+    ///
+    /// Each carries a comment asserting they are "kept identical"; nothing enforced it.
+    /// They drifted once already (all three skipped only `\(` / `\)`, so an escaped
+    /// comma or space read as a separator and tore an ident in half). This is the
+    /// differential that stops the next drift: same input, same verdict.
+    #[test]
+    fn twin_trackers_agree_on_top_level_structure() {
+        // Each case pairs a shape with what the top level really contains, so a tracker
+        // that mis-reads an escape's interior disagrees with the other two.
+        let cases = [
+            // (input, has_top_level_comma, has_top_level_whitespace)
+            ("red", false, false),
+            ("red blue", false, true),
+            ("red, blue", true, true),
+            ("rgba(1, 2, 3)", false, false),
+            ("calc(1px + 2px)", false, false),
+            // Escaped separators are CONTENT, not structure.
+            (r"x\,y", false, false),
+            (r"x\ y", false, false),
+            (r"a\+b", false, false),
+            (r"a\(b", false, false),
+            (r"a\)b", false, false),
+            // A hex escape swallows one whitespace terminator — still one token.
+            (r"\41 2px", false, false),
+            (r"\41 2px 3px", false, true),
+            // An escaped backslash does NOT escape what follows it (even run).
+            (r"a\\ b", false, true),
+            (r"a\\,b", true, false),
+            // Escapes next to real structure.
+            (r"x\,y, z", true, true),
+            (r"x\ y z", false, true),
+            // Quotes and parens still shield their interiors.
+            ("'a, b'", false, false),
+            ("url(a b)", false, false),
+        ];
+
+        for (text, want_comma, want_ws) in cases {
+            let arena = Bump::new();
+            let span = Span {
+                start: 0,
+                end: text.len() as u32,
+            };
+            let parser = ValueParser::new(text, span);
+
+            // 1. `classify_separators` — the standalone classifier.
+            let classified = classify_separators(text);
+            let classify_comma = classified == ValueSeparator::Comma;
+            let classify_ws = classified == ValueSeparator::Whitespace;
+            assert_eq!(
+                classify_comma, want_comma,
+                "classify_separators comma verdict for {text:?}"
+            );
+            assert_eq!(
+                classify_ws,
+                want_ws && !want_comma,
+                "classify_separators whitespace verdict for {text:?}"
+            );
+
+            // 2. `fast_scan` — the fused single pass. Its verdict must match.
+            let fast_comma = matches!(parser.fast_scan(text, &arena), FastScan::Comma(_));
+            let fast_ws = matches!(parser.fast_scan(text, &arena), FastScan::Whitespace);
+            assert_eq!(
+                fast_comma, classify_comma,
+                "fast_scan disagrees with classify_separators on a comma in {text:?}"
+            );
+            assert_eq!(
+                fast_ws, classify_ws,
+                "fast_scan disagrees with classify_separators on whitespace in {text:?}"
+            );
+
+            // 3. `ValueCursor::consume_until` — the splitter's scanner. Stopping before
+            // EOF means it found a top-level delimiter.
+            let mut cursor = ValueCursor::new(text);
+            let (_, comma_end) = cursor.consume_until(|c| c == ',');
+            assert_eq!(
+                comma_end < text.len(),
+                want_comma,
+                "ValueCursor disagrees on a top-level comma in {text:?}"
+            );
+            let mut cursor = ValueCursor::new(text);
+            let (_, ws_end) = cursor.consume_until(is_css_whitespace);
+            assert_eq!(
+                ws_end < text.len(),
+                want_ws,
+                "ValueCursor disagrees on top-level whitespace in {text:?}"
+            );
+        }
+    }
+
     #[test]
     fn test_new_parser() {
         let source = "red, blue";

@@ -13,13 +13,19 @@
 /// content — including colons and commas — verbatim, and preserving the original
 /// `url`/`URL` casing. Returns `None` when the raw text isn't a parenthesized token, so
 /// the caller can fall back (rejoin parsed args, or keep the source slice as-is).
+///
+/// The trailing trim spares an **escape's payload**: the url tokenizer consumes `\ ` as
+/// an escape (css-syntax-3 §4.3.6 defers to §4.3.7), so `url(x\ )` is the url `x `, and
+/// that space is content. Trimming it strands the backslash onto the closing `)`, which
+/// it then escapes — the url token never terminates and the output stops parsing
+/// entirely.
 pub(crate) fn trim_url_raw(raw: &str) -> Option<String> {
     let open = raw.find('(')?;
     let close = raw.rfind(')')?;
     if close < open {
         return None;
     }
-    let inner = raw[open + 1..close].trim();
+    let inner = crate::escapes::trim_end_preserving_escape(raw[open + 1..close].trim_start());
     Some(format!("{}{})", &raw[..=open], inner))
 }
 

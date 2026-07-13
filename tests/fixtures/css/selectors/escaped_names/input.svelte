@@ -66,4 +66,11 @@
 	.a\ {
 		color: silver;
 	}
+	/* the pseudo path has the same payload-vs-terminator split as a class/id leaf:
+	   `:hover\ ` is a pseudo named `hover `, so its payload must survive a
+	   selector-list comma that would otherwise be escaped */
+	.a:hover\ ,
+	.d {
+		color: fuchsia;
+	}
 </style>
