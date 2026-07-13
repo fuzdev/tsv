@@ -19,7 +19,7 @@ Uses [@fuzdev/fuz_util](https://github.com/fuzdev/fuz_util) benchmarking library
 
 | Gate | Composition | Corpus / oracle | Cadence |
 | --- | --- | --- | --- |
-| **`deno task check`** | `cargo fmt --check` · `pins:audit` · `typecheck` · `conformance:audit` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `test:deno` · `cargo test` (incl. fixtures) · `swallow:audit` · `check:ast-types` · `clippy` | **committed tree only** — `tests/fixtures` + pure-Rust/Deno audits, no external oracle | every commit; the CI `check` job |
+| **`deno task check`** | `cargo fmt --check` · `pins:audit` · `typecheck` · `conformance:audit` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `fuzz:audit` · `test:deno` · `cargo test` (incl. fixtures) · `swallow:audit` · `check:ast-types` · `clippy` | **committed tree only** — `tests/fixtures` + pure-Rust/Deno audits, no external oracle | every commit; the CI `check` job |
 | **`deno task conformance:all`** | `conformance` (one process, five FFI legs: `svelte-fixtures` · `ts-fixtures` · `ts-repo` · `corpus:compare:parse --all` · `corpus:compare:format --all`) **+** `conformance:test262` (pure Rust; JS parser vs test262 positives) | `../svelte`, `../acorn-typescript`, `../typescript` (tsc baselines), `../prettier`, `../test262`; the **`gates`** corpus view (~6,200) | release; `scripts/publish.ts` **Step 3b** |
 | **`deno task bench` / `bench:conformance`** | perf throughput ×3 runtimes + compose; parse-coverage report | **`perf`** view (~3,200; 100%-coverage invariant) / **`conformance`** view (fixtures + wpt/test262 harvests; coverage-only + node-only) | dev / release cadence; feeds tsv.fuz.dev |
 

@@ -349,7 +349,7 @@ impl RoundtripAuditCommand {
                 .map(|r| {
                     serde_json::json!({
                         "path": r.display,
-                        "parser": parser_label(r.parser),
+                        "parser": r.parser.name(),
                         "bucket": r.bucket().label(),
                     })
                 })
@@ -399,7 +399,7 @@ impl RoundtripAuditCommand {
                 "  [{}] {} ({})",
                 r.bucket().label(),
                 r.display,
-                parser_label(r.parser)
+                r.parser.name()
             );
             if self.verbose
                 && let Some(diff) = &r.diff
@@ -408,14 +408,6 @@ impl RoundtripAuditCommand {
             }
         }
         Err(CliError::Failed)
-    }
-}
-
-fn parser_label(p: ParserType) -> &'static str {
-    match p {
-        ParserType::Svelte => "svelte",
-        ParserType::TypeScript => "typescript",
-        ParserType::Css => "css",
     }
 }
 
@@ -481,7 +473,9 @@ fn tsv_reparses(source: &str, parser: ParserType) -> bool {
 
 /// Parse `source` with tsv's own parser and convert to the wire-JSON `Value`
 /// (the same shape the canonical ASTs use). `None` on a tsv parse error.
-fn tsv_parse_to_value(source: &str, parser: ParserType) -> Option<Value> {
+///
+/// Shared with the `fuzz` command (mutated-input round-tripping).
+pub(crate) fn tsv_parse_to_value(source: &str, parser: ParserType) -> Option<Value> {
     let arena = bumpalo::Bump::new();
     match parser {
         ParserType::TypeScript => {
@@ -586,7 +580,9 @@ async fn canonical_roundtrip(
 ///
 /// Returns `(structurally_equal, diff)` — the diff (only with `verbose`) shows the
 /// full location-stripped values, not the skeleton, so it's readable for triage.
-fn structurally_equivalent(
+///
+/// Shared with the `fuzz` command (mutated-input round-tripping).
+pub(crate) fn structurally_equivalent(
     a: Value,
     b: Value,
     render: bool,

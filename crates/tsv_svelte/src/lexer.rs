@@ -318,14 +318,14 @@ impl<'a> Lexer<'a> {
                             self.advance();
                         }
                     } else {
-                        // Outside expression tags
-                        if ch == '\\' {
-                            // Escape sequence - skip the backslash and the next character
-                            self.advance();
-                            if self.current.is_some() {
-                                self.advance();
-                            }
-                        } else if ch == quote {
+                        // Outside expression tags — attribute-value text. HTML/Svelte
+                        // attribute values have NO backslash escapes (unlike a JS string
+                        // inside `{expr}`, handled above), so `\` is a literal char:
+                        // `a="{x}\"` closes at the `"` with value `{x}\`, matching
+                        // Svelte's parser. Treating `\` as an escape here read `\"` as an
+                        // escaped quote and ran past the close → "Unterminated string
+                        // literal" (an over-rejection of valid Svelte; the `fuzz` gate).
+                        if ch == quote {
                             self.advance(); // consume closing quote
                             return Ok(self.make_token(TokenKind::String, start));
                         } else if ch == '{' {

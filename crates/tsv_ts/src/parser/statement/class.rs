@@ -336,11 +336,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         start: usize,
         declare: bool,
     ) -> Result<ClassDeclaration<'arena>, ParseError> {
-        // Consume 'class' keyword
-        debug_assert!(matches!(
-            self.current_kind(),
-            TokenKind::Keyword(KeywordKind::Class)
-        ));
+        // The `class` keyword must be here. Most callers confirm it first, but the
+        // modifier-prefix paths (`export default abstract`, `declare`) reach here
+        // after consuming their modifier, so a missing `class` on malformed input
+        // must be a clean parse error — never a panic (debug) or a mis-consumed
+        // token (release, where a bare `debug_assert!` is elided). `fuzz` gate.
+        if !matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Class)) {
+            return Err(self.error_expected("'class'"));
+        }
         self.advance()?;
 
         // Parse class name (required for declarations, optional for export default; see

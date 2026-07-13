@@ -1679,9 +1679,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse a string literal into a Literal node.
     ///
-    /// Expects the current token to be a String token.
+    /// Most callers first confirm a `String` token, but the module `from`/source
+    /// paths (`export * from …`, `export { … } from …`) reach here directly on
+    /// arbitrary input, so a non-`String` token is returned as a clean parse error
+    /// rather than panicking (debug) or mis-extracting a "string" from the wrong
+    /// token (release, where a bare `debug_assert!` would be elided). Surfaced by
+    /// the `fuzz` gate (`tsv_debug fuzz`).
     pub(super) fn parse_string_literal(&mut self) -> Result<Literal<'arena>, ParseError> {
-        debug_assert!(matches!(self.current_kind(), TokenKind::String));
+        if !matches!(self.current_kind(), TokenKind::String) {
+            return Err(self.error_expected("string literal"));
+        }
 
         let (start, end) = self.current_pos();
         let cooked = self.extract_string_cooked();

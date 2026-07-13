@@ -12,4 +12,9 @@
 	// whether standalone or continued by an optional chain afterward
 	a.fn<T>( b );
 	a.fn<T>()?.b;
+
+	// optional typed call whose callee is itself a call — acorn-typescript marks the
+	// callee CallExpression node optional too (the force-optional spine)
+	g()?.<T>( );
+	a.b()?.<T>( c );
 </script>

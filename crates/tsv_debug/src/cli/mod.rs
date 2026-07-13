@@ -13,9 +13,10 @@ use commands::{
     fixtures_update_formatted::FixturesUpdateFormattedCommand,
     fixtures_update_parsed::FixturesUpdateParsedCommand,
     fixtures_validate::FixturesValidateCommand, format_prettier::FormatPrettierCommand,
-    json_profile::JsonProfileCommand, lex_diff::LexDiffCommand, line_width::LineWidthCommand,
-    metrics::MetricsCommand, profile::ProfileCommand, roundtrip_audit::RoundtripAuditCommand,
-    scan_audit::ScanAuditCommand, test262::Test262Command, ts_fixture_audit::TsFixtureAuditCommand,
+    fuzz::FuzzCommand, json_profile::JsonProfileCommand, lex_diff::LexDiffCommand,
+    line_width::LineWidthCommand, metrics::MetricsCommand, profile::ProfileCommand,
+    roundtrip_audit::RoundtripAuditCommand, scan_audit::ScanAuditCommand, test262::Test262Command,
+    ts_fixture_audit::TsFixtureAuditCommand,
 };
 
 /// A command failure, carrying the process exit code up to the single exit
@@ -67,6 +68,7 @@ pub enum Subcommand {
     LineWidth(LineWidthCommand),
     CanonicalParse(CanonicalParseCommand),
     FormatPrettier(FormatPrettierCommand),
+    Fuzz(FuzzCommand),
     FixtureInit(FixtureInitCommand),
     FixturesUpdate(FixturesUpdateCommand),
     FixturesUpdateParsed(FixturesUpdateParsedCommand),
@@ -108,6 +110,7 @@ impl TopLevel {
             Subcommand::LineWidth(c) => c.run(),
             Subcommand::CanonicalParse(c) => c.run(),
             Subcommand::FormatPrettier(c) => c.run(),
+            Subcommand::Fuzz(c) => c.run(),
             Subcommand::FixtureInit(c) => c.run(),
             Subcommand::FixturesUpdate(c) => c.run(),
             Subcommand::FixturesUpdateParsed(c) => c.run(),

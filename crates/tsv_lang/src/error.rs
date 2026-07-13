@@ -22,7 +22,14 @@ impl ErrorContext {
             return None;
         }
 
-        let position = position.min(source.len());
+        // `position` is a byte offset that can land *inside* a multibyte char — a
+        // lexer/parser error position on malformed multibyte input. Error
+        // formatting must be total, so floor it to the nearest char boundary
+        // before slicing (every slice below would otherwise panic).
+        let mut position = position.min(source.len());
+        while position > 0 && !source.is_char_boundary(position) {
+            position -= 1;
+        }
 
         // Find line start: search backwards for '\n' and go past it
         let line_start = source[..position].rfind('\n').map_or(0, |i| i + 1);
@@ -225,6 +232,24 @@ mod tests {
         assert_eq!(ctx.source_line, "hello");
         assert_eq!(ctx.column, 0);
         assert_eq!(ctx.line_number, 1);
+    }
+
+    #[test]
+    fn test_error_context_position_inside_multibyte_char() {
+        // A byte offset landing *inside* a multibyte char must not panic — it's
+        // floored to the char boundary. `名` is 3 bytes (starts at byte 4).
+        let source = "abc 名 def";
+        for pos in 4..=6 {
+            let ctx = ErrorContext::from_source(source, pos)
+                .expect("in-bounds position yields a context");
+            assert_eq!(ctx.source_line, source);
+            assert_eq!(ctx.line_number, 1);
+            // Floored to the char boundary at byte 4 (the start of `名`).
+            assert_eq!(ctx.column, 4);
+        }
+        // A boundary just past the multibyte char is kept as-is.
+        let ctx = ErrorContext::from_source(source, 7).unwrap();
+        assert_eq!(ctx.column, 7);
     }
 
     #[test]

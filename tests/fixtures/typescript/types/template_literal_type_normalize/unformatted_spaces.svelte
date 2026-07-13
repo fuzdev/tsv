@@ -21,7 +21,10 @@
 		| C  }`;
 
 	// Nested template literal type
-	type E = `outer_${ 
+	type E = `outer_${
 	 `inner_${
 	   Deep  }`  }`;
+
+	// Adjacent interpolations — the empty quasi between them (cooked/raw '')
+	type F = `${  A  }${  B  }`;
 </script>
