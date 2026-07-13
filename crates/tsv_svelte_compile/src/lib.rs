@@ -1651,6 +1651,81 @@ mod tests {
     }
 
     #[test]
+    fn compile_typescript_wrapper_does_not_force_the_context_wrapper() {
+        // `needs_context` walks the RAW template — the Svelte AST is never rebuilt,
+        // so template erasure happens per-expression at the emitter's borrow points
+        // and this analysis still sees the TypeScript wrappers. Its `is_safe_identifier`
+        // port must peel them, or a member/call rooted at a SAFE binding (a plain
+        // local, `$state`, a block local, a global) reads as a non-identifier root and
+        // spuriously fires — wrapping the whole body in `$$renderer.component(…)` plus
+        // a `$$props` parameter the oracle never emits. A silent MISMATCH, not a
+        // refusal.
+        for source in [
+            "<script lang=\"ts\">\n\tlet local: any = { field: 1 };\n</script>\n<p>{(local!).field}</p>",
+            "<script lang=\"ts\">\n\tlet local: any = { field: 1 };\n</script>\n<p>{(local as any).field}</p>",
+            "<script lang=\"ts\">\n\tlet fns: any = { go: () => 1 };\n</script>\n<p>{(fns!).go()}</p>",
+            "<script lang=\"ts\">\n\tlet obj = $state({ a: 1 });\n</script>\n<p>{(obj as any).a}</p>",
+        ] {
+            let js = compile_js(source);
+            assert!(
+                !js.contains("$$renderer.component("),
+                "a safe root behind a TypeScript wrapper must not force the wrapper:\n{source}\n{js}"
+            );
+        }
+    }
+
+    #[test]
+    fn compile_rejects_snippet_rest_parameter() {
+        // A **top-level** rest parameter is `snippet_invalid_rest_parameter` in the
+        // oracle's analysis phase…
+        assert_unsupported(
+            "{#snippet foo(...xs)}<p>{xs}</p>{/snippet}\n{@render foo(1)}",
+            "{#snippet} rest parameter",
+        );
+        // …but the oracle scans `node.parameters` itself and never descends, so a rest
+        // element NESTED in a destructuring parameter is legal and compiles.
+        let nested =
+            compile_js("{#snippet foo({ ...rest })}<p>{rest}</p>{/snippet}\n{@render foo({})}");
+        assert!(
+            nested.contains("function foo($$renderer, { ...rest })"),
+            "a nested rest must not be refused: {nested}"
+        );
+        let array = compile_js(
+            "{#snippet foo(a, [b, ...t])}<p>{a}{b}{t}</p>{/snippet}\n{@render foo(1, [2])}",
+        );
+        assert!(
+            array.contains("function foo($$renderer, a, [b, ...t])"),
+            "an array-nested rest must not be refused: {array}"
+        );
+    }
+
+    #[test]
+    fn compile_dropped_derived_read_is_not_refused() {
+        // The derived-read rule is an emission REWRITE (`d` → `d()`), not a validity
+        // rule — the oracle accepts a derived read it never emits. So a dropped region
+        // must not enforce it: `{#key}`'s expression and the `{#each}` key are as
+        // dropped as a `{:catch}` branch, and refusing there costs parity on shapes
+        // the oracle compiles.
+        let key = compile_js(
+            "<script>\n\tlet { a } = $props();\n\tlet d = $derived(a * 2);\n</script>\n\
+             {#key d}<p>k</p>{/key}",
+        );
+        assert!(key.contains("<!---->"), "{{#key}} must compile: {key}");
+        compile_js(
+            "<script>\n\tlet { xs, a } = $props();\n\tlet d = $derived(a);\n</script>\n\
+             {#each xs as x (d)}<p>{x}</p>{/each}",
+        );
+        // An EMITTED pattern is not a dropped region: this emitter borrows a binding
+        // pattern through untouched, so a derived read in a default value would print a
+        // bare `d` where the oracle prints `d()`. That one still refuses.
+        assert_unsupported(
+            "<script>\n\tlet { xs, a } = $props();\n\tlet d = $derived(a);\n</script>\n\
+             {#each xs as { v = d }}<p>{v}</p>{/each}",
+            "read of derived binding",
+        );
+    }
+
+    #[test]
     fn compile_refuses_template_typescript_without_lang_ts() {
         // The oracle's `ts` flag is document-wide: without `lang="ts"` its parser
         // rejects TypeScript in the template too, so accepting it would be an
@@ -1684,6 +1759,24 @@ mod tests {
         assert_unsupported(
             "<script>\n\tlet { a } = $props();\n</script>\n\
              {#snippet foo<T>(x)}<p>{x}</p>{/snippet}\n{@render foo(a)}",
+            "TypeScript syntax without lang=\"ts\"",
+        );
+        // The destructured block-pattern forms. These were INVISIBLE to this sweep
+        // until the parser stopped silently discarding a destructuring pattern's
+        // annotation — a dropped node is a node no tree-walking gate can refuse.
+        assert_unsupported(
+            "<script>\n\tlet { p } = $props();\n</script>\n\
+             {#await p then { a }: { a: number }}<p>{a}</p>{/await}",
+            "TypeScript syntax without lang=\"ts\"",
+        );
+        assert_unsupported(
+            "<script>\n\tlet { p } = $props();\n</script>\n\
+             {#await p then v}<p>{v}</p>{:catch { message }: Error}<p>{message}</p>{/await}",
+            "TypeScript syntax without lang=\"ts\"",
+        );
+        assert_unsupported(
+            "<script>\n\tlet { xs } = $props();\n</script>\n\
+             {#each xs as { a }: { a: number }}<p>{a}</p>{/each}",
             "TypeScript syntax without lang=\"ts\"",
         );
     }

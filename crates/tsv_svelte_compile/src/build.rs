@@ -462,6 +462,12 @@ impl<'arena> Builder<'arena> {
     /// `params` may mix the synthetic `$$renderer` identifier with borrowed
     /// snippet parameter patterns (host spans). `block_span` anchors the body's
     /// comment windows (host-anchored when the body holds borrowed statements).
+    ///
+    /// **`type_parameters` is always `None`, and that is a contract, not an
+    /// accident**: it is how a generic `{#snippet s<T>(x: T)}` erases its `<T>`.
+    /// The clause is type-level only — the oracle emits `function s($$renderer, x)`
+    /// either way — so *not reading it* IS the erasure. Threading a caller's type
+    /// parameters through here would silently print them into the compiled JS.
     pub fn function_declaration(
         &mut self,
         name: &str,

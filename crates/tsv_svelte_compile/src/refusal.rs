@@ -319,6 +319,13 @@ pub enum Refusal {
     /// can't reproduce it.
     #[error("{{#snippet}} with an escaped name")]
     SnippetEscapedName,
+    /// A `{#snippet}` with a **top-level** rest parameter (`{#snippet s(...xs)}`).
+    /// The oracle rejects it in its analysis phase
+    /// (`snippet_invalid_rest_parameter`). A rest element *nested* inside a
+    /// destructuring parameter (`{#snippet s({ ...rest })}`) is legal and
+    /// compiles — the oracle checks only the top level.
+    #[error("{{#snippet}} rest parameter (the oracle rejects it)")]
+    SnippetRestParameter,
     /// A `{#snippet}` whose hoist classification is ambiguous for the name-based
     /// port: a name it references is both an instance binding and a nested
     /// (non-parameter) local, so free-vs-shadowed can't be told apart.
@@ -681,6 +688,9 @@ impl Refusal {
                 Cow::Borrowed("{#snippet} signature the parser fell back to raw text for")
             }
             Self::SnippetEscapedName => Cow::Borrowed("{#snippet} with an escaped name"),
+            Self::SnippetRestParameter => {
+                Cow::Borrowed("{#snippet} rest parameter (the oracle rejects it)")
+            }
             Self::SnippetHoistAmbiguous { .. } => {
                 Cow::Borrowed("{#snippet} {name} hoist classification ambiguous")
             }

@@ -1013,6 +1013,17 @@ fn document_ts_flag(root: &Root<'_>, source: &str) -> Result<bool, CompileError>
 /// is `attr_refs`'s shared, exhaustively-matched one, so a new template shape fails
 /// compilation rather than slipping past. Runs only when the flag is absent, so the
 /// ordinary TypeScript path pays nothing.
+///
+/// # Soundness precondition
+///
+/// **The sweep is sound only if `tsv_svelte`'s parser preserves every TypeScript
+/// node it parses.** It reasons about TypeScript by walking the tree, so a node the
+/// parser *drops* is a node it cannot see — and cannot refuse. That is not
+/// hypothetical: the block-pattern readers once parsed a destructured binding's
+/// `: T` and threw it away (no node, no span, no error), and this sweep let
+/// `{#await p then { a }: { a: number }}` through in a document with no `lang="ts"`,
+/// where the oracle parse-errors. A dropped node is an invisible node. The same
+/// precondition backs the erase self-check, for the same reason.
 fn refuse_template_typescript<'arena>(
     root: &Root<'arena>,
     source: &str,
@@ -2049,31 +2060,22 @@ fn wrap_single<'arena>(
     Ok(wrapped[0].clone())
 }
 
-/// Guard-walk a dropped expression (a `{#key}` / `{#each (key)}` expression the
-/// SSR output ignores) so stray runes / derived reads inside still refuse.
-fn guard_dropped<'arena>(
-    env: &EmitEnv<'arena, '_>,
-    expr: &'arena Expression<'arena>,
-) -> Result<(), CompileError> {
-    let mut updated = NameSet::default();
-    let mut nested = NameSet::default();
-    let mut ctx = WalkCtx::new(env.source, &mut updated, &mut nested, &env.derived_names);
-    walk_expression_guarded(expr, &mut ctx)
-}
-
-/// The **rune-only** guard for a region the SSR output drops WITHOUT walking it —
-/// an event-handler attribute, and the `{:catch}` branch (the emitter's two
-/// discard-without-visiting sites).
+/// The guard for an expression the SSR output **drops** — the `{#each}` key, the
+/// `{#key}` expression, an event-handler attribute, and everything inside a
+/// `{:catch}` branch.
 ///
 /// A misplaced rune must still refuse: the oracle rejects one in its *analysis*
 /// phase, before it decides what to emit, so dropping the region cannot make the
 /// component valid (`{:catch e}{$state(1)}{/await}` is a `state_invalid_placement`
-/// error there). But the derived-read rule is switched **off** — the empty
-/// `derived_names` set: `walk_expression_guarded` refuses every derived read it
-/// sees (the emitted path rewrites a bare one to `d()` before the guard runs), and
-/// the oracle happily *accepts* a derived read it never emits. Refusing here would
-/// cost parity on a shape the oracle compiles.
-fn guard_dropped_runes<'arena>(
+/// error there).
+///
+/// But the derived-read rule is switched **off** — the empty `derived_names` set.
+/// It is an emission *rewrite* (a bare read becomes `d()`; `wrap_value_expr`
+/// applies it before the guard runs, so `walk_expression_guarded` refuses every
+/// derived read that reaches it), not a validity rule: the oracle happily accepts
+/// a derived read it never emits. Enforcing it in a dropped region would refuse
+/// `{#key d}` and `{:catch e}<p>{d}</p>`, which the oracle compiles.
+fn guard_dropped<'arena>(
     env: &EmitEnv<'arena, '_>,
     expr: &'arena Expression<'arena>,
 ) -> Result<(), CompileError> {
@@ -2086,8 +2088,28 @@ fn guard_dropped_runes<'arena>(
     walk_expression_guarded(expr, &mut ctx)
 }
 
+/// The guard for a binding **pattern** the SSR output EMITS verbatim — the
+/// `{#each}` context (`let CTX = each_array[i]`) and the `{:then}` value (the
+/// then-arrow's parameter).
+///
+/// A pattern is not a dropped region: its *default values* are real emitted
+/// expressions (`{#each xs as { a = d }}`), and this emitter borrows the pattern
+/// through untouched — it never rewrites a derived read inside one to `d()` the
+/// way `wrap_value_expr` does for a value position. So the derived rule stays ON
+/// here (unlike [`guard_dropped`]): a derived read in a pattern default would
+/// otherwise emit a bare `d` where the oracle emits `d()`. A MISMATCH, so refuse.
+fn guard_pattern<'arena>(
+    env: &EmitEnv<'arena, '_>,
+    pattern: &'arena Expression<'arena>,
+) -> Result<(), CompileError> {
+    let mut updated = NameSet::default();
+    let mut nested = NameSet::default();
+    let mut ctx = WalkCtx::new(env.source, &mut updated, &mut nested, &env.derived_names);
+    walk_expression_guarded(pattern, &mut ctx)
+}
+
 /// Guard a whole fragment the SSR output drops (the `{:catch}` branch) — the
-/// dropped-fragment analog of [`guard_dropped_runes`], over `attr_refs`' shared
+/// dropped-fragment analog of [`guard_dropped`], over `attr_refs`' shared
 /// traversal. Without it a rune anywhere inside a `{:catch}` compiles, which the
 /// oracle rejects: the M4 lesson (an emission-dropped fragment still needs
 /// refusal-equivalent walking), and the property `dropped_fragments_are_walked`
@@ -2097,7 +2119,7 @@ fn guard_dropped_fragment<'arena>(
     fragment: &'arena Fragment<'arena>,
 ) -> Result<(), CompileError> {
     each_template_item(fragment, &mut |item| match item {
-        TemplateItem::Expression(expr) => guard_dropped_runes(env, expr),
+        TemplateItem::Expression(expr) => guard_dropped(env, expr),
         // A `<T>` clause holds no value reference. TypeScript in a document with
         // no `lang="ts"` is refused up front by `refuse_template_typescript`.
         TemplateItem::SnippetTypeParameters => Ok(()),
@@ -2415,7 +2437,7 @@ fn emit_each_block<'arena>(
     let context = match &each.context {
         Some(context) => {
             let context = env.erase(context)?;
-            guard_dropped(env, context)?;
+            guard_pattern(env, context)?;
             Some(context)
         }
         None => None,
@@ -2632,7 +2654,7 @@ fn emit_await_block<'arena>(
     // param; its names mask to UNKNOWN in the then body.
     let then_params: &'arena [Expression<'arena>] = match value {
         Some(value) => {
-            guard_dropped(env, value)?;
+            guard_pattern(env, value)?;
             std::slice::from_ref(value)
         }
         None => &[],
@@ -2738,6 +2760,18 @@ fn build_snippet_function<'arena>(
         || (snippet.type_params_raw.is_some() && snippet.type_parameters.is_none())
     {
         return Err(unsupported(Refusal::SnippetSignatureUnparsed));
+    }
+    // A **top-level** rest parameter is a `snippet_invalid_rest_parameter` error in
+    // the oracle's analysis phase (`2-analyze/visitors/SnippetBlock.js`), which
+    // scans `node.parameters` itself and never descends — so a rest element NESTED
+    // in a destructuring parameter (`{#snippet s({ ...rest })}`, `s(a, [b, ...t])`)
+    // is legal and compiles. Match that exactly: top level only.
+    if snippet
+        .parameters
+        .iter()
+        .any(|param| matches!(param, Expression::RestElement(_)))
+    {
+        return Err(unsupported(Refusal::SnippetRestParameter));
     }
     let Some(name) = snippet_name(snippet, env.source) else {
         // An escaped snippet name isn't reproducible by this port.
@@ -3892,7 +3926,7 @@ fn emit_attribute<'arena>(
                 }
                 // Dropped, but still guarded: a misplaced rune inside a handler is
                 // an oracle analysis-phase error, not an emission one.
-                return guard_dropped_runes(env, &tag.expression);
+                return guard_dropped(env, &tag.expression);
             }
             // Quoted (`class="{a}"`) vs bare (`class={a}`): the oracle's AST
             // represents the quoted form as a one-chunk ARRAY and the bare form
