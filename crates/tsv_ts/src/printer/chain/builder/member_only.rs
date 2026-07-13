@@ -3,9 +3,11 @@
 // Handles chains that contain only member accesses (no calls) using
 // fill() for greedy packing of segments.
 
-use super::super::printing::{ChainPrinter, node_comment_gap, print_node, print_node_inner};
+use super::super::printing::{
+    ChainPrinter, node_comment_gap, print_node, print_node_inner, push_gap_comments_and_break,
+};
 use super::super::types::{ChainGroup, ChainNode, ChainNodeRefVec};
-use super::helpers::push_gap_comments_and_break;
+
 use crate::ast::internal::Expression;
 use smallvec::smallvec;
 use tsv_lang::doc::{DocBuf, arena::DocId};

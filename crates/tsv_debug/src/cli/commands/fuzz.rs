@@ -298,6 +298,55 @@ struct Seed {
     parser: ParserType,
 }
 
+/// The findings a run accumulates: exact counts plus a **bounded** store of the
+/// findings themselves (they hold the mutant text, so a noisy discovery run must not
+/// balloon memory — the counts stay exact regardless).
+///
+/// Owns the counters so both passes (pristine seeds, then mutants) share one
+/// [`Self::record`] rather than threading a `&mut` per counter through a closure.
+struct Found {
+    hard: usize,
+    soft: usize,
+    store: Vec<Finding>,
+    cap: usize,
+}
+
+impl Found {
+    fn new(cap: usize) -> Self {
+        Self {
+            hard: 0,
+            soft: 0,
+            store: Vec::new(),
+            cap,
+        }
+    }
+
+    /// Count a finding and store it if there is room. `iteration` is `None` for a
+    /// pristine (unmutated) seed.
+    fn record(&mut self, outcome: Outcome, iteration: Option<usize>, seed: &Seed, src: &str) {
+        if outcome.is_hard() {
+            self.hard += 1;
+        } else {
+            self.soft += 1;
+        }
+        if self.store.len() < self.cap {
+            let panic = if outcome == Outcome::Panic {
+                LAST_PANIC.with(|c| c.borrow_mut().take())
+            } else {
+                None
+            };
+            self.store.push(Finding {
+                iteration,
+                parser: seed.parser,
+                outcome,
+                seed_path: seed.display.clone(),
+                input: src.to_string(),
+                panic,
+            });
+        }
+    }
+}
+
 impl FuzzCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
         let paths = if self.paths.is_empty() {
@@ -359,47 +408,13 @@ impl FuzzCommand {
         let mut skipped_non_utf8 = 0usize;
         let mut rejected = 0usize;
         let mut ok = 0usize;
-        let mut hard_count = 0usize;
-        let mut soft_count = 0usize;
         let mut pristine_reflow = 0usize;
         // Paths of the pristine seeds that reflowed (see the pass-1 soft arm). Bounded
-        // like `findings`, though each entry is only a path; the count stays exact.
+        // like the findings store, though each entry is only a path; the count stays exact.
         let mut reflow_paths: Vec<String> = Vec::new();
-        let mut findings: Vec<Finding> = Vec::new();
         // Bound stored findings (they hold the mutant text) so a noisy discovery
-        // run can't balloon memory; the counts above stay exact.
-        let store_cap = self.max_findings.max(20) * 4;
-
-        // A closure would have to capture the counters mutably alongside `findings`;
-        // keep the invariant drive inline in both passes and share only the recording.
-        let record = |outcome: Outcome,
-                      iteration: Option<usize>,
-                      seed: &Seed,
-                      src: &str,
-                      hard_count: &mut usize,
-                      soft_count: &mut usize,
-                      findings: &mut Vec<Finding>| {
-            if outcome.is_hard() {
-                *hard_count += 1;
-            } else {
-                *soft_count += 1;
-            }
-            if findings.len() < store_cap {
-                let panic = if outcome == Outcome::Panic {
-                    LAST_PANIC.with(|c| c.borrow_mut().take())
-                } else {
-                    None
-                };
-                findings.push(Finding {
-                    iteration,
-                    parser: seed.parser,
-                    outcome,
-                    seed_path: seed.display.clone(),
-                    input: src.to_string(),
-                    panic,
-                });
-            }
-        };
+        // run can't balloon memory; the counts inside stay exact.
+        let mut found = Found::new(self.max_findings.max(20) * 4);
 
         // Pass 1 — every seed **as authored**. The mutation loop below only ever drives
         // mutants, so a pristine corpus file is never itself checked; yet the corpus is
@@ -441,15 +456,7 @@ impl FuzzCommand {
                         reflow_paths.push(seed.display.clone());
                     }
                 }
-                finding => record(
-                    finding,
-                    None,
-                    seed,
-                    src,
-                    &mut hard_count,
-                    &mut soft_count,
-                    &mut findings,
-                ),
+                finding => found.record(finding, None, seed, src),
             }
         }
 
@@ -475,18 +482,10 @@ impl FuzzCommand {
                 Outcome::Rejected => rejected += 1,
                 Outcome::Ok => ok += 1,
                 finding => {
-                    record(
-                        finding,
-                        Some(iteration),
-                        seed,
-                        src,
-                        &mut hard_count,
-                        &mut soft_count,
-                        &mut findings,
-                    );
+                    found.record(finding, Some(iteration), seed, src);
                     // Only HARD findings stop the run early — soft ones (render-
                     // model-noisy structural divergences) are counted, not fatal.
-                    if self.max_findings > 0 && hard_count >= self.max_findings {
+                    if self.max_findings > 0 && found.hard >= self.max_findings {
                         break;
                     }
                 }
@@ -495,18 +494,18 @@ impl FuzzCommand {
 
         std::panic::set_hook(prev_hook);
 
-        self.dump_findings(&findings);
+        self.dump_findings(&found.store);
         let stats = Stats {
             tested,
             skipped_non_utf8,
             rejected,
             ok,
-            hard_count,
-            soft_count,
+            hard_count: found.hard,
+            soft_count: found.soft,
             pristine_reflow,
             reflow_paths,
         };
-        self.report(&stats, &findings)
+        self.report(&stats, &found.store)
     }
 
     /// Write each finding's input to `--dump-dir` (if set) for reproduction.

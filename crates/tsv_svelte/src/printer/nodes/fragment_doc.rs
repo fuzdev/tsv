@@ -390,11 +390,13 @@ impl<'a> Printer<'a> {
         d.concat(&child_docs)
     }
 
-    /// Check if a node is an expression-like tag (ExpressionTag, HtmlTag, RenderTag).
+    /// Whether a node is a **tag** — `{expr}`, `{@html …}`, or `{@render …}`. All three,
+    /// not just `ExpressionTag` (the old name said `is_expression_tag` and read as if it
+    /// meant only the first).
     ///
     /// These tags use the leading/trailing line fill approach instead of group wrapping,
     /// because group wrapping forces line breaks after multiline expressions.
-    fn is_expression_tag(node: &FragmentNode<'_>) -> bool {
+    fn is_tag_node(node: &FragmentNode<'_>) -> bool {
         matches!(
             node,
             FragmentNode::ExpressionTag(_) | FragmentNode::HtmlTag(_) | FragmentNode::RenderTag(_)
@@ -451,9 +453,9 @@ impl<'a> Printer<'a> {
         let prev_node = i.checked_sub(1).map(|j| &trimmed_nodes[j]);
         let next_node = trimmed_nodes.get(i + 1);
         let prev_is_inline = prev_node.is_some_and(is_inline_content);
-        let prev_is_tag = prev_node.is_some_and(Self::is_expression_tag);
+        let prev_is_tag = prev_node.is_some_and(Self::is_tag_node);
         let next_is_inline = next_node.is_some_and(is_inline_content);
-        let next_is_tag = next_node.is_some_and(Self::is_expression_tag);
+        let next_is_tag = next_node.is_some_and(Self::is_tag_node);
         // Whether the next sibling is an HTML *inline* element vs a *block* element —
         // the two kinds prettier-plugin-svelte trims boundary whitespace *into* (the
         // trimmed text emits nothing; the element's own group([line, …]) /
