@@ -132,6 +132,11 @@ pub trait ChainPrinter: SymbolLookup {
     /// Check if there are any comments between two positions
     fn has_comments_between(&self, start: u32, end: u32) -> bool;
 
+    /// As `has_comments_between`, but counts comments a node owns and prints itself.
+    /// The chain-level flag is a *structural* gate (it selects the doc shape, not who
+    /// emits), so an owned-comment-only chain must still take the commented path.
+    fn has_any_comments_between(&self, start: u32, end: u32) -> bool;
+
     /// Whether the chain currently being built contains any comment anywhere in its
     /// span. Set once per chain (save/restore) at [`build_chain_doc`] and read by the
     /// print path to skip per-member comment classification on comment-free chains.

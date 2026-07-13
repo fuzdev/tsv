@@ -108,7 +108,7 @@ pub fn build_chain_doc<'a, P: ChainPrinter>(
     // path reads this to skip per-member comment classification on comment-free chains,
     // and `build_chain_doc_impl` reads it below instead of recomputing the search.
     let prev_has_comments = printer
-        .set_chain_has_comments(printer.has_comments_between(chain_span.start, chain_span.end));
+        .set_chain_has_comments(printer.has_any_comments_between(chain_span.start, chain_span.end));
     let result = build_chain_doc_impl(groups, printer);
     printer.restore_chain_has_comments(prev_has_comments);
     printer.exit_chain_arg_share(was_active);

@@ -559,17 +559,11 @@ impl<'a> Printer<'a> {
         end: u32,
     ) -> Option<DocId> {
         let d = self.d();
-        // Single binary search to find first comment
-        let first_idx = tsv_lang::find_first_comment_from(self.comments, start);
-        let first = self.comments.get(first_idx).filter(|c| c.span.end <= end)?;
+        let mut in_range = comments_in_range(self.comments, start, end).peekable();
+        in_range.peek()?;
 
-        // Build parts starting from found comment
         let mut parts = DocBuf::new();
-        for comment in std::iter::once(first).chain(
-            self.comments[first_idx + 1..]
-                .iter()
-                .take_while(|c| c.span.end <= end),
-        ) {
+        for comment in in_range {
             parts.push(d.text(" "));
             parts.push(self.build_comment_doc(comment));
         }
@@ -791,12 +785,8 @@ impl<'a> Printer<'a> {
         let body_start = span_start + 1; // After opening delimiter
         let body_end = span_end.saturating_sub(1); // Before closing delimiter
 
-        // Single binary search to find comments
-        let first_idx = tsv_lang::find_first_comment_from(self.comments, body_start);
-        let comments: CommentVec<'_> = self.comments[first_idx..]
-            .iter()
-            .take_while(|c| c.span.end <= body_end)
-            .collect();
+        let comments: CommentVec<'_> =
+            comments_in_range(self.comments, body_start, body_end).collect();
 
         if comments.is_empty() {
             return d.concat(&[opening, d.text(closing)]);
