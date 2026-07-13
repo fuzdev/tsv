@@ -523,6 +523,10 @@ pub(crate) fn format_string_value(content: &str, quote: char) -> String {
 ///   (the parser's `CssDeclaration::colon_offset`, minus the declaration span start —
 ///   no re-scan; a property comment may itself hold a `:` that a naive scan would
 ///   mis-match, which the parser-recorded colon already skips)
+/// * `has_block_comment` - The parser-recorded `CssDeclaration::has_block_comment`. False
+///   proves the declaration holds no `/* … */` at all, so the comment path is skipped
+///   without scanning the property text (the free O(1) negative gate
+///   `has_value_comments_in_decl` uses).
 ///
 /// # Returns
 /// * Normalized property name (e.g., `color /* test */`)
@@ -536,14 +540,14 @@ pub(crate) fn format_string_value(content: &str, quote: char) -> String {
 /// ```ignore
 /// // colon_pos = the parser's recorded colon offset within decl_source
 /// let source = "color/* comment */:red;";
-/// assert_eq!(extract_property_name(source, 18), "color /* comment */");
+/// assert_eq!(extract_property_name(source, 18, true), "color /* comment */");
 ///
 /// // Every gap comment is preserved, joined single-spaced.
 /// let source = "color/* a *//* b */:red;";
-/// assert_eq!(extract_property_name(source, 19), "color /* a */ /* b */");
+/// assert_eq!(extract_property_name(source, 19, true), "color /* a */ /* b */");
 ///
 /// let source = "margin: 10px;";
-/// assert_eq!(extract_property_name(source, 6), "margin");
+/// assert_eq!(extract_property_name(source, 6, false), "margin");
 /// ```
 ///
 /// # Svelte Quirk
@@ -555,11 +559,19 @@ pub(crate) fn format_string_value(content: &str, quote: char) -> String {
 /// - Input: `color/* comment */:red;`
 /// - Output: `color /* comment */` (normalized spacing)
 /// - Prettier: `color/* comment */` (no space before comment)
-pub(crate) fn extract_property_name(decl_source: &str, colon_pos: usize) -> Cow<'_, str> {
+pub(crate) fn extract_property_name(
+    decl_source: &str,
+    colon_pos: usize,
+    has_block_comment: bool,
+) -> Cow<'_, str> {
     let property_part = &decl_source[..colon_pos];
 
-    // Check if property contains a comment
-    if let Some(comment_start) = property_part.find("/*") {
+    // `has_block_comment` is recorded at parse time and is false iff the declaration
+    // carries no `/* … */` anywhere — so the property→colon gap holds none either and the
+    // substring scan below is provably fruitless. A literal `/*` cannot occur in a
+    // property name except as a comment start (an escaped one is written `\2f\2a`), so
+    // the gate can only skip work, never change the branch taken.
+    if has_block_comment && let Some(comment_start) = property_part.find("/*") {
         let before_comment = property_part[..comment_start].trim();
 
         // Collect EVERY comment in the property→colon gap, not just the first: a
@@ -736,6 +748,14 @@ pub(crate) fn extract_value_with_comments(decl_source: &str, colon_pos: usize) -
 mod tests {
     use super::*;
 
+    /// Stands in for the parser-recorded `CssDeclaration::has_block_comment` — true iff
+    /// the declaration carries a `/* … */` anywhere. These test inputs hold no string or
+    /// `url()` that could disguise a literal `/*`, so the substring check agrees with
+    /// what the parser would record.
+    fn has_block_comment(src: &str) -> bool {
+        src.contains("/*")
+    }
+
     #[test]
     fn test_extract_property_name_borrows_common_case() {
         // The overwhelmingly-common case: a bare property name with no comment and
@@ -750,22 +770,26 @@ mod tests {
             "--custom-prop: var(--x)",
             "grid-template-columns: 1fr 2fr",
         ] {
-            let got = extract_property_name(src, colon(src));
+            let got = extract_property_name(src, colon(src), has_block_comment(src));
             assert!(
                 matches!(got, Cow::Borrowed(_)),
                 "bare property in {src:?} must borrow, got owned {got:?}"
             );
         }
         assert_eq!(
-            extract_property_name("margin: 10px", colon("margin: 10px")),
+            extract_property_name("margin: 10px", colon("margin: 10px"), false),
             "margin"
         );
         assert_eq!(
-            extract_property_name("color:red", colon("color:red")),
+            extract_property_name("color:red", colon("color:red"), false),
             "color"
         );
         assert_eq!(
-            extract_property_name("--custom-prop: var(--x)", colon("--custom-prop: var(--x)")),
+            extract_property_name(
+                "--custom-prop: var(--x)",
+                colon("--custom-prop: var(--x)"),
+                false
+            ),
             "--custom-prop"
         );
     }
@@ -775,7 +799,7 @@ mod tests {
         // Insignificant whitespace around the property name is trimmed; the result
         // is still a borrowed sub-slice (trim returns a sub-slice, no alloc).
         let src = "color : red";
-        let got = extract_property_name(src, src.find(':').unwrap());
+        let got = extract_property_name(src, src.find(':').unwrap(), has_block_comment(src));
         assert_eq!(got, "color");
         assert!(matches!(got, Cow::Borrowed(_)));
     }
@@ -785,7 +809,7 @@ mod tests {
         // A comment in the property name reconstructs an owned, space-normalized form.
         // The comment holds no `:`, so the real colon is the first `:`.
         let src = "color/* comment */:red";
-        let got = extract_property_name(src, src.find(':').unwrap());
+        let got = extract_property_name(src, src.find(':').unwrap(), has_block_comment(src));
         assert_eq!(got, "color /* comment */");
         assert!(matches!(got, Cow::Owned(_)));
     }
@@ -795,13 +819,13 @@ mod tests {
         // A property name ending in a hex escape consumes one trailing whitespace as
         // the escape's terminator — that space is preserved, so the result owns.
         let src = "\\41 : red";
-        let got = extract_property_name(src, src.find(':').unwrap());
+        let got = extract_property_name(src, src.find(':').unwrap(), has_block_comment(src));
         assert_eq!(got, "\\41 ");
         assert!(matches!(got, Cow::Owned(_)));
 
         // A non-escape trailing space is trimmed (borrowed).
         let src = "color : red";
-        let got = extract_property_name(src, src.find(':').unwrap());
+        let got = extract_property_name(src, src.find(':').unwrap(), has_block_comment(src));
         assert_eq!(got, "color");
         assert!(matches!(got, Cow::Borrowed(_)));
     }
