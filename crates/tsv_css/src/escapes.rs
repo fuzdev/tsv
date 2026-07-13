@@ -64,6 +64,38 @@ pub fn decode_escape_sequences(source: &str) -> Cow<'_, str> {
     Cow::Owned(result)
 }
 
+/// Trim trailing whitespace, but never the whitespace a CSS **escape** owns.
+///
+/// `\` followed by whitespace is a valid escape whose payload *is* that whitespace
+/// character (CSS Syntax 3 §4.3.4 "Check if two code points are a valid escape" —
+/// only a newline after `\` invalidates it — and §4.3.7 "Consume an escaped code
+/// point", whose final branch returns the code point itself). So the trailing
+/// space in `width: 50px\ ;` is part of the value, not padding.
+///
+/// Trimming it strands the backslash, which then escapes whatever follows — the
+/// declaration's `;`, a function's `)`, an `!important` — and the result no longer
+/// parses. Exactly one whitespace character is therefore kept when an **odd**-length
+/// backslash run precedes it (an even run is a completed `\\`, so the whitespace
+/// after it is ordinary padding); any further whitespace past the escaped one is
+/// ordinary trailing whitespace and still goes.
+///
+/// A *hex* escape's whitespace terminator (`\41 `) needs no such care: what follows
+/// a trimmed value is always a delimiter (`;` / `)` / `!`), never a hex digit, so
+/// the escape reads the same either way.
+pub(crate) fn trim_end_preserving_escape(s: &str) -> &str {
+    let trimmed = s.trim_end();
+    if trimmed.len() == s.len() {
+        return s;
+    }
+    let backslashes = trimmed.bytes().rev().take_while(|&b| b == b'\\').count();
+    if backslashes % 2 == 0 {
+        return trimmed;
+    }
+    // Give the escape its one payload character back.
+    let escaped_len = s[trimmed.len()..].chars().next().map_or(0, char::len_utf8);
+    &s[..trimmed.len() + escaped_len]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

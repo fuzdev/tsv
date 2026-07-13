@@ -128,7 +128,9 @@ impl<'a> ValueParser<'a> {
 
     /// Calculate trimmed end position for a text range
     ///
-    /// Removes trailing whitespace from a range and returns the adjusted end position.
+    /// Removes trailing whitespace from a range and returns the adjusted end position —
+    /// except whitespace a CSS escape owns (`var(--a, 50px\ )`), which stays part of the
+    /// element (see `super::trim_end_preserving_escape`).
     ///
     /// # Arguments
     /// * `text` - The full text being parsed
@@ -139,8 +141,7 @@ impl<'a> ValueParser<'a> {
     /// End position after removing trailing whitespace
     fn trimmed_end(&self, text: &str, start: usize, end: usize) -> usize {
         let slice = &text[start..end];
-        let trimmed_len = slice.trim_end().len();
-        start + trimmed_len
+        start + crate::escapes::trim_end_preserving_escape(slice).len()
     }
 
     /// Main parse entry point
@@ -319,7 +320,7 @@ impl<'a> ValueParser<'a> {
         // Unicode-wide (like `trimmed_end`'s `str::trim_end`). A leading non-ASCII space
         // (e.g. NBSP) therefore stays part of the element, as it does in the old path.
         let after_lead = seg.trim_start_matches(|c: char| c.is_ascii_whitespace());
-        let core = after_lead.trim_end();
+        let core = crate::escapes::trim_end_preserving_escape(after_lead);
         if core.is_empty() {
             return;
         }

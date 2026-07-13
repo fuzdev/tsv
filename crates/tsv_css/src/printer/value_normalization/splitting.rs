@@ -112,6 +112,24 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> Cow<'_, str> {
             continue;
         }
 
+        // A CSS escape (`\` + code point). Its payload is value **content**, never a
+        // separator — `\` followed by whitespace is a valid escape whose escaped code
+        // point IS that whitespace (CSS Syntax 3 §4.3.4 / §4.3.7). Copy the pair
+        // verbatim so it can't reach the whitespace branch below: collapsing or
+        // trimming the payload strands the backslash, which then escapes the next
+        // delimiter (`;`, `)`, `!`) and the output no longer parses.
+        if ch == '\\' {
+            if pending_space && !result.is_empty() {
+                result.push(' ');
+            }
+            pending_space = false;
+            result.push(ch);
+            if let Some(escaped) = chars.next() {
+                result.push(escaped);
+            }
+            continue;
+        }
+
         // Opening paren - skip following whitespace
         if ch == '(' {
             if pending_space && !result.is_empty() {
@@ -167,11 +185,12 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> Cow<'_, str> {
     }
 
     // The char-loop above already suppresses leading/trailing whitespace in the
-    // common case, so `trim()` is usually a no-op; return the owned buffer as-is
+    // common case, so the trim is usually a no-op; return the owned buffer as-is
     // rather than cloning it. Only the rare edge cases that preserve verbatim
     // boundary whitespace (e.g. an unterminated string/comment) pay the copy —
-    // byte-identical to `result.trim().to_string()` either way.
-    let trimmed = result.trim();
+    // byte-identical either way. The trailing trim spares an escape's payload
+    // (`50px\ `), which the loop copied verbatim as content.
+    let trimmed = crate::escapes::trim_end_preserving_escape(result.trim_start());
     if trimmed.len() == result.len() {
         Cow::Owned(result)
     } else {

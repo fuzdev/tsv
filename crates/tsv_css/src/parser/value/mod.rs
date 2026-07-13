@@ -12,6 +12,7 @@ pub(crate) mod parser;
 pub mod strings;
 
 use crate::ast::internal::CssValue;
+use crate::escapes::trim_end_preserving_escape;
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
@@ -42,9 +43,13 @@ pub fn parse_value_from_source<'arena>(
     base_offset: u32,
     arena: &'arena Bump,
 ) -> CssValue<'arena> {
-    // Extract value directly from source using source-relative positions
+    // Extract value directly from source using source-relative positions. The
+    // trailing trim stops at an escaped whitespace (`50px\ ;`) — see
+    // `trim_end_preserving_escape`. `trimmed` becomes the `ValueParser`'s source,
+    // and its length is what the leaf spans are derived from, so cutting the
+    // escape's payload here is what strands the backslash onto the `;`.
     let value_str = source_relative_span.extract(source);
-    let trimmed = value_str.trim();
+    let trimmed = trim_end_preserving_escape(value_str.trim_start());
 
     if trimmed.is_empty() {
         return CssValue::Identifier {
@@ -57,7 +62,7 @@ pub fn parse_value_from_source<'arena>(
 
     // Calculate adjusted span for trimmed value (relative to source)
     let trim_start_offset = value_str.len() - value_str.trim_start().len();
-    let trim_end_offset = value_str.len() - value_str.trim_end().len();
+    let trim_end_offset = value_str.len() - trim_start_offset - trimmed.len();
     let source_relative_adjusted = Span {
         start: source_relative_span.start + trim_start_offset as u32,
         end: source_relative_span.end - trim_end_offset as u32,
