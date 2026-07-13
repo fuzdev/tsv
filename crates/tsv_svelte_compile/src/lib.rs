@@ -16,6 +16,7 @@
 //! [`CompileError::Unsupported`] rather than guessed output.
 
 mod analyze;
+mod attr_refs;
 mod build;
 mod needs_context;
 mod refusal;
@@ -679,6 +680,67 @@ mod tests {
              \t}\n\
              \tfoo($$renderer);\n\
              }\n"
+        );
+    }
+
+    #[test]
+    fn compile_snippet_component_spread_reference_blocks_hoist() {
+        // The regression shape: a snippet whose ONLY instance-binding reference
+        // sits in a component `{...spread}` must NOT module-hoist (a hoisted
+        // `function s` referencing `n` declared inside Input is a runtime
+        // ReferenceError — invisible to the reparse self-validation). The
+        // shared attr_refs traversal makes the hoist collector see the spread.
+        let js = compile_js(
+            "<script>import Foo from './Foo.svelte';\n\tlet n = $state({ a: 1 });</script>\n{#snippet s()}<Foo {...n} />{/snippet}\n{@render s()}",
+        );
+        assert_eq!(
+            js,
+            "import * as $ from 'svelte/internal/server';\n\
+             import Foo from './Foo.svelte';\n\
+             export default function Input($$renderer) {\n\
+             \tlet n = { a: 1 };\n\
+             \tfunction s($$renderer) {\n\
+             \t\tFoo($$renderer, $.spread_props([n]));\n\
+             \t}\n\
+             \ts($$renderer);\n\
+             }\n"
+        );
+        // The same discipline for a prop and a plain top-level const, and with
+        // the component nested inside an element.
+        for source in [
+            "<script>let { p } = $props();</script>\n{#snippet s()}<Foo {...p} />{/snippet}\n{@render s()}",
+            "<script>const c = { a: 1 };</script>\n{#snippet s()}<Foo {...c} />{/snippet}\n{@render s()}",
+            "<script>let n = $state({ a: 1 });</script>\n{#snippet s()}<div><Foo {...n} /></div>{/snippet}\n{@render s()}",
+        ] {
+            let js = compile_js(source);
+            assert!(
+                js.contains("export default function Input")
+                    && js.find("function s($$renderer)").unwrap()
+                        > js.find("export default function Input").unwrap(),
+                "snippet must stay inside the component body for {source:?}:\n{js}"
+            );
+        }
+    }
+
+    #[test]
+    fn compile_snippet_component_spread_of_import_still_hoists() {
+        // Imports (and globals) don't disqualify hoisting — a component spread of
+        // an import keeps the snippet at module scope.
+        let js = compile_js(
+            "<script>import Foo from './Foo.svelte';\n\timport { cfg } from './cfg.js';</script>\n{#snippet s()}<Foo {...cfg} />{/snippet}\n{@render s()}",
+        );
+        assert!(
+            js.find("function s($$renderer)").unwrap()
+                < js.find("export default function Input").unwrap(),
+            "import-spread snippet must module-hoist: {js}"
+        );
+        let js = compile_js(
+            "<script>import Foo from './Foo.svelte';</script>\n{#snippet s()}<Foo {...globalThis.cfg} />{/snippet}\n{@render s()}",
+        );
+        assert!(
+            js.find("function s($$renderer)").unwrap()
+                < js.find("export default function Input").unwrap(),
+            "global-spread snippet must module-hoist: {js}"
         );
     }
 

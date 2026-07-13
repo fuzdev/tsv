@@ -23,9 +23,8 @@
 use std::collections::HashMap;
 
 use tsv_svelte::ast::internal::{
-    AttributeNode, AttributeValue, AwaitBlock, ConstTag, DebugTag, DeclarationTag, EachBlock,
-    Element, Fragment, FragmentNode, HtmlTag, IfBlock, KeyBlock, RenderTag, Root, SnippetBlock,
-    SpecialElement,
+    AwaitBlock, ConstTag, DebugTag, DeclarationTag, EachBlock, Element, Fragment, FragmentNode,
+    HtmlTag, IfBlock, KeyBlock, RenderTag, Root, SnippetBlock, SpecialElement,
 };
 use tsv_ts::ast::internal::{
     ArrowFunctionBody, ClassBody, ClassMember, Expression, ForInOfLeft, ForInit,
@@ -34,6 +33,7 @@ use tsv_ts::ast::internal::{
 };
 
 use crate::analyze::{NameSet, pattern_binding_names};
+use crate::attr_refs::each_attribute_expression;
 use crate::{CompileError, Refusal};
 
 /// The snippet analysis product consumed by the server transform.
@@ -354,17 +354,12 @@ impl<'s> Collector<'s> {
     }
 
     fn element(&mut self, element: &Element<'_>) {
-        for attr_node in element.attributes {
-            if let AttributeNode::Attribute(attr) = attr_node
-                && let Some(values) = attr.value
-            {
-                for value in values {
-                    if let AttributeValue::ExpressionTag(tag) = value {
-                        self.expr(&tag.expression);
-                    }
-                }
-            }
-        }
+        // The shared traversal (`attr_refs`) defines which attribute expressions
+        // are reference-bearing — including component `{...spread}` expressions,
+        // whose free references must disqualify hoisting exactly like a plain
+        // attribute value's (a module-hoisted snippet referencing an instance
+        // binding is a runtime ReferenceError).
+        each_attribute_expression(element, &mut |expr| self.expr(expr));
         self.fragment(&element.fragment);
     }
 

@@ -31,8 +31,8 @@
 //! past the analysis.
 
 use tsv_svelte::ast::internal::{
-    AttributeNode, AttributeValue, AwaitBlock, ConstTag, EachBlock, Element, ElementKind, Fragment,
-    FragmentNode, HtmlTag, IfBlock, KeyBlock, RenderTag, Root, SnippetBlock,
+    AwaitBlock, ConstTag, EachBlock, Element, Fragment, FragmentNode, HtmlTag, IfBlock, KeyBlock,
+    RenderTag, Root, SnippetBlock,
 };
 use tsv_ts::ast::internal::{
     ArrowFunctionBody, ClassBody, ClassMember, ExportDefaultValue, Expression, ForInOfLeft,
@@ -41,6 +41,7 @@ use tsv_ts::ast::internal::{
 };
 
 use crate::analyze::{NameSet, RuneInit, classify_rune_init, pattern_binding_names};
+use crate::attr_refs::each_attribute_expression;
 use crate::{CompileError, Refusal};
 
 /// The accumulating analysis state.
@@ -688,27 +689,11 @@ fn walk_render_tag(tag: &RenderTag<'_>, nc: &mut Nc<'_>) {
 }
 
 fn walk_element(element: &Element<'_>, nc: &mut Nc<'_>) {
-    for attr_node in element.attributes {
-        match attr_node {
-            // Plain attribute expression values feed the trigger check.
-            AttributeNode::Attribute(attr) => {
-                if let Some(values) = attr.value {
-                    for value in values {
-                        if let AttributeValue::ExpressionTag(tag) = value {
-                            walk_expr(&tag.expression, nc);
-                        }
-                    }
-                }
-            }
-            // A component's `{...spread}` is emitted (a `$.spread_props` element),
-            // so its expression must feed the trigger check too. On a regular
-            // element a spread is refused at emission, so it's ignored there.
-            AttributeNode::SpreadAttribute(spread) if element.kind == ElementKind::Component => {
-                walk_expr(&spread.expression, nc);
-            }
-            _ => {}
-        }
-    }
+    // The shared traversal (`attr_refs`) defines which attribute expressions are
+    // reference-bearing: plain attribute values on any element, plus component
+    // `{...spread}` expressions (emitted as `$.spread_props` elements); element
+    // spreads and directives are refused at emission and not visited.
+    each_attribute_expression(element, &mut |expr| walk_expr(expr, nc));
     walk_fragment(&element.fragment, nc);
 }
 
