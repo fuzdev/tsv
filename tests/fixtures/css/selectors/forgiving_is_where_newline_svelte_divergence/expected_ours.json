@@ -1,0 +1,85 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 276,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 229,
+					"end": 248,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 229,
+							"end": 248,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 229,
+											"end": 232
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "is",
+											"args": {
+												"type": "SelectorList",
+												"start": 236,
+												"end": 247,
+												"children": []
+											},
+											"start": 232,
+											"end": 248
+										}
+									],
+									"start": 229,
+									"end": 248
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 249,
+					"end": 267,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 253,
+							"end": 263,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 229,
+				"end": 267
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 268,
+			"styles": "\n\t/* :is() forgiving list: the empty `.` class makes the complex selector invalid, so it is dropped from the AST; tsv keeps the dropped text but collapses its internal whitespace runs (incl. newlines) to single spaces */\n\tdiv:is(.a > . > .b) {\n\t\tcolor: red;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 277,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

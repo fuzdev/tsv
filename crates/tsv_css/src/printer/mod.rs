@@ -339,6 +339,11 @@ impl<'a> Printer<'a> {
                 }
             }
 
+            // Leading indent for this top-level node (matches the nested
+            // `print_css_block_children` pattern). No-op at `indent_level` 0
+            // (standalone); the embedded stylesheet renders at the wrapper level.
+            self.write_indent();
+
             // format-ignore: emit raw source instead of formatting
             if has_ignore {
                 self.write(node.span().extract(self.source));
@@ -406,10 +411,12 @@ impl<'a> Printer<'a> {
             }
 
             // Print with proper spacing
+            let mut starts_line = true;
             if printed > 0 {
                 // Check if this comment is on the same line as the previous comment
                 if self.is_same_line(last_end, comment.span.start) {
                     self.write(" ");
+                    starts_line = false;
                 } else if self.has_blank_line_between(last_end, comment.span.start) {
                     self.write("\n\n");
                 } else {
@@ -424,6 +431,12 @@ impl<'a> Printer<'a> {
                 }
             }
 
+            // Leading indent for a top-level comment that starts its own line
+            // (skip a mid-line comment joined to the previous by a space; no-op
+            // at indent_level 0 / standalone).
+            if starts_line {
+                self.write_indent();
+            }
             self.print_css_comment(comment);
             last_end = comment.span.end;
             *comment_idx += 1;
@@ -503,6 +516,8 @@ impl<'a> Printer<'a> {
                 }
             }
 
+            // Leading indent for this top-level trailing comment (no-op standalone).
+            self.write_indent();
             self.print_css_comment(comment);
             last_end = comment.span.end;
             *comment_idx += 1;
@@ -531,8 +546,9 @@ impl<'a> Printer<'a> {
     /// Join the comments fully within `[start, end)` as space-separated `/*…*/`
     /// blocks (empty string when there are none). The single source-to-string form of
     /// a comment run, shared by the at-rule prelude and selector comment interleaving.
-    /// Multi-line comment interiors stay verbatim under Svelte `<style>` embedding —
-    /// the embed reindent skips lines that start inside an open block comment.
+    /// Multi-line comment interiors stay verbatim under Svelte `<style>` embedding:
+    /// the CSS renders at its final indent, so an interior line keeps its content at
+    /// column 0 with no post-hoc re-indent.
     pub(crate) fn comment_blocks_in_range(&self, start: u32, end: u32) -> String {
         let mut out = String::new();
         for comment in comments_in_range(self.comments, start, end) {
@@ -812,7 +828,22 @@ pub(crate) fn format_css_embedded_in(
     embed: EmbedContext,
     arena: &DocArena,
 ) -> String {
+    // Render at the host's final indentation directly (fold `base_indent_offset`
+    // into the starting `indent_level`, zeroing the offset), mirroring how the
+    // `<script>` embed renders the TS doc at `start_indent_level=1`. Structural
+    // lines get the wrapper indent from `write_indent` / hardlines; verbatim
+    // content (raw at-rule preludes, comment interiors, `Invalid` selector text)
+    // is written with no indent, so its embedded newlines stay at column 0 — the
+    // same as standalone, matching prettier. This retires the Svelte host's
+    // post-hoc line re-indenter, which compounded a preserved newline one indent
+    // level per format pass (an F1 non-idempotency; see script_style.rs).
+    let base = embed.base_indent_offset;
+    let embed = EmbedContext {
+        base_indent_offset: 0,
+        ..embed
+    };
     let mut printer = Printer::with_embed(arena, source, &stylesheet.comments, line_breaks, embed);
+    printer.indent_level = base;
     printer.print_css_nodes(stylesheet.nodes);
     printer.into_string()
 }
