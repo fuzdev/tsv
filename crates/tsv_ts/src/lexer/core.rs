@@ -350,10 +350,24 @@ impl<'a> Lexer<'a> {
                         break;
                     }
                 }
-                // Any other byte: decode the char (ASCII or not) and continue while it
-                // is an IdentifierPart. The ASCII fast path above already consumed the
-                // no-escape ASCII run, so the common case is one decode of the terminator;
-                // the escape path (decoded is `Some`) also re-consumes ASCII parts here.
+                // ASCII byte (the overwhelmingly common case): after the fast path this
+                // is almost always the terminator, so settle it from the byte LUT alone —
+                // no char decode, no cross-crate Unicode `is_id_continue` dispatch. The
+                // LUT equals `is_id_continue` on ASCII (the same equivalence the fast path
+                // above relies on), so this stays exact. The escape path (decoded is
+                // `Some`) re-consumes ASCII identifier parts through here too.
+                Some(b) if b < 0x80 => {
+                    if is_ascii_id_continue(b) {
+                        if let Some(d) = &mut decoded {
+                            d.push(b as char);
+                        }
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
+                // Non-ASCII lead byte: decode the full char and continue while it is an
+                // IdentifierPart.
                 Some(_) => match self.cur_char() {
                     Some(ch) if is_id_continue(ch) => {
                         if let Some(d) = &mut decoded {
@@ -1437,5 +1451,30 @@ impl<'a> Lexer<'a> {
             end: self.position as u32,
         };
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // The byte-cursor fast path and the identifier-scan terminator arm both decide
+    // ASCII identifier bytes from the `[bool; 256]` LUTs instead of decoding a char
+    // and calling the Unicode predicates. That is only sound if the LUTs agree with
+    // `is_id_start`/`is_id_continue` on every ASCII byte.
+    #[test]
+    fn ascii_id_luts_match_unicode_predicates() {
+        for b in 0u8..0x80 {
+            assert_eq!(
+                is_ascii_id_start(b),
+                is_id_start(b as char),
+                "id_start mismatch at byte {b:#x}"
+            );
+            assert_eq!(
+                is_ascii_id_continue(b),
+                is_id_continue(b as char),
+                "id_continue mismatch at byte {b:#x}"
+            );
+        }
     }
 }

@@ -8,7 +8,7 @@ use smallvec::smallvec;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::source_scan::{TriviaProfile, find_char, find_char_skipping_comments};
+use tsv_lang::source_scan::{TriviaProfile, find_char};
 
 impl<'a> Printer<'a> {
     /// Build a doc for a switch statement with proper line-width wrapping
@@ -213,31 +213,20 @@ impl<'a> Printer<'a> {
         if let Some(test) = &case.test {
             parts.push(d.text("case "));
             parts.push(self.build_expression_doc(test));
-            // Comments between expression and colon: `case 1 /* c */:`
+            // Comments between expression and colon: `case 1 /* c */:`. The colon sits
+            // exactly one byte before the label end, which `get_case_label_end` already
+            // located as colon+1, so no second scan is needed.
             let test_end = test.span().end;
-            let colon_pos = find_char_skipping_comments(
-                self.source.as_bytes(),
-                test_end as usize,
-                case_label_end as usize,
-                b':',
-            )
-            .unwrap_or(case_label_end as usize - 1);
-            parts.push(self.build_inline_comments_between_doc(test_end, colon_pos as u32));
+            let colon_pos = case_label_end - 1;
+            parts.push(self.build_inline_comments_between_doc(test_end, colon_pos));
             parts.push(d.text(":"));
         } else {
-            // Comments between `default` keyword and colon: `default /* c */:`
+            // Comments between `default` keyword and colon: `default /* c */:`. The colon
+            // sits one byte before the label end located by `get_case_label_end`.
             let default_keyword_end = case.span.start + "default".len() as u32;
-            let colon_pos = find_char_skipping_comments(
-                self.source.as_bytes(),
-                default_keyword_end as usize,
-                case_label_end as usize,
-                b':',
-            )
-            .unwrap_or(case_label_end as usize - 1);
+            let colon_pos = case_label_end - 1;
             parts.push(d.text("default"));
-            parts.push(
-                self.build_inline_comments_between_doc(default_keyword_end, colon_pos as u32),
-            );
+            parts.push(self.build_inline_comments_between_doc(default_keyword_end, colon_pos));
             parts.push(d.text(":"));
         }
 
