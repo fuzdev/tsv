@@ -83,8 +83,11 @@ export interface GatePins {
  * (svelte-block-ws gap fixed — the `if-block-whitespace-{legacy,runes}` pair moves to both-accept).
  * both_accept 3273→3274: leading-symbol attribute names (`<p }>`) now parse (svelte-attr-name gap fixed),
  * so `validator/samples/attribute-invalid-name` moved from over-rejection to both-accept.
+ * scanned 3375→3378 / both_accept 3280→3283: ../svelte at b4d1583a added three suite inputs at the
+ * same 5.56.4 version (the commit-level suite drift the version check can't see). Both counts moved
+ * up in lockstep — all three parse on both sides — so over-rejections stay 0 and no verdict changed.
  */
-export const SVELTE_FIXTURES_PINS: GatePins = { scanned: 3375, both_accept: 3280 };
+export const SVELTE_FIXTURES_PINS: GatePins = { scanned: 3378, both_accept: 3283 };
 
 /** conformance:ts-fixtures — measured 2026-07-08: ../acorn-typescript at 312d079 (v1.0.11), oracle @sveltejs/acorn-typescript@1.0.11. */
 export const TS_FIXTURES_PINS: GatePins = { scanned: 207, both_accept: 186 };
