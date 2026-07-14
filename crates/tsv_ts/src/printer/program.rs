@@ -10,7 +10,7 @@ use tsv_lang::{
     doc::arena::DocId,
 };
 
-use super::Printer;
+use super::{Printer, next_printed_stmt_start};
 
 impl<'a> Printer<'a> {
     /// Print a TypeScript program
@@ -118,14 +118,13 @@ impl<'a> Printer<'a> {
                 parts.push(self.build_statement_doc(statement, true));
             }
 
-            // Trailing same-line comments. Bound the scan by the next statement's
-            // start so a comment only attaches to the statement it immediately
-            // follows — multiple statements on one source line (`a(); b(); // c`)
-            // must not each grab the trailing comment.
-            let next_start = program
-                .body
-                .get(stmt_idx + 1)
-                .map_or(program.span.end, |s| s.span().start);
+            // Trailing same-line comments. Bound the scan by the next *printed*
+            // statement's start so a comment only attaches to the statement it
+            // immediately follows — multiple statements on one source line
+            // (`a(); b(); // c`) must not each grab the trailing comment — while
+            // still claiming a comment trailing a dropped `;` on this line
+            // (`a();; // c`), which the erased `;` emits nothing to carry.
+            let next_start = next_printed_stmt_start(program.body, stmt_idx, program.span.end);
             let trailing_docs =
                 self.build_trailing_same_line_comment_docs(statement.span().end, next_start);
             parts.extend(trailing_docs);
