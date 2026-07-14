@@ -187,7 +187,13 @@ pub(super) fn build_call_args_doc_for_chain_standard_expanded(
 struct ChainArgsContext {
     paren_open: u32,
     prefix: &'static str,
+    /// **to emit**: a non-owned leading comment before the first argument (emitted here).
     has_leading_comments: bool,
+    /// **on page**: any leading comment before the first argument, **owned or not** — an
+    /// owned comment rides inside the argument's own doc but still defeats the argument
+    /// hug (prettier's `shouldExpandLastArg` returns false for a leading-commented arg). A
+    /// to-emit gate would go blind to it and wrongly hug.
+    has_leading_comment_on_page: bool,
     has_any_comments: bool,
     /// Whether the argument window puts any comment text on the page, **including** a
     /// comment a node owns and prints itself. The superset of `has_any_comments`, which is
@@ -252,6 +258,10 @@ fn build_call_args_doc_for_chain_impl(
     let has_leading_comments = call_has_comments
         && !call.arguments.is_empty()
         && printer.has_comments_to_emit_between(paren_open, call.arguments[0].span().start);
+    // Layout counterpart of `has_leading_comments`: counts an owned leading comment too.
+    let has_leading_comment_on_page = call_has_comments
+        && !call.arguments.is_empty()
+        && printer.has_comments_on_page_between(paren_open, call.arguments[0].span().start);
     let has_inter_arg_comments = call_has_comments && has_inter_argument_comments(call, printer);
     let has_trailing_comments = call_has_comments && has_trailing_comments_on_args(call, printer);
     // Also check for trailing block comments on last arg (for inline handling)
@@ -319,6 +329,7 @@ fn build_call_args_doc_for_chain_impl(
         paren_open,
         prefix,
         has_leading_comments,
+        has_leading_comment_on_page,
         has_any_comments,
         has_any_comment_text: call_has_comments,
         has_trailing_block_comments,
@@ -612,6 +623,7 @@ fn build_chain_args_single(
         paren_open,
         prefix,
         has_leading_comments,
+        has_leading_comment_on_page,
         has_any_comments,
         has_any_comment_text,
         leading_comment_doc,
@@ -761,7 +773,10 @@ fn build_chain_args_single(
             &**body_expr,
             Expression::ObjectExpression(_) | Expression::ArrayExpression(_)
         )
-        && !(has_any_comments
+        // `has_any_comment_text` (on page), not `has_any_comments` (to emit): an owned
+        // leading comment defeats the expand-last hug just like an ordinary one, so the
+        // hug must refuse it too — a to-emit gate would hug blind.
+        && !(has_any_comment_text
             && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
     {
         // Render the arrow with flat params (prettier's expandLastArg
@@ -891,8 +906,10 @@ fn build_chain_args_single(
             d.hardline(),
             d.text(")"),
         ]);
-        if has_leading_comments {
-            // Leading comments prevent hugging — force expansion
+        if has_leading_comment_on_page {
+            // Leading comments prevent hugging — force expansion. An owned comment
+            // (on page but not in `has_leading_comments`) rides inside `arg_with_comments`
+            // via `arg_doc`, so it still defeats the hug.
             parts.push(state_expand);
         } else {
             // No leading comments — try hug first, then expand
@@ -905,7 +922,7 @@ fn build_chain_args_single(
     // Leading comments prevent hugging — prettier's shouldExpandLastArg
     // returns false when hasComment(lastArg, Leading), so the default
     // expansion path is used instead of expand-last hugging.
-    let kind = if has_leading_comments {
+    let kind = if has_leading_comment_on_page {
         ChainArgKind::NeedsSoftWrap
     } else {
         classify_chain_arg(arg)
@@ -1198,8 +1215,12 @@ fn build_chain_args_multi(
     // Skip when last two args have the same outer type - use expand-all instead.
     if call.arguments.len() >= 2
         && last_arg_is_array_or_object(call.arguments)
-        && !call.arguments.last().is_some_and(is_concise_numeric_array)        && !comments_force_expansion
-        && !(has_any_comments
+        && !call.arguments.last().is_some_and(is_concise_numeric_array)
+        && !comments_force_expansion
+        // `has_any_comment_text` (on page), not `has_any_comments` (to emit): an owned
+        // comment leading the last array/object argument defeats the expand-last hug just
+        // like an ordinary one — a to-emit gate would hug blind.
+        && !(has_any_comment_text
             && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
         // Prettier blocks expand-last for 2-arg arrow+array (React hook pattern)
         && !(call.arguments.len() == 2

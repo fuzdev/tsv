@@ -181,6 +181,7 @@ deno task pins:audit                 # canonical-oracle version sync (gated in `
 deno task scan:audit                 # guard against new raw find/rfind/match_indices substring scans over source (gated in `deno task check`); see Debug Tooling
 deno task fanout:audit               # guard against super-linear doc-node fanout (the per-layout-candidate rebuild blowup); gated in `deno task check`; see Debug Tooling
 deno task roundtrip:audit            # cheap tripwire that format(tests/fixtures) reparses (pure-Rust phase 1, no *_unreparseable output; gated in `deno task check`) — real yield is external corpora; see Debug Tooling
+deno task binding:audit              # comment↔token binding audit: does format re-bind a forward-binding comment (JSDoc cast / bundler annotation) to a different subtree — the class invisible to ast_diff/roundtrip/SAFETY because the characters only MOVE (pure Rust, no sidecar; gated in `deno task check`) — HARD (owned cast/annotation) fails the gate, SOFT (plain glued) is informational; TS-family files only; real yield on external corpora; see Debug Tooling
 deno task authoring:audit            # authoring-independence over Svelte boundary whitespace: every render-equivalent authoring of one document (hug ↔ space ↔ newline at a tag's content boundary; space ↔ newline between siblings) must reach ONE tsv fixed point (pure Rust, no sidecar; gated in `deno task check`) — exits 1 on any non-idempotency, site-level or a base-non-idempotent FILE; see Debug Tooling
 deno task fuzz:audit                 # seeded mutational fuzzer over tests/fixtures (fixed --seed 0 --iterations 5000; pure Rust, no sidecar; gated in `deno task check`) — asserts no-panic + idempotency + structural-reparse, on every seed file AS AUTHORED and then on mutated input; see Debug Tooling
 deno task comments:audit             # print-once comment ledger: every comment a document PARSES must be EMITTED exactly once (pure Rust, no sidecar; gated in `deno task check`) — reports DROPPED (silent content loss) and DOUBLE-PRINTED; the structural guard on the detached comment model, tsv's `ensureAllCommentsPrinted`; see Debug Tooling
@@ -987,6 +988,41 @@ cargo run -p tsv_debug roundtrip_audit --gate --canonical-all ../prettier/tests/
 # (non-gate) run is a diagnostic — the divergent bucket over tests/fixtures is
 # Svelte-reflow-noisy vs render_normalize's simpler whitespace model.
 cargo run -p tsv_debug roundtrip_audit --canonical-all --verbose ../prettier/tests/format/typescript
+```
+
+**Comment↔Token Binding Audit (re-binding gate):**
+
+```bash
+# binding_audit - does format re-bind a FORWARD-binding comment to a different
+# subtree? Two comment kinds bind to the token AFTER them: a JSDoc type cast
+# (`/** @type {T} */ (x)` — the parens + comment ARE the cast) and a bundler
+# annotation (`/* @__PURE__ */ f()` — marks the call side-effect-free). A paren
+# migrating across such a comment under formatting silently re-binds it (a cast
+# annotating a wider node, an annotation gone inert). This class is INVISIBLE to
+# every other gate — neither a cast, a grouping paren, nor an annotation is a
+# public-AST node, so both forms serialize to byte-identical wire JSON: ast_diff
+# says "equivalent", roundtrip_audit's skeleton can't see it, corpus SAFETY is
+# char-frequency (the characters only MOVE). Pure Rust, no sidecar.
+#
+# Signal: reparse input + tsv-formatted output with `preserve_parens` (grouping
+# parens become ParenthesizedExpression nodes), and per glued comment compare the
+# bound subtree. A cast stays invisible even so (its JsdocCast node emits its bare
+# inner), so the audit anchors INSIDE the cast's `(`. And since the only structural
+# delta formatting can add under preserve_parens is a clarity-paren (roundtrip_audit
+# gates the rest), the skeleton is compared with ParenthesizedExpression STRIPPED —
+# the binding-paren signal rides a separate `anchor_is_paren` flag. So a clarity
+# paren deep inside is not a finding; a paren at the anchor is.
+#
+# HARD (owned cast/annotation re-binds) fails --gate; SOFT (a plain glued comment,
+# the class slice C generalizes ownership to) is informational. TS-family files
+# only (.ts/.js/.mts/.cts/…); casts/annotations concentrate in JSDoc-typed JS.
+cargo run -p tsv_debug binding_audit                                  # audit tests/fixtures
+cargo run -p tsv_debug binding_audit ../svelte/packages/svelte/src ../prettier/tests/format/js
+cargo run -p tsv_debug binding_audit --gate                          # the check gate (HARD only)
+# Also: --verbose (in→out bound-subtree per finding), --limit N, --json. A bare
+# --gate over tests/fixtures is a cheap tripwire (fixtures are format-stable); the
+# real yield is external corpora, where JSDoc casts + annotations are dense.
+cargo run -p tsv_debug binding_audit --verbose ../svelte/packages/svelte/src
 ```
 
 **Seeded Mutational Fuzzer (panic / idempotency / structural-reparse safety):**
