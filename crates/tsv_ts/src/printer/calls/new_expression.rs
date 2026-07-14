@@ -171,8 +171,8 @@ impl<'a> Printer<'a> {
                     // not in `glued`) but still defeats the hug, exactly as prettier
                     // expands a block-arrow arg whose leading comment precedes it. A
                     // to-emit gate here would go blind to it and wrongly hug.
-                    let has_leading_comment =
-                        new_has_comments && self.has_comments_on_page_between(paren_open, arg_start);
+                    let has_leading_comment = new_has_comments
+                        && self.has_comments_on_page_between(paren_open, arg_start);
 
                     // If the arrow has trailing param comments or leading comments,
                     // force wrapped state

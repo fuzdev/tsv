@@ -258,7 +258,10 @@ fn probe_site(path: &Path, source: &str, site: &Site) -> Option<Finding> {
         let Some(first) = first else {
             return None; // identical (both comments dropped) — not a layout issue
         };
-        let last = (0..ob.len()).rev().find(|&i| ob[i] != xb[i]).unwrap_or(first);
+        let last = (0..ob.len())
+            .rev()
+            .find(|&i| ob[i] != xb[i])
+            .unwrap_or(first);
         if last - first + 1 == width {
             return None; // neutral
         }
