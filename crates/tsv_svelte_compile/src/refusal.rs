@@ -397,6 +397,33 @@ pub enum Refusal {
     /// a load-error element drop cleanly.
     #[error("use: directive on a load-error element (event-capture markup not implemented)")]
     UseDirectiveOnLoadErrorElement,
+    /// Two or more transition directives on one element claim the same animation
+    /// channel. The oracle's phase-2 placement check (`shared/element.js:115-132`)
+    /// runs before it discards the SSR visit: a `transition:` contributes both
+    /// intro and outro, `in:` intro only, `out:` outro only, and a channel claimed
+    /// twice is `transition_duplicate` (same signature) or `transition_conflict`
+    /// (different) — both oracle-rejected, so a combination it rejects must refuse
+    /// rather than drop and compile. tsv folds the whole union into one refusal;
+    /// modifiers are irrelevant (direction alone decides). A single
+    /// `transition:`/`in:`/`out:`, or an `in:`+`out:` pair, is legal.
+    #[error(
+        "conflicting transition directives (an element may have at most one intro \
+         and one outro — the oracle rejects it)"
+    )]
+    TransitionDirectiveConflict,
+    /// An `animate:` directive in a position the oracle rejects at phase-2
+    /// (`shared/element.js:92-114`): it is legal only as the **sole** non-trivial
+    /// child of a **keyed** `{#each}` body (comments, `{@const}`/declaration tags,
+    /// and whitespace-only text are the trivial siblings the filter ignores), and
+    /// only one may appear on the element — `animation_invalid_placement` /
+    /// `animation_missing_key` / `animation_duplicate` respectively. Those checks
+    /// run before the SSR visit is discarded, so a rejected placement must refuse
+    /// rather than drop and compile.
+    #[error(
+        "invalid animate: directive (one per element, only on the sole child of a \
+         keyed {{#each}} — the oracle rejects it)"
+    )]
+    AnimateDirectiveInvalid,
     /// A directive or spread attribute the transform does not yet emit —
     /// `class:`/`style:`/`bind:`, a legacy `on:` event directive, `let:`, or an
     /// element `{...spread}`. The no-op drop family (`use:`/`transition:`/`in:`/
@@ -718,6 +745,12 @@ impl Refusal {
             Self::MutationInTemplateExpr => Cow::Borrowed("mutation inside a template expression"),
             Self::UseDirectiveOnLoadErrorElement => Cow::Borrowed(
                 "use: directive on a load-error element (event-capture markup not implemented)",
+            ),
+            Self::TransitionDirectiveConflict => Cow::Borrowed(
+                "conflicting transition directives (an element may have at most one intro and one outro — the oracle rejects it)",
+            ),
+            Self::AnimateDirectiveInvalid => Cow::Borrowed(
+                "invalid animate: directive (one per element, only on the sole child of a keyed {#each} — the oracle rejects it)",
             ),
             Self::NonPlainAttribute => Cow::Borrowed("non-plain attribute (directive/spread)"),
             Self::StringLiteralExprAttribute => {

@@ -11,7 +11,8 @@ use std::collections::HashMap;
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
 use tsv_svelte::ast::internal::{
-    AwaitBlock, ConstTag, EachBlock, Fragment, FragmentNode, IfBlock, KeyBlock, SpecialElement,
+    AwaitBlock, ConstTag, EachBlock, Element, Fragment, FragmentNode, IfBlock, KeyBlock,
+    SpecialElement,
 };
 use tsv_ts::ast::internal::{
     BinaryOperator, BlockStatement, Expression, ExpressionStatement, ForInit, ForStatement,
@@ -296,6 +297,32 @@ pub(crate) fn emit_if_block<'arena>(
     Ok(())
 }
 
+/// The one element position a single `animate:` directive is legal: the sole
+/// non-trivial child of a keyed `{#each}` body. Mirrors the oracle's phase-2
+/// placement check (`2-analyze/visitors/shared/element.js:93-108`): a keyed each
+/// whose body has at most one child once `Comment`/`ConstTag`/`DeclarationTag`/
+/// whitespace-only `Text` are filtered out, and that child is a regular element.
+/// Returns that element (whose span the emitter matches) or `None`.
+fn animate_host_element<'arena>(each: &'arena EachBlock<'arena>) -> Option<&'arena Element<'arena>> {
+    each.key.as_ref()?;
+    let mut count = 0usize;
+    let mut sole_element: Option<&'arena Element<'arena>> = None;
+    for node in each.body.nodes {
+        match node {
+            FragmentNode::Comment(_)
+            | FragmentNode::ConstTag(_)
+            | FragmentNode::DeclarationTag(_) => {}
+            FragmentNode::Text(t) if t.is_ascii_ws_only => {}
+            FragmentNode::Element(el) => {
+                count += 1;
+                sole_element = Some(el);
+            }
+            _ => count += 1,
+        }
+    }
+    if count <= 1 { sole_element } else { None }
+}
+
 /// Emit `{#each}`: `const each_array = $.ensure_array_like(expr)` + a `for` loop
 /// binding `let CTX = each_array[IDX]`. Without `{:else}` the opener `<!--[-->`
 /// merges into the preceding template; with it, `each_array` hoists before an
@@ -408,6 +435,11 @@ pub(crate) fn emit_each_block<'arena>(
         }
     }
     overlay.insert(index_name.clone(), ScopeEntry::Masked);
+    // The sanctioned `animate:` position (the sole non-trivial child of this keyed
+    // each) is recognized by span, so `emit_element` can accept exactly it and
+    // refuse every other `animate:`. Save/restore around the body like `in_each`.
+    let saved_animate_host = env.animate_host_span;
+    env.animate_host_span = animate_host_element(each).map(|el| el.span);
     env.in_each = true;
     let body_result = emit_each_body(
         env,
@@ -419,6 +451,7 @@ pub(crate) fn emit_each_block<'arena>(
         overlay,
     );
     env.in_each = false;
+    env.animate_host_span = saved_animate_host;
     let body_stmts = body_result?;
 
     let for_body = block_stmt(&env.b, body_stmts);

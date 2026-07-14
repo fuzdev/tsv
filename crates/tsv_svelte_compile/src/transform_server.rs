@@ -101,6 +101,12 @@ pub(crate) struct EmitEnv<'arena, 's> {
     /// Inside an `{#each}` body — a nested each would need the oracle's
     /// unique-name allocation order, which is not confidently reproducible.
     pub(crate) in_each: bool,
+    /// The one element position an `animate:` directive is legal: the span of the
+    /// sole non-trivial child of the enclosing keyed `{#each}` body (decided in
+    /// `blocks::animate_host_element`). `element::emit_element` matches an
+    /// element's span against this to accept exactly that placement; every other
+    /// `animate:` refuses (the oracle's phase-2 placement check).
+    pub(crate) animate_host_span: Option<Span>,
     /// Source-order counters for the oracle's per-each unique names
     /// (`each_array`/`each_array_1`, `$$index`/`$$index_1`), advanced once per
     /// each block regardless of an authored index.
@@ -504,6 +510,7 @@ pub(crate) fn compile_server<'arena>(
         has_comments,
         overlays: Vec::new(),
         in_each: false,
+        animate_host_span: None,
         each_array_count: 0,
         index_count: 0,
         snippets,

@@ -30,6 +30,54 @@ use crate::snippet_emit::build_snippet_function;
 use crate::transform_server::{EmitEnv, unsupported};
 use crate::{CompileError, Refusal};
 
+/// The oracle's phase-2 directive-validity checks (`2-analyze/visitors/shared/
+/// element.js:92-132`), which run before it discards the SSR visit — so a
+/// combination it rejects must refuse, not compile.
+///
+/// - **Transitions**: a `transition:` claims both intro and outro, `in:` intro,
+///   `out:` outro; a channel claimed twice is `transition_duplicate`/
+///   `transition_conflict`. Equivalent rule: refuse iff two or more directives
+///   claim intro, or two or more claim outro (modifiers are irrelevant).
+/// - **Animate**: legal only as the sole non-trivial child of a keyed `{#each}`
+///   (`animate_host`, decided in `blocks.rs`) and only one per element;
+///   everything else is `animation_invalid_placement`/`animation_missing_key`/
+///   `animation_duplicate`.
+///
+/// Runs on the HTML-element path only (components early-return above). Valid
+/// combinations fall through to the per-attribute drop loop unchanged.
+fn validate_directive_combinations(
+    element: &Element<'_>,
+    animate_host: bool,
+) -> Result<(), CompileError> {
+    let mut intro_seen = false;
+    let mut outro_seen = false;
+    let mut animate_count = 0usize;
+    for attr in element.attributes {
+        match attr {
+            AttributeNode::TransitionDirective(d) => {
+                if d.direction.has_intro() {
+                    if intro_seen {
+                        return Err(unsupported(Refusal::TransitionDirectiveConflict));
+                    }
+                    intro_seen = true;
+                }
+                if d.direction.has_outro() {
+                    if outro_seen {
+                        return Err(unsupported(Refusal::TransitionDirectiveConflict));
+                    }
+                    outro_seen = true;
+                }
+            }
+            AttributeNode::AnimateDirective(_) => animate_count += 1,
+            _ => {}
+        }
+    }
+    if animate_count > 1 || (animate_count == 1 && !animate_host) {
+        return Err(unsupported(Refusal::AnimateDirectiveInvalid));
+    }
+    Ok(())
+}
+
 /// Emit one element's open tag, children, and close tag into the template.
 pub(crate) fn emit_element<'arena>(
     env: &mut EmitEnv<'arena, '_>,
@@ -86,6 +134,13 @@ pub(crate) fn emit_element<'arena>(
         }
         _ => {}
     }
+
+    // The oracle's phase-2 directive-validity checks run before it discards the
+    // SSR visit, so a rejected combination must refuse here — not fall through to
+    // the drop loop and compile. `animate_host` is whether this element is the
+    // sanctioned `animate:` position (decided in `blocks.rs`).
+    let animate_host = env.animate_host_span == Some(element.span);
+    validate_directive_combinations(element, animate_host)?;
 
     out.push_text(&format!("<{name}"));
     for attr_node in element.attributes {
