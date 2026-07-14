@@ -52,11 +52,15 @@ project-wide conventions.
     ordinary JS and clones through), `svelte/internal*` imports and
     `beforeUpdate`/`afterUpdate` imports from `svelte` (the oracle's runes-mode
     import rules), `{@debug}`, the still-refused attribute directives
-    (`bind:`, a legacy `on:` directive, `let:`, and an element
+    (a legacy `on:` directive, `let:`, and an element
     `{...spread}`) — a `class:` / `style:` directive on a **regular element** is
     instead **emitted** as the fused `$.attr_class(base, hash, {…})` /
     `$.attr_style(base, {…})` call (`element.rs` /
-    `attribute.rs`); the no-op drop family (`use:`/`transition:`/`in:`/`out:`/
+    `attribute.rs`), and a `bind:` **core kind** on a regular element is
+    **handled** by `attribute::emit_bind_directive` (`bind:this` omits;
+    `bind:value`/`bind:checked`/`bind:group` on `<input>` synthesize a
+    `$.attr(...)` for a `$state`-rooted target; every other `bind:` refuses via
+    `Refusal::BindDirective { name }`); the no-op drop family (`use:`/`transition:`/`in:`/`out:`/
     `animate:`/`{@attach}`) is instead **dropped** on a regular element, its
     expression still guarded (a stray rune / `await` refuses) and still walked for
     scope analysis, except a `use:` on a load-error element, which refuses because
@@ -181,12 +185,15 @@ project-wide conventions.
   - the element-attribute pair — `each_attribute_expression`, the emitted-path
     view (everything not refused at emission: plain values, component spreads, a
     `class:` / `style:` directive's expression-bearing value on a regular element
-    (emitted as `$.attr_class` / `$.attr_style`),
+    (emitted as `$.attr_class` / `$.attr_style`), a `bind:` directive's target
+    expression on a regular element (the oracle's analysis visits every bind
+    expression regardless of SSR emission, so a snippet whose only instance-binding
+    reference sits in a bind must not module-hoist),
     and the no-op drop family `use:`/`transition:`/`in:`/`out:`/`animate:`/`{@attach}`
     on a regular element, dropped-but-analyzed like an event handler; its
     `each_emitted_directive_name` companion surfaces the drop-family directive
     *names* plus a `style:` shorthand name an expression traversal can't reach; the
-    still-refused positions — element spread, `bind:`/legacy `on:`/`let:` — are
+    still-refused positions — element spread, legacy `on:`/`let:` — are
     skipped, the refusal keeping their references out of output), and
     `each_reference_bearing_attribute_expression` (+ the directive-name and
     special-element entry points), the **dropped-fragment** view, which includes
@@ -323,7 +330,8 @@ project-wide conventions.
   regular element's `class:` and `style:` directives and defers them to
   `attribute::emit_class_directives` / `attribute::emit_style_directives` (each
   fused at its authored-`class`/`style` slot, or after all plain attributes when
-  synthetic — the synthetic `class` before the synthetic `style`).
+  synthetic — the synthetic `class` before the synthetic `style`), and handles a
+  `bind:` directive inline at its source slot via `attribute::emit_bind_directive`.
 - `attribute.rs` — attribute emission: dynamic and mixed attributes →
   `$.attr(name, expr[, true])` / `$.attr_class` / `$.attr_style` with
   `$.stringify` interpolations (a mixed attribute whose every part folds
@@ -356,7 +364,20 @@ project-wide conventions.
   `style:x="a {b}"` refuses (`StyleDirectiveWithMixedValue`), and any modifier but
   a single `|important` refuses (`StyleDirectiveInvalidModifier`). `element.rs`'s
   attribute loop pre-scans the `class:` and `style:` directives and calls these at
-  the authored slot (or after all plain attributes when synthetic).
+  the authored slot (or after all plain attributes when synthetic). Also
+  `emit_bind_directive` — a `bind:` **core kind** on a regular element, emitted
+  inline at its source slot: `bind:this` omits (any variable, any element);
+  `bind:value` on `<input>` → `$.attr('value', expr)`; `bind:checked` on a static
+  `<input type="checkbox">` → `$.attr('checked', expr, true)`; `bind:group` on a
+  static-`type` `<input>` → a synthesized `$.attr('checked', <synth>, true)` where
+  `<synth>` is `group.includes(<value>)` (checkbox) / `group === <value>`
+  (radio/other), `<value>` the companion `value` attribute's value (still emitted at
+  its own slot; no companion → the oracle silently drops the bind). The bind TARGET
+  is gated to a `$state`-rooted `Identifier`/member chain (the crate's one supported
+  bindable — the SAFE side of the oracle's assignable-lvalue rule); every other
+  `bind:` (non-`<input>` target, `value` on `<textarea>`/`<select>`, `omit_in_ssr`
+  media/dimension binds, `bind:open`, the content-editable trio, an invalid
+  target/type, a non-`$state` target) refuses via `Refusal::BindDirective { name }`.
 - `css_scope.rs` — minimal CSS scoping (single class selectors: the
   `svelte-tsvhash` class appended to matched elements and
   **source-spliced** into the style text — the author's whitespace is

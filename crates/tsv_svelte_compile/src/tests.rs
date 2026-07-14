@@ -2421,6 +2421,176 @@ fn compile_style_directive_mixed_base_refuses() {
 }
 
 #[test]
+fn compile_bind_this_omits() {
+    // `bind:this` is omitted on any regular element (the oracle's early
+    // `continue`) and works for any variable — no `$state` gate, nothing emitted.
+    let js = compile_js("<script>let el = $state();</script>\n<div bind:this={el}>t</div>");
+    assert!(js.contains("`<div>t</div>`"), "{js}");
+}
+
+#[test]
+fn compile_bind_value_and_member_emit_attr() {
+    // `bind:value` on `<input>` → `$.attr('value', expr)`; a member target rides
+    // through (`obj.x`), a dynamic `type={x}` is fine for `value`.
+    let js = compile_js("<script>let v = $state('');</script>\n<input bind:value={v}>");
+    assert!(js.contains("$.attr('value', v)"), "{js}");
+    let js = compile_js("<script>let obj = $state({ x: 1 });</script>\n<input bind:value={obj.x}>");
+    assert!(js.contains("$.attr('value', obj.x)"), "{js}");
+    let js = compile_js(
+        "<script>let v = $state(''); let t = $state('text');</script>\n<input type={t} bind:value={v}>",
+    );
+    assert!(js.contains("$.attr('value', v)"), "{js}");
+}
+
+#[test]
+fn compile_bind_checked_checkbox_emits_boolean_attr() {
+    // `bind:checked` on a static `type="checkbox"` → `$.attr('checked', c, true)`.
+    let js = compile_js(
+        "<script>let c = $state(false);</script>\n<input type=\"checkbox\" bind:checked={c}>",
+    );
+    assert!(js.contains("$.attr('checked', c, true)"), "{js}");
+}
+
+#[test]
+fn compile_bind_group_synthesizes_checked() {
+    // `bind:group` synthesizes a `checked`: `group === value` (radio/other static
+    // type) or `group.includes(value)` (checkbox). The companion `value` attribute
+    // still emits at its own slot.
+    let js = compile_js(
+        "<script>let g = $state('a');</script>\n<input type=\"radio\" bind:group={g} value=\"a\">",
+    );
+    assert!(js.contains("$.attr('checked', g === 'a', true)"), "{js}");
+    assert!(
+        js.contains(" value=\"a\""),
+        "companion value still emits: {js}"
+    );
+    let js = compile_js(
+        "<script>let g = $state('a');</script>\n<input type=\"checkbox\" bind:group={g} value=\"a\">",
+    );
+    assert!(
+        js.contains("$.attr('checked', g.includes('a'), true)"),
+        "{js}"
+    );
+    // A dynamic companion `value={x}`: the synthesis reads `x` AND `value={x}`
+    // still emits its own `$.attr('value', x)`.
+    let js = compile_js(
+        "<script>let g = $state('a'); let x = $state(1);</script>\n<input type=\"checkbox\" bind:group={g} value={x}>",
+    );
+    assert!(
+        js.contains("$.attr('checked', g.includes(x), true)"),
+        "{js}"
+    );
+    assert!(js.contains("$.attr('value', x)"), "{js}");
+}
+
+#[test]
+fn compile_bind_group_no_companion_value_drops() {
+    // No companion `value` attribute → the oracle silently drops the group bind.
+    let js =
+        compile_js("<script>let g = $state('a');</script>\n<input type=\"radio\" bind:group={g}>");
+    assert!(js.contains("`<input type=\"radio\"/>`"), "{js}");
+}
+
+#[test]
+fn compile_bind_coexists_with_class_directive() {
+    // `bind:value` (inline) and `class:x` (pre-scanned, fused, synthetic slot) both
+    // emit — the value attr first, then the fused class call after all plain attrs.
+    let js = compile_js(
+        "<script>let v = $state(''); let c = $state(false);</script>\n<input bind:value={v} class:x={c}>",
+    );
+    assert!(
+        js.contains("$.attr('value', v)}${$.attr_class('', void 0, { x: c })}"),
+        "{js}"
+    );
+}
+
+#[test]
+fn compile_bind_invalid_target_refuses() {
+    // A `value`/`checked` bind on a non-`<input>` element, or `value` on
+    // `<textarea>` — the oracle rejects the target (or the shape is unimplemented).
+    assert_unsupported(
+        "<script>let v = $state('');</script>\n<div bind:value={v}></div>",
+        "bind: directive value",
+    );
+    assert_unsupported(
+        "<script>let v = $state('');</script>\n<textarea bind:value={v}></textarea>",
+        "bind: directive value",
+    );
+}
+
+#[test]
+fn compile_bind_checked_requires_static_checkbox_type() {
+    // `bind:checked` requires a static `type="checkbox"` — a missing / non-checkbox
+    // type is `bind_invalid_target` (an oracle error).
+    assert_unsupported(
+        "<script>let c = $state(false);</script>\n<input bind:checked={c}>",
+        "bind: directive checked",
+    );
+    assert_unsupported(
+        "<script>let c = $state(false);</script>\n<input type=\"radio\" bind:checked={c}>",
+        "bind: directive checked",
+    );
+}
+
+#[test]
+fn compile_bind_group_dynamic_type_refuses() {
+    // A dynamic `type={x}` with `bind:group` is `attribute_invalid_type` (an oracle
+    // error) — refuse rather than over-accept.
+    assert_unsupported(
+        "<script>let g = $state('a'); let t = $state('radio');</script>\n<input type={t} bind:group={g} value=\"a\">",
+        "bind: directive group",
+    );
+}
+
+#[test]
+fn compile_bind_value_bare_type_and_file_refuse() {
+    // A BARE `type` with `bind:value` is `attribute_invalid_type` (an oracle error);
+    // a static `type="file"` is the files trap the oracle silently drops the bind
+    // for — refuse rather than emit a divergent `$.attr('value', …)`.
+    assert_unsupported(
+        "<script>let v = $state('');</script>\n<input type bind:value={v}>",
+        "bind: directive value",
+    );
+    assert_unsupported(
+        "<script>let v = $state('');</script>\n<input type=\"file\" bind:value={v}>",
+        "bind: directive value",
+    );
+}
+
+#[test]
+fn compile_bind_omit_in_ssr_and_special_targets_refuse() {
+    // The `omit_in_ssr` media/dimension binds, `bind:open` on `<details>`, and the
+    // content-editable trio are all deferred → the collapsing `bind:` bucket.
+    assert_unsupported(
+        "<script>let w = $state(0);</script>\n<div bind:clientWidth={w}></div>",
+        "bind: directive clientWidth",
+    );
+    assert_unsupported(
+        "<script>let o = $state(false);</script>\n<details bind:open={o}></details>",
+        "bind: directive open",
+    );
+    assert_unsupported(
+        "<script>let h = $state('');</script>\n<div contenteditable bind:innerHTML={h}></div>",
+        "bind: directive innerHTML",
+    );
+}
+
+#[test]
+fn compile_bind_non_state_expression_refuses() {
+    // The expression-validity gate: a non-lvalue target (a call) and a bind rooted
+    // at a non-`$state` binding (a `$derived`) both refuse — tsv emits only a
+    // `$state`-rooted lvalue (the SAFE side of the oracle's assignable rule).
+    assert_unsupported(
+        "<script>let f = () => '';</script>\n<input bind:value={f()}>",
+        "bind: directive value",
+    );
+    assert_unsupported(
+        "<script>let n = $state(1); let d = $derived(n + 1);</script>\n<input bind:value={d}>",
+        "bind: directive value",
+    );
+}
+
+#[test]
 fn compile_empty_class_attribute_drops() {
     // A static string-valued class that collapses+trims to empty is
     // dropped entirely (oracle-probed); a bare `class` (boolean form)

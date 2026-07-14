@@ -425,12 +425,26 @@ pub enum Refusal {
     )]
     AnimateDirectiveInvalid,
     /// A directive or spread attribute the transform does not yet emit —
-    /// `style:`/`bind:`, a legacy `on:` event directive, `let:`, or an element
-    /// `{...spread}`. The no-op drop family (`use:`/`transition:`/`in:`/`out:`/
-    /// `animate:`/`{@attach}`) is dropped, not refused, on a regular element;
-    /// `class:` on a regular element is emitted (`$.attr_class`).
+    /// a legacy `on:` event directive, `let:`, or an element `{...spread}`. The
+    /// no-op drop family (`use:`/`transition:`/`in:`/`out:`/`animate:`/`{@attach}`)
+    /// is dropped, not refused, on a regular element; `class:`/`style:` on a
+    /// regular element are emitted (`$.attr_class`/`$.attr_style`), and `bind:` is
+    /// handled by [`BindDirective`](Refusal::BindDirective) (a handled core kind
+    /// emits, everything else refuses).
     #[error("non-plain attribute (directive/spread)")]
     NonPlainAttribute,
+    /// A `bind:` directive on a regular element outside the handled core set. The
+    /// handled kinds emit (`bind:this` omits; `bind:value`/`bind:checked`/
+    /// `bind:group` on `<input>` synthesize a `$.attr(...)`); everything else — a
+    /// bind on a non-`<input>` target, `value` on `<textarea>`/`<select>`, the
+    /// `omit_in_ssr` media/dimension binds, the content-editable trio, `open`,
+    /// `focused`, an invalid target/type, or a bind expression that isn't a
+    /// `$state`-rooted lvalue — refuses. The `{name}` collapses in the bucket key.
+    #[error("bind: directive {name}")]
+    BindDirective {
+        /// The bind property name (`value`, `checked`, `clientWidth`, …).
+        name: String,
+    },
     /// A `class:` directive alongside a **mixed-value** `class="a {b}"` attribute.
     /// The oracle passes the mixed template value to `build_attr_class` as the
     /// base; tsv defers reproducing that rare shape rather than build it.
@@ -774,6 +788,7 @@ impl Refusal {
                 "invalid animate: directive (one per element, only on the sole child of a keyed {#each} — the oracle rejects it)",
             ),
             Self::NonPlainAttribute => Cow::Borrowed("non-plain attribute (directive/spread)"),
+            Self::BindDirective { .. } => Cow::Borrowed("bind: directive {name}"),
             Self::ClassDirectiveWithMixedClass => {
                 Cow::Borrowed("class: directive alongside a mixed-value class attribute")
             }

@@ -4,17 +4,19 @@
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{InfallibleResolve, Span};
 use tsv_svelte::ast::internal::{
-    Attribute, AttributeValue, ClassDirective, StyleDirective, StyleDirectiveValue,
+    Attribute, AttributeNode, AttributeValue, BindDirective, ClassDirective, Element,
+    StyleDirective, StyleDirectiveValue,
 };
 use tsv_ts::ast::internal::{
-    ArrayExpression, Expression, LiteralValue, ObjectExpression, ObjectProperty, Property,
-    PropertyKind,
+    ArrayExpression, BinaryOperator, Expression, LiteralValue, ObjectExpression, ObjectProperty,
+    Property, PropertyKind,
 };
 
 use crate::analyze::{evaluate, stringify_value};
 use crate::build::escape_template_text;
 use crate::css_scope::SCOPE_HASH_CLASS;
 use crate::fragment::{BodyBuilder, escape_html_attr, guard_dropped, wrap_value_expr};
+use crate::script_rewrite::plain_identifier_name;
 use crate::transform_server::{EmitEnv, unsupported};
 use crate::{CompileError, Refusal};
 
@@ -826,6 +828,244 @@ pub(crate) fn emit_style_directives<'arena>(
     let call = env.b.member_call("$", "attr_style", args.into_bump_slice());
     out.push_expr(call);
     Ok(())
+}
+
+/// Refuse a `bind:` directive with the collapsing `bind: directive {name}` bucket.
+fn refuse_bind<T>(name: &str) -> Result<T, CompileError> {
+    Err(unsupported(Refusal::BindDirective {
+        name: name.to_string(),
+    }))
+}
+
+/// The `type` attribute's shape on a `bind:`-bearing `<input>` — the split the
+/// oracle keys on (`is_text_attribute`): absent, a bare boolean `type`, a static
+/// text value (`checkbox`/`file`/…), or a dynamic/mixed expression value.
+enum InputType {
+    None,
+    Bare,
+    Static(String),
+    Dynamic,
+}
+
+/// Classify the `<input>`'s `type` attribute (case-sensitive `type`, mirroring the
+/// oracle's `attr.name === 'type'` — a `TYPE` would not be found).
+fn classify_input_type(env: &EmitEnv<'_, '_>, element: &Element<'_>) -> InputType {
+    for attr_node in element.attributes {
+        let AttributeNode::Attribute(attr) = attr_node else {
+            continue;
+        };
+        let is_type = {
+            let interner = env.b.interner.borrow();
+            interner.resolve_infallible(attr.name) == "type"
+        };
+        if !is_type {
+            continue;
+        }
+        return match attr.value {
+            None => InputType::Bare,
+            Some([AttributeValue::Text(text)]) => {
+                InputType::Static(text.data(env.source).into_owned())
+            }
+            Some(_) => InputType::Dynamic,
+        };
+    }
+    InputType::None
+}
+
+/// The root identifier name of a bind target that is an `Identifier` or a member
+/// chain rooted at one (`v`, `obj.x`, `a[i].b`); `None` for any other shape (a
+/// call, literal, binary — not an lvalue root). Mirrors the oracle's `object()`.
+fn bind_target_root(expr: &Expression<'_>, source: &str) -> Option<String> {
+    match expr {
+        Expression::Identifier(id) => plain_identifier_name(id, source),
+        Expression::MemberExpression(member) => bind_target_root(member.object, source),
+        _ => None,
+    }
+}
+
+/// Erase + guard + gate the bind target, returning the emitted expression. The
+/// expression-validity gate keeps tsv on the SAFE side of the oracle's assignable
+/// lvalue rule: emit only a `$state`-rooted `Identifier`/member chain (the crate's
+/// one supported bindable). The oracle also accepts props, bindable props,
+/// reassigned plain lets, and each/store bindings — tsv over-refuses those (never
+/// over-accepts).
+fn emitted_bind_target<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    directive: &'arena BindDirective<'arena>,
+    bind_name: &str,
+) -> Result<Expression<'arena>, CompileError> {
+    // The template borrow point: erase the bind target once, then gate its erased
+    // shape (an `x as T` target is `x`, an assignable lvalue).
+    let expr = env.erase(&directive.expression)?;
+    match bind_target_root(expr, env.source) {
+        Some(name) if env.state_names.contains(&name) => {}
+        _ => return refuse_bind(bind_name),
+    }
+    Ok(wrap_value_expr(env, expr)?[0].clone())
+}
+
+/// Build and push `$.attr(name, value[, true])` for a synthesized bind attribute.
+/// The synthetic call interleaves minted (appendix) and borrowed (host) argument
+/// spans; with carried script comments their windows would sweep — refuse,
+/// matching the dynamic-attribute path.
+fn push_bind_attr<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    name: &str,
+    value: Expression<'arena>,
+    boolean: bool,
+    out: &mut BodyBuilder<'arena>,
+) -> Result<(), CompileError> {
+    if env.has_comments {
+        return Err(unsupported(Refusal::CommentsAlongsideExprAttributes));
+    }
+    let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(env.b.arena);
+    args.push(env.b.string_literal_expr(name));
+    args.push(value);
+    if boolean {
+        args.push(env.b.true_literal());
+    }
+    let call = env.b.member_call("$", "attr", args.into_bump_slice());
+    out.push_expr(call);
+    Ok(())
+}
+
+/// The companion `value` attribute (case-sensitive `value`, the oracle's
+/// `attr.name === 'value'`) a `bind:group` reads for its synthesized `checked`.
+fn find_value_attribute<'arena>(
+    env: &EmitEnv<'_, '_>,
+    element: &'arena Element<'arena>,
+) -> Option<&'arena Attribute<'arena>> {
+    element.attributes.iter().find_map(|attr_node| {
+        let AttributeNode::Attribute(attr) = attr_node else {
+            return None;
+        };
+        let interner = env.b.interner.borrow();
+        (interner.resolve_infallible(attr.name) == "value").then_some(attr)
+    })
+}
+
+/// Build the companion `value` attribute's value for a `bind:group` synthesis —
+/// the oracle's `build_attribute_value(value_attribute.value, …)` (no trim, not
+/// component mode): a static text → an attr-escaped string literal; a single
+/// `{expr}` → the erased/wrapped expression; a bare `value` → `true`; a mixed
+/// value → refuse this group for now.
+fn build_companion_value<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    value_attr: &'arena Attribute<'arena>,
+) -> Result<Expression<'arena>, CompileError> {
+    let Some(values) = value_attr.value else {
+        return Ok(env.b.true_literal());
+    };
+    match values {
+        [AttributeValue::Text(text)] => {
+            let decoded = text.data(env.source);
+            Ok(env.b.string_literal_expr(&escape_html_attr(&decoded)))
+        }
+        [AttributeValue::ExpressionTag(tag)] => {
+            let expr = env.erase(&tag.expression)?;
+            Ok(wrap_value_expr(env, expr)?[0].clone())
+        }
+        _ => refuse_bind("group"),
+    }
+}
+
+/// Emit a `bind:` directive on a regular `<input>`/element (the oracle's server
+/// `BindDirective` handling in `shared/element.js`). The handled core kinds:
+///
+/// - **`bind:this`** → omit (emit nothing). Valid on any variable / any element.
+/// - **`bind:value`** on `<input>` → `$.attr('value', expr)`. A bare `type` is
+///   `attribute_invalid_type` (refuse); a static `type="file"` is the files trap
+///   the oracle silently drops the bind for (refuse rather than emit a divergent
+///   value); a dynamic `type={x}` / static-non-file / no type is fine.
+/// - **`bind:checked`** on `<input>` → `$.attr('checked', expr, true)`; requires a
+///   static `type="checkbox"` (else the oracle rejects).
+/// - **`bind:group`** on `<input>` with a static `type` → a synthesized
+///   `$.attr('checked', <synth>, true)` where `<synth>` is
+///   `group.includes(<value>)` for `type="checkbox"` else `group === <value>`, and
+///   `<value>` is the companion `value` attribute's value. No companion `value` →
+///   the oracle silently drops the bind (emit nothing). The companion `value` still
+///   emits normally at its own source slot — it is only READ here.
+///
+/// Everything else `bind:`-related refuses with the collapsing
+/// [`Refusal::BindDirective`] bucket: a bind on a non-`<input>` target, `value` on
+/// `<textarea>`/`<select>`, the `omit_in_ssr` media/dimension/window binds, the
+/// content-editable trio, `open`, `focused`, an invalid target/type, or a bind
+/// expression that isn't a `$state`-rooted lvalue.
+pub(crate) fn emit_bind_directive<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    directive: &'arena BindDirective<'arena>,
+    element: &'arena Element<'arena>,
+    element_name: &str,
+    out: &mut BodyBuilder<'arena>,
+) -> Result<(), CompileError> {
+    let bind_name = directive.name_span.extract(env.source).to_string();
+
+    // `bind:this` omits on any regular element (the oracle's early `continue`) and
+    // works for any variable — no `$state` gate, nothing emitted (so it is
+    // comment-safe: no synthetic call whose windows could sweep).
+    if bind_name == "this" {
+        return Ok(());
+    }
+
+    match (bind_name.as_str(), element_name) {
+        ("value", "input") => {
+            // A BARE `type` rejects (`attribute_invalid_type`); a static
+            // `type="file"` is dropped by the oracle (refuse rather than diverge);
+            // dynamic / static-non-file / no type is fine for `value`.
+            match classify_input_type(env, element) {
+                InputType::Bare => return refuse_bind(&bind_name),
+                InputType::Static(t) if t == "file" => return refuse_bind(&bind_name),
+                _ => {}
+            }
+            let value = emitted_bind_target(env, directive, &bind_name)?;
+            push_bind_attr(env, "value", value, false, out)
+        }
+        ("checked", "input") => {
+            // `bind:checked` requires a static `type="checkbox"` (a dynamic / bare /
+            // missing / other type is an oracle error).
+            match classify_input_type(env, element) {
+                InputType::Static(t) if t == "checkbox" => {}
+                _ => return refuse_bind(&bind_name),
+            }
+            let value = emitted_bind_target(env, directive, &bind_name)?;
+            push_bind_attr(env, "checked", value, true, out)
+        }
+        ("group", "input") => {
+            // A static `type` is required (a dynamic / bare type is
+            // `attribute_invalid_type`; tsv also over-refuses no type). checkbox →
+            // `group.includes(value)`, any other static type → `group === value`.
+            let is_checkbox = match classify_input_type(env, element) {
+                InputType::Static(t) => t == "checkbox",
+                InputType::None | InputType::Bare | InputType::Dynamic => {
+                    return refuse_bind(&bind_name);
+                }
+            };
+            // Validate the bind TARGET (`g`) even when the bind is later dropped —
+            // the oracle rejects an invalid group expression in its analysis phase,
+            // before it decides whether to emit.
+            let group = emitted_bind_target(env, directive, &bind_name)?;
+            // No companion `value` → the oracle silently drops the bind.
+            let Some(value_attr) = find_value_attribute(env, element) else {
+                return Ok(());
+            };
+            let value = build_companion_value(env, value_attr)?;
+            let arena = env.b.arena;
+            let synth = if is_checkbox {
+                let group_alloc = arena.alloc(group);
+                let callee = env.b.member_prop(group_alloc, "includes");
+                let callee_alloc = arena.alloc(callee);
+                let args = std::slice::from_ref(arena.alloc(value));
+                env.b.call_of(callee_alloc, args, false)
+            } else {
+                let group_alloc = arena.alloc(group);
+                let value_alloc = arena.alloc(value);
+                env.b
+                    .binary(group_alloc, BinaryOperator::EqualsEqualsEquals, value_alloc)
+            };
+            push_bind_attr(env, "checked", synth, true, out)
+        }
+        _ => refuse_bind(&bind_name),
+    }
 }
 
 /// Collapse `[ \t\n\r\f]+` runs to one space without trimming (the mixed-value

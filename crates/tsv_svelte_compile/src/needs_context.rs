@@ -31,8 +31,8 @@
 //! past the analysis.
 
 use tsv_svelte::ast::internal::{
-    AwaitBlock, ConstTag, EachBlock, Element, Fragment, FragmentNode, HtmlTag, IfBlock, KeyBlock,
-    RenderTag, Root, SnippetBlock, SpecialElement,
+    AttributeNode, AwaitBlock, ConstTag, EachBlock, Element, Fragment, FragmentNode, HtmlTag,
+    IfBlock, KeyBlock, RenderTag, Root, SnippetBlock, SpecialElement,
 };
 use tsv_ts::ast::internal::{
     ArrowFunctionBody, ClassBody, ClassMember, ExportDefaultValue, Expression, ForInOfLeft,
@@ -744,6 +744,20 @@ fn walk_render_tag(tag: &RenderTag<'_>, nc: &mut Nc<'_>) {
 }
 
 fn walk_element(element: &Element<'_>, nc: &mut Nc<'_>) {
+    // A `bind:` directive is a two-way binding — it MUTATES its target, so the
+    // target's root binding is reassigned component-wide (the oracle marks the
+    // binding mutated at analysis time, before it decides what to emit). Without
+    // this a bound `$state` would statically fold to its initial value where the
+    // oracle keeps the read dynamic (`bind:group={value}` beside a `{value}`
+    // interpolation). Collected for every bind — a bind tsv refuses at emission
+    // makes the whole component refuse, so the mark is harmless there — and rides
+    // `assign_target_roots`, which unwraps the raw template's TypeScript
+    // assignment-target wrappers.
+    for attr_node in element.attributes {
+        if let AttributeNode::BindDirective(d) = attr_node {
+            crate::rune_guard::assign_target_roots(&d.expression, nc.source, &mut nc.reassigned);
+        }
+    }
     // The shared traversal (`attr_refs`) defines which attribute expressions are
     // reference-bearing on the emitted path: plain attribute values on any element,
     // component `{...spread}` expressions (emitted as `$.spread_props` elements),

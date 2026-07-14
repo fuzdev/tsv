@@ -22,7 +22,8 @@ use tsv_ts::ast::internal::{
 use crate::analyze::{BindingKind, evaluate, stringify_value};
 use crate::attr_refs::fragment_any;
 use crate::attribute::{
-    emit_attribute, emit_class_directives, emit_style_directives, is_load_error_element,
+    emit_attribute, emit_bind_directive, emit_class_directives, emit_style_directives,
+    is_load_error_element,
 };
 use crate::build::escape_template_text;
 use crate::fragment::{
@@ -254,12 +255,19 @@ pub(crate) fn emit_element<'arena>(
                 }
             }
             AttributeNode::AttachTag(attach) => guard_dropped(env, &attach.expression)?,
-            // `bind:`, a legacy `on:` directive, `let:`, and an element `{...spread}`
-            // are not emitted yet — refuse. (`class:`/`style:` alongside one of these
+            // `bind:` is handled inline at its source slot: a handled core kind
+            // (`this` omits; `value`/`checked`/`group` on `<input>` synthesize a
+            // `$.attr(...)`) emits, everything else refuses (`emit_bind_directive`).
+            // A `bind:group`'s companion `value` attribute still emits normally via
+            // the `Attribute` arm above — it is only READ for the synthesis.
+            AttributeNode::BindDirective(directive) => {
+                emit_bind_directive(env, directive, element, &name, out)?;
+            }
+            // A legacy `on:` directive, `let:`, and an element `{...spread}` are not
+            // emitted yet — refuse. (`class:`/`style:`/`bind:` alongside one of these
             // still refuses here, via the sibling.)
             AttributeNode::SpreadAttribute(_)
             | AttributeNode::OnDirective(_)
-            | AttributeNode::BindDirective(_)
             | AttributeNode::LetDirective(_) => {
                 return Err(unsupported(Refusal::NonPlainAttribute));
             }

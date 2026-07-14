@@ -24,11 +24,13 @@
 //! Two traversals share that definition. `each_attribute_expression` is the
 //! **emitted-path** view: it visits everything not refused at emission — plain
 //! attribute values, component spreads, a `class:` / `style:` directive on a
-//! regular element (emitted as `$.attr_class` / `$.attr_style`), and the no-op
+//! regular element (emitted as `$.attr_class` / `$.attr_style`), a `bind:`
+//! directive's target expression on a regular element (the oracle's analysis
+//! visits every bind expression regardless of SSR emission), and the no-op
 //! drop family (`use:`/`transition:`/`in:`/`out:`/`animate:`/`{@attach}`) on a
 //! regular element, which is dropped-but-analyzed exactly like an event handler.
-//! It skips the positions that *do* refuse (an element spread, `bind:`/
-//! legacy `on:`/`let:`), because the emission refusal is what keeps their
+//! It skips the positions that *do* refuse (an element spread, legacy
+//! `on:`/`let:`), because the emission refusal is what keeps their
 //! references out of output — and its `each_emitted_directive_name` companion
 //! surfaces the drop-family directive *names* plus a `style:` shorthand name
 //! (which an expression traversal can't reach).
@@ -275,6 +277,11 @@ pub(crate) fn fragment_any<'arena>(
 ///   / `$.attr_style(base, { name: value, … })` call). A `style:` shorthand carries
 ///   no expression — its reference rides `each_emitted_directive_name`. On a
 ///   component both refuse at emission, so they are skipped there;
+/// - a `bind:` directive's target expression on a regular HTML element. The oracle
+///   counts every bind expression at analysis time regardless of what SSR emits, so
+///   the reference must be seen (a snippet whose only instance-binding reference sits
+///   in a bind must not module-hoist). On a component `bind:` refuses at emission (a
+///   `ComponentBindDirective`), so it is skipped;
 /// - the **no-op drop family** on a regular HTML element (`use:`/`transition:`/
 ///   `in:`/`out:`/`animate:` expressions and `{@attach}`). These contribute
 ///   nothing to the tag but are dropped-but-analyzed, exactly like an event
@@ -286,8 +293,8 @@ pub(crate) fn fragment_any<'arena>(
 ///
 /// An *element* spread is refused at emission, so its expression never reaches
 /// output — and visiting it here would let an analysis refusal fire before the
-/// emission refusal, shifting corpus buckets. `bind:`/legacy `on:`/`let:`
-/// are likewise refused at emission and not visited.
+/// emission refusal, shifting corpus buckets. Legacy `on:`/`let:` are likewise
+/// refused at emission and not visited.
 ///
 /// A drop-family directive's **name** (`use:action`, `transition:fade`) is also a
 /// binding reference the oracle counts, but tsv stores it as a verbatim name span
@@ -336,6 +343,17 @@ pub(crate) fn each_attribute_expression<'a, 'arena>(
                 }
                 StyleDirectiveValue::True => {}
             },
+            // A `bind:` directive on a regular element: the oracle's analysis visits
+            // every bind expression (for reference counting / `needs_context`),
+            // regardless of what SSR emits, so every analysis must see it. The binds
+            // tsv actually compiles (`this` omitted; `value`/`checked`/`group` on
+            // `<input>` emitted) are all $state-rooted here, so this never fires
+            // `needs_context` — but a snippet whose only instance-binding reference
+            // sits in a bind must still not module-hoist. A bind tsv refuses elsewhere
+            // makes the whole component refuse, so visiting it is harmless there. On a
+            // component `bind:` refuses at emission (a `ComponentBindDirective`), so it
+            // is skipped.
+            AttributeNode::BindDirective(d) if is_html => f(&d.expression),
             // The no-op drop family: dropped-but-analyzed on a regular element.
             AttributeNode::AttachTag(attach) if is_html => f(&attach.expression),
             AttributeNode::UseDirective(d) if is_html => {

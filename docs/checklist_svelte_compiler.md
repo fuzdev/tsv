@@ -296,7 +296,9 @@ A **static** component invocation compiles to `Name($$renderer, props)` (`shared
 | `style:` alongside a **mixed-value** `style="a {b}"` base | **Refused**: `style: directive alongside a mixed-value style attribute` |
 | `style:prop="a {b}"` with a **mixed-value** (text + expression) directive value | **Refused**: `style: directive with a mixed-value (text + expression) value` |
 | `style:prop\|mod` with an invalid modifier — anything but a single `\|important` (the oracle's `style_directive_invalid_modifier`) | **Refused**: `style: directive with an invalid modifier (only \|important, once, is allowed)` |
-| the still-refused directives / spread — `bind:`, a legacy `on:` event directive, `let:`, and an element `{...spread}` (a `class:`/`style:` alongside one of these still refuses via the sibling; `class:`/`style:` on a **component** refuses through `directive on <{name}> component`) | **Refused**: `non-plain attribute (directive/spread)` |
+| `bind:` core kinds on a **regular element** (the oracle's server `BindDirective` handling, `shared/element.js`): **`bind:this`** → omit (emit nothing; valid on any variable / any element); **`bind:value`** on `<input>` → `$.attr('value', expr)`; **`bind:checked`** on `<input type="checkbox">` (static) → `$.attr('checked', expr, true)`; **`bind:group`** on `<input>` with a static `type` → a synthesized `$.attr('checked', <synth>, true)`, `<synth>` = `group.includes(<value>)` for `type="checkbox"` else `group === <value>`, where `<value>` is the companion `value` attribute's value (which still emits at its own slot; no companion `value` → the oracle silently drops the bind). Emit only when the (erased) bind target is a `$state`-rooted `Identifier`/member chain (the crate's one supported bindable) | Supported (regular elements) |
+| every other `bind:` — a bind on a non-`<input>` target, `value` on `<textarea>`/`<select>`, the `omit_in_ssr` media/dimension/window binds (`clientWidth`, `currentTime`, `files`, …), `bind:open` on `<details>`, the content-editable trio (`innerHTML`/`innerText`/`textContent`), `focused`, an invalid target/type (a dynamic/bare `type` with a two-way bind, a non-checkbox `bind:checked`, a static `type="file"` with `bind:value`), or a bind target that isn't a `$state`-rooted lvalue (a prop, `$derived`, reassigned plain let, a call — a SAFE over-refusal) | **Refused**: `bind: directive {name}` |
+| the still-refused directives / spread — a legacy `on:` event directive, `let:`, and an element `{...spread}` (a `class:`/`style:`/`bind:` alongside one of these still refuses via the sibling; `class:`/`style:`/`bind:` on a **component** refuses through `directive on <{name}> component` / `bind: directive on <{name}> component`) | **Refused**: `non-plain attribute (directive/spread)` |
 | string-literal expression value (`name={'s'}`) | **Refused**: `string-literal expression attribute value (inline-literal path)` |
 | dynamic `class`/`style` on a styled component | **Refused**: `dynamic class attribute on a styled component` / `dynamic style attribute on a styled component` / `interpolated {name} attribute on a styled component` |
 | `value` attribute on `<textarea>` / `<select>` (child content / `select_value` bookkeeping in the oracle) | **Refused**: `value attribute on <{name}>` |
@@ -319,17 +321,19 @@ A **static** component invocation compiles to `Name($$renderer, props)` (`shared
 
 ### select-family
 
-A trap for the later spread/`bind:` slices: the oracle routes a **children-free**
+A trap for the later spread slice: the oracle routes a **children-free**
 `<select {...props}>` or `<select bind:value={v}>` through `$$renderer.select(...)`
 (a closure form), **not** the ordinary `$.attributes` / `$.attr` attribute path
 (`is_select_special` / `is_option_special`, `RegularElement.js`). tsv's existing
 "populated `<select>`/`<optgroup>`" refusal catches only the *populated* case, so
-the children-free select escapes it. Today both shapes refuse anyway — a spread or
-`bind:` is a still-refused directive (`non-plain attribute (directive/spread)`) —
-and `compile_select_family_spread_and_bind_refuse` pins that. When spread / `bind:`
-land (slices 4 / 3), an empty `<select {...props}>` / `<select bind:value>` must
-grow its **own** select-family refusal (or emission) rather than fall through to
-`$.attributes`, or it will silently mis-route.
+the children-free select escapes it. Today both shapes refuse anyway — a spread is
+a still-refused directive (`non-plain attribute (directive/spread)`), and
+`bind:value` on `<select>` refuses because the `bind:` slice handles `value` only
+on `<input>` (`bind: directive value` for any other target) —
+and `compile_select_family_spread_and_bind_refuse` pins that. When the spread slice
+lands, an empty `<select {...props}>` must grow its **own** select-family refusal
+(or emission) rather than fall through to `$.attributes`, or it will silently
+mis-route.
 
 ### Styles (CSS scoping)
 
