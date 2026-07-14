@@ -734,6 +734,24 @@ pub enum ElementKind {
     Component,
 }
 
+/// Whether a tag `name` is a Svelte **component** rather than an HTML element.
+///
+/// A dotted tag (member access, e.g. `ns.Comp`, `Object.component`) is always a component;
+/// otherwise it is a component iff its first character is uppercase (Unicode, so `\p{Lu}` such
+/// as `Δ` / `Я` counts, not just ASCII). Mirrors Svelte's `regex_valid_component_name`
+/// (`1-parse/state/element.js`): uppercase-first with optional dots, or any `ID_Start`-first
+/// name with one or more dotted segments.
+///
+/// The single source for component-ness: the parser reads it to set [`ElementKind::Component`],
+/// and the printer's tag classification reads it too (adding only its own `:`-namespaced term
+/// for the self-close decision). One predicate keeps the two from drifting — the printer must
+/// not classify a Unicode-uppercase component as a plain inline element and strip its self-close.
+///
+/// Examples: `Comp` → true, `ns.Comp` → true, `Object.component` → true, `div` → false.
+pub(crate) fn is_component_name(name: &str) -> bool {
+    name.contains('.') || name.chars().next().is_some_and(char::is_uppercase)
+}
+
 /// Svelte Element - HTML/component tag
 ///
 /// Represents an HTML element or Svelte component in the template.
