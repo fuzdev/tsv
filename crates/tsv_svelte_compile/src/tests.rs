@@ -1045,6 +1045,96 @@ fn compile_component_event_handler_is_a_plain_prop() {
 }
 
 #[test]
+fn compile_element_spread_object() {
+    // A regular element `{...spread}` routes the WHOLE attribute set through one
+    // fused `$.attributes({ … })` call, source order: plain attrs become object
+    // properties, spreads become `...expr` elements.
+    let js = compile_js(
+        "<script>let props = $state({});</script>\n<div class=\"foo\" id=\"a\" {...props}></div>",
+    );
+    assert!(
+        js.contains("$.attributes({ class: 'foo', id: 'a', ...props })"),
+        "{js}"
+    );
+    // A single-expression event handler drops from the object; a bare boolean and
+    // a `data-*` key (quoted, lowercased) survive.
+    let js = compile_js(
+        "<script>let props = $state({}); let x = $state(1);</script>\n<div DataFoo={x} disabled onclick={x} {...props}></div>",
+    );
+    assert!(
+        js.contains("$.attributes({ datafoo: x, disabled: true, ...props })"),
+        "{js}"
+    );
+}
+
+#[test]
+fn compile_element_spread_flags_and_elision() {
+    // `<input>` → the `ELEMENT_IS_INPUT` flag (4) with interior `void 0` padding.
+    let js = compile_js("<script>let props = $state({});</script>\n<input {...props}/>");
+    assert!(
+        js.contains("$.attributes({ ...props }, void 0, void 0, void 0, 4)"),
+        "{js}"
+    );
+    // A custom element (hyphenated tag) → `ELEMENT_PRESERVE_ATTRIBUTE_CASE` (2).
+    let js = compile_js("<script>let props = $state({});</script>\n<my-elem {...props}></my-elem>");
+    assert!(
+        js.contains("$.attributes({ ...props }, void 0, void 0, void 0, 2)"),
+        "{js}"
+    );
+}
+
+#[test]
+fn compile_element_spread_scope_hash_rides_second_arg() {
+    // In spread mode the scope hash is NOT concatenated into the class value — it
+    // rides the `css_hash` (2nd) argument.
+    let out = compile(
+        "<script>let props = $state({});</script>\n<div class=\"foo\" {...props}></div><style>.foo{color:red}</style>",
+        &CompileOptions::default(),
+    )
+    .unwrap();
+    assert!(
+        out.js
+            .contains("$.attributes({ class: 'foo', ...props }, 'svelte-tsvhash')"),
+        "{}",
+        out.js
+    );
+}
+
+#[test]
+fn compile_element_spread_prop_root_forces_context_wrapper() {
+    // A member access rooted at a prop inside a `{...spread}` must fire the
+    // `$$renderer.component` wrapper (the reference feeds `needs_context`).
+    let out = compile(
+        "<script>let obj = $props();</script>\n<div {...obj.foo}></div>",
+        &CompileOptions::default(),
+    )
+    .unwrap();
+    assert!(
+        out.js.contains("$$renderer.component(($$renderer) =>"),
+        "prop-rooted spread must wrap: {}",
+        out.js
+    );
+}
+
+#[test]
+fn compile_element_spread_with_directive_refuses() {
+    // A co-present `class:`/`style:`/`bind:` directive folds into the
+    // `$.attributes` arguments differently — a later slice, so refuse for now.
+    assert_unsupported(
+        "<script>let props = $state({}); let x = $state(1);</script>\n<div class:a={x} {...props}></div>",
+        "alongside a directive",
+    );
+    assert_unsupported(
+        "<script>let props = $state({}); let x = $state(1);</script>\n<div style:color={x} {...props}></div>",
+        "alongside a directive",
+    );
+    assert_unsupported(
+        "<script>let props = $state({}); let v = $state('');</script>\n<input bind:value={v} {...props}/>",
+        "alongside a directive",
+    );
+}
+
+#[test]
 fn compile_component_anchor_when_not_standalone() {
     // Inside an element the component is not standalone → trailing `<!---->`.
     let js = compile_js("<div><Foo /></div>");

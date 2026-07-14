@@ -270,8 +270,9 @@ pub(crate) fn fragment_any<'arena>(
 ///
 /// - plain attribute expression values (single-expression and mixed-value
 ///   chunks) on any element;
-/// - `{...spread}` expressions on **components** (emitted as `$.spread_props`
-///   array elements);
+/// - `{...spread}` expressions on any element — a component's `$.spread_props`
+///   array element and a regular element's fused `$.attributes({ …spread })`
+///   object element both emit the expression, so both are visited;
 /// - a `class:` / `style:` directive's expression-bearing value on a regular HTML
 ///   element (fused into the element's `$.attr_class(base, hash, { name: expr, … })`
 ///   / `$.attr_style(base, { name: value, … })` call). A `style:` shorthand carries
@@ -291,10 +292,8 @@ pub(crate) fn fragment_any<'arena>(
 ///   emission (a `ComponentDirective`), so they are skipped there — visiting them
 ///   would let an analysis refusal fire first and shift corpus buckets.
 ///
-/// An *element* spread is refused at emission, so its expression never reaches
-/// output — and visiting it here would let an analysis refusal fire before the
-/// emission refusal, shifting corpus buckets. Legacy `on:`/`let:` are likewise
-/// refused at emission and not visited.
+/// Legacy `on:`/`let:` are refused at emission, so their expressions never reach
+/// output and are not visited here.
 ///
 /// A drop-family directive's **name** (`use:action`, `transition:fade`) is also a
 /// binding reference the oracle counts, but tsv stores it as a verbatim name span
@@ -317,7 +316,13 @@ pub(crate) fn each_attribute_expression<'a, 'arena>(
                     }
                 }
             }
-            AttributeNode::SpreadAttribute(spread) if element.kind == ElementKind::Component => {
+            // A `{...spread}` reaches output on BOTH element kinds — a component's
+            // `$.spread_props([…])` array element and a regular element's fused
+            // `$.attributes({ …spread })` object element — so every analysis must
+            // see its expression (a `new`/prop-rooted access inside one fires the
+            // `$$renderer.component` wrapper; a snippet whose only instance-binding
+            // reference sits in a spread must not module-hoist).
+            AttributeNode::SpreadAttribute(spread) => {
                 f(&spread.expression);
             }
             // A `class:` directive on a regular element is emitted (`$.attr_class`),

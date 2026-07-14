@@ -424,15 +424,36 @@ pub enum Refusal {
          keyed {{#each}} — the oracle rejects it)"
     )]
     AnimateDirectiveInvalid,
-    /// A directive or spread attribute the transform does not yet emit —
-    /// a legacy `on:` event directive, `let:`, or an element `{...spread}`. The
-    /// no-op drop family (`use:`/`transition:`/`in:`/`out:`/`animate:`/`{@attach}`)
-    /// is dropped, not refused, on a regular element; `class:`/`style:` on a
-    /// regular element are emitted (`$.attr_class`/`$.attr_style`), and `bind:` is
-    /// handled by [`BindDirective`](Refusal::BindDirective) (a handled core kind
-    /// emits, everything else refuses).
-    #[error("non-plain attribute (directive/spread)")]
+    /// A directive the transform does not yet emit — a legacy `on:` event
+    /// directive or `let:`. The no-op drop family
+    /// (`use:`/`transition:`/`in:`/`out:`/`animate:`/`{@attach}`) is dropped, not
+    /// refused, on a regular element; `class:`/`style:` on a regular element are
+    /// emitted (`$.attr_class`/`$.attr_style`), `bind:` is handled by
+    /// [`BindDirective`](Refusal::BindDirective) (a handled core kind emits,
+    /// everything else refuses), and an element `{...spread}` routes to the fused
+    /// `$.attributes({…})` object-builder (see [`SpreadWithDirective`](Refusal::SpreadWithDirective)).
+    #[error("non-plain attribute (directive)")]
     NonPlainAttribute,
+    /// An element `{...spread}` co-present with any directive
+    /// (`class:`/`style:`/`bind:`/legacy `on:`/`let:`/the no-op drop family). The
+    /// spread routes the whole element through `$.attributes(object, css_hash,
+    /// classes, styles, flags)`, where `class:`/`style:` become the 3rd/4th
+    /// arguments and `bind:` folds into the object — a later slice. This slice
+    /// handles a spread alongside only plain attributes and other spreads, so any
+    /// co-present directive refuses.
+    #[error("element {{...spread}} alongside a directive (deferred)")]
+    SpreadWithDirective,
+    /// An element `{...spread}` on a `<select>`. The oracle routes a spread (or a
+    /// bind) on a select through `$$renderer.select(object, ($$renderer) => …)`, a
+    /// different callee than `$.attributes` — not implemented, so refuse.
+    #[error("{{...spread}} on <select> (the oracle routes to $$renderer.select)")]
+    SpreadOnSelect,
+    /// An element `{...spread}` on a load-error element (`img`, `iframe`, …). The
+    /// oracle adds `onload`/`onerror` capture attributes there (its
+    /// `events_to_capture` set — a spread triggers it like a `use:`), which tsv
+    /// does not yet reproduce.
+    #[error("{{...spread}} on a load-error element (event-capture markup not implemented)")]
+    SpreadOnLoadErrorElement,
     /// A `bind:` directive on a regular element outside the handled core set. The
     /// handled kinds emit (`bind:this` omits; `bind:value`/`bind:checked`/
     /// `bind:group` on `<input>` synthesize a `$.attr(...)`); everything else — a
@@ -787,7 +808,16 @@ impl Refusal {
             Self::AnimateDirectiveInvalid => Cow::Borrowed(
                 "invalid animate: directive (one per element, only on the sole child of a keyed {#each} — the oracle rejects it)",
             ),
-            Self::NonPlainAttribute => Cow::Borrowed("non-plain attribute (directive/spread)"),
+            Self::NonPlainAttribute => Cow::Borrowed("non-plain attribute (directive)"),
+            Self::SpreadWithDirective => {
+                Cow::Borrowed("element {...spread} alongside a directive (deferred)")
+            }
+            Self::SpreadOnSelect => {
+                Cow::Borrowed("{...spread} on <select> (the oracle routes to $$renderer.select)")
+            }
+            Self::SpreadOnLoadErrorElement => Cow::Borrowed(
+                "{...spread} on a load-error element (event-capture markup not implemented)",
+            ),
             Self::BindDirective { .. } => Cow::Borrowed("bind: directive {name}"),
             Self::ClassDirectiveWithMixedClass => {
                 Cow::Borrowed("class: directive alongside a mixed-value class attribute")
