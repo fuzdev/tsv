@@ -185,6 +185,44 @@ mod arena_tests {
         assert_eq!(cached("中\n中"), CachedWidth::HasNewline);
     }
 
+    // `MultilineText::first_width` precomputes the first line's visual width with
+    // the same `.min(TEXT_WIDTH_NOT_COMPUTED - 1)` clamp as `pooled_text_width`
+    // (arena.rs `multiline_text`). No corpus reaches the clamp — it needs a
+    // ~65k-column first line — so this is the only gate over that arm (mutation
+    // survivor: the `- 1` in the clamp).
+    #[test]
+    fn test_multiline_first_width_precompute_clamps_below_sentinels() {
+        use super::arena::DocNode;
+
+        let a = DocArena::new();
+        let first_width = |s: &str| {
+            let id = a.multiline_text(s);
+            let nodes = a.borrow_nodes();
+            let DocNode::MultilineText { first_width, .. } = &nodes[id.index()] else {
+                panic!("expected multiline-text node");
+            };
+            *first_width
+        };
+
+        const MAX_CACHEABLE: u16 = u16::MAX - 2; // one below TEXT_WIDTH_NOT_COMPUTED
+
+        // Ordinary first lines carry their exact visual width (tabs = TAB_WIDTH).
+        assert_eq!(first_width("abcd\ntail"), 4);
+        assert_eq!(first_width("a\tb\ntail"), 4);
+        // First line 65,533 cols (32,766 CJK × 2 + 1): the widest exactly cacheable.
+        assert_eq!(
+            first_width(&("中".repeat(32_766) + "x\ntail")),
+            MAX_CACHEABLE
+        );
+        // First line 65,534 cols would alias TEXT_WIDTH_NOT_COMPUTED; must clamp.
+        assert_eq!(
+            first_width(&("中".repeat(32_767) + "\ntail")),
+            MAX_CACHEABLE
+        );
+        // Only the first line is measured; a wide continuation line is irrelevant.
+        assert_eq!(first_width(&format!("ok\n{}", "中".repeat(40_000))), 2);
+    }
+
     #[test]
     fn test_static_text_width_cached_via_static_cache() {
         use super::arena::DocNode;
