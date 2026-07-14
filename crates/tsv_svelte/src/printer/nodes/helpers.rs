@@ -9,7 +9,7 @@ use crate::printer::Printer;
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::TAB_WIDTH;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -177,7 +177,7 @@ impl<'a> Printer<'a> {
     /// runs to end of line, so the following token drops to the next line to avoid
     /// swallowing it). Empty doc when the range holds no comments.
     fn build_pattern_leading_comments(&self, start: u32, end: u32) -> DocId {
-        let docs: DocBuf = comments_in_range(self.comments, start, end)
+        let docs: DocBuf = comments_to_emit_in_range(self.comments, start, end)
             .map(|c| self.build_leading_js_comment_doc(c))
             .collect();
         self.d().concat(&docs)
@@ -187,7 +187,7 @@ impl<'a> Printer<'a> {
     /// ` /* … */` (inline, leading space); a line comment as ` // …` + `hardline`. Empty
     /// doc when the range holds no comments.
     fn build_pattern_trailing_comments(&self, start: u32, end: u32) -> DocId {
-        let docs: DocBuf = comments_in_range(self.comments, start, end)
+        let docs: DocBuf = comments_to_emit_in_range(self.comments, start, end)
             .map(|c| self.build_trailing_js_comment_doc(c))
             .collect();
         self.d().concat(&docs)
@@ -412,7 +412,7 @@ impl<'a> Printer<'a> {
     ///
     /// **Comments are preserved in place.** A comment in any pattern position (after a
     /// brace/bracket, around a `,` / `:` / `=`, inside a property, before the close) is
-    /// threaded through via `comments_in_range` and kept where the author wrote it —
+    /// threaded through via `comments_to_emit_in_range` and kept where the author wrote it —
     /// block comments inline, line comments line-safely (`//` + `hardline`, so the tail
     /// drops to the next line without swallow). prettier-plugin-svelte prints these
     /// patterns from a comment-blind path and drops them, so this is a
@@ -518,7 +518,7 @@ impl<'a> Printer<'a> {
         let expr_end = expr.span().end;
 
         // Build docs for leading comments (between span_start and expression start)
-        let leading_docs: DocBuf = comments_in_range(self.comments, span_start, expr_start)
+        let leading_docs: DocBuf = comments_to_emit_in_range(self.comments, span_start, expr_start)
             .map(|c| self.build_leading_js_comment_doc(c))
             .collect();
 
@@ -540,7 +540,7 @@ impl<'a> Printer<'a> {
             tsv_ts::build_expression_doc_with_comments(d, expr, &self.ts_inputs(), &embed);
 
         // Build docs for trailing comments (between expression end and span_end)
-        let trailing_docs: DocBuf = comments_in_range(self.comments, expr_end, span_end)
+        let trailing_docs: DocBuf = comments_to_emit_in_range(self.comments, expr_end, span_end)
             .map(|c| self.build_trailing_js_comment_doc(c))
             .collect();
 
@@ -576,7 +576,7 @@ impl<'a> Printer<'a> {
         let expr_end = expr.span().end;
 
         // Build docs for leading comments
-        let leading_docs: DocBuf = comments_in_range(self.comments, span_start, expr_start)
+        let leading_docs: DocBuf = comments_to_emit_in_range(self.comments, span_start, expr_start)
             .map(|c| self.build_leading_js_comment_doc(c))
             .collect();
 
@@ -614,7 +614,7 @@ impl<'a> Printer<'a> {
         };
 
         // Build docs for trailing comments
-        let trailing_docs: DocBuf = comments_in_range(self.comments, expr_end, span_end)
+        let trailing_docs: DocBuf = comments_to_emit_in_range(self.comments, expr_end, span_end)
             .map(|c| self.build_trailing_js_comment_doc(c))
             .collect();
 

@@ -144,6 +144,12 @@ pub fn format(program: &Program<'_>, source: &str) -> String {
 /// borrowed from `arena` escapes — the result is an owned `String` — so the
 /// caller may reset and reuse it the moment this returns.
 pub fn format_in(program: &Program<'_>, source: &str, arena: &DocArena) -> String {
+    // The print-once comment ledger's expectation for this document (diagnostic; see
+    // `tsv_lang::comment_ledger`). A Svelte host registers its own `Root.comments`, so
+    // an embedded `<script>` never reaches here.
+    #[cfg(feature = "comment_check")]
+    tsv_lang::comment_ledger::register_parsed(source, &program.comments);
+
     // Fill the arena-parked line-break table (one warm table across a
     // multi-file driver's files instead of a fresh Vec per file).
     let mut line_breaks = arena.take_line_breaks_scratch();

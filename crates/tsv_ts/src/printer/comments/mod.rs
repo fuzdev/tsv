@@ -43,7 +43,7 @@ pub(super) use super::{Printer, calls, layout};
 use smallvec::SmallVec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::{Comment, comments_in_range};
+use tsv_lang::{Comment, comments_to_emit_in_range};
 
 /// Small stack-allocated vector of comment references. Inline capacity 4 keeps
 /// the common comment gaps off the heap: 0–2 comments are the bulk, and a short
@@ -239,7 +239,7 @@ impl<'a> Printer<'a> {
     /// the site's leading run (a block hugging the next item leads it).
     pub(crate) fn push_before_comma_blocks(&self, parts: &mut DocBuf, start: u32, comma_pos: u32) {
         let d = self.d();
-        for comment in comments_in_range(self.comments, start, comma_pos) {
+        for comment in comments_to_emit_in_range(self.comments, start, comma_pos) {
             parts.push(d.text(" "));
             parts.push(self.build_comment_doc(comment));
         }
@@ -258,7 +258,7 @@ impl<'a> Printer<'a> {
         next_start: u32,
     ) {
         let d = self.d();
-        for comment in comments_in_range(self.comments, comma_pos, next_start) {
+        for comment in comments_to_emit_in_range(self.comments, comma_pos, next_start) {
             if self.is_stranded_after_comma_block(comment, comma_pos, next_start) {
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
@@ -295,7 +295,7 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for inline comments with filtering, returning None if no comments.
     ///
-    /// This is more efficient than `has_comments_between` + `build_comments_between`
+    /// This is more efficient than `has_comments_to_emit_between` + `build_comments_between`
     /// because it uses a single binary search instead of two.
     pub(crate) fn build_comments_between_filtered_opt(
         &self,
@@ -307,7 +307,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
 
         // Check if any comments exist in range (considering filter)
-        let has_comments = comments_in_range(self.comments, start, end)
+        let has_comments = comments_to_emit_in_range(self.comments, start, end)
             .any(|c| !matches!(filter, CommentFilter::BlockOnly) || c.is_block);
 
         if !has_comments {
@@ -325,7 +325,7 @@ impl<'a> Printer<'a> {
         let mut parts = DocBuf::new();
         let mut prev_was_line = false;
         let mut first = true;
-        for comment in comments_in_range(self.comments, start, end) {
+        for comment in comments_to_emit_in_range(self.comments, start, end) {
             // Apply filter
             if matches!(filter, CommentFilter::BlockOnly) && !comment.is_block {
                 continue;
@@ -383,7 +383,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_trailing_comments_break_for_line(&self, start: u32, end: u32) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
-        for comment in comments_in_range(self.comments, start, end) {
+        for comment in comments_to_emit_in_range(self.comments, start, end) {
             parts.push(self.build_comment_doc(comment));
             if comment.is_block {
                 parts.push(d.text(" "));
@@ -404,7 +404,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_leading_comments_break_for_line(&self, start: u32, end: u32) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
-        for comment in comments_in_range(self.comments, start, end) {
+        for comment in comments_to_emit_in_range(self.comments, start, end) {
             parts.push(d.text(" "));
             parts.push(self.build_comment_doc(comment));
             if !comment.is_block {
@@ -417,7 +417,7 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for inline comments, returning None if no comments.
     ///
-    /// Use this instead of `has_comments_between` + `build_inline_comments_between_doc`
+    /// Use this instead of `has_comments_to_emit_between` + `build_inline_comments_between_doc`
     /// to avoid redundant binary searches.
     #[inline]
     pub(crate) fn build_inline_comments_between_doc_opt(
@@ -564,7 +564,7 @@ impl<'a> Printer<'a> {
         let mut parts = DocBuf::new();
         self.push_leading_comment_run(
             &mut parts,
-            comments_in_range(self.comments, start, end),
+            comments_to_emit_in_range(self.comments, start, end),
             end,
             glue,
         );
@@ -620,14 +620,14 @@ impl<'a> Printer<'a> {
         build_value: impl FnOnce() -> DocId,
     ) -> Option<DocId> {
         let d = self.d();
-        if !self.has_comments_between(eq_pos + 1, value_start) {
+        if !self.has_comments_to_emit_between(eq_pos + 1, value_start) {
             return None;
         }
         if self.has_line_comments_between(eq_pos + 1, value_start) {
             // Line comment → mandatory break. Partition the run: a comment on the
             // `=`'s line trails it; the rest lead the value on their own lines.
             let after_eq: CommentVec<'_> =
-                comments_in_range(self.comments, eq_pos + 1, value_start).collect();
+                comments_to_emit_in_range(self.comments, eq_pos + 1, value_start).collect();
             let mut trailing = DocBuf::new();
             let mut leading = DocBuf::new();
             for (ci, comment) in after_eq.iter().enumerate() {
@@ -646,7 +646,8 @@ impl<'a> Printer<'a> {
                 d.concat(&trailing),
                 d.indent(d.concat(&[d.hardline(), d.concat(&leading), build_value()])),
             ]))
-        } else if comments_in_range(self.comments, eq_pos + 1, value_start)
+        } else if self
+            .comments_on_page_between(eq_pos + 1, value_start)
             .any(|c| self.comment_forces_own_line(c))
         {
             // Own-line / multiline block → break-after-operator hang.

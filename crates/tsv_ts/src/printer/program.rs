@@ -6,7 +6,8 @@
 use crate::ast::internal;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::{
-    CommentPosition, classify_comment_fast, comments_after, comments_in_range, doc::arena::DocId,
+    CommentPosition, classify_comment_fast, comments_to_emit_after, comments_to_emit_in_range,
+    doc::arena::DocId,
 };
 
 use super::Printer;
@@ -61,9 +62,13 @@ impl<'a> Printer<'a> {
                     self.build_leading_comments_doc(prev_end, search_end, !has_output, true);
                 if let Some(comments_doc) = comments_doc {
                     if has_output {
-                        // Check for blank line before the first comment (same as regular statements)
+                        // Check for blank line before the first comment (same as regular
+                        // statements). The scan is over source *bytes*, so it must stop at
+                        // the first comment physically in the gap — including one this gap
+                        // does not emit (an owned annotation), whose own newlines would
+                        // otherwise read as an authored blank line.
                         let first_comment_start =
-                            comments_in_range(self.comments, prev_end, search_end)
+                            tsv_lang::comments_in_source_range(self.comments, prev_end, search_end)
                                 .next()
                                 .map(|c| c.span.start);
                         let check_end = first_comment_start.unwrap_or_else(|| statement.span().end);
@@ -82,14 +87,10 @@ impl<'a> Printer<'a> {
 
             // Separator between statements
             if has_output {
-                // Check for blank line before the next item:
-                // - If there are comments, check before the first comment
-                // - If no comments, check before the statement
-                let first_comment_start =
-                    comments_in_range(self.comments, prev_end, statement.span().start)
-                        .next()
-                        .map(|c| c.span.start);
-                let check_end = first_comment_start.unwrap_or_else(|| statement.span().start);
+                // Check for blank line before the next item — up to the first comment
+                // physically in the gap (see the EmptyStatement arm above), else up to the
+                // statement.
+                let check_end = self.blank_scan_end(prev_end, statement.span().start);
 
                 if self.has_blank_line_between(prev_end, check_end) {
                     parts.push(d.literalline()); // Blank line at column 0
@@ -175,7 +176,7 @@ impl<'a> Printer<'a> {
         let mut printed_any = false;
         let mut last_was_inline = false;
 
-        for comment in comments_in_range(self.comments, prev_end, curr_start) {
+        for comment in comments_to_emit_in_range(self.comments, prev_end, curr_start) {
             let position = classify_comment_fast(comment, prev_end, curr_start, self.line_breaks);
 
             // Skip trailing comments EXCEPT for first statement (file start)
@@ -284,7 +285,7 @@ impl<'a> Printer<'a> {
         let mut last_comment_end = prev_end;
         let mut is_first_comment = true;
 
-        for comment in comments_after(self.comments, prev_end) {
+        for comment in comments_to_emit_after(self.comments, prev_end) {
             // Skip comments on same line as prev_end - those are inline trailing comments
             // already handled by build_trailing_same_line_comment_docs
             // BUT: When prev_end == 0 (no statements), there's no previous statement to be

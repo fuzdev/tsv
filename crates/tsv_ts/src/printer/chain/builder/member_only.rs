@@ -76,7 +76,7 @@ pub(super) fn build_member_only_chain_with_comments_doc<'a, P: ChainPrinter>(
         // computed one — the comments inside its brackets belong to the bracket
         // builder, not to this chain gap. See `node_comment_gap`.
         match node_comment_gap(node, printer) {
-            Some((obj_end, gap_end)) if printer.has_comments_between(obj_end, gap_end) => {
+            Some((obj_end, gap_end)) if printer.has_comments_to_emit_between(obj_end, gap_end) => {
                 push_gap_comments_and_break(&mut rest, printer, obj_end, gap_end, true);
                 rest.push(print_node_inner(node, printer, false, true));
             }

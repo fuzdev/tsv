@@ -423,7 +423,10 @@ impl<'a> Printer<'a> {
         {
             return None;
         }
-        Some(self.d().source_span(node.span(), self.source))
+        // The ignored node's subtree can hold `{expr}` / block-head comments (all in
+        // `Root.comments`); they ride out inside the raw slice — see
+        // `tsv_lang::comment_ledger`.
+        Some(self.verbatim_source_doc(node.span()))
     }
 
     /// Handle a text child node - matches prettier-plugin-svelte's handleTextChild.

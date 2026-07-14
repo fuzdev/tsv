@@ -73,8 +73,8 @@ fn is_numeric_expression(expr: &Expression<'_>) -> bool {
 /// Used when the first arg is a block function and we want to keep the second arg
 /// inline after the closing `}`. Returns false for expressions that would expand.
 ///
-/// The `has_comments_between` closure checks for comments inside empty containers
-/// (typically `printer.has_comments_between`).
+/// The `has_comments_to_emit_between` closure checks for comments inside empty containers
+/// (typically `printer.has_comments_to_emit_between`).
 pub(in crate::printer) fn is_short_second_arg_for_expand_first<F>(
     arg: &Expression<'_>,
     has_comments: F,
@@ -173,7 +173,7 @@ pub(in crate::printer) fn is_ternary_arrow_body(body: &Expression<'_>) -> bool {
 pub(crate) fn arrow_has_trailing_param_comments<F>(
     arrow: &internal::ArrowFunctionExpression<'_>,
     arrow_token_pos: u32,
-    has_comments_between: F,
+    has_comments_to_emit_between: F,
 ) -> bool
 where
     F: Fn(u32, u32) -> bool,
@@ -183,7 +183,7 @@ where
     };
     let param_end = last_param.span().end;
 
-    has_comments_between(param_end, arrow_token_pos)
+    has_comments_to_emit_between(param_end, arrow_token_pos)
 }
 
 /// Check if the last argument is an array or object expression (unwrapping type assertions)

@@ -109,7 +109,13 @@ impl<'a> Printer<'a> {
         // which scans a sub-range within it. The callee and type-argument gap
         // comments live before `paren_open` and are handled unconditionally above.
         // Canonical reference: build_params_doc_with_comments.
-        let new_has_comments = self.has_comments_between(paren_open, new_expr.span.end);
+        //
+        // **on page**: this is the master gate for the whole `new` cascade — including
+        // the layout predicates (`first_arg_has_any_comments`, the huggable-argument
+        // refusal). Skipping an owned annotation here would short-circuit them all and
+        // silently hug an argument prettier expands. Its analogs (`call_has_comments`)
+        // in `calls/mod.rs`, `call_formatting.rs` and `chain_args.rs` count too.
+        let new_has_comments = self.has_comments_on_page_between(paren_open, new_expr.span.end);
 
         // Single huggable argument: object literal or function
         // These stay on the same line as the opening paren: `new Cls({...})` not `new Cls(\n{...})`
@@ -167,7 +173,7 @@ impl<'a> Printer<'a> {
                     let arrow_token = arrow.arrow_token;
                     let has_trailing_param_comments = new_has_comments
                         && arrow_has_trailing_param_comments(arrow, arrow_token, |start, end| {
-                            self.has_comments_between(start, end)
+                            self.has_comments_to_emit_between(start, end)
                         });
 
                     if has_trailing_param_comments || has_leading_comment {
@@ -466,7 +472,7 @@ impl<'a> Printer<'a> {
             && new_expr.arguments.last().is_some_and(|last_arg| {
                 let arg_end = last_arg.span().end;
                 let paren_close = new_expr.span.end;
-                self.has_comments_between(arg_end, paren_close)
+                self.has_comments_to_emit_between(arg_end, paren_close)
                     && !self.has_line_comments_between(arg_end, paren_close)
             });
 
@@ -704,7 +710,7 @@ impl<'a> Printer<'a> {
         // These need explicit handling that the simple join_doc path doesn't provide
         let has_leading_comments = new_has_comments
             && !new_expr.arguments.is_empty()
-            && self.has_comments_between(paren_open, new_expr.arguments[0].span().start);
+            && self.has_comments_to_emit_between(paren_open, new_expr.arguments[0].span().start);
         let has_inter_arg_comments =
             new_has_comments && has_inter_argument_comments_slice(new_expr.arguments, self);
 

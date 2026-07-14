@@ -500,6 +500,44 @@ pub fn skip_template_literal(bytes: &[u8], start: usize, end: usize) -> usize {
     end // unterminated template literal
 }
 
+/// How much whitespace may sit between a block comment's `*/` and the token it precedes for
+/// the two to still count as adjacent — the one axis on which the callers of
+/// [`block_comment_end_before`] differ, so it is named rather than re-derived per copy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommentGlue {
+    /// Horizontal whitespace only (spaces/tabs). A comment the author put on its own line
+    /// leads the *line*, not the token, so a newline breaks the glue.
+    SameLine,
+    /// Any whitespace, newlines included — the comment is adjacent even from its own line.
+    AnyLine,
+}
+
+/// The end offset of a **block** comment (`… */`) preceding the token at `pos`, with nothing
+/// but `glue` whitespace between them. `None` when no block comment is adjacent.
+///
+/// Byte-level only: it locates the `*/`, never the `/*`. A `/*` can appear inside the
+/// comment's own body, in a preceding line comment, or in a string literal, and byte scanning
+/// cannot tell those apart from the real opener — mis-slicing the content would drop a real
+/// comment or fabricate one. Callers resolve the actual comment through the lexer's spans by
+/// matching the end offset this returns; the spans, not the bytes, are authoritative.
+///
+/// A `*/` inside a string literal can therefore reach a caller's lookup, which then simply
+/// finds no comment ending there.
+#[must_use]
+pub fn block_comment_end_before(bytes: &[u8], pos: usize, glue: CommentGlue) -> Option<usize> {
+    let mut i = pos.min(bytes.len());
+    while i > 0
+        && match glue {
+            CommentGlue::SameLine => matches!(bytes[i - 1], b' ' | b'\t'),
+            CommentGlue::AnyLine => bytes[i - 1].is_ascii_whitespace(),
+        }
+    {
+        i -= 1;
+    }
+    // The shortest block comment is `/**/` (4 bytes), so a `*/` before offset 4 cannot be one.
+    (i >= 4 && bytes.get(i - 2..i) == Some(b"*/".as_slice())).then_some(i)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

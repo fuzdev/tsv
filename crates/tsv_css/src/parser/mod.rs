@@ -257,7 +257,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// Skip whitespace and comments, **dropping** the comments.
     ///
     /// A comment skipped here never reaches `self.comments`, so the printer's
-    /// `comments_in_range` lookups cannot reconstruct it — in any gap the printer
+    /// `comments_to_emit_in_range` lookups cannot reconstruct it — in any gap the printer
     /// rebuilds from the AST (rather than emitting verbatim source), that is
     /// silent content loss. Use `skip_whitespace_registering_comments` in those
     /// positions; this variant is only safe where the skipped range is re-emitted

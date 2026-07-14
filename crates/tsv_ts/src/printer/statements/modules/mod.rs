@@ -20,7 +20,7 @@ use crate::ast::internal;
 use crate::printer::needs_parens::export_default_needs_parens;
 use smallvec::SmallVec;
 use smallvec::smallvec;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -40,7 +40,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let expr_doc = self.build_expression_doc(&decl.expression);
         let argument_end = decl.expression.span().end;
-        let has_trailing_comments = self.has_comments_between(argument_end, decl.span.end);
+        let has_trailing_comments = self.has_comments_to_emit_between(argument_end, decl.span.end);
         if has_trailing_comments {
             // `export =` keeps a same-line trailing block comment *before* the `;`
             // (operand-attached — prettier 3.9 does not move it, unlike `export default`
@@ -341,7 +341,8 @@ impl<'a> Printer<'a> {
                     expr_doc = d.concat(&[d.text("("), expr_doc, d.text(")")]);
                 }
                 let argument_end = expr.span().end;
-                let has_trailing_comments = self.has_comments_between(argument_end, decl.span.end);
+                let has_trailing_comments =
+                    self.has_comments_to_emit_between(argument_end, decl.span.end);
                 if has_trailing_comments {
                     let mut parts = smallvec![expr_doc];
                     let after = self.split_terminator_gap_comments(
@@ -744,7 +745,8 @@ impl<'a> Printer<'a> {
                     // Multi-line format with comments
                     // Build comments doc: each comment on its own line
                     let mut comment_parts = DocBuf::new();
-                    for comment in comments_in_range(self.comments, require_open_end, literal_start)
+                    for comment in
+                        comments_to_emit_in_range(self.comments, require_open_end, literal_start)
                     {
                         comment_parts.push(self.build_comment_doc(comment));
                         comment_parts.push(d.hardline());
@@ -761,7 +763,7 @@ impl<'a> Printer<'a> {
                 } else {
                     // Check for inline block comments
                     let has_inline_comments =
-                        self.has_comments_between(require_open_end, literal_start);
+                        self.has_comments_to_emit_between(require_open_end, literal_start);
                     if has_inline_comments {
                         parts.push(d.text("require("));
                         parts.push(

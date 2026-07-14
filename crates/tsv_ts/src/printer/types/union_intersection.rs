@@ -5,7 +5,7 @@
 // - Intersection types: `A & B & C`
 // - Comment handling between type members
 
-use super::super::comments_in_range;
+use super::super::comments_to_emit_in_range;
 use super::helpers::{
     find_separator_position, intersection_has_expanding_first_type,
     intersection_has_huggable_last_type, is_huggable_type, is_hugging_union_type_arg,
@@ -67,7 +67,7 @@ impl<'a> Printer<'a> {
     fn build_member_leading_block_comments(&self, start: u32, end: u32) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
-        for comment in comments_in_range(self.comments, start, end) {
+        for comment in comments_to_emit_in_range(self.comments, start, end) {
             if !comment.is_block {
                 continue;
             }
@@ -197,7 +197,7 @@ impl<'a> Printer<'a> {
         // larger cost — the per-separator `find_separator_position` byte scans never run.
         // Those scans exist only to bound the comment ranges; the printed `|` is static
         // text. Byte-identical, and unions are the most common non-trivial TS type.
-        let has_comments = self.has_comments_between(union.span.start, union.span.end);
+        let has_comments = self.has_comments_on_page_between(union.span.start, union.span.end);
 
         // A single-member union collapses to its member — Prettier drops
         // single-element `TSUnionType`/`TSIntersectionType` nodes in postprocess
@@ -482,7 +482,7 @@ impl<'a> Printer<'a> {
                     // union_infix_pipe_line_comment_prettier_divergence.
                     let after_pipe = pipe_pos + 1;
                     let own_line: CommentVec<'_> =
-                        comments_in_range(self.comments, after_pipe, type_start)
+                        comments_to_emit_in_range(self.comments, after_pipe, type_start)
                             .filter(|c| !(c.is_block && self.is_same_line(c.span.end, type_start)))
                             .collect();
                     // A blank line the author left *before* the first own-line comment
@@ -508,7 +508,8 @@ impl<'a> Printer<'a> {
                         parts.push(d.hardline());
                     }
                     parts.push(d.text("| "));
-                    for comment in comments_in_range(self.comments, after_pipe, type_start) {
+                    for comment in comments_to_emit_in_range(self.comments, after_pipe, type_start)
+                    {
                         if comment.is_block && self.is_same_line(comment.span.end, type_start) {
                             parts.push(self.build_comment_doc(comment));
                             parts.push(d.text(" "));
@@ -537,7 +538,8 @@ impl<'a> Printer<'a> {
             // indent the member's own first line. Non-first members keep their
             // leading line comments before the pipe, so they stay glued.
             let member_on_own_line = i == 0
-                && (comments_in_range(self.comments, union.span.start, type_start)
+                && (self
+                    .comments_on_page_between(union.span.start, type_start)
                     .any(|c| !(c.is_block && self.is_same_line(c.span.end, type_start)))
                     || matches!(t, TSType::Parenthesized(p) if self.paren_has_leading_line_comment(p)));
 
@@ -601,7 +603,7 @@ impl<'a> Printer<'a> {
 
             // Trailing comments on last type
             if i == union.types.len() - 1 {
-                for comment in comments_in_range(self.comments, type_end, union.span.end) {
+                for comment in comments_to_emit_in_range(self.comments, type_end, union.span.end) {
                     parts.push(d.text(" "));
                     parts.push(self.build_comment_doc(comment));
                 }
@@ -639,7 +641,7 @@ impl<'a> Printer<'a> {
     ) -> bool {
         is_hugging_union_type_arg(value_type)
             && !self.union_has_comments_between_members(union)
-            && !self.has_comments_between(gap_start, gap_end)
+            && !self.has_comments_to_emit_between(gap_start, gap_end)
     }
 
     pub(crate) fn union_has_comments_between_members(&self, union: &TSUnionType<'_>) -> bool {
@@ -648,13 +650,13 @@ impl<'a> Printer<'a> {
         // `[union.span.start, union.span.end]`, so with no comment inside the union
         // every pairwise check is provably false — skip them on the common
         // comment-free `A | B | C`.
-        if !self.has_comments_between(union.span.start, union.span.end) {
+        if !self.has_comments_to_emit_between(union.span.start, union.span.end) {
             return false;
         }
         union
             .types
             .windows(2)
-            .any(|pair| self.has_comments_between(pair[0].span().end, pair[1].span().start))
+            .any(|pair| self.has_comments_to_emit_between(pair[0].span().end, pair[1].span().start))
     }
 
     /// Check if a union type has line comments between any consecutive members.
@@ -666,7 +668,7 @@ impl<'a> Printer<'a> {
         // pairwise range lies within the union span, so no comment inside the union
         // means every pairwise scan below is provably false — skip them on the common
         // comment-free `A | B | C`.
-        if !self.has_comments_between(union.span.start, union.span.end) {
+        if !self.has_comments_to_emit_between(union.span.start, union.span.end) {
             return false;
         }
         union
@@ -689,14 +691,14 @@ impl<'a> Printer<'a> {
     fn union_has_own_line_member_comment(&self, union: &TSUnionType<'_>) -> bool {
         // Zero-comment window gate (see `union_has_comments_between_members`): every
         // pairwise range lies within the union span, so no comment inside the union
-        // means every `comments_in_range` below is empty — skip the N-1 scans on the
+        // means every `comments_to_emit_in_range` below is empty — skip the N-1 scans on the
         // common comment-free union.
-        if !self.has_comments_between(union.span.start, union.span.end) {
+        if !self.has_comments_to_emit_between(union.span.start, union.span.end) {
             return false;
         }
         union.types.windows(2).any(|pair| {
             let (prev_end, next_start) = (pair[0].span().end, pair[1].span().start);
-            comments_in_range(self.comments, prev_end, next_start)
+            self.comments_on_page_between(prev_end, next_start)
                 .any(|c| self.is_own_line_comment(c))
         })
     }
@@ -721,13 +723,13 @@ impl<'a> Printer<'a> {
     ) -> bool {
         // Zero-comment window gate (see `union_has_comments_between_members`): every
         // pairwise range lies within the intersection span, so no comment inside it
-        // means every `comments_in_range` below is empty — skip the N-1 scans.
-        if !self.has_comments_between(intersection.span.start, intersection.span.end) {
+        // means every `comments_to_emit_in_range` below is empty — skip the N-1 scans.
+        if !self.has_comments_to_emit_between(intersection.span.start, intersection.span.end) {
             return false;
         }
         intersection.types.windows(2).any(|pair| {
             let (prev_end, next_start) = (pair[0].span().end, pair[1].span().start);
-            comments_in_range(self.comments, prev_end, next_start)
+            self.comments_on_page_between(prev_end, next_start)
                 .any(|c| self.comment_isolated_from_neighbors(prev_end, c, next_start))
         })
     }
@@ -791,7 +793,7 @@ impl<'a> Printer<'a> {
         // provably has none — no search, no empty child, and no `find_separator_position`
         // byte scan (the printed `&` is static text).
         let has_comments =
-            self.has_comments_between(intersection.span.start, intersection.span.end);
+            self.has_comments_to_emit_between(intersection.span.start, intersection.span.end);
 
         // A single-member intersection collapses to its member — see the matching
         // note in `build_union_type_doc`. The lone member needs no precedence
@@ -1063,7 +1065,7 @@ impl<'a> Printer<'a> {
             // `hasLeadingOwnLineComment`, which forces the boundary to break. (Same-line
             // ones trail the `&` inline and are emitted below.)
             let own_line_leading: CommentVec<'_> = match amp {
-                Some(amp_pos) => comments_in_range(self.comments, amp_pos + 1, cur_start)
+                Some(amp_pos) => comments_to_emit_in_range(self.comments, amp_pos + 1, cur_start)
                     .filter(|c| !self.is_same_line(amp_pos, c.span.start))
                     .collect(),
                 None => smallvec![],
@@ -1091,7 +1093,8 @@ impl<'a> Printer<'a> {
             // the gap can't be inline, so its boundary breaks even where object-adjacency
             // would glue — the tsv/Prettier divergence this path exists for.
             if !should_break
-                && comments_in_range(self.comments, prev_end, cur_start)
+                && self
+                    .comments_on_page_between(prev_end, cur_start)
                     .any(|c| self.comment_isolated_from_neighbors(prev_end, c, cur_start))
             {
                 should_break = true;
@@ -1102,7 +1105,7 @@ impl<'a> Printer<'a> {
             // the no-comment loop and Prettier. Emit those first, on the previous
             // member's line (indent-agnostic — no preceding newline), before the `&`.
             if let Some(amp_pos) = amp {
-                for comment in comments_in_range(self.comments, prev_end, amp_pos)
+                for comment in comments_to_emit_in_range(self.comments, prev_end, amp_pos)
                     .filter(|c| c.is_block && self.is_same_line(prev_end, c.span.start))
                 {
                     parts.push(d.text(" "));
@@ -1120,7 +1123,7 @@ impl<'a> Printer<'a> {
                 // `build_trailing_comments_multiline` minus the same-line blocks handled
                 // above. Then the same-line-after-`&` comments trail the operator inline.
                 let mut run_end = prev_end;
-                for comment in comments_in_range(self.comments, prev_end, amp_pos) {
+                for comment in comments_to_emit_in_range(self.comments, prev_end, amp_pos) {
                     if self.is_same_line(prev_end, comment.span.start) {
                         if !comment.is_block {
                             unit.push(d.text(" "));
@@ -1132,7 +1135,7 @@ impl<'a> Printer<'a> {
                     }
                     run_end = comment.span.end;
                 }
-                for comment in comments_in_range(self.comments, amp_pos + 1, cur_start)
+                for comment in comments_to_emit_in_range(self.comments, amp_pos + 1, cur_start)
                     .filter(|c| self.is_same_line(amp_pos, c.span.start))
                 {
                     unit.push(d.text(" "));
@@ -1148,7 +1151,7 @@ impl<'a> Printer<'a> {
             unit.push(self.build_intersection_line_comment_member_doc(cur, member_parens));
             if is_last {
                 for comment in
-                    comments_in_range(self.comments, cur.span().end, intersection.span.end)
+                    comments_to_emit_in_range(self.comments, cur.span().end, intersection.span.end)
                 {
                     unit.push(d.text(" "));
                     unit.push(self.build_comment_doc(comment));

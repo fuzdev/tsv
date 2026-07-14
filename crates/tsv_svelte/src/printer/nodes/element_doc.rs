@@ -16,7 +16,7 @@ use crate::printer::Printer;
 use crate::printer::text::TextAnalysis;
 use smallvec::smallvec;
 use string_interner::DefaultSymbol;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::{Span, SymbolResolver, SymbolToU32};
 
@@ -861,11 +861,12 @@ impl<'a> Printer<'a> {
 
         // Every gap this fn probes — each attribute's leading range and the trailing range
         // after the last one — lies inside `[first_range_start, open_tag_end]`. A comment
-        // lands in `has_comments_in_range` only when it sits fully inside the queried range,
+        // lands in `has_comments_to_emit_in_range` only when it sits fully inside the queried range,
         // so a comment-free open tag means every one of those gaps is comment-free: each
         // would take the bare-separator branch below and the trailing block would emit
         // nothing. Answer that with one probe instead of one per attribute plus one.
-        if !tsv_lang::has_comments_in_range(self.comments, first_range_start, open_tag_end) {
+        if !tsv_lang::has_comments_to_emit_in_range(self.comments, first_range_start, open_tag_end)
+        {
             for attr in attrs {
                 docs.push(separator);
                 docs.push(self.build_attribute_node_doc(attr, is_html));
@@ -882,12 +883,12 @@ impl<'a> Printer<'a> {
             };
             let range_end = attr.span().start;
 
-            if !tsv_lang::has_comments_in_range(self.comments, range_start, range_end) {
+            if !tsv_lang::has_comments_to_emit_in_range(self.comments, range_start, range_end) {
                 docs.push(separator);
             } else {
                 let last_is_own_line = self.push_attr_comment_docs(
                     docs,
-                    comments_in_range(self.comments, range_start, range_end),
+                    comments_to_emit_in_range(self.comments, range_start, range_end),
                     range_start,
                 );
                 // Separator before the next attribute
@@ -904,10 +905,10 @@ impl<'a> Printer<'a> {
         // Check for trailing comments after last attribute
         if let Some(last_attr) = attrs.last() {
             let range_start = last_attr.span().end;
-            if tsv_lang::has_comments_in_range(self.comments, range_start, open_tag_end) {
+            if tsv_lang::has_comments_to_emit_in_range(self.comments, range_start, open_tag_end) {
                 self.push_attr_comment_docs(
                     docs,
-                    comments_in_range(self.comments, range_start, open_tag_end),
+                    comments_to_emit_in_range(self.comments, range_start, open_tag_end),
                     range_start,
                 );
             }
@@ -960,7 +961,7 @@ impl<'a> Printer<'a> {
     /// Build a doc for a JS comment's text (without surrounding separators)
     pub(super) fn build_attr_js_comment_doc(&self, comment: &tsv_lang::Comment) -> DocId {
         let d = self.d();
-        if comment.is_block {
+        let doc = if comment.is_block {
             d.concat(&[
                 d.text("/*"),
                 d.source_span(comment.content_span, self.source),
@@ -971,7 +972,12 @@ impl<'a> Printer<'a> {
                 d.text("//"),
                 d.source_span(comment.content_span, self.source),
             ])
-        }
+        };
+        // The renderer records the emit when it reaches the node — see
+        // `tsv_lang::comment_ledger`.
+        #[cfg(feature = "comment_check")]
+        d.tag_comment_doc(doc, comment.span, self.source);
+        doc
     }
 
     /// Whether the source slice for `span` ends with a self-closing `/>` (for doc

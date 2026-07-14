@@ -21,6 +21,9 @@ use crate::Span;
 use crate::config::TAB_WIDTH;
 use crate::printing::visual_width;
 
+#[cfg(feature = "comment_check")]
+use crate::comment_ledger::{DocumentKey, comment_check_enabled, document_key};
+
 use super::DocBuf;
 #[cfg(feature = "swallow_check")]
 use super::swallow::swallow_check_enabled;
@@ -456,6 +459,15 @@ pub struct DocArena {
     /// feature, so production builds carry no diagnostic state.
     #[cfg(feature = "swallow_check")]
     line_comment_ids: RefCell<Vec<u32>>,
+    /// Diagnostic side-set: the doc nodes that *are* a comment, recorded by
+    /// [`Self::tag_comment_doc`] only while the comment ledger is enabled (empty and
+    /// untouched otherwise). Each entry pairs the node with the comment's span and the
+    /// document it was parsed from, because the renderer — which records the emit when it
+    /// reaches the node — holds no `source`. Appended in `alloc` order, so the vec is
+    /// sorted ascending on the id and the renderer looks up by binary search. See
+    /// [`crate::comment_ledger`]. Compiled in only under the `comment_check` feature.
+    #[cfg(feature = "comment_check")]
+    comment_docs: RefCell<Vec<(u32, Span, DocumentKey)>>,
 }
 
 /// One `static_cache` slot: a static string's identity (`ptr`+`len`)
@@ -527,6 +539,8 @@ impl DocArena {
             symbol_nodes: RefCell::new(Vec::new()),
             #[cfg(feature = "swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
+            #[cfg(feature = "comment_check")]
+            comment_docs: RefCell::new(Vec::new()),
         }
     }
 
@@ -578,6 +592,8 @@ impl DocArena {
             symbol_nodes: RefCell::new(Vec::new()),
             #[cfg(feature = "swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
+            #[cfg(feature = "comment_check")]
+            comment_docs: RefCell::new(Vec::new()),
         }
     }
 
@@ -639,6 +655,8 @@ impl DocArena {
         self.flat_width_cache.get_mut().clear();
         #[cfg(feature = "swallow_check")]
         self.line_comment_ids.get_mut().clear();
+        #[cfg(feature = "comment_check")]
+        self.comment_docs.get_mut().clear();
     }
 
     //
@@ -874,6 +892,50 @@ impl DocArena {
     #[inline]
     pub(crate) fn is_line_comment(&self, id: DocId) -> bool {
         self.line_comment_ids.borrow().binary_search(&id.0).is_ok()
+    }
+
+    /// Tag `id` as the doc node that emits the comment at `span` in `source`.
+    ///
+    /// The print-once comment ledger's build-side seam for a doc-based printer: the
+    /// *renderer* records the emit when it reaches this node, so a comment assembled into
+    /// a `conditional_group` candidate that loses never counts (and one assembled only
+    /// into a losing candidate is correctly reported as dropped). `source` is captured as
+    /// a [`DocumentKey`] because the renderer holds no source of its own — the arena is
+    /// shared across a Svelte host and a nested element's re-parsed island, whose spans
+    /// live in different namespaces. A no-op unless the ledger is enabled, and compiled
+    /// out entirely without the `comment_check` feature. See [`crate::comment_ledger`].
+    #[cfg(feature = "comment_check")]
+    #[inline]
+    pub fn tag_comment_doc(&self, id: DocId, span: Span, source: &str) {
+        if comment_check_enabled() {
+            // Recorded in alloc order → sorted ascending (see field doc). Every comment
+            // doc's root is a fresh alloc (a `SourceSpan` / `MultilineText` leaf or a
+            // `Concat` container — none of them interned), so ids strictly increase.
+            self.comment_docs
+                .borrow_mut()
+                .push((id.0, span, document_key(source)));
+        }
+    }
+
+    /// Whether any comment-doc tags were recorded — the renderer's hoisted gate, so a
+    /// document with no comments pays no per-node lookup.
+    #[cfg(feature = "comment_check")]
+    #[inline]
+    pub(crate) fn has_comment_docs(&self) -> bool {
+        !self.comment_docs.borrow().is_empty()
+    }
+
+    /// The comment a doc node emits, if it is one (binary search over the sorted
+    /// side-set). Internal to the renderer's ledger hook — not part of the builder API.
+    #[cfg(feature = "comment_check")]
+    #[inline]
+    pub(crate) fn comment_doc_tag(&self, id: DocId) -> Option<(Span, DocumentKey)> {
+        let tags = self.comment_docs.borrow();
+        let idx = tags
+            .binary_search_by_key(&id.0, |&(node, _, _)| node)
+            .ok()?;
+        let (_, span, key) = tags[idx];
+        Some((span, key))
     }
 
     /// Return the per-document interned node held in `cell`, allocating it on

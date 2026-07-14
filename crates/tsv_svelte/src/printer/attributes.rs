@@ -12,7 +12,7 @@
 use crate::ast::internal;
 use crate::printer::Printer;
 use smallvec::smallvec;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{Span, SymbolResolver, SymbolToU32};
@@ -96,7 +96,7 @@ impl<'a> Printer<'a> {
     /// Line comments: `// content\n` (with hardline)
     pub(super) fn build_leading_js_comment_doc(&self, comment: &tsv_lang::Comment) -> DocId {
         let d = self.d();
-        if comment.is_block {
+        let doc = if comment.is_block {
             d.concat(&[
                 d.text("/*"),
                 d.source_span(comment.content_span, self.source),
@@ -109,7 +109,12 @@ impl<'a> Printer<'a> {
                 d.source_span(comment.content_span, self.source),
                 d.hardline(),
             ])
-        }
+        };
+        // The renderer records the emit when it reaches the node — see
+        // `tsv_lang::comment_ledger`.
+        #[cfg(feature = "comment_check")]
+        d.tag_comment_doc(doc, comment.span, self.source);
+        doc
     }
 
     /// Build a Doc for a trailing JS comment (after content), before a closing
@@ -128,7 +133,7 @@ impl<'a> Printer<'a> {
     /// `expr_trailing_line` divergence fixture.
     pub(super) fn build_trailing_js_comment_doc(&self, comment: &tsv_lang::Comment) -> DocId {
         let d = self.d();
-        if comment.is_block {
+        let doc = if comment.is_block {
             d.concat(&[
                 d.text(" /*"),
                 d.source_span(comment.content_span, self.source),
@@ -141,7 +146,12 @@ impl<'a> Printer<'a> {
                 d.source_span(comment.content_span, self.source),
                 d.hardline(),
             ])
-        }
+        };
+        // The renderer records the emit when it reaches the node — see
+        // `tsv_lang::comment_ledger`.
+        #[cfg(feature = "comment_check")]
+        d.tag_comment_doc(doc, comment.span, self.source);
+        doc
     }
 
     //
@@ -367,7 +377,7 @@ impl<'a> Printer<'a> {
 
         // Leading comments (between prefix and expression)
         let expr_start = expr.span().start;
-        for comment in comments_in_range(self.comments, comment_start, expr_start) {
+        for comment in comments_to_emit_in_range(self.comments, comment_start, expr_start) {
             parts.push(self.build_leading_js_comment_doc(comment));
         }
 
@@ -376,7 +386,7 @@ impl<'a> Printer<'a> {
 
         // Trailing comments (between expression and `}`)
         let expr_end = expr.span().end;
-        for comment in comments_in_range(self.comments, expr_end, span_end - 1) {
+        for comment in comments_to_emit_in_range(self.comments, expr_end, span_end - 1) {
             parts.push(self.build_trailing_js_comment_doc(comment));
         }
 
@@ -648,7 +658,7 @@ impl<'a> Printer<'a> {
         let mut leading_comments: DocBuf = DocBuf::new();
         if let Some(span) = tag_span {
             let expr_start = expr.span().start;
-            for comment in comments_in_range(self.comments, span.start + 1, expr_start) {
+            for comment in comments_to_emit_in_range(self.comments, span.start + 1, expr_start) {
                 leading_comments.push(self.build_leading_js_comment_doc(comment));
             }
         }
@@ -659,7 +669,7 @@ impl<'a> Printer<'a> {
         let mut trailing_comments: DocBuf = DocBuf::new();
         if let Some(span) = tag_span {
             let expr_end = expr.span().end;
-            for comment in comments_in_range(self.comments, expr_end, span.end - 1) {
+            for comment in comments_to_emit_in_range(self.comments, expr_end, span.end - 1) {
                 trailing_comments.push(self.build_trailing_js_comment_doc(comment));
             }
         }
@@ -716,7 +726,8 @@ impl<'a> Printer<'a> {
             // included in the range: prettier drops them, so tsv matches by dropping.
             if let Some(span) = tag_span {
                 let last_end = seq.expressions[seq.expressions.len() - 1].span().end;
-                if tsv_lang::has_comments_in_range(self.comments, span.start + 1, last_end) {
+                if tsv_lang::has_comments_to_emit_in_range(self.comments, span.start + 1, last_end)
+                {
                     return smallvec![
                         d.text("="),
                         self.build_bind_sequence_with_comments_doc(seq, span),
@@ -798,12 +809,18 @@ impl<'a> Printer<'a> {
         // overflow or carry their own forced break (matching prettier, which keeps
         // `() => a, (v) => (a = v)` on one line under a leading comment).
         let first_start = seq.expressions[0].span().start;
-        for comment in comments_in_range(self.comments, tag_span.start + 1, first_start) {
+        for comment in comments_to_emit_in_range(self.comments, tag_span.start + 1, first_start) {
             if comment.is_block && comment.multiline {
                 // Multi-line block: own line(s), forcing the broken layout. Emitted
-                // without the inline trailing space so the line ends at `*/`.
+                // without the inline trailing space so the line ends at `*/` — the one
+                // comment emission in this crate that doesn't route through the shared
+                // leading/trailing builders, so it tags its own ledger node.
+                let body = d.source_span(comment.content_span, self.source);
+                #[cfg(feature = "comment_check")]
+                d.tag_comment_doc(body, comment.span, self.source);
+
                 content.push(d.text("/*"));
-                content.push(d.source_span(comment.content_span, self.source));
+                content.push(body);
                 content.push(d.text("*/"));
                 content.push(d.hardline());
             } else {
@@ -824,7 +841,7 @@ impl<'a> Printer<'a> {
                         .map_or(prev_end, |c| c as u32);
 
                 // Comments before the comma trail the previous operand.
-                for comment in comments_in_range(self.comments, prev_end, comma_pos) {
+                for comment in comments_to_emit_in_range(self.comments, prev_end, comma_pos) {
                     items.push(self.build_trailing_js_comment_doc(comment));
                 }
 
@@ -833,7 +850,7 @@ impl<'a> Printer<'a> {
                 // Comments after the comma: an all-block run leads the next operand
                 // inline; a line comment trails the comma and forces the break.
                 let after: Vec<_> =
-                    comments_in_range(self.comments, comma_pos + 1, cur_start).collect();
+                    comments_to_emit_in_range(self.comments, comma_pos + 1, cur_start).collect();
                 if after.is_empty() {
                     items.push(d.line());
                 } else if after.iter().all(|c| c.is_block) {
@@ -894,7 +911,7 @@ impl<'a> Printer<'a> {
 
         // Add leading comments between { and expression (block inline, line + hardline)
         let expr_start = tag.expression.span().start;
-        for comment in comments_in_range(self.comments, tag.span.start + 1, expr_start) {
+        for comment in comments_to_emit_in_range(self.comments, tag.span.start + 1, expr_start) {
             parts.push(self.build_leading_js_comment_doc(comment));
         }
 
@@ -903,7 +920,7 @@ impl<'a> Printer<'a> {
         // Add trailing comments. A line comment forces `}` onto its own line (the
         // helper appends a hardline) so the `//` doesn't swallow the brace.
         let expr_end = tag.expression.span().end;
-        for comment in comments_in_range(self.comments, expr_end, tag.span.end - 1) {
+        for comment in comments_to_emit_in_range(self.comments, expr_end, tag.span.end - 1) {
             parts.push(self.build_trailing_js_comment_doc(comment));
         }
 

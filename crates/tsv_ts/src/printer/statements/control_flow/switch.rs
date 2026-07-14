@@ -5,7 +5,7 @@
 use crate::ast::internal::{self, Statement};
 use crate::printer::{CommentVec, Printer};
 use smallvec::smallvec;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::{TriviaProfile, find_char};
@@ -37,7 +37,7 @@ impl<'a> Printer<'a> {
         let body_open_brace = close_paren
             .and_then(|close| self.find_char_outside_comments(close + 1, stmt.span.end, b'{'));
         let paren_brace_comments = match (close_paren, body_open_brace) {
-            (Some(close), Some(brace)) if self.has_comments_between(close + 1, brace) => {
+            (Some(close), Some(brace)) if self.has_comments_to_emit_between(close + 1, brace) => {
                 self.build_inline_comments_between_doc_opt(close + 1, brace)
             }
             _ => None,
@@ -66,7 +66,7 @@ impl<'a> Printer<'a> {
             // advanced past them via `find_end_with_trailing_comments` (the case-cursor
             // update below), so this range holds only genuine own-line comments.
             let comments: CommentVec<'_> =
-                comments_in_range(self.comments, prev_end, case.span.start).collect();
+                comments_to_emit_in_range(self.comments, prev_end, case.span.start).collect();
             let mut last_content_end = prev_end;
             for comment in &comments {
                 // Add hardline before comment (except for very first item - body_doc handles that)
@@ -110,7 +110,7 @@ impl<'a> Printer<'a> {
         // Also handles comments in empty switch bodies
         let switch_end = stmt.span.end - 1; // Before '}'
         let mut last_trailing_end = prev_end;
-        for comment in comments_in_range(self.comments, prev_end, switch_end) {
+        for comment in comments_to_emit_in_range(self.comments, prev_end, switch_end) {
             if !is_first_item {
                 if self.has_blank_line_between(last_trailing_end, comment.span.start) {
                     case_parts.push(d.literalline());
@@ -186,7 +186,7 @@ impl<'a> Printer<'a> {
         case_label_end: u32,
     ) -> CommentVec<'_> {
         let comments: CommentVec<'_> =
-            comments_in_range(self.comments, prev_end, boundary).collect();
+            comments_to_emit_in_range(self.comments, prev_end, boundary).collect();
         let anchor = prev_stmt_end.unwrap_or(case_label_end);
         comments
             .iter()
@@ -242,7 +242,8 @@ impl<'a> Printer<'a> {
         let first_stmt_start = case.consequent.first().map(|s| s.span().start);
         let inline_comment_end = first_stmt_start.unwrap_or(inline_comment_boundary);
         let mut has_inline_line_comment = false;
-        for comment in comments_in_range(self.comments, case_label_end, inline_comment_end) {
+        for comment in comments_to_emit_in_range(self.comments, case_label_end, inline_comment_end)
+        {
             if self.is_same_line(case_label_end, comment.span.start) {
                 // A line comment goes through `line_suffix` (zero width) so it never
                 // forces the case test (e.g. a binary expression) to break; it flushes

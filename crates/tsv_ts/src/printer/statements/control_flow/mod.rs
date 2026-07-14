@@ -21,7 +21,7 @@ use crate::printer::{CommentVec, Printer};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
-use tsv_lang::{Comment, comments_in_range};
+use tsv_lang::{Comment, comments_to_emit_in_range};
 
 impl<'a> Printer<'a> {
     /// Build a control-flow *body* whose empty block form collapses (`do {} while (cond)`,
@@ -60,7 +60,7 @@ impl<'a> Printer<'a> {
         let mut own_line = SmallVec::new();
         let mut inline_next = SmallVec::new();
 
-        for comment in comments_in_range(self.comments, prev_end, next_start) {
+        for comment in comments_to_emit_in_range(self.comments, prev_end, next_start) {
             let same_line_as_prev = self.is_same_line(prev_end, comment.span.start);
             let same_line_as_next = self.is_same_line(comment.span.end, next_start);
 
@@ -148,7 +148,7 @@ impl<'a> Printer<'a> {
     ) {
         let d = self.d();
         parts.push(d.text(")"));
-        if self.has_comments_between(paren_end, empty_start) {
+        if self.has_comments_to_emit_between(paren_end, empty_start) {
             let has_line = self.has_line_comments_between(paren_end, empty_start);
             let comment_doc =
                 self.build_inline_comments_between_doc_no_leading_space(paren_end, empty_start);
@@ -182,7 +182,7 @@ impl<'a> Printer<'a> {
         body_start: u32,
     ) {
         let d = self.d();
-        if self.has_comments_between(paren_end, body_start) {
+        if self.has_comments_to_emit_between(paren_end, body_start) {
             let (mut inline_prev, own_line, inline_next) =
                 self.partition_comments_by_line(paren_end, body_start);
 
@@ -235,7 +235,7 @@ impl<'a> Printer<'a> {
         body_doc: DocId,
     ) -> DocId {
         let d = self.d();
-        if self.has_comments_between(paren_end, body_start) {
+        if self.has_comments_to_emit_between(paren_end, body_start) {
             let has_line = self.has_line_comments_between(paren_end, body_start);
             let comment_doc =
                 self.build_inline_comments_between_doc_no_leading_space(paren_end, body_start);
@@ -305,7 +305,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         if self.condition_should_inline_negation(test) {
             let no_comments = match (open_paren, close_paren) {
-                (Some(open), Some(close)) => !self.has_comments_between(open + 1, close),
+                (Some(open), Some(close)) => !self.has_comments_to_emit_between(open + 1, close),
                 _ => true,
             };
             if no_comments {
@@ -389,8 +389,8 @@ impl<'a> Printer<'a> {
         let test_end = test_expr.span().end;
 
         // Check for comments before and after the condition
-        let has_leading = self.has_comments_between(open_paren_pos + 1, test_start);
-        let has_trailing = self.has_comments_between(test_end, close_paren_pos);
+        let has_leading = self.has_comments_to_emit_between(open_paren_pos + 1, test_start);
+        let has_trailing = self.has_comments_to_emit_between(test_end, close_paren_pos);
 
         if !has_leading && !has_trailing {
             // No comments - use the standard condition group
@@ -406,7 +406,7 @@ impl<'a> Printer<'a> {
         // - "inline with open paren" = comment STARTS on same line as open paren
         // - "own line" = comment does NOT start on same line as open paren
         let leading_comments: CommentVec<'_> = if has_leading {
-            comments_in_range(self.comments, open_paren_pos + 1, test_start).collect()
+            comments_to_emit_in_range(self.comments, open_paren_pos + 1, test_start).collect()
         } else {
             SmallVec::new()
         };

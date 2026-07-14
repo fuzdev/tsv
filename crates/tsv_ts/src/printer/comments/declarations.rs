@@ -9,7 +9,7 @@ use super::layout::hang_after_operator;
 use super::{CommentSpacing, CommentVec, Printer};
 use crate::ast::internal;
 use smallvec::{SmallVec, smallvec};
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::{TriviaProfile, find_char, find_char_skipping_comments};
@@ -59,7 +59,7 @@ impl<'a> Printer<'a> {
     ) {
         let keyword = kind_text.trim_end();
         if let Some(kw_pos) = self.find_keyword_in_range(*cursor, bound, keyword) {
-            if self.has_comments_between(*cursor, kw_pos) {
+            if self.has_comments_to_emit_between(*cursor, kw_pos) {
                 parts.push(self.build_trailing_comments_break_for_line(*cursor, kw_pos));
             }
             *cursor = kw_pos + keyword.len() as u32;
@@ -76,7 +76,7 @@ impl<'a> Printer<'a> {
         cursor: u32,
         name_start: u32,
     ) {
-        if self.has_comments_between(cursor, name_start) {
+        if self.has_comments_to_emit_between(cursor, name_start) {
             parts.push(self.build_trailing_comments_break_for_line(cursor, name_start));
         }
     }
@@ -165,7 +165,7 @@ impl<'a> Printer<'a> {
         if self.has_line_comments_between(after, pos) {
             parts.push(self.build_continuation_indent(after, pos, marker_doc));
         } else {
-            if self.has_comments_between(after, pos) {
+            if self.has_comments_to_emit_between(after, pos) {
                 parts.push(self.build_inline_comments_between_doc(after, pos));
             }
             parts.push(marker_doc);
@@ -243,7 +243,7 @@ impl<'a> Printer<'a> {
     ///
     /// `marker_end` is the offset just past the key (and any `?`/`!`); `colon_pos`
     /// is the type annotation's `:` (its span start). Callers gate on
-    /// `has_comments_between` first, so the common (no-comment) path never reaches
+    /// `has_comments_to_emit_between` first, so the common (no-comment) path never reaches
     /// the `has_line_comments_between` probe here.
     ///
     /// Shared by the before-`:` sites: index/property signatures, class properties,
@@ -300,7 +300,7 @@ impl<'a> Printer<'a> {
     /// just `: T`. `marker_end` is the offset past the name and any `!`/`?`; `wrap`
     /// selects the width-aware annotation builder (generics / wrapping type args).
     ///
-    /// Gates on `has_comments_between` once, so the common no-comment path is a single
+    /// Gates on `has_comments_to_emit_between` once, so the common no-comment path is a single
     /// binary search. Shared by every before-`:` site whose block form keeps the space
     /// before `:`: index-signature keys, class properties, variable bindings, and
     /// function parameters/identifiers. (Property signatures handle the gap inline:
@@ -318,7 +318,7 @@ impl<'a> Printer<'a> {
         } else {
             self.build_type_annotation_doc(type_ann)
         };
-        if !self.has_comments_between(marker_end, colon_pos) {
+        if !self.has_comments_to_emit_between(marker_end, colon_pos) {
             return type_doc;
         }
         if let Some(doc) =
@@ -375,7 +375,7 @@ impl<'a> Printer<'a> {
         // nothing to indent, so the header is just `" " + continuation` — no empty
         // child, and neither of the per-shape searches below runs. Every declaration in
         // every file passes through here, so this is the hottest of the gap printers.
-        if !self.has_comments_between(keyword_end, name_start) {
+        if !self.has_comments_to_emit_between(keyword_end, name_start) {
             return d.concat(&[d.text(" "), continuation]);
         }
         let has_line = self.has_line_comments_between(keyword_end, name_start);
@@ -409,7 +409,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         // A comment-free gap is just the leading space — emitting it as a bare text
         // saves both the empty child and the concat node that would wrap it.
-        if !self.has_comments_between(start, end) {
+        if !self.has_comments_to_emit_between(start, end) {
             return d.text(" ");
         }
         if self.has_line_comments_between(start, end) {
@@ -445,7 +445,7 @@ impl<'a> Printer<'a> {
         // line, so it must not get a leading space — otherwise a 2nd+ own-line comment
         // renders as `\t // c` (stray leading space).
         let mut at_line_start = false;
-        for comment in comments_in_range(self.comments, start, end) {
+        for comment in comments_to_emit_in_range(self.comments, start, end) {
             if comment.is_block {
                 // Block comment: use caller-specified spacing
                 match block_spacing {
@@ -479,14 +479,14 @@ impl<'a> Printer<'a> {
     }
 
     /// Like `build_name_to_type_params_comments`, but returns `None` when there
-    /// are no comments in the range (avoids the separate `has_comments_between` check).
+    /// are no comments in the range (avoids the separate `has_comments_to_emit_between` check).
     pub(crate) fn build_name_to_type_params_comments_opt(
         &self,
         start: u32,
         end: u32,
         block_spacing: CommentSpacing,
     ) -> Option<DocId> {
-        if self.has_comments_between(start, end) {
+        if self.has_comments_to_emit_between(start, end) {
             Some(self.build_name_to_type_params_comments(start, end, block_spacing))
         } else {
             None
@@ -531,7 +531,7 @@ impl<'a> Printer<'a> {
         let mut inline_parts = DocBuf::new();
         let mut indent_parts = DocBuf::new();
         let mut saw_line_comment = false;
-        for comment in comments_in_range(self.comments, start, end) {
+        for comment in comments_to_emit_in_range(self.comments, start, end) {
             if saw_line_comment {
                 indent_parts.push(d.hardline());
                 indent_parts.push(self.build_comment_doc(comment));
@@ -589,7 +589,7 @@ impl<'a> Printer<'a> {
                         let next_start = items[i + 1].span.start;
                         let comma_pos =
                             self.comma_between(heritage_item_end(&items[i]), next_start);
-                        comments_in_range(self.comments, comma_pos, next_start)
+                        self.comments_on_page_between(comma_pos, next_start)
                             .any(|c| self.is_stranded_after_comma_block(c, comma_pos, next_start))
                     })
             })
@@ -612,7 +612,8 @@ impl<'a> Printer<'a> {
                 if i > 0 && !has_trailing_line_comment[i - 1] {
                     let prev_end = heritage_item_end(&items[i - 1]);
                     let comma_pos = self.comma_between(prev_end, heritage.span.start);
-                    for comment in comments_in_range(self.comments, comma_pos, heritage.span.start)
+                    for comment in
+                        comments_to_emit_in_range(self.comments, comma_pos, heritage.span.start)
                     {
                         if group_mode
                             && self.is_stranded_after_comma_block(
@@ -655,7 +656,8 @@ impl<'a> Printer<'a> {
                         // after it, via `comma_baked`); the run sits inside the clause's
                         // `d.indent()`, so continuation indent is empty.
                         let comments: CommentVec<'_> =
-                            comments_in_range(self.comments, item_end, next.span.start).collect();
+                            comments_to_emit_in_range(self.comments, item_end, next.span.start)
+                                .collect();
                         let comma_pos = self.comma_between(item_end, next.span.start);
                         self.push_inter_declarator_line_comment_gap(
                             &mut h_parts,
@@ -781,7 +783,7 @@ impl<'a> Printer<'a> {
         type_params_end: u32,
         paren_pos: u32,
     ) {
-        for comment in comments_in_range(self.comments, type_params_end, paren_pos) {
+        for comment in comments_to_emit_in_range(self.comments, type_params_end, paren_pos) {
             parts.push(self.build_trailing_comment_doc(comment));
         }
     }
@@ -819,7 +821,9 @@ impl<'a> Printer<'a> {
         // Comments before the `*` lead it, at the author's position. A generator
         // always has a real `*`; if (defensively) none is found, treat the whole
         // gap as "before" so no comment is ever dropped.
-        for comment in comments_in_range(self.comments, search_start, star.unwrap_or(key_start)) {
+        for comment in
+            comments_to_emit_in_range(self.comments, search_start, star.unwrap_or(key_start))
+        {
             parts.push(self.build_comment_doc(comment));
             parts.push(d.text(" "));
         }
@@ -828,7 +832,7 @@ impl<'a> Printer<'a> {
         // computed key, whose in-bracket comments the bracket builder owns).
         if let Some(star) = star {
             let name_bound = self.computed_key_name_bound(star + 1, key_start, computed);
-            for comment in comments_in_range(self.comments, star + 1, name_bound) {
+            for comment in comments_to_emit_in_range(self.comments, star + 1, name_bound) {
                 parts.push(self.build_comment_doc(comment));
                 parts.push(d.text(" "));
             }
@@ -859,7 +863,7 @@ impl<'a> Printer<'a> {
         let mut value_block: DocBuf = smallvec![d.hardline()];
         let mut on_own_line = false;
         let comments: CommentVec<'_> =
-            comments_in_range(self.comments, keyword_end, value_start).collect();
+            comments_to_emit_in_range(self.comments, keyword_end, value_start).collect();
         for (i, comment) in comments.iter().enumerate() {
             let same_line = !on_own_line && self.is_same_line(keyword_end, comment.span.start);
             if same_line {

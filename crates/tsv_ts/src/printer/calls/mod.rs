@@ -125,7 +125,7 @@ impl<'a> Printer<'a> {
             // text on the page (a *layout* question), not who emits it. A bundler annotation
             // on the last argument must still disable the expand-last hug, exactly as an
             // ordinary leading comment does — prettier's `shouldExpandLastArg` sees it.
-            let call_has_comments = self.has_any_comments_between(paren_open, call.span.end);
+            let call_has_comments = self.has_comments_on_page_between(paren_open, call.span.end);
             if call.arguments.len() >= 2
                 && call.arguments.last().is_some_and(is_block_function)
                 && !has_blank_lines_between_args
