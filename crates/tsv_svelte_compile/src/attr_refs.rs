@@ -23,10 +23,11 @@
 //!
 //! Two traversals share that definition. `each_attribute_expression` is the
 //! **emitted-path** view: it visits everything not refused at emission — plain
-//! attribute values, component spreads, and the no-op drop family
+//! attribute values, component spreads, a `class:` directive on a regular element
+//! (emitted as `$.attr_class`), and the no-op drop family
 //! (`use:`/`transition:`/`in:`/`out:`/`animate:`/`{@attach}`) on a regular
 //! element, which is dropped-but-analyzed exactly like an event handler. It skips
-//! the positions that *do* refuse (an element spread, `class:`/`style:`/`bind:`/
+//! the positions that *do* refuse (an element spread, `style:`/`bind:`/
 //! legacy `on:`/`let:`), because the emission refusal is what keeps their
 //! references out of output — and its `each_emitted_directive_name` companion
 //! surfaces the drop-family directive *names* (which an expression traversal can't
@@ -268,6 +269,9 @@ pub(crate) fn fragment_any<'arena>(
 ///   chunks) on any element;
 /// - `{...spread}` expressions on **components** (emitted as `$.spread_props`
 ///   array elements);
+/// - a `class:` directive expression on a regular HTML element (fused into the
+///   element's `$.attr_class(base, hash, { name: expr, … })` call). On a
+///   component `class:` refuses at emission, so it is skipped there;
 /// - the **no-op drop family** on a regular HTML element (`use:`/`transition:`/
 ///   `in:`/`out:`/`animate:` expressions and `{@attach}`). These contribute
 ///   nothing to the tag but are dropped-but-analyzed, exactly like an event
@@ -279,8 +283,8 @@ pub(crate) fn fragment_any<'arena>(
 ///
 /// An *element* spread is refused at emission, so its expression never reaches
 /// output — and visiting it here would let an analysis refusal fire before the
-/// emission refusal, shifting corpus buckets. `class:`/`style:`/`bind:`/legacy
-/// `on:`/`let:` are likewise refused at emission and not visited.
+/// emission refusal, shifting corpus buckets. `style:`/`bind:`/legacy `on:`/`let:`
+/// are likewise refused at emission and not visited.
 ///
 /// A drop-family directive's **name** (`use:action`, `transition:fade`) is also a
 /// binding reference the oracle counts, but tsv stores it as a verbatim name span
@@ -306,6 +310,13 @@ pub(crate) fn each_attribute_expression<'a, 'arena>(
             AttributeNode::SpreadAttribute(spread) if element.kind == ElementKind::Component => {
                 f(&spread.expression);
             }
+            // A `class:` directive on a regular element is emitted (`$.attr_class`),
+            // so its expression reaches output — every analysis must see it. A
+            // shorthand `class:active` carries the auto-generated identifier here;
+            // the class *name* is a CSS token, not a binding reference. On a
+            // component `class:` refuses at emission (a `ComponentDirective`), so it
+            // is skipped there.
+            AttributeNode::ClassDirective(d) if is_html => f(&d.expression),
             // The no-op drop family: dropped-but-analyzed on a regular element.
             AttributeNode::AttachTag(attach) if is_html => f(&attach.expression),
             AttributeNode::UseDirective(d) if is_html => {

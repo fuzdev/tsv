@@ -11,7 +11,8 @@ use std::collections::HashMap;
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{InfallibleResolve, Span};
 use tsv_svelte::ast::internal::{
-    Attribute, AttributeNode, AttributeValue, Element, ElementKind, Fragment, FragmentNode,
+    Attribute, AttributeNode, AttributeValue, ClassDirective, Element, ElementKind, Fragment,
+    FragmentNode,
 };
 use tsv_ts::ast::internal::{
     ArrayExpression, BlockStatement, Expression, ExpressionStatement, ObjectExpression,
@@ -20,7 +21,7 @@ use tsv_ts::ast::internal::{
 
 use crate::analyze::{BindingKind, evaluate, stringify_value};
 use crate::attr_refs::fragment_any;
-use crate::attribute::{emit_attribute, is_load_error_element};
+use crate::attribute::{emit_attribute, emit_class_directives, is_load_error_element};
 use crate::build::escape_template_text;
 use crate::fragment::{
     BodyBuilder, FragmentCtx, emit_child_body, emit_fragment, guard_dropped, wrap_value_expr,
@@ -76,6 +77,15 @@ fn validate_directive_combinations(
         return Err(unsupported(Refusal::AnimateDirectiveInvalid));
     }
     Ok(())
+}
+
+/// Whether `attr` is the element's `class` attribute (case-insensitive, matching
+/// the oracle's lowercasing of attribute names on non-foreign elements).
+fn attribute_is_class(env: &EmitEnv<'_, '_>, attr: &Attribute<'_>) -> bool {
+    let interner = env.b.interner.borrow();
+    interner
+        .resolve_infallible(attr.name)
+        .eq_ignore_ascii_case("class")
 }
 
 /// Emit one element's open tag, children, and close tag into the template.
@@ -142,10 +152,46 @@ pub(crate) fn emit_element<'arena>(
     let animate_host = env.animate_host_span == Some(element.span);
     validate_directive_combinations(element, animate_host)?;
 
+    // Pre-scan the `class:` directives (source order). When present, the authored
+    // `class` attribute (if any) and the directives fuse into one
+    // `$.attr_class(base, hash, { name: expr, … })` call (the oracle's
+    // `build_attr_class`), emitted at the authored `class` slot — or, with no
+    // authored `class`, after all plain attributes (the oracle's phase-2 synthetic
+    // empty-`class` injection appends to the attribute list). Designed to extend
+    // symmetrically to `style:` (which fuses into `$.attr_style`).
+    let class_directives: Vec<&'arena ClassDirective<'arena>> = element
+        .attributes
+        .iter()
+        .filter_map(|attr_node| match attr_node {
+            AttributeNode::ClassDirective(d) => Some(d),
+            _ => None,
+        })
+        .collect();
+    let has_class_directives = !class_directives.is_empty();
+    let mut class_call_emitted = false;
+
     out.push_text(&format!("<{name}"));
     for attr_node in element.attributes {
         match attr_node {
-            AttributeNode::Attribute(attr) => emit_attribute(env, attr, &name, out)?,
+            AttributeNode::Attribute(attr) => {
+                // With `class:` directives present, the authored `class` attribute is
+                // not emitted inline — it becomes the base of the fused
+                // `$.attr_class(...)` call, emitted here at its source slot.
+                if has_class_directives
+                    && !class_call_emitted
+                    && attribute_is_class(env, attr)
+                {
+                    emit_class_directives(env, Some(attr), &class_directives, out)?;
+                    class_call_emitted = true;
+                } else {
+                    emit_attribute(env, attr, &name, out)?;
+                }
+            }
+            // `class:` directives fuse into the single `$.attr_class(...)` call
+            // (emitted at the authored `class` slot, or after all plain attributes
+            // when synthetic) — never inline here. A `ClassDirective` node implies
+            // `has_class_directives`, so this arm only runs for the fused case.
+            AttributeNode::ClassDirective(_) => {}
             // The no-op drop family: `use:`/`transition:`/`in:`/`out:`/`animate:`/
             // `{@attach}` contribute nothing to the tag — SSR runs no client
             // lifecycle, so the oracle discards their output (the discarded
@@ -179,17 +225,23 @@ pub(crate) fn emit_element<'arena>(
                 }
             }
             AttributeNode::AttachTag(attach) => guard_dropped(env, &attach.expression)?,
-            // `class:`/`style:`/`bind:`, a legacy `on:` directive, `let:`, and an
-            // element `{...spread}` are not emitted yet — refuse.
+            // `style:`/`bind:`, a legacy `on:` directive, `let:`, and an element
+            // `{...spread}` are not emitted yet — refuse. (`class:` alongside one of
+            // these still refuses here, via the sibling, until its slice lands.)
             AttributeNode::SpreadAttribute(_)
             | AttributeNode::OnDirective(_)
             | AttributeNode::BindDirective(_)
-            | AttributeNode::ClassDirective(_)
             | AttributeNode::StyleDirective(_)
             | AttributeNode::LetDirective(_) => {
                 return Err(unsupported(Refusal::NonPlainAttribute));
             }
         }
+    }
+    // No authored `class` attribute: the fused `$.attr_class(...)` call emits after
+    // all plain attributes (the oracle appends the synthetic empty `class` to the
+    // end of the attribute list).
+    if has_class_directives && !class_call_emitted {
+        emit_class_directives(env, None, &class_directives, out)?;
     }
 
     if tsv_html::is_void_element(&name) {

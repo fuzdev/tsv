@@ -52,8 +52,10 @@ project-wide conventions.
     ordinary JS and clones through), `svelte/internal*` imports and
     `beforeUpdate`/`afterUpdate` imports from `svelte` (the oracle's runes-mode
     import rules), `{@debug}`, the still-refused attribute directives
-    (`class:`/`style:`/`bind:`, a legacy `on:` directive, `let:`, and an element
-    `{...spread}`) — the no-op drop family (`use:`/`transition:`/`in:`/`out:`/
+    (`style:`/`bind:`, a legacy `on:` directive, `let:`, and an element
+    `{...spread}`) — a `class:` directive on a **regular element** is instead
+    **emitted** as the fused `$.attr_class(base, hash, {…})` call (`element.rs` /
+    `attribute.rs`); the no-op drop family (`use:`/`transition:`/`in:`/`out:`/
     `animate:`/`{@attach}`) is instead **dropped** on a regular element, its
     expression still guarded (a stray rune / `await` refuses) and still walked for
     scope analysis, except a `use:` on a load-error element, which refuses because
@@ -176,12 +178,13 @@ project-wide conventions.
   its own walk and drifts (which is how the component-spread arm once existed in
   one and not the other). Three levels:
   - the element-attribute pair — `each_attribute_expression`, the emitted-path
-    view (everything not refused at emission: plain values, component spreads, and
-    the no-op drop family `use:`/`transition:`/`in:`/`out:`/`animate:`/`{@attach}`
+    view (everything not refused at emission: plain values, component spreads, a
+    `class:` directive expression on a regular element (emitted as `$.attr_class`),
+    and the no-op drop family `use:`/`transition:`/`in:`/`out:`/`animate:`/`{@attach}`
     on a regular element, dropped-but-analyzed like an event handler; its
     `each_emitted_directive_name` companion surfaces the drop-family directive
     *names* an expression traversal can't reach; the still-refused positions —
-    element spread, `class:`/`style:`/`bind:`/legacy `on:`/`let:` — are skipped,
+    element spread, `style:`/`bind:`/legacy `on:`/`let:` — are skipped,
     the refusal keeping their references out of output), and
     `each_reference_bearing_attribute_expression` (+ the directive-name and
     special-element entry points), the **dropped-fragment** view, which includes
@@ -314,7 +317,10 @@ project-wide conventions.
   {…props})` call — a plain object literal, or `$.spread_props([…])` when a
   `{...spread}` attribute is present — the implicit `children` snippet prop
   for default-slot content, and named `{#snippet}` children as named snippet
-  props (`$$slots: { key: true, … }` alongside).
+  props (`$$slots: { key: true, … }` alongside). The attribute loop pre-scans a
+  regular element's `class:` directives and defers them to
+  `attribute::emit_class_directives` (fused `$.attr_class` at the authored-`class`
+  slot, or after all plain attributes when synthetic).
 - `attribute.rs` — attribute emission: dynamic and mixed attributes →
   `$.attr(name, expr[, true])` / `$.attr_class` / `$.attr_style` with
   `$.stringify` interpolations (a mixed attribute whose every part folds
@@ -325,7 +331,17 @@ project-wide conventions.
   boolean attributes emit `name=""`; `class`/`style` values collapse+trim,
   and a string-valued `class` that collapses+trims to empty is dropped
   entirely (static path only — bare `class` keeps `class=""`, empty
-  `style`/`id` stay).
+  `style`/`id` stay). Also `emit_class_directives` — a regular element's
+  `class:name={expr}` directives fuse with the authored `class` attribute (or
+  the phase-2 synthetic empty `''`) into `$.attr_class(base, css_hash, { name:
+  expr, … })` (the oracle's `build_attr_class`): the base is the static value /
+  `$.clsx(expr)` / `''`; the scope hash concatenates into a string-literal base
+  or rides the 2nd argument; the element is scoped when a static-class token or a
+  `class:` directive name matches a scoped selector (recorded in
+  `matched_classes`). A mixed-value `class="a {b}"` base refuses
+  (`ClassDirectiveWithMixedClass`). `element.rs`'s attribute loop pre-scans the
+  `class:` directives and calls this at the authored-`class` slot (or after all
+  plain attributes when synthetic).
 - `css_scope.rs` — minimal CSS scoping (single class selectors: the
   `svelte-tsvhash` class appended to matched elements and
   **source-spliced** into the style text — the author's whitespace is

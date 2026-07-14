@@ -425,11 +425,17 @@ pub enum Refusal {
     )]
     AnimateDirectiveInvalid,
     /// A directive or spread attribute the transform does not yet emit —
-    /// `class:`/`style:`/`bind:`, a legacy `on:` event directive, `let:`, or an
-    /// element `{...spread}`. The no-op drop family (`use:`/`transition:`/`in:`/
-    /// `out:`/`animate:`/`{@attach}`) is dropped, not refused, on a regular element.
+    /// `style:`/`bind:`, a legacy `on:` event directive, `let:`, or an element
+    /// `{...spread}`. The no-op drop family (`use:`/`transition:`/`in:`/`out:`/
+    /// `animate:`/`{@attach}`) is dropped, not refused, on a regular element;
+    /// `class:` on a regular element is emitted (`$.attr_class`).
     #[error("non-plain attribute (directive/spread)")]
     NonPlainAttribute,
+    /// A `class:` directive alongside a **mixed-value** `class="a {b}"` attribute.
+    /// The oracle passes the mixed template value to `build_attr_class` as the
+    /// base; tsv defers reproducing that rare shape rather than build it.
+    #[error("class: directive alongside a mixed-value class attribute")]
+    ClassDirectiveWithMixedClass,
     /// A string-literal expression attribute value (inline-literal path).
     #[error("string-literal expression attribute value (inline-literal path)")]
     StringLiteralExprAttribute,
@@ -753,6 +759,9 @@ impl Refusal {
                 "invalid animate: directive (one per element, only on the sole child of a keyed {#each} — the oracle rejects it)",
             ),
             Self::NonPlainAttribute => Cow::Borrowed("non-plain attribute (directive/spread)"),
+            Self::ClassDirectiveWithMixedClass => {
+                Cow::Borrowed("class: directive alongside a mixed-value class attribute")
+            }
             Self::StringLiteralExprAttribute => {
                 Cow::Borrowed("string-literal expression attribute value (inline-literal path)")
             }

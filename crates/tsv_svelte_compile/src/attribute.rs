@@ -2,9 +2,11 @@
 //! `$.attr_style` calls, and mixed text+expression attribute templates.
 
 use bumpalo::collections::Vec as BumpVec;
-use tsv_lang::InfallibleResolve;
-use tsv_svelte::ast::internal::{Attribute, AttributeValue};
-use tsv_ts::ast::internal::{Expression, LiteralValue};
+use tsv_lang::{InfallibleResolve, Span};
+use tsv_svelte::ast::internal::{Attribute, AttributeValue, ClassDirective};
+use tsv_ts::ast::internal::{
+    Expression, LiteralValue, ObjectExpression, ObjectProperty, Property, PropertyKind,
+};
 
 use crate::analyze::{evaluate, stringify_value};
 use crate::build::escape_template_text;
@@ -404,6 +406,188 @@ fn emit_mixed_attribute<'arena>(
             env.b.member_call("$", "attr", args.into_bump_slice())
         }
     };
+    out.push_expr(call);
+    Ok(())
+}
+
+/// The base (1st) argument of a `$.attr_class(base, hash, directives)` call — the
+/// authored `class` attribute value, or the synthetic empty string. The two arms
+/// govern CSS-scope handling: a string-literal base folds the hash into its text
+/// and contributes its tokens to selector matching; any other base carries the
+/// hash in the 2nd argument and contributes no static tokens.
+enum ClassBase<'arena> {
+    /// A statically-known string base (`class="foo"`, or the synthetic `''`).
+    StringLiteral(String),
+    /// A non-string-literal base expression (`$.clsx(w)`, a bare identifier, a
+    /// template literal, `true`).
+    Expr(Expression<'arena>),
+}
+
+/// Build the base expression for an element's `$.attr_class(...)` call from its
+/// authored `class` attribute (`None` = no authored class → the oracle's synthetic
+/// empty `''`). Mirrors the oracle's `build_attribute_value` + `needs_clsx`
+/// handling for the `class` attribute.
+fn build_class_base<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    class_attr: Option<&'arena Attribute<'arena>>,
+) -> Result<ClassBase<'arena>, CompileError> {
+    let Some(attr) = class_attr else {
+        // No authored `class` — the oracle injects a synthetic `class=""`
+        // (2-analyze/index.js), so the base is the empty string literal.
+        return Ok(ClassBase::StringLiteral(String::new()));
+    };
+    let Some(values) = attr.value else {
+        // A bare boolean `class` — the oracle's `build_attribute_value(true)` → `true`.
+        return Ok(ClassBase::Expr(env.b.true_literal()));
+    };
+    match values {
+        [AttributeValue::Text(text)] => {
+            // Static class value: whitespace-insensitive collapse + trim.
+            let decoded = text.data(env.source);
+            Ok(ClassBase::StringLiteral(collapse_attr_whitespace(&decoded)))
+        }
+        [AttributeValue::ExpressionTag(tag)] => {
+            // Dynamic `class={expr}` / `class="{expr}"`. The oracle wraps in
+            // `$.clsx` per the `needs_clsx` rule (`class_needs_clsx`). A
+            // string-literal expression takes the oracle's inline-literal path we
+            // don't reproduce — refuse, matching the standalone dynamic-attribute
+            // path (`emit_dynamic_attribute`).
+            let quoted = preceded_by_quote(env.source, tag.span.start);
+            let expr = env.erase(&tag.expression)?;
+            if matches!(expr, Expression::Literal(lit)
+                if matches!(lit.value, LiteralValue::String(_)))
+            {
+                return Err(unsupported(Refusal::StringLiteralExprAttribute));
+            }
+            let wrapped = wrap_value_expr(env, expr)?;
+            let base = if class_needs_clsx(expr, quoted) {
+                env.b.member_call("$", "clsx", wrapped)
+            } else {
+                wrapped[0].clone()
+            };
+            Ok(ClassBase::Expr(base))
+        }
+        // A mixed-value `class="a {b}"` base — deferred (rare).
+        _ => Err(unsupported(Refusal::ClassDirectiveWithMixedClass)),
+    }
+}
+
+/// Build the directives object `{ 'name': expr, … }` (source order) for
+/// `$.attr_class`. The key is always a string literal (the oracle's
+/// `b.literal(directive.name)`); `format_canonical` drops the quotes for an
+/// identifier-safe name, matching the oracle's own canonicalized output. Each
+/// value is the directive expression, erased + guarded + derived-rewritten.
+fn build_class_directives_object<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    class_directives: &[&'arena ClassDirective<'arena>],
+) -> Result<Expression<'arena>, CompileError> {
+    let arena = env.b.arena;
+    let obrace = env.b.mint("{").start;
+    let mut properties: BumpVec<'arena, ObjectProperty<'arena>> = BumpVec::new_in(arena);
+    for directive in class_directives {
+        let name = directive.name_span.extract(env.source);
+        let key = env.b.string_literal_expr(name);
+        let key_span = key.span();
+        // The template borrow point: erase once, then guard + rewrite a bare
+        // derived read to `d()`.
+        let expr = env.erase(&directive.expression)?;
+        let value = wrap_value_expr(env, expr)?[0].clone();
+        properties.push(ObjectProperty::Property(Property {
+            key,
+            value,
+            kind: PropertyKind::Init,
+            shorthand: false,
+            computed: false,
+            method: false,
+            span: key_span,
+        }));
+    }
+    let cbrace = env.b.mint("}").end;
+    Ok(Expression::ObjectExpression(ObjectExpression {
+        properties: properties.into_bump_slice(),
+        spread_trailing_comma: false,
+        span: Span::new(obrace, cbrace),
+    }))
+}
+
+/// Emit the fused `$.attr_class(base, css_hash, { name: expr, … })` call for a
+/// regular element carrying `class:` directives (the oracle's `build_attr_class`,
+/// `shared/element.js`). `class_attr` is the authored `class` attribute when
+/// present (its value is the base), else `None` (the oracle's synthetic empty
+/// `''`).
+///
+/// CSS scoping: the element is scoped when any of its candidate classes — the
+/// static tokens of a string-literal base ∪ the `class:` directive names — is a
+/// scoped selector. Each matched class is recorded (so the no-match post-check
+/// passes). A scoped hash folds into a string-literal base (`(value + ' ' +
+/// hash).trim()`) or, for any other base, rides the 2nd argument; otherwise the
+/// 2nd argument is `void 0` (the directives object is always the 3rd argument, so
+/// the middle argument is never elided).
+pub(crate) fn emit_class_directives<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    class_attr: Option<&'arena Attribute<'arena>>,
+    class_directives: &[&'arena ClassDirective<'arena>],
+    out: &mut BodyBuilder<'arena>,
+) -> Result<(), CompileError> {
+    // The synthetic `$.attr_class` call interleaves minted (appendix) and borrowed
+    // (host) argument spans; with carried script comments their windows would
+    // sweep — refuse, matching the dynamic-attribute path.
+    if env.has_comments {
+        return Err(unsupported(Refusal::CommentsAlongsideExprAttributes));
+    }
+
+    let base = build_class_base(env, class_attr)?;
+    let base_is_string = matches!(base, ClassBase::StringLiteral(_));
+
+    // Scope matching. `env.scope` and `env.matched_classes` are disjoint fields,
+    // so the immutable scope borrow and the mutable insert coexist.
+    let mut scoped = false;
+    if let Some(scope) = &env.scope {
+        if let ClassBase::StringLiteral(s) = &base {
+            for token in s.split_ascii_whitespace() {
+                if scope.class_names.contains(token) {
+                    env.matched_classes.insert(token.to_string());
+                    scoped = true;
+                }
+            }
+        }
+        for directive in class_directives {
+            let dname = directive.name_span.extract(env.source);
+            if scope.class_names.contains(dname) {
+                env.matched_classes.insert(dname.to_string());
+                scoped = true;
+            }
+        }
+    }
+
+    // The base expression, folding the scope hash into a string-literal base.
+    let base_expr = match base {
+        ClassBase::StringLiteral(s) => {
+            let text = if scoped {
+                format!("{s} {SCOPE_HASH_CLASS}").trim().to_string()
+            } else {
+                s
+            };
+            env.b.string_literal_expr(&text)
+        }
+        ClassBase::Expr(e) => e,
+    };
+
+    // The css-hash 2nd argument: `void 0` unless scoped with a non-string base,
+    // where it carries the hash literal (a string base folded it in above).
+    let css_hash = if scoped && !base_is_string {
+        env.b.string_literal_expr(SCOPE_HASH_CLASS)
+    } else {
+        env.b.void_zero()
+    };
+
+    let directives = build_class_directives_object(env, class_directives)?;
+
+    let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(env.b.arena);
+    args.push(base_expr);
+    args.push(css_hash);
+    args.push(directives);
+    let call = env.b.member_call("$", "attr_class", args.into_bump_slice());
     out.push_expr(call);
     Ok(())
 }
