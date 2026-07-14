@@ -11,7 +11,7 @@
 // expressions/ and statements/ modules.
 
 use crate::ast::internal;
-use crate::printer::{CommentVec, Printer, is_effectively_empty_body};
+use crate::printer::{CommentVec, Printer, is_effectively_empty_body, next_printed_stmt_start};
 use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
@@ -367,7 +367,10 @@ impl<'a> Printer<'a> {
             // `find_end_with_trailing_comments(end) == end`.
             let stmt_end = stmt.span().end;
             if body_has_comments {
-                let next_start = body.get(i + 1).map_or(body_end, |s| s.span().start);
+                // Bound at the next *printed* statement, skipping dropped `;`s, so a
+                // same-line comment trailing a dropped `;` (`a();; // c`) attaches here
+                // rather than being stranded (the `;` emits nothing to carry it).
+                let next_start = next_printed_stmt_start(body, i, body_end);
                 body_parts.extend(self.build_trailing_same_line_comment_docs(stmt_end, next_start));
                 // Update prev_end past trailing comments (including comments on the
                 // closing */ line of multi-line block comments)

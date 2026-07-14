@@ -40,6 +40,27 @@ pub(crate) fn is_effectively_empty_body(body: &[internal::Statement<'_>]) -> boo
         .all(|s| matches!(s, internal::Statement::EmptyStatement(_)))
 }
 
+/// The start of the next statement after `index` that will actually be printed
+/// — the first one that isn't a dropped standalone `EmptyStatement` — falling
+/// back to `body_end` when only dropped statements (or nothing) follow.
+///
+/// Used to bound a statement's trailing same-line comment scan. A comment
+/// physically trailing a dropped `;` on the statement's own line (`a();; // c`)
+/// must attach to that statement: the `;` it follows emits nothing, so bounding
+/// the scan at the `;` — rather than the next *printed* statement — would strand
+/// the comment (neither the statement's trailing scan nor the dropped `;`'s
+/// leading-comment collection claims it) and silently drop it.
+pub(crate) fn next_printed_stmt_start(
+    body: &[internal::Statement<'_>],
+    index: usize,
+    body_end: u32,
+) -> u32 {
+    body[index + 1..]
+        .iter()
+        .find(|s| !matches!(s, internal::Statement::EmptyStatement(_)))
+        .map_or(body_end, |s| s.span().start)
+}
+
 /// Check if an expression is a module path call that should use fluid assignment wrapping
 /// (break after `=` if too long, keeping the call together).
 ///

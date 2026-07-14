@@ -3,7 +3,7 @@
 // Switch head, case labels, and case-body layout with comment handling.
 
 use crate::ast::internal::{self, Statement};
-use crate::printer::{CommentVec, Printer};
+use crate::printer::{CommentVec, Printer, next_printed_stmt_start};
 use smallvec::smallvec;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
@@ -329,14 +329,13 @@ impl<'a> Printer<'a> {
             // SwitchCase span) gets relocated to its own line by the switch printer.
             // A line comment trails via `line_suffix`; a block comment renders inline
             // — its continuation lines indent to the statement, so the docs must sit
-            // INSIDE the statement's `indent`. Bound the scan by the next statement's
-            // start, or `inline_comment_boundary` (next case / switch end) for the
-            // last statement, so a comment attaches only to the statement it follows.
+            // INSIDE the statement's `indent`. Bound the scan at the next *printed*
+            // statement's start (skipping dropped `;`s), or `inline_comment_boundary`
+            // (next case / switch end) for the last one, so a comment attaches only to
+            // the statement it follows — while a same-line comment trailing a dropped
+            // `;` (`f();; // c`) still attaches here (the `;` emits nothing to carry it).
             let stmt_end = stmt.span().end;
-            let next_bound = case
-                .consequent
-                .get(i + 1)
-                .map_or(inline_comment_boundary, |s| s.span().start);
+            let next_bound = next_printed_stmt_start(case.consequent, i, inline_comment_boundary);
             let trailing = self.build_trailing_same_line_comment_docs(stmt_end, next_bound);
 
             // First block statement hugs the case label: `case 'a': { ... }`
