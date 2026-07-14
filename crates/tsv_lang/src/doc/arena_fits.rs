@@ -221,14 +221,13 @@ pub(super) fn arena_fits_with_lookahead<R: TextResolver + ?Sized>(
                     return remaining >= 0;
                 }
 
-                DocNode::Line(kind) => match kind {
-                    LineKind::Hard | LineKind::Literal => return true,
-                    _ if current_mode == Mode::Break => return true,
-                    LineKind::Soft => {}
-                    LineKind::Normal => {
-                        remaining -= 1;
-                    }
-                },
+                // Any `Line` reaching the slow walk ends the current line, so
+                // everything measured so far fits. `Hard`/`Literal` break in
+                // either mode; a `Soft`/`Normal` reaches here only in `Break`
+                // mode (the Flat fast path above answers them from the memo —
+                // `Some(0)`/`Some(1)` — so they never fall through), where the
+                // break likewise ends the line. Hence unconditionally `true`.
+                DocNode::Line(_) => return true,
 
                 DocNode::Group {
                     contents,
