@@ -105,10 +105,34 @@ impl<'a> Printer<'a> {
         // This is the `has_comments_on_page_in_range` / `has_comments_to_emit_in_range` split: an
         // emit-decision skips owned comments, a layout/semantic gate counts them.
         //
-        // A sequence is the exception: its own value-position parens already enclose the
-        // comment (`!(/** @type {A} */ (x), y)`), so wrapping again would just double them.
+        // An operand that already prints its own value-position pair is the exception:
+        // that pair encloses the owned comment on the plain needs-parens path below
+        // (`!(/** @type {A} */ (x), y)`, `!(/* c */ x = y)`, `!(/* c */ cond ? b : c)`),
+        // so counting the owned comment here would drive the comment-holder wrap and
+        // double the parens (`!((/* c */ x = y))`). Skipping it routes the operand to that
+        // plain path, where its own single pair encloses the owned comment (prepended by
+        // `build_expression_doc`). That's any `needs_parens` operand — assignment, a
+        // conditional, an arrow, await/yield, a type assertion — plus a sequence, whose
+        // own printer supplies the pair (`needs_parens` reports false for it). Binary is
+        // deliberately NOT here: its plain path renders through
+        // `build_binary_chain_doc_ungrouped`, which does not prepend the owned comment, so
+        // binary must take the comment-holder path (where `needs_paren_wrap` excludes it —
+        // one pair either way). A *trailing* comment on such an operand still keeps both
+        // pairs (the comment-holder path via `has_trailing_comments`) — that is the
+        // deliberate `!((x = y) /* c */)` form, pinned by `operand_paren_comment`.
+        // Asked three times below (the exception here, the comment-holder inner wrap,
+        // and the plain path), always with the same operand + context — compute once.
+        let arg_needs_parens = self.needs_parens(
+            unary.argument,
+            ParenContext::UnaryArgument {
+                parent_op: unary.operator,
+            },
+        );
+        let operand_encloses_owned_comment =
+            matches!(unary.argument, Expression::SequenceExpression(_))
+                || (arg_needs_parens && !matches!(unary.argument, Expression::BinaryExpression(_)));
         let owned_leading_comment = leading_comments_opt.is_none()
-            && !matches!(unary.argument, Expression::SequenceExpression(_))
+            && !operand_encloses_owned_comment
             && tsv_lang::has_comments_on_page_in_range(self.comments, operator_end, argument_start);
         let has_leading_comments = leading_comments_opt.is_some() || owned_leading_comment;
 
@@ -141,12 +165,8 @@ impl<'a> Printer<'a> {
             // needs_parens layer is redundant for a binary/logical operand — prettier
             // strips it (`!(x + y /* c */)`). Assignment/ternary operands keep their
             // parens for clarity in both formatters, so leave those untouched.
-            let needs_paren_wrap = self.needs_parens(
-                unary.argument,
-                ParenContext::UnaryArgument {
-                    parent_op: unary.operator,
-                },
-            ) && !matches!(unary.argument, Expression::BinaryExpression(_));
+            let needs_paren_wrap =
+                arg_needs_parens && !matches!(unary.argument, Expression::BinaryExpression(_));
             let inner = if needs_paren_wrap {
                 d.parens(inner)
             } else {
@@ -203,12 +223,7 @@ impl<'a> Printer<'a> {
                 parts.push(d.text(")"));
                 d.concat(&parts)
             }
-        } else if self.needs_parens(
-            unary.argument,
-            ParenContext::UnaryArgument {
-                parent_op: unary.operator,
-            },
-        ) {
+        } else if arg_needs_parens {
             // Binary expressions need parens - grouping lets the parens expand when the arg is long
             if let Expression::BinaryExpression(binary) = unary.argument {
                 // Wrap any binaryish arg (logical or not) in a single paren group.

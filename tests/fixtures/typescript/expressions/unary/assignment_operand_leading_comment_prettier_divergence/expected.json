@@ -1,0 +1,273 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 293,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A leading block comment glued inside a unary operand's required parens — an",
+			"start": 20,
+			"end": 98,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " assignment needs the parens — stays inside the single paren where the author",
+			"start": 100,
+			"end": 179,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " wrote it. prettier relocates it out, before the operand's own parens.",
+			"start": 181,
+			"end": 253,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 267,
+			"end": 274,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 13
+				},
+				"end": {
+					"line": 5,
+					"column": 20
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 292,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 283,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 6,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 255,
+					"end": 282,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 28
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 261,
+							"end": 281,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 7
+								},
+								"end": {
+									"line": 5,
+									"column": 27
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 261,
+								"end": 262,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 7
+									},
+									"end": {
+										"line": 5,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "UnaryExpression",
+								"start": 265,
+								"end": 281,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 11
+									},
+									"end": {
+										"line": 5,
+										"column": 27
+									}
+								},
+								"operator": "!",
+								"prefix": true,
+								"argument": {
+									"type": "AssignmentExpression",
+									"start": 275,
+									"end": 280,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 21
+										},
+										"end": {
+											"line": 5,
+											"column": 26
+										}
+									},
+									"operator": "=",
+									"left": {
+										"type": "Identifier",
+										"start": 275,
+										"end": 276,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 21
+											},
+											"end": {
+												"line": 5,
+												"column": 22
+											}
+										},
+										"name": "x"
+									},
+									"right": {
+										"type": "Identifier",
+										"start": 279,
+										"end": 280,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 25
+											},
+											"end": {
+												"line": 5,
+												"column": 26
+											}
+										},
+										"name": "y"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 267,
+											"end": 274
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A leading block comment glued inside a unary operand's required parens — an",
+							"start": 20,
+							"end": 98
+						},
+						{
+							"type": "Line",
+							"value": " assignment needs the parens — stays inside the single paren where the author",
+							"start": 100,
+							"end": 179
+						},
+						{
+							"type": "Line",
+							"value": " wrote it. prettier relocates it out, before the operand's own parens.",
+							"start": 181,
+							"end": 253
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

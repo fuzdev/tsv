@@ -303,7 +303,11 @@ fn skip_ws(bytes: &[u8], mut i: usize) -> usize {
 }
 
 fn indent(s: &str) -> String {
-    s.lines().map(|l| format!("      {l}\n")).collect()
+    use std::fmt::Write as _;
+    s.lines().fold(String::new(), |mut acc, l| {
+        let _ = writeln!(acc, "      {l}");
+        acc
+    })
 }
 
 fn is_ts_family(path: &Path) -> bool {

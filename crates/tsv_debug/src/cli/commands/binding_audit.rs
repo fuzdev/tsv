@@ -99,9 +99,11 @@ pub struct BindingAuditCommand {
 /// A block comment's forward binding, or `None` when it binds nothing (an
 /// own-line comment, or one glued to another comment rather than a token).
 ///
-/// Equality is the re-binding test: two authorings of the same comment that
-/// compare unequal have re-bound it.
-#[derive(Clone, PartialEq)]
+/// The re-binding test is [`is_rebind`], **not** structural equality: the
+/// `anchor_is_paren` flag is asymmetric (a paren appearing at the anchor is a
+/// re-binding; one disappearing is the safe restore direction), so a derived
+/// `PartialEq` would be too coarse for `Glued`.
+#[derive(Clone)]
 enum Binding {
     /// A JSDoc cast — the paren-stripped skeleton of the subtree it wraps.
     Cast(Value),
@@ -112,6 +114,35 @@ enum Binding {
         skeleton: Value,
         anchor_is_paren: bool,
     },
+}
+
+/// Whether the comment's binding changed in a way that counts as a re-binding.
+///
+/// A skeleton change (the paren-stripped bound subtree differs) is a re-binding
+/// in either direction. The `anchor_is_paren` flag is **asymmetric**: a paren
+/// *appearing* at the anchor (`false → true`) is the bug — a synthesized paren
+/// now leads the comment and re-binds it — while a paren *disappearing*
+/// (`true → false`, a redundant grouping paren stripped) restores the comment's
+/// binding to the underlying token and is safe (never a bug; for an annotation
+/// it *restores* the correct binding). A kind change (cast↔glued, bound↔unbound)
+/// is a re-binding. Using derived `!=` here fired on the safe paren-strip
+/// direction — the coverage gap the `ignores_stripped_grouping_paren` test pins.
+fn is_rebind(a: Option<&Binding>, b: Option<&Binding>) -> bool {
+    match (a, b) {
+        (None, None) => false,
+        (Some(Binding::Cast(sa)), Some(Binding::Cast(sb))) => sa != sb,
+        (
+            Some(Binding::Glued {
+                skeleton: sa,
+                anchor_is_paren: pa,
+            }),
+            Some(Binding::Glued {
+                skeleton: sb,
+                anchor_is_paren: pb,
+            }),
+        ) => sa != sb || (!*pa && *pb),
+        _ => true,
+    }
 }
 
 /// One block comment's audit record: its content (the cross-format match key),
@@ -268,12 +299,13 @@ impl BindingAuditCommand {
         }
         println!("✗ {} finding(s):\n", reported.len());
         for f in reported {
-            // hard non-cast comments are the parser-owned annotations; soft ones
-            // are plain glued comments.
+            // A hard non-cast finding is any parser-owned glued comment (a bundler
+            // annotation OR a plain glued comment — post "own every glued block
+            // comment" they bind identically); a soft one is an unowned glued comment.
             let kind = if f.cast {
                 "cast"
             } else if f.hard {
-                "annotation"
+                "owned"
             } else {
                 "glued"
             };
@@ -326,7 +358,7 @@ fn audit_file(path: &Path) -> FileOutcome {
     let display = path.to_string_lossy().into_owned();
     let mut findings = Vec::new();
     for (a, b) in input.iter().zip(&output) {
-        if a.binding != b.binding {
+        if is_rebind(a.binding.as_ref(), b.binding.as_ref()) {
             findings.push(Finding {
                 display: display.clone(),
                 content: a.content.clone(),
@@ -534,7 +566,7 @@ mod tests {
         input
             .iter()
             .zip(&output)
-            .filter(|(a, b)| a.binding != b.binding)
+            .filter(|(a, b)| is_rebind(a.binding.as_ref(), b.binding.as_ref()))
             .map(|(a, _)| (a.content.clone(), a.owned))
             .collect()
     }
@@ -547,7 +579,7 @@ mod tests {
         assert_eq!(ga.len(), gb.len(), "comment set differs");
         ga.iter()
             .zip(&gb)
-            .filter(|(x, y)| x.binding != y.binding)
+            .filter(|(x, y)| is_rebind(x.binding.as_ref(), y.binding.as_ref()))
             .map(|(x, _)| x.content.clone())
             .collect()
     }
@@ -576,6 +608,27 @@ mod tests {
         let flat = "const x = /* @__PURE__ */ f(aaaaaa, bbbbbb);\n";
         let broken = "const x = /* @__PURE__ */ f(\n\taaaaaa,\n\tbbbbbb\n);\n";
         assert!(rebinds(flat, broken).is_empty());
+    }
+
+    #[test]
+    fn ignores_stripped_grouping_paren() {
+        // A redundant grouping paren stripped from around the bound token — the
+        // safe direction (anchor_is_paren true→false, identical skeleton) — is
+        // NOT a re-binding; it restores the comment's binding to the token. This
+        // is the paren-strip direction that a derived `!=` wrongly flagged.
+        let with_paren = "const b = /* grouping */ (expr);\n";
+        let without = "const b = /* grouping */ expr;\n";
+        assert!(rebinds(with_paren, without).is_empty());
+    }
+
+    #[test]
+    fn detects_appearing_grouping_paren() {
+        // The mirror of the case above: a paren *appearing* at the anchor
+        // (false→true) re-binds the comment to the paren even when the stripped
+        // skeleton is unchanged — the bug direction, so it must be a finding.
+        let without = "const b = /* grouping */ expr;\n";
+        let with_paren = "const b = /* grouping */ (expr);\n";
+        assert!(!rebinds(without, with_paren).is_empty());
     }
 
     #[test]

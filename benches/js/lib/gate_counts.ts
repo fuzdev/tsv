@@ -258,9 +258,21 @@ export const CORPUS_PARSE_TSV_ERRORS_PIN: Record<Language, number> = {
  */
 export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	svelte: 1101,
-	typescript: 4168,
+	typescript: 4170,
 	css: 125,
 };
+// typescript 4168→4170 (2026-07-14, ../svelte b4d1583ae, ../kit da5b08ea7, ../svelte.dev
+// c21c2d0f0, ../prettier 1dcd0b05d, ../prettier-plugin-svelte 7809486, oracle
+// acorn-typescript 1.0.11); svelte + css unchanged, SAFETY 0. The checkouts are UNCHANGED
+// from the 2026-07-13 pin (pins:audit's commit check confirms — zero corpus drift), so the
+// +2 is behavior: #459 "own every glued block comment" landed after the pin. Net +2 match on
+// TS because its call/chain/new layout gates now see owned comments (more expand/hug matches)
+// and outweigh the new preserve-divergences (a leading block comment kept glued where
+// prettier hoists it out). This branch's follow-ups have ~0 TS-corpus effect (the
+// svelte-destructure comment-preservation fix is svelte-only — svelte match holds at 1101 —
+// and the M4 unary-assignment leading-comment fix is exercised by no corpus file). A per-file
+// worktree diff was not re-run this session; the cause is #459 and the move is small +
+// SAFETY 0.
 // typescript 4164→4168 (2026-07-13, ../svelte b4d1583ae, ../kit da5b08ea7, ../svelte.dev
 // c21c2d0f0, ../prettier 1dcd0b05d, ../prettier-plugin-svelte 7809486, oracle
 // acorn-typescript 1.0.11); svelte + css unchanged, SAFETY 0.
@@ -304,9 +316,16 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	svelte: 7,
-	typescript: 139,
+	typescript: 140,
 	css: 22,
 };
+// typescript 139→140 (2026-07-14, checkouts as in CORPUS_FORMAT_MATCH_MIN above; svelte 7 +
+// css 22 unchanged, SAFETY 0). Checkouts UNCHANGED from the 2026-07-13 pin (zero corpus
+// drift), so the +1 is behavior from #459 "own every glued block comment": a glued block
+// comment now shifts fill wrapping where it fuses into a fill item — `js/arrays/numbers3.js`
+// (its inline `/*21,*/` array comment re-flows the number fill by one column), verified no
+// data loss, reparses, idempotent. A deliberate comment-preservation divergence, not a
+// regression (see conformance_prettier.md §Comment relocation / §Comment Position Philosophy).
 // typescript 141→139 (2026-07-13, checkouts as in CORPUS_FORMAT_MATCH_MIN above). The
 // pre-change binary measures 142 on today's checkouts — the 141 pin was stale by +1 from
 // the same ../kit + ../svelte.dev movement — and the computed-lookup work then removes 3

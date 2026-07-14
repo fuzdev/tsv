@@ -190,17 +190,18 @@ enum SubscriptMode {
 
 // ## Forward-binding comments
 //
-// Most comments are positional: they sit where the author put them and mean whatever the
-// surrounding code means. A few **bind to the token that follows them** — they are read by
-// some other tool as modifying the *next* thing, so anything printed between the two
-// changes what they modify. Those are the comments the parser marks `owned_by_node`, and
-// the two classifiers below are the membership test. Both are keyed on comment *content*,
-// which is a smell worth being honest about — but the alternative (owning every glued
-// block comment) was measured against the corpus and is worse; see
-// `docs/conformance_prettier.md` §Comment relocation.
+// A comment glued to the token after it is **bound to that token** — read by some other
+// tool (or by tsv's own layout) as modifying the *next* thing, so anything printed between
+// the two changes what it modifies. **Every glued block comment is owned** (`owned_by_node`,
+// set by `bind_leading_comment`): ownership is keyed on *position* (glued-ness), not content.
+// The one content classifier below, `is_jsdoc_type_cast_comment`, is no longer an ownership
+// membership test — it decides a **cast's paren-retention** (whether `(expr)` becomes a
+// `JsdocCast` node). It retains a residual ownership role only because a cast's comment may
+// sit a newline *above* its `(` (`CommentGlue::AnyLine`), which the general `SameLine`-glued
+// rule doesn't reach; a same-line cast comment's ownership is already subsumed by that rule.
 //
-// Adding a third class means checking that some node actually prints it — an owned comment
-// nothing prints is a *dropped* comment. See `printer/comments/owned.rs`.
+// An owned comment must be printed by some node — an owned comment nothing prints is a
+// *dropped* comment. See `printer/comments/owned.rs`.
 
 /// Mirror of prettier's `isTypeCastComment` (`is-type-cast-comment.js`): the
 /// comment text (between `/*` and `*/`) starts with `*` — i.e. the `/**` form —
@@ -1688,7 +1689,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         //   unit, so the cast prints it and the flat-`Vec<Comment>` lookups skip it
         //   (`Comment::owned_by_node`) — printed from an enclosing gap instead, a
         //   paren synthesized around an enclosing expression lands between the two
-        //   and the cast silently re-binds to the wider node on reparse.
+        //   and the cast silently re-binds to the wider node on reparse. This owning
+        //   is not fully subsumed by the general "every glued block comment is owned"
+        //   rule (`bind_leading_comment`), which binds only a **same-line** glued
+        //   comment (`CommentGlue::SameLine`); a cast comment may sit a newline
+        //   **above** its `(` (`AnyLine`) and still be the cast, so the cast owns it
+        //   here regardless (a same-line cast comment is owned by both, harmlessly).
         // - **Snippet-parameter sub-parse** (`preserve_parens`) — acorn's
         //   `preserveParens` without Svelte's `remove_parens`; wraps in a
         //   layout-transparent `ParenthesizedExpression` so only the wire shape moves.
