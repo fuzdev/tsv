@@ -20,4 +20,19 @@
 
 	// Multiple members with trailing comments (single-line)
 	type E = { a: number; /* first */ b: string /* second */ };
+
+	// Trailing multiline block on a non-last member (kept trailing, no spurious blank line)
+	type F = {
+		a: number; /*
+		 * trailing multiline
+		 */
+		b: string;
+	};
+
+	// Trailing multiline block on the last member (kept trailing)
+	type G = {
+		a: number; /*
+		 * trailing multiline
+		 */
+	};
 </script>
