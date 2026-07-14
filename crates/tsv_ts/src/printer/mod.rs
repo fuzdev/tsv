@@ -46,7 +46,8 @@ pub(crate) use analysis::{
     PatternContext, build_entity_name_doc, has_multiline_content, has_newline_before_position,
     is_brace_block_multiline, is_effectively_empty_body, is_module_path_fluid_call,
     is_multiline_string_literal, is_multiline_template_expression, is_pure_property_chain,
-    is_string_literal, object_pattern_should_expand, template_literal_has_newlines,
+    is_string_literal, next_printed_stmt_start, object_pattern_should_expand,
+    template_literal_has_newlines,
 };
 pub(crate) use comments::{
     CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue,
