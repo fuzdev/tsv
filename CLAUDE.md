@@ -186,7 +186,7 @@ deno task fixtures:update:formatted  # regenerate output_prettier.svelte only
 deno task fixtures:audit             # audit _prettier_divergence fixtures (diagnostic; --all for every fixture)
 deno task conformance:audit          # doc/fixture integrity: divergence fixtures cataloged + every doc/README link resolves + each divergence README back-links its sanctioning doc + no stray READMEs on matching fixtures (gated in `deno task check`)
 deno task conformance:audit:compiler # compile-fixture divergence integrity: any _compiled_divergence fixture must be cataloged in docs/conformance_svelte_compiler.md + carry a back-linking README — the catalog is expected to stay EMPTY (gated in `deno task check`); see Debug Tooling
-deno task canonicalize:audit         # canonicalize_js idempotence + output validity over tests/fixtures + tests/fixtures_compile (pure Rust; gated in `deno task check`) — point the command at real corpora on demand; see Debug Tooling
+deno task canonicalize:audit         # canonicalize_js idempotence + output validity + comment preservation (the COMMENT-LOSS bucket) over tests/fixtures + tests/fixtures_compile (pure Rust; gated in `deno task check`) — point the command at real corpora on demand; see Debug Tooling
 deno task compile:fixtures:init      # create/reinit a compile fixture (oracle-compiles + canonicalizes; tests/fixtures_compile)
 deno task compile:fixtures:validate  # validate compile fixtures: oracle freshness + expected idempotence + ours parity (all gating; the sidecar-free slice also gates in cargo test)
 deno task compile:corpus:compare     # compile-parity wide net over real repos + the Svelte suites: per-file parity/refused/oracle-rejected buckets; MISMATCH = always a bug by the refusal contract (sidecar-dependent, on demand — kept out of `deno task check`); see Debug Tooling
@@ -834,7 +834,9 @@ cargo run -p tsv_debug compile_conformance_audit
 # canonicalize_audit - canonicalize_js (the compile-parity reprint) at corpus scale: run the
 # canonicalizer twice per TS/JS file (.ts/.js/.mts/.cts/.mjs/.cjs, .svelte.ts included) and bucket —
 # input-rejected (informational: invalid fixtures, script-goal files), NON-IDEMPOTENT (failure),
-# CORRUPT-OUTPUT / unreparseable reprint (failure; the canonicalizer self-validates by reparse).
+# CORRUPT-OUTPUT / unreparseable reprint (failure; the canonicalizer self-validates by reparse),
+# COMMENT-LOSS (failure; whitespace-normalized comment text/order before-vs-after — the bucket the
+# other two are structurally blind to: a swallowed comment leaves valid, idempotent JS).
 # Pure Rust (no Deno). Exits 1 on any failure. Gated in `deno task check` over tests/fixtures +
 # tests/fixtures_compile (fast); point it at real corpora for the full sweep.
 cargo run -p tsv_debug canonicalize_audit                              # default scope (tests/fixtures only)

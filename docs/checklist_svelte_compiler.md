@@ -246,6 +246,7 @@ What a dropped region does **not** get is the *emission* refusals: a directive, 
 - **Refused**: `{#snippet} {name} hoist classification ambiguous` — a referenced name is both an instance binding and a nested (non-parameter) local, so free-vs-shadowed can't be told apart under the flat name model (also an escaped snippet reference).
 - **Refused**: `{#snippet} alongside a {@const}/<svelte:head> in the same fragment (hoist order)` — the relative hoist order across kinds isn't reproduced.
 - **Refused**: `duplicate {#snippet} {name} (the oracle rejects it)`.
+- **Refused**: `{#snippet} rest parameter (the oracle rejects it)` — a **top-level** rest parameter (`{#snippet s(...xs)}`; the oracle's `snippet_invalid_rest_parameter`, raised in its analysis phase). A rest element *nested* inside a destructuring parameter (`{#snippet s({ ...rest })}`) is legal and compiles — the oracle checks only the top level.
 
 `{@render callee(args)}` → `callee($$renderer, ...args)` (or `callee?.($$renderer, …)` when optional). Arguments ride the same value machinery as block tests (a bare `$derived` read becomes `d()`; runes/mutations refuse). The trailing `<!---->` anchor (the oracle's `empty_comment`, `RenderTag.js:42`) is emitted unless the enclosing block's sole trimmed child is this render with a **non-dynamic** callee (`clean_nodes` `is_standalone`; a local snippet is non-dynamic, a snippet prop is dynamic). `is_standalone` is inherited by element children, so an element wrapping the render keeps the anchor.
 

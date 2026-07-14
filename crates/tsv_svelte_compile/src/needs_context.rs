@@ -636,7 +636,8 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
         },
         Statement::TSExportAssignment(s) => walk_expr(&s.expression, nc),
         // No trigger-bearing children, or refused elsewhere (TS enum/module are
-        // rejected by the rune guard before this analysis runs).
+        // refused by type erasure before this analysis runs; the rune guard
+        // refuses them too as its own defense in depth).
         Statement::BreakStatement(_)
         | Statement::ContinueStatement(_)
         | Statement::EmptyStatement(_)
