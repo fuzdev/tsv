@@ -59,8 +59,8 @@ fn is_namespaced_name(name: &str) -> bool {
 
 /// `REGEX_VALID_TAG_NAME` (`utils.js`): `/^[a-zA-Z][a-zA-Z0-9]*(-[…PCENChar…]*)?$/u` — an
 /// ASCII-alpha start, ASCII alphanumerics, then optionally a hyphen introducing a run of
-/// [PCENChar](is_pcen_char) (custom-element names such as `<my-café>`). The Unicode ranges are
-/// literal, so no general-category lookup is needed.
+/// [`PCENChar`](tsv_html::is_pcen_char) (custom-element names such as `<my-café>`). The Unicode
+/// ranges are literal, so no general-category lookup is needed.
 fn is_valid_element_local_name(name: &str) -> bool {
     let mut chars = name.chars();
     if !chars.next().is_some_and(|c| c.is_ascii_alphabetic()) {
@@ -69,7 +69,7 @@ fn is_valid_element_local_name(name: &str) -> bool {
     let mut after_hyphen = false;
     for c in chars {
         if after_hyphen {
-            if !is_pcen_char(c) {
+            if !tsv_html::is_pcen_char(c) {
                 return false;
             }
         } else if c.is_ascii_alphanumeric() {
@@ -81,20 +81,6 @@ fn is_valid_element_local_name(name: &str) -> bool {
         }
     }
     true
-}
-
-/// A `PCENChar` (HTML "valid custom element name" grammar,
-/// <https://html.spec.whatwg.org/multipage/custom-elements.html#valid-custom-element-name>);
-/// the ranges are `REGEX_VALID_TAG_NAME`'s verbatim. Surrogate code points are unreachable — a
-/// Rust `char` is never a surrogate.
-fn is_pcen_char(c: char) -> bool {
-    c.is_ascii_alphanumeric()
-        || matches!(c, '-' | '.' | '_' | '\u{00B7}')
-        || matches!(c,
-            '\u{00C0}'..='\u{00D6}' | '\u{00D8}'..='\u{00F6}' | '\u{00F8}'..='\u{037D}'
-            | '\u{037F}'..='\u{1FFF}' | '\u{200C}'..='\u{200D}' | '\u{203F}'..='\u{2040}'
-            | '\u{2070}'..='\u{218F}' | '\u{2C00}'..='\u{2FEF}' | '\u{3001}'..='\u{D7FF}'
-            | '\u{F900}'..='\u{FDCF}' | '\u{FDF0}'..='\u{FFFD}' | '\u{10000}'..='\u{EFFFF}')
 }
 
 /// Result type for parsing elements - either a regular element or a special element.

@@ -97,47 +97,70 @@ fn parse_hue(s: &str) -> Option<(ColorChannel, Option<AngleUnit>)> {
 
 /// The three channels of a color function plus its optional alpha — everything
 /// `parse_rgb` and `parse_hsl` read. A color function has at most four parts, so
-/// they travel as a tuple rather than a heap list, and "at least three channels"
+/// they travel as a tuple rather than a heap list, and "exactly three channels"
 /// is a fact the type states instead of a length check each caller repeats.
 type ColorArgs<'a> = (&'a str, &'a str, &'a str, Option<&'a str>);
 
-/// The first three parts, plus a fourth if the iterator has one; `None` if there
-/// are fewer than three. Parts past the fourth are discarded — nothing reads one,
-/// so an over-long argument list is still accepted on its first four.
-fn first_channels<'a>(mut parts: impl Iterator<Item = &'a str>) -> Option<ColorArgs<'a>> {
-    let first = parts.next()?;
-    let second = parts.next()?;
-    let third = parts.next()?;
-    Some((first, second, third, parts.next()))
-}
-
 /// Split a color function's argument string into its channel parts across the
-/// CSS Color 4 syntaxes — `c, c, c[, a]`, space-separated `c c c`, and the
-/// slash-alpha form `c c c / a`. Returns `None` if fewer than 3 parts. Shared by
+/// CSS Color 4 syntaxes (css-color-4 §rgb()/§hsl()) — legacy `c, c, c[, a]`,
+/// modern `c c c`, and the modern slash-alpha form `c c c / a`. Shared by
 /// `parse_rgb` and `parse_hsl`, which differ only in how they parse each channel.
 ///
-/// The slash form appends its alpha to the head's parts rather than binding it to
-/// the fourth slot, so a two-channel head like `rgb(1 2 / 3)` reads `3` as the
-/// *blue* channel and carries no alpha — hence the chained iterator rather than a
-/// separate alpha argument. CSS rejects such a value anyway, so nothing depends on
-/// a better answer here.
+/// Returns `None` unless the arity matches one of those grammars **exactly**: 3
+/// (modern), 3 or 4 (legacy comma), or 3-channels-then-slash-alpha. A malformed
+/// value — too many channels, or a slash form missing a channel — is deliberately
+/// **not** classified as a color, so it falls through to the generic function path,
+/// which preserves it verbatim (matching prettier). Classifying it here instead
+/// would reconstruct it lossily: dropping the trailing channel, reinterpreting a
+/// slash-alpha as the missing channel, or inserting legacy commas.
+///
+/// Channels split on CSS whitespace (css-syntax-3 §whitespace: no U+000B), not
+/// only U+0020, so an interior tab/newline classifies the same as a space would —
+/// otherwise the same color, authored across two lines, could reformat to two
+/// different fixed points (once as a misclassified generic function, once as a
+/// color).
 fn split_color_args(args_str: &str) -> Option<ColorArgs<'_>> {
     let args_str = args_str.trim();
-    if let Some((head, alpha_part)) = args_str.split_once('/') {
-        // Slash-alpha form: c c c / a
-        first_channels(
-            head.split([',', ' '])
-                .filter(|s| !s.is_empty())
-                .map(str::trim)
-                .chain(std::iter::once(alpha_part.trim())),
-        )
+    if let Some((head, alpha)) = args_str.split_once('/') {
+        // Modern slash-alpha form: exactly `c c c / a`. Bind the alpha to the
+        // fourth slot; the caller's channel parse rejects a malformed alpha (a
+        // second slash, extra tokens, or an empty one all fail to parse), so only
+        // the head arity is checked here.
+        let mut channels = head
+            .split(|c: char| c == ',' || c.is_ascii_whitespace())
+            .filter(|s| !s.is_empty());
+        let c1 = channels.next()?;
+        let c2 = channels.next()?;
+        let c3 = channels.next()?;
+        if channels.next().is_some() {
+            return None; // more than three channels before the slash
+        }
+        Some((c1, c2, c3, Some(alpha.trim())))
     } else if args_str.contains(',') {
-        // Comma-separated: c, c, c[, a] — empties are kept, so `rgb(1,,2)` still
-        // presents three parts (and then fails to parse the empty channel).
-        first_channels(args_str.split(',').map(str::trim))
+        // Legacy comma form: exactly `c, c, c` or `c, c, c, a`. Empties are kept,
+        // so `rgb(1,,2)` still presents three parts (and then fails to parse the
+        // empty channel).
+        let mut parts = args_str.split(',').map(str::trim);
+        let c1 = parts.next()?;
+        let c2 = parts.next()?;
+        let c3 = parts.next()?;
+        let alpha = parts.next();
+        if parts.next().is_some() {
+            return None; // more than four comma-separated parts
+        }
+        Some((c1, c2, c3, alpha))
     } else {
-        // Space-separated: c c c
-        first_channels(args_str.split(' ').filter(|s| !s.is_empty()).map(str::trim))
+        // Modern space form: exactly `c c c` (its alpha uses the slash form above).
+        let mut channels = args_str
+            .split(|c: char| c.is_ascii_whitespace())
+            .filter(|s| !s.is_empty());
+        let c1 = channels.next()?;
+        let c2 = channels.next()?;
+        let c3 = channels.next()?;
+        if channels.next().is_some() {
+            return None; // more than three space-separated channels
+        }
+        Some((c1, c2, c3, None))
     }
 }
 
