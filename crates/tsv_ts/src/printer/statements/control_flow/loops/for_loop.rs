@@ -308,7 +308,8 @@ impl<'a> Printer<'a> {
 
         // Build "for" + optional keyword comments + " (" prefix
         let for_open = if let Some(kc) = keyword_comments {
-            d.concat(&[d.text("for"), kc, d.text(" (")])
+            // `kc` carries its own trailing space (block) or hardline (line).
+            d.concat(&[d.text("for"), kc, d.text("(")])
         } else {
             d.text("for (")
         };
@@ -877,8 +878,11 @@ impl<'a> Printer<'a> {
         let close_paren = open_paren.and_then(|o| self.matching_close_paren(o));
         let (for_await_comments, await_paren_comments) = if is_await {
             let await_pos = self.find_keyword_in_range(for_keyword_end, left_start, "await");
+            // Same line-safe builder as the `await`→`(` gap below: a line comment in
+            // the `for`→`await` gap breaks `await` onto the next line so the `//`
+            // can't swallow it; a block comment keeps its glue space.
             let for_await_c = await_pos
-                .and_then(|ap| self.build_inline_comments_between_doc_opt(for_keyword_end, ap));
+                .and_then(|ap| self.build_keyword_paren_comments(for_keyword_end, Some(ap)));
             let await_paren_c = await_pos
                 .map(|ap| ap + "await".len() as u32)
                 .and_then(|ae| self.build_keyword_paren_comments(ae, open_paren));
@@ -1081,19 +1085,29 @@ impl<'a> Printer<'a> {
     ) {
         let d = self.d();
         parts.push(d.text("for"));
+        // `for` → (`await` | `(`) transition. Both `keyword_comments` (the non-await
+        // `for`→`(` gap) and `for_await_comments` (the `for`→`await` gap) are built by
+        // `build_keyword_paren_comments`, so each already carries its own trailing
+        // space (block) or hardline (line) — a line comment breaks the next token
+        // (`(` or `await`) onto its own line so the `//` can't swallow it. The two are
+        // mutually exclusive (keyword_comments only non-await, for_await_comments only
+        // await).
         if let Some(kc) = keyword_comments {
             parts.push(kc);
-        }
-        if let Some(fac) = for_await_comments {
+        } else if let Some(fac) = for_await_comments {
             parts.push(fac);
+        } else {
+            parts.push(d.text(" "));
         }
-        parts.push(d.text(" "));
         if is_await {
             parts.push(d.text("await"));
+            // `await` → `(` transition: `await_paren_comments` carries its own
+            // trailing space/break; otherwise a plain space.
             if let Some(apc) = await_paren_comments {
                 parts.push(apc);
+            } else {
+                parts.push(d.text(" "));
             }
-            parts.push(d.text(" "));
         }
         parts.push(d.text("("));
     }
