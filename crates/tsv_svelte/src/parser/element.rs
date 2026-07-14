@@ -9,20 +9,92 @@ use tsv_lang::{ParseError, Span};
 use super::parser_impl::SvelteParser;
 use super::{find_exact_tag_close, rcdata_close_at};
 
-/// Whether `name` can begin a valid Svelte element/component tag name. Svelte's full
-/// grammar (`is_valid_element_name` + `regex_valid_component_name`,
-/// `1-parse/state/element.js`) accepts only names starting with an ASCII letter
-/// (HTML/SVG/custom/namespaced tags), an uppercase or `ID_Start` letter (components), or
-/// `!` (doctype); `svelte.parse` rejects a name starting with a digit, `_`, `$`, etc.
-/// (`<1>`, `<_x>`) as a parse error. tsv's tag lexer reads a raw name run, so it would
-/// otherwise over-accept these. Only the unambiguous ASCII non-starters are rejected;
-/// non-ASCII starts stay permissive so no valid Unicode component name is ever
-/// over-rejected (full Unicode `is_valid_element_name` parity is a deferred follow-up).
-fn tag_name_starts_valid(name: &str) -> bool {
-    match name.as_bytes().first() {
-        Some(&b) if b.is_ascii() => b.is_ascii_alphabetic() || b == b'!',
-        _ => true,
+/// Whether `name` is an acceptable Svelte element or component tag name, mirroring Svelte's
+/// accept gate (`1-parse/state/element.js`): `is_valid_element_name(name) ||
+/// regex_valid_component_name.test(name)`. The component half reuses the shared
+/// [`is_component_name`] predicate — `char::is_uppercase`, a superset of Svelte's `\p{Lu}`
+/// over the *valid* set — so a non-ASCII-initial name is admissible only when it is a
+/// component (`<Δfoo>`, `<ns.Comp>`), never a plain non-ASCII element (`<élan>`, `<你好>`).
+/// tsv's tag lexer reads a raw name run, so without this whole-name check it over-accepts
+/// names the HTML tokenizer (start tag only on `<` + ASCII alpha) and Svelte both reject.
+fn is_valid_tag_name(name: &str) -> bool {
+    is_valid_element_name(name) || is_component_name(name)
+}
+
+/// Port of Svelte's `is_valid_element_name` (`1-parse/state/element.js`): a doctype
+/// (`<!DOCTYPE>`), a namespaced meta/element name (`<svelte:head>`, `<foo:bar>`), or a valid
+/// HTML/SVG/MathML/custom element name (`REGEX_VALID_TAG_NAME`).
+fn is_valid_element_name(name: &str) -> bool {
+    is_doctype_name(name) || is_namespaced_name(name) || is_valid_element_local_name(name)
+}
+
+/// `regex_doctype_name` = `/^![a-zA-Z]+$/` — `!` then one or more ASCII letters.
+fn is_doctype_name(name: &str) -> bool {
+    name.strip_prefix('!')
+        .is_some_and(|rest| !rest.is_empty() && rest.bytes().all(|b| b.is_ascii_alphabetic()))
+}
+
+/// `regex_namespaced_name` = `/^[a-zA-Z][a-zA-Z0-9]*:[a-zA-Z][a-zA-Z0-9-]*[a-zA-Z0-9]$/` — a
+/// single ASCII colon; the prefix is `[a-zA-Z][a-zA-Z0-9]*`, the local part is ≥2 ASCII chars
+/// starting with a letter and ending alphanumeric (interior `-` allowed). Covers `svelte:*`
+/// meta tags and namespaced regular elements (`foo:bar`).
+fn is_namespaced_name(name: &str) -> bool {
+    let Some((prefix, local)) = name.split_once(':') else {
+        return false;
+    };
+    let prefix = prefix.as_bytes();
+    if !prefix.first().is_some_and(u8::is_ascii_alphabetic)
+        || !prefix[1..].iter().all(u8::is_ascii_alphanumeric)
+    {
+        return false;
     }
+    let local = local.as_bytes();
+    local.len() >= 2
+        && local[0].is_ascii_alphabetic()
+        && local[local.len() - 1].is_ascii_alphanumeric()
+        && local[1..local.len() - 1]
+            .iter()
+            .all(|&b| b.is_ascii_alphanumeric() || b == b'-')
+}
+
+/// `REGEX_VALID_TAG_NAME` (`utils.js`): `/^[a-zA-Z][a-zA-Z0-9]*(-[…PCENChar…]*)?$/u` — an
+/// ASCII-alpha start, ASCII alphanumerics, then optionally a hyphen introducing a run of
+/// [PCENChar](is_pcen_char) (custom-element names such as `<my-café>`). The Unicode ranges are
+/// literal, so no general-category lookup is needed.
+fn is_valid_element_local_name(name: &str) -> bool {
+    let mut chars = name.chars();
+    if !chars.next().is_some_and(|c| c.is_ascii_alphabetic()) {
+        return false;
+    }
+    let mut after_hyphen = false;
+    for c in chars {
+        if after_hyphen {
+            if !is_pcen_char(c) {
+                return false;
+            }
+        } else if c.is_ascii_alphanumeric() {
+            // still in the leading `[a-zA-Z0-9]*` run
+        } else if c == '-' {
+            after_hyphen = true; // the hyphen that opens the PCENChar tail
+        } else {
+            return false;
+        }
+    }
+    true
+}
+
+/// A `PCENChar` (HTML "valid custom element name" grammar,
+/// <https://html.spec.whatwg.org/multipage/custom-elements.html#valid-custom-element-name>);
+/// the ranges are `REGEX_VALID_TAG_NAME`'s verbatim. Surrogate code points are unreachable — a
+/// Rust `char` is never a surrogate.
+fn is_pcen_char(c: char) -> bool {
+    c.is_ascii_alphanumeric()
+        || matches!(c, '-' | '.' | '_' | '\u{00B7}')
+        || matches!(c,
+            '\u{00C0}'..='\u{00D6}' | '\u{00D8}'..='\u{00F6}' | '\u{00F8}'..='\u{037D}'
+            | '\u{037F}'..='\u{1FFF}' | '\u{200C}'..='\u{200D}' | '\u{203F}'..='\u{2040}'
+            | '\u{2070}'..='\u{218F}' | '\u{2C00}'..='\u{2FEF}' | '\u{3001}'..='\u{D7FF}'
+            | '\u{F900}'..='\u{FDCF}' | '\u{FDF0}'..='\u{FFFD}' | '\u{10000}'..='\u{EFFFF}')
 }
 
 /// Result type for parsing elements - either a regular element or a special element.
@@ -71,10 +143,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             end: self.current_end as u32,
         };
 
-        // The tag name must immediately follow `<` and begin a valid element/component
-        // name; `svelte.parse` rejects `< div>` (whitespace after `<`, which tsv's tag
-        // lexer skips) and `<1>` / `<_x>` / `<$x>` (invalid start char) at parse.
-        if name_span.start as usize != start + 1 || !tag_name_starts_valid(tag_name) {
+        // The tag name must immediately follow `<` and be a valid element/component name;
+        // `svelte.parse` rejects `< div>` (whitespace after `<`, which tsv's tag lexer skips),
+        // `<1>` / `<_x>` / `<$x>` (invalid start char), and `<élan>` / `<divä>` (non-ASCII
+        // outside a valid custom-element/component name) at parse.
+        if name_span.start as usize != start + 1 || !is_valid_tag_name(tag_name) {
             return Err(self.error_msg_at("Expected a valid element or component name", start + 1));
         }
 
@@ -673,6 +746,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
 #[cfg(test)]
 mod tests {
+    use super::{is_namespaced_name, is_valid_element_name, is_valid_tag_name};
     use crate::ast::internal::is_component_name;
 
     #[test]
@@ -692,5 +766,68 @@ mod tests {
         // Non-ASCII uppercase still counts (the printer must agree — see TagFacts).
         assert!(is_component_name("Über"));
         assert!(!is_component_name("élan"));
+        // A `:`-namespaced tag is a RegularElement, never a component — even with an
+        // uppercase prefix (Svelte's `regex_valid_component_name` rejects `:`).
+        assert!(!is_component_name("foo:bar"));
+        assert!(!is_component_name("Foo:bar"));
+        assert!(!is_component_name("svelte:head"));
+    }
+
+    #[test]
+    fn accepts_valid_element_and_component_names() {
+        // Standard HTML/SVG elements and ASCII custom elements.
+        for name in [
+            "div",
+            "h1",
+            "a",
+            "my-elem",
+            "foreignObject",
+            "annotation-xml",
+        ] {
+            assert!(is_valid_tag_name(name), "should accept <{name}>");
+        }
+        // Custom-element names with PCENChar after the hyphen (non-ASCII, `.`, `_`).
+        for name in ["my-café", "x-\u{00B7}", "a-b.c", "a-b_c"] {
+            assert!(is_valid_tag_name(name), "should accept <{name}>");
+        }
+        // Components: uppercase-initial (incl. non-ASCII \p{Lu}) and dotted member access.
+        for name in ["Foo", "MyComp", "Δfoo", "ns.Comp", "deep.nested.Comp"] {
+            assert!(is_valid_tag_name(name), "should accept <{name}>");
+        }
+        // Doctype and namespaced/meta tags.
+        for name in [
+            "!DOCTYPE",
+            "!doctype",
+            "svelte:head",
+            "svelte:component",
+            "foo:bar",
+        ] {
+            assert!(is_valid_tag_name(name), "should accept <{name}>");
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_tag_names() {
+        // Non-ASCII start that is not a component (lowercase / caseless / titlecase). A
+        // titlecase letter (`ǅ`, category Lt) is not `\p{Lu}` nor `Uppercase`, so it is not a
+        // component name — matching Svelte.
+        for name in ["élan", "δfoo", "你好", "ǅfoo"] {
+            assert!(!is_valid_tag_name(name), "should reject <{name}>");
+        }
+        // ASCII start but a non-ASCII letter mid-name without a hyphen (not PCENChar-eligible).
+        assert!(!is_valid_tag_name("divä"));
+        // Stray delimiters the lexer folds into the name run.
+        assert!(!is_valid_tag_name("a|b"));
+        // Namespaced local part too short / hyphen-terminated / non-ASCII.
+        for name in ["foo:b", "foo:bar-", "foo:bär"] {
+            assert!(!is_namespaced_name(name), "namespaced should reject {name}");
+            assert!(
+                !is_valid_element_name(name),
+                "element name should reject {name}"
+            );
+        }
+        // Doctype must be `!` + ASCII letters only.
+        assert!(!is_valid_element_name("!-"));
+        assert!(!is_valid_element_name("!doc7"));
     }
 }
