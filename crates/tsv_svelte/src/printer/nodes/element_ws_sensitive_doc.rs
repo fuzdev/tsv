@@ -51,7 +51,7 @@ impl<'a> Printer<'a> {
         // classifier splits `Component` out as its own kind. The two predicates agree on
         // `<pre>`/`<textarea>` themselves but diverge on a nested `<Comp>`, so this stays its own
         // question rather than being folded into the shared one.
-        let is_inline = !self.tag_facts(element.name).is_block();
+        let is_inline = !element.facts.is_block();
         let is_html = element.kind == internal::ElementKind::Html;
         let has_content = !element.fragment.nodes.is_empty();
 
