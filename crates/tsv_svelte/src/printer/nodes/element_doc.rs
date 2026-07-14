@@ -15,7 +15,6 @@ use crate::ast::internal::{self, FragmentNode};
 use crate::printer::Printer;
 use crate::printer::text::TextAnalysis;
 use smallvec::smallvec;
-use string_interner::DefaultSymbol;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::{Span, SymbolToU32};
@@ -113,9 +112,9 @@ pub(super) struct ElementParts<'arena> {
 
 /// Everything the printer derives from an element's tag NAME.
 ///
-/// Unpacked from the per-document [`Printer::tag_facts`] memo (`classify_tag`), so an element
-/// whose tag the document has already classified pays one vector index — no interner borrow,
-/// no per-element `String`. Emission uses the symbol, never the string.
+/// Unpacked from the parse-time `Element::facts` ([`TagFacts`](internal::TagFacts)) by
+/// `classify_tag`, so the printer re-derives nothing per element — one field read, no interner
+/// borrow, no per-element `String`. Emission uses the symbol, never the string.
 ///
 /// A named struct rather than a tuple: these are seven independent bools that would otherwise
 /// be positional and silently misorderable at the call site (the same reason
@@ -180,10 +179,10 @@ impl<'a> Printer<'a> {
         d.concat(&[d.text("</"), d.symbol(name), d.text(">")])
     }
 
-    /// Answer every tag-name-keyed question from the per-document facts memo. The single
-    /// classifier — both element entry points go through it, so they cannot drift.
-    pub(super) fn classify_tag(&self, name: DefaultSymbol) -> TagClass {
-        let facts = self.tag_facts(name);
+    /// Unpack an element's parse-time name facts (`Element::facts`) into the printer's per-tag
+    /// view. The single classifier — both element entry points go through it, so they cannot drift.
+    pub(super) fn classify_tag(&self, element: &internal::Element<'_>) -> TagClass {
+        let facts = element.facts;
         // Element kind, matching prettier-plugin-svelte's isInlineElement = !isBlockElement:
         // elements NOT in the block list (table cells included) use inline formatting.
         let kind = if facts.is_component_name() {
@@ -232,7 +231,7 @@ impl<'a> Printer<'a> {
     /// 2. Classify: Determine layout strategy (void, empty, hug modes, etc.)
     /// 3. Build: Construct doc based on layout
     pub(crate) fn build_element_doc(&self, element: &internal::Element<'_>) -> DocId {
-        let class = self.classify_tag(element.name);
+        let class = self.classify_tag(element);
         let is_html = element.kind == internal::ElementKind::Html;
 
         // Build attribute docs (needed for all paths)
@@ -307,7 +306,7 @@ impl<'a> Printer<'a> {
         // Special-content elements (raw `<script>`/`<style>`, foreign `<template>`,
         // whitespace-sensitive `<pre>`/`<textarea>`) never participate — their closing
         // tags aren't the simple hug-both shape.
-        let class = self.classify_tag(element.name);
+        let class = self.classify_tag(element);
         if class.is_style
             || class.is_script
             || class.is_ws_sensitive

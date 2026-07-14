@@ -232,6 +232,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         Ok(ParsedElement::Element(Element {
             name: tag_symbol,
             kind,
+            facts: TagFacts::compute(tag_name),
             attributes: attributes.into_bump_slice(),
             fragment: Fragment { nodes },
             span: Span {
