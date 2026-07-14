@@ -37,11 +37,10 @@ impl TagFacts {
     const VOID: u16 = 1 << 2;
     /// `tsv_html::is_foreign_element` (SVG or MathML).
     const FOREIGN: u16 = 1 << 3;
-    /// Component-shaped name for the printer's self-close/inline decision: the parser's
-    /// [`internal::is_component_name`] (Unicode-uppercase initial or a dotted member name —
-    /// `Button`, `Δcomp`, `foo.bar`) **or** a `:` in the name (`foo:bar`, the namespaced form
-    /// that self-closes like a component). The `:` term is printer-only — the parser must not
-    /// see it, since Svelte classifies `foo:bar` as a `RegularElement`, not a `Component`.
+    /// Component-shaped name — the parser's [`internal::is_component_name`] (Unicode-uppercase
+    /// initial or a dotted member name — `Button`, `Δcomp`, `foo.bar`). Drives the `Component`
+    /// element kind. A `:`-namespaced name (`foo:bar`) is a `RegularElement`, not a component,
+    /// so it is *not* here — it carries [`NAMESPACED`](Self::NAMESPACED) instead.
     const COMPONENT_NAME: u16 = 1 << 4;
     const STYLE: u16 = 1 << 5;
     const SCRIPT: u16 = 1 << 6;
@@ -50,6 +49,11 @@ impl TagFacts {
     const WS_SENSITIVE: u16 = 1 << 8;
     /// `<!DOCTYPE>`-style declaration (leading `!`), which closes with `>`, not `/>`.
     const DECLARATION: u16 = 1 << 9;
+    /// A `:` in the name (`<foo:bar>`) — a namespaced `RegularElement`. Independent of
+    /// [`COMPONENT_NAME`](Self::COMPONENT_NAME): it takes the inline element kind like any other
+    /// non-block regular element, but may still print self-closing (prettier's `didSelfClose`),
+    /// so it is the third contributor to `can_self_close` alongside component and foreign.
+    const NAMESPACED: u16 = 1 << 10;
 
     /// Derive the facts from the tag name. The single source: the memo stores exactly this,
     /// and the equivalence test below grades every accessor against the predicates named here.
@@ -64,8 +68,11 @@ impl TagFacts {
         if html::is_foreign_element(tag_name) {
             bits |= Self::FOREIGN;
         }
-        if internal::is_component_name(tag_name) || tag_name.contains(':') {
+        if internal::is_component_name(tag_name) {
             bits |= Self::COMPONENT_NAME;
+        }
+        if tag_name.contains(':') {
+            bits |= Self::NAMESPACED;
         }
         if tag_name == "style" {
             bits |= Self::STYLE;
@@ -96,6 +103,9 @@ impl TagFacts {
     }
     pub(crate) fn is_component_name(self) -> bool {
         self.0 & Self::COMPONENT_NAME != 0
+    }
+    pub(crate) fn is_namespaced(self) -> bool {
+        self.0 & Self::NAMESPACED != 0
     }
     pub(crate) fn is_style(self) -> bool {
         self.0 & Self::STYLE != 0
@@ -353,8 +363,13 @@ mod tests {
             );
             assert_eq!(
                 facts.is_component_name(),
-                internal::is_component_name(tag) || tag.contains(':'),
+                internal::is_component_name(tag),
                 "component name: {tag:?}"
+            );
+            assert_eq!(
+                facts.is_namespaced(),
+                tag.contains(':'),
+                "namespaced: {tag:?}"
             );
             assert_eq!(facts.is_style(), tag == "style", "style: {tag:?}");
             assert_eq!(facts.is_script(), tag == "script", "script: {tag:?}");

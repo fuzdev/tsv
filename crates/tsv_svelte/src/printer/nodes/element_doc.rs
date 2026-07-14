@@ -128,6 +128,8 @@ pub(super) struct TagClass {
     pub(super) is_void: bool,
     /// SVG / MathML — may print self-closing like a component
     pub(super) is_foreign: bool,
+    /// `<foo:bar>` — a namespaced regular element; inline-kinded, but may print self-closing
+    pub(super) is_namespaced: bool,
     pub(super) is_style: bool,
     pub(super) is_script: bool,
     pub(super) is_template: bool,
@@ -195,6 +197,7 @@ impl<'a> Printer<'a> {
             kind,
             is_void: facts.is_void(),
             is_foreign: facts.is_foreign(),
+            is_namespaced: facts.is_namespaced(),
             is_style: facts.is_style(),
             is_script: facts.is_script(),
             is_template: facts.is_template(),
@@ -213,8 +216,9 @@ impl<'a> Printer<'a> {
             name: self.d().symbol(element.name.to_u32()),
             kind: class.kind,
             is_void: class.is_void,
-            // Only components and foreign (SVG/MathML) elements may print self-closing.
-            can_self_close: class.kind.is_component() || class.is_foreign,
+            // Components, foreign (SVG/MathML), and namespaced (`foo:bar`) elements may print
+            // self-closing (prettier's `didSelfClose`).
+            can_self_close: class.kind.is_component() || class.is_foreign || class.is_namespaced,
             attributes: element.attributes,
             nodes: element.fragment.nodes,
             span: element.span,

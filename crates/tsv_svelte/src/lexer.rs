@@ -389,10 +389,10 @@ impl<'a> Lexer<'a> {
             // parses as Svelte's `read_static_attribute` reads it. This arm is
             // reached only inside a tag (template mode stops at `<`/`{`), and it only
             // ever converts a former hard error into a token — so it cannot regress a
-            // previously-valid parse. A symbol-led *tag* name (`<%foo>`) then
-            // over-accepts, joining tsv's other deferred tag-name early-errors
-            // (`<_foo>`): tag-name validity is a diagnostics-layer check tsv defers,
-            // not a parse error.
+            // previously-valid parse. A symbol-led *tag* name (`<%foo>`, `<_foo>`) is then
+            // rejected by the element parser's `is_valid_tag_name` gate (`parser/element.rs`),
+            // which validates the whole name against Svelte's element/component grammar — so
+            // this arm never turns an invalid tag name into an accepted element.
             Some(_) => {
                 self.advance();
                 Ok(self.make_token(TokenKind::Identifier, start))
