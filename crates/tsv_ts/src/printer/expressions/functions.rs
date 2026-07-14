@@ -486,8 +486,34 @@ impl<'a> Printer<'a> {
         let body_start = block.span.start;
         let has_post_arrow_comments = self.has_comments_to_emit_between(arrow_end, body_start);
 
+        // A block body terminates any curried-arrow chain — arrows nested
+        // inside it (callbacks, object-property arrows) are NOT part of the
+        // chain, so clear the flag so they aren't force-broken after `=>`.
+        // Mirrors the innermost expression-body case above.
+        let block_doc = self.build_with_in_curried(false, || self.build_block_statement_doc(block));
+
+        // A line comment (or own-line block comment) between `=>` and the block
+        // body must break so the comment sits on its own line and the `{` drops
+        // to the next line — emitting it inline would let the `//` run to
+        // end-of-line and swallow the `{`, dropping the whole block body
+        // (non-idempotent, non-reparseable). Mirrors the expression-body path
+        // (`build_arrow_body_with_comments_doc`).
+        if has_post_arrow_comments && self.has_own_line_post_arrow_comment(arrow_end, body_start) {
+            let mut body_parts: DocBuf = DocBuf::new();
+            self.push_leading_comment_run(
+                &mut body_parts,
+                comments_to_emit_in_range(self.comments, arrow_end, body_start),
+                body_start,
+                LeadingGlue::Adjacent,
+            );
+            body_parts.push(block_doc);
+            parts.push(hang_after_operator(d, d.concat(&body_parts)));
+            return;
+        }
+
+        // Otherwise the block stays hugged to `=>`; an inline block comment
+        // (`=> /* c */ {}`) sits between and can't swallow the brace.
         if has_post_arrow_comments {
-            // Build comments doc
             let mut comment_parts: DocBuf = DocBuf::new();
             for comment in comments_to_emit_in_range(self.comments, arrow_end, body_start) {
                 comment_parts.push(d.text(" "));
@@ -497,11 +523,6 @@ impl<'a> Printer<'a> {
         }
 
         parts.push(d.text(" "));
-        // A block body terminates any curried-arrow chain — arrows nested
-        // inside it (callbacks, object-property arrows) are NOT part of the
-        // chain, so clear the flag so they aren't force-broken after `=>`.
-        // Mirrors the innermost expression-body case above.
-        let block_doc = self.build_with_in_curried(false, || self.build_block_statement_doc(block));
         parts.push(block_doc);
     }
 

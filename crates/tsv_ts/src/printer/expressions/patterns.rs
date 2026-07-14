@@ -722,12 +722,30 @@ impl<'a> Printer<'a> {
                         } else {
                             rhs_start
                         };
-                        let mut parts: DocBuf = smallvec![self.build_expression_doc(&p.key)];
-                        // Comments before `=` stay before `=`
-                        if gap_has_comments && self.has_comments_to_emit_between(key_end, eq_pos) {
-                            parts.push(self.build_inline_comments_between_doc(key_end, eq_pos));
-                        }
-                        parts.push(d.text(" = "));
+                        let key_doc = self.build_expression_doc(&p.key);
+                        let mut tail: DocBuf = DocBuf::new();
+                        // Comment(s) before `=`: a block comment stays glued
+                        // (`k /* c */ = 1`); a line comment trails the key and
+                        // breaks so the `=` drops to the next line and can't
+                        // swallow it (`k // c⏎= 1`). tsv preserves the authored
+                        // position — prettier relocates the comment to trail the
+                        // whole `k = 1` binding.
+                        let mut pre_eq_line_break = false;
+                        let eq_text = if gap_has_comments
+                            && self.has_comments_to_emit_between(key_end, eq_pos)
+                        {
+                            tail.push(self.build_leading_comments_break_for_line(key_end, eq_pos));
+                            // A trailing line comment left `=` at the start of a fresh
+                            // line (no leading space); a glued block keeps ` = `.
+                            pre_eq_line_break =
+                                comments_to_emit_in_range(self.comments, key_end, eq_pos)
+                                    .last()
+                                    .is_some_and(|c| !c.is_block);
+                            if pre_eq_line_break { "= " } else { " = " }
+                        } else {
+                            " = "
+                        };
+                        tail.push(d.text(eq_text));
                         // A block comment after `=` inlines onto the value; a line
                         // comment breaks before it. Matches the param-default rule in
                         // `build_assignment_pattern_doc` (collapse an own-line block);
@@ -735,12 +753,20 @@ impl<'a> Printer<'a> {
                         if gap_has_comments
                             && self.has_comments_to_emit_between(eq_pos + 1, rhs_start)
                         {
-                            parts.push(
+                            tail.push(
                                 self.build_trailing_comments_break_for_line(eq_pos + 1, rhs_start),
                             );
                         }
-                        parts.push(self.build_expression_doc(rhs));
-                        d.concat(&parts)
+                        tail.push(self.build_expression_doc(rhs));
+                        let tail_doc = d.concat(&tail);
+                        // A pre-`=` line comment broke `= value` onto its own line;
+                        // indent it so it reads as this binding's continuation, not a
+                        // sibling property.
+                        if pre_eq_line_break {
+                            d.concat(&[key_doc, d.indent(tail_doc)])
+                        } else {
+                            d.concat(&[key_doc, tail_doc])
+                        }
                     } else {
                         // Simple shorthand: `{k}`
                         self.build_expression_doc(&p.key)
@@ -1078,11 +1104,21 @@ impl<'a> Printer<'a> {
             rhs_start
         };
 
-        // Comments before `=` stay before `=` (e.g., `{a /* c */ = 1}`)
-        let mut parts: DocBuf = smallvec![left_doc];
-        if gap_has_comments && self.has_comments_to_emit_between(left_end, eq_pos) {
-            parts.push(self.build_inline_comments_between_doc(left_end, eq_pos));
-        }
+        // Comment(s) before `=` (e.g., `{a /* c */ = 1}`): a block comment stays
+        // glued; a line comment trails the left and breaks so the `=` drops to the
+        // next line and can't swallow it (`a // c⏎= 1`). tsv preserves the authored
+        // position — prettier relocates the comment to trail the whole binding.
+        let mut tail: DocBuf = DocBuf::new();
+        let mut pre_eq_line_break = false;
+        let eq_text = if gap_has_comments && self.has_comments_to_emit_between(left_end, eq_pos) {
+            tail.push(self.build_leading_comments_break_for_line(left_end, eq_pos));
+            pre_eq_line_break = comments_to_emit_in_range(self.comments, left_end, eq_pos)
+                .last()
+                .is_some_and(|c| !c.is_block);
+            if pre_eq_line_break { "= " } else { " = " }
+        } else {
+            " = "
+        };
 
         // A block comment after `=` inlines onto the value (`a = /* c */ b`),
         // collapsing an own-line authoring; a line comment forces the value onto
@@ -1104,9 +1140,16 @@ impl<'a> Printer<'a> {
             rhs_doc
         };
 
-        parts.push(d.text(" = "));
-        parts.push(value_doc);
-        d.concat(&parts)
+        tail.push(d.text(eq_text));
+        tail.push(value_doc);
+        let tail_doc = d.concat(&tail);
+        // A pre-`=` line comment broke `= value` onto its own line; indent it so it
+        // reads as this binding's continuation, not a sibling element.
+        if pre_eq_line_break {
+            d.concat(&[left_doc, d.indent(tail_doc)])
+        } else {
+            d.concat(&[left_doc, tail_doc])
+        }
     }
 
     /// Build a Doc for a rest element

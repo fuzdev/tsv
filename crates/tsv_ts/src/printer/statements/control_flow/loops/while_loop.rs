@@ -37,11 +37,8 @@ impl<'a> Printer<'a> {
             // Block body: while (cond) { ... }
             // Uses append_close_paren_with_comments for consistency with if/for-in/for-of:
             // block comments stay inline, line comments become trailing.
-            let mut parts = smallvec![d.text("while")];
-            if let Some(kc) = &keyword_comments {
-                parts.push(*kc);
-            }
-            parts.push(d.text(" ("));
+            let mut parts: DocBuf = DocBuf::new();
+            self.push_keyword_open_paren(&mut parts, "while", keyword_comments);
             parts.push(condition_group);
             let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
             self.append_close_paren_with_comments(&mut parts, paren_end, block.span.start);
@@ -52,11 +49,8 @@ impl<'a> Printer<'a> {
             let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
             let empty_start = stmt.body.span().start;
 
-            let mut empty_parts = smallvec![d.text("while")];
-            if let Some(kc) = &keyword_comments {
-                empty_parts.push(*kc);
-            }
-            empty_parts.push(d.text(" ("));
+            let mut empty_parts: DocBuf = DocBuf::new();
+            self.push_keyword_open_paren(&mut empty_parts, "while", keyword_comments);
             empty_parts.push(condition_group);
             self.append_close_paren_empty_stmt_with_comments(
                 &mut empty_parts,
@@ -73,11 +67,8 @@ impl<'a> Printer<'a> {
             let body_start = stmt.body.span().start;
             let body_doc = self.build_statement_doc(stmt.body, false);
 
-            let mut head_parts: DocBuf = smallvec![d.text("while")];
-            if let Some(kc) = &keyword_comments {
-                head_parts.push(*kc);
-            }
-            head_parts.push(d.text(" ("));
+            let mut head_parts: DocBuf = DocBuf::new();
+            self.push_keyword_open_paren(&mut head_parts, "while", keyword_comments);
             head_parts.push(condition_group);
             self.build_adjust_clause_with_comments(&head_parts, paren_end, body_start, body_doc)
         }
@@ -184,8 +175,10 @@ impl<'a> Printer<'a> {
         }
         if let Some(kc) = keyword_comments {
             parts.push(kc);
+            parts.push(d.text("("));
+        } else {
+            parts.push(d.text(" ("));
         }
-        parts.push(d.text(" ("));
 
         // Check for comments in the condition and use preserve_inline if present
         // Use preserve_inline for do-while to intentionally differ from Prettier

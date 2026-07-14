@@ -78,14 +78,59 @@ impl<'a> Printer<'a> {
 
     /// Build comments between a keyword and its `(`, preserving position.
     ///
-    /// Returns a doc for comments between `keyword_end` and `open_paren` if any exist.
-    /// Example: `if/* c */(a)` → `if /* c */ (a)` (comment stays between keyword and paren)
+    /// Returns the full keyword→`(` transition (leading space included) for comments
+    /// between `keyword_end` and `open_paren`, or `None` when there are none. A block
+    /// comment glues with a trailing space (`if /* c */ ` → `if /* c */ (a)`); a line
+    /// comment trails the keyword and breaks so the `(` drops to the next line and
+    /// can't be swallowed (`if // c` + hardline → `if // c⏎(a)`). The caller pushes a
+    /// bare `(` after this (no leading space) — see [`Self::build_keyword_paren_comments`]
+    /// call sites. Prettier relocates the comment instead (into the parens for
+    /// `if`/`while`/`switch`, past the header for `for`); tsv preserves the authored
+    /// position uniformly.
     fn build_keyword_paren_comments(
         &self,
         keyword_end: u32,
         open_paren: Option<u32>,
     ) -> Option<DocId> {
-        open_paren.and_then(|op| self.build_inline_comments_between_doc_opt(keyword_end, op))
+        let op = open_paren?;
+        if !self.has_comments_to_emit_between(keyword_end, op) {
+            return None;
+        }
+        let d = self.d();
+        let mut parts = DocBuf::new();
+        for comment in comments_to_emit_in_range(self.comments, keyword_end, op) {
+            parts.push(d.text(" "));
+            parts.push(self.build_comment_doc(comment));
+            // Block: glue with a trailing space so the `(` follows directly. Line: a
+            // hardline drops the `(` to the next line so the `//` can't swallow it.
+            if comment.is_block {
+                parts.push(d.text(" "));
+            } else {
+                parts.push(d.hardline());
+            }
+        }
+        Some(d.concat(&parts))
+    }
+
+    /// Push a control-flow head opener — `keyword`, any `keyword`→`(` comment
+    /// (`keyword_comments`, which already carries its own trailing space/break), then
+    /// `(`. With no comment it emits a plain `keyword (`. Shared by `if`/`while`/
+    /// `switch`/`catch` and the plain-`for` header so the `keyword`→`(` line-comment
+    /// break is uniform (`if // c⏎(a)`) rather than swallowing the `(`.
+    fn push_keyword_open_paren(
+        &self,
+        parts: &mut DocBuf,
+        keyword: &'static str,
+        kc: Option<DocId>,
+    ) {
+        let d = self.d();
+        parts.push(d.text(keyword));
+        if let Some(kc) = kc {
+            parts.push(kc);
+            parts.push(d.text("("));
+        } else {
+            parts.push(d.text(" ("));
+        }
     }
 
     /// Build docs for comments between statement parts (e.g., between `}` and `else`).

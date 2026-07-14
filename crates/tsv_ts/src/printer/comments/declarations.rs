@@ -706,7 +706,28 @@ impl<'a> Printer<'a> {
         if let Some(kw_start) = keyword_start {
             let kw_end = kw_start + keyword.as_str().len() as u32;
             if self.comments_force_own_line_between(kw_end, items[0].span.start) {
-                let value_doc = d.join(item_docs, ", ");
+                // Items carrying their own line comments must join with the
+                // comma-baking-aware separators (a bare hardline where the gap's
+                // comma is baked into the preceding item, a comma+hardline
+                // otherwise) — mirroring the group-mode line-comment join below.
+                // A plain `", "` join would let a per-item line comment swallow the
+                // next item (`// c1, B` — non-reparseable content loss).
+                let value_doc = if has_any_item_line_comments {
+                    let comma_hardline = d.concat(&[d.text(","), d.hardline()]);
+                    let hardline = d.hardline();
+                    let mut joined: DocBuf = smallvec![item_docs[0]];
+                    for (idx, &item_doc) in item_docs.iter().enumerate().skip(1) {
+                        joined.push(if comma_baked[idx - 1] {
+                            hardline
+                        } else {
+                            comma_hardline
+                        });
+                        joined.push(item_doc);
+                    }
+                    d.concat(&joined)
+                } else {
+                    d.join(item_docs, ", ")
+                };
                 let mut parts = smallvec![d.text(keyword.as_str())];
                 self.append_keyword_value_line_comments(
                     &mut parts,

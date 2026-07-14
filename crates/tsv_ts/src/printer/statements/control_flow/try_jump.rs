@@ -83,10 +83,12 @@ impl<'a> Printer<'a> {
                     self.build_keyword_paren_comments(catch_keyword_end, open_paren);
                 if let Some(kc) = keyword_comments {
                     parts.push(kc);
+                    parts.push(d.text("("));
+                } else {
+                    parts.push(d.text(" ("));
                 }
 
                 // Check for comments in catch parameter
-                parts.push(d.text(" ("));
                 if let (Some(open), Some(close)) = (open_paren, close_paren)
                     && (self.has_comments_to_emit_between(open + 1, param.span().start)
                         || self.has_comments_to_emit_between(param.span().end, close))

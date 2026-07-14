@@ -134,11 +134,8 @@ impl<'a> Printer<'a> {
             ])
         };
 
-        let mut switch_parts: DocBuf = smallvec![d.text("switch")];
-        if let Some(kc) = keyword_comments {
-            switch_parts.push(kc);
-        }
-        switch_parts.push(d.text(" ("));
+        let mut switch_parts: DocBuf = DocBuf::new();
+        self.push_keyword_open_paren(&mut switch_parts, "switch", keyword_comments);
         switch_parts.push(condition_group);
         switch_parts.push(d.text(")"));
         if let Some(pbc) = paren_brace_comments {
