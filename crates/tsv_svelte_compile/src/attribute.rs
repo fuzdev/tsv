@@ -566,10 +566,13 @@ pub(crate) fn emit_class_directives<'arena>(
     // The base expression, folding the scope hash into a string-literal base.
     let base_expr = match base {
         ClassBase::StringLiteral(s) => {
+            // HTML-escape the static base (`escape_html(data, true)`), after token
+            // matching, matching the oracle.
+            let escaped = escape_html_attr(&s);
             let text = if scoped {
-                format!("{s} {SCOPE_HASH_CLASS}").trim().to_string()
+                format!("{escaped} {SCOPE_HASH_CLASS}").trim().to_string()
             } else {
-                s
+                escaped
             };
             env.b.string_literal_expr(&text)
         }
