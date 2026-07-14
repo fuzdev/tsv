@@ -403,3 +403,99 @@ pub(super) fn arena_fits_multi<R: TextResolver + ?Sized>(
         resolver,
     )
 }
+
+#[cfg(test)]
+mod break_mode_fits_tests {
+    //! Boundary contract for the `arena_fits_with_lookahead` **Break-mode slow
+    //! walk**. The `fits_flat` / `assert_flat_width` guards in `doc::mod.rs` cover
+    //! only Flat mode, where the `flat_width_memo` fast path answers before the
+    //! walk runs — so the Break-mode width-accounting arms (a `Text`, a
+    //! `MultilineText` first line, an `IfBreak`, a `WithContext` trailing reserve)
+    //! had no assertion, and `cargo mutants` flagged their arithmetic as surviving.
+    //!
+    //! No corpus grades this: a fits verdict changes the *output* only when it
+    //! lands exactly on the print-width boundary, so an off-by-one in a
+    //! width-subtraction arm is invisible to the fixtures and any format/wire diff
+    //! ([`super::super::arena`]'s `pooled_text_width_tests` documents the same
+    //! blind spot). Each case pins the exact fit/no-fit boundary; break an arm and
+    //! watch one assertion flip.
+    use super::super::DocContext;
+    use super::super::arena::{DocArena, DocId};
+    use super::super::types::{Mode, TextResolver};
+    use super::arena_fits;
+
+    /// Fit `doc` in `width` columns in Break mode, no resolver (these docs use
+    /// only `Static`/`Pooled` text, never `Symbol`).
+    fn fits_break(a: &DocArena, doc: DocId, width: usize) -> bool {
+        arena_fits(a, doc, width, Mode::Break, None::<&dyn TextResolver>)
+    }
+
+    /// The doc fits at `w` but not at `w - 1`: any off-by-one in a width arm flips
+    /// exactly one of these.
+    fn assert_break_boundary(a: &DocArena, doc: DocId, w: usize) {
+        assert!(
+            fits_break(a, doc, w),
+            "expected width {w} to fit in break mode"
+        );
+        assert!(
+            !fits_break(a, doc, w - 1),
+            "expected width {} not to fit in break mode",
+            w - 1
+        );
+    }
+
+    #[test]
+    fn break_mode_text_consumes_its_width() {
+        // Break-mode `Text` arm (`remaining -= w`): a 4-col text fits in 4, not 3.
+        let a = DocArena::new();
+        assert_break_boundary(&a, a.text("abcd"), 4);
+        // Tab expansion is part of the width (TAB_WIDTH = 2 → "a\tb" is 4 cols).
+        let a2 = DocArena::new();
+        assert_break_boundary(&a2, a2.text_pooled("a\tb"), 4);
+    }
+
+    #[test]
+    fn break_mode_multiline_text_measures_first_line() {
+        // `MultilineText` arm (`remaining -= first_width; return remaining >= 0`):
+        // only the first line ("abcd", 4 cols) counts — the newline ends the line,
+        // so the tail's width is irrelevant. The `>= 0` verdict is exact at the
+        // boundary (remaining 0 must still fit).
+        let a = DocArena::new();
+        let ml = a.multiline_text("abcd\na much longer trailing line that is ignored");
+        assert!(
+            fits_break(&a, ml, 4),
+            "first line fits exactly (remaining 0)"
+        );
+        assert!(
+            !fits_break(&a, ml, 3),
+            "first line overflows (remaining -1)"
+        );
+    }
+
+    #[test]
+    fn break_mode_if_break_measures_break_doc() {
+        // `IfBreak` with no group id in Break mode measures `break_doc` (4 cols),
+        // never `flat_doc` (1 col) — the `group_id.is_none() && mode == Break`
+        // selector. A mutated selector would measure the 1-col flat form and
+        // wrongly fit at 3.
+        let a = DocArena::new();
+        let doc = a.if_break(a.text("WWWW"), a.text("y"));
+        assert_break_boundary(&a, doc, 4);
+    }
+
+    #[test]
+    fn break_mode_with_context_reserves_trailing_width() {
+        // `WithContext` arm reserves `trailing_reserve` up front
+        // (`remaining -= reserve`, then an inline `remaining < 0` guard) before
+        // descending: 4 content + 3 reserved = 7.
+        let a = DocArena::new();
+        let doc = a.with_context(
+            a.text("abcd"),
+            DocContext {
+                trailing_reserve: 3,
+                ..Default::default()
+            },
+        );
+        assert_break_boundary(&a, doc, 7);
+    }
+}

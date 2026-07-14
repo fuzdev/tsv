@@ -1288,3 +1288,175 @@ fn indent_str_width(indent: &str) -> usize {
         .map(|ch| if ch == '\t' { TAB_WIDTH } else { 1 })
         .sum()
 }
+
+#[cfg(test)]
+mod column_arithmetic_tests {
+    //! Equivalence/contract tests for this module's corpus-blind numeric facts —
+    //! the column-advance and indent-width helpers that feed every `fits` verdict.
+    //!
+    //! **No corpus can grade these.** A column error only changes the *output*
+    //! once a fits verdict lands exactly on the print width, so an arithmetic slip
+    //! on a rare byte (a tab, a control char) or a rare position leaves every
+    //! formatted file byte-identical — it sails through the fixtures and any size
+    //! of format/wire diff (verified for the sibling `pooled_text_width`: a
+    //! one-column tab error was invisible to an 11,696-file diff and caught only by
+    //! its equivalence test). These are the only gates with power over their facts.
+    //! Mutation testing (`cargo mutants -p tsv_lang --file '**/arena_render.rs'`)
+    //! flagged each arm below as an unasserted survivor; corruption-verify any
+    //! change here by breaking the arm and watching exactly one assertion fail.
+    use super::RenderConfig;
+    use super::{
+        effective_suffix_width, indent_str_width, indent_width, line_start_column,
+        update_pos_for_text,
+    };
+    use crate::EmbedContext;
+    use crate::config::TAB_WIDTH;
+    use crate::printing::visual_width;
+
+    // --- update_pos_for_text / update_pos_for_text_unicode column advance ---
+
+    /// Run `update_pos_for_text` (the ASCII fast path, which delegates the whole
+    /// slice to `update_pos_for_text_unicode` on the first non-ASCII byte) and
+    /// return the resulting column.
+    fn advanced(pos: usize, s: &str) -> usize {
+        let mut p = pos;
+        update_pos_for_text(&mut p, s);
+        p
+    }
+
+    /// The column after rendering `s` starting at column `pos`, spelled out
+    /// independently of the fast path: a newline restarts the column at the width
+    /// of the text after the last one; otherwise the width simply adds. This is
+    /// the shape `update_pos_for_text_unicode` implements, kept as a *separate*
+    /// copy here so a mutation to the source arithmetic desyncs the two and fires.
+    fn reference(pos: usize, s: &str) -> usize {
+        match s.rfind('\n') {
+            Some(nl) => visual_width(&s[nl + 1..], TAB_WIDTH),
+            None => pos + visual_width(s, TAB_WIDTH),
+        }
+    }
+
+    fn assert_advance_agrees(pos: usize, s: &str) {
+        assert_eq!(
+            advanced(pos, s),
+            reference(pos, s),
+            "update_pos_for_text disagrees with the reference at pos {pos} on {s:?}"
+        );
+    }
+
+    #[test]
+    fn advance_agrees_on_exhaustive_short_strings() {
+        // Every string of length 0-2 over an alphabet spanning each arm of the
+        // byte walk (newline reset, tab expansion, plain ASCII, control/DEL — all
+        // 0x00..=0x7f) and the non-ASCII hand-off (2-/3-/4-byte, combining mark,
+        // ZWJ), at several starting columns so the `pos + w` accumulation and the
+        // newline-reset-to-0 are both graded.
+        let alphabet = [
+            "a", "Z", "0", " ", "\t", "\n", "\x01", "\x7f", "é", "中", "🎉", "\u{0301}", "\u{200d}",
+        ];
+        for pos in [0usize, 1, 7, 42] {
+            assert_advance_agrees(pos, "");
+            for a in alphabet {
+                assert_advance_agrees(pos, a);
+                for b in alphabet {
+                    assert_advance_agrees(pos, &format!("{a}{b}"));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn advance_agrees_on_realistic_and_boundary_inputs() {
+        // Cases that pin specific arms: tab expansion, the newline reset (both
+        // pure-ASCII, handled by the fast path, and non-ASCII, routed whole to
+        // `_unicode` so its `rfind('\n') + 1` slice + tail measure are graded),
+        // and a combining cluster crossing an ASCII boundary.
+        for pos in [0usize, 5] {
+            for s in [
+                "identifier",
+                "a\tb\tc",
+                "line one\ntail",
+                "\tindented\ttail",
+                // Non-ASCII → the whole slice goes through `_unicode`; a newline
+                // after the multibyte char grades its restart slice.
+                "é\ntail",
+                "中\tafter",
+                "prefix\n中tail",
+                "e\u{0301}x",
+                "1\u{fe0f}\u{20e3}",
+            ] {
+                assert_advance_agrees(pos, s);
+            }
+        }
+    }
+
+    // --- indent column math: indent_str_width / indent_width / line_start_column ---
+
+    fn cfg(indent: &'static str) -> RenderConfig {
+        RenderConfig {
+            print_width: 100,
+            indent,
+        }
+    }
+
+    #[test]
+    fn indent_str_width_counts_tabs_as_tab_width() {
+        // Each '\t' is TAB_WIDTH columns, every other char is 1.
+        assert_eq!(indent_str_width(""), 0);
+        assert_eq!(indent_str_width("\t"), TAB_WIDTH);
+        assert_eq!(indent_str_width("\t\t"), 2 * TAB_WIDTH);
+        assert_eq!(indent_str_width("  "), 2);
+        assert_eq!(indent_str_width("    "), 4);
+        // Mixed: the tab/non-tab split must not collapse to a constant.
+        assert_eq!(indent_str_width(" \t "), 1 + TAB_WIDTH + 1);
+    }
+
+    #[test]
+    fn indent_width_is_level_times_indent_str_width() {
+        let tab = cfg("\t");
+        let spaces = cfg("  ");
+        assert_eq!(indent_width(0, &tab), 0);
+        assert_eq!(indent_width(3, &tab), 3 * TAB_WIDTH);
+        assert_eq!(indent_width(4, &spaces), 4 * 2);
+    }
+
+    #[test]
+    fn line_start_column_adds_indent_and_embed_offset() {
+        let tab = cfg("\t");
+        // base_indent_offset 0: purely the indent width.
+        let embed0 = EmbedContext::default();
+        assert_eq!(line_start_column(0, &tab, &embed0), 0);
+        assert_eq!(line_start_column(2, &tab, &embed0), 2 * TAB_WIDTH);
+        // base_indent_offset > 0 contributes base * TAB_WIDTH, ADDED (not
+        // multiplied) to the indent width. Level 0 isolates the additive term
+        // (a `+`→`*` flip reads 0 here instead of the offset); level 2 grades the
+        // sum of two non-zero terms.
+        let embed = EmbedContext {
+            base_indent_offset: 3,
+            ..EmbedContext::default()
+        };
+        assert_eq!(line_start_column(0, &tab, &embed), 3 * TAB_WIDTH);
+        assert_eq!(
+            line_start_column(2, &tab, &embed),
+            2 * TAB_WIDTH + 3 * TAB_WIDTH
+        );
+    }
+
+    // --- effective_suffix_width boundary ---
+
+    #[test]
+    fn effective_suffix_width_gates_on_first_line_offset() {
+        let embed = EmbedContext {
+            first_line_offset: 5,
+            suffix_width: 3,
+            ..EmbedContext::default()
+        };
+        // pos >= first_line_offset → the reserved suffix; the boundary is
+        // inclusive (pos == offset already reserves).
+        assert_eq!(effective_suffix_width(5, &embed), 3);
+        assert_eq!(effective_suffix_width(6, &embed), 3);
+        // pos < first_line_offset → nothing reserved yet.
+        assert_eq!(effective_suffix_width(4, &embed), 0);
+        assert_eq!(effective_suffix_width(0, &embed), 0);
+    }
+}
