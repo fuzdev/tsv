@@ -500,13 +500,20 @@ fn try_single_arg_comment_paths(
         ]));
     }
 
-    // Check for inline block comments (single binary search via _opt)
-    // Use build_rhs_comments_opt to get spaces between consecutive block comments:
-    // fn(/** @type {A} */ /** @type {B} */ expr) — not fn(/** @type {A} *//** @type {B} */ expr)
-    if let Some(inline_comments) = printer
-        .build_rhs_comments_glued_opt(paren_open, arg_start)
-        .filter(|_| !has_own_line_trailing_comment)
+    // A block comment before the lone argument — **owned or not** — defeats the
+    // argument hug, exactly as prettier's `couldExpandArg` refuses to hug an arg
+    // whose leading comment sits before it. This is an **on-page** question (does a
+    // comment occupy the page here), not a *to-emit* one: an owned comment (a JSDoc
+    // cast / any glued block comment) travels inside the argument's own doc, so it
+    // isn't emitted here, but it still forces the expansion — a to-emit gate would
+    // go blind to it and wrongly hug.
+    //
+    // `build_rhs_comments_glued_opt` emits only the non-owned comments (with spaces
+    // between consecutive blocks: `fn(/** @type {A} */ /** @type {B} */ expr)`); an
+    // owned one is `None` here and rides on `arg_doc`.
+    if printer.has_comments_on_page_between(paren_open, arg_start) && !has_own_line_trailing_comment
     {
+        let inline_comments = printer.build_rhs_comments_glued_opt(paren_open, arg_start);
         // Argument-context builder so a binary/logical chain gets its
         // continuation indent (matches the no-comment path); see the leading
         // line-comment branch above for the same reasoning.
@@ -514,7 +521,11 @@ fn try_single_arg_comment_paths(
 
         // Build comment + arg, including any trailing comments after the arg
         // Note: build_rhs_comments_opt already adds trailing space after each comment
-        let mut parts: DocBuf = smallvec![inline_comments, arg_doc];
+        let mut parts: DocBuf = DocBuf::new();
+        if let Some(inline) = inline_comments {
+            parts.push(inline);
+        }
+        parts.push(arg_doc);
         if let Some(trailing) = printer.build_inline_comments_between_doc_opt(arg_end, paren_close)
         {
             parts.push(trailing);

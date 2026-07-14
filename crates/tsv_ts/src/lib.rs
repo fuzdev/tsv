@@ -112,6 +112,31 @@ pub fn parse_with_goal<'arena>(
     parser::parse_typescript_with_goal(source, goal, arena).map_err(|e| e.with_context(source))
 }
 
+/// Parse standalone TypeScript with grouping parens preserved.
+///
+/// Like [`parse`] but keeps `(expr)` as a `ParenthesizedExpression` node (acorn's
+/// `preserveParens: true`) against a fresh interner, so the paren structure is
+/// present in the AST and its wire JSON. The binding audit uses this to reparse
+/// formatted output and see which parenthesized subtree a glued comment binds to
+/// — a re-binding is invisible in the paren-free public AST.
+pub fn parse_preserve_parens<'arena>(
+    source: &str,
+    arena: &'arena bumpalo::Bump,
+) -> Result<Program<'arena>> {
+    parser::parse_typescript_preserve_parens(source, arena).map_err(|e| e.with_context(source))
+}
+
+/// Whether a block comment's content (delimiters excluded) is a JSDoc type cast —
+/// the `/**`-form comment carrying `@type`/`@satisfies` that binds forward to the
+/// `(` it precedes (prettier's `isTypeCastComment`).
+///
+/// Exposed for the binding audit, which classifies a glued comment's anchor rule
+/// by whether it is a cast (its parens are expected — the audit looks *inside*
+/// them) or an ordinary glued/annotation comment (its next token is what it binds).
+pub fn is_jsdoc_type_cast_comment(content: &str) -> bool {
+    parser::is_jsdoc_type_cast_comment(content)
+}
+
 /// Format a TypeScript AST back to source code
 ///
 /// # Arguments

@@ -207,7 +207,9 @@ enum SubscriptMode {
 /// and contains `@type` or `@satisfies` followed by a word boundary.
 ///
 /// Binds forward to the `(` it glues to: the comment plus those parens **are** the cast.
-fn is_jsdoc_type_cast_comment(value: &str) -> bool {
+///
+/// Re-exported as [`crate::is_jsdoc_type_cast_comment`] for the binding audit.
+pub(crate) fn is_jsdoc_type_cast_comment(value: &str) -> bool {
     value.starts_with('*') && contains_type_or_satisfies_tag(value)
 }
 
@@ -230,43 +232,6 @@ fn contains_type_or_satisfies_tag(value: &str) -> bool {
                 return true;
             }
             from = abs + 1;
-        }
-    }
-    false
-}
-
-/// A **bundler annotation** — `/* @__PURE__ */` and friends, which mark the call *after*
-/// them as side-effect-free so rollup/esbuild/terser may drop it. A paren emitted between
-/// the comment and its call unbinds the annotation and the call stops being droppable.
-///
-/// Matches the *convention* — `@`/`#` + `__NAME__` — not a fixed vocabulary, so
-/// `@__PURE__`, `#__PURE__`, `@__NO_SIDE_EFFECTS__`, `@__KEY__` and any later term of the
-/// same shape are covered without tsv learning each bundler's dictionary. An annotation
-/// tsv failed to recognize would be a silent semantic loss, which is the whole failure
-/// this prevents — so the predicate errs wide on purpose.
-///
-/// Erring wide is safe: a false positive (a comment that merely *mentions* `@__PURE__` in
-/// prose) is only ever *glued to the token it already precedes*. That is lossless and
-/// position-preserving — it cannot move, merge, or drop the comment. The cost of a false
-/// negative is a silently inert annotation; the cost of a false positive is nothing.
-fn is_annotation_comment(value: &str) -> bool {
-    let bytes = value.as_bytes();
-    // A leading `@__` / `#__`, a non-empty `[A-Z0-9_]` payload, then a closing `__`.
-    for i in 0..bytes.len() {
-        if !matches!(bytes[i], b'@' | b'#') || bytes.get(i + 1) != Some(&b'_') {
-            continue;
-        }
-        if bytes.get(i + 2) != Some(&b'_') {
-            continue;
-        }
-        let payload_start = i + 3;
-        let mut j = payload_start;
-        while j < bytes.len() && (bytes[j].is_ascii_uppercase() || bytes[j] == b'_') {
-            j += 1;
-        }
-        // At least one payload byte before the closing `__` (so `@____` doesn't match).
-        if j >= payload_start + 3 && bytes[j - 1] == b'_' && bytes[j - 2] == b'_' {
-            return true;
         }
     }
     false
@@ -1799,6 +1764,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// to that token, so the printer emits the two together and no paren it synthesizes
     /// around an enclosing expression can land between them.
     ///
+    /// **Every** glued block comment is owned — the position is an authoring choice that
+    /// binds the comment to the operand it leads, so a paren the printer synthesizes
+    /// around an enclosing expression must not land between them, and the leading-comment
+    /// hoist out of stripped grouping parens (`(/* c */ x ?? y)` → `/* c */ (x ?? y)`)
+    /// must not fire. There is no content sniff: a bundler annotation
+    /// (`/* @__PURE__ */`) and a plain comment bind their token identically; only the
+    /// JSDoc cast is special, and only for *paren retention* (`jsdoc_cast_comment_index`
+    /// builds the `JsdocCast`), never for ownership — that flows through here too.
+    ///
     /// `expr` is the node the head token begins — the leftmost leaf of whatever
     /// expression is being parsed, before any postfix subscript or infix operator wraps
     /// it. The `span().start == head_start` guard is what makes the binding safe: an
@@ -1813,12 +1787,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let Some(idx) = self.glued_block_comment_index(head_start) else {
             return;
         };
-        let c = &self.comments[idx];
-        let start = c.content_span.start as usize - self.base_offset;
-        let end = c.content_span.end as usize - self.base_offset;
-        if is_annotation_comment(&self.source[start..end]) {
-            self.comments[idx].owned_by_node = true;
-        }
+        self.comments[idx].owned_by_node = true;
     }
 
     /// The index in `self.comments` of a **block** comment glued to the token at
