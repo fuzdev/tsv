@@ -9,19 +9,6 @@ use tsv_lang::{ParseError, Span};
 use super::parser_impl::SvelteParser;
 use super::{find_exact_tag_close, rcdata_close_at};
 
-/// Check if a tag name is a component.
-///
-/// A dotted tag (member access, e.g. `ns.Comp`, `Object.component`, `object.property`) is always
-/// a component; otherwise it's a component iff the first char is uppercase. Mirrors Svelte's
-/// `regex_valid_component_name` (`1-parse/state/element.js`): uppercase-first with optional dots,
-/// or any `ID_Start`-first name with one or more dotted segments.
-///
-/// Examples: "Comp" -> true, "ns.Comp" -> true, "Object.component" -> true, "object.property" ->
-/// true, "div" -> false
-fn is_component(name: &str) -> bool {
-    name.contains('.') || name.chars().next().is_some_and(char::is_uppercase)
-}
-
 /// Whether `name` can begin a valid Svelte element/component tag name. Svelte's full
 /// grammar (`is_valid_element_name` + `regex_valid_component_name`,
 /// `1-parse/state/element.js`) accepts only names starting with an ASCII letter
@@ -105,7 +92,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         // Regular element or component
         let tag_symbol = self.intern(tag_name);
-        let kind = if is_component(tag_name) {
+        let kind = if is_component_name(tag_name) {
             ElementKind::Component
         } else {
             ElementKind::Html
@@ -686,24 +673,24 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
 #[cfg(test)]
 mod tests {
-    use super::is_component;
+    use crate::ast::internal::is_component_name;
 
     #[test]
     fn component_classification() {
         // Uppercase first char ⇒ component.
-        assert!(is_component("Comp"));
-        assert!(is_component("ns.Comp"));
-        assert!(is_component("deep.nested.Comp"));
+        assert!(is_component_name("Comp"));
+        assert!(is_component_name("ns.Comp"));
+        assert!(is_component_name("deep.nested.Comp"));
         // Any dotted tag is member access ⇒ component, regardless of segment casing.
-        assert!(is_component("Object.component"));
-        assert!(is_component("object.property"));
-        assert!(is_component("ns.lower"));
+        assert!(is_component_name("Object.component"));
+        assert!(is_component_name("object.property"));
+        assert!(is_component_name("ns.lower"));
         // No dot + lowercase first char ⇒ regular HTML element.
-        assert!(!is_component("div"));
+        assert!(!is_component_name("div"));
         // Empty name has no first char.
-        assert!(!is_component(""));
-        // Non-ASCII uppercase still counts.
-        assert!(is_component("Über"));
-        assert!(!is_component("élan"));
+        assert!(!is_component_name(""));
+        // Non-ASCII uppercase still counts (the printer must agree — see TagFacts).
+        assert!(is_component_name("Über"));
+        assert!(!is_component_name("élan"));
     }
 }

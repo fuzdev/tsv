@@ -18,7 +18,7 @@ use smallvec::smallvec;
 use string_interner::DefaultSymbol;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::{DocBuf, arena::DocId};
-use tsv_lang::{Span, SymbolResolver, SymbolToU32};
+use tsv_lang::{Span, SymbolToU32};
 
 /// How content relates to an element boundary (opening or closing tag)
 ///
@@ -113,9 +113,9 @@ pub(super) struct ElementParts<'arena> {
 
 /// Everything the printer derives from an element's tag NAME.
 ///
-/// Resolved in ONE borrow of the interner per element (`classify_tag`) — the symbol table
-/// hands out a `&str`, and every tag-name-keyed question is answered while it is held, so the
-/// hot path pays no per-element `String`. Emission uses the symbol, never the string.
+/// Unpacked from the per-document [`Printer::tag_facts`] memo (`classify_tag`), so an element
+/// whose tag the document has already classified pays one vector index — no interner borrow,
+/// no per-element `String`. Emission uses the symbol, never the string.
 ///
 /// A named struct rather than a tuple: these are seven independent bools that would otherwise
 /// be positional and silently misorderable at the call site (the same reason
@@ -178,33 +178,29 @@ impl<'a> Printer<'a> {
         d.concat(&[d.text("</"), d.symbol(name), d.text(">")])
     }
 
-    /// Answer every tag-name-keyed question in one borrow of the interner. The single
+    /// Answer every tag-name-keyed question from the per-document facts memo. The single
     /// classifier — both element entry points go through it, so they cannot drift.
     pub(super) fn classify_tag(&self, name: DefaultSymbol) -> TagClass {
-        self.with_resolved_symbol(name, |t| {
-            // Element kind, matching prettier-plugin-svelte's isInlineElement = !isBlockElement:
-            // elements NOT in the block list (table cells included) use inline formatting.
-            let kind = if t.starts_with(|c: char| c.is_ascii_uppercase())
-                || t.contains(':')
-                || t.contains('.')
-            {
-                ElementKind::Component
-            } else if tsv_html::is_block_element(t) {
-                ElementKind::Block
-            } else {
-                ElementKind::Inline
-            };
-            TagClass {
-                kind,
-                is_void: tsv_html::is_void_element(t),
-                is_foreign: tsv_html::is_foreign_element(t),
-                is_style: t == "style",
-                is_script: t == "script",
-                is_template: t == "template",
-                is_ws_sensitive: tsv_html::preserves_whitespace(t),
-                is_declaration: t.starts_with('!'),
-            }
-        })
+        let facts = self.tag_facts(name);
+        // Element kind, matching prettier-plugin-svelte's isInlineElement = !isBlockElement:
+        // elements NOT in the block list (table cells included) use inline formatting.
+        let kind = if facts.is_component_name() {
+            ElementKind::Component
+        } else if facts.is_block() {
+            ElementKind::Block
+        } else {
+            ElementKind::Inline
+        };
+        TagClass {
+            kind,
+            is_void: facts.is_void(),
+            is_foreign: facts.is_foreign(),
+            is_style: facts.is_style(),
+            is_script: facts.is_script(),
+            is_template: facts.is_template(),
+            is_ws_sensitive: facts.is_ws_sensitive(),
+            is_declaration: facts.is_declaration(),
+        }
     }
 
     /// Project a regular element onto the shared [`ElementParts`] view.
