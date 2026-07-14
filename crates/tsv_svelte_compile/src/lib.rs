@@ -17,17 +17,24 @@
 
 mod analyze;
 mod attr_refs;
+mod attribute;
+mod blocks;
 mod build;
+mod css_scope;
+mod element;
 mod erase;
 
 /// The forward half of an erased TypeScript region's comment-refusal window (see
 /// `erase`). Exported so the `erase_comment_census` diagnostic sizes the rule the
 /// compiler actually enforces, rather than a hand-rolled copy of it.
 pub use erase::next_token_pos;
+mod fragment;
 mod needs_context;
 mod refusal;
 mod rune_guard;
+mod script_rewrite;
 mod snippet;
+mod snippet_emit;
 mod transform_server;
 
 pub use refusal::Refusal;

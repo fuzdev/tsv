@@ -191,53 +191,66 @@ project-wide conventions.
   `refuse_template_typescript` / `guard_dropped_fragment`, and the analyses'
   dropped-fragment view) — but **not** the emission refusals, and not the
   derived-read rule, which is an emission rewrite rather than a validity rule.
-- `transform_server.rs` — the SSR transform: module scaffold
-  (`import * as $ from 'svelte/internal/server'`, then any instance-script
-  `import` declarations hoisted to module scope in source order — an import
-  inside the component function is invalid JS — + the exported component
-  function), instance-script statements borrowed with rune rewrites —
-  `$props()` → `$$props` (span-stolen; a rest element in its pattern gains the
-  oracle's `$$slots, $$events` injection immediately before it, and a
-  non-destructured `let props = $props()` becomes
-  `let { $$slots, $$events, ...props } = $$props` — a plain destructure without
-  a rest gets no injection), `$state(v)`/`$state.raw(v)` → `v`
-  (`void 0` argument-less), `$derived(e)` → `$.derived(() => e)` — but the
-  oracle's `b.thunk` runs `unthunk`, which collapses the arrow when its body is
-  a call on a bare identifier whose arguments match its (empty) parameter list,
-  so an argument-less call passes straight through
-  (`$derived(get_library())` → `$.derived(get_library)`) —
-  `$derived.by(f)` → `$.derived(f)`, statement-position `$effect`/`$effect.pre`
-  dropped — a multi-declarator top-level declaration splitting into one
-  declaration per declarator, source order (the oracle's shape; nested
-  declarations and for-heads stay joined; comments alongside a multi-declarator
-  refuse — the oracle re-anchors them inside the split) — the whole body
-  wrapping in
-  `$$renderer.component(($$renderer) => { … })` whenever `needs_context` fires (a
-  dropped effect, or the new/member/call analysis above), which also forces the
-  `$$props` parameter — the template folded into one `$$renderer.push(\`…\`)` with
-  `{expr}` → `$.escape(expr)` (a bare derived read becomes `d()`; known
-  evaluations fold as static text), `{@html expr}` → `$.html(expr)`, dynamic
-  and mixed attributes → `$.attr(name, expr[, true])` / `$.attr_class` /
-  `$.attr_style` with `$.stringify` interpolations (a mixed attribute whose
-  every part folds statically emits a *static* attribute instead —
-  attr-escaped `[&"<]`, folded value verbatim: no trim, no empty-class drop,
-  boolean attributes keep the folded value; single-expression attributes never
-  fold), and minimal CSS scoping
-  (single class selectors: the `svelte-tsvhash` class appended to matched
-  elements and **source-spliced** into the style text — the author's
-  whitespace is preserved, not reprinted). Static emission implements the
-  oracle's normalization, derived from Svelte's own `clean_nodes`/`escape_html`
-  and probe-verified: whitespace-only boundary text drops and edge runs trim
-  per fragment; a text edge run abutting a non-text node collapses to one
-  space (runs abutting `{expr}` stay — text + expression count as one text);
-  interior whitespace is verbatim; `<pre>`/`<textarea>` preserve everything;
-  entities decode then re-escape (`[&<]` in text, `[&"<]` in static
-  attributes); boolean attributes emit `name=""`; `class`/`style` values
-  collapse+trim, and a string-valued `class` that collapses+trims to empty is
-  dropped entirely (static path only — bare `class` keeps `class=""`, empty
-  `style`/`id` stay); void elements close `/>`; a text-first fragment (component
+- `transform_server.rs` — the SSR transform **orchestrator**: `compile_server`
+  runs the phase-numbered pipeline (TypeScript erasure/gate, CSS scoping
+  analysis, script analysis, snippet hoist analysis, script rewrite,
+  `needs_context`, template emission, wrapping, assembly/print) and owns
+  `EmitEnv`, the struct threaded through every emitter in the sibling modules
+  below — the builder, the binding table, the derived-name set, the CSS scope,
+  block-scope overlays, snippet hoist state, and the erased-region windows
+  every `EmitEnv::erase` call collects. Module scaffold: `import * as $ from
+  'svelte/internal/server'`, then any instance-script `import` declarations
+  hoisted to module scope in source order (an import inside the component
+  function is invalid JS) + the exported component function. The whole body
+  wraps in `$$renderer.component(($$renderer) => { … })` whenever
+  `needs_context` fires (a dropped effect, or the new/member/call analysis in
+  `needs_context.rs`), which also forces the `$$props` parameter.
+- `script_rewrite.rs` — the document-wide TypeScript flag and gate
+  (`document_ts_flag`/`refuse_template_typescript`), the top-level
+  binding-table analysis (`analyze_script`/`analyze_declarator`), and the
+  per-statement rune rewrites (`rewrite_script_statement`) — `$props()` →
+  `$$props` (span-stolen; a rest element in its pattern gains the oracle's
+  `$$slots, $$events` injection immediately before it, and a non-destructured
+  `let props = $props()` becomes `let { $$slots, $$events, ...props } =
+  $$props` — a plain destructure without a rest gets no injection),
+  `$state(v)`/`$state.raw(v)` → `v` (`void 0` argument-less), `$derived(e)` →
+  `$.derived(() => e)` — but the oracle's `b.thunk` runs `unthunk`, which
+  collapses the arrow when its body is a call on a bare identifier whose
+  arguments match its (empty) parameter list, so an argument-less call passes
+  straight through (`$derived(get_library())` → `$.derived(get_library)`) —
+  `$derived.by(f)` → `$.derived(f)`, statement-position
+  `$effect`/`$effect.pre` dropped — a multi-declarator top-level declaration
+  splitting into one declaration per declarator, source order (the oracle's
+  shape; nested declarations and for-heads stay joined; comments alongside a
+  multi-declarator refuse — the oracle re-anchors them inside the split). Also
+  `collect_script_comments`: instance-script comments carry through into the
+  synthetic program (host-absolute spans; the import prints as a separate
+  comment-free program so no window bridges a low anchor to its appendix
+  source literal); divergent placement classes refuse — comments after the
+  last script statement (the oracle re-attaches them into the template),
+  template-expression comments, comments inside dropped rune regions, and
+  comments alongside `$derived` / argument-less `$state()` /
+  expression-valued attributes (window-sweep hazards) — and
+  `self_check_no_typescript`, the type-erasure self-check that closes the
+  loop on the finished program (see `erase.rs`).
+- `fragment.rs` — the per-fragment walk (`emit_fragment`) and its
+  `BodyBuilder` accumulator (alternating static text and interpolation
+  expressions, flushed into a `$$renderer.push(…)` statement). Static
+  emission implements the oracle's normalization, derived from Svelte's own
+  `clean_nodes`/`escape_html` and probe-verified: whitespace-only boundary
+  text drops and edge runs trim per fragment; a text edge run abutting a
+  non-text node collapses to one space (runs abutting `{expr}` stay — text +
+  expression count as one text); interior whitespace is verbatim;
+  `<pre>`/`<textarea>` preserve everything; a text-first fragment (component
   root or `{#each}` body — the oracle's `is_text_first` parent set) gets a
-  `<!---->` prefix. **Control-flow blocks** split the single template into
+  `<!---->` prefix. `{expr}` → `$.escape(expr)` (a bare derived read becomes
+  `d()`; known evaluations fold as static text), `{@html expr}` →
+  `$.html(expr)`; entities decode then re-escape (`[&<]` in text). The
+  `guard_dropped`/`guard_pattern`/`guard_dropped_fragment`/`wrap_single`/
+  `wrap_value_expr` family prepares a borrowed template expression for a
+  synthetic call argument slot, guarding stray runes and rewriting a bare
+  derived read to `d()`.
+- `blocks.rs` — **control-flow blocks** split the single template into
   multiple `$$renderer.push(…)` statements, each block emitting its own
   statements between flushes and merging its closer/opener into the adjacent
   template: `{#if}` is a flat `if … else if … else` chain with per-branch
@@ -256,7 +269,9 @@ project-wide conventions.
   `const` declaration to the top of its branch body and enters the evaluator's
   innermost block-scope overlay so later reads fold. Each/await locals and the
   `{:then}` value mask to UNKNOWN in that overlay; a block body that shadows a
-  `$derived` name refuses. **Snippets/render**: a `{#snippet}` becomes a
+  `$derived` name refuses. `<svelte:head>` emits `$.head(hash, $$renderer,
+  ($$renderer) => { … })`.
+- `snippet_emit.rs` — **snippets/render**: a `{#snippet}` becomes a
   `function name($$renderer, ...params) { … }` — hoisted to true module scope
   (its own program between imports and export) when `snippet.rs` deems it
   hoistable, else to its nearest enclosing block scope's init (a block-scope
@@ -265,14 +280,29 @@ project-wide conventions.
   `callee($$renderer, ...args)` (`?.` preserved) with a trailing `<!---->` anchor
   unless the enclosing block's sole trimmed child is this render with a
   non-dynamic (local-snippet) callee — the `is_standalone` flag, inherited by
-  element children. Instance-script comments carry through into the
-  synthetic program (host-absolute spans; the import prints as a separate
-  comment-free program so no window bridges a low anchor to its appendix
-  source literal); divergent placement classes refuse — comments after the
-  last script statement (the oracle re-attaches them into the template),
-  template-expression comments, comments inside dropped rune regions, and
-  comments alongside `$derived` / argument-less `$state()` /
-  expression-valued attributes (window-sweep hazards).
+  element children.
+- `element.rs` — element and component emission: `emit_element` prints
+  static HTML (void elements close `/>`) and routes a component invocation
+  (`<Foo … />`) to `emit_component`, which builds the `Foo($$renderer,
+  {…props})` call — a plain object literal, or `$.spread_props([…])` when a
+  `{...spread}` attribute is present — the implicit `children` snippet prop
+  for default-slot content, and named `{#snippet}` children as named snippet
+  props (`$$slots: { key: true, … }` alongside).
+- `attribute.rs` — attribute emission: dynamic and mixed attributes →
+  `$.attr(name, expr[, true])` / `$.attr_class` / `$.attr_style` with
+  `$.stringify` interpolations (a mixed attribute whose every part folds
+  statically emits a *static* attribute instead — attr-escaped `[&"<]`,
+  folded value verbatim: no trim, no empty-class drop, boolean attributes
+  keep the folded value; single-expression attributes never fold). Static
+  text values inline: entities re-escape (`[&"<]` in static attributes);
+  boolean attributes emit `name=""`; `class`/`style` values collapse+trim,
+  and a string-valued `class` that collapses+trims to empty is dropped
+  entirely (static path only — bare `class` keeps `class=""`, empty
+  `style`/`id` stay).
+- `css_scope.rs` — minimal CSS scoping (single class selectors: the
+  `svelte-tsvhash` class appended to matched elements and
+  **source-spliced** into the style text — the author's whitespace is
+  preserved, not reprinted).
 
 Types: `CompileOptions { generate: Generate, dev: bool }` (default: `Server`,
 non-dev), `CompileOutput { js, css, warnings }`, `CompileWarning { code, message }`
