@@ -160,7 +160,9 @@ pub(super) fn build_call_doc_with_wrapping(
     // within [paren_open, call.span.end], so when the call has no comment they are
     // provably all false/empty — skip them. Canonical reference:
     // build_params_doc_with_comments.
-    let call_has_comments = printer.has_comments_between(paren_open, call.span.end);
+    // Counts owned comments: this asks whether the argument window puts any comment text on
+    // the page (a *layout* question), not who emits it — see `has_any_comments_between`.
+    let call_has_comments = printer.has_any_comments_between(paren_open, call.span.end);
 
     // Module path calls that should not break at arguments (e.g., require.resolve)
     // Keep the call on one line; let assignment/parent break instead

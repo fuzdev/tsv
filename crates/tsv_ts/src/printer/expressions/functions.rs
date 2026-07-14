@@ -566,12 +566,25 @@ impl<'a> Printer<'a> {
         // (non-arrow) body.
         let mut sig_docs: DocBuf = DocBuf::new();
         let mut current = head;
+        let mut is_head = true;
         let terminal: &internal::ArrowFunctionBody<'_> = loop {
             // Each signature is its own group so its params break independently of
             // the chain (prettier wraps each `printArrowFunctionSignature` in a
             // group): when the heads break onto separate lines, the params stay
             // flat unless a single signature genuinely overflows.
-            sig_docs.push(d.group(self.build_arrow_signature_doc(current)));
+            let sig = d.group(self.build_arrow_signature_doc(current));
+            // An INNER arrow is built from its signature here and never routed through
+            // `build_expression_doc`, so this is the only place its owned leading comment
+            // can be claimed — otherwise it is dropped. The head is not: this whole chain
+            // doc is what `build_expression_doc` wraps, and it claims the head's comment
+            // there, so claiming it again here would print it twice.
+            let sig = if is_head {
+                sig
+            } else {
+                self.prepend_owned_leading_comment_at(current.span.start, sig)
+            };
+            is_head = false;
+            sig_docs.push(sig);
             match &current.body {
                 internal::ArrowFunctionBody::Expression(b) => {
                     if let internal::Expression::ArrowFunctionExpression(inner) = b {

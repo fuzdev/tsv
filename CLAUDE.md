@@ -1126,15 +1126,40 @@ pub struct Comment {
 **Owned comments — the one crack in the detached model.** A comment that is *bound to
 the token after it* can't be located positionally at print time, because a paren the
 printer synthesizes around an enclosing expression lands between the two and re-binds it.
-The single case today is the JSDoc cast: `/** @type {T} */` plus the `(` it glues to
-**are** the cast, so the parser marks the comment `owned_by_node` and hands it to the
-`JsdocCast` node, which prints it. The range lookups (`comments_in_range`,
-`has_comments_in_range`, `comments_after`) **skip** owned comments, so no gap emitter can
-print one and no synthesized paren can be placed inside the pair — at any of the ~29 paren
-sites, present or future. A pure *layout* gate that only asks "does this range print any
-comment text" uses `has_any_comments_in_range` instead (it counts owned comments; the
-member-chain's structural fast path is the case in point). Prettier, oxfmt and biome all
-get this wrong — see [conformance_prettier.md §JSDoc / paren semantics](docs/conformance_prettier.md).
+Two classes today, both marked `owned_by_node` by the parser:
+
+- the **JSDoc cast** — `/** @type {T} */` plus the `(` it glues to **are** the cast, so the
+  comment is handed to the `JsdocCast` node, which prints it;
+- a **bundler annotation** — `/* @__PURE__ */` and friends mark the call *after* them as
+  side-effect-free, so a paren between the two leaves the annotation leading a paren and the
+  call is no longer droppable. It has no AST node, so it is printed by the innermost node its
+  token begins (`printer/comments/owned.rs`). The predicate is the `@`/`#` + `__NAME__`
+  *convention*, not a vocabulary — an annotation tsv failed to know would be a silent loss.
+
+The range lookups (`comments_in_range`, `has_comments_in_range`, `comments_after`) **skip**
+owned comments, so no gap emitter can print one and no synthesized paren can be placed inside
+the pair — at any of the ~29 paren sites, present or future.
+
+⚠️ **Two hazards, both of which have bitten.** Ownership is a sharp tool: it takes a comment out
+of the positional model, so every consumer of that model has to be re-examined.
+
+1. **An owned comment nothing prints is a DROPPED comment.** Ownership assumes the owning node
+   prints it, so any builder that **reassembles** a node instead of routing it through
+   `build_expression_doc` must claim it on its own seam (`prepend_owned_leading_comment_at`).
+   Two do: `build_arrow_sig_doc` (every call-argument state) and `build_arrow_chain_doc`'s inner
+   arrows. Adding a third reassembly path means adding a third claim.
+2. **Owned comments are invisible to *emit*-decisions, NOT to *layout*.** A gate deciding who
+   prints a comment must skip owned ones (`has_comments_between`). A gate deciding layout — one
+   that only asks whether the range puts any comment text on the page — must **count** them
+   (`has_any_comments_between` / `has_any_comments_in_range`): the comment is still there, still
+   occupies width, and still means to prettier's rules what any comment means. Getting this
+   backwards makes the comment silently vanish from a layout decision. Live cases: the unary
+   operand's parens (which is what keeps the comment bound to the operand rather than the
+   operator), the call-argument expand-last hug, and the member-chain's structural fast path.
+
+Prettier, oxfmt and biome all get the paren binding wrong — see
+[conformance_prettier.md §Comment relocation](docs/conformance_prettier.md#comment-relocation)
+and [§JSDoc / paren semantics](docs/conformance_prettier.md).
 
 The content is **not stored owned** — comment text is a pure delimiter-stripped
 sub-slice of source, so `Comment` holds a `content_span` and recovers the text on

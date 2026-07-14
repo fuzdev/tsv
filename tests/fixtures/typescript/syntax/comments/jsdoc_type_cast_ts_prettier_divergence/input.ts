@@ -25,6 +25,11 @@ new A(/** @type {any} */ (a), {});
 new A(/** @type {any} */ (a), []);
 new A(a, /** @type {any} */ (b), {});
 
+// unary operand — the wrap is keyed on the comment sitting in the operator→operand gap,
+// so it does not care what the operand is: an instantiation expression takes it too
+const g1 = !(/** @type {A} */ (b).c);
+const g2 = !(/** @type {A} */ (b)<T>);
+
 // default parameter value
 function fn2(a = /** @type {A} */ (b)) {}
 function fn3(a, b = /** @type {A} */ (c)) {}

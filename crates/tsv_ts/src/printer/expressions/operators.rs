@@ -93,6 +93,24 @@ impl<'a> Printer<'a> {
         // A single-line block glued to the operator hugs the operand even across a
         // source newline (`!/* c */⏎x` → `!(/* c */ x)`), matching prettier.
         let leading_comments_opt = self.build_rhs_comments_glued_opt(operator_end, argument_start);
+        // Whether a leading comment is *present* — the gate for re-adding the parens — as
+        // opposed to whether this emitter has to print it. A **forward-binding** comment (a
+        // bundler annotation, a JSDoc cast) is `owned_by_node`, so the operand's own doc
+        // prints it and `leading_comments_opt` is `None` — but the parens are still wanted,
+        // for the same reason an ordinary gap comment wants them: bare,
+        // `!/* @__PURE__ */ f()` reads as annotating the *operator* rather than the operand.
+        // Counting the owned comment here is what keeps the wrap, and it is the ONLY thing
+        // that does — `needs_parens` deliberately doesn't (it would double-wrap).
+        //
+        // This is the `has_any_comments_in_range` / `has_comments_in_range` split: an
+        // emit-decision skips owned comments, a layout/semantic gate counts them.
+        //
+        // A sequence is the exception: its own value-position parens already enclose the
+        // comment (`!(/** @type {A} */ (x), y)`), so wrapping again would just double them.
+        let owned_leading_comment = leading_comments_opt.is_none()
+            && !matches!(unary.argument, Expression::SequenceExpression(_))
+            && tsv_lang::has_any_comments_in_range(self.comments, operator_end, argument_start);
+        let has_leading_comments = leading_comments_opt.is_some() || owned_leading_comment;
 
         // Check for trailing comments after the argument but inside the original parens.
         // When the parser strips grouping parens from `!(x /* c */)`, the comment
@@ -115,7 +133,7 @@ impl<'a> Printer<'a> {
             || comments_in_range(self.comments, operator_end, argument_start)
                 .any(|c| self.comment_forces_own_line(c));
 
-        let argument_doc = if leading_comments_opt.is_some() || has_trailing_comments {
+        let argument_doc = if has_leading_comments || has_trailing_comments {
             // Comments inside grouping parens — must wrap in parens to preserve them.
             let inner = self.build_expression_doc(unary.argument);
             // The outer comment-holder parens already group the operand, so the inner
