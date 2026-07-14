@@ -24,6 +24,8 @@ mod statement; // Statement parsing (refactored into submodules)
 mod type_members; // Type-literal / interface-body member grammar (property/method/signature elements)
 mod types; // TypeScript type-syntax parsing (annotations, type expressions, type parameters)
 
+pub(crate) use expression::is_jsdoc_type_cast_comment;
+
 /// Build a detached [`Comment`] from a lexed comment token's positions.
 ///
 /// `content_start` / `token_*` are local (pre-`base_offset`) byte offsets; the
@@ -1729,5 +1731,19 @@ pub fn parse_typescript_with_goal<'arena>(
     arena: &'arena Bump,
 ) -> Result<Program<'arena>, ParseError> {
     let mut parser = Parser::new_with_goal(source, goal, arena)?;
+    parser.parse()
+}
+
+/// [`parse_typescript`] with grouping parens preserved as `ParenthesizedExpression`
+/// nodes (acorn's `preserveParens: true`), against a fresh interner. Standalone
+/// analog of [`crate::parse_with_interner_preserve_parens`] — the binding audit
+/// (`tsv_debug binding_audit`) reparses formatted output this way so the paren
+/// structure a glued comment binds to is visible in the wire JSON.
+pub fn parse_typescript_preserve_parens<'arena>(
+    source: &str,
+    arena: &'arena Bump,
+) -> Result<Program<'arena>, ParseError> {
+    let mut parser = Parser::new_with_goal(source, Goal::Module, arena)?;
+    parser.preserve_parens = true;
     parser.parse()
 }

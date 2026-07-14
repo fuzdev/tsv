@@ -2,7 +2,9 @@
 //
 // Handles: new Foo(), new Foo(arg1, arg2), new Foo<T>()
 
-use super::arg_comments::{build_after_comma_leading_comments, first_arg_has_any_comments};
+use super::arg_comments::{
+    build_after_comma_leading_comments, first_arg_has_any_comments, last_arg_has_comments,
+};
 use super::arg_wrapping::{
     append_type_args_with_gap_comments, build_args_with_blank_lines, build_empty_args_doc,
     should_expand_first_arg, try_hug_multiline_template_arg, wrap_call_with_soft_breaks,
@@ -161,12 +163,16 @@ impl<'a> Printer<'a> {
                     } else {
                         None
                     };
-                    let has_leading_comment = if let Some(leading) = glued {
+                    if let Some(leading) = glued {
                         arrow_doc = d.concat(&[leading, arrow_doc]);
-                        true
-                    } else {
-                        false
-                    };
+                    }
+                    // **on page**: a leading comment forces the wrapped (expanded) state,
+                    // owned or not — an owned comment rides inside `arrow_doc` (so it's
+                    // not in `glued`) but still defeats the hug, exactly as prettier
+                    // expands a block-arrow arg whose leading comment precedes it. A
+                    // to-emit gate here would go blind to it and wrongly hug.
+                    let has_leading_comment = new_has_comments
+                        && self.has_comments_on_page_between(paren_open, arg_start);
 
                     // If the arrow has trailing param comments or leading comments,
                     // force wrapped state
@@ -588,6 +594,12 @@ impl<'a> Printer<'a> {
                 && (last_is_function || last_is_expandable_collection)
                 && !(new_has_comments
                     && has_inter_argument_comments_slice(new_expr.arguments, self))
+                // On-page: a leading comment on the last argument defeats the expand-last
+                // hug (prettier's `shouldExpandLastArg`), owned or not — an owned comment
+                // rides inside the argument's doc, so this must count it (on page), not just
+                // the emit-keyed ones, or it hugs blind. Mirrors the call/chain paths.
+                && !(new_has_comments
+                    && last_arg_has_comments(new_expr.arguments, self, new_expr.span.end, paren_open))
             {
                 // Expand-last arrow with a call body: build the body ONCE and inject it so
                 // the whole-arrow arg doc reuses it (the break-body state below reuses it
