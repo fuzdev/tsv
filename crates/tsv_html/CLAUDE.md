@@ -24,6 +24,11 @@ not here. This crate stays AST-agnostic.
   `is_foreign_element`. Inline-ness is derived by negation in the
   consumer (matches prettier-plugin-svelte: `isInline = !isBlock`); no
   positive list is exported.
+- **Custom-element name chars** (`elements.rs`): `is_pcen_char` — the one
+  `char`-level predicate (the rest of the API is `&str`), a `PCENChar` per
+  the HTML "valid custom element name" grammar. Shared by `tsv_svelte`'s
+  tokenizer (keep a whole custom-element name in one token) and its name
+  validator (the hyphen-tail run) — one source of truth for the ranges.
 - **Whitespace** (`whitespace.rs`): `preserves_whitespace` (`<pre>`,
   `<textarea>`).
 - **Entity decoding** (`entities.rs`): `decode_character_references` —
