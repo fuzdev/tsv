@@ -2528,3 +2528,33 @@ fn validate_output_js_rejects_corrupt_output_loudly() {
         )
         .expect("valid output must validate");
 }
+
+#[test]
+fn fragment_contains_block_descends_special_element() {
+    use crate::fragment::fragment_contains_block;
+
+    // `<svelte:head>` is a SpecialElement; the `{#if}` inside it is a control-flow
+    // block. The shared child-fragment seam descends the special element's
+    // fragment (the sanctioned alignment with the `fragment_has_*` siblings), so
+    // the nested block is found — a hand-written walk that skipped SpecialElement
+    // would miss it.
+    let arena = bumpalo::Bump::new();
+    let root = tsv_svelte::parse(
+        "<svelte:head>{#if x}<title>t</title>{/if}</svelte:head>",
+        &arena,
+    )
+    .expect("parse");
+    assert!(
+        fragment_contains_block(&root.fragment),
+        "a block nested in a SpecialElement fragment must be found"
+    );
+
+    // Control: the same special element with no nested block is block-free.
+    let plain_arena = bumpalo::Bump::new();
+    let plain = tsv_svelte::parse("<svelte:head><title>t</title></svelte:head>", &plain_arena)
+        .expect("parse");
+    assert!(
+        !fragment_contains_block(&plain.fragment),
+        "a SpecialElement with no nested block must not be reported"
+    );
+}

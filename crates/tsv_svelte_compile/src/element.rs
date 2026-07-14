@@ -19,6 +19,7 @@ use tsv_ts::ast::internal::{
 };
 
 use crate::analyze::{BindingKind, evaluate, stringify_value};
+use crate::attr_refs::fragment_any;
 use crate::attribute::emit_attribute;
 use crate::build::escape_template_text;
 use crate::fragment::{BodyBuilder, FragmentCtx, emit_child_body, emit_fragment, wrap_value_expr};
@@ -756,27 +757,13 @@ fn build_component_mixed_value<'arena>(
 }
 
 /// Recursively test whether a fragment contains a component (`<Foo … />`) — the
-/// comments+component refusal gate.
+/// comments+component refusal gate. Rides the shared child-fragment seam
+/// ([`fragment_any`]).
 pub(crate) fn fragment_has_component(fragment: &Fragment<'_>) -> bool {
-    fragment.nodes.iter().any(|node| match node {
-        FragmentNode::Element(element) => {
-            element.kind == ElementKind::Component || fragment_has_component(&element.fragment)
-        }
-        FragmentNode::SpecialElement(se) => fragment_has_component(&se.fragment),
-        FragmentNode::IfBlock(b) => {
-            fragment_has_component(&b.consequent)
-                || b.alternate.as_ref().is_some_and(fragment_has_component)
-        }
-        FragmentNode::EachBlock(b) => {
-            fragment_has_component(&b.body)
-                || b.fallback.as_ref().is_some_and(fragment_has_component)
-        }
-        FragmentNode::AwaitBlock(b) => [&b.pending, &b.then, &b.catch]
-            .into_iter()
-            .flatten()
-            .any(fragment_has_component),
-        FragmentNode::KeyBlock(b) => fragment_has_component(&b.fragment),
-        FragmentNode::SnippetBlock(s) => fragment_has_component(&s.body),
-        _ => false,
+    fragment_any(fragment, &|node| {
+        matches!(
+            node,
+            FragmentNode::Element(element) if element.kind == ElementKind::Component
+        )
     })
 }

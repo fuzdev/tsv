@@ -34,7 +34,7 @@ use tsv_ts::ast::internal::{
 
 use crate::analyze::{NameSet, pattern_binding_names};
 use crate::attr_refs::{
-    each_attribute_expression, each_reference_bearing_attribute_expression,
+    each_attribute_expression, each_child_fragment, each_reference_bearing_attribute_expression,
     each_reference_bearing_directive_name, special_element_reference_expression,
 };
 use crate::{CompileError, Refusal};
@@ -304,35 +304,15 @@ impl<'s> Collector<'s> {
 
     fn collect_names(&mut self, fragment: &Fragment<'_>, out: &mut NameSet) {
         for node in fragment.nodes {
-            match node {
-                FragmentNode::SnippetBlock(s) => {
-                    if let Some(name) = snippet_name(s, self.source) {
-                        out.insert(name.to_string());
-                    }
-                    self.collect_names(&s.body, out);
-                }
-                FragmentNode::Element(e) => self.collect_names(&e.fragment, out),
-                FragmentNode::SpecialElement(se) => self.collect_names(&se.fragment, out),
-                FragmentNode::IfBlock(b) => {
-                    self.collect_names(&b.consequent, out);
-                    if let Some(alt) = &b.alternate {
-                        self.collect_names(alt, out);
-                    }
-                }
-                FragmentNode::EachBlock(b) => {
-                    self.collect_names(&b.body, out);
-                    if let Some(fb) = &b.fallback {
-                        self.collect_names(fb, out);
-                    }
-                }
-                FragmentNode::AwaitBlock(b) => {
-                    for frag in [&b.pending, &b.then, &b.catch].into_iter().flatten() {
-                        self.collect_names(frag, out);
-                    }
-                }
-                FragmentNode::KeyBlock(b) => self.collect_names(&b.fragment, out),
-                _ => {}
+            // Only a snippet contributes a name; the recursion into every child
+            // fragment rides the shared seam, so a new template shape can't drop
+            // out of this pass silently (the former `_ => {}` arm).
+            if let FragmentNode::SnippetBlock(s) = node
+                && let Some(name) = snippet_name(s, self.source)
+            {
+                out.insert(name.to_string());
             }
+            each_child_fragment(node, &mut |child| self.collect_names(child, out));
         }
     }
 

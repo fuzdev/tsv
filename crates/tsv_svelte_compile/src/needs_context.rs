@@ -45,6 +45,7 @@ use crate::attr_refs::{
     each_attribute_expression, each_reference_bearing_attribute_expression,
     special_element_reference_expression,
 };
+use crate::snippet_emit::render_call_expression;
 use crate::{CompileError, Refusal};
 
 /// The accumulating analysis state.
@@ -735,15 +736,9 @@ fn walk_render_tag(tag: &RenderTag<'_>, nc: &mut Nc<'_>) {
         walk_expr(&tag.expression, nc);
         return;
     }
-    let call = match &tag.expression {
-        Expression::CallExpression(c) => Some(c),
-        Expression::ParenthesizedExpression(p) => match p.expression {
-            Expression::CallExpression(c) => Some(c),
-            _ => None,
-        },
-        _ => None,
-    };
-    if let Some(call) = call {
+    // The same (possibly-parenthesized) call unwrap the emitter uses. A non-call
+    // render refuses at emission, so here it simply yields no arguments to check.
+    if let Some(call) = render_call_expression(&tag.expression) {
         walk_exprs(call.arguments, nc);
     }
 }

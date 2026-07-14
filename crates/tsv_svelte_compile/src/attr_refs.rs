@@ -1,9 +1,14 @@
 //! The shared template traversals.
 //!
-//! Two of them, both here for the same reason: an analysis that hand-writes its
-//! own walk drifts from the others, and the drift is silent. [`each_template_item`]
-//! is the whole-fragment walk; the `each_*_attribute_expression` pair below is the
-//! per-element one it and the other analyses share.
+//! Several of them, all here for the same reason: an analysis that hand-writes
+//! its own walk drifts from the others, and the drift is silent.
+//! [`each_template_item`] is the whole-fragment walk yielding every
+//! reference-bearing expression; the `each_*_attribute_expression` pair below is
+//! the per-element one it and the other analyses share; and [`each_child_fragment`]
+//! is the pure structural seam — "which sub-fragments does a node contain" — that
+//! the `fragment_has_*` predicates (via [`fragment_any`]) and the snippet-name
+//! collector ride, so the fragment-recursion shape lives in exactly one
+//! exhaustively-matched place.
 //!
 //! Both the snippet hoist analysis (`snippet.rs`) and the `needs_context` walk
 //! (`needs_context.rs`) must see every attribute expression the compiled output
@@ -171,6 +176,83 @@ fn each_attribute_item<'a, 'arena>(
         f(TemplateItem::Expression(e))?;
     }
     Ok(())
+}
+
+/// The single, exhaustively-matched enumeration of a `FragmentNode`'s child
+/// fragments — "which sub-fragments does this node contain".
+///
+/// Every purely-structural recursion that only needs to descend the fragment
+/// tree rides this one match: the `fragment_has_*` predicates (via
+/// [`fragment_any`]) and the snippet-name collector (`snippet.rs`). So a new
+/// `FragmentNode` variant — or a new child fragment on an existing variant — fails
+/// compilation HERE instead of silently drifting across the hand-written copies
+/// (which is how `fragment_contains_block` came to skip `SpecialElement` while its
+/// siblings recursed).
+///
+/// This is fragment recursion *only*. A block's own condition/key expressions are
+/// not fragments and are out of scope; an expression-bearing walk uses
+/// [`each_template_item`]. The scope-tracking / dropped-`{:catch}` walks
+/// (`needs_context.rs`, `snippet.rs`'s free-variable collector) keep their own
+/// exhaustive matches, because their descent is entangled with per-node scope
+/// mutation and the emission-vs-dropped distinction this uniform enumeration
+/// cannot express without changing behavior.
+pub(crate) fn each_child_fragment<'a, 'arena>(
+    node: &'a FragmentNode<'arena>,
+    f: &mut impl FnMut(&'a Fragment<'arena>),
+) {
+    match node {
+        FragmentNode::Text(_)
+        | FragmentNode::Comment(_)
+        | FragmentNode::ExpressionTag(_)
+        | FragmentNode::HtmlTag(_)
+        | FragmentNode::RenderTag(_)
+        | FragmentNode::DebugTag(_)
+        | FragmentNode::ConstTag(_)
+        | FragmentNode::DeclarationTag(_) => {}
+        FragmentNode::Element(element) => f(&element.fragment),
+        FragmentNode::SpecialElement(special) => f(&special.fragment),
+        FragmentNode::IfBlock(block) => {
+            f(&block.consequent);
+            if let Some(alternate) = &block.alternate {
+                f(alternate);
+            }
+        }
+        FragmentNode::EachBlock(block) => {
+            f(&block.body);
+            if let Some(fallback) = &block.fallback {
+                f(fallback);
+            }
+        }
+        FragmentNode::AwaitBlock(block) => {
+            for fragment in [&block.pending, &block.then, &block.catch]
+                .into_iter()
+                .flatten()
+            {
+                f(fragment);
+            }
+        }
+        FragmentNode::KeyBlock(block) => f(&block.fragment),
+        FragmentNode::SnippetBlock(snippet) => f(&snippet.body),
+    }
+}
+
+/// Whether any node in `fragment`, or recursively in any of its child fragments,
+/// satisfies `test`. The descent rides [`each_child_fragment`], so every
+/// `fragment_has_*` predicate shares one exhaustively-matched recursion and none
+/// can drift; each predicate supplies only its own narrow per-node `test`.
+pub(crate) fn fragment_any<'arena>(
+    fragment: &Fragment<'arena>,
+    test: &impl Fn(&FragmentNode<'arena>) -> bool,
+) -> bool {
+    fragment.nodes.iter().any(|node| {
+        test(node) || {
+            let mut found = false;
+            each_child_fragment(node, &mut |child| {
+                found = found || fragment_any(child, test);
+            });
+            found
+        }
+    })
 }
 
 /// Visit every attribute expression of `element` that can reach compiled

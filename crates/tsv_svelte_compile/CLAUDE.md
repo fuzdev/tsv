@@ -168,7 +168,7 @@ project-wide conventions.
   (render-callee classification, generated-name collisions).
 - `attr_refs.rs` — the **shared template traversals**, so no analysis hand-writes
   its own walk and drifts (which is how the component-spread arm once existed in
-  one and not the other). Two levels:
+  one and not the other). Three levels:
   - the element-attribute pair — `each_attribute_expression`, the emitted-path
     view (skips the positions refused at emission: element spreads, directives,
     `{@attach}` — that refusal is what keeps their references out of output), and
@@ -181,7 +181,23 @@ project-wide conventions.
     is TypeScript with no expression to yield). Its two consumers ask what a
     region *contains* rather than what it *emits* — the document-wide TypeScript
     gate and the rune guard over a dropped `{:catch}`. Exhaustively matched: a new
-    template shape fails compilation rather than slipping past both.
+    template shape fails compilation rather than slipping past both;
+  - `each_child_fragment`, the pure structural seam — the one
+    exhaustively-matched answer to "which sub-fragments does this node contain"
+    (element/special-element fragments, `{#if}` branches, `{#each}` body+fallback,
+    `{#await}` pending/then/catch, `{#key}` fragment, `{#snippet}` body). The
+    `fragment_has_*` refusal predicates ride it through the `fragment_any`
+    combinator — each supplying only its own narrow per-node test — and the
+    snippet-name collector recurses through it, so the recursion shape has a single
+    home. A new `FragmentNode` variant, or a new child fragment on an existing
+    variant, fails compilation HERE rather than drifting across the copies (which
+    is how `fragment_contains_block` came to skip `SpecialElement` while its
+    siblings recursed; unifying it onto the seam realigns that descent). The
+    scope-tracking / dropped-`{:catch}` walks (`needs_context.rs`, `snippet.rs`'s
+    free-variable collector) keep their own exhaustive matches on purpose: their
+    descent is entangled with per-node scope binding, the emission-vs-dropped
+    distinction, and the `{#await}`-catch flag toggle, which a uniform enumeration
+    can't carry without changing behavior.
   The SSR output **drops** four regions without visiting them — the `{#each}`
   key, the `{#key}` expression, an event-handler attribute, and the whole
   `{:catch}` branch — so no emission refusal can fire inside them. But the oracle

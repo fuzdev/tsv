@@ -18,7 +18,7 @@ use tsv_svelte::ast::internal::{
 use tsv_ts::ast::internal::{Expression, ExpressionStatement, Statement};
 
 use crate::analyze::{NameSet, ScopeEntry, evaluate, stringify_value};
-use crate::attr_refs::{TemplateItem, each_template_item};
+use crate::attr_refs::{TemplateItem, each_template_item, fragment_any};
 use crate::blocks::{
     emit_await_block, emit_const_tag, emit_each_block, emit_if_block, emit_key_block,
     emit_svelte_head,
@@ -399,46 +399,32 @@ pub(crate) fn emit_fragment<'arena>(
 }
 
 /// Recursively test whether a fragment contains any control-flow block or
-/// `{@const}` tag (the comments+blocks refusal gate).
+/// `{@const}` tag (the comments+blocks refusal gate). Rides the shared
+/// child-fragment seam ([`fragment_any`]), so it descends every sub-fragment —
+/// `SpecialElement` included — like its `fragment_has_*` siblings.
 pub(crate) fn fragment_contains_block(fragment: &Fragment<'_>) -> bool {
-    fragment.nodes.iter().any(|node| match node {
-        FragmentNode::IfBlock(_)
-        | FragmentNode::EachBlock(_)
-        | FragmentNode::AwaitBlock(_)
-        | FragmentNode::KeyBlock(_)
-        | FragmentNode::ConstTag(_) => true,
-        FragmentNode::Element(element) => fragment_contains_block(&element.fragment),
-        _ => false,
+    fragment_any(fragment, &|node| {
+        matches!(
+            node,
+            FragmentNode::IfBlock(_)
+                | FragmentNode::EachBlock(_)
+                | FragmentNode::AwaitBlock(_)
+                | FragmentNode::KeyBlock(_)
+                | FragmentNode::ConstTag(_)
+        )
     })
 }
 
 /// Recursively test whether a fragment contains a `{#snippet}` or `{@render}`
 /// (the comments+snippet/render refusal gate — a hoisted snippet function or a
 /// per-render flush reshapes the body in ways whose comment windows aren't
-/// probed).
+/// probed). Rides the shared child-fragment seam ([`fragment_any`]).
 pub(crate) fn fragment_has_snippet_or_render(fragment: &Fragment<'_>) -> bool {
-    fragment.nodes.iter().any(|node| match node {
-        FragmentNode::SnippetBlock(_) | FragmentNode::RenderTag(_) => true,
-        FragmentNode::Element(element) => fragment_has_snippet_or_render(&element.fragment),
-        FragmentNode::SpecialElement(se) => fragment_has_snippet_or_render(&se.fragment),
-        FragmentNode::IfBlock(b) => {
-            fragment_has_snippet_or_render(&b.consequent)
-                || b.alternate
-                    .as_ref()
-                    .is_some_and(fragment_has_snippet_or_render)
-        }
-        FragmentNode::EachBlock(b) => {
-            fragment_has_snippet_or_render(&b.body)
-                || b.fallback
-                    .as_ref()
-                    .is_some_and(fragment_has_snippet_or_render)
-        }
-        FragmentNode::AwaitBlock(b) => [&b.pending, &b.then, &b.catch]
-            .into_iter()
-            .flatten()
-            .any(fragment_has_snippet_or_render),
-        FragmentNode::KeyBlock(b) => fragment_has_snippet_or_render(&b.fragment),
-        _ => false,
+    fragment_any(fragment, &|node| {
+        matches!(
+            node,
+            FragmentNode::SnippetBlock(_) | FragmentNode::RenderTag(_)
+        )
     })
 }
 

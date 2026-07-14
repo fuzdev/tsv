@@ -10,7 +10,7 @@ use std::collections::HashMap;
 
 use bumpalo::collections::Vec as BumpVec;
 use tsv_svelte::ast::internal::{RenderTag, SnippetBlock};
-use tsv_ts::ast::internal::{Expression, ExpressionStatement, Statement};
+use tsv_ts::ast::internal::{CallExpression, Expression, ExpressionStatement, Statement};
 
 use crate::analyze::{ScopeEntry, pattern_binding_names};
 use crate::fragment::{BodyBuilder, emit_child_body, wrap_single};
@@ -119,19 +119,27 @@ pub(crate) fn build_snippet_function<'arena>(
     Ok((fn_decl, name))
 }
 
-/// Whether a `{@render}` expression is a call — the oracle's **parse-time**
-/// shape rule, so it reads the raw (un-erased) node. A TypeScript wrapper AROUND
-/// the call (`{@render (s(x) as T)}`, `{@render s(x)!}`) is
-/// `render_tag_invalid_expression` there, even though erasure would reveal a call
-/// underneath; a wrapper around the *callee* (`{@render (s as T)(x)}`) leaves a
-/// call and compiles.
-fn render_expression_is_call(expr: &Expression<'_>) -> bool {
+/// Unwrap a `{@render}` expression to the call it applies, tolerating a single
+/// layer of parentheses around the call (`{@render (foo)(x)}`); `None` for a
+/// non-call.
+///
+/// This is the oracle's **parse-time** shape rule, decided on the RAW (un-erased)
+/// node: a TypeScript wrapper AROUND the call (`{@render (s(x) as T)}`,
+/// `{@render s(x)!}`) is `render_tag_invalid_expression` there even though erasure
+/// would reveal a call underneath, while a wrapper around the *callee*
+/// (`{@render (s as T)(x)}`) leaves a call and compiles. One definition, shared by
+/// the emitter (its shape gate and callee/argument extraction, on the raw node
+/// then again on the erased one) and the `needs_context` render walk.
+pub(crate) fn render_call_expression<'a, 'arena>(
+    expr: &'a Expression<'arena>,
+) -> Option<&'a CallExpression<'arena>> {
     match expr {
-        Expression::CallExpression(_) => true,
-        Expression::ParenthesizedExpression(p) => {
-            matches!(p.expression, Expression::CallExpression(_))
-        }
-        _ => false,
+        Expression::CallExpression(call) => Some(call),
+        Expression::ParenthesizedExpression(paren) => match paren.expression {
+            Expression::CallExpression(call) => Some(call),
+            _ => None,
+        },
+        _ => None,
     }
 }
 
@@ -139,14 +147,7 @@ fn render_expression_is_call(expr: &Expression<'_>) -> bool {
 /// optional) call, requiring a plain-identifier callee. `None` for a member
 /// callee, a non-call, or an escaped identifier.
 pub(crate) fn render_callee_name<'s>(expr: &Expression<'_>, source: &'s str) -> Option<&'s str> {
-    let call = match expr {
-        Expression::CallExpression(c) => c,
-        Expression::ParenthesizedExpression(p) => match p.expression {
-            Expression::CallExpression(c) => c,
-            _ => return None,
-        },
-        _ => return None,
-    };
+    let call = render_call_expression(expr)?;
     match call.callee {
         Expression::Identifier(id) if id.escaped_name.is_none() => {
             let start = id.span.start as usize;
@@ -182,7 +183,7 @@ pub(crate) fn emit_render_tag<'arena>(
     // observable: `{@render (s as T)(x)}` is a call and compiles, while
     // `{@render (s(x) as T)}` and `{@render s(x)!}` are rejected even though
     // erasure would turn both into calls.
-    if !render_expression_is_call(&tag.expression) {
+    if render_call_expression(&tag.expression).is_none() {
         return Err(unsupported(Refusal::RenderTagUnsupportedCallee));
     }
     // The template borrow point: the whole `callee(args)` call is erased once, so
@@ -190,13 +191,8 @@ pub(crate) fn emit_render_tag<'arena>(
     // node (`{@render s<T>(x as U)}` → `s(x)`). Erasing a call yields a call, so
     // the shape settled above survives.
     let expression = env.erase(&tag.expression)?;
-    let call = match expression {
-        Expression::CallExpression(c) => c,
-        Expression::ParenthesizedExpression(p) => match &p.expression {
-            Expression::CallExpression(c) => c,
-            _ => return Err(unsupported(Refusal::RenderTagUnsupportedCallee)),
-        },
-        _ => return Err(unsupported(Refusal::RenderTagUnsupportedCallee)),
+    let Some(call) = render_call_expression(expression) else {
+        return Err(unsupported(Refusal::RenderTagUnsupportedCallee));
     };
     // The callee must be a plain identifier resolving to a local snippet or a
     // snippet prop.
