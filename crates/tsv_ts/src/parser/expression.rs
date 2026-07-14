@@ -187,9 +187,25 @@ enum SubscriptMode {
     ClassHeritage,
 }
 
+// ## Forward-binding comments
+//
+// Most comments are positional: they sit where the author put them and mean whatever the
+// surrounding code means. A few **bind to the token that follows them** — they are read by
+// some other tool as modifying the *next* thing, so anything printed between the two
+// changes what they modify. Those are the comments the parser marks `owned_by_node`, and
+// the two classifiers below are the membership test. Both are keyed on comment *content*,
+// which is a smell worth being honest about — but the alternative (owning every glued
+// block comment) was measured against the corpus and is worse; see
+// `docs/conformance_prettier.md` §Comment relocation.
+//
+// Adding a third class means checking that some node actually prints it — an owned comment
+// nothing prints is a *dropped* comment. See `printer/comments/owned.rs`.
+
 /// Mirror of prettier's `isTypeCastComment` (`is-type-cast-comment.js`): the
 /// comment text (between `/*` and `*/`) starts with `*` — i.e. the `/**` form —
 /// and contains `@type` or `@satisfies` followed by a word boundary.
+///
+/// Binds forward to the `(` it glues to: the comment plus those parens **are** the cast.
 fn is_jsdoc_type_cast_comment(value: &str) -> bool {
     value.starts_with('*') && contains_type_or_satisfies_tag(value)
 }
@@ -213,6 +229,43 @@ fn contains_type_or_satisfies_tag(value: &str) -> bool {
                 return true;
             }
             from = abs + 1;
+        }
+    }
+    false
+}
+
+/// A **bundler annotation** — `/* @__PURE__ */` and friends, which mark the call *after*
+/// them as side-effect-free so rollup/esbuild/terser may drop it. A paren emitted between
+/// the comment and its call unbinds the annotation and the call stops being droppable.
+///
+/// Matches the *convention* — `@`/`#` + `__NAME__` — not a fixed vocabulary, so
+/// `@__PURE__`, `#__PURE__`, `@__NO_SIDE_EFFECTS__`, `@__KEY__` and any later term of the
+/// same shape are covered without tsv learning each bundler's dictionary. An annotation
+/// tsv failed to recognize would be a silent semantic loss, which is the whole failure
+/// this prevents — so the predicate errs wide on purpose.
+///
+/// Erring wide is safe: a false positive (a comment that merely *mentions* `@__PURE__` in
+/// prose) is only ever *glued to the token it already precedes*. That is lossless and
+/// position-preserving — it cannot move, merge, or drop the comment. The cost of a false
+/// negative is a silently inert annotation; the cost of a false positive is nothing.
+fn is_annotation_comment(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    // A leading `@__` / `#__`, a non-empty `[A-Z0-9_]` payload, then a closing `__`.
+    for i in 0..bytes.len() {
+        if !matches!(bytes[i], b'@' | b'#') || bytes.get(i + 1) != Some(&b'_') {
+            continue;
+        }
+        if bytes.get(i + 2) != Some(&b'_') {
+            continue;
+        }
+        let payload_start = i + 3;
+        let mut j = payload_start;
+        while j < bytes.len() && (bytes[j].is_ascii_uppercase() || bytes[j] == b'_') {
+            j += 1;
+        }
+        // At least one payload byte before the closing `__` (so `@____` doesn't match).
+        if j >= payload_start + 3 && bytes[j - 1] == b'_' && bytes[j - 2] == b'_' {
+            return true;
         }
     }
     false
@@ -632,6 +685,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse prefix expression returning ParsedExpr with actual end position
     fn parse_prefix_expression(&mut self) -> Result<ParsedExpr<'arena>, Box<ParseError>> {
+        // The head token — the leftmost token of the expression being parsed, and the
+        // only one a leading comment can be glued to. Taken before the match, which
+        // produces exactly the node that token begins (postfix subscripts wrap it after).
+        let (head_start, _) = self.current_pos();
         let parsed = match self.current_kind() {
             TokenKind::Minus | TokenKind::Plus | TokenKind::Bang | TokenKind::Tilde => {
                 let expr = self.parse_unary_expression()?;
@@ -779,6 +836,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
             _ => self.parse_primary_expression()?,
         };
+
+        self.bind_leading_comment(head_start, parsed.expr);
 
         // An unparenthesized arrow function — or a bare `yield` inside a generator
         // — is a complete AssignmentExpression, so no `.`-member subscript can
@@ -1736,6 +1795,62 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             is_jsdoc_type_cast_comment(&self.source[start..end])
         };
         is_cast.then_some(idx)
+    }
+
+    /// Give the node beginning at `head_start` **ownership** of a leading comment glued
+    /// to that token, so the printer emits the two together and no paren it synthesizes
+    /// around an enclosing expression can land between them.
+    ///
+    /// `expr` is the node the head token begins — the leftmost leaf of whatever
+    /// expression is being parsed, before any postfix subscript or infix operator wraps
+    /// it. The `span().start == head_start` guard is what makes the binding safe: an
+    /// owned comment nothing prints is a *dropped* comment, so the flag is set only when
+    /// a node genuinely starts at the token, never when the head was a grouping `(` the
+    /// parser discards (`/* c */ (a + b)` — there the comment leads a paren, no node
+    /// begins at it, and it stays an ordinary positional comment).
+    fn bind_leading_comment(&mut self, head_start: usize, expr: &Expression<'arena>) {
+        if expr.span().start as usize != head_start {
+            return;
+        }
+        let Some(idx) = self.glued_block_comment_index(head_start) else {
+            return;
+        };
+        let c = &self.comments[idx];
+        let start = c.content_span.start as usize - self.base_offset;
+        let end = c.content_span.end as usize - self.base_offset;
+        if is_annotation_comment(&self.source[start..end]) {
+            self.comments[idx].owned_by_node = true;
+        }
+    }
+
+    /// The index in `self.comments` of a **block** comment glued to the token at
+    /// `head_start` — nothing but spaces/tabs between its `*/` and the token, and no
+    /// newline (a comment the author put on its own line leads the *line*, not the
+    /// token, so it keeps its ordinary positional handling).
+    ///
+    /// Resolves the comment through the lexer's spans rather than re-scanning, for the
+    /// same reason [`Self::jsdoc_cast_comment_index`] does: a `/*` inside this comment's
+    /// own body, a preceding line comment, or a string literal are indistinguishable
+    /// from the real opener by byte scanning.
+    fn glued_block_comment_index(&self, head_start: usize) -> Option<usize> {
+        let bytes = self.source.as_bytes();
+        // `head_start` is a full-file offset (`current_pos` adds `base_offset`);
+        // `self.source` is the local slice, so translate back to a local index.
+        let mut i = head_start.checked_sub(self.base_offset)?;
+        // Walk back over same-line whitespace immediately before the token.
+        while i > 0 && matches!(bytes[i - 1], b' ' | b'\t') {
+            i -= 1;
+        }
+        // The preceding token must be a block comment ending exactly at `i`.
+        if i < 4 || &bytes[i - 2..i] != b"*/" {
+            return None;
+        }
+        let token_end = (i + self.base_offset) as u32;
+        let idx = self
+            .comments
+            .iter()
+            .rposition(|c| c.span.end == token_end)?;
+        self.comments[idx].is_block.then_some(idx)
     }
 
     /// Parse a TypeScript angle-bracket type assertion: `<Type>expr`

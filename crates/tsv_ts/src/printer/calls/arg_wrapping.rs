@@ -68,11 +68,17 @@ pub(crate) fn build_arrow_sig_doc(
     printer: &Printer<'_>,
     arrow: &internal::ArrowFunctionExpression<'_>,
 ) -> DocId {
-    if arrow_has_return_or_type_params(arrow) {
+    let sig = if arrow_has_return_or_type_params(arrow) {
         printer.d().group(printer.build_arrow_signature_doc(arrow))
     } else {
         build_arrow_inline_signature(printer, arrow)
-    }
+    };
+    // Every call-argument state that reassembles an arrow from signature + body starts
+    // here, and none of them route the arrow through `build_expression_doc` — so this is
+    // the only place its owned leading comment can be claimed. An owned comment nothing
+    // prints is a *dropped* comment (`f(/** @param {any} n */ (n) => g(n))`), so the
+    // claim must live on the same seam the reassembly does. See `comments/owned.rs`.
+    printer.prepend_owned_leading_comment_at(arrow.span.start, sig)
 }
 
 /// Prepend any comments between arrow `=>` and body expression to `body_doc`.

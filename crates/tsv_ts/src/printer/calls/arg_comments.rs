@@ -440,18 +440,21 @@ pub(super) fn last_arg_has_comments(
     };
     let last_start = last.span().start;
 
-    // Leading: comments before last arg
+    // Leading: comments before last arg. Counts owned comments — this is a pure layout
+    // gate (it only disables the expand-last hug), and a bundler annotation leading the
+    // last argument is on the page just like any other leading comment, so prettier's
+    // `shouldExpandLastArg` refuses the hug for it too.
     if arguments.len() >= 2 {
         // Multi-arg: check after comma
         let prev_end = arguments[arguments.len() - 2].span().end;
         if let Some(cp) = find_comma_pos(printer.source, prev_end, last_start)
-            && printer.has_comments_between((cp + 1) as u32, last_start)
+            && printer.has_any_comments_between((cp + 1) as u32, last_start)
         {
             return true;
         }
     } else {
         // Single-arg: check after opening paren
-        if printer.has_comments_between(paren_open + 1, last_start) {
+        if printer.has_any_comments_between(paren_open + 1, last_start) {
             return true;
         }
     }

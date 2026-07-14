@@ -274,17 +274,14 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
         // The shared rule, plus the `+`/`-` same-sign guard so an operand that
         // would re-tokenize with the parent (`+(+x)`, `-(--x)`, `+(++x)`) is
         // parenthesized (prettier's UnaryExpression/UpdateExpression cases).
+        // An operand led by a *forward-binding* comment (a JSDoc cast, a bundler
+        // annotation) also takes a wrapping pair — `!(/** @type {A} */ (x).y)`, not
+        // `!/** @type {A} */ (x).y` — because bare, the comment reads as annotating the
+        // operator rather than the operand. That is NOT decided here: the comment sits in
+        // the gap between the operator and the operand, so `build_unary_doc` sees it
+        // positionally and adds the parens itself. Deciding it here too would double-wrap.
         ParenContext::UnaryArgument { parent_op } => {
-            // An operand whose LEFT EDGE is a JSDoc cast takes a wrapping pair on top of
-            // the cast's own — `!(/** @type {A} */ (x).y)`, not `!/** @type {A} */ (x).y`
-            // — matching prettier: bare, the comment reads as annotating the operator
-            // rather than the operand. Cosmetic (the cast's own parens already bind it),
-            // and it lands outside the comment either way, since the cast prints the
-            // comment inside its own doc. Left EDGE, not identity: the cast is usually
-            // the base of a member/call chain (`(value).toJSON`), not the whole operand.
-            starts_with_jsdoc_cast(expr)
-                || needs_parens_unary_arg_common(expr)
-                || needs_parens_unary_same_sign(expr, parent_op)
+            needs_parens_unary_arg_common(expr) || needs_parens_unary_same_sign(expr, parent_op)
         }
 
         // Update argument: a type-assertion operand keeps its parens
@@ -466,31 +463,6 @@ fn is_type_assertion(expr: &Expression<'_>) -> bool {
 /// assertion's operand: await/yield, any type assertion, and the
 /// lower-precedence binary / conditional / assignment / arrow forms all need
 /// parens.
-/// Whether `expr`'s **leftmost token** is a JSDoc cast's comment — i.e. the cast sits at
-/// the left edge, so the cast's comment is the first thing `expr` prints.
-///
-/// Walks the left spine, which is where a cast lands in practice: the base of a
-/// member/call chain (`/** @type {A} */ (x).y.z()`), the left operand of a binary, the
-/// target of an assignment. The node's own span can't answer this — a `MemberExpression`
-/// and its `JsdocCast` object share a start offset, which is exactly the ambiguity that
-/// makes prettier attach the comment to the wrong node.
-fn starts_with_jsdoc_cast(expr: &Expression<'_>) -> bool {
-    match expr {
-        Expression::JsdocCast(_) => true,
-        Expression::MemberExpression(m) => starts_with_jsdoc_cast(m.object),
-        Expression::CallExpression(c) => starts_with_jsdoc_cast(c.callee),
-        Expression::BinaryExpression(b) => starts_with_jsdoc_cast(b.left),
-        Expression::ConditionalExpression(c) => starts_with_jsdoc_cast(c.test),
-        Expression::AssignmentExpression(a) => starts_with_jsdoc_cast(a.left),
-        Expression::TaggedTemplateExpression(t) => starts_with_jsdoc_cast(t.tag),
-        Expression::TSNonNullExpression(n) => starts_with_jsdoc_cast(n.expression),
-        Expression::TSAsExpression(a) => starts_with_jsdoc_cast(a.expression),
-        Expression::TSSatisfiesExpression(s) => starts_with_jsdoc_cast(s.expression),
-        Expression::UpdateExpression(u) if !u.prefix => starts_with_jsdoc_cast(u.argument),
-        _ => false,
-    }
-}
-
 fn needs_parens_unary_arg_common(expr: &Expression<'_>) -> bool {
     is_await_or_yield(expr)
         || is_type_assertion(expr)

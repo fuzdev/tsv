@@ -80,7 +80,17 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for an expression (for use in object/array contexts and statements)
+    ///
+    /// Every expression funnels through here, which is what lets the owned-comment seam
+    /// be a single line: a comment bound to `expr`'s first token is prepended *inside*
+    /// the doc, so a paren any parent synthesizes around it lands outside the pair. See
+    /// `comments/owned.rs`.
     pub(crate) fn build_expression_doc(&self, expr: &Expression<'_>) -> DocId {
+        let doc = self.build_expression_doc_dispatch(expr);
+        self.prepend_owned_leading_comment(expr, doc)
+    }
+
+    fn build_expression_doc_dispatch(&self, expr: &Expression<'_>) -> DocId {
         let d = self.d();
 
         // Take and clear is_expression_statement so it doesn't leak to sub-expressions.

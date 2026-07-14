@@ -14,6 +14,9 @@
 //   indentable / preserved block comments, trailing line/block comment docs).
 // - **paren.rs**: Stripped-grouping-paren comment handling (promotion across `=`
 //   / operators, trailing-paren comment preservation, removed-paren prepends).
+// - **owned.rs**: The comment/paren binding seam — a comment glued to the token
+//   after it is printed by the node that token begins, so a synthesized paren
+//   can't land between the two (`Comment::owned_by_node`).
 // - **scan.rs**: Pure source span-math helpers (comma/angle/blank-line scanning).
 // - **declarations.rs**: Member-keyword / modifier-marker / marker→colon /
 //   heritage / keyword→name comment emitters.
@@ -27,6 +30,7 @@
 mod declarations;
 mod element_comma;
 mod lists;
+mod owned;
 mod paren;
 mod render;
 mod scan;
