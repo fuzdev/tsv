@@ -16,7 +16,7 @@
 use super::{CommentVec, Printer};
 use smallvec::SmallVec;
 use tsv_lang::Comment;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -49,7 +49,7 @@ impl<'a> Printer<'a> {
         // Zero-comment fast gate: the comma position only classifies comments, so
         // with no comment in the window there is nothing to collect — skip the
         // comma scan entirely.
-        if !self.has_comments_between(elem_end, upper_bound) {
+        if !self.has_comments_to_emit_between(elem_end, upper_bound) {
             return TrailingComments {
                 block: SmallVec::new(),
                 line: SmallVec::new(),
@@ -71,7 +71,7 @@ impl<'a> Printer<'a> {
         // comma emitted, a last element's after-comma block trails the element in the
         // same run as its before-comma blocks, so all same-line blocks collect into
         // one source-ordered `block` (the comma between them is `d.empty()`).
-        let all: CommentVec<'_> = comments_in_range(self.comments, elem_end, upper_bound)
+        let all: CommentVec<'_> = comments_to_emit_in_range(self.comments, elem_end, upper_bound)
             .filter(|c| {
                 self.is_same_line(elem_end, c.span.start)
                     && (!c.is_block

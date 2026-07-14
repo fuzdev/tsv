@@ -36,7 +36,7 @@ use crate::printer::{
 };
 use smallvec::smallvec;
 use tsv_lang::Span;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -269,7 +269,7 @@ impl<'a> Printer<'a> {
         // (silent content loss). Mirrors `build_expression_doc_keep_paren_comments`.
         if self.has_line_comments_between(open + 1, inner_start) {
             let mut parts: DocBuf = smallvec![d.hardline()];
-            for comment in comments_in_range(self.comments, open + 1, inner_start) {
+            for comment in comments_to_emit_in_range(self.comments, open + 1, inner_start) {
                 parts.push(self.build_comment_doc(comment));
                 // A line comment runs to end-of-line, so it must break; a block
                 // comment hugs the next token inline (`/** @type {B} */ (x)`).
@@ -594,7 +594,7 @@ impl<'a> Printer<'a> {
         // Comments between expression and keyword → place before the keyword. Skip the
         // `empty()` child on the comment-free `expr as` gap (ubiquitous). Byte-identical.
         if let Some(kw_pos) = keyword_pos
-            && self.has_comments_between(expr_end, kw_pos)
+            && self.has_comments_to_emit_between(expr_end, kw_pos)
         {
             parts.push(self.build_inline_comments_between_doc(expr_end, kw_pos));
         }
@@ -649,7 +649,7 @@ impl<'a> Printer<'a> {
         if let Some(kw_pos) = keyword_pos {
             let kw_end = kw_pos + keyword.len() as u32;
             // Skip the `empty()` child on the comment-free `as Type` gap. Byte-identical.
-            if self.has_comments_between(kw_end, type_start) {
+            if self.has_comments_to_emit_between(kw_end, type_start) {
                 parts.push(self.build_comments_between(
                     kw_end,
                     type_start,
@@ -685,7 +685,9 @@ impl<'a> Printer<'a> {
         type_start: u32,
     ) -> Option<DocId> {
         let keyword_len = keyword.len() as u32;
-        if keyword_pos.is_some_and(|pos| self.has_comments_between(pos + keyword_len, type_start)) {
+        if keyword_pos
+            .is_some_and(|pos| self.has_comments_to_emit_between(pos + keyword_len, type_start))
+        {
             return None;
         }
         let hanging = self.build_union_hanging_indent_doc(type_annotation)?;
@@ -709,7 +711,9 @@ impl<'a> Printer<'a> {
         type_start: u32,
     ) -> Option<DocId> {
         let keyword_len = keyword.len() as u32;
-        if keyword_pos.is_some_and(|pos| self.has_comments_between(pos + keyword_len, type_start)) {
+        if keyword_pos
+            .is_some_and(|pos| self.has_comments_to_emit_between(pos + keyword_len, type_start))
+        {
             return None;
         }
         let TSType::Intersection(i) = type_annotation else {
@@ -787,7 +791,7 @@ impl<'a> Printer<'a> {
                 parts.push(lead);
             }
             parts.push(inner_doc);
-            if self.has_comments_between(argument_end, non_null_expr.span.end) {
+            if self.has_comments_to_emit_between(argument_end, non_null_expr.span.end) {
                 self.append_trailing_paren_comments(
                     &mut parts,
                     argument_end,
@@ -796,9 +800,10 @@ impl<'a> Printer<'a> {
             }
             parts.push(d.text(")!"));
             d.concat(&parts)
-        } else if self
-            .has_comments_between(non_null_expr.expression.span().end, non_null_expr.span.end)
-        {
+        } else if self.has_comments_to_emit_between(
+            non_null_expr.expression.span().end,
+            non_null_expr.span.end,
+        ) {
             // A comment between the operand and `!` (`p?.q /* c */!`, or from stripped
             // grouping parens `(x /* c */)!`) trails the operand — preserve it rather
             // than dropping it. The redundant grouping parens are stripped per tsv's
@@ -895,7 +900,7 @@ impl<'a> Printer<'a> {
         // If there are comments within the binary expression, use the comment-aware
         // implementation from operators.rs which preserves comments and their line breaks.
         // This handles cases like: fn(a && // comment\n    b)
-        if self.has_comments_between(binary.span.start, binary.span.end) {
+        if self.has_comments_to_emit_between(binary.span.start, binary.span.end) {
             // Use the parts version (no group wrapper) since our caller controls grouping
             return self.build_binary_chain_parts_with_continuation_indent(binary);
         }

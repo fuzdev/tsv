@@ -35,7 +35,7 @@ pub struct Root<'arena> {
     /// `<svelte:options>` configuration (not part of fragment)
     pub options: Option<SvelteOptions<'arena>>,
     /// All comments from scripts and template expressions.
-    /// Use `comments_in_range(span)` to find comments for a specific node.
+    /// Use `comments_to_emit_in_range(span)` to find comments for a specific node.
     pub comments: Vec<Comment>,
     pub span: Span,
     pub interner: SharedInterner,

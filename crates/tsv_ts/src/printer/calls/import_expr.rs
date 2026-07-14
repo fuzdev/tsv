@@ -84,7 +84,7 @@ pub(super) fn build_import_expression_doc(
 
     // If no options, check for trailing comments on the sole source arg.
     let Some(options) = &import_expr.options else {
-        if printer.has_comments_between(source_end, paren_close) {
+        if printer.has_comments_to_emit_between(source_end, paren_close) {
             let pc = PartitionedComments::new(
                 printer.comments,
                 printer.line_breaks,
@@ -127,8 +127,8 @@ pub(super) fn build_import_expression_doc(
     let options_end = options.span().end;
     let options_start = options.span().start;
 
-    let has_inter_comments = printer.has_comments_between(source_end, options_start);
-    let has_trailing_comments = printer.has_comments_between(options_end, paren_close);
+    let has_inter_comments = printer.has_comments_on_page_between(source_end, options_start);
+    let has_trailing_comments = printer.has_comments_to_emit_between(options_end, paren_close);
     // A blank line in the source→options gap (with no comment there) is preserved like
     // every other argument gap; the comment case re-derives it comment-aware below.
     let inter_blank_no_comments = !has_inter_comments

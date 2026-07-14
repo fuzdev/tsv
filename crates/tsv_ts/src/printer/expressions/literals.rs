@@ -450,7 +450,8 @@ impl<'a> Printer<'a> {
 
         // Check for trailing comments from stripped grouping parens: `...(x /* c */)`
         let argument_end = spread.argument.span().end;
-        let has_trailing_comments = self.has_comments_between(argument_end, spread.span.end);
+        let has_trailing_comments =
+            self.has_comments_to_emit_between(argument_end, spread.span.end);
 
         let prefix = if needs_parens { "...(" } else { "..." };
         let mut parts = smallvec![d.text(prefix)];

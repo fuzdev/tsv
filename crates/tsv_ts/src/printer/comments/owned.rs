@@ -2,7 +2,7 @@
 //
 // A comment glued to the token after it is **bound to that token**, and the node the
 // token begins prints it (`Comment::owned_by_node`, set by the parser). Every gap
-// emitter and range lookup skips an owned comment (`comments_in_range`), so the comment
+// emitter and range lookup skips an owned comment (`comments_to_emit_in_range`), so the comment
 // travels inside its node's doc — and a paren the printer synthesizes around *any*
 // enclosing expression therefore lands outside the pair instead of between the two.
 //
@@ -14,7 +14,9 @@
 
 use crate::ast::internal::{self, Expression};
 use crate::printer::Printer;
+use crate::printer::expressions::assignment::jsdoc_cast_comment_is_own_line;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::source_scan;
 
 /// The child on `expr`'s **left spine** — the one whose first token is also `expr`'s
 /// first token, when there is one.
@@ -23,13 +25,12 @@ use tsv_lang::doc::arena::DocId;
 /// `NewExpression` (`new F()`) and a `ParenthesizedExpression` have children that start
 /// later, so they are their own left edge.
 ///
-/// Kept separate from `needs_parens`'s `starts_with_jsdoc_cast`, which walks the same
-/// spine for a different question ("does a cast sit at the left edge"). The two lists
-/// differ in exactly two arms, and merging them would be a behavior change, not a cleanup:
-/// `SequenceExpression` is a no-op there (a sequence already takes parens as a unary
-/// argument), but `TSInstantiationExpression` is not — adding it would newly wrap
-/// `!(/** @type {A} */ (x)<T>)`, which that rule arguably *should* do but is a
-/// fixtures-first change of its own.
+/// Kept separate from `needs_parens`'s `leftmost_no_lookahead`, which walks the same spine
+/// for a different question (prettier's `startsWithNoLookaheadToken` — "is the leftmost
+/// token an object/function/class, so the expression statement needs parens"). That one
+/// recurses to the leaf and stops at IIFE callees/tags; this one takes a single step and
+/// asks only whether the child *starts where the parent does*. Merging them would be a
+/// behavior change, not a cleanup.
 fn left_spine_child<'x>(expr: &'x Expression<'x>) -> Option<&'x Expression<'x>> {
     Some(match expr {
         Expression::MemberExpression(m) => m.object,
@@ -84,20 +85,46 @@ impl<'a> Printer<'a> {
         d.concat(&[self.build_comment_doc(comment), d.text(" "), doc])
     }
 
+    /// **on page**: whether the comment `expr` owns hangs `expr` onto its own line after an
+    /// assignment operator (`=` / `:`).
+    ///
+    /// An owned comment is glued to `expr`'s first token and travels *inside* `expr`'s doc,
+    /// so it never reaches the operator→value gap the assignment layout inspects — its
+    /// `rhs_comments` is `None`. But the comment is still on the page, and prettier's
+    /// `hasLeadingOwnLineComment` sees it, so the layout must ask the node instead of the
+    /// gap. This is the general rule; the cast-only `is_own_line_jsdoc_cast` node check that
+    /// used to sit in `variable.rs` was its special case.
+    ///
+    /// The hang test matches every other keyword→value gap: a line comment, a multi-line
+    /// block, or a block the author left on its own line. A single-line block glued to the
+    /// value (`= /* c */ v`) stays inline.
+    pub(crate) fn owned_leading_comment_hangs_value(&self, expr: &Expression<'_>) -> bool {
+        // A JSDoc cast keeps its own rule, and must: it prints a hardline between the
+        // comment and its `(` on exactly the shape `jsdoc_cast_comment_is_own_line`
+        // describes, and a hang without that hardline strands the `(` (see that
+        // function's doc — it is the single source of truth for both). The cast's comment
+        // may also sit a *newline* away from the `(`, which the glued lookup below
+        // deliberately does not match — a bundler annotation binds only when glued.
+        if let Expression::JsdocCast(cast) = expr {
+            return jsdoc_cast_comment_is_own_line(cast, self.source);
+        }
+        let start = expr.span().start;
+        self.owned_leading_comment_at(start)
+            .is_some_and(|c| !c.is_block || c.multiline || !self.is_same_line(c.span.end, start))
+    }
+
     /// The owned comment ending immediately before `start`, glued to the token there.
     fn owned_leading_comment_at(&self, start: u32) -> Option<&'a internal::Comment> {
-        // Cheap reject before the search: a glued block comment ends in `*/` just before
-        // the token, past nothing but spaces/tabs. Almost every expression bails here.
-        // A `*/` inside a string literal can reach the search, which then finds no
-        // comment ending there — the spans, not the bytes, are authoritative.
-        let bytes = self.source.as_bytes();
-        let mut i = start as usize;
-        while i > 0 && matches!(bytes[i - 1], b' ' | b'\t') {
-            i -= 1;
-        }
-        if i < 4 || bytes.get(i - 2..i)? != b"*/" {
-            return None;
-        }
+        // Cheap reject before the span search — almost every expression bails here.
+        // `SameLine`, matching the parser's `glued_block_comment_index`, which is what set
+        // `owned_by_node` in the first place: only a glued comment is bound to its token.
+        // (A JSDoc cast's comment may sit a newline away and is deliberately NOT found
+        // here — it hangs off its `JsdocCast` node, which carries its own copy.)
+        let i = source_scan::block_comment_end_before(
+            self.source.as_bytes(),
+            start as usize,
+            source_scan::CommentGlue::SameLine,
+        )?;
 
         let idx = self
             .comments

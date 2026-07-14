@@ -13,6 +13,7 @@ use crate::ast::internal::{
 use crate::lexer::{KeywordKind, TokenKind};
 use crate::parser::expression_assignable::AssignableContext;
 use tsv_lang::printing::visual_width;
+use tsv_lang::source_scan;
 use tsv_lang::{ParseError, Span, TAB_WIDTH};
 
 use super::Parser;
@@ -1764,25 +1765,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// comment somewhere before here" (an owned comment nothing prints is a dropped
     /// comment).
     fn jsdoc_cast_comment_index(&self, paren_start: usize) -> Option<usize> {
-        let bytes = self.source.as_bytes();
         // `paren_start` is a full-file offset (`current_pos` adds `base_offset`);
         // `self.source` is the local slice, so translate back to a local index.
-        let mut i = paren_start - self.base_offset;
-        // Walk back over whitespace immediately before '('.
-        while i > 0 && bytes[i - 1].is_ascii_whitespace() {
-            i -= 1;
-        }
-        // The preceding token must be a block comment ending exactly at `i`.
-        if i < 4 || &bytes[i - 2..i] != b"*/" {
-            return None;
-        }
+        //
+        // `AnyLine`: the cast's comment may sit on its own line above the `(`
+        // (`const a =⏎  /** @type {T} */⏎  (v);`) and still be the cast — unlike a bundler
+        // annotation, which binds only when glued to its token (`SameLine`, see
+        // `glued_block_comment_index`).
+        let i = source_scan::block_comment_end_before(
+            self.source.as_bytes(),
+            paren_start - self.base_offset,
+            source_scan::CommentGlue::AnyLine,
+        )?;
         // Resolve the comment through the lexer's spans rather than re-scanning the
-        // source. A `/*` can appear inside this comment's own body *or* a preceding
-        // line comment / string literal, and byte scanning can't tell those apart from
-        // the real opener — mis-slicing the content would drop a real cast
-        // (`/** z /* @type {T} */`) or fabricate one (`/* z /** @type {T} */`). The
-        // comment ending here was just drained into `self.comments`; match it by its
-        // host-coordinate end and test its exact (delimiter-excluded) content.
+        // source (see `block_comment_end_before` — byte scanning cannot find the real
+        // `/*`). The comment ending here was just drained into `self.comments`; match it
+        // by its host-coordinate end and test its exact (delimiter-excluded) content.
         let token_end = (i + self.base_offset) as u32;
         let idx = self
             .comments
@@ -1833,18 +1831,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// own body, a preceding line comment, or a string literal are indistinguishable
     /// from the real opener by byte scanning.
     fn glued_block_comment_index(&self, head_start: usize) -> Option<usize> {
-        let bytes = self.source.as_bytes();
         // `head_start` is a full-file offset (`current_pos` adds `base_offset`);
         // `self.source` is the local slice, so translate back to a local index.
-        let mut i = head_start.checked_sub(self.base_offset)?;
-        // Walk back over same-line whitespace immediately before the token.
-        while i > 0 && matches!(bytes[i - 1], b' ' | b'\t') {
-            i -= 1;
-        }
-        // The preceding token must be a block comment ending exactly at `i`.
-        if i < 4 || &bytes[i - 2..i] != b"*/" {
-            return None;
-        }
+        //
+        // `SameLine`: a comment the author put on its own line leads the *line*, not the
+        // token, so it keeps its ordinary positional handling. This is the one axis on
+        // which this differs from `jsdoc_cast_comment_index` (`AnyLine`), and it is
+        // load-bearing — an annotation binds only when glued.
+        let i = source_scan::block_comment_end_before(
+            self.source.as_bytes(),
+            head_start.checked_sub(self.base_offset)?,
+            source_scan::CommentGlue::SameLine,
+        )?;
         let token_end = (i + self.base_offset) as u32;
         let idx = self
             .comments

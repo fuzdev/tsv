@@ -107,8 +107,9 @@ pub fn build_chain_doc<'a, P: ChainPrinter>(
     // nested chain in a call arg / base restores the parent's value on exit). The print
     // path reads this to skip per-member comment classification on comment-free chains,
     // and `build_chain_doc_impl` reads it below instead of recomputing the search.
-    let prev_has_comments = printer
-        .set_chain_has_comments(printer.has_any_comments_between(chain_span.start, chain_span.end));
+    let prev_has_comments = printer.set_chain_has_comments(
+        printer.has_comments_on_page_between(chain_span.start, chain_span.end),
+    );
     let result = build_chain_doc_impl(groups, printer);
     printer.restore_chain_has_comments(prev_has_comments);
     printer.exit_chain_arg_share(was_active);
@@ -473,7 +474,7 @@ fn is_base_call_then_only_members<'a, P: ChainPrinter>(
     // No inter-element comments (those need the comment-aware chain path).
     all_nodes[1..].iter().all(|n| {
         n.comment_range()
-            .is_none_or(|(start, end)| !printer.has_comments_between(start, end))
+            .is_none_or(|(start, end)| !printer.has_comments_to_emit_between(start, end))
     })
 }
 

@@ -12,7 +12,7 @@ use crate::printer::{CommentVec, Printer, has_multiline_content};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::{comments_in_range, has_multiline_block_comments_in_range};
+use tsv_lang::{comments_to_emit_in_range, has_multiline_block_comments_on_page_in_range};
 
 impl<'a> Printer<'a> {
     /// Check if array should force break based on Prettier's heuristic
@@ -116,7 +116,9 @@ impl<'a> Printer<'a> {
         let mut pos = self
             .find_last_comma_before(scan_from, upper)
             .map_or(scan_from, |c| c + 1);
-        for c in comments_in_range(self.comments, pos, upper) {
+        // Every comment physically in the gap, not just the ones this gap emits: an owned
+        // annotation's bytes are still there, and stepping over them is the whole point.
+        for c in self.comments_in_source_between(pos, upper) {
             if c.span.end > pos {
                 pos = c.span.end;
             }
@@ -141,7 +143,12 @@ impl<'a> Printer<'a> {
             w.push(' ');
             w.push_str(comment.span.extract(self.source));
         }
-        w.finish_text()
+        let doc = w.finish_text();
+        // A comment emission that can't route through `build_comment_doc` (the space must
+        // share the node), so it tags its own ledger node.
+        #[cfg(feature = "comment_check")]
+        d.tag_comment_doc(doc, comment.span, self.source);
+        doc
     }
 
     /// Build expression doc for array element, wrapping certain expressions in isolated_group
@@ -170,7 +177,7 @@ impl<'a> Printer<'a> {
         elem_start: u32,
         parts: &mut DocBuf,
     ) {
-        for comment in comments_in_range(self.comments, search_start, elem_start) {
+        for comment in comments_to_emit_in_range(self.comments, search_start, elem_start) {
             if comment.is_block {
                 parts.push(self.format_inline_block_comment(comment, true));
             }
@@ -209,7 +216,7 @@ impl<'a> Printer<'a> {
         let next_boundary = self.next_element_boundary(arr, current_index);
         let comma_pos = self.find_comma_after(elem_end);
 
-        for comment in comments_in_range(self.comments, elem_end, next_boundary) {
+        for comment in comments_to_emit_in_range(self.comments, elem_end, next_boundary) {
             if comment.is_block && self.is_same_line(elem_end, comment.span.start) {
                 // Only add if before comma (or no comma found - shouldn't happen in valid arrays with more elements)
                 if comma_pos.is_none_or(|pos| comment.span.start < pos) {
@@ -234,7 +241,7 @@ impl<'a> Printer<'a> {
         // the fill/group builders — lies within [span.start, span.end], so when the
         // array holds no comment, none can lie in any of them (canonical reference:
         // build_params_doc_with_comments).
-        let has_comments = self.has_comments_between(arr.span.start, arr.span.end);
+        let has_comments = self.has_comments_on_page_between(arr.span.start, arr.span.end);
 
         // Check for comments that force expansion: line comments (can't be inline),
         // multi-line block comments (contain hardlines that must propagate),
@@ -243,7 +250,7 @@ impl<'a> Printer<'a> {
         // collect — on the comment-free common case.
         let has_expanding_comments = has_comments
             && (self.has_line_comments_between(arr.span.start, arr.span.end)
-                || has_multiline_block_comments_in_range(
+                || has_multiline_block_comments_on_page_in_range(
                     self.comments,
                     arr.span.start,
                     arr.span.end,
@@ -445,7 +452,9 @@ impl<'a> Printer<'a> {
                     .next_back()
                     .map_or(arr.span.start + 1, |e| e.span().end);
                 if let Some(lc) = self.find_last_comma_before(scan_start, arr.span.end - 1) {
-                    for comment in comments_in_range(self.comments, lc + 1, arr.span.end - 1) {
+                    for comment in
+                        comments_to_emit_in_range(self.comments, lc + 1, arr.span.end - 1)
+                    {
                         if comment.is_block {
                             parts.push(self.build_comment_doc(comment));
                         }
@@ -463,7 +472,7 @@ impl<'a> Printer<'a> {
             // comments from stripped parens (argument.end to spread.end)
             if let Expression::SpreadElement(spread) = e {
                 let has_inner =
-                    self.has_comments_between(spread.argument.span().end, spread.span.end);
+                    self.has_comments_to_emit_between(spread.argument.span().end, spread.span.end);
                 if has_inner {
                     return spread.argument.span().end;
                 }
@@ -477,7 +486,8 @@ impl<'a> Printer<'a> {
         let mut trailing_same_line_after_comma: CommentVec<'_> = smallvec![];
         if let Some(search_start) = last_elem_end {
             let comma_pos = self.find_comma_after(search_start);
-            for comment in comments_in_range(self.comments, search_start, arr.span.end - 1) {
+            for comment in comments_to_emit_in_range(self.comments, search_start, arr.span.end - 1)
+            {
                 if !comment.is_block {
                     continue;
                 }
@@ -553,7 +563,8 @@ impl<'a> Printer<'a> {
         let mut trailing_comments: CommentVec<'_> = smallvec![];
         if let Some(last) = arr.elements.last().and_then(|e| e.as_ref()) {
             let search_start = last.span().end;
-            for comment in comments_in_range(self.comments, search_start, arr.span.end - 1) {
+            for comment in comments_to_emit_in_range(self.comments, search_start, arr.span.end - 1)
+            {
                 if comment.is_block && !self.is_same_line(search_start, comment.span.start) {
                     trailing_comments.push(comment);
                 }
@@ -645,7 +656,7 @@ impl<'a> Printer<'a> {
                 let prev_comma_pos = (i > 0)
                     .then(|| self.find_comma_after(last_real_emit_end))
                     .flatten();
-                comments_in_range(self.comments, last_real_emit_end, upper)
+                comments_to_emit_in_range(self.comments, last_real_emit_end, upper)
                     .filter(|c| {
                         // Bracket-line comments pulled onto the `[` line above are
                         // emitted as the prefix, not as leading on the first element.
@@ -721,7 +732,7 @@ impl<'a> Printer<'a> {
             // Same-line trailing comments (real elements only).
             let trailing: CommentVec<'_> = if elem.is_some() {
                 let comma_pos = self.find_comma_after(elem_end);
-                comments_in_range(self.comments, elem_end, next_boundary)
+                comments_to_emit_in_range(self.comments, elem_end, next_boundary)
                     .filter(|c| self.is_same_line(elem_end, c.span.start))
                     .filter(|c| {
                         if c.is_block {
@@ -790,9 +801,10 @@ impl<'a> Printer<'a> {
             // Suppress trailing hardline if the next iter has a blank line before it
             // (the blank check at start of that iter will emit it).
             let next_has_blank_before = if i + 1 < arr.elements.len() {
-                let first_leading_comment =
-                    comments_in_range(self.comments, elem_end, next_boundary)
-                        .find(|c| !self.is_same_line(elem_end, c.span.start));
+                // **in source**: bounds a raw blank-line scan (see `blank_scan_end`).
+                let first_leading_comment = self
+                    .comments_in_source_between(elem_end, next_boundary)
+                    .find(|c| !self.is_same_line(elem_end, c.span.start));
                 let blank_check_boundary =
                     first_leading_comment.map_or(next_boundary, |c| c.span.start);
                 self.has_blank_line_at_array_boundary(arr, i + 1, blank_check_boundary)
@@ -811,7 +823,8 @@ impl<'a> Printer<'a> {
                 // expose them to subsequent leading-comment searches and the final scan.
                 if let Some(Expression::SpreadElement(spread)) = elem {
                     let arg_end = spread.argument.span().end;
-                    let has_own_line = comments_in_range(self.comments, arg_end, spread.span.end)
+                    let has_own_line = self
+                        .comments_on_page_between(arg_end, spread.span.end)
                         .any(|c| c.is_block && self.has_newline_between(arg_end, c.span.start));
                     if has_own_line {
                         last_real_emit_end = arg_end;
@@ -824,7 +837,8 @@ impl<'a> Printer<'a> {
         // already handled.
         let final_scan_start = trailing_hole_comments_end.unwrap_or(last_real_emit_end);
         let mut prev_end = final_scan_start;
-        for comment in comments_in_range(self.comments, final_scan_start, arr.span.end - 1) {
+        for comment in comments_to_emit_in_range(self.comments, final_scan_start, arr.span.end - 1)
+        {
             if !self.is_same_line(final_scan_start, comment.span.start) {
                 // Preserve an author blank line before an own-line trailing comment.
                 self.push_blank_preserving_hardline(&mut parts, prev_end, comment.span.start);

@@ -104,7 +104,7 @@ impl<'a> Printer<'a> {
         // Check for comments between `do` keyword and body
         let do_end = stmt.span.start + "do".len() as u32;
         let body_start = stmt.body.span().start;
-        let mut parts = if self.has_comments_between(do_end, body_start) {
+        let mut parts = if self.has_comments_to_emit_between(do_end, body_start) {
             let has_line = self.has_line_comments_between(do_end, body_start);
             let comment_doc =
                 self.build_inline_comments_between_doc_no_leading_space(do_end, body_start);
@@ -142,7 +142,7 @@ impl<'a> Printer<'a> {
 
         // Check for comments between } and while, determine if while stays on same line
         let while_on_same_line = if let Some(while_start) = while_pos
-            && self.has_comments_between(body_end, while_start)
+            && self.has_comments_to_emit_between(body_end, while_start)
         {
             let (inline_prev, own_line, inline_next) =
                 self.partition_comments_by_line(body_end, while_start);
@@ -191,8 +191,8 @@ impl<'a> Printer<'a> {
         // Use preserve_inline for do-while to intentionally differ from Prettier
         // Prettier moves comments after `while (` to outside the parens - we keep them in place
         if let (Some(open), Some(close)) = (open_paren, close_paren)
-            && (self.has_comments_between(open + 1, stmt.test.span().start)
-                || self.has_comments_between(stmt.test.span().end, close))
+            && (self.has_comments_to_emit_between(open + 1, stmt.test.span().start)
+                || self.has_comments_to_emit_between(stmt.test.span().end, close))
         {
             parts.push(self.build_condition_group_preserve_inline(&stmt.test, open, close));
         } else {

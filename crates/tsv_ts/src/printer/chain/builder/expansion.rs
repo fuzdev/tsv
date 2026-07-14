@@ -66,7 +66,7 @@ pub(super) fn has_comments_forcing_expansion<'a, P: ChainPrinter>(
             }
 
             if let Some((obj_end, prop_start)) = node.comment_range()
-                && printer.has_comments_between(obj_end, prop_start)
+                && printer.has_comments_to_emit_between(obj_end, prop_start)
             {
                 return true;
             }

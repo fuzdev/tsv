@@ -12,6 +12,8 @@ use super::render_config::RenderConfig;
 #[cfg(feature = "swallow_check")]
 use super::swallow::SwallowTracker;
 use super::types::{CachedWidth, DocContext, GroupId, LineKind, Mode, TextResolver, resolve_text};
+#[cfg(feature = "comment_check")]
+use crate::comment_ledger;
 
 /// The mode each id-bearing group resolved to, as a total map over the closed
 /// [`GroupId`] enum. Backed by a fixed inline array indexed by `id as usize`, so
@@ -749,7 +751,20 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
     let children_vec: &[DocId] = &children_outer;
     let pool: &str = &pool_outer;
 
+    // The print-once comment ledger's render-side hook (`comment_check` feature). Every
+    // command popped here is a node the renderer *emits* — a conditional-group candidate
+    // that loses, or a `fits()` lookahead, never reaches this loop — so recording the tag
+    // here is the emit itself. Gated on the arena actually carrying tags, so a
+    // comment-free document pays nothing. See `crate::comment_ledger`.
+    #[cfg(feature = "comment_check")]
+    let ledger_on = comment_ledger::comment_check_enabled() && arena.has_comment_docs();
+
     loop {
+        #[cfg(feature = "comment_check")]
+        if ledger_on && let Some((span, key)) = arena.comment_doc_tag(cmd.doc) {
+            comment_ledger::record_emitted_keyed(key, span);
+        }
+
         match &nodes[cmd.doc.index()] {
             DocNode::Text(t) => {
                 #[cfg(feature = "swallow_check")]
