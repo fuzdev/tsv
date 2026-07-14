@@ -449,7 +449,7 @@ impl<'a> Printer<'a> {
         }
 
         if let Expression::BinaryExpression(binary) = arg {
-            return self.build_binary_paren_doc(keyword, binary, inline_comments);
+            return self.build_binary_paren_doc(keyword, binary, span_end, inline_comments);
         }
 
         // Ternary in return/throw: binary test expressions need continuation indent.
@@ -581,6 +581,7 @@ impl<'a> Printer<'a> {
         &self,
         keyword: &'static str,
         binary: &internal::BinaryExpression<'_>,
+        span_end: u32,
         inline_comments: Option<DocId>,
     ) -> DocId {
         let d = self.d();
@@ -594,12 +595,17 @@ impl<'a> Printer<'a> {
         // Find trailing comments between expression end and semicolon. The scan
         // skips comments so a `;` inside one (`a + b /* ; */ /* c */;`) isn't
         // mistaken for the statement's terminator, which would drop the comments
-        // after it.
+        // after it. Bounded by `span_end` (the statement's own end): under ASI
+        // there is no `;` within the statement, so the scan must not wander past
+        // it into the enclosing source and find a later terminator (the object
+        // literal's `};`, the next statement's `;`) — that would pull the
+        // statement's own trailing comment into this gap AND leave it for the
+        // block's trailing-comment emitter too, printing it twice.
         let expr_end = binary.span.end;
         let semicolon_pos = find_char_skipping_comments(
             self.source.as_bytes(),
             expr_end as usize,
-            self.source.len(),
+            span_end as usize,
             b';',
         )
         .map_or(expr_end, |p| p as u32);
