@@ -35,6 +35,7 @@ Every `◆prettier_bug` — cases where Prettier produces output that is non-ide
 
 - CSS empty value + `!important` — never converges (oscillates every pass) — [empty_value_important](../tests/fixtures/css/values/variables/empty_value_important_prettier_divergence/)
 - CSS escaped whitespace in a value (`50px\ ;`) — drops the escape's payload, stranding the `\` onto the `;` / `)` → output fails to re-parse; also splits an ident on an escaped `,` / `+`, and wraps a long value *inside* an escape — [escaped_whitespace](../tests/fixtures/css/values/escaped_whitespace_prettier_divergence/), [escaped_whitespace_long](../tests/fixtures/css/values/escaped_whitespace_long_prettier_divergence/)
+- CSS escaped whitespace ending an at-rule prelude (`@layer a\ ;`) — same, stranded onto the `;` → the at-rule never ends; alone the output fails to re-parse, in context two at-rules silently merge — [layer_escaped_whitespace](../tests/fixtures/css/at_rules/layer_escaped_whitespace_prettier_divergence/)
 - CSS escaped whitespace ending a `url()` (`url(x\ )`) — same, stranded onto the url's closing paren → the token never terminates and the output fails to re-parse — [url_escaped_whitespace](../tests/fixtures/css/values/functions/url_escaped_whitespace_prettier_divergence/)
 - `<svelte:element this={'x'}>` — ignores `singleQuote` and skips escaping → invalid output (`this={"a"b"}`) — [svelte_element_this_string](../tests/fixtures/svelte/special_elements/svelte_element_this_string_prettier_divergence/)
 - `<svelte:element class="a  b">` — fails to collapse repeated whitespace — [svelte_element_class_whitespace](../tests/fixtures/svelte/special_elements/svelte_element_class_whitespace_prettier_divergence/)
@@ -200,6 +201,7 @@ columns wide. Cataloged in [Tabs-Only Alignment](#tabs-only-alignment).
 
 ### CSS: At-Rules
 
+- Escaped whitespace ending a prelude — ◆prettier_bug — [layer_escaped_whitespace](../tests/fixtures/css/at_rules/layer_escaped_whitespace_prettier_divergence/)
 - @container spacing — ◆spec_violation — [container_spacing](../tests/fixtures/css/at_rules/container_spacing_prettier_divergence/)
 - @container empty feature value — ◆stable_quirk — [container_empty_feature_value](../tests/fixtures/css/at_rules/container_empty_feature_value_prettier_divergence/)
 - @container line wrap — ◆print_width — [container_long](../tests/fixtures/css/at_rules/container_long_prettier_divergence/)
@@ -213,6 +215,8 @@ columns wide. Cataloged in [Tabs-Only Alignment](#tabs-only-alignment).
 - @scope empty-root spacing — ◆design_choice — tsv keeps a consistent space before the clause paren (`@scope ()`), where prettier collapses it (`@scope()`) only for the empty-root-only prelude (the forgiving-list acceptance otherwise matches prettier — see [scope_forgiving_selector_list](../tests/fixtures/css/at_rules/scope_forgiving_selector_list/)) — [scope_empty_root](../tests/fixtures/css/at_rules/scope_empty_root_prettier_divergence/)
 - Media grouped feature case — ◆parser_compat — [media_grouped_feature_case](../tests/fixtures/css/at_rules/media_grouped_feature_case_prettier_divergence/)
 - SCSS directive numbers — ◆design_choice — [scss_directive_number_preserved](../tests/fixtures/css/at_rules/scss_directive_number_preserved_prettier_divergence/)
+
+**Escaped whitespace ending a prelude**: an at-rule prelude can end in an escaped whitespace (`@layer a\ ;` — the layer is named `a `, since `\ ` is a valid escape whose escaped code point IS that space, css-syntax-3 §4.3.4/§4.3.7). tsv preserves it. Prettier trims it as padding, stranding the backslash onto the `;`, which it then escapes: alone, prettier's output no longer parses (tsv rejects `@layer a\;` with `Expected '{' or ';' after 'at-rule prelude'`); in context it parses but the prelude swallows everything up to the next `{`, silently **merging two at-rules into one**. Prettier gets the block form right (`@layer b\ {`), where the payload space already separates the prelude from the brace — and tsv likewise adds no second separator there. Same rule, same reason as [CSS: Values §Escaped whitespace in a value](#css-values). See [layer_escaped_whitespace](../tests/fixtures/css/at_rules/layer_escaped_whitespace_prettier_divergence/).
 
 **Spec violations**: CSS Syntax 3 §4.3.4 specifies that an identifier immediately followed by `(` tokenizes as a `<function-token>`, not as an `<ident-token>` plus `(`. Media Queries 4 §3 explicitly notes: "Whitespace is required between a 'not', 'and', or 'or' keyword and the following '(' character, because without it that would instead parse as a `<function-token>`." Container Queries (CSS Conditional 5) use the same grammar pattern. Prettier normalizes this for `@supports` but not `@media` or `@container`.
 

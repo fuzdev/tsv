@@ -12,7 +12,7 @@ pub(crate) mod parser;
 pub mod strings;
 
 use crate::ast::internal::CssValue;
-use crate::escapes::trim_end_preserving_escape;
+use crate::escapes::{trim_end_preserving_escape, trim_start_css};
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
@@ -49,7 +49,7 @@ pub fn parse_value_from_source<'arena>(
     // and its length is what the leaf spans are derived from, so cutting the
     // escape's payload here is what strands the backslash onto the `;`.
     let value_str = source_relative_span.extract(source);
-    let trimmed = trim_end_preserving_escape(value_str.trim_start());
+    let trimmed = trim_end_preserving_escape(trim_start_css(value_str));
 
     if trimmed.is_empty() {
         return CssValue::Identifier {
@@ -61,7 +61,7 @@ pub fn parse_value_from_source<'arena>(
     }
 
     // Calculate adjusted span for trimmed value (relative to source)
-    let trim_start_offset = value_str.len() - value_str.trim_start().len();
+    let trim_start_offset = value_str.len() - trim_start_css(value_str).len();
     let trim_end_offset = value_str.len() - trim_start_offset - trimmed.len();
     let source_relative_adjusted = Span {
         start: source_relative_span.start + trim_start_offset as u32,

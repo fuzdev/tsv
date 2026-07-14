@@ -74,23 +74,18 @@ fn ends_with_open_escape(text: &str) -> bool {
     text.bytes().rev().take_while(|&b| b == b'\\').count() % 2 == 1
 }
 
-/// Whether `c` is a character [`trim_end_preserving_escape`] must hand back to an
-/// escape as its **payload**.
+/// Whether `c` is a character [`trim_end_preserving_escape`] must hand back to an escape
+/// as its **payload**.
 ///
-/// §4.3.7's final branch escapes *any* code point, so an escape's payload is not
-/// restricted to CSS whitespace — `\<NBSP>` is a perfectly good escape. The set here is
-/// therefore keyed to what the trim can *eat*: `str::trim_end` follows Unicode
-/// `White_Space`, so anything it strips must be recoverable, NBSP included. Using the
-/// narrower [`is_css_whitespace`] here would let the Unicode trim swallow a payload the
-/// rule then refused to restore — the very loss this exists to prevent.
+/// §4.3.7's final branch escapes *any* code point, so an escape's payload is not restricted
+/// to whitespace at all — `\<NBSP>` is a perfectly good escape. But this predicate only ever
+/// sees a character the trim was about to *eat*, and that trim removes **CSS** whitespace
+/// only (§4.2). Of those five, a newline is the one shape §4.3.4 excludes from starting an
+/// escape — leaving exactly the space and the tab.
 ///
-/// The one exclusion is §4.3.4's: a `\` followed by a **newline** is not a valid escape,
-/// so a newline is never a payload. (A newline *can* terminate a hex escape, which is why
-/// [`escape_len`] uses [`is_css_whitespace`] there instead. Two spec rules, two
-/// predicates — and neither is the duplicate that `whitespace::is_css_whitespace` already
-/// owns.)
+/// So an NBSP payload needs no rescue here: it is content the trim never touches.
 fn is_escapable_whitespace(c: char) -> bool {
-    c.is_whitespace() && !matches!(c, '\n' | '\r' | '\x0C')
+    matches!(c, ' ' | '\t')
 }
 
 /// The byte length of the CSS escape starting at `s[i]` (which must be a `\`), or
@@ -141,37 +136,56 @@ pub(crate) fn escape_len(s: &str, i: usize) -> Option<usize> {
     Some(1 + hex + terminator)
 }
 
-/// Trim trailing whitespace, but never the whitespace a CSS **escape** owns.
+/// Trim trailing **CSS** whitespace, but never the whitespace a CSS **escape** owns.
 ///
-/// `\` followed by whitespace is a valid escape whose escaped code point *is* that
-/// whitespace character (CSS Syntax 3 §4.3.4, and §4.3.7 "Consume an escaped code
-/// point", whose final branch returns the code point itself). So the trailing space
-/// in `width: 50px\ ;` is value *content*, not padding.
+/// Two rules, and the first is the one that makes the second small.
 ///
-/// Trimming it strands the backslash, which then escapes whatever follows — the
-/// declaration's `;`, a function's `)` — and the result no longer parses. Exactly one
-/// whitespace character is therefore kept when an odd-length backslash run precedes
-/// it; any further whitespace past the escaped one is ordinary padding and still goes.
+/// **Trim only CSS whitespace** (§4.2: tab, newline, form feed, carriage return, space —
+/// ASCII, and exactly what [`is_css_whitespace`] answers). `str::trim_end` follows Unicode
+/// `White_Space`, which would also strip NBSP, U+3000 and friends — and those are ordinary
+/// **content** to CSS: `parseCss` and prettier both keep them inside the token, so eating
+/// one silently renames a class (`.a<NBSP>, .b` → `.a,`) or rewrites a value
+/// (`translate(a<NBSP>)` → `translate(a)`).
 ///
-/// A newline is never kept: `\` + newline is the one shape §4.3.4 excludes, so it is not
-/// an escape and the backslash owns nothing. The lexer rejects that input before this is
-/// reached, so the arm never fires today; it exists because the rule, not its
-/// reachability, is what this function encodes.
+/// **Never take an escape's payload.** `\` + whitespace is a valid escape whose escaped
+/// code point *is* that whitespace (§4.3.4, and §4.3.7 "Consume an escaped code point",
+/// whose final branch returns the code point itself), so the trailing space in
+/// `width: 50px\ ;` is content too. Trimming it strands the backslash, which then escapes
+/// whatever follows — the declaration's `;`, a function's `)`, a selector's `,` — and the
+/// output no longer parses. Exactly one character is therefore kept when an odd-length
+/// backslash run precedes it (an even run is a completed `\\`); anything past the escaped
+/// one is ordinary padding and still goes.
+///
+/// Because the trim is CSS-only, the payload can only ever be a space or a tab: a newline
+/// is the one shape §4.3.4 excludes from being an escape at all, and every *other*
+/// whitespace character is never eaten in the first place. There is no "restore what the
+/// Unicode trim took" case, because nothing takes it.
 ///
 /// The single definition of this rule. The parser's value/argument spans, the printer's
-/// whitespace normalizer and top-level splitter, the selector leaf/pseudo printers, and
-/// `url()` trimming all route through it, so they cannot drift.
+/// whitespace normalizer and top-level splitter, the selector leaf/pseudo printers, the
+/// at-rule prelude, and `url()` trimming all route through it, so they cannot drift.
+///
+/// This is **not** the lexer's escape-terminator rule (`lexer::identifiers`), which is
+/// Unicode-wide because its oracle is `parseCss`'s `\s`-based regex. Different question,
+/// different oracle — see [`escape_len`] and the comment there.
 pub(crate) fn trim_end_preserving_escape(s: &str) -> &str {
-    let trimmed = s.trim_end();
+    let trimmed = s.trim_end_matches(is_css_whitespace);
     if trimmed.len() == s.len() || !ends_with_open_escape(trimmed) {
         return trimmed;
     }
-    // Give the escape back its one payload character — unless that character is a
-    // newline, which cannot be one.
+    // Give the escape back its one payload character.
     match s[trimmed.len()..].chars().next() {
         Some(c) if is_escapable_whitespace(c) => &s[..trimmed.len() + c.len_utf8()],
         _ => trimmed,
     }
+}
+
+/// Trim leading **CSS** whitespace — the leading-side counterpart of
+/// [`trim_end_preserving_escape`], and needed for the same reason: `str::trim_start` is
+/// Unicode-wide and would eat an NBSP that is content. No escape can own a *leading*
+/// whitespace (an escape's payload always follows its `\`), so there is nothing to restore.
+pub(crate) fn trim_start_css(s: &str) -> &str {
+    s.trim_start_matches(is_css_whitespace)
 }
 
 #[cfg(test)]
@@ -200,7 +214,7 @@ mod tests {
 
 #[cfg(test)]
 mod escape_scan_tests {
-    use super::{escape_len, trim_end_preserving_escape};
+    use super::{escape_len, trim_end_preserving_escape, trim_start_css};
 
     #[test]
     fn trim_keeps_an_escaped_space() {
@@ -247,10 +261,23 @@ mod escape_scan_tests {
     }
 
     #[test]
-    fn trim_keeps_a_multi_byte_payload() {
-        // A non-breaking space is whitespace to `str::trim_end` and 2 bytes wide; the
-        // slice must be cut on its char boundary, not one byte in.
+    fn trim_leaves_non_css_whitespace_alone() {
+        // NBSP / ideographic space are CSS *content*, not whitespace (§4.2) — `parseCss`
+        // and prettier keep them inside the token, so the trim must never eat one. This is
+        // what collapses the payload rule: an escaped NBSP needs no rescue, because nothing
+        // takes it in the first place.
+        assert_eq!(trim_end_preserving_escape("a\u{a0}"), "a\u{a0}");
+        assert_eq!(trim_end_preserving_escape("a\u{3000}"), "a\u{3000}");
         assert_eq!(trim_end_preserving_escape("a\\\u{a0}"), "a\\\u{a0}");
+        // …and ordinary CSS whitespace after it still goes.
+        assert_eq!(trim_end_preserving_escape("a\u{a0}  "), "a\u{a0}");
+    }
+
+    #[test]
+    fn trim_start_css_leaves_non_css_whitespace_alone() {
+        assert_eq!(trim_start_css("  a"), "a");
+        assert_eq!(trim_start_css("\u{a0}a"), "\u{a0}a");
+        assert_eq!(trim_start_css(" \u{a0}a"), "\u{a0}a");
     }
 
     #[test]

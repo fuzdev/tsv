@@ -193,7 +193,8 @@ impl<'a> ValueParser<'a> {
         // Fallback (comment present, a non-ASCII/whitespace boundary, or a
         // non-trimmed range): trim, then classify comment-aware and split with the
         // comment-blind `ValueCursor` — the original behaviour.
-        let trimmed = text.trim();
+        let trimmed =
+            crate::escapes::trim_end_preserving_escape(crate::escapes::trim_start_css(text));
         if trimmed.is_empty() {
             return CssValue::Identifier {
                 span: self.absolute_span(),
@@ -439,7 +440,11 @@ impl<'a> ValueParser<'a> {
     /// Used by the two-pass fallback, where the range may carry surrounding
     /// whitespace; the fast path calls `build_leaf` directly.
     fn parse_single<'arena>(&self, arena: &'arena Bump) -> CssValue<'arena> {
-        self.build_leaf(self.text().trim(), arena)
+        let text = self.text();
+        self.build_leaf(
+            crate::escapes::trim_end_preserving_escape(crate::escapes::trim_start_css(text)),
+            arena,
+        )
     }
 }
 
@@ -451,10 +456,13 @@ mod tests {
     /// `ValueCursor::consume_until`, and `classify_separators` — must agree on what is
     /// structure and what is the interior of an escape / quote / comment / paren.
     ///
-    /// Each carries a comment asserting they are "kept identical"; nothing enforced it.
-    /// They drifted once already (all three skipped only `\(` / `\)`, so an escaped
-    /// comma or space read as a separator and tore an ident in half). This is the
-    /// differential that stops the next drift: same input, same verdict.
+    /// Each carries a comment asserting they are "kept identical"; nothing enforced it, and
+    /// they had already drifted once (all three skipped only `\(` / `\)`, so an escaped
+    /// comma or space read as a separator and tore an ident in half).
+    ///
+    /// This is a **regression net, not a proof**: it pins the invariant the three now hold,
+    /// so the next edit to one of them fails here instead of silently in a corpus. It does
+    /// not demonstrate the original bug — that was fixed before this test existed.
     #[test]
     fn twin_trackers_agree_on_top_level_structure() {
         // Each case pairs a shape with what the top level really contains, so a tracker
@@ -481,9 +489,16 @@ mod tests {
             // Escapes next to real structure.
             (r"x\,y, z", true, true),
             (r"x\ y z", false, true),
-            // Quotes and parens still shield their interiors.
+            // Quotes, comments and parens still shield their interiors.
             ("'a, b'", false, false),
             ("url(a b)", false, false),
+            // An escape at end-of-input has no payload to consume — it must not run past
+            // the end or swallow a separator that is not there.
+            (r"a\", false, false),
+            (r"a\ ", false, false),
+            // A `\r` terminator on a hex escape (CSS whitespace, unlike an escape payload).
+            ("\\41\r2px", false, false),
+            ("\\41\r2px 3px", false, true),
         ];
 
         for (text, want_comma, want_ws) in cases {
@@ -535,6 +550,25 @@ mod tests {
                 ws_end < text.len(),
                 want_ws,
                 "ValueCursor disagrees on top-level whitespace in {text:?}"
+            );
+        }
+
+        // A comment is the ONE place the three deliberately diverge: `ValueCursor` is
+        // comment-BLIND while `classify_separators` is comment-aware, so a `,` inside a
+        // comment would split the cursor's scan. `fast_scan` is what makes that safe — it
+        // detects the comment and bails to the comment-aware two-pass path, so the blind
+        // cursor is never asked about such a value. Pin the bail, not a false agreement.
+        for text in ["a/* , */b", "a /* , */ b", "red /* x */, blue"] {
+            let arena = Bump::new();
+            let span = Span {
+                start: 0,
+                end: text.len() as u32,
+            };
+            let parser = ValueParser::new(text, span);
+            assert!(
+                matches!(parser.fast_scan(text, &arena), FastScan::Comment),
+                "fast_scan must bail to the comment-aware path for {text:?} — the blind \
+                 `ValueCursor` may not be used on a comment-bearing value"
             );
         }
     }

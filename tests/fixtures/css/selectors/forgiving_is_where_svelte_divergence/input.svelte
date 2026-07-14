@@ -47,4 +47,10 @@
 	:is(.a > . > .b\	c) {
 		color: teal;
 	}
+	/* the item's OUTER trim is escape-aware too: `.b\ ` ends in an escape whose payload
+	   is that space, and trimming it strands the backslash onto the `)` that closes the
+	   pseudo — output tsv's own parser would then reject */
+	.x:is(.a > . > .b\ ) {
+		color: olive;
+	}
 </style>

@@ -25,7 +25,9 @@ pub(crate) fn trim_url_raw(raw: &str) -> Option<String> {
     if close < open {
         return None;
     }
-    let inner = crate::escapes::trim_end_preserving_escape(raw[open + 1..close].trim_start());
+    let inner = crate::escapes::trim_end_preserving_escape(crate::escapes::trim_start_css(
+        &raw[open + 1..close],
+    ));
     Some(format!("{}{})", &raw[..=open], inner))
 }
 

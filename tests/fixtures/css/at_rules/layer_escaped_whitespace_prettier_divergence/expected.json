@@ -1,0 +1,95 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 340,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 155,
+				"end": 166,
+				"name": "layer",
+				"prelude": "a\\",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 290,
+				"end": 331,
+				"name": "layer",
+				"prelude": "b\\",
+				"block": {
+					"type": "Block",
+					"start": 300,
+					"end": 331,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 304,
+								"end": 307,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 304,
+										"end": 307,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 304,
+														"end": 307
+													}
+												],
+												"start": 304,
+												"end": 307
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 308,
+								"end": 328,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 313,
+										"end": 323,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 304,
+							"end": 328
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 332,
+			"styles": "\n\t/* the prelude ends in an escape whose payload IS that space (the layer is named\n\t   `a `), so trimming it strands the backslash onto the `;` */\n\t@layer a\\ ;\n\n\t/* the block form: the payload space already separates the prelude from the `{`, so\n\t   no second separator is added */\n\t@layer b\\ {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 341,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

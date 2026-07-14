@@ -25,7 +25,7 @@ pub fn parse_function_arguments<'arena>(
     // recomputing the same two boundaries). The trailing trim stops at an escaped
     // whitespace (`var(--a, 50px\ )`), which would otherwise strand the backslash onto
     // the closing `)` — see `trim_end_preserving_escape`.
-    let trim_start_offset = args_str.len() - args_str.trim_start().len();
+    let trim_start_offset = args_str.len() - crate::escapes::trim_start_css(args_str).len();
     let trimmed = crate::escapes::trim_end_preserving_escape(&args_str[trim_start_offset..]);
 
     if trimmed.is_empty() {

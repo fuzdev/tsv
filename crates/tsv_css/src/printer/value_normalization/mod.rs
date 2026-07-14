@@ -665,11 +665,15 @@ pub(crate) fn lowercase_at_rule_name(name: &str) -> Cow<'_, str> {
 /// before `:` in a property name `\41 : red`). A literal char after the escape
 /// (`ab\44 cd`) or an escaped backslash (`\\41`) does not end with a live escape.
 ///
+/// **Live** means the escape still *needs* its terminator: an escape that already carries
+/// one (`\41 `) is complete, so re-emitting a separator would double it. That case cannot
+/// reach the caller today (it passes a trimmed name), but the predicate answers it
+/// correctly rather than relying on the caller — hence the final hex-digit check.
+///
 /// Walks forward through `crate::escapes::escape_len` rather than scanning backward for
 /// hex digits: that is the crate's single definition of how far an escape reaches, so an
-/// escaped backslash (`\\41` — a literal `\` followed by the ordinary text `41`) and a
-/// hex escape that already swallowed its terminator both fall out of the walk instead of
-/// needing their own parity/lookback rules here.
+/// escaped backslash (`\\41` — a literal `\` followed by the ordinary text `41`) falls out
+/// of the walk instead of needing its own parity/lookback rule here.
 fn ends_with_hex_escape(name: &str) -> bool {
     let bytes = name.as_bytes();
     let mut i = 0;
@@ -678,9 +682,14 @@ fn ends_with_hex_escape(name: &str) -> bool {
         if bytes[i] == b'\\'
             && let Some(len) = crate::escapes::escape_len(name, i)
         {
-            // A hex escape is the one whose first payload byte is a hex digit.
-            ends_with_escape = bytes[i + 1].is_ascii_hexdigit() && i + len == bytes.len();
-            i += len;
+            let end = i + len;
+            // A hex escape is the one whose first payload byte is a hex digit — and it is
+            // still *live* only if it ends ON a hex digit, i.e. `escape_len` found no
+            // whitespace terminator to swallow.
+            ends_with_escape = bytes[i + 1].is_ascii_hexdigit()
+                && end == bytes.len()
+                && bytes[end - 1].is_ascii_hexdigit();
+            i = end;
             continue;
         }
         ends_with_escape = false;

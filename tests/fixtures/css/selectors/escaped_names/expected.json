@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 2320,
+		"end": 2678,
 		"attributes": [],
 		"children": [
 			{
@@ -864,18 +864,65 @@
 				},
 				"start": 2273,
 				"end": 2311
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 2639,
+					"end": 2646,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 2639,
+							"end": 2646,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "aAb",
+											"start": 2639,
+											"end": 2646
+										}
+									],
+									"start": 2639,
+									"end": 2646
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 2647,
+					"end": 2669,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 2651,
+							"end": 2665,
+							"property": "color",
+							"value": "crimson"
+						}
+					]
+				},
+				"start": 2639,
+				"end": 2669
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 2312,
-			"styles": "\n\t/* identity escapes keep the backslash in the AST name */\n\t#\\? {\n\t\tcolor: red;\n\t}\n\t.\\@ {\n\t\tcolor: blue;\n\t}\n\ta\\+b {\n\t\tcolor: green;\n\t}\n\t/* hex escapes decode (with optional whitespace terminator) */\n\t#\\3A b {\n\t\tcolor: orange;\n\t}\n\t/* mixed identity and hex in one name */\n\t.a\\?\\41 b {\n\t\tcolor: purple;\n\t}\n\t/* astral-plane (>BMP) hex escape decodes to a multi-byte char in the AST name\n\t   (exercises surrogate-pair / 4-byte offset translation); formatter keeps it raw */\n\t.\\1F600 b {\n\t\tcolor: teal;\n\t}\n\t/* a hex escape's terminator whitespace right before the block is part of the\n\t   selector token, but the formatter must not re-emit it as a doubled separator */\n\t.\\41 {\n\t\tcolor: brown;\n\t}\n\t/* the same terminator before a combinator is consumed once, not doubled — and\n\t   the single space inside the compound `.\\41 .b` (two simple selectors) stays */\n\t.\\41 .b > c\\64 e {\n\t\tcolor: navy;\n\t}\n\t/* pseudo-class and pseudo-element names keep hex escapes raw too — Svelte\n\t   decodes them in the AST `name`, but the formatter preserves the source */\n\t:\\41 {\n\t\tcolor: pink;\n\t}\n\t::\\41 b {\n\t\tcolor: gray;\n\t}\n\t/* the terminator between two escaped pseudos in a compound stays; only the\n\t   trailing one (before the block) is dropped */\n\t:\\41 :\\42 {\n\t\tcolor: olive;\n\t}\n\t/* a LITERAL escape's whitespace is the opposite of a hex terminator: the space is\n\t   the escape's PAYLOAD (the class is named `a `), so it must survive. Dropping it\n\t   strands the backslash onto the next separator, merging the descendant combinator\n\t   into the compound (`.a\\  .b` would re-parse as one compound, losing the space) */\n\t.a\\  .b {\n\t\tcolor: maroon;\n\t}\n\t/* the same escape with NO combinator after it: one compound (class `a ` and .b) */\n\t.a\\ .b {\n\t\tcolor: lime;\n\t}\n\t/* and before a selector-list comma / the block, where a stranded backslash would\n\t   escape the `,` / `{` instead. Before `{` the payload space IS the separator, so\n\t   no second one is added (the literal-escape twin of the hex-terminator rule) */\n\t.a\\ ,\n\t.c {\n\t\tcolor: aqua;\n\t}\n\t.a\\ {\n\t\tcolor: silver;\n\t}\n\t/* the pseudo path has the same payload-vs-terminator split as a class/id leaf:\n\t   `:hover\\ ` is a pseudo named `hover `, so its payload must survive a\n\t   selector-list comma that would otherwise be escaped */\n\t.a:hover\\ ,\n\t.d {\n\t\tcolor: fuchsia;\n\t}\n",
+			"end": 2670,
+			"styles": "\n\t/* identity escapes keep the backslash in the AST name */\n\t#\\? {\n\t\tcolor: red;\n\t}\n\t.\\@ {\n\t\tcolor: blue;\n\t}\n\ta\\+b {\n\t\tcolor: green;\n\t}\n\t/* hex escapes decode (with optional whitespace terminator) */\n\t#\\3A b {\n\t\tcolor: orange;\n\t}\n\t/* mixed identity and hex in one name */\n\t.a\\?\\41 b {\n\t\tcolor: purple;\n\t}\n\t/* astral-plane (>BMP) hex escape decodes to a multi-byte char in the AST name\n\t   (exercises surrogate-pair / 4-byte offset translation); formatter keeps it raw */\n\t.\\1F600 b {\n\t\tcolor: teal;\n\t}\n\t/* a hex escape's terminator whitespace right before the block is part of the\n\t   selector token, but the formatter must not re-emit it as a doubled separator */\n\t.\\41 {\n\t\tcolor: brown;\n\t}\n\t/* the same terminator before a combinator is consumed once, not doubled — and\n\t   the single space inside the compound `.\\41 .b` (two simple selectors) stays */\n\t.\\41 .b > c\\64 e {\n\t\tcolor: navy;\n\t}\n\t/* pseudo-class and pseudo-element names keep hex escapes raw too — Svelte\n\t   decodes them in the AST `name`, but the formatter preserves the source */\n\t:\\41 {\n\t\tcolor: pink;\n\t}\n\t::\\41 b {\n\t\tcolor: gray;\n\t}\n\t/* the terminator between two escaped pseudos in a compound stays; only the\n\t   trailing one (before the block) is dropped */\n\t:\\41 :\\42 {\n\t\tcolor: olive;\n\t}\n\t/* a LITERAL escape's whitespace is the opposite of a hex terminator: the space is\n\t   the escape's PAYLOAD (the class is named `a `), so it must survive. Dropping it\n\t   strands the backslash onto the next separator, merging the descendant combinator\n\t   into the compound (`.a\\  .b` would re-parse as one compound, losing the space) */\n\t.a\\  .b {\n\t\tcolor: maroon;\n\t}\n\t/* the same escape with NO combinator after it: one compound (class `a ` and .b) */\n\t.a\\ .b {\n\t\tcolor: lime;\n\t}\n\t/* and before a selector-list comma / the block, where a stranded backslash would\n\t   escape the `,` / `{` instead. Before `{` the payload space IS the separator, so\n\t   no second one is added (the literal-escape twin of the hex-terminator rule) */\n\t.a\\ ,\n\t.c {\n\t\tcolor: aqua;\n\t}\n\t.a\\ {\n\t\tcolor: silver;\n\t}\n\t/* the pseudo path has the same payload-vs-terminator split as a class/id leaf:\n\t   `:hover\\ ` is a pseudo named `hover `, so its payload must survive a\n\t   selector-list comma that would otherwise be escaped */\n\t.a:hover\\ ,\n\t.d {\n\t\tcolor: fuchsia;\n\t}\n\t/* a hex escape's whitespace TERMINATOR is Unicode-wide, not ASCII: Svelte's\n\t   read_identifier matches it with /\\\\[0-9a-fA-F]{1,6}(\\r\\n|\\s)?/, and JS `\\s`\n\t   covers the vertical tab — so `\\41<VT>b` is the single class `aAb`. Narrowing\n\t   this to ASCII moves the token boundary: it re-parses as `aA` + descendant + `b` */\n\t.a\\41\u000bb {\n\t\tcolor: crimson;\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 2321,
+	"end": 2679,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

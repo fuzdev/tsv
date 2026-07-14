@@ -638,9 +638,15 @@ impl<'a> Printer<'a> {
                 // collapse to single spaces — the same normalization every other
                 // selector-argument position gets, and what prettier does inside a
                 // selector.
-                d.text_pooled(&value_normalization::collapse_whitespace_runs(
-                    span.extract(self.source).trim(),
-                ))
+                //
+                // The OUTER trim is escape-aware for the same reason the collapse inside
+                // is: `:is(.a > . > .b\ )` ends in an escape whose payload is that space,
+                // and trimming it strands the backslash onto the `)` that closes the
+                // pseudo — output tsv's own parser then rejects.
+                let raw = span.extract(self.source);
+                let item =
+                    crate::escapes::trim_end_preserving_escape(crate::escapes::trim_start_css(raw));
+                d.text_pooled(&value_normalization::collapse_whitespace_runs(item))
             }
         }
     }

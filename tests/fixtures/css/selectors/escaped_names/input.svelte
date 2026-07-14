@@ -73,4 +73,11 @@
 	.d {
 		color: fuchsia;
 	}
+	/* a hex escape's whitespace TERMINATOR is Unicode-wide, not ASCII: Svelte's
+	   read_identifier matches it with /\\[0-9a-fA-F]{1,6}(\r\n|\s)?/, and JS `\s`
+	   covers the vertical tab — so `\41<VT>b` is the single class `aAb`. Narrowing
+	   this to ASCII moves the token boundary: it re-parses as `aA` + descendant + `b` */
+	.a\41b {
+		color: crimson;
+	}
 </style>
