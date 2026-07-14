@@ -51,4 +51,4 @@ comment, prettier adds them after it.
 - [jsdoc_type_cast_svelte](../jsdoc_type_cast_svelte/) — JS `<script>` casts prettier preserves (tsv matches)
 - [jsdoc_type_cast_nested](../jsdoc_type_cast_nested/) — nested casts, each level keeping its parens
 - [nullish_branch](../../../expressions/ternary/nullish_branch/) — the `??` clarity parens themselves, cast-free
-- [test_paren_leading_comment](../../../expressions/ternary/test_paren_leading_comment/) — a *non*-cast comment in the same stripped-paren position (no gluing: the comment leads the parens)
+- [test_paren_leading_comment](../../../expressions/ternary/test_paren_leading_comment_prettier_divergence/) — an ordinary (non-cast) glued comment in the same stripped-paren position, now preserved the same way (every glued block comment is owned)

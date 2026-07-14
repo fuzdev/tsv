@@ -1,0 +1,436 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 396,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A conditional or arrow as a unary operand needs its own parens. A leading",
+			"start": 20,
+			"end": 96,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " block comment glued inside those parens stays in the single pair where the",
+			"start": 98,
+			"end": 175,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " author wrote it — tsv does not add a second, comment-holder pair. prettier",
+			"start": 177,
+			"end": 254,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " relocates the comment out, before the operand's own parens.",
+			"start": 256,
+			"end": 318,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 63
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 332,
+			"end": 339,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 13
+				},
+				"end": {
+					"line": 6,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 368,
+			"end": 375,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 13
+				},
+				"end": {
+					"line": 7,
+					"column": 20
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 395,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 386,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 8,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 320,
+					"end": 354,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 35
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 326,
+							"end": 353,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 34
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 326,
+								"end": 327,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "UnaryExpression",
+								"start": 330,
+								"end": 353,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 11
+									},
+									"end": {
+										"line": 6,
+										"column": 34
+									}
+								},
+								"operator": "!",
+								"prefix": true,
+								"argument": {
+									"type": "ConditionalExpression",
+									"start": 340,
+									"end": 352,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 21
+										},
+										"end": {
+											"line": 6,
+											"column": 33
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 340,
+										"end": 344,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 21
+											},
+											"end": {
+												"line": 6,
+												"column": 25
+											}
+										},
+										"name": "cond"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 347,
+										"end": 348,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 28
+											},
+											"end": {
+												"line": 6,
+												"column": 29
+											}
+										},
+										"name": "b"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 351,
+										"end": 352,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 32
+											},
+											"end": {
+												"line": 6,
+												"column": 33
+											}
+										},
+										"name": "c"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 332,
+											"end": 339
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A conditional or arrow as a unary operand needs its own parens. A leading",
+							"start": 20,
+							"end": 96
+						},
+						{
+							"type": "Line",
+							"value": " block comment glued inside those parens stays in the single pair where the",
+							"start": 98,
+							"end": 175
+						},
+						{
+							"type": "Line",
+							"value": " author wrote it — tsv does not add a second, comment-holder pair. prettier",
+							"start": 177,
+							"end": 254
+						},
+						{
+							"type": "Line",
+							"value": " relocates the comment out, before the operand's own parens.",
+							"start": 256,
+							"end": 318
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 356,
+					"end": 385,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 30
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 362,
+							"end": 384,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 7
+								},
+								"end": {
+									"line": 7,
+									"column": 29
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 362,
+								"end": 363,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "UnaryExpression",
+								"start": 366,
+								"end": 384,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 11
+									},
+									"end": {
+										"line": 7,
+										"column": 29
+									}
+								},
+								"operator": "!",
+								"prefix": true,
+								"argument": {
+									"type": "ArrowFunctionExpression",
+									"start": 376,
+									"end": 383,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 21
+										},
+										"end": {
+											"line": 7,
+											"column": 28
+										}
+									},
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "Identifier",
+										"start": 382,
+										"end": 383,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 27
+											},
+											"end": {
+												"line": 7,
+												"column": 28
+											}
+										},
+										"name": "x"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 368,
+											"end": 375
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -44,15 +44,19 @@ pub struct Comment {
     /// parser; always a **block** comment, and only ever when glued to its token (a comment
     /// the author left on its own line leads the *line*, not the token — the one exception
     /// is a JSDoc cast, whose comment may sit a newline above its `(` and still be the cast).
-    /// Two classes:
     ///
-    /// - the **JSDoc type cast** (`/** @type {T} */ (x)`) — the comment plus the `(` it
-    ///   glues to *are* the cast, so anything printed between them re-binds the cast to a
-    ///   wider node on reparse. The `JsdocCast` node carries its own copy and prints it.
-    /// - a **bundler annotation** (`/* @__PURE__ */ f()`) — it marks the call *after* it as
-    ///   side-effect-free, so a paren between the two leaves the annotation leading a paren
-    ///   and the call is no longer droppable. It has no node of its own, so the innermost
-    ///   node its token begins prints it.
+    /// **Every glued block comment is owned**, not a special class: the position binds the
+    /// comment to the operand it leads, so a paren the printer synthesizes around an enclosing
+    /// expression would otherwise land between them and re-bind it. There is no content sniff —
+    /// a plain `/* c */`, a **bundler annotation** (`/* @__PURE__ */ f()`, which marks the call
+    /// after it side-effect-free), and a **JSDoc type cast** (`/** @type {T} */ (x)`, whose
+    /// comment plus `(` *are* the cast) all bind their token the same way. Two print shapes:
+    ///
+    /// - the general glued comment (plain or annotation) has no node of its own, so the
+    ///   innermost node its token begins prints it (via `build_expression_doc`);
+    /// - the JSDoc cast is printed by its `JsdocCast` node, which carries its own copy.
+    ///   `is_jsdoc_type_cast_comment` (the only surviving content sniff) decides cast
+    ///   *paren-retention*, i.e. whether that node is built — never ownership itself.
     ///
     /// **Ownership is a fact about who PRINTS a comment, never about whether it EXISTS.**
     /// The lookups below make a caller name which of the three questions it is asking, and

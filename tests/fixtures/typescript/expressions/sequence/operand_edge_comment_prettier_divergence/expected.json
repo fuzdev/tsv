@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 301,
+	"end": 326,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,9 +12,9 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " Leading comment on the first operand floats before the sequence parens",
+			"value": " Leading comment glued inside the sequence parens, before the first operand",
 			"start": 20,
-			"end": 93,
+			"end": 97,
 			"loc": {
 				"start": {
 					"line": 2,
@@ -22,31 +22,31 @@
 				},
 				"end": {
 					"line": 2,
-					"column": 74
+					"column": 78
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 98,
-			"end": 105,
+			"start": 103,
+			"end": 110,
 			"loc": {
 				"start": {
 					"line": 3,
-					"column": 4
+					"column": 5
 				},
 				"end": {
 					"line": 3,
-					"column": 11
+					"column": 12
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " Trailing comment on the last operand floats after the sequence parens",
-			"start": 117,
-			"end": 189,
+			"value": " Trailing comment after the sequence parens (matches prettier — both float it out)",
+			"start": 121,
+			"end": 205,
 			"loc": {
 				"start": {
 					"line": 5,
@@ -54,15 +54,15 @@
 				},
 				"end": {
 					"line": 5,
-					"column": 73
+					"column": 85
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " d ",
-			"start": 201,
-			"end": 208,
+			"start": 217,
+			"end": 224,
 			"loc": {
 				"start": {
 					"line": 6,
@@ -76,9 +76,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " Both edges float out of the sequence parens",
-			"start": 213,
-			"end": 259,
+			"value": " Both edges: leading glued inside, trailing after `)`",
+			"start": 229,
+			"end": 284,
 			"loc": {
 				"start": {
 					"line": 8,
@@ -86,31 +86,31 @@
 				},
 				"end": {
 					"line": 8,
-					"column": 47
+					"column": 56
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " c1 ",
-			"start": 264,
-			"end": 272,
+			"start": 290,
+			"end": 298,
 			"loc": {
 				"start": {
 					"line": 9,
-					"column": 4
+					"column": 5
 				},
 				"end": {
 					"line": 9,
-					"column": 12
+					"column": 13
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " c2 ",
-			"start": 280,
-			"end": 288,
+			"start": 305,
+			"end": 313,
 			"loc": {
 				"start": {
 					"line": 9,
@@ -126,12 +126,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 300,
+		"end": 325,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 291,
+			"end": 316,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -145,8 +145,8 @@
 			"body": [
 				{
 					"type": "ExpressionStatement",
-					"start": 95,
-					"end": 114,
+					"start": 99,
+					"end": 118,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -159,8 +159,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 95,
-						"end": 113,
+						"start": 99,
+						"end": 117,
 						"loc": {
 							"start": {
 								"line": 3,
@@ -173,8 +173,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 95,
-							"end": 97,
+							"start": 99,
+							"end": 101,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -190,8 +190,8 @@
 						"arguments": [
 							{
 								"type": "SequenceExpression",
-								"start": 107,
-								"end": 111,
+								"start": 111,
+								"end": 115,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -205,8 +205,8 @@
 								"expressions": [
 									{
 										"type": "Identifier",
-										"start": 107,
-										"end": 108,
+										"start": 111,
+										"end": 112,
 										"loc": {
 											"start": {
 												"line": 3,
@@ -221,8 +221,8 @@
 									},
 									{
 										"type": "Identifier",
-										"start": 110,
-										"end": 111,
+										"start": 114,
+										"end": 115,
 										"loc": {
 											"start": {
 												"line": 3,
@@ -240,8 +240,8 @@
 									{
 										"type": "Block",
 										"value": " c ",
-										"start": 98,
-										"end": 105
+										"start": 103,
+										"end": 110
 									}
 								]
 							}
@@ -251,16 +251,16 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " Leading comment on the first operand floats before the sequence parens",
+							"value": " Leading comment glued inside the sequence parens, before the first operand",
 							"start": 20,
-							"end": 93
+							"end": 97
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 191,
-					"end": 210,
+					"start": 207,
+					"end": 226,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -273,8 +273,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 191,
-						"end": 209,
+						"start": 207,
+						"end": 225,
 						"loc": {
 							"start": {
 								"line": 6,
@@ -287,8 +287,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 191,
-							"end": 193,
+							"start": 207,
+							"end": 209,
 							"loc": {
 								"start": {
 									"line": 6,
@@ -304,8 +304,8 @@
 						"arguments": [
 							{
 								"type": "SequenceExpression",
-								"start": 195,
-								"end": 199,
+								"start": 211,
+								"end": 215,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -319,8 +319,8 @@
 								"expressions": [
 									{
 										"type": "Identifier",
-										"start": 195,
-										"end": 196,
+										"start": 211,
+										"end": 212,
 										"loc": {
 											"start": {
 												"line": 6,
@@ -335,8 +335,8 @@
 									},
 									{
 										"type": "Identifier",
-										"start": 198,
-										"end": 199,
+										"start": 214,
+										"end": 215,
 										"loc": {
 											"start": {
 												"line": 6,
@@ -354,8 +354,8 @@
 									{
 										"type": "Block",
 										"value": " d ",
-										"start": 201,
-										"end": 208
+										"start": 217,
+										"end": 224
 									}
 								]
 							}
@@ -365,16 +365,16 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " Trailing comment on the last operand floats after the sequence parens",
-							"start": 117,
-							"end": 189
+							"value": " Trailing comment after the sequence parens (matches prettier — both float it out)",
+							"start": 121,
+							"end": 205
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 261,
-					"end": 290,
+					"start": 286,
+					"end": 315,
 					"loc": {
 						"start": {
 							"line": 9,
@@ -387,8 +387,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 261,
-						"end": 289,
+						"start": 286,
+						"end": 314,
 						"loc": {
 							"start": {
 								"line": 9,
@@ -401,8 +401,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 261,
-							"end": 263,
+							"start": 286,
+							"end": 288,
 							"loc": {
 								"start": {
 									"line": 9,
@@ -418,8 +418,8 @@
 						"arguments": [
 							{
 								"type": "SequenceExpression",
-								"start": 274,
-								"end": 278,
+								"start": 299,
+								"end": 303,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -433,8 +433,8 @@
 								"expressions": [
 									{
 										"type": "Identifier",
-										"start": 274,
-										"end": 275,
+										"start": 299,
+										"end": 300,
 										"loc": {
 											"start": {
 												"line": 9,
@@ -449,8 +449,8 @@
 									},
 									{
 										"type": "Identifier",
-										"start": 277,
-										"end": 278,
+										"start": 302,
+										"end": 303,
 										"loc": {
 											"start": {
 												"line": 9,
@@ -468,16 +468,16 @@
 									{
 										"type": "Block",
 										"value": " c1 ",
-										"start": 264,
-										"end": 272
+										"start": 290,
+										"end": 298
 									}
 								],
 								"trailingComments": [
 									{
 										"type": "Block",
 										"value": " c2 ",
-										"start": 280,
-										"end": 288
+										"start": 305,
+										"end": 313
 									}
 								]
 							}
@@ -487,9 +487,9 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " Both edges float out of the sequence parens",
-							"start": 213,
-							"end": 259
+							"value": " Both edges: leading glued inside, trailing after `)`",
+							"start": 229,
+							"end": 284
 						}
 					]
 				}

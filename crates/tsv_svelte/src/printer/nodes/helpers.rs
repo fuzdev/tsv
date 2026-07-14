@@ -256,7 +256,10 @@ impl<'a> Printer<'a> {
             )
             .map_or(key_end, |p| p as u32);
             let lead = self.build_pattern_leading_comments(prop_start + 1, key_start);
-            let key_doc = self.build_ts_expression_doc_no_comments(key);
+            // Comment-aware so an owned leading comment glued to the key (`[/* c */ k]`)
+            // is claimed by the key's own doc — the `[`→key gap emitter above skips it
+            // (owned comments are off the positional axis), so nothing else would print it.
+            let key_doc = self.build_ts_expression_doc(key);
             let trail = self.build_pattern_trailing_comments(key_end, close);
             let doc = d.concat(&[d.text("["), lead, key_doc, trail, d.text("]")]);
             (doc, close + 1)
@@ -471,15 +474,24 @@ impl<'a> Printer<'a> {
             Expression::AssignmentExpression(assign) => {
                 self.build_pattern_assignment(assign.left, assign.right)
             }
-            // Default: build doc directly in shared arena. Literals route here too,
-            // so string and numeric defaults normalize through the TS printer
+            // Default: build doc through the comment-aware TS builder. Literals route
+            // here too, so string and numeric defaults normalize through the TS printer
             // (single quotes + escaping, lowercase hex/exponent, leading/trailing zeros) —
             // identical to `{@const}` and every other literal tsv emits.
             // prettier-plugin-svelte instead prints these binding patterns from raw
             // source, preserving the author's quote style and numeric form; tsv
             // normalizes uniformly (a deliberate divergence — see conformance_prettier.md
             // §Svelte: destructuring literal normalization).
-            _ => self.build_ts_expression_doc_no_comments(expr),
+            //
+            // Comment-aware (not `_no_comments`) so an owned leading comment glued to the
+            // leaf — a default value (`{ a = /* c */ 1 }`), a rename value (`{ g: /* c */ h }`),
+            // an array element (`[/* c */ m]`), a rest argument (`.../* c */ rest`) — is
+            // claimed by the leaf's own doc via `prepend_owned_leading_comment`. Every gap
+            // emitter around it skips owned comments (the to-emit axis), so without this the
+            // comment reaches no printer and is dropped. The surrounding positional gap
+            // comments stay with the pattern printer: `build_expression_doc` prepends only
+            // the owned leading comment, never a positional one, so there is no double-emit.
+            _ => self.build_ts_expression_doc(expr),
         }
     }
 

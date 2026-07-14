@@ -50,4 +50,4 @@ them around the annotation, prettier adds them after it.
 
 - [jsdoc_type_cast_enclosing_parens](../jsdoc_type_cast_enclosing_parens_prettier_divergence/) — the same paren boundary for a JSDoc cast, where the comment is owned by an AST node
 - [nullish_branch](../../../expressions/ternary/nullish_branch/) — the `??` clarity parens themselves, comment-free
-- [test_paren_leading_comment](../../../expressions/ternary/test_paren_leading_comment/) — an ordinary (non-annotation) comment in the same stripped-paren position
+- [test_paren_leading_comment](../../../expressions/ternary/test_paren_leading_comment_prettier_divergence/) — an ordinary (non-annotation) glued comment in the same stripped-paren position, preserved the same way (every glued block comment is owned)
