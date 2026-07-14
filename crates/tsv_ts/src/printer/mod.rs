@@ -626,6 +626,20 @@ impl<'a> Printer<'a> {
         has_comments_in_range(self.comments, start, end)
     }
 
+    /// As [`Self::has_comments_between`], but **counts** a comment a node owns and prints
+    /// itself ([`tsv_lang::Comment::owned_by_node`]).
+    ///
+    /// The distinction is emit-vs-layout. A gate deciding *who prints a comment* must skip
+    /// owned ones (the owning node prints them) — that is `has_comments_between`. A gate
+    /// deciding *layout*, which only asks whether the range puts any comment text on the
+    /// page, must count them: the comment is still there, still occupies width, and still
+    /// means the same thing to prettier's own rule. Using the wrong one makes an owned
+    /// comment silently *disappear* from a layout decision — see the call-argument
+    /// expansion gates and `build_unary_doc`.
+    pub(crate) fn has_any_comments_between(&self, start: u32, end: u32) -> bool {
+        tsv_lang::has_any_comments_in_range(self.comments, start, end)
+    }
+
     /// Position to start scanning from when looking for comments that trail the
     /// last argument (between the argument and the closing paren).
     ///

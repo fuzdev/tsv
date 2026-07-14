@@ -188,6 +188,12 @@ struct ChainArgsContext {
     prefix: &'static str,
     has_leading_comments: bool,
     has_any_comments: bool,
+    /// Whether the argument window puts any comment text on the page, **including** a
+    /// comment a node owns and prints itself. The superset of `has_any_comments`, which is
+    /// built from emit-keyed scans and so cannot see an owned comment. Layout gates take
+    /// this one — an owned annotation on the last argument must refuse the expand-last hug
+    /// exactly as an ordinary leading comment does.
+    has_any_comment_text: bool,
     has_trailing_block_comments: bool,
     comments_force_expansion: bool,
     standard_expansion: bool,
@@ -238,7 +244,10 @@ fn build_call_args_doc_for_chain_impl(
     // call.span.end]): every sub-scan below lies within that window, so with no
     // comment they are all provably false — skip them. Canonical reference:
     // build_params_doc_with_comments.
-    let call_has_comments = printer.has_comments_between(paren_open, call.span.end);
+    // Counts owned comments — it only short-circuits the sub-scans below, and an owned
+    // comment still puts text on the page. The sub-scans themselves stay emit-keyed
+    // (`has_comments_between`): the owning node prints those, so there is nothing to emit.
+    let call_has_comments = printer.has_any_comments_between(paren_open, call.span.end);
     let has_leading_comments = call_has_comments
         && !call.arguments.is_empty()
         && printer.has_comments_between(paren_open, call.arguments[0].span().start);
@@ -311,6 +320,7 @@ fn build_call_args_doc_for_chain_impl(
         prefix,
         has_leading_comments,
         has_any_comments,
+        has_any_comment_text: call_has_comments,
         has_trailing_block_comments,
         comments_force_expansion,
         standard_expansion,
@@ -927,6 +937,7 @@ fn build_chain_args_multi(
         paren_open,
         prefix,
         has_any_comments,
+        has_any_comment_text,
         comments_force_expansion,
         ..
     } = ctx;
@@ -941,7 +952,10 @@ fn build_chain_args_multi(
     if call.arguments.len() >= 2
         && call.arguments.last().is_some_and(is_block_function)
         && !comments_force_expansion
-        && !(has_any_comments
+        // `has_any_comment_text`, not `has_any_comments`: refusing the expand-last hug is a
+        // LAYOUT decision, so it must see a comment the last argument owns and prints
+        // itself (a bundler annotation) — prettier's `shouldExpandLastArg` sees it too.
+        && !(has_any_comment_text
             && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
     {
         let (head_parts, last_arg_doc, all_args_broken) =
