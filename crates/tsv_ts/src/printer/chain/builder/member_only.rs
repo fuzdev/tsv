@@ -81,7 +81,15 @@ pub(super) fn build_member_only_chain_with_comments_doc<'a, P: ChainPrinter>(
                 rest.push(print_node_inner(node, printer, false, true));
             }
             _ => {
-                rest.push(d.hardline());
+                // A trailing non-null `!` glues to the preceding member — a break
+                // before it is a syntax error (`[no LineTerminator here]`), so it must
+                // never land on its own line. Every other gapless node keeps its own
+                // line: a computed `[i]` lookup deliberately drops to its own line here
+                // (the chain breaks at every bracket — see
+                // `computed_pre_bracket_line_comment`).
+                if !node.is_non_null() {
+                    rest.push(d.hardline());
+                }
                 rest.push(print_node(node, printer));
             }
         }
