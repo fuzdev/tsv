@@ -65,11 +65,16 @@ impl<'a> Printer<'a> {
             self.first_member_leading_comments(all_comments, delimiter_pull_pos)
         };
 
-        let has_blank = if !leading_comments.is_empty() {
-            self.has_blank_line_between(prev_end, leading_comments[0].span.start)
+        // Step the scan past the previous member's trailing comment(s) so a multi-line
+        // block's interior newlines aren't read as an authored blank line
+        // (`a: 1; /*⏎…⏎*/⏎b` has no blank line between the members).
+        let check_pos = if !leading_comments.is_empty() {
+            leading_comments[0].span.start
         } else {
-            self.has_blank_line_between(prev_end, member_start)
+            member_start
         };
+        let has_blank =
+            self.has_blank_line_between(self.blank_scan_start(prev_end, check_pos), check_pos);
 
         let mut docs = DocBuf::with_capacity(3);
         if has_blank && !is_first {
