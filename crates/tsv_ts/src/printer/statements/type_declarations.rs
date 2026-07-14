@@ -686,7 +686,6 @@ impl<'a> Printer<'a> {
 
             // Find comments between previous element and this one
             // Filter out trailing same-line comments from the previous member
-            // BUT keep multi-line block comments even if they start on the same line
             let leading_comments: CommentVec<'_> = if !body_has_comments {
                 CommentVec::new()
             } else {
@@ -700,15 +699,12 @@ impl<'a> Printer<'a> {
                             if !self.is_same_line(prev_end, c.span.start) {
                                 return true;
                             }
-                            // Also keep multi-line block comments (they're always leading, never trailing)
-                            if c.multiline {
-                                return true;
-                            }
-                            // An inline comment that hugs this member on its line leads it
-                            // (`a: 1, /* c */ b`), even though it shares the previous
-                            // member's line — keep it here rather than letting it trail the
-                            // previous member. (A comment with a newline after it instead
-                            // trails the previous member: the `is_same_line` is false.)
+                            // A comment that hugs this member on its line leads it
+                            // (`a: 1, /* c */ b`, single- or multi-line block), even though
+                            // it shares the previous member's line — keep it here rather than
+                            // letting it trail the previous member. A comment with a newline
+                            // after it instead trails the previous member (the `is_same_line`
+                            // is false), matching prettier and the type-literal/class printers.
                             self.is_same_line(c.span.end, member_start)
                         })
                         .copied()
@@ -729,7 +725,11 @@ impl<'a> Printer<'a> {
                 } else {
                     leading_comments[0].span.start
                 };
-                if self.has_blank_line_between(prev_end, check_pos) {
+                // Step the scan past the previous member's trailing comment(s) so a
+                // multi-line block's interior newlines aren't read as an authored blank
+                // line (`a: 1; /*⏎…⏎*/⏎b` has no blank line between the members).
+                let blank_start = self.blank_scan_start(prev_end, check_pos);
+                if self.has_blank_line_between(blank_start, check_pos) {
                     parts.push(d.literalline());
                 }
             }
@@ -753,8 +753,10 @@ impl<'a> Printer<'a> {
                 };
             parts.push(member_doc);
 
-            // Handle trailing inline comments on same line after member
-            // Skip multi-line block comments - they should be leading comments for the next element
+            // Handle trailing inline comments on the same line after the member —
+            // single- or multi-line block, matching prettier and the type-literal /
+            // class member printers (a multi-line block trailing the last member was
+            // previously skipped here and then dropped entirely).
             if body_has_comments {
                 let upper_bound = members
                     .get(i + 1)
@@ -764,11 +766,7 @@ impl<'a> Printer<'a> {
                     comments_to_emit_in_range(self.comments, member.span().end, upper_bound)
                 {
                     if self.is_same_line(member.span().end, comment.span.start) {
-                        // Skip multi-line block comments (they're leading comments for next element)
-                        if comment.multiline {
-                            continue;
-                        }
-                        // An inline comment that hugs the next member on its line leads that
+                        // A comment that hugs the next member on its line leads that
                         // member (`a: 1, /* c */ b`) — the leading filter emits it — so it
                         // must not also trail this one (which would duplicate it). A comment
                         // with a newline after it (next member on a later line) trails here.
