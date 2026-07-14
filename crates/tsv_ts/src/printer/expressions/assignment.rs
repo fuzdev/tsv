@@ -89,14 +89,6 @@ pub fn jsdoc_cast_comment_is_own_line(cast: &JsdocCast<'_>, source: &str) -> boo
         && !tsv_lang::printing::is_same_line(source, cast.comment.span.end, cast.span.start)
 }
 
-/// `jsdoc_cast_comment_is_own_line` for an arbitrary expression — the assignment-layout
-/// entry point. The cast **owns** its comment (`Comment::owned_by_node`), so the generic
-/// comment-in-the-gap signal that used to select the hang no longer sees it; this
-/// node-level predicate is the only signal left.
-pub fn is_own_line_jsdoc_cast(expr: &Expression<'_>, source: &str) -> bool {
-    matches!(expr, Expression::JsdocCast(cast) if jsdoc_cast_comment_is_own_line(cast, source))
-}
-
 /// Choose the layout strategy for an assignment
 ///
 /// Follows prettier's `chooseLayout` logic in assignment.js
@@ -118,12 +110,6 @@ pub fn choose_layout(
     print_width: usize,
     comments: &[Comment],
 ) -> AssignmentLayout {
-    // A JSDoc cast whose comment the author put on its own line keeps that shape —
-    // hang it after the operator (see `is_own_line_jsdoc_cast`).
-    if is_own_line_jsdoc_cast(right_expr, source) {
-        return AssignmentLayout::BreakAfterOperator;
-    }
-
     // Untyped curried arrow chains (`(a) => (b) => …`) use fluid layout: break
     // after `=` only when the signature heads don't fit on the operator line,
     // letting a hugging body (object/array/block) expand in place otherwise.
@@ -749,7 +735,7 @@ fn call_arg_has_comments(call: &internal::CallExpression<'_>, comments: &[Commen
     // Check for any comments in the argument region (between callee end and closing paren)
     let args_region_start = call.callee.span().end;
     let args_region_end = call.span.end;
-    tsv_lang::has_comments_in_range(comments, args_region_start, args_region_end)
+    tsv_lang::has_comments_on_page_in_range(comments, args_region_start, args_region_end)
 }
 
 /// Check if expression is a type assertion (`as` or `satisfies`) wrapping a call with long arguments.
@@ -946,6 +932,15 @@ impl<'a> Printer<'a> {
         {
             layout = AssignmentLayout::BreakAfterOperator;
         }
+        // A comment the RHS *owns* (a JSDoc cast, a bundler annotation) is glued to its
+        // first token and travels inside its doc, so it is never in `rhs_comments` — the
+        // gap emits nothing for it. It is still on the page and still hangs the value, so
+        // ask the node. See `owned_leading_comment_hangs_value`.
+        if layout != AssignmentLayout::BreakAfterOperator
+            && self.owned_leading_comment_hangs_value(right_expr)
+        {
+            layout = AssignmentLayout::BreakAfterOperator;
+        }
         // Member-only AND call chains with line comments break internally at the
         // comment location (the chain formatter does this — see
         // build_member_only_chain_with_comments_doc and the call-chain breaking path).
@@ -983,10 +978,23 @@ impl<'a> Printer<'a> {
         // doc should not contain forced breaks (hardlines/breakParent). If it does,
         // our static AST analysis missed a break-emitting node — the chain actually
         // has internal break points and may need a different layout.
+        //
+        // A comment the RHS *owns* is exempt: it prints inside the RHS's doc, so the doc
+        // force-breaks for a reason that is not a chain break point at all. "Poorly
+        // breakable" is a claim about the *chain*, and the layout already hangs the value
+        // for such a comment (`owned_leading_comment_hangs_value`). Without the exemption an
+        // owned multi-line annotation on a trivial call (`a = /**⏎ * @__PURE__⏎ */ fn();`)
+        // trips the assert on every debug build.
         debug_assert!(
             {
                 let core_expr = unwrap_expression(right_expr);
-                !is_poorly_breakable_chain(core_expr, self.source, PRINT_WIDTH, self.comments)
+                self.owned_leading_comment_hangs_value(right_expr)
+                    || !is_poorly_breakable_chain(
+                        core_expr,
+                        self.source,
+                        PRINT_WIDTH,
+                        self.comments,
+                    )
                     || !d.will_break(right_doc)
             },
             "is_poorly_breakable_chain classified expression as poorly breakable but the \
@@ -1081,7 +1089,7 @@ impl<'a> Printer<'a> {
                     .options
                     .as_ref()
                     .map_or_else(|| import.source.span().end, |opts| opts.span().end);
-                self.has_comments_between(last_arg_end, paren_close)
+                self.has_comments_to_emit_between(last_arg_end, paren_close)
             }
             Expression::AwaitExpression(await_expr) => {
                 self.has_import_with_trailing_comments(await_expr.argument)

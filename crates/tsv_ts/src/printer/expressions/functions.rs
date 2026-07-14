@@ -19,7 +19,7 @@ use crate::printer::{
 };
 use smallvec::smallvec;
 use tsv_lang::Span;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::doc::{DocBuf, GroupId};
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -227,9 +227,9 @@ impl<'a> Printer<'a> {
         // (`(x) /* c */ =>`). The common (no-comment) path uses the signature doc
         // directly — no extra Vec.
         let sig_inner = self.build_arrow_signature_doc(arrow);
-        let sig_doc = if self.has_comments_between(sig_end, arrow_pos) {
+        let sig_doc = if self.has_comments_to_emit_between(sig_end, arrow_pos) {
             let mut sig_parts: DocBuf = smallvec![sig_inner];
-            for comment in comments_in_range(self.comments, sig_end, arrow_pos) {
+            for comment in comments_to_emit_in_range(self.comments, sig_end, arrow_pos) {
                 sig_parts.push(d.text(" "));
                 sig_parts.push(self.build_comment_doc(comment));
             }
@@ -296,8 +296,8 @@ impl<'a> Printer<'a> {
             // `() => /* lead */ (x /* trail */)` — emit inline leading,
             // then paren-wrapped body with trailing.
             let body_start = expr.span().start;
-            if self.has_comments_between(arrow_end, body_start) {
-                for comment in comments_in_range(self.comments, arrow_end, body_start) {
+            if self.has_comments_to_emit_between(arrow_end, body_start) {
+                for comment in comments_to_emit_in_range(self.comments, arrow_end, body_start) {
                     parts.push(self.build_comment_doc(comment));
                     parts.push(d.text(" "));
                 }
@@ -310,7 +310,7 @@ impl<'a> Printer<'a> {
         // Check for comments between `=>` and body start
         // These are comments like: `() => /* comment */ expr`
         let body_start = expr.span().start;
-        let has_post_arrow_comments = self.has_comments_between(arrow_end, body_start);
+        let has_post_arrow_comments = self.has_comments_to_emit_between(arrow_end, body_start);
 
         // Prettier's `hasLeadingOwnLineComment`: checks if any comment
         // between `=>` and body has a newline after it. Inline block
@@ -340,7 +340,7 @@ impl<'a> Printer<'a> {
             if let internal::Expression::ArrowFunctionExpression(body_arrow) = expr {
                 let arrow_token = body_arrow.arrow_token;
                 arrow_has_trailing_param_comments(body_arrow, arrow_token, |start, end| {
-                    self.has_comments_between(start, end)
+                    self.has_comments_to_emit_between(start, end)
                 })
             } else {
                 false
@@ -484,12 +484,12 @@ impl<'a> Printer<'a> {
         // }
         // Check for comments between `=>` and body start
         let body_start = block.span.start;
-        let has_post_arrow_comments = self.has_comments_between(arrow_end, body_start);
+        let has_post_arrow_comments = self.has_comments_to_emit_between(arrow_end, body_start);
 
         if has_post_arrow_comments {
             // Build comments doc
             let mut comment_parts: DocBuf = DocBuf::new();
-            for comment in comments_in_range(self.comments, arrow_end, body_start) {
+            for comment in comments_to_emit_in_range(self.comments, arrow_end, body_start) {
                 comment_parts.push(d.text(" "));
                 comment_parts.push(self.build_comment_doc(comment));
             }
@@ -535,7 +535,7 @@ impl<'a> Printer<'a> {
         // Any comment anywhere in the chain (heads, between `=>`s, around the body,
         // or trailing a stripped grouping paren) routes to the existing path, which
         // owns the chain's comment handling.
-        !self.has_comments_between(arrow.span.start, arrow.span.end)
+        !self.has_comments_to_emit_between(arrow.span.start, arrow.span.end)
     }
 
     /// Build a flattened curried arrow chain: the signature heads
@@ -874,7 +874,7 @@ impl<'a> Printer<'a> {
             }
             // For the last param, also check for own-line block comments before `)`
             if i == params.len() - 1 {
-                comments_in_range(self.comments, param.span().end, trailing_end)
+                self.comments_on_page_between(param.span().end, trailing_end)
                     .any(|c| c.is_block && !self.is_same_line(param.span().end, c.span.start))
             } else {
                 false
@@ -970,7 +970,7 @@ impl<'a> Printer<'a> {
         // absorb the body). Same shape as the RHS-of-`=` leading run.
         self.push_leading_comment_run(
             &mut parts,
-            comments_in_range(self.comments, sig_end, body_start),
+            comments_to_emit_in_range(self.comments, sig_end, body_start),
             body_start,
             LeadingGlue::Adjacent,
         );
@@ -988,7 +988,7 @@ impl<'a> Printer<'a> {
     /// `=> /* c */ expr` have no newline after them (returns false). Own-line comments
     /// and line comments have a newline after (returns true).
     pub(crate) fn has_own_line_post_arrow_comment(&self, sig_end: u32, body_start: u32) -> bool {
-        for comment in comments_in_range(self.comments, sig_end, body_start) {
+        for comment in comments_to_emit_in_range(self.comments, sig_end, body_start) {
             // A line comment, a multiline block, or a block that starts on its own
             // line (a newline precedes it) forces the body onto its own line. A
             // single-line block glued to `=>` keeps the body hugged even when the
@@ -1007,7 +1007,7 @@ impl<'a> Printer<'a> {
     fn build_inline_post_arrow_comments_doc(&self, sig_end: u32, body_start: u32) -> DocId {
         let d = self.d();
         let mut parts: DocBuf = DocBuf::new();
-        for comment in comments_in_range(self.comments, sig_end, body_start) {
+        for comment in comments_to_emit_in_range(self.comments, sig_end, body_start) {
             parts.push(self.build_comment_doc(comment));
             parts.push(d.text(" "));
         }
@@ -1182,7 +1182,7 @@ impl<'a> Printer<'a> {
         // Zero-comment fast gate: one binary search over the whole params window.
         // Every comment sub-query below (the hug/force-break predicates and the
         // per-gap lookups in the build loop) is bounded within
-        // [window_start, window_end], and `comments_in_range` only yields comments
+        // [window_start, window_end], and `comments_to_emit_in_range` only yields comments
         // fully inside its range — so when no comment lies inside the window, every
         // sub-query is provably empty/false. Skip them all, including the per-gap
         // `find_comma_after` trivia scans, whose results feed only comment placement.
@@ -1190,7 +1190,7 @@ impl<'a> Printer<'a> {
             let window_start = params_start.unwrap_or_else(|| params[0].span().start);
             let last_end = params[params.len() - 1].span().end;
             let window_end = trailing_comments_end.map_or(last_end, |end| end.max(last_end));
-            self.has_comments_between(window_start, window_end)
+            self.has_comments_to_emit_between(window_start, window_end)
         };
 
         // Prettier's shouldHugFunctionParameters: single param that's an object/array pattern
@@ -1214,13 +1214,13 @@ impl<'a> Printer<'a> {
         //       a?: { b: T },
         //   ): void {}
         let no_leading_comments = !comments_present
-            || !self.has_comments_between(
+            || !self.has_comments_to_emit_between(
                 params_start.unwrap_or_else(|| params[0].span().start),
                 params[0].span().start,
             );
         let no_trailing_comments = !comments_present
             || trailing_comments_end
-                .is_none_or(|end| !self.has_comments_between(params[0].span().end, end));
+                .is_none_or(|end| !self.has_comments_to_emit_between(params[0].span().end, end));
         let should_hug_single_pattern = params.len() == 1
             && (is_huggable_pattern(&params[0]) || has_huggable_type_annotation(&params[0]))
             && no_leading_comments
@@ -1307,8 +1307,9 @@ impl<'a> Printer<'a> {
                     // leading comment (or the param itself) — prettier keeps one blank
                     // line in the expanded list. `search_start` is the previous param's
                     // end, so the gap spans the comma too.
+                    // **in source**: bounds a raw blank-line scan (see `blank_scan_end`).
                     let check_pos = if comments_present {
-                        comments_in_range(self.comments, search_start, param_start)
+                        self.comments_in_source_between(search_start, param_start)
                             .next()
                             .map_or(param_start, |c| c.span.start)
                     } else {
@@ -1365,7 +1366,7 @@ impl<'a> Printer<'a> {
 
             // Collect same-line comments
             let same_line_comments: CommentVec<'_> = if comments_present {
-                comments_in_range(self.comments, param.span().end, search_end)
+                comments_to_emit_in_range(self.comments, param.span().end, search_end)
                     .filter(|c| self.is_same_line(param.span().end, c.span.start))
                     .collect()
             } else {
@@ -1422,8 +1423,9 @@ impl<'a> Printer<'a> {
             // Only for the last param - non-last param comments are handled as leading for next param
             if is_last && comments_present {
                 let mut prev_own = param.span().end;
-                for comment in comments_in_range(self.comments, param.span().end, search_end)
-                    .filter(|c| !self.is_same_line(param.span().end, c.span.start))
+                for comment in
+                    comments_to_emit_in_range(self.comments, param.span().end, search_end)
+                        .filter(|c| !self.is_same_line(param.span().end, c.span.start))
                 {
                     // Preserve an author blank line before the own-line trailing comment.
                     self.push_blank_preserving_hardline(
@@ -1495,7 +1497,7 @@ impl<'a> Printer<'a> {
     /// gate; keying only on the following param over-expanded a block that trailed
     /// the previous one before its comma.)
     fn has_own_line_comment_between(&self, start: u32, end: u32) -> bool {
-        comments_in_range(self.comments, start, end)
+        self.comments_on_page_between(start, end)
             .any(|c| self.comment_isolated_from_neighbors(start, c, end))
     }
 
@@ -1539,36 +1541,37 @@ impl<'a> Printer<'a> {
         skip_delim: Option<u32>,
     ) -> DocId {
         let d = self.d();
-        let comments: CommentVec<'_> = comments_in_range(self.comments, start, param_render_start)
-            .filter(|c| {
-                // A comment already pulled onto the opening `(` line (first param)
-                // must not be re-emitted as a leading comment here.
-                if let Some(dpos) = skip_delim
-                    && self.comment_on_delimiter_line(dpos, c)
-                {
-                    return false;
-                }
-                let Some(comma) = prev_comma_pos else {
-                    return true; // First param - keep all comments
-                };
-                // A stranded after-comma block (on the comma's line, newline before
-                // this param) trails the comma — emitted by the loop's
-                // `push_stranded_after_comma_blocks`, not led here.
-                if c.is_block
-                    && c.span.start >= comma
-                    && self.is_stranded_after_comma_block(c, comma, param_render_start)
-                {
-                    return false;
-                }
-                // Different line from prev param - definitely a leading comment
-                if !self.is_same_line(start, c.span.start) {
-                    return true;
-                }
-                // Same line as prev param: only keep block comments after the comma
-                // (line comments go in line_suffix, block comments before comma are trailing)
-                c.is_block && c.span.start >= comma
-            })
-            .collect();
+        let comments: CommentVec<'_> =
+            comments_to_emit_in_range(self.comments, start, param_render_start)
+                .filter(|c| {
+                    // A comment already pulled onto the opening `(` line (first param)
+                    // must not be re-emitted as a leading comment here.
+                    if let Some(dpos) = skip_delim
+                        && self.comment_on_delimiter_line(dpos, c)
+                    {
+                        return false;
+                    }
+                    let Some(comma) = prev_comma_pos else {
+                        return true; // First param - keep all comments
+                    };
+                    // A stranded after-comma block (on the comma's line, newline before
+                    // this param) trails the comma — emitted by the loop's
+                    // `push_stranded_after_comma_blocks`, not led here.
+                    if c.is_block
+                        && c.span.start >= comma
+                        && self.is_stranded_after_comma_block(c, comma, param_render_start)
+                    {
+                        return false;
+                    }
+                    // Different line from prev param - definitely a leading comment
+                    if !self.is_same_line(start, c.span.start) {
+                        return true;
+                    }
+                    // Same line as prev param: only keep block comments after the comma
+                    // (line comments go in line_suffix, block comments before comma are trailing)
+                    c.is_block && c.span.start >= comma
+                })
+                .collect();
         if comments.is_empty() {
             return d.empty();
         }
@@ -1685,10 +1688,11 @@ impl<'a> Printer<'a> {
         // Determine group mode: structural reasons OR heritage comments
         let has_heritage_comments = positions
             .first_heritage_start
-            .is_some_and(|hs| self.has_comments_between(positions.pre_heritage_end, hs))
+            .is_some_and(|hs| self.has_comments_on_page_between(positions.pre_heritage_end, hs))
             || positions.extends_clause_end.is_some_and(|ext_end| {
                 !class_expr.implements.is_empty()
-                    && self.has_comments_between(ext_end, class_expr.implements[0].span.start)
+                    && self
+                        .has_comments_on_page_between(ext_end, class_expr.implements[0].span.start)
             });
         let group_mode = self.should_class_group_mode(
             class_expr.super_class,

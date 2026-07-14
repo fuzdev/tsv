@@ -8,7 +8,7 @@
 // - Type queries: `typeof x`
 // - Entity names: `A.B.C`
 
-use super::super::comments_in_range;
+use super::super::comments_to_emit_in_range;
 use super::helpers::{
     should_hug_union_type, type_needs_parens_for_array_element,
     type_needs_parens_for_conditional_check, type_needs_parens_for_conditional_extends,
@@ -51,7 +51,7 @@ impl<'a> Printer<'a> {
         // for `None`, and every `needs_breaking` term that consults them scans a comment-free
         // sub-range either way). Paren-leading-line-comment terms below stay independent.
         let (question_pos, colon_pos) =
-            if self.has_comments_between(extends_type_end, false_type_start) {
+            if self.has_comments_to_emit_between(extends_type_end, false_type_start) {
                 (
                     self.find_char_outside_comments(extends_type_end, true_type_start, b'?'),
                     self.find_char_outside_comments(true_type_end, false_type_start, b':'),
@@ -84,9 +84,9 @@ impl<'a> Printer<'a> {
         );
         let has_breaking_comments_around_question = self
             .has_line_comments_between(extends_type_end, true_type_start)
-            || self.has_multiline_block_comments_between(extends_type_end, true_type_start)
+            || self.has_multiline_block_comments_on_page_between(extends_type_end, true_type_start)
             || question_pos.is_some_and(|q| {
-                tsv_lang::has_comments_in_range(self.comments, extends_type_end, q)
+                tsv_lang::has_comments_to_emit_in_range(self.comments, extends_type_end, q)
             })
             // A single-line block comment in the `?`→branch gap (own-line or trailing)
             // collapses inline (`? /* c */ B`) — the branch loop pulls the comment to
@@ -97,7 +97,7 @@ impl<'a> Printer<'a> {
         let colon_end = colon_pos.map_or(true_type_end, |c| c + 1);
         let has_breaking_comments_after_colon = self
             .has_line_comments_between(colon_end, false_type_start)
-            || self.has_multiline_block_comments_between(colon_end, false_type_start)
+            || self.has_multiline_block_comments_on_page_between(colon_end, false_type_start)
             || false_paren_has_leading_line_comment;
         // Trailing line comments on true_type also force breaking (they end the line)
         let has_trailing_line_comment_on_true =
@@ -392,7 +392,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut needs_indent = false;
         let mut prev_was_line_comment = false;
-        for comment in comments_in_range(self.comments, from, to) {
+        for comment in comments_to_emit_in_range(self.comments, from, to) {
             if prev_was_line_comment {
                 parts.push(d.hardline());
                 parts.push(d.text(INDENT));
@@ -486,7 +486,7 @@ impl<'a> Printer<'a> {
         // (before the hardline that ends extends_type's line). Also includes
         // relocated leading line comments from inside true_type's parens.
         let mut trailing_on_extends_parts: DocBuf = DocBuf::new();
-        for comment in comments_in_range(self.comments, extends_type_end, before_q_end) {
+        for comment in comments_to_emit_in_range(self.comments, extends_type_end, before_q_end) {
             trailing_on_extends_parts.push(self.build_trailing_comment_doc(comment));
         }
         for comment in &true_paren_leading_line_comments {
@@ -512,7 +512,7 @@ impl<'a> Printer<'a> {
         // Also includes relocated leading line comments from inside false_type's parens.
         let colon = self.find_char_outside_comments(true_type_end, false_type_start, b':');
         if let Some(c_pos) = colon {
-            for comment in comments_in_range(self.comments, true_type_end, c_pos) {
+            for comment in comments_to_emit_in_range(self.comments, true_type_end, c_pos) {
                 q_parts.push(self.build_trailing_comment_doc(comment));
             }
         }
@@ -583,9 +583,9 @@ impl<'a> Printer<'a> {
         )
         .map_or(param_name_start, |p| p as u32);
         let leading_comments: CommentVec<'_> =
-            comments_in_range(self.comments, content_start, bracket_pos).collect();
+            comments_to_emit_in_range(self.comments, content_start, bracket_pos).collect();
         let bracket_inner_comments: CommentVec<'_> =
-            comments_in_range(self.comments, bracket_pos + 1, param_name_start).collect();
+            comments_to_emit_in_range(self.comments, bracket_pos + 1, param_name_start).collect();
 
         // Leading comments (before `[`): the node-adjacent (LAST) comment stays
         // inline iff it's a block comment with no newline after it; every earlier
@@ -737,7 +737,7 @@ impl<'a> Printer<'a> {
             // Comments between `]` (or `?`/`+?`/`-?`) and value type
             // Start from bracket_close to avoid double-counting pre-bracket comments
             let comments_before_value: CommentVec<'_> =
-                comments_in_range(self.comments, bracket_close, type_start).collect();
+                comments_to_emit_in_range(self.comments, bracket_close, type_start).collect();
 
             body_parts.push(d.text(":"));
 
@@ -798,7 +798,7 @@ impl<'a> Printer<'a> {
             // end-of-line *after* the `;` (`V; // c`) instead of swallowing it —
             // the `;` is emitted separately by the multiline/one-line branch below.
             let body_end = m.span.end.saturating_sub(1); // before `}`
-            for comment in comments_in_range(self.comments, type_end, body_end) {
+            for comment in comments_to_emit_in_range(self.comments, type_end, body_end) {
                 body_parts.push(self.build_trailing_comment_doc(comment));
             }
         } else {
@@ -806,7 +806,7 @@ impl<'a> Printer<'a> {
             // optional modifier) still trail the member the same way — dropping
             // through without collecting them would lose content.
             let body_end = m.span.end.saturating_sub(1); // before `}`
-            for comment in comments_in_range(self.comments, bracket_close, body_end) {
+            for comment in comments_to_emit_in_range(self.comments, bracket_close, body_end) {
                 body_parts.push(self.build_trailing_comment_doc(comment));
             }
         }
@@ -871,7 +871,7 @@ impl<'a> Printer<'a> {
         // comment there the expansion checks are provably false and the list is
         // plain elements joined by `,` + line (renders identically — the skipped
         // pushes are empty comment docs and the empty after-comma buffer).
-        if !self.has_comments_between(t.span.start, t.span.end) {
+        if !self.has_comments_to_emit_between(t.span.start, t.span.end) {
             let mut parts = DocBuf::new();
             for (i, elem) in t.element_types.iter().enumerate() {
                 if i > 0 {

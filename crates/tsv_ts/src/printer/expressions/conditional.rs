@@ -6,7 +6,7 @@ use crate::ast::internal;
 use crate::printer::{CommentVec, Printer, template_literal_has_newlines};
 use smallvec::smallvec;
 use tsv_lang::INDENT;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -207,7 +207,7 @@ impl<'a> Printer<'a> {
         // Comments before ? go after test, comments after ? go before consequent,
         // comments after : go before alternate. These positions only bound the comment
         // scans below, so a ternary with no comment anywhere skips both position scans.
-        let ternary_has_comments = self.has_comments_between(test_end, alternate_start);
+        let ternary_has_comments = self.has_comments_to_emit_between(test_end, alternate_start);
         let (question_pos, colon_pos) = if ternary_has_comments {
             (
                 self.find_char_outside_comments(test_end, consequent_start, b'?'),
@@ -525,7 +525,7 @@ impl<'a> Printer<'a> {
     ) -> (bool, bool) {
         let d = self.d();
         let comments: CommentVec<'_> = op_pos
-            .map(|p| comments_in_range(self.comments, p + 1, value_start).collect())
+            .map(|p| comments_to_emit_in_range(self.comments, p + 1, value_start).collect())
             .unwrap_or_default();
         let mut has_line_comment = false;
         let mut last_own_line = false;

@@ -10,7 +10,7 @@
 use crate::ast::internal::{self, Fragment, FragmentNode};
 use crate::printer::Printer;
 use smallvec::smallvec;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::doc::{DocBuf, GroupId};
 
@@ -178,8 +178,12 @@ impl<'a> Printer<'a> {
     /// already drop to the next line. The head dangle (and the flat hug) must then not
     /// add their own break, or a spurious blank line / leading space appears. A trailing
     /// *block* comment carries no `hardline`, so it does not suppress the dangle.
+    ///
+    /// **to emit**, deliberately: the question is whether the comment *this gap prints last*
+    /// is a line comment, because that emission is what carries the closing `hardline`. A
+    /// comment the gap does not print carries no hardline, so it must not answer this.
     pub(super) fn head_trailing_line_comment(&self, start: u32, end: u32) -> bool {
-        comments_in_range(self.comments, start, end)
+        comments_to_emit_in_range(self.comments, start, end)
             .last()
             .is_some_and(|c| !c.is_block)
     }

@@ -5,7 +5,7 @@
 use super::Printer;
 use crate::ast::internal;
 use smallvec::smallvec;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -62,7 +62,7 @@ impl<'a> Printer<'a> {
             let mut inner: DocBuf = smallvec![d.text("{")];
             let mut last_was_line = false;
             let mut any_comment = false;
-            for comment in comments_in_range(self.comments, brace_start + 1, brace_close) {
+            for comment in comments_to_emit_in_range(self.comments, brace_start + 1, brace_close) {
                 if any_comment {
                     inner.push(d.text(" "));
                 }
@@ -153,9 +153,8 @@ impl<'a> Printer<'a> {
         let value_start = attr.value.span.start;
 
         // Check for comments between key and value (around the `:`)
-        let has_comments = comments_in_range(self.comments, key_end, value_start)
-            .next()
-            .is_some();
+        // **on page**: a zero-comment fast gate — it short-circuits the layout work below.
+        let has_comments = self.has_comments_on_page_between(key_end, value_start);
 
         if !has_comments {
             // Fast path: no comments
@@ -186,7 +185,7 @@ impl<'a> Printer<'a> {
         // Comments between `:` and value
         let after_colon = colon_pos + 1;
         parts.push(d.text(" "));
-        for comment in comments_in_range(self.comments, after_colon, value_start) {
+        for comment in comments_to_emit_in_range(self.comments, after_colon, value_start) {
             if comment.is_block {
                 parts.push(self.build_comment_doc(comment));
                 parts.push(d.text(" "));

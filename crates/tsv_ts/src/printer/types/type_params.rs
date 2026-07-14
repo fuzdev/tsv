@@ -149,7 +149,7 @@ impl<'a> Printer<'a> {
         // (the `<`→first-param gap, the delimited-list scan up to `end - 1`, and each
         // per-param constraint/default gap), so with no comment inside the `<…>` all
         // are provably false. Skips them on the common comment-free `<T, U>`.
-        if !self.has_comments_between(decl.span.start, decl.span.end) {
+        if !self.has_comments_to_emit_between(decl.span.start, decl.span.end) {
             return false;
         }
         // A line comment trailing the opening `<` (`<// c\n T>`) forces expansion;
@@ -274,7 +274,7 @@ impl<'a> Printer<'a> {
         // both keywords are re-emitted as static text — which is why a comment-free
         // parameter can pass `None` for the range. Byte-identical; `<T>` is on every
         // generic function, class, interface and alias.
-        let has_comments = self.has_comments_between(param.span.start, param.span.end);
+        let has_comments = self.has_comments_on_page_between(param.span.start, param.span.end);
 
         // Add modifiers in order: const, in, out
         if param.is_const {
@@ -529,7 +529,7 @@ impl<'a> Printer<'a> {
         }
 
         // One window search over the `<…>`, threaded into everything below it.
-        let has_comments = self.has_comments_between(inst.span.start, inst.span.end);
+        let has_comments = self.has_comments_on_page_between(inst.span.start, inst.span.end);
 
         // Line comments (anywhere, including a leading `foo<// c\n A>(x)` — which
         // would otherwise fall through to the block-comment-only group path below and
@@ -677,8 +677,11 @@ impl<'a> Printer<'a> {
             let param_start = param.span().start;
             let has_line = self.has_line_comments_between(inst.span.start + 1, param_start);
             let before_close = inst.span.end - 1;
-            let has_trailing =
-                tsv_lang::has_comments_in_range(self.comments, param.span().end, before_close);
+            let has_trailing = tsv_lang::has_comments_to_emit_in_range(
+                self.comments,
+                param.span().end,
+                before_close,
+            );
             if has_line && !has_trailing {
                 let leading =
                     self.build_leading_comments_multiline(inst.span.start + 1, param_start);
@@ -770,7 +773,8 @@ impl<'a> Printer<'a> {
             // so the object breaks block-style on width, the same as elsewhere.
             TSType::TypeLiteral(type_lit)
                 if !type_lit.members.is_empty()
-                    || self.has_comments_between(type_lit.span.start, type_lit.span.end) =>
+                    || self
+                        .has_comments_to_emit_between(type_lit.span.start, type_lit.span.end) =>
             {
                 Some(self.build_type_literal_doc(type_lit))
             }

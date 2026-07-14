@@ -28,7 +28,7 @@ use super::needs_parens::leftmost_no_lookahead;
 use crate::ast::internal::{self, Expression, Statement};
 use smallvec::smallvec;
 use tsv_lang::Span;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -179,9 +179,13 @@ impl<'a> Printer<'a> {
             // before `(` — a divergence (`decorated_expr_open_paren_comment`).
             // TODO: a same-line block comment after `(` is still dropped here.
             let expr_start = stmt.expression.span().start;
+            // Deliberately **to emit**, not on-page: this branch also *prints* the comments it
+            // finds, and the non-owned path here already drops them (`(/* c */ fn());` loses the
+            // comment — the ledger reports it). Moving it to the layout axis before that is
+            // fixed would route an owned comment into a path that loses it.
             let paren_open_own_line_comment = needs_parens
                 && stmt.span.start < expr_start
-                && comments_in_range(self.comments, stmt.span.start + 1, expr_start)
+                && comments_to_emit_in_range(self.comments, stmt.span.start + 1, expr_start)
                     .any(|c| self.is_own_line_comment(c));
 
             // When the whole expression isn't wrapped, a nested leftmost
@@ -233,7 +237,9 @@ impl<'a> Printer<'a> {
 
             if paren_open_own_line_comment {
                 let mut inner: DocBuf = smallvec![d.hardline()];
-                for comment in comments_in_range(self.comments, stmt.span.start + 1, expr_start) {
+                for comment in
+                    comments_to_emit_in_range(self.comments, stmt.span.start + 1, expr_start)
+                {
                     inner.push(self.build_comment_doc(comment));
                     inner.push(d.hardline());
                 }
@@ -357,7 +363,7 @@ impl<'a> Printer<'a> {
 
         // Trailing comments from stripped grouping parens: `return (x /* c */)` → `return x /* c */;`
         let argument_end = arg.span().end;
-        let has_trailing_comments = self.has_comments_between(argument_end, span_end);
+        let has_trailing_comments = self.has_comments_to_emit_between(argument_end, span_end);
 
         if self.argument_has_own_line_comment(keyword_start, arg) {
             return self.build_comment_paren_doc(keyword, arg, inline_comments);
@@ -432,7 +438,7 @@ impl<'a> Printer<'a> {
             // Any comment AFTER the grouping `)` (before the `;`) trails after the `;`;
             // the in-paren comment is already inside `seq_doc`.
             let after_start = grouping_close.saturating_add(1).min(span_end);
-            let after = if self.has_comments_between(after_start, span_end) {
+            let after = if self.has_comments_to_emit_between(after_start, span_end) {
                 self.split_terminator_gap_comments(&mut parts, after_start, span_end, false)
             } else {
                 DocBuf::new()
@@ -523,7 +529,7 @@ impl<'a> Printer<'a> {
     /// This matches Prettier's `hasLeadingOwnLineComment` which checks for
     /// comments with a newline after them that are leading on a node.
     fn has_leading_own_line_comment_in_range(&self, start: u32, end: u32) -> bool {
-        comments_in_range(self.comments, start, end)
+        self.comments_in_source_between(start, end)
             .any(|c| !self.is_same_line(start, c.span.start))
     }
 
@@ -605,8 +611,11 @@ impl<'a> Printer<'a> {
         // (`return (a && b // c\n);`) likewise stays inside the parens — it forces the
         // break so it never lands on the flat `expr // c;` path. See
         // `split_terminator_gap_comments`.
-        let has_operand_line_comment = comments_in_range(self.comments, expr_end, semicolon_pos)
-            .any(|c| !c.is_block && self.gap_has_close_paren(c.span.end, semicolon_pos));
+        // Axis-free: the rule looks only at LINE comments, and ownership binds only a block
+        // comment (`owned ⇒ is_block`), so skipping and counting give the same answer.
+        let has_operand_line_comment =
+            comments_to_emit_in_range(self.comments, expr_end, semicolon_pos)
+                .any(|c| !c.is_block && self.gap_has_close_paren(c.span.end, semicolon_pos));
         let mut inline_trailing = DocBuf::new();
         let after_semi =
             self.split_terminator_gap_comments(&mut inline_trailing, expr_end, semicolon_pos, true);

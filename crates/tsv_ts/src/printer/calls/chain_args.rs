@@ -14,13 +14,14 @@ use super::arg_comments::{
 use super::arg_predicates::{
     arrow_body_is_call_through_non_null, arrow_has_trailing_param_comments, is_block_function,
     is_concise_numeric_array, is_curried_arrow, is_function_composition_args,
-    is_short_second_arg_for_expand_first, is_ternary_arrow_body, last_arg_is_array_or_object,
+    is_ternary_arrow_body, last_arg_is_array_or_object,
 };
 use super::arg_wrapping::{
     ChainArgKind, build_args_split_last, build_arrow_sig_doc, build_break_body_state,
     build_chain_expand_all_args, classify_chain_arg, last_two_args_same_type,
     prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
-    prepend_arrow_body_comments, wrap_args_with_soft_breaks, wrap_huggable_arg,
+    prepend_arrow_body_comments, should_expand_first_arg, wrap_args_with_soft_breaks,
+    wrap_huggable_arg,
 };
 use crate::ast::internal::{self, Expression};
 use smallvec::smallvec;
@@ -246,19 +247,18 @@ fn build_call_args_doc_for_chain_impl(
     // build_params_doc_with_comments.
     // Counts owned comments — it only short-circuits the sub-scans below, and an owned
     // comment still puts text on the page. The sub-scans themselves stay emit-keyed
-    // (`has_comments_between`): the owning node prints those, so there is nothing to emit.
-    let call_has_comments = printer.has_any_comments_between(paren_open, call.span.end);
+    // (`has_comments_to_emit_between`): the owning node prints those, so there is nothing to emit.
+    let call_has_comments = printer.has_comments_on_page_between(paren_open, call.span.end);
     let has_leading_comments = call_has_comments
         && !call.arguments.is_empty()
-        && printer.has_comments_between(paren_open, call.arguments[0].span().start);
+        && printer.has_comments_to_emit_between(paren_open, call.arguments[0].span().start);
     let has_inter_arg_comments = call_has_comments && has_inter_argument_comments(call, printer);
     let has_trailing_comments = call_has_comments && has_trailing_comments_on_args(call, printer);
     // Also check for trailing block comments on last arg (for inline handling)
     let has_trailing_block_comments = call_has_comments
-        && call
-            .arguments
-            .last()
-            .is_some_and(|last| printer.has_comments_between(last.span().end, call.span.end));
+        && call.arguments.last().is_some_and(|last| {
+            printer.has_comments_to_emit_between(last.span().end, call.span.end)
+        });
     let has_any_comments = has_leading_comments
         || has_inter_arg_comments
         || has_trailing_comments
@@ -510,13 +510,16 @@ fn build_chain_args_force_expand(
         // since comments with blank lines are handled in the separator logic below.
         if i > 0 {
             let prev_end = call.arguments[i - 1].span().end;
-            let has_comments_before = printer.has_comments_between(prev_end, arg_start);
+            let has_comments_before = printer.has_comments_to_emit_between(prev_end, arg_start);
+            // Nothing to emit in the gap, but an owned annotation can still physically be
+            // there — stop the raw newline scan at the comment, so its own newlines don't
+            // read as a blank line yet an authored blank *before* it is kept (`blank_scan_end`).
             if !has_comments_before
                 && has_blank_line_between_args(
                     printer.source,
                     printer.line_breaks,
                     prev_end,
-                    arg_start,
+                    printer.blank_scan_end(prev_end, arg_start),
                 )
             {
                 arg_parts.push(d.literalline());
@@ -545,7 +548,8 @@ fn build_chain_args_force_expand(
 
             // Skip hardline if next arg has blank line
             // (blank line preservation at the top of the loop handles the line break)
-            let has_comments_before_next = printer.has_comments_between(arg_end, next_arg_start);
+            let has_comments_before_next =
+                printer.has_comments_to_emit_between(arg_end, next_arg_start);
             let next_has_blank = if has_comments_before_next {
                 pc.has_blank_line_in_gap(printer.source, printer.line_breaks)
             } else {
@@ -553,7 +557,7 @@ fn build_chain_args_force_expand(
                     printer.source,
                     printer.line_breaks,
                     arg_end,
-                    next_arg_start,
+                    printer.blank_scan_end(arg_end, next_arg_start),
                 )
             };
             if next_has_blank && has_comments_before_next {
@@ -609,6 +613,7 @@ fn build_chain_args_single(
         prefix,
         has_leading_comments,
         has_any_comments,
+        has_any_comment_text,
         leading_comment_doc,
         ..
     } = ctx;
@@ -628,7 +633,9 @@ fn build_chain_args_single(
     if let Expression::ArrowFunctionExpression(arrow) = arg
         && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
         && arrow_body_is_call_through_non_null(body_expr)
-        && !(has_any_comments
+        // `has_any_comment_text`: refusing the hug is a LAYOUT decision, so it must see a
+        // comment the argument owns and prints itself (see `build_chain_args_multi`).
+        && !(has_any_comment_text
             && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
     {
         let arrow_doc = printer.build_arg_expression_doc(arg);
@@ -687,7 +694,8 @@ fn build_chain_args_single(
     if let Expression::ArrowFunctionExpression(arrow) = arg
         && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
         && is_ternary_arrow_body(body_expr)
-        && !(has_any_comments
+        // `has_any_comment_text`: see above — a layout gate counts an owned comment.
+        && !(has_any_comment_text
             && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
     {
         let arrow_doc = printer.build_arg_expression_doc(arg);
@@ -827,7 +835,7 @@ fn build_chain_args_single(
     {
         let arrow_token = arrow.arrow_token;
         arrow_has_trailing_param_comments(arrow, arrow_token, |start, end| {
-            printer.has_comments_between(start, end)
+            printer.has_comments_to_emit_between(start, end)
         })
     } else {
         false
@@ -1127,25 +1135,18 @@ fn build_chain_args_multi(
     // Matches prettier's shouldExpandFirstArg behavior
     // NOTE: Must come before expand-last-array/object to match Prettier's ordering —
     // shouldExpandFirstArg is checked before shouldExpandLastArg for arrays/objects.
-    if call.arguments.len() == 2
-        && is_block_function(&call.arguments[0])
+    //
+    // The shape test (two args, block-function first, short/comment-free second) is the
+    // shared `should_expand_first_arg` — the chain used to inline a copy of it, which is how
+    // one of the two gets a fix and the other doesn't. Only the chain-specific refusals are
+    // spelled out here.
+    if should_expand_first_arg(printer, call.arguments)
         && !comments_force_expansion
-        && !(has_any_comments && first_arg_has_any_comments(call.arguments, printer, paren_open))
-        // Prettier's shouldExpandFirstArg checks !couldExpandArg(secondArg).
-        // couldExpandArg returns true for a bare object/array with a leading comment
-        // (hasComment(node)), so prettier breaks all args; tsv matches by blocking
-        // expand-first. A cast-wrapped collection is NOT blocked — prettier expand-firsts
-        // it and the inter-arg comment is carried inline below.
-        && !(matches!(
-            &call.arguments[1],
-            Expression::ObjectExpression(_) | Expression::ArrayExpression(_)
-        ) && printer.has_comments_between(
-            call.arguments[0].span().end,
-            call.arguments[1].span().start,
-        ))
-        && is_short_second_arg_for_expand_first(&call.arguments[1], |start, end| {
-            printer.has_comments_between(start, end)
-        })
+        // `has_any_comment_text`, not `has_any_comments`: refusing the expand-FIRST hug is a
+        // LAYOUT decision, so it must see a comment the first argument owns and prints
+        // itself — the twin of the expand-last gate above.
+        && !(has_any_comment_text
+            && first_arg_has_any_comments(call.arguments, printer, paren_open))
     {
         // First arg (callback) expands, tail args stay inline
         let first_arg_doc = printer.build_arg_expression_doc(&call.arguments[0]);
@@ -1276,7 +1277,7 @@ fn build_chain_args_multi(
             }
         } else {
             let next_arg_start = call.arguments[i + 1].span().start;
-            if has_any_comments && printer.has_comments_between(arg_end, next_arg_start) {
+            if has_any_comments && printer.has_comments_to_emit_between(arg_end, next_arg_start) {
                 let mut pc = PartitionedComments::new(
                     printer.comments,
                     printer.line_breaks,

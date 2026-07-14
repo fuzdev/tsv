@@ -65,7 +65,7 @@ impl<'a> Printer<'a> {
     /// `build_type_arguments_doc*` and the call/`new` instantiation
     /// `build_type_parameter_instantiation_doc`).
     /// `has_comments` is the caller's whole-`<…>` window answer. Every sub-query below
-    /// is bounded within `[args.span.start, args.span.end]`, and `has_comments_between`
+    /// is bounded within `[args.span.start, args.span.end]`, and `has_comments_to_emit_between`
     /// only yields comments fully inside its range — so when no comment lies inside the
     /// `<…>`, all three are provably false. Callers hold the flag rather than
     /// recomputing it here, because they gate their own per-argument comment work
@@ -108,7 +108,7 @@ impl<'a> Printer<'a> {
         }
 
         // One window search over the `<…>`, threaded into everything below it.
-        let has_comments = self.has_comments_between(args.span.start, args.span.end);
+        let has_comments = self.has_comments_on_page_between(args.span.start, args.span.end);
 
         if self.type_arguments_force_expansion(args, has_comments) {
             return self.build_type_arguments_doc_with_line_comments(args);
@@ -149,7 +149,7 @@ impl<'a> Printer<'a> {
         }
 
         // One window search over the `<…>`, threaded into everything below it.
-        let has_comments = self.has_comments_between(args.span.start, args.span.end);
+        let has_comments = self.has_comments_to_emit_between(args.span.start, args.span.end);
 
         if self.type_arguments_force_expansion(args, has_comments) {
             return self.build_type_arguments_doc_with_line_comments(args);

@@ -19,7 +19,7 @@ use super::arg_predicates::{
 use crate::ast::internal;
 use crate::printer::expressions::functions::has_leftmost_object_expression;
 use smallvec::smallvec;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 
@@ -492,7 +492,8 @@ pub(crate) fn build_args_split_last(
 
             // Add inline block comments around comma
             if let Some(cpos) = comma_pos {
-                for comment in comments_in_range(printer.comments, arg_end, next_arg_start) {
+                for comment in comments_to_emit_in_range(printer.comments, arg_end, next_arg_start)
+                {
                     if is_inline_block_before_comma(comment, cpos, printer.line_breaks, arg_end) {
                         head_parts.push(d.text(" "));
                         head_parts.push(printer.build_comment_doc(comment));
@@ -503,7 +504,8 @@ pub(crate) fn build_args_split_last(
             head_parts.push(d.text(", "));
 
             if let Some(cpos) = comma_pos {
-                for comment in comments_in_range(printer.comments, arg_end, next_arg_start) {
+                for comment in comments_to_emit_in_range(printer.comments, arg_end, next_arg_start)
+                {
                     if is_inline_block_after_comma(comment, cpos, printer.line_breaks, arg_end) {
                         head_parts.push(printer.build_comment_doc(comment));
                         head_parts.push(d.text(" "));
@@ -537,7 +539,8 @@ pub(crate) fn build_args_split_last(
 
             // Only add inline block comments that are BEFORE the comma
             if let Some(cpos) = comma_pos {
-                for comment in comments_in_range(printer.comments, arg_end, next_arg_start) {
+                for comment in comments_to_emit_in_range(printer.comments, arg_end, next_arg_start)
+                {
                     if is_inline_block_before_comma(comment, cpos, printer.line_breaks, arg_end) {
                         all_args_parts.push(d.text(" "));
                         all_args_parts.push(printer.build_comment_doc(comment));
@@ -772,7 +775,7 @@ pub(crate) fn build_args_joined_with_comments(
             let arg_end = arg.span().end;
             let next_arg_start = arguments[i + 1].span().start;
 
-            if printer.has_comments_between(arg_end, next_arg_start) {
+            if printer.has_comments_to_emit_between(arg_end, next_arg_start) {
                 let pc = printer.open_inter_arg_gap(&mut parts, arg_end, next_arg_start);
                 // A line comment runs to EOL → hard-break; otherwise honor the caller's style.
                 parts.push(if pc.has_trailing_line() || use_hardline {
@@ -818,17 +821,22 @@ pub(super) fn should_expand_first_arg(
     // attaches to the cast, `couldExpandArg` stays false, and it expand-firsts; the
     // expand-first path carries the inter-arg leading comment via
     // `build_after_comma_leading_comments`.
+    //
+    // **on page** (both probes): prettier's `couldExpandArg` asks `hasComment(node)`, a
+    // pure layout question — an owned annotation is on the page and blocks the hug just
+    // like any other comment. Kept in lockstep with the twin guard in
+    // `chain_args::should_expand_first_arg_for_chain`.
     if matches!(
         &args[1],
         internal::Expression::ObjectExpression(_) | internal::Expression::ArrayExpression(_)
-    ) && printer.has_comments_between(args[0].span().end, args[1].span().start)
+    ) && printer.has_comments_on_page_between(args[0].span().end, args[1].span().start)
     {
         return false;
     }
 
     // Second arg must be short/simple
     is_short_second_arg_for_expand_first(&args[1], |start, end| {
-        printer.has_comments_between(start, end)
+        printer.has_comments_on_page_between(start, end)
     })
 }
 
@@ -926,12 +934,16 @@ pub(super) fn build_args_with_blank_lines(
         if i > 0 {
             let prev_end = args[i - 1].span().end;
             let curr_start = arg.span().start;
-            if !printer.has_comments_between(prev_end, curr_start)
+            // Nothing to emit in the gap, but a comment can still physically *be* there —
+            // an owned annotation leading this argument. The blank-line scan counts raw
+            // newlines, so it must stop at the comment: `[prev_end, comment_start)` excludes
+            // the annotation's own newlines yet keeps an authored blank line *before* it.
+            if !printer.has_comments_to_emit_between(prev_end, curr_start)
                 && has_blank_line_between_args(
                     printer.source,
                     printer.line_breaks,
                     prev_end,
-                    curr_start,
+                    printer.blank_scan_end(prev_end, curr_start),
                 )
             {
                 arg_parts.push(d.literalline());
@@ -949,7 +961,7 @@ pub(super) fn build_args_with_blank_lines(
             let arg_end = arg.span().end;
             let next_start = args[i + 1].span().start;
 
-            if printer.has_comments_between(arg_end, next_start) {
+            if printer.has_comments_to_emit_between(arg_end, next_start) {
                 let pc = printer.open_inter_arg_gap(&mut arg_parts, arg_end, next_start);
 
                 let next_has_blank = pc.has_blank_line_in_gap(printer.source, printer.line_breaks);
@@ -962,12 +974,13 @@ pub(super) fn build_args_with_blank_lines(
             } else {
                 arg_parts.push(d.text(","));
                 // Skip hardline if next arg has blank line
-                // (handled at top of next iteration)
+                // (handled at top of next iteration — same physical scan window, so the
+                // two agree even when an owned annotation sits in the gap).
                 let next_has_blank = has_blank_line_between_args(
                     printer.source,
                     printer.line_breaks,
                     arg_end,
-                    next_start,
+                    printer.blank_scan_end(arg_end, next_start),
                 );
                 if !next_has_blank {
                     arg_parts.push(d.hardline());

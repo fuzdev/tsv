@@ -5,6 +5,8 @@ pub mod buffer_sizes;
 pub mod build_fanout_audit;
 pub mod canonical_parse;
 pub mod check;
+#[cfg(feature = "comment_check")]
+pub mod comment_audit;
 pub mod compare;
 pub mod conformance_audit;
 pub mod fixture_init;

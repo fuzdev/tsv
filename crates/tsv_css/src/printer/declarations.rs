@@ -77,7 +77,7 @@ impl<'a> Printer<'a> {
     /// Shared by the rule and at-rule block loops.
     pub(super) fn write_format_ignore_declaration(&mut self, decl: &internal::CssDeclaration<'_>) {
         self.write_indent();
-        self.write(decl.span.extract(self.source));
+        self.write_verbatim_span(decl.span);
         self.write_declaration_end(decl);
     }
 

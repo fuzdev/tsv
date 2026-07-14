@@ -7,7 +7,7 @@
 // - ConstructSignature: `new (args): Return`
 // - IndexSignature: `[key: Type]: Value`
 
-use super::super::comments_in_range;
+use super::super::comments_to_emit_in_range;
 use super::CommentSpacing;
 use super::Printer;
 use crate::ast::internal::{self, TSTypeElement};
@@ -77,9 +77,9 @@ impl<'a> Printer<'a> {
             let colon_pos = type_ann.span.start;
             // Width-aware wrapping for TypeReference with type arguments.
             let type_doc = self.build_type_annotation_doc_wrapping(type_ann);
-            // Comments between the key (or `?`) and `:`. Gate on `has_comments_between`
+            // Comments between the key (or `?`) and `:`. Gate on `has_comments_to_emit_between`
             // so the common no-comment path stays a single binary search.
-            if self.has_comments_between(after_marker, colon_pos) {
+            if self.has_comments_to_emit_between(after_marker, colon_pos) {
                 // A line comment keeps the comment after the marker and indents the
                 // `: type` continuation one level (`a // c⏎\t\t: T`). A block stays
                 // inline before `:`: the optional `?→:` path keeps a space
@@ -336,7 +336,7 @@ impl<'a> Printer<'a> {
             && type_parameters.is_none()
             && let Some(pp) = paren_pos
         {
-            for comment in comments_in_range(self.comments, new_end, pp) {
+            for comment in comments_to_emit_in_range(self.comments, new_end, pp) {
                 parts.push(self.build_comment_doc(comment));
                 if comment.is_block {
                     parts.push(d.text(" "));
@@ -513,12 +513,12 @@ impl<'a> Printer<'a> {
         // the `[` line above (same source line as `[`) is emitted by the prefix, so
         // skip it here to avoid emitting it twice.
         // The trailing `.then(!is_empty)` already collapses the no-comment (and
-        // all-pulled-onto-the-`[`-line) case to `None`, so no `has_comments_between`
+        // all-pulled-onto-the-`[`-line) case to `None`, so no `has_comments_to_emit_between`
         // guard is needed here (unlike `trailing_comment` below, which has no such net).
         let lead_comment = match (bracket_open_pos, first_param_start) {
             (Some(open), Some(key_start)) => {
                 let mut lead_parts = DocBuf::new();
-                for comment in comments_in_range(self.comments, open + 1, key_start) {
+                for comment in comments_to_emit_in_range(self.comments, open + 1, key_start) {
                     if let Some(dpos) = bracket_pull_pos
                         && self.comment_on_delimiter_line(dpos, comment)
                     {
@@ -543,11 +543,11 @@ impl<'a> Printer<'a> {
         // (conformance_prettier.md §Comment relocation), and a line comment swallowing
         // the `]` would otherwise be content loss.
         let (trailing_comment, trailing_has_line) = match bracket_close_pos {
-            Some(cp) if self.has_comments_between(search_start, cp) => {
+            Some(cp) if self.has_comments_to_emit_between(search_start, cp) => {
                 let mut tparts = DocBuf::new();
                 let mut has_line = false;
                 let mut prev = search_start;
-                for comment in comments_in_range(self.comments, search_start, cp) {
+                for comment in comments_to_emit_in_range(self.comments, search_start, cp) {
                     if self.is_same_line(prev, comment.span.start) {
                         tparts.push(d.text(" "));
                     } else {
@@ -593,7 +593,7 @@ impl<'a> Printer<'a> {
             // not the type start). Emission is below, after the value type is built.
             let val_colon_pos = type_annotation.span.start;
             let has_bracket_colon_comment = bracket_close_pos
-                .is_some_and(|cp| self.has_comments_between(cp + 1, val_colon_pos));
+                .is_some_and(|cp| self.has_comments_to_emit_between(cp + 1, val_colon_pos));
             let bracket_colon_has_line = bracket_close_pos
                 .is_some_and(|cp| self.has_line_comments_between(cp + 1, val_colon_pos));
 
@@ -622,7 +622,9 @@ impl<'a> Printer<'a> {
                 Some(close_pos) if has_bracket_colon_comment => {
                     // Block-only comment(s): stay inline before the value `:`, which keeps
                     // its own line (`[k: T] /* c */ : V`).
-                    for comment in comments_in_range(self.comments, close_pos + 1, val_colon_pos) {
+                    for comment in
+                        comments_to_emit_in_range(self.comments, close_pos + 1, val_colon_pos)
+                    {
                         parts.push(d.text(" "));
                         parts.push(self.build_comment_doc(comment));
                     }

@@ -9,6 +9,12 @@ default = ["convert"]
 # The wire-JSON conversion layer (`ast/convert/write.rs`). Forwards to
 # tsv_ts/tsv_css because the writer composes their embedded emitters.
 convert = ["dep:serde_json", "tsv_lang/json", "tsv_ts/convert", "tsv_css/convert"]
+# Opt-in print-once comment ledger (`tsv_lang::comment_ledger`): the format entry points
+# register `Root.comments`, the four JS-comment doc builders record each emit, and the
+# format-ignore seams (raw `<script>`/`<style>`, the template node + range forms) record
+# their verbatim ranges. Forwards to tsv_ts/tsv_css, which emit the comments inside the
+# `<script>`/`{expr}`/`<style>` islands. Off in production builds.
+comment_check = ["tsv_lang/comment_check", "tsv_ts/comment_check", "tsv_css/comment_check"]
 
 [dependencies]
 tsv_lang.workspace = true

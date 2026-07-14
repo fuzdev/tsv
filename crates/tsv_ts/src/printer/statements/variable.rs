@@ -7,13 +7,13 @@ use crate::printer::{
     CommentFilter, CommentSpacing, CommentVec, ParenContext, analysis, class_expr_has_decorators,
     conditional_should_break_after_op, is_call_on_member_chain, is_curried_arrow_chain,
     is_curried_arrow_with_return_type, is_literal_member_chain, is_module_path_fluid_call,
-    is_multiline_string_literal, is_own_line_jsdoc_cast, is_poorly_breakable_chain,
-    is_pure_property_chain, is_regex_root_chain, is_self_expanding_value, is_simple_self_expanding,
-    is_simple_value, is_single_call_on_member_chain, is_string_literal, is_type_assertion_call,
-    needs_parens, should_inline_logical_expression,
+    is_multiline_string_literal, is_poorly_breakable_chain, is_pure_property_chain,
+    is_regex_root_chain, is_self_expanding_value, is_simple_self_expanding, is_simple_value,
+    is_single_call_on_member_chain, is_string_literal, is_type_assertion_call, needs_parens,
+    should_inline_logical_expression,
 };
 use smallvec::smallvec;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::doc::{DocBuf, GroupId};
 use tsv_lang::{INDENT, PRINT_WIDTH};
@@ -65,7 +65,8 @@ impl<'a> Printer<'a> {
         }
         let expr_end = init.span().end;
         self.has_trailing_paren_comments(expr_end, boundary_end)
-            && comments_in_range(self.comments, expr_end, boundary_end)
+            && self
+                .comments_on_page_between(expr_end, boundary_end)
                 .any(|c| !c.is_block || self.has_newline_between(expr_end, c.span.start))
     }
 
@@ -190,7 +191,7 @@ impl<'a> Printer<'a> {
 
                 // Check for comments between declarators
                 let has_line_comment = self.has_line_comments_between(prev_end, curr_start);
-                let has_block_comment = self.has_comments_between(prev_end, curr_start);
+                let has_block_comment = self.has_comments_to_emit_between(prev_end, curr_start);
                 // The declarator-separating comma. A block comment keeps the author's
                 // side of it: before → trails the previous init; after → leads the next
                 // declarator. (Only consulted when `has_block_comment`.)
@@ -204,7 +205,8 @@ impl<'a> Printer<'a> {
                         // These declarators aren't wrapped in `d.indent()`, so the
                         // continuation break carries explicit `INDENT` text.
                         let comments: CommentVec<'_> =
-                            comments_in_range(self.comments, prev_end, curr_start).collect();
+                            comments_to_emit_in_range(self.comments, prev_end, curr_start)
+                                .collect();
                         self.push_inter_declarator_line_comment_gap(
                             &mut parts,
                             &comments,
@@ -235,7 +237,8 @@ impl<'a> Printer<'a> {
                         // preserved before the declarator/next comment). A stranded
                         // block already trailed the comma above, so skip it here.
                         let comments: CommentVec<'_> =
-                            comments_in_range(self.comments, comma_pos, curr_start).collect();
+                            comments_to_emit_in_range(self.comments, comma_pos, curr_start)
+                                .collect();
                         for (ci, comment) in comments.iter().enumerate() {
                             if self.is_stranded_after_comma_block(comment, comma_pos, curr_start) {
                                 continue;
@@ -268,7 +271,9 @@ impl<'a> Printer<'a> {
                     // Soft break for declarations without initializers
                     rest_parts.push(d.line());
                     if has_block_comment {
-                        for comment in comments_in_range(self.comments, comma_pos, curr_start) {
+                        for comment in
+                            comments_to_emit_in_range(self.comments, comma_pos, curr_start)
+                        {
                             rest_parts.push(self.build_comment_doc(comment));
                             rest_parts.push(d.text(" "));
                         }
@@ -311,14 +316,14 @@ impl<'a> Printer<'a> {
                 // both gap sub-ranges lie within `[id_end, init_start]`, so an empty
                 // whole-gap window makes every sub-query provably empty. Canonical
                 // reference: `build_params_doc_with_comments`.
-                let gap_has_comments = self.has_comments_between(id_end, init_start);
+                let gap_has_comments = self.has_comments_on_page_between(id_end, init_start);
                 let (equals_pos, has_comments_before_eq, has_comments_after_eq) =
                     if gap_has_comments {
                         let eq = self.find_equals_position(id_end, init_start);
                         (
                             eq,
-                            self.has_comments_between(id_end, eq),
-                            self.has_comments_between(eq + 1, init_start),
+                            self.has_comments_to_emit_between(id_end, eq),
+                            self.has_comments_to_emit_between(eq + 1, init_start),
                         )
                     } else {
                         // No gap comment ⇒ the `=` position is never consulted (its only
@@ -559,10 +564,13 @@ impl<'a> Printer<'a> {
                 let is_break_after_op_rhs = should_break_after_op_rhs
                     || needs_break_after_op_layout
                     || is_decorated_class_expr
-                    // An own-line JSDoc-cast comment hangs after `=`. The cast owns its
-                    // comment, so `has_comments_after_eq` below can't see it — this
-                    // node-level check is the only signal left.
-                    || is_own_line_jsdoc_cast(init, self.source);
+                    // A comment the initializer *owns* (a JSDoc cast, a bundler
+                    // annotation) is glued to its first token and travels inside its doc,
+                    // so the gap probes above cannot see it. It is still on the page and
+                    // still hangs the value — this declarator builds its own layout rather
+                    // than routing through `build_assignment_layout`, so it applies the
+                    // rule itself. See `owned_leading_comment_hangs_value`.
+                    || self.owned_leading_comment_hangs_value(init);
 
                 // Breakable LHS (destructuring patterns) with non-self-expanding RHS:
                 // Use fluid layout so the printer breaks at `=` before expanding the
