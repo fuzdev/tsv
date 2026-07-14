@@ -181,7 +181,7 @@ deno task pins:audit                 # canonical-oracle version sync (gated in `
 deno task scan:audit                 # guard against new raw find/rfind/match_indices substring scans over source (gated in `deno task check`); see Debug Tooling
 deno task fanout:audit               # guard against super-linear doc-node fanout (the per-layout-candidate rebuild blowup); gated in `deno task check`; see Debug Tooling
 deno task roundtrip:audit            # cheap tripwire that format(tests/fixtures) reparses (pure-Rust phase 1, no *_unreparseable output; gated in `deno task check`) — real yield is external corpora; see Debug Tooling
-deno task binding:audit              # comment↔token binding audit: does format re-bind a forward-binding comment (JSDoc cast / bundler annotation) to a different subtree — the class invisible to ast_diff/roundtrip/SAFETY because the characters only MOVE (pure Rust, no sidecar; gated in `deno task check`) — HARD (owned cast/annotation) fails the gate, SOFT (plain glued) is informational; TS-family files only; real yield on external corpora; see Debug Tooling
+deno task binding:audit              # comment↔token binding audit: does format re-bind a forward-binding glued block comment (a plain comment, a bundler annotation, or a JSDoc cast — all owned) to a different subtree — the class invisible to ast_diff/roundtrip/SAFETY because the characters only MOVE (pure Rust, no sidecar; gated in `deno task check`) — HARD (a parser-owned glued comment) fails the gate, SOFT (an unowned glued block comment, now rare) is informational; TS-family files only; real yield on external corpora; see Debug Tooling
 deno task authoring:audit            # authoring-independence over Svelte boundary whitespace: every render-equivalent authoring of one document (hug ↔ space ↔ newline at a tag's content boundary; space ↔ newline between siblings) must reach ONE tsv fixed point (pure Rust, no sidecar; gated in `deno task check`) — exits 1 on any non-idempotency, site-level or a base-non-idempotent FILE; see Debug Tooling
 deno task fuzz:audit                 # seeded mutational fuzzer over tests/fixtures (fixed --seed 0 --iterations 5000; pure Rust, no sidecar; gated in `deno task check`) — asserts no-panic + idempotency + structural-reparse, on every seed file AS AUTHORED and then on mutated input; see Debug Tooling
 deno task comments:audit             # print-once comment ledger: every comment a document PARSES must be EMITTED exactly once (pure Rust, no sidecar; gated in `deno task check`) — reports DROPPED (silent content loss) and DOUBLE-PRINTED; the structural guard on the detached comment model, tsv's `ensureAllCommentsPrinted`; see Debug Tooling
@@ -1013,8 +1013,9 @@ cargo run -p tsv_debug roundtrip_audit --canonical-all --verbose ../prettier/tes
 # the binding-paren signal rides a separate `anchor_is_paren` flag. So a clarity
 # paren deep inside is not a finding; a paren at the anchor is.
 #
-# HARD (owned cast/annotation re-binds) fails --gate; SOFT (a plain glued comment,
-# the class slice C generalizes ownership to) is informational. TS-family files
+# HARD (a parser-owned glued comment re-binds) fails --gate — every glued block
+# comment is owned, so a cast, an annotation, and a plain glued comment alike; SOFT
+# (an unowned glued block comment, now rare) is informational. TS-family files
 # only (.ts/.js/.mts/.cts/…); casts/annotations concentrate in JSDoc-typed JS.
 cargo run -p tsv_debug binding_audit                                  # audit tests/fixtures
 cargo run -p tsv_debug binding_audit ../svelte/packages/svelte/src ../prettier/tests/format/js
@@ -1201,15 +1202,23 @@ pub struct Comment {
 **Owned comments — the one crack in the detached model.** A comment that is *bound to
 the token after it* can't be located positionally at print time, because a paren the
 printer synthesizes around an enclosing expression lands between the two and re-binds it.
-Two classes today, both marked `owned_by_node` by the parser:
+**Every glued block comment is owned** (`owned_by_node`, set by the parser): the position
+is an authoring choice that binds the comment to the operand it leads, so the operand's own
+doc prints it and no synthesized paren can land between them. There is no content sniff — a
+plain `/* c */` and a bundler annotation `/* @__PURE__ */` bind their token identically. Two
+shapes are worth naming:
 
+- the **glued block comment** (the general case) — printed by the innermost node its token
+  begins (`printer/comments/owned.rs`, via `build_expression_doc`'s
+  `prepend_owned_leading_comment`). Covers an ordinary leading comment and a **bundler
+  annotation** alike (`/* @__PURE__ */` and friends mark the call *after* them as
+  side-effect-free; a paren between the two would leave the annotation leading a paren, so the
+  marked call is no longer droppable). No AST node is involved.
 - the **JSDoc cast** — `/** @type {T} */` plus the `(` it glues to **are** the cast, so the
-  comment is handed to the `JsdocCast` node, which prints it;
-- a **bundler annotation** — `/* @__PURE__ */` and friends mark the call *after* them as
-  side-effect-free, so a paren between the two leaves the annotation leading a paren and the
-  call is no longer droppable. It has no AST node, so it is printed by the innermost node its
-  token begins (`printer/comments/owned.rs`). The predicate is the `@`/`#` + `__NAME__`
-  *convention*, not a vocabulary — an annotation tsv failed to know would be a silent loss.
+  comment is handed to the `JsdocCast` node, which prints it. `is_jsdoc_type_cast_comment` is
+  the **only** remaining content sniff, and it governs the cast's **paren-retention** (building
+  the `JsdocCast`), *not* ownership — ownership flows to a cast the same as to any other glued
+  comment.
 
 An owned comment is always a **block** comment (`owned ⇒ is_block`), and always **glued** to
 its token — a comment the author left on its own line leads the *line*, not the token. The one
