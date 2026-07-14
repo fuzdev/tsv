@@ -273,6 +273,18 @@ pub(super) type LineSuffixBuf = SmallVec<[ArenaCommand; 4]>;
 pub(super) const FLAT_WIDTH_UNKNOWN: u32 = u32::MAX;
 pub(super) const FLAT_WIDTH_BREAKS: u32 = u32::MAX - 1;
 
+/// Longest slice [`pooled_text_width`] measures with its fused byte walk. Past
+/// it, the scan shape flips to the searcher-based one: `contains('\n')` and
+/// `is_ascii` are SIMD and the tab count auto-vectorizes (it has no early exit),
+/// so on a long slice three vector passes beat one scalar walk — while on a
+/// short one their setup, paid regardless of length, is the entire cost. Text
+/// nodes are short (a CSS property name, a value chunk), but not uniformly: the
+/// TS printer's tail runs long enough that an ungated fused walk measured a real
+/// regression on TS while CSS never noticed the gate at all. The crossover is
+/// broad and 32 sits in the flat middle of it. Only a *speed* switch — both arms
+/// answer identically, and one oracle grades them.
+const FUSED_WIDTH_SCAN_MAX: usize = 32;
+
 /// The eager width-cache policy for doc text: pool-stored text
 /// ([`DocText::Pooled`], `MultilineText` first lines), verbatim source slices
 /// ([`DocArena::source_span`]), and `text()` statics (amortized through the
@@ -298,8 +310,58 @@ pub(super) const FLAT_WIDTH_BREAKS: u32 = u32::MAX - 1;
 /// answer identically. The same holds for the other consumer, `render_text`'s
 /// column advance — the column only feeds threshold comparisons (print width,
 /// `first_line_offset`) far below the clamp, and resets at each newline.
+///
+/// One forward byte pass decides all three facts the width needs — is there a
+/// newline, is the slice ASCII, how many tabs does it hold — because three
+/// separate searchers cost more in *setup* (paid regardless of length) than one
+/// walk costs in total on the short slice that actually arrives here. Slices
+/// past [`FUSED_WIDTH_SCAN_MAX`] take the searcher shape instead.
+///
+/// Answers identically to probing `contains('\n')` and then
+/// [`visual_width`](crate::printing::visual_width): on an all-ASCII slice the
+/// loop accumulates `1` per byte and `TAB_WIDTH` per tab, which is exactly that
+/// function's ASCII fast path, `len + tabs * (TAB_WIDTH - 1)`; a `\n` seen before
+/// any non-ASCII byte yields the same sentinel the `contains` probe would have;
+/// and the first non-ASCII byte hands the **whole** slice to the searcher arm, so
+/// a newline sitting *after* that byte is still found.
+///
+/// ⚠️ It mirrors that **ASCII fast path**, where a control character counts as
+/// one column — deliberately *not* `printing::ascii_char_width`, which counts it
+/// as zero and which only the grapheme-walking path uses (see
+/// `visual_width_mixed`). The two disagree on purpose; a fused walk that reached
+/// for the "obvious" shared helper would silently change every width holding a
+/// control byte. The exhaustive equivalence test grades this arm with `\x00`,
+/// `\x1b` and `\x7f` precisely because no corpus does.
 #[inline]
 fn pooled_text_width(s: &str) -> u16 {
+    if s.len() > FUSED_WIDTH_SCAN_MAX {
+        return pooled_text_width_scanned(s);
+    }
+    let mut width = 0usize;
+    for &b in s.as_bytes() {
+        match b {
+            b'\n' => return TEXT_WIDTH_HAS_NEWLINE,
+            b'\t' => width += TAB_WIDTH,
+            0x00..=0x7f => width += 1,
+            _ => return pooled_text_width_scanned(s),
+        }
+    }
+    width.min(TEXT_WIDTH_NOT_COMPUTED as usize - 1) as u16
+}
+
+/// The searcher-based arm of [`pooled_text_width`]: the whole-slice shape, for a
+/// slice too long for the fused walk or holding a non-ASCII byte. Outlined to
+/// keep that walk lean and inlinable, mirroring the split in
+/// `arena_render::update_pos_for_text` — but, unlike that one's helper,
+/// **not `#[cold]`**: a long slice is a normal input here, not a rare one (the TS
+/// printer's text nodes run past the gate often enough that marking this arm cold
+/// would mispredict against the corpus that needs it most).
+///
+/// Takes the whole slice, not the scanned remainder — a grapheme cluster can
+/// start on the ASCII byte *before* the first non-ASCII one, so only measuring
+/// from the beginning is cluster-correct.
+#[inline(never)]
+fn pooled_text_width_scanned(s: &str) -> u16 {
     if s.contains('\n') {
         TEXT_WIDTH_HAS_NEWLINE
     } else {
@@ -1908,5 +1970,116 @@ impl std::fmt::Write for PoolTextWriter<'_> {
     fn write_str(&mut self, s: &str) -> std::fmt::Result {
         self.scratch.push_str(s);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod pooled_text_width_tests {
+    use super::{TEXT_WIDTH_HAS_NEWLINE, TEXT_WIDTH_NOT_COMPUTED, pooled_text_width};
+    use crate::config::TAB_WIDTH;
+    use crate::printing::visual_width;
+
+    /// The width, spelled out independently of [`pooled_text_width`]: probe for a
+    /// newline, then measure. This is the oracle — the fused single-pass scan must
+    /// agree with it on every input.
+    ///
+    /// It has to be graded here because **no corpus can grade it**. A width only
+    /// changes the output once it crosses the print width, so an arithmetic slip
+    /// on a rare byte (a tab, a control char) leaves every formatted file
+    /// byte-identical and sails through the fixtures and any size of format/wire
+    /// diff. Verified: a one-column error in the tab arm is invisible to all of
+    /// them and caught only here.
+    fn reference(s: &str) -> u16 {
+        if s.contains('\n') {
+            TEXT_WIDTH_HAS_NEWLINE
+        } else {
+            visual_width(s, TAB_WIDTH).min(TEXT_WIDTH_NOT_COMPUTED as usize - 1) as u16
+        }
+    }
+
+    fn assert_agrees(s: &str) {
+        assert_eq!(
+            pooled_text_width(s),
+            reference(s),
+            "pooled_text_width disagrees with the reference on {s:?}"
+        );
+    }
+
+    #[test]
+    fn agrees_on_exhaustive_short_strings() {
+        // Every string of length 0-3 over an alphabet spanning each arm of the
+        // scan: plain ASCII, the two special ASCII bytes, a control char, DEL,
+        // and multi-byte UTF-8 (2-, 3- and 4-byte, plus a combining mark and a
+        // ZWJ — the clusters that can cross an ASCII boundary).
+        let alphabet = [
+            "a", "Z", "0", "-", " ", "\t", "\n", "\r", "\x00", "\x1b", "\x7f", "é", "中", "🎉",
+            "\u{0301}", "\u{200d}", "\u{fe0f}", "\u{00a0}",
+        ];
+        assert_agrees("");
+        for a in alphabet {
+            assert_agrees(a);
+            for b in alphabet {
+                assert_agrees(&format!("{a}{b}"));
+                for c in alphabet {
+                    assert_agrees(&format!("{a}{b}{c}"));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn agrees_on_realistic_and_boundary_inputs() {
+        for s in [
+            "color",
+            "--custom-property",
+            "rgb(12 34 56 / 0.5)",
+            "\tindented",
+            "a\tb\tc",
+            "line one\nline two",
+            // A newline positioned AFTER the first non-ASCII byte: the fast
+            // path bails to the cold arm mid-scan, which must still find it.
+            "é\nafter",
+            "中\ttab-after-multibyte",
+            // A combining mark on an ASCII base — the cluster starts on the
+            // byte the fast path already counted, so the cold arm has to
+            // re-measure the whole slice, not the remainder.
+            "e\u{0301}x",
+            "\u{200d}",
+            "1\u{fe0f}\u{20e3}",
+            "👨\u{200d}👩\u{200d}👧",
+        ] {
+            assert_agrees(s);
+        }
+    }
+
+    #[test]
+    fn agrees_at_the_clamp_boundary() {
+        // A single-line text wider than the u16 sentinels must clamp, not alias
+        // TEXT_WIDTH_HAS_NEWLINE or wrap.
+        for len in [
+            TEXT_WIDTH_NOT_COMPUTED as usize - 2,
+            TEXT_WIDTH_NOT_COMPUTED as usize - 1,
+            TEXT_WIDTH_NOT_COMPUTED as usize,
+            TEXT_WIDTH_NOT_COMPUTED as usize + 5,
+        ] {
+            let ascii = "a".repeat(len);
+            assert_agrees(&ascii);
+            assert!(pooled_text_width(&ascii) < TEXT_WIDTH_HAS_NEWLINE);
+            // Tabs multiply the width, so a far shorter run also clamps.
+            let tabs = "\t".repeat(len);
+            assert_agrees(&tabs);
+        }
+    }
+
+    #[test]
+    fn agrees_on_long_ascii_runs() {
+        // The length range where the replaced shape's SIMD scans were at their
+        // best — the fused walk must still agree there.
+        for len in [31, 32, 33, 63, 64, 65, 127, 128, 256, 1000] {
+            assert_agrees(&"x".repeat(len));
+            assert_agrees(&format!("{}\t{}", "x".repeat(len / 2), "y".repeat(len / 2)));
+            assert_agrees(&format!("{}\n{}", "x".repeat(len / 2), "y".repeat(len / 2)));
+            assert_agrees(&format!("{}é{}", "x".repeat(len / 2), "y".repeat(len / 2)));
+        }
     }
 }

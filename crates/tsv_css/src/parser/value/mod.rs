@@ -43,36 +43,65 @@ pub fn parse_value_from_source<'arena>(
     base_offset: u32,
     arena: &'arena Bump,
 ) -> CssValue<'arena> {
-    // Extract value directly from source using source-relative positions
     let value_str = source_relative_span.extract(source);
-    let trimmed = value_str.trim();
+    let absolute_start = base_offset + source_relative_span.start;
 
-    if trimmed.is_empty() {
+    // An all-whitespace (or empty) value keeps the span it was handed.
+    let Some((trimmed, leading)) = locate_value(value_str) else {
         return CssValue::Identifier {
             span: Span {
-                start: base_offset + source_relative_span.start,
+                start: absolute_start,
                 end: base_offset + source_relative_span.end,
             },
         };
+    };
+
+    // The value's own span: where it starts, plus how long it is. The end needs
+    // no separate trailing-whitespace offset — a span that begins at the value
+    // and runs its length already excludes what follows it.
+    let start = absolute_start + leading as u32;
+    let absolute_span = Span {
+        start,
+        end: start + trimmed.len() as u32,
+    };
+
+    // ValueParser re-parses the same source text, so nested value spans stay
+    // accurate through its same-source recursion.
+    parser::ValueParser::new(trimmed, absolute_span).parse(arena)
+}
+
+/// A value's text with its surrounding whitespace removed, and how many bytes of
+/// that whitespace preceded it. `None` when the value is entirely whitespace.
+///
+/// The span a declaration hands over is, in practice, already trimmed — real
+/// stylesheets do not put a whitespace byte at either end of a value — so the
+/// common case answers from two byte comparisons and never walks the text. That
+/// matters because `str::trim*` is Unicode-aware: it decodes a `char` and tests
+/// `White_Space` at each end, and the offsets a naive shape recovers cost a
+/// second and third walk to learn what the first already knew.
+///
+/// ⚠️ Only an **ASCII non-whitespace** byte at each end settles it. A non-ASCII
+/// byte cannot (a multi-byte char's leading byte says nothing about whether that
+/// char is `White_Space`), and an ASCII whitespace byte means there is something
+/// to trim; both fall through to the trimming path. The test is
+/// `char::is_whitespace`, **not** `u8::is_ascii_whitespace` — the two disagree on
+/// the **vertical tab**, and `trim` uses the former.
+fn locate_value(value_str: &str) -> Option<(&str, usize)> {
+    let bytes = value_str.as_bytes();
+    let settled = |b: u8| b.is_ascii() && !char::from(b).is_whitespace();
+    if let (Some(&first), Some(&last)) = (bytes.first(), bytes.last())
+        && settled(first)
+        && settled(last)
+    {
+        return Some((value_str, 0));
     }
 
-    // Calculate adjusted span for trimmed value (relative to source)
-    let trim_start_offset = value_str.len() - value_str.trim_start().len();
-    let trim_end_offset = value_str.len() - value_str.trim_end().len();
-    let source_relative_adjusted = Span {
-        start: source_relative_span.start + trim_start_offset as u32,
-        end: source_relative_span.end - trim_end_offset as u32,
-    };
-
-    // Calculate absolute span for ValueParser (includes base_offset)
-    let absolute_span = Span {
-        start: base_offset + source_relative_adjusted.start,
-        end: base_offset + source_relative_adjusted.end,
-    };
-
-    // Use ValueParser for accurate span tracking through same-source recursion
-    let parser = parser::ValueParser::new(trimmed, absolute_span);
-    parser.parse(arena)
+    let after_leading = value_str.trim_start();
+    let trimmed = after_leading.trim_end();
+    if trimmed.is_empty() {
+        return None;
+    }
+    Some((trimmed, value_str.len() - after_leading.len()))
 }
 
 // Old parsing functions removed - replaced by ValueParser with same-source recursion
@@ -202,4 +231,66 @@ fn extract_function_parts(s: &str, paren_pos: usize) -> Option<(&str, &str, bool
 
     let args = &s[paren_pos + 1..close_pos];
     Some((name_part, args, true))
+}
+
+#[cfg(test)]
+mod value_span_tests {
+    use super::parse_value_from_source;
+    use bumpalo::Bump;
+    use tsv_lang::Span;
+
+    /// The span `parse_value_from_source` gives the value it parsed.
+    fn value_span(source: &str, start: u32, end: u32) -> Span {
+        let arena = Bump::new();
+        parse_value_from_source(source, Span { start, end }, 0, &arena).span()
+    }
+
+    /// The already-trimmed fast path must agree with the trimming path on where
+    /// the value starts and ends. No corpus can grade this: real declaration
+    /// spans arrive pre-trimmed (200K+ of them without one whitespace byte at
+    /// either end), so the trimming path is only ever reached by inputs a
+    /// stylesheet does not contain — and a span error inside it would sail
+    /// through every fixture and corpus diff in the repo.
+    #[test]
+    fn trims_the_span_the_same_either_way() {
+        // Pre-trimmed (the fast path) — the span comes back untouched.
+        assert_eq!(value_span("red", 0, 3), Span { start: 0, end: 3 });
+        assert_eq!(value_span("a red b", 2, 5), Span { start: 2, end: 5 });
+
+        // Whitespace at either end must come off the span identically.
+        for (source, span, want) in [
+            (" red", (0, 4), (1, 4)),
+            ("red ", (0, 4), (0, 3)),
+            ("  red  ", (0, 7), (2, 5)),
+            ("\tred\t", (0, 5), (1, 4)),
+            ("\nred\n", (0, 5), (1, 4)),
+            // The vertical tab is `White_Space` (so `trim` eats it) but NOT
+            // `u8::is_ascii_whitespace` — asking the `char` is what keeps the
+            // fast path's guard equivalent to the trim it stands in for.
+            ("\x0bred\x0b", (0, 5), (1, 4)),
+            ("\x0cred\x0c", (0, 5), (1, 4)),
+        ] {
+            assert_eq!(
+                value_span(source, span.0, span.1),
+                Span {
+                    start: want.0,
+                    end: want.1
+                },
+                "value span for {source:?}"
+            );
+        }
+    }
+
+    /// A non-ASCII boundary byte cannot settle the question (a lead byte says
+    /// nothing about its char's `White_Space`), so it must fall through to the
+    /// trimming path — where NBSP, which `char::is_whitespace` accepts, is
+    /// trimmed, and a letter is not.
+    #[test]
+    fn non_ascii_boundaries_take_the_trimming_path() {
+        assert_eq!(
+            value_span("\u{a0}red\u{a0}", 0, 7),
+            Span { start: 2, end: 5 }
+        );
+        assert_eq!(value_span("é", 0, 2), Span { start: 0, end: 2 });
+    }
 }

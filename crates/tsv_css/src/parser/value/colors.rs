@@ -95,34 +95,50 @@ fn parse_hue(s: &str) -> Option<(ColorChannel, Option<AngleUnit>)> {
     None
 }
 
+/// The three channels of a color function plus its optional alpha — everything
+/// `parse_rgb` and `parse_hsl` read. A color function has at most four parts, so
+/// they travel as a tuple rather than a heap list, and "at least three channels"
+/// is a fact the type states instead of a length check each caller repeats.
+type ColorArgs<'a> = (&'a str, &'a str, &'a str, Option<&'a str>);
+
+/// The first three parts, plus a fourth if the iterator has one; `None` if there
+/// are fewer than three. Parts past the fourth are discarded — nothing reads one,
+/// so an over-long argument list is still accepted on its first four.
+fn first_channels<'a>(mut parts: impl Iterator<Item = &'a str>) -> Option<ColorArgs<'a>> {
+    let first = parts.next()?;
+    let second = parts.next()?;
+    let third = parts.next()?;
+    Some((first, second, third, parts.next()))
+}
+
 /// Split a color function's argument string into its channel parts across the
 /// CSS Color 4 syntaxes — `c, c, c[, a]`, space-separated `c c c`, and the
 /// slash-alpha form `c c c / a`. Returns `None` if fewer than 3 parts. Shared by
 /// `parse_rgb` and `parse_hsl`, which differ only in how they parse each channel.
-fn split_color_args(args_str: &str) -> Option<Vec<&str>> {
+///
+/// The slash form appends its alpha to the head's parts rather than binding it to
+/// the fourth slot, so a two-channel head like `rgb(1 2 / 3)` reads `3` as the
+/// *blue* channel and carries no alpha — hence the chained iterator rather than a
+/// separate alpha argument. CSS rejects such a value anyway, so nothing depends on
+/// a better answer here.
+fn split_color_args(args_str: &str) -> Option<ColorArgs<'_>> {
     let args_str = args_str.trim();
-    let parts: Vec<&str> = if let Some((head, alpha_part)) = args_str.split_once('/') {
+    if let Some((head, alpha_part)) = args_str.split_once('/') {
         // Slash-alpha form: c c c / a
-        let mut parts = head
-            .split([',', ' '])
-            .filter(|s| !s.is_empty())
-            .map(str::trim)
-            .collect::<Vec<_>>();
-        parts.push(alpha_part.trim());
-        parts
+        first_channels(
+            head.split([',', ' '])
+                .filter(|s| !s.is_empty())
+                .map(str::trim)
+                .chain(std::iter::once(alpha_part.trim())),
+        )
     } else if args_str.contains(',') {
-        // Comma-separated: c, c, c[, a]
-        args_str.split(',').map(str::trim).collect::<Vec<_>>()
+        // Comma-separated: c, c, c[, a] — empties are kept, so `rgb(1,,2)` still
+        // presents three parts (and then fails to parse the empty channel).
+        first_channels(args_str.split(',').map(str::trim))
     } else {
         // Space-separated: c c c
-        args_str
-            .split(' ')
-            .filter(|s| !s.is_empty())
-            .map(str::trim)
-            .collect::<Vec<_>>()
-    };
-
-    (parts.len() >= 3).then_some(parts)
+        first_channels(args_str.split(' ').filter(|s| !s.is_empty()).map(str::trim))
+    }
 }
 
 /// Parse rgb() or rgba() color
@@ -133,15 +149,15 @@ fn split_color_args(args_str: &str) -> Option<Vec<&str>> {
 /// - Percentages: rgb(100% 0% 0%), rgb(100% 0% 0% / 50%)
 /// - None keyword: rgb(255 0 none)
 fn parse_rgb(args_str: &str) -> Option<Color> {
-    let parts = split_color_args(args_str)?;
+    let (red, green, blue, alpha_part) = split_color_args(args_str)?;
 
-    let r = parse_color_channel(parts[0])?;
-    let g = parse_color_channel(parts[1])?;
-    let b = parse_color_channel(parts[2])?;
-    let alpha = if parts.len() > 3 {
-        Some(parse_color_channel(parts[3])?)
-    } else {
-        None
+    let r = parse_color_channel(red)?;
+    let g = parse_color_channel(green)?;
+    let b = parse_color_channel(blue)?;
+    // An absent alpha is fine; a present one that will not parse sinks the color.
+    let alpha = match alpha_part {
+        Some(alpha) => Some(parse_color_channel(alpha)?),
+        None => None,
     };
 
     Some(Color::Rgb { r, g, b, alpha })
@@ -156,15 +172,15 @@ fn parse_rgb(args_str: &str) -> Option<Color> {
 /// - None keyword: hsl(none 50% 50%)
 /// - Alpha as percentage: hsl(0 100% 50% / 50%)
 fn parse_hsl(args_str: &str) -> Option<Color> {
-    let parts = split_color_args(args_str)?;
+    let (hue_part, saturation_part, lightness_part, alpha_part) = split_color_args(args_str)?;
 
-    let (hue, hue_unit) = parse_hue(parts[0])?;
-    let saturation = parse_color_channel(parts[1])?;
-    let lightness = parse_color_channel(parts[2])?;
-    let alpha = if parts.len() > 3 {
-        Some(parse_color_channel(parts[3])?)
-    } else {
-        None
+    let (hue, hue_unit) = parse_hue(hue_part)?;
+    let saturation = parse_color_channel(saturation_part)?;
+    let lightness = parse_color_channel(lightness_part)?;
+    // An absent alpha is fine; a present one that will not parse sinks the color.
+    let alpha = match alpha_part {
+        Some(alpha) => Some(parse_color_channel(alpha)?),
+        None => None,
     };
 
     Some(Color::Hsl {
