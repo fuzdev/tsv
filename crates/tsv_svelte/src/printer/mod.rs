@@ -90,6 +90,13 @@ pub(crate) struct Printer<'a> {
     /// `blocks/await/preceding_sibling_body_long`). Populated once by
     /// [`Printer::mark_root_inline_run_blocks`] before the root content is built.
     root_inline_run_block_starts: RefCell<HashSet<u32>>,
+    /// Memoized name-derived tag facts ([`TagFacts`](classification::element::TagFacts)),
+    /// indexed by interned symbol id. Symbol ids are small dense per-document integers (the
+    /// interner's tenants are element/attribute names), so a plain vector indexes them
+    /// directly; `0` marks a never-computed slot. The element/fragment/sibling paths ask the
+    /// same tag-name questions many times per element, and every answer is a pure function of
+    /// the name — see [`Printer::tag_facts`].
+    tag_facts_cache: RefCell<Vec<u16>>,
 }
 
 impl<'a> Printer<'a> {
@@ -129,6 +136,7 @@ impl<'a> Printer<'a> {
             line_breaks,
             block_dangle_allowed: Cell::new(true),
             root_inline_run_block_starts: RefCell::new(HashSet::new()),
+            tag_facts_cache: RefCell::new(Vec::new()),
         }
     }
 
