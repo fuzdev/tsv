@@ -1366,6 +1366,28 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Prefix a for-header declaration's `continuation` (the declarator run, or the
+    /// for-of/for-in binding) with its `kind` keyword plus any comment in the
+    /// keyword→binding gap (`for (const /* c */ x of y)`, `for (let /* c */ i = 0;
+    /// …)`). Routes through `build_keyword_to_name_continuation` — the same helper the
+    /// standalone declaration uses — so the gap comment isn't dropped; byte-identical
+    /// to `kind + " " + continuation` when the gap is comment-free, so a caller's
+    /// enclosing `group`/`indent` is preserved. A for-header declaration is never
+    /// `declare`, so `keyword_end` is just past the `kind` keyword.
+    fn build_for_decl_keyword_gap(
+        &self,
+        decl: &internal::VariableDeclaration<'_>,
+        binding_start: u32,
+        continuation: DocId,
+    ) -> DocId {
+        let d = self.d();
+        let keyword_end = decl.span.start + decl.kind.as_str().len() as u32;
+        d.concat(&[
+            d.text(decl.kind.as_str()),
+            self.build_keyword_to_name_continuation(keyword_end, binding_start, continuation),
+        ])
+    }
+
     fn build_for_init_doc(&self, init: &internal::ForInit<'_>) -> DocId {
         let d = self.d();
         // The init clause is `[~In]`: an `in` binary must be parenthesized so it
@@ -1419,16 +1441,22 @@ impl<'a> Printer<'a> {
                     }
                     decl_docs.push(d.concat(&one));
                 }
-                let kind = d.text(decl.kind.as_str());
+                // The keyword→first-declarator gap carries a comment (`for (let /* c */
+                // i = 0; …)`) that must not be dropped — see `build_for_decl_keyword_gap`.
+                let first_decl_start = decl.declarations[0].span.start;
                 if decl.declarations.len() > 1 {
                     // Multiple declarators break on width: they stay on one line when the
                     // init clause fits and drop onto their own lines (continuation
                     // indented one level) when it doesn't — matching prettier's
                     // `printVariableDeclaration`. A declarator whose `=` comment forces a
                     // break also breaks the group (its hardline propagates).
-                    d.group(d.concat(&[kind, d.text(" "), d.indent(d.concat(&decl_docs))]))
+                    d.group(self.build_for_decl_keyword_gap(
+                        decl,
+                        first_decl_start,
+                        d.indent(d.concat(&decl_docs)),
+                    ))
                 } else {
-                    d.concat(&[kind, d.text(" "), d.concat(&decl_docs)])
+                    self.build_for_decl_keyword_gap(decl, first_decl_start, d.concat(&decl_docs))
                 }
             }
             internal::ForInit::Expression(expr) => {
@@ -1469,11 +1497,14 @@ impl<'a> Printer<'a> {
         let d = self.d();
         match left {
             internal::ForInOfLeft::VariableDeclaration(decl) => {
-                let mut parts: DocBuf = smallvec![d.text(decl.kind.as_str()), d.text(" ")];
-                if let Some(declarator) = decl.declarations.first() {
-                    parts.push(self.build_expression_doc(&declarator.id));
-                }
-                d.concat(&parts)
+                let Some(declarator) = decl.declarations.first() else {
+                    return d.concat(&[d.text(decl.kind.as_str()), d.text(" ")]);
+                };
+                // The keyword→binding gap carries a comment (`for (const /* c */ x of y)`)
+                // that must not be dropped — see `build_for_decl_keyword_gap`. Covers
+                // `const`/`let`/`var`/`using`/`await using` uniformly.
+                let id_doc = self.build_expression_doc(&declarator.id);
+                self.build_for_decl_keyword_gap(decl, declarator.span.start, id_doc)
             }
             // `for ((async) of x)` keeps parens around the bare `async` identifier
             // (the caller decides via `wrap_async_paren` — a non-await for-of, where
