@@ -178,6 +178,25 @@ inputs, so the corpus AST differential is the regression oracle.
   `expression.loc.end` entries; offsets and `loc.start` are never absorbed, so
   a real loc bug still surfaces as undocumented.
 
+- **Typed block-pattern `end`/`loc` split** — reproduced, not corrected. Svelte's
+  `read_pattern` (`1-parse/read/context.js`) handles a typed block binding two
+  different ways, and tsv matches both. For a plain identifier
+  (`{#each xs as item: T}`) it returns the identifier with `start`/`end`/`loc`
+  untouched and the annotation as a sibling field — so the binding's span covers
+  only the name, unlike an ordinary TS binding identifier, whose span is
+  tail-anchored over its `: T`. For a **destructuring** pattern
+  (`{#each xs as { a }: T}`, `{:then { a }: T}`, `{:catch { a }: T}`) it patches
+  `expression.end = typeAnnotation.end` but **never touches `expression.loc`** —
+  so `end` and `loc.end` genuinely disagree. tsv keeps the internal span on the
+  bare pattern (which `loc` derives from) and widens only the emitted `end`, via a
+  `max` in the wire writer, so a plain signature parameter — whose span already
+  covers its annotation — is unaffected. Same context-reparse-loc family as the
+  each-`as` correction above and the block binding-pattern interior-comment column
+  offset below, but here the quirk is *matched* rather than fixed: it is a shape in
+  the wire AST, not a slip in a position tsv can independently derive. Pinned by
+  [each/typed_context_destructured](../tests/fixtures/svelte/blocks/each/typed_context_destructured/)
+  and [await/typed_value_destructured](../tests/fixtures/svelte/blocks/await/typed_value_destructured/).
+
 ### TypeScript Corrections
 
 Svelte uses acorn + acorn-typescript, which lags behind TypeScript's parser. tsv implements the full spec.

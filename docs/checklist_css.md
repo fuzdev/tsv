@@ -69,6 +69,9 @@ Foundation for all CSS parsing. Spec: `css-syntax-3` (REC)
 - Escapes preserved verbatim in at-rule preludes (`@keyframes \@mymove`, `\31 23` — serialized raw, not decoded)
 - Escapes in strings
 - Surrogate pair handling
+- An escape's payload is content, not padding — a trailing escaped whitespace survives trimming and line-wrapping in every position (`width: 50px\ ;`, `url(x\ )`, `@layer a\ ;`, `.a\ , .b`), so the backslash never strands onto the following delimiter. Prettier corrupts these into forms that no longer parse; see [conformance_prettier.md §CSS: Values](conformance_prettier.md#css-values) and [§CSS: At-Rules](conformance_prettier.md#css-at-rules)
+- A hex escape's optional whitespace terminator belongs to the escape and is absorbed exactly once (`\41 2px` is the single ident `A2px`, never `A` + `2px`)
+- Non-CSS whitespace is value content, not separator — an NBSP or U+3000 in a value or selector survives verbatim (`.a<NBSP>, .b` keeps its class name)
 
 ---
 

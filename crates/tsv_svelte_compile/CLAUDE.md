@@ -96,7 +96,7 @@ project-wide conventions.
   nothing is allocated; a rebuilt node shallow-clones (children are `&'arena T`,
   so pointers move, never subtrees). The `Statement` and `Expression` matches are
   **exhaustive, no catch-all** — a new AST variant fails compilation here rather
-  than silently passing TypeScript through, and `TSType`'s 21 variants are never
+  than silently passing TypeScript through, and `TSType`'s 23 variants are never
   visited (they hang off the dropped `Option` fields). That exhaustiveness plus
   the `None` contract is the whole safety argument: re-running the eraser over the
   *finished* program and getting no change PROVES no TypeScript survived — the one
@@ -154,7 +154,8 @@ project-wide conventions.
   expression, or a member/call whose root (`is_safe_identifier`) is not a plain
   identifier or is a prop/import binding — a plain local, a global, and rune
   bindings stay safe. A member/call rooted at a prop/import that is *also* bound
-  in a nested scope is ambiguous for this name-based port and refuses. Descends
+  in a nested scope is ambiguous for this name-based port and refuses, as does one
+  rooted at an escaped identifier (classification not ported). Descends
   into `{#snippet}` bodies (a function-like subtree — a `new`/prop-rooted access
   there still fires the flag) and `{@render}` arguments.
 - `snippet.rs` — the `{#snippet}` hoist analysis (name-based port of Svelte's

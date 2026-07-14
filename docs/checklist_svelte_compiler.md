@@ -10,7 +10,7 @@ The compiler targets **server (SSR) output for runes-mode components**, measured
 
 - **Supported** — compiles, and the canonical form matches the oracle's byte-for-byte;
 - **Refused** — `compile` returns `CompileError::Unsupported(Refusal)`, a typed refusal from the inventory in `crates/tsv_svelte_compile/src/refusal.rs`, never guessed output;
-- **a bug** — both sides compile and the canonical forms differ (`compile_corpus_compare`'s MISMATCH bucket), or generated JS fails its reparse self-validation (`CompileError::CorruptOutput`).
+- **a bug** — both sides compile and the canonical forms differ (`compile_corpus_compare`'s MISMATCH bucket), generated JS fails its reparse self-validation (`CompileError::CorruptOutput`), or a TypeScript-only node survives type erasure (`CompileError::TypeErasureLeak`).
 
 Inputs the oracle itself rejects (legacy-mode syntax, invalid JS, TypeScript in a plain script) are out of scope for parity — the corpus runner buckets them ORACLE_REJECTED.
 
@@ -53,9 +53,10 @@ The oracle wraps the whole component body in `$$renderer.component(($$renderer) 
 
 **`is_safe_identifier` rule** (`2-analyze/visitors/shared/utils.js:175-194`): walk a member chain down `.object` to its root; a non-identifier root is unsafe; an identifier root is unsafe when its binding's `declaration_kind` is `import` or its `kind` is `prop`/`bindable_prop`/`rest_prop`. A plain local, a global (no binding), and rune bindings (`state`, `derived`, …) are safe.
 
-tsv ports this as `needs_context.rs`, folding props + imports into a name set. `$effect` forces the wrapper through its own dropped-statement path; `$bindable` is refused by the rune guard. Because the port is name-based where the oracle is scope-sensitive, one shape is genuinely ambiguous and refuses:
+tsv ports this as `needs_context.rs`, folding props + imports into a name set. `$effect` forces the wrapper through its own dropped-statement path; `$bindable` is refused by the rune guard. Because the port is name-based where the oracle is scope-sensitive, two shapes can't be classified and refuse:
 
 - **Refused**: `` member/call rooted at prop/import `{name}` that is also bound in a nested scope (needs_context classification ambiguous) ``
+- **Refused**: `member/call rooted at an escaped identifier (classification not ported)` — the root's name can't be read from its raw span.
 
 ### `$$props` coupling — Supported
 

@@ -402,6 +402,34 @@ cargo run -p tsv_debug arena_stats <paths> --reuse         # reset()-reuse high-
 cargo run -p tsv_debug arena_stats <paths> --list-errors   # list parse-skipped files
 ```
 
+### 8. `tsv_debug compile_profile` — Svelte compile against the format wall
+
+Times the Svelte compiler (`tsv_svelte_compile::compile`) per file and reports it
+as a **ratio** against parsing plus formatting the same file. The ratio is the
+point: it says how many times the format wall a compile costs, which is the cheap
+tripwire for super-linear or rebuilt work in the compile pipeline. The design
+frame is ~2–3× for an all-linear pipeline.
+
+The two rows deliberately keep different shapes, so the number means what it says:
+`compile` is the whole **cold per-call** cost (the compiler has no warm arena-reuse
+entry point, so that *is* its production shape), while `parse + format` uses warm
+`reset()`-reuse arenas (the `tsv_cli` shape). **Compare ratios only against ratios
+from this same command** — never against a raw timing from `profile`.
+
+Refusals and parse failures are counted, not timed. A `CorruptOutput` or a
+`TypeErasureLeak` is a compiler bug and fails the run. Pure Rust, no Deno; run with
+`--release` for anchors.
+
+```bash
+cargo run --release -p tsv_debug -- compile_profile tests/fixtures_compile
+cargo run --release -p tsv_debug -- compile_profile ../svelte/packages/svelte/tests/runtime-runes
+cargo run --release -p tsv_debug -- compile_profile <paths> --iterations 20 --json
+```
+
+Because the ratio is relative to the corpus it ran on, a compiled corpus that
+*grows* (a refusal class getting unlocked) reshapes the denominator — so an anchor
+is only comparable to another anchor over the same corpus.
+
 ## Measurement Process
 
 ### Before an optimization

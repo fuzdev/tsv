@@ -418,6 +418,8 @@ cargo run --release -p tsv_debug -- profile file.ts --iterations 20  # more iter
 # Also: --json (machine-readable)
 
 cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib   # parse vs wire-JSON write timing
+
+cargo run --release -p tsv_debug -- compile_profile tests/fixtures_compile  # Svelte compile vs the format wall
 ```
 
 For function-level hotspots, use `perf` with the `profiling` cargo profile:
@@ -749,10 +751,14 @@ cargo run -p tsv_debug compile_corpus_compare <paths...>
 # statements, `: T` annotations, type params/args, as/satisfies/! tails, type-only
 # imports/exports, declare items) and counts comments intersecting an erased span's refusal
 # window — the span extended to the next surviving token, so `let x: Foo /* c */ = v` counts
-# while a leading JSDoc on an erased interface (which survives erasure) does not. Also flags
-# cheaply-detectable non-TS blockers (directives/spread, special elements, module scripts,
-# option/select, instance exports) to approximate "type stripping is this file's only blocker";
-# runes/derived/evaluator refusals are NOT detected, so that bucket is an approximation.
+# while a leading JSDoc on an erased interface (which survives erasure) does not. The census
+# measures the FORWARD half of that window only, while the compiler's real refusal window is
+# bidirectional (it also reaches BACKWARD over a detached erased region — a return type, an
+# `implements` clause, a `<T>` list — where a comment can sit between the region and the token
+# before it). So the exposure rate this reports is a LOWER BOUND on the true refusal rate.
+# Also flags cheaply-detectable non-TS blockers (directives/spread, special elements, module
+# scripts, option/select, instance exports) to approximate "type stripping is this file's only
+# blocker"; runes/derived/evaluator refusals are NOT detected, so that bucket is an approximation.
 cargo run --release -p tsv_debug -- erase_comment_census ../fuz_ui ../zzz
 # Also: --verbose (per exposed file), --json.
 
@@ -878,8 +884,8 @@ cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib
 # shape) vs parse + format of the same file (warm reset-reuse arenas, the tsv_cli shape).
 # Headline = the ratio column, compile / (parse + format): the compile-multiple over the format
 # wall (design frame ~2-3x for the all-linear pipeline) — the cheap tripwire for super-linear or
-# rebuilt work. Refusals/parse failures are counted, not timed; a CorruptOutput is a compiler
-# bug and fails the run. Compare ratios only against ratios from this same command (the two
+# rebuilt work. Refusals/parse failures are counted, not timed; a CorruptOutput or a
+# TypeErasureLeak is a compiler bug and fails the run. Compare ratios only against ratios from this same command (the two
 # rows keep their own production shapes on purpose). Run with --release for anchors.
 cargo run --release -p tsv_debug -- compile_profile tests/fixtures_compile
 cargo run --release -p tsv_debug -- compile_profile ../svelte/packages/svelte/tests/runtime-runes
