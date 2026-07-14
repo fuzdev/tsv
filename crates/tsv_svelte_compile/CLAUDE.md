@@ -52,26 +52,39 @@ project-wide conventions.
     ordinary JS and clones through), `svelte/internal*` imports and
     `beforeUpdate`/`afterUpdate` imports from `svelte` (the oracle's runes-mode
     import rules), `{@debug}`, the still-refused attribute directives
-    (a legacy `on:` directive and `let:`) — an element `{...spread}` alongside
-    only plain attributes and other spreads is **emitted** as the fused
+    (a legacy `on:` directive and `let:`) — an element `{...spread}` (alone, or
+    co-present with `class:` / `style:` / `bind:` / the no-op drop family) is
+    **emitted** as the fused
     `$.attributes(object, css_hash, classes, styles, flags)` call
     (`element.rs::emit_spread_attributes`): the whole attribute set becomes the
-    object (plain attributes → `key: value` properties, event handlers /
+    object (plain attributes → `key: value` properties, a `bind:` core kind →
+    its synthesized `value`/`checked` property at the bind's slot, event handlers /
     `defaultValue` dropped, spreads → `...expr`), the scope hash rides the
     `css_hash` argument (not concatenated into the class value as in the
-    non-spread path), and `<input>` / a custom element set the `flags` argument
+    non-spread path; a static-class token OR a `class:` directive name scopes),
+    the `class:` directives ride the `classes` argument (the oracle's
+    `b.init(name, expr)` — identifier keys, case-preserved, with the
+    object-shorthand collapse — `attribute::build_spread_class_object`), the
+    `style:` directives ride the `styles` argument (a **FLAT** object, **no**
+    `|important` partitioning — the divergence from the non-spread
+    `$.attr_style` array — `attribute::build_spread_style_object`), and `<input>`
+    / a custom element set the `flags` argument
     (trailing absent args elide, interior ones become `void 0`); a spread
-    co-present with any directive, on a `<select>` (the `$$renderer.select`
-    trap), or on a load-error element refuses (`Refusal::SpreadWithDirective` /
-    `SpreadOnSelect` / `SpreadOnLoadErrorElement`) — a `class:` / `style:`
-    directive on a **regular element** is
+    co-present with a legacy `on:`/`let:` refuses (`Refusal::NonPlainAttribute`),
+    and a spread on a `<select>` (the `$$renderer.select`
+    trap) or on a load-error element refuses (`SpreadOnSelect` /
+    `SpreadOnLoadErrorElement`) — a `class:` / `style:`
+    directive on a **regular element without a spread** is
     instead **emitted** as the fused `$.attr_class(base, hash, {…})` /
     `$.attr_style(base, {…})` call (`element.rs` /
-    `attribute.rs`), and a `bind:` **core kind** on a regular element is
+    `attribute.rs`), and a `bind:` **core kind** on a regular element without a
+    spread is
     **handled** by `attribute::emit_bind_directive` (`bind:this` omits;
     `bind:value`/`bind:checked`/`bind:group` on `<input>` synthesize a
     `$.attr(...)` for a `$state`-rooted target; every other `bind:` refuses via
-    `Refusal::BindDirective { name }`); the no-op drop family (`use:`/`transition:`/`in:`/`out:`/
+    `Refusal::BindDirective { name }`) — both the inline and spread `bind:` paths
+    share one `attribute::resolve_bind_directive` validity fork; the no-op drop
+    family (`use:`/`transition:`/`in:`/`out:`/
     `animate:`/`{@attach}`) is instead **dropped** on a regular element, its
     expression still guarded (a stray rune / `await` refuses) and still walked for
     scope analysis, except a `use:` on a load-error element, which refuses because
@@ -345,11 +358,18 @@ project-wide conventions.
   → one fused `$.attributes(object, css_hash, classes, styles, flags)` call
   (`<name${$.attributes(…)}>`): `build_element_spread_object` builds the
   source-order object (plain attributes via `attribute::build_spread_object_property`,
-  spreads as `...expr`), the scope hash rides `css_hash` (matched classes recorded
-  in `matched_classes`), `<input>` / a custom element (hyphenated tag or `is`
+  a `bind:` core kind's synthesized `value`/`checked` property at its slot via
+  `attribute::build_bind_object_property`, spreads as `...expr`), the scope hash
+  rides `css_hash` (a static-class token OR a `class:` directive name scopes;
+  matched classes recorded in `matched_classes`), the `class:` directives ride
+  `classes` (`attribute::build_spread_class_object` — identifier keys + shorthand)
+  and the `style:` directives ride `styles`
+  (`attribute::build_spread_style_object` — a FLAT object, no `|important`
+  partition), `<input>` / a custom element (hyphenated tag or `is`
   attribute) set `flags` (`4` / `2`), and `elide_call_args` applies the oracle's
   `b.call` elision (trailing `void 0` dropped, interior padded). A co-present
-  directive, a `<select>`, or a load-error element refuses. The non-spread path
+  `on:`/`let:`, a `<select>`, or a load-error element refuses; the drop family is
+  guarded-and-dropped. The non-spread path
   (`emit_plain_attributes`) pre-scans a
   regular element's `class:` and `style:` directives and defers them to
   `attribute::emit_class_directives` / `attribute::emit_style_directives` (each
@@ -390,7 +410,9 @@ project-wide conventions.
   attribute loop pre-scans the `class:` and `style:` directives and calls these at
   the authored slot (or after all plain attributes when synthetic). Also
   `emit_bind_directive` — a `bind:` **core kind** on a regular element, emitted
-  inline at its source slot: `bind:this` omits (any variable, any element — no
+  inline at its source slot (delegating to `resolve_bind_directive`, the validity
+  fork the spread `build_bind_object_property` shares so the two never drift):
+  `bind:this` omits (any variable, any element — no
   `$state` gate), but only for a valid bind target (an Identifier/member chain or a
   `{get, set}` pair); a non-lvalue target (a call/literal/logical) refuses
   (`bind_invalid_expression`). `bind:value` on `<input>` → `$.attr('value', expr)`;
@@ -415,7 +437,15 @@ project-wide conventions.
   `build_spread_object_property` — one `key: value` object property from a plain
   attribute (key lowercased, `shorthand` on a same-named identifier value), `None`
   for a dropped attribute (a single-expression event handler — still guarded — and
-  `defaultValue`/`defaultChecked`).
+  `defaultValue`/`defaultChecked`). And the three spread-directive builders:
+  `build_bind_object_property` (a `bind:` core kind's `value`/`checked` property via
+  the shared `resolve_bind_directive` — `bind:this`/a no-companion `bind:group`/an
+  `omit_in_ssr` bind yield `None`, the last **skipped** on the spread path where the
+  inline path refuses it), `build_spread_class_object` (the `classes` argument —
+  identifier keys, case-preserved, with the object-shorthand collapse the oracle's
+  `b.init` applies, checked on the RAW directive expression), and
+  `build_spread_style_object` (the `styles` argument — a FLAT object, `|important`
+  validated but NOT partitioned, reusing `build_style_property`).
 - `css_scope.rs` — minimal CSS scoping (single class selectors: the
   `svelte-tsvhash` class appended to matched elements and
   **source-spliced** into the style text — the author's whitespace is

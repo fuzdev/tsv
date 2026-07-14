@@ -32,6 +32,55 @@ pub(crate) fn is_load_error_element(name: &str) -> bool {
     LOAD_ERROR_ELEMENTS.contains(&name)
 }
 
+/// The `bind:` names Svelte's `binding_properties` marks `omit_in_ssr` — media,
+/// dimension, window, and readback bindings (`bindings.js`) that produce **no** SSR
+/// output. The oracle's server `BindDirective` handling skips them with an early
+/// `continue`, before it visits the target (`shared/element.js`). `this` is
+/// `omit_in_ssr` too but is handled separately (it carries `{get, set}`/lvalue
+/// validation and skips on both the inline and spread paths), so it is excluded
+/// here. Membership is by exact (case-sensitive) name, matching
+/// `binding_properties[attribute.name]`.
+const OMIT_IN_SSR_BINDS: &[&str] = &[
+    "currentTime",
+    "duration",
+    "paused",
+    "buffered",
+    "seekable",
+    "played",
+    "volume",
+    "muted",
+    "playbackRate",
+    "seeking",
+    "ended",
+    "readyState",
+    "videoHeight",
+    "videoWidth",
+    "naturalWidth",
+    "naturalHeight",
+    "activeElement",
+    "fullscreenElement",
+    "pointerLockElement",
+    "visibilityState",
+    "innerWidth",
+    "innerHeight",
+    "outerWidth",
+    "outerHeight",
+    "scrollX",
+    "scrollY",
+    "online",
+    "devicePixelRatio",
+    "clientWidth",
+    "clientHeight",
+    "offsetWidth",
+    "offsetHeight",
+    "contentRect",
+    "contentBoxSize",
+    "borderBoxSize",
+    "devicePixelContentBoxSize",
+    "indeterminate",
+    "files",
+];
+
 /// The DOM boolean attributes (the oracle's `DOM_BOOLEAN_ATTRIBUTES`): a
 /// dynamic value on one of these emits `$.attr(name, value, true)`.
 // TODO: consider a home in tsv_html beside the element classification tables.
@@ -683,6 +732,101 @@ fn build_class_directives_object<'arena>(
     }))
 }
 
+/// Build the `classes` (3rd) argument of a spread element's `$.attributes(…)` call
+/// from its `class:` directives (the oracle's `prepare_element_spread`, which uses
+/// `b.init(directive.name, …)`). Unlike the non-spread `$.attr_class` object
+/// ([`build_class_directives_object`], string-literal keys), this uses an
+/// **identifier key** (a quoted string literal only when the name isn't
+/// identifier-safe, e.g. `class:foo-bar` → `{ 'foo-bar': x }`) with the
+/// **object-shorthand** collapse the oracle's `b.init` applies: `class:active`
+/// (shorthand) and `class:active={active}` both → `{ active }`, `class:active={x}` →
+/// `{ active: x }`. Class names are **case-sensitive** (never lowercased). The
+/// same-named-identifier fork reads the **raw** directive expression, mirroring the
+/// oracle's `directive.expression.type === 'Identifier' && … === directive.name`
+/// (a `class:active={active as T}` is not shorthand — the raw node is a
+/// `TSAsExpression` — and its value is the erased/guarded expression).
+pub(crate) fn build_spread_class_object<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    class_directives: &[&'arena ClassDirective<'arena>],
+) -> Result<Expression<'arena>, CompileError> {
+    let arena = env.b.arena;
+    let obrace = env.b.mint("{").start;
+    let mut properties: BumpVec<'arena, ObjectProperty<'arena>> = BumpVec::new_in(arena);
+    for directive in class_directives {
+        let name = directive.name_span.extract(env.source).to_string();
+        // The oracle's same-named-identifier shorthand fork, read on the RAW node:
+        // the value is the bare `b.id(directive.name)` (no transform / derived
+        // rewrite), exactly like a `style:` shorthand.
+        let same_named = matches!(&directive.expression, Expression::Identifier(id)
+            if plain_identifier_name(id, env.source).as_deref() == Some(name.as_str()));
+        let (value, is_shorthand_id) = if same_named {
+            (Expression::Identifier(env.b.ident(&name)), true)
+        } else {
+            // The template borrow point: erase once, then guard + rewrite a bare
+            // derived read to `d()`.
+            let expr = env.erase(&directive.expression)?;
+            (wrap_value_expr(env, expr)?[0].clone(), false)
+        };
+        let key_is_ident = is_js_identifier(&name);
+        let shorthand = is_shorthand_id && key_is_ident;
+        let (key, key_span) = if key_is_ident {
+            let id = env.b.ident(&name);
+            let span = id.span;
+            (Expression::Identifier(id), span)
+        } else {
+            let key = env.b.string_literal_expr(&name);
+            let span = key.span();
+            (key, span)
+        };
+        properties.push(ObjectProperty::Property(Property {
+            key,
+            value,
+            kind: PropertyKind::Init,
+            shorthand,
+            computed: false,
+            method: false,
+            span: key_span,
+        }));
+    }
+    let cbrace = env.b.mint("}").end;
+    Ok(Expression::ObjectExpression(ObjectExpression {
+        properties: properties.into_bump_slice(),
+        spread_trailing_comma: false,
+        span: Span::new(obrace, cbrace),
+    }))
+}
+
+/// Build the `styles` (4th) argument of a spread element's `$.attributes(…)` call
+/// from its `style:` directives (the oracle's `prepare_element_spread`). A **flat**
+/// object `{ prop: value, … }` in source order — **no** `|important` partitioning
+/// (the CRITICAL divergence from the non-spread `$.attr_style` path, which builds
+/// the `[ {normal}, {important} ]` array): in spread mode the oracle's
+/// `build_attribute_value(directive.value, …, true)` folds every directive into one
+/// object regardless of modifier. `|important` is still **validated** (only a single
+/// `|important` is legal, else refuse) but does not partition. Reuses
+/// [`build_style_property`] for the per-property build (key lowercasing / quoting,
+/// shorthand).
+pub(crate) fn build_spread_style_object<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    style_directives: &[&'arena StyleDirective<'arena>],
+) -> Result<Expression<'arena>, CompileError> {
+    let arena = env.b.arena;
+    let obrace = env.b.mint("{").start;
+    let mut properties: BumpVec<'arena, ObjectProperty<'arena>> = BumpVec::new_in(arena);
+    for directive in style_directives {
+        validate_style_modifiers(directive)?;
+        properties.push(ObjectProperty::Property(build_style_property(
+            env, directive,
+        )?));
+    }
+    let cbrace = env.b.mint("}").end;
+    Ok(Expression::ObjectExpression(ObjectExpression {
+        properties: properties.into_bump_slice(),
+        spread_trailing_comma: false,
+        span: Span::new(obrace, cbrace),
+    }))
+}
+
 /// Emit the fused `$.attr_class(base, css_hash, { name: expr, … })` call for a
 /// regular element carrying `class:` directives (the oracle's `build_attr_class`,
 /// `shared/element.js`). `class_attr` is the authored `class` attribute when
@@ -1146,53 +1290,80 @@ fn build_companion_value<'arena>(
     }
 }
 
-/// Emit a `bind:` directive on a regular `<input>`/element (the oracle's server
-/// `BindDirective` handling in `shared/element.js`). The handled core kinds:
+/// The SSR emission a `bind:` **core kind** reduces to, independent of whether the
+/// element carries a `{...spread}` — the fork the inline (`emit_bind_directive`)
+/// and spread (`build_bind_object_property`) callers share so the two never drift.
+enum BindEmission<'arena> {
+    /// The synthesized attribute `name = value` (`bind:value`/`bind:checked`, or
+    /// `bind:group`'s synthesized `checked`). `boolean` picks the inline
+    /// `$.attr(name, value, true)` boolean form; the spread object drops it (the
+    /// object property is just `name: value`).
+    Attr {
+        name: &'static str,
+        value: Expression<'arena>,
+        boolean: bool,
+    },
+    /// Emit nothing on BOTH paths: a valid `bind:this`, or a `bind:group` with no
+    /// companion `value` attribute (the oracle silently drops it).
+    Omit,
+    /// An `omit_in_ssr` bind ([`OMIT_IN_SSR_BINDS`]): the oracle drops it from SSR
+    /// entirely (its early `continue`). The inline path **refuses** it (a safe
+    /// over-refusal, unchanged from the non-spread slice); the spread path **skips**
+    /// it, matching the oracle.
+    OmitInSsr,
+}
+
+/// Resolve a `bind:` **core kind** on a regular `<input>`/element to its SSR
+/// emission (the oracle's server `BindDirective` handling in `shared/element.js`),
+/// applying every validity gate. Shared by the inline and spread callers so a bind
+/// is validated identically whether or not the element also carries a spread:
 ///
-/// - **`bind:this`** → omit (emit nothing). Valid on any variable / any element,
-///   with no `$state` gate, but the target must be one of the oracle's three
-///   accepted forms — an Identifier, a member chain, or a `{get, set}` pair; any
-///   other shape is `bind_invalid_expression` (refuse).
-/// - **`bind:value`** on `<input>` → `$.attr('value', expr)`. A bare `type` is
+/// - **`bind:this`** → [`BindEmission::Omit`] (no output). Valid on any variable /
+///   any element, no `$state` gate, but the (erased) target must be one of the
+///   oracle's three accepted forms — an Identifier, a member chain, or a
+///   `{get, set}` pair; any other shape is `bind_invalid_expression` (refuse).
+/// - **`omit_in_ssr` binds** → [`BindEmission::OmitInSsr`] (each caller decides).
+/// - **`bind:value`** on `<input>` → `Attr { "value", .. }`. A bare `type` is
 ///   `attribute_invalid_type` (refuse); a static `type="file"` is the files trap
-///   the oracle silently drops the bind for (refuse rather than emit a divergent
-///   value); a dynamic `type={x}` / static-non-file / no type is fine.
-/// - **`bind:checked`** on `<input>` → `$.attr('checked', expr, true)`; requires a
-///   static `type="checkbox"` (else the oracle rejects).
+///   the oracle silently drops (refuse rather than emit a divergent value); a
+///   dynamic `type={x}` / static-non-file / no type is fine.
+/// - **`bind:checked`** on `<input>` → `Attr { "checked", .., boolean }`; requires
+///   a static `type="checkbox"` (else the oracle rejects).
 /// - **`bind:group`** on `<input>` with a static `type` → a synthesized
-///   `$.attr('checked', <synth>, true)` where `<synth>` is
-///   `group.includes(<value>)` for `type="checkbox"` else `group === <value>`, and
-///   `<value>` is the companion `value` attribute's value. No companion `value` →
-///   the oracle silently drops the bind (emit nothing). The companion `value` still
-///   emits normally at its own source slot — it is only READ here.
+///   `Attr { "checked", <synth>, .. }` where `<synth>` is `group.includes(<value>)`
+///   for `type="checkbox"` else `group === <value>`, and `<value>` is the companion
+///   `value` attribute's value. No companion `value` → [`BindEmission::Omit`]. The
+///   companion `value` still emits normally at its own source slot — it is only
+///   READ here.
 ///
-/// Everything else `bind:`-related refuses with the collapsing
-/// [`Refusal::BindDirective`] bucket: a bind on a non-`<input>` target, `value` on
-/// `<textarea>`/`<select>`, the `omit_in_ssr` media/dimension/window binds, the
+/// Everything else refuses with the collapsing [`Refusal::BindDirective`] bucket: a
+/// bind on a non-`<input>` target, `value` on `<textarea>`/`<select>`, the
 /// content-editable trio, `open`, `focused`, an invalid target/type, or a bind
 /// expression that isn't a `$state`-rooted lvalue.
-pub(crate) fn emit_bind_directive<'arena>(
+fn resolve_bind_directive<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     directive: &'arena BindDirective<'arena>,
     element: &'arena Element<'arena>,
     element_name: &str,
-    out: &mut BodyBuilder<'arena>,
-) -> Result<(), CompileError> {
+) -> Result<BindEmission<'arena>, CompileError> {
     let bind_name = directive.name_span.extract(env.source).to_string();
 
-    // `bind:this` omits on any regular element (the oracle's early `continue`) and
-    // works for any variable — no `$state` gate, so a plain `let` is a valid target,
-    // not only `$state`. But the target must still be a valid bind expression: gate
-    // to an Identifier/member chain, or the `{get, set}` pair (the oracle's three
-    // accepted forms — anything else is `bind_invalid_expression`), erasing a
-    // `bind:this={x as T}` TS wrapper first. Nothing is emitted for a valid target
-    // (so it stays comment-safe: no synthetic call whose windows could sweep).
+    // `bind:this` (itself an `omit_in_ssr` bind, but with the `{get, set}`/lvalue
+    // validation and a skip — not a refusal — on the inline path too). Erase a
+    // `bind:this={x as T}` TS wrapper first.
     if bind_name == "this" {
         let expr = env.erase(&directive.expression)?;
         if bind_target_root(expr, env.source).is_some() || is_get_set_pair(expr) {
-            return Ok(());
+            return Ok(BindEmission::Omit);
         }
         return refuse_bind(&bind_name);
+    }
+
+    // Every other `omit_in_ssr` bind: the oracle skips it before visiting the
+    // target. `value`/`checked`/`group`/`open`/`focused`/the content-editable trio
+    // are NOT `omit_in_ssr`, so they fall through to the dispatch below.
+    if OMIT_IN_SSR_BINDS.contains(&bind_name.as_str()) {
+        return Ok(BindEmission::OmitInSsr);
     }
 
     match (bind_name.as_str(), element_name) {
@@ -1206,7 +1377,11 @@ pub(crate) fn emit_bind_directive<'arena>(
                 _ => {}
             }
             let value = emitted_bind_target(env, directive, &bind_name)?;
-            push_bind_attr(env, "value", value, false, out)
+            Ok(BindEmission::Attr {
+                name: "value",
+                value,
+                boolean: false,
+            })
         }
         ("checked", "input") => {
             // `bind:checked` requires a static `type="checkbox"` (a dynamic / bare /
@@ -1216,7 +1391,11 @@ pub(crate) fn emit_bind_directive<'arena>(
                 _ => return refuse_bind(&bind_name),
             }
             let value = emitted_bind_target(env, directive, &bind_name)?;
-            push_bind_attr(env, "checked", value, true, out)
+            Ok(BindEmission::Attr {
+                name: "checked",
+                value,
+                boolean: true,
+            })
         }
         ("group", "input") => {
             // A static `type` is required (a dynamic / bare type is
@@ -1234,7 +1413,7 @@ pub(crate) fn emit_bind_directive<'arena>(
             let group = emitted_bind_target(env, directive, &bind_name)?;
             // No companion `value` → the oracle silently drops the bind.
             let Some(value_attr) = find_value_attribute(env, element) else {
-                return Ok(());
+                return Ok(BindEmission::Omit);
             };
             let value = build_companion_value(env, value_attr)?;
             let arena = env.b.arena;
@@ -1250,9 +1429,80 @@ pub(crate) fn emit_bind_directive<'arena>(
                 env.b
                     .binary(group_alloc, BinaryOperator::EqualsEqualsEquals, value_alloc)
             };
-            push_bind_attr(env, "checked", synth, true, out)
+            Ok(BindEmission::Attr {
+                name: "checked",
+                value: synth,
+                boolean: true,
+            })
         }
         _ => refuse_bind(&bind_name),
+    }
+}
+
+/// Emit a `bind:` directive on a regular `<input>`/element **inline** at its source
+/// slot (the non-spread path) — a handled core kind ([`resolve_bind_directive`])
+/// becomes `$.attr(name, value[, true])`; a `bind:this` / no-companion `bind:group`
+/// emits nothing; an `omit_in_ssr` bind refuses (a safe over-refusal — the oracle
+/// drops it, but the inline path declines rather than reproduce the drop; the spread
+/// path skips it instead).
+pub(crate) fn emit_bind_directive<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    directive: &'arena BindDirective<'arena>,
+    element: &'arena Element<'arena>,
+    element_name: &str,
+    out: &mut BodyBuilder<'arena>,
+) -> Result<(), CompileError> {
+    match resolve_bind_directive(env, directive, element, element_name)? {
+        BindEmission::Attr {
+            name,
+            value,
+            boolean,
+        } => push_bind_attr(env, name, value, boolean, out),
+        BindEmission::Omit => Ok(()),
+        BindEmission::OmitInSsr => refuse_bind(directive.name_span.extract(env.source)),
+    }
+}
+
+/// Build the object property a `bind:` **core kind** contributes to a spread
+/// element's `$.attributes({…})` object, at the bind's source position (the oracle
+/// pre-processes each bind into a synthetic attribute inside `build_spread_object`).
+/// Reuses [`resolve_bind_directive`] for every validity gate, then adapts:
+///
+/// - `Attr { name, value, .. }` → the object property `{ name: value }` (the boolean
+///   flag is an `$.attr` concern and is dropped), with the object-shorthand collapse
+///   (`bind:value={value}` → `{ value }`);
+/// - `Omit` (a valid `bind:this`, a no-companion `bind:group`) → `None`;
+/// - `OmitInSsr` → `None` (the oracle skips these in SSR — parity, not an
+///   over-refusal like the inline path).
+pub(crate) fn build_bind_object_property<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    directive: &'arena BindDirective<'arena>,
+    element: &'arena Element<'arena>,
+    element_name: &str,
+) -> Result<Option<Property<'arena>>, CompileError> {
+    match resolve_bind_directive(env, directive, element, element_name)? {
+        BindEmission::Attr {
+            name,
+            value,
+            boolean: _,
+        } => {
+            // The synthesized bind name (`value`/`checked`) is always a valid
+            // identifier key; `shorthand` collapses `{ value: value }` → `{ value }`.
+            let key = env.b.ident(name);
+            let key_span = key.span;
+            let shorthand = matches!(&value, Expression::Identifier(id)
+                if plain_identifier_name(id, env.source).as_deref() == Some(name));
+            Ok(Some(Property {
+                key: Expression::Identifier(key),
+                value,
+                kind: PropertyKind::Init,
+                shorthand,
+                computed: false,
+                method: false,
+                span: key_span,
+            }))
+        }
+        BindEmission::Omit | BindEmission::OmitInSsr => Ok(None),
     }
 }
 

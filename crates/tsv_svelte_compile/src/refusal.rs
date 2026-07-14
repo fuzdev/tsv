@@ -431,18 +431,12 @@ pub enum Refusal {
     /// emitted (`$.attr_class`/`$.attr_style`), `bind:` is handled by
     /// [`BindDirective`](Refusal::BindDirective) (a handled core kind emits,
     /// everything else refuses), and an element `{...spread}` routes to the fused
-    /// `$.attributes({…})` object-builder (see [`SpreadWithDirective`](Refusal::SpreadWithDirective)).
+    /// `$.attributes({…})` object-builder — `class:`/`style:` become its `classes`/
+    /// `styles` arguments and `bind:` folds into the object, so a spread co-present
+    /// with those compiles; a legacy `on:`/`let:` alongside a spread still refuses
+    /// here.
     #[error("non-plain attribute (directive)")]
     NonPlainAttribute,
-    /// An element `{...spread}` co-present with any directive
-    /// (`class:`/`style:`/`bind:`/legacy `on:`/`let:`/the no-op drop family). The
-    /// spread routes the whole element through `$.attributes(object, css_hash,
-    /// classes, styles, flags)`, where `class:`/`style:` become the 3rd/4th
-    /// arguments and `bind:` folds into the object — a later slice. This slice
-    /// handles a spread alongside only plain attributes and other spreads, so any
-    /// co-present directive refuses.
-    #[error("element {{...spread}} alongside a directive (deferred)")]
-    SpreadWithDirective,
     /// An element `{...spread}` on a `<select>`. The oracle routes a spread (or a
     /// bind) on a select through `$$renderer.select(object, ($$renderer) => …)`, a
     /// different callee than `$.attributes` — not implemented, so refuse.
@@ -809,9 +803,6 @@ impl Refusal {
                 "invalid animate: directive (one per element, only on the sole child of a keyed {#each} — the oracle rejects it)",
             ),
             Self::NonPlainAttribute => Cow::Borrowed("non-plain attribute (directive)"),
-            Self::SpreadWithDirective => {
-                Cow::Borrowed("element {...spread} alongside a directive (deferred)")
-            }
             Self::SpreadOnSelect => {
                 Cow::Borrowed("{...spread} on <select> (the oracle routes to $$renderer.select)")
             }

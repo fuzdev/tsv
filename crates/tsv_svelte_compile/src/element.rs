@@ -22,7 +22,8 @@ use tsv_ts::ast::internal::{
 use crate::analyze::{BindingKind, evaluate, stringify_value};
 use crate::attr_refs::fragment_any;
 use crate::attribute::{
-    build_spread_object_property, collapse_attr_whitespace, emit_attribute, emit_bind_directive,
+    build_bind_object_property, build_spread_class_object, build_spread_object_property,
+    build_spread_style_object, collapse_attr_whitespace, emit_attribute, emit_bind_directive,
     emit_class_directives, emit_style_directives, is_load_error_element,
 };
 use crate::build::escape_template_text;
@@ -376,8 +377,8 @@ fn spread_element_flags(env: &EmitEnv<'_, '_>, element: &Element<'_>, name: &str
 }
 
 /// The static (single-`Text`) `class` attribute tokens of `element`, collapsed —
-/// the candidates for CSS-scope matching on a spread element (a `class:` directive
-/// would also contribute, but co-present directives refuse in this slice).
+/// one source of CSS-scope-match candidates on a spread element (a `class:`
+/// directive name is the other; `emit_spread_attributes` matches both).
 fn static_class_tokens(env: &EmitEnv<'_, '_>, element: &Element<'_>) -> Vec<String> {
     let mut tokens = Vec::new();
     for attr_node in element.attributes {
@@ -396,12 +397,17 @@ fn static_class_tokens(env: &EmitEnv<'_, '_>, element: &Element<'_>) -> Vec<Stri
 }
 
 /// Build the `{ … }` object (1st argument of `$.attributes`) from every plain
-/// attribute and spread on the element, in SOURCE ORDER (the oracle's
-/// `build_spread_object`): a plain attribute → a `key: value` property (dropped
-/// for an event handler / `defaultValue`), a `{...spread}` → a `...expr` spread
-/// element. The braces are minted around the property construction so the object
-/// span (the printer's only newline-scan region for the expansion decision) is
-/// appendix-only and collapses when it fits — the same idiom as `build_props_object`.
+/// attribute, `bind:` entry, and spread on the element, in SOURCE ORDER (the
+/// oracle's `build_spread_object`, over the attribute list its main loop
+/// pre-processes each `bind:` into): a plain attribute → a `key: value` property
+/// (dropped for an event handler / `defaultValue`), a `bind:` core kind → its
+/// synthesized `value`/`checked` property at the bind's position (`bind:this` /
+/// `omit_in_ssr` / a no-companion `bind:group` contribute nothing), a `{...spread}`
+/// → a `...expr` spread element. `class:`/`style:` and the drop family carry no
+/// object property (they ride the other `$.attributes` arguments / drop). The braces
+/// are minted around the property construction so the object span (the printer's
+/// only newline-scan region for the expansion decision) is appendix-only and
+/// collapses when it fits — the same idiom as `build_props_object`.
 fn build_element_spread_object<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     element: &'arena Element<'arena>,
@@ -414,6 +420,15 @@ fn build_element_spread_object<'arena>(
         match attr_node {
             AttributeNode::Attribute(attr) => {
                 if let Some(property) = build_spread_object_property(env, attr, name)? {
+                    properties.push(ObjectProperty::Property(property));
+                }
+            }
+            // A `bind:` core kind synthesizes its `value`/`checked` object property
+            // at the bind's source slot (the oracle inlines the bind into the
+            // `attributes` list its `build_spread_object` walks); its validity gates
+            // still apply and refuse an invalid target/type/expression.
+            AttributeNode::BindDirective(bind) => {
+                if let Some(property) = build_bind_object_property(env, bind, element, name)? {
                     properties.push(ObjectProperty::Property(property));
                 }
             }
@@ -430,7 +445,10 @@ fn build_element_spread_object<'arena>(
                     span: argument_alloc.span(),
                 }));
             }
-            // Directives refuse before this is reached (`emit_spread_attributes`).
+            // `class:`/`style:` ride the `classes`/`styles` arguments, and the drop
+            // family (`use:`/`transition:`/…/`{@attach}`) contributes nothing to the
+            // tag — none carry an object property. `on:`/`let:` already refused in
+            // `emit_spread_attributes` before this is reached.
             _ => {}
         }
     }
@@ -467,15 +485,29 @@ fn elide_call_args<'arena>(
 /// Emit the fused `$.attributes(object, css_hash, classes, styles, flags)` call
 /// for a regular element carrying a `{...spread}` (the oracle's
 /// `build_element_spread_attributes` / `prepare_element_spread`). The whole
-/// attribute set becomes the object; `css_hash` carries the scope hash when the
-/// element is scoped; `classes`/`styles` (the `class:`/`style:` directive objects)
-/// are always absent in this slice (a co-present directive refuses); `flags` marks
-/// `<input>` / a custom element. Trailing absent arguments elide and interior ones
-/// become `void 0`.
+/// attribute set routes through this one call, replacing per-attribute emission:
 ///
-/// Refuses the deferred/divergent shapes: a co-present directive (a later slice),
-/// a `<select>` (the `$$renderer.select` trap), and a load-error element (which
-/// gets `onload`/`onerror` capture markup).
+/// - **object** (1st): plain attributes + `bind:` entries + spreads, in source
+///   order ([`build_element_spread_object`]);
+/// - **css_hash** (2nd): `'svelte-tsvhash'` when the element is scoped — a
+///   static-class token **or** a `class:` directive name matches a scoped selector.
+///   Unlike the non-spread `class` path the hash is NOT folded into the class value;
+///   it rides this argument, which the runtime `$.attributes` merges;
+/// - **classes** (3rd): the `class:` directives object ([`build_spread_class_object`],
+///   identifier keys + shorthand), absent when there are none;
+/// - **styles** (4th): the `style:` directives object ([`build_spread_style_object`],
+///   a FLAT object — no `|important` partitioning), absent when there are none;
+/// - **flags** (5th): `4` (`<input>`) / `2` (custom element), else absent.
+///
+/// Trailing absent arguments elide; an interior absent one becomes `void 0`. The
+/// no-op drop family (`use:`/`transition:`/…/`{@attach}`) contributes nothing but is
+/// still guarded (a stray rune / top-level `await` refuses) exactly as on a
+/// non-spread element.
+///
+/// Refuses the deferred/divergent shapes: a `<select>` (the `$$renderer.select`
+/// trap), a load-error element (which gets `onload`/`onerror` capture markup), and a
+/// legacy `on:` / `let:` directive (still not emitted). A `bind:`/`class:`/`style:`
+/// validity gate can also refuse (an invalid bind target, a bad `style:` modifier).
 fn emit_spread_attributes<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     element: &'arena Element<'arena>,
@@ -492,14 +524,53 @@ fn emit_spread_attributes<'arena>(
     if is_load_error_element(name) {
         return Err(unsupported(Refusal::SpreadOnLoadErrorElement));
     }
-    // Any co-present directive (`class:`/`style:`/`bind:`/`on:`/`let:`/the drop
-    // family) folds into the `$.attributes` arguments differently — a later slice.
+
+    // The oracle's phase-2 directive-validity checks (transition/animate placement)
+    // run before it discards the SSR visit — a rejected combination must refuse
+    // here too, exactly as on a non-spread element.
+    let animate_host = env.animate_host_span == Some(element.span);
+    validate_directive_combinations(element, animate_host)?;
+
+    // Collect the `class:`/`style:` directives (source order) for the 3rd/4th
+    // arguments, guard-and-drop the no-op drop family (SSR runs no client lifecycle,
+    // but a misplaced rune / top-level `await` inside the expression still refuses),
+    // and refuse the still-unemitted `on:`/`let:`. Plain attributes / spreads /
+    // `bind:` are handled inside the object builder.
+    let mut class_directives: Vec<&'arena ClassDirective<'arena>> = Vec::new();
+    let mut style_directives: Vec<&'arena StyleDirective<'arena>> = Vec::new();
     for attr_node in element.attributes {
         match attr_node {
-            AttributeNode::Attribute(_) | AttributeNode::SpreadAttribute(_) => {}
-            _ => return Err(unsupported(Refusal::SpreadWithDirective)),
+            AttributeNode::Attribute(_)
+            | AttributeNode::SpreadAttribute(_)
+            | AttributeNode::BindDirective(_) => {}
+            AttributeNode::ClassDirective(d) => class_directives.push(d),
+            AttributeNode::StyleDirective(d) => style_directives.push(d),
+            // The drop family: `use:` on a load-error element already refused above
+            // (the whole element), so only the guard remains here.
+            AttributeNode::UseDirective(directive) => {
+                if let Some(expr) = &directive.expression {
+                    guard_dropped(env, expr)?;
+                }
+            }
+            AttributeNode::TransitionDirective(directive) => {
+                if let Some(expr) = &directive.expression {
+                    guard_dropped(env, expr)?;
+                }
+            }
+            AttributeNode::AnimateDirective(directive) => {
+                if let Some(expr) = &directive.expression {
+                    guard_dropped(env, expr)?;
+                }
+            }
+            AttributeNode::AttachTag(attach) => guard_dropped(env, &attach.expression)?,
+            // A legacy `on:` directive and `let:` are not emitted yet — refuse,
+            // matching the non-spread path (the oracle drops them, but tsv declines).
+            AttributeNode::OnDirective(_) | AttributeNode::LetDirective(_) => {
+                return Err(unsupported(Refusal::NonPlainAttribute));
+            }
         }
     }
+
     // The synthetic `$.attributes` call interleaves minted (appendix) and borrowed
     // (host) argument spans; with carried script comments their windows would sweep
     // — refuse, matching the `$.attr` family.
@@ -507,16 +578,21 @@ fn emit_spread_attributes<'arena>(
         return Err(unsupported(Refusal::CommentsAlongsideExprAttributes));
     }
 
-    // Scope matching (before building the object). A static-class token matching a
-    // scoped selector scopes the element; each match is recorded so the no-match
-    // post-check passes. Unlike the non-spread `class` path the hash is NOT folded
-    // into the class value — it rides the `css_hash` (2nd) argument, which the
-    // runtime `$.attributes` merges.
+    // Scope matching (before building the object). The element is scoped when a
+    // static-class token OR a `class:` directive name matches a scoped selector;
+    // each match is recorded so the no-match post-check passes. The hash rides the
+    // `css_hash` (2nd) argument, never concatenated into the class value.
     let mut matched: Vec<String> = Vec::new();
     if let Some(scope) = &env.scope {
         for token in static_class_tokens(env, element) {
             if scope.class_names.contains(&token) {
                 matched.push(token);
+            }
+        }
+        for directive in &class_directives {
+            let dname = directive.name_span.extract(env.source);
+            if scope.class_names.contains(dname) {
+                matched.push(dname.to_string());
             }
         }
     }
@@ -527,12 +603,17 @@ fn emit_spread_attributes<'arena>(
 
     let object = build_element_spread_object(env, element, name)?;
     let css_hash = scoped.then(|| env.b.string_literal_expr(SCOPE_HASH_CLASS));
+    let classes = (!class_directives.is_empty())
+        .then(|| build_spread_class_object(env, &class_directives))
+        .transpose()?;
+    let styles = (!style_directives.is_empty())
+        .then(|| build_spread_style_object(env, &style_directives))
+        .transpose()?;
     let flags = match spread_element_flags(env, element, name) {
         0 => None,
         f => Some(env.b.number(f64::from(f))),
     };
-    // [object, css_hash, classes, styles, flags] — classes/styles never present here.
-    let args = elide_call_args(env, [Some(object), css_hash, None, None, flags]);
+    let args = elide_call_args(env, [Some(object), css_hash, classes, styles, flags]);
     let call = env.b.member_call("$", "attributes", args);
     out.push_expr(call);
     Ok(())

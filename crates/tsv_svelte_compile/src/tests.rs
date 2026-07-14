@@ -1117,20 +1117,117 @@ fn compile_element_spread_prop_root_forces_context_wrapper() {
 }
 
 #[test]
-fn compile_element_spread_with_directive_refuses() {
-    // A co-present `class:`/`style:`/`bind:` directive folds into the
-    // `$.attributes` arguments differently — a later slice, so refuse for now.
+fn compile_element_spread_with_class_and_style_directives() {
+    // A `class:`/`style:` directive co-present with a `{...spread}` folds into the
+    // `classes` (3rd) / `styles` (4th) `$.attributes` arguments — an identifier-key
+    // object with shorthand collapse for `classes`, a FLAT object (no `|important`
+    // partition) for `styles`.
+    let js = compile_js(
+        "<script>let props = $state({}); let x = $state(1); let v = $state('');</script>\n<div class:a={x} style:color={v} {...props}></div>",
+    );
+    assert!(
+        js.contains("$.attributes({ ...props }, void 0, { a: x }, { color: v })"),
+        "{js}"
+    );
+    // A shorthand `class:active` collapses to `{ active }`.
+    let js = compile_js(
+        "<script>let props = $state({}); let active = $state(true);</script>\n<div class:active {...props}></div>",
+    );
+    assert!(
+        js.contains("$.attributes({ ...props }, void 0, { active })"),
+        "{js}"
+    );
+    // `|important` is validated but does NOT partition in spread mode.
+    let js = compile_js(
+        "<script>let props = $state({}); let v = $state('');</script>\n<div style:c|important={v} {...props}></div>",
+    );
+    assert!(
+        js.contains("$.attributes({ ...props }, void 0, void 0, { c: v })"),
+        "{js}"
+    );
+}
+
+#[test]
+fn compile_element_spread_bind_folds_into_object() {
+    // A `bind:value` folds into the object at the bind's source slot (before the
+    // spread); `<input>` still sets the flags argument.
+    let js = compile_js(
+        "<script>let props = $state({}); let w = $state('');</script>\n<input bind:value={w} {...props}/>",
+    );
+    assert!(
+        js.contains("$.attributes({ value: w, ...props }, void 0, void 0, void 0, 4)"),
+        "{js}"
+    );
+    // `bind:group` synthesizes a `checked` entry; the companion `value` still emits
+    // as its own object property.
+    let js = compile_js(
+        "<script>let props = $state({}); let x = $state('a');</script>\n<input type=\"radio\" bind:group={x} value=\"a\" {...props}/>",
+    );
+    assert!(
+        js.contains(
+            "$.attributes({ type: 'radio', checked: x === 'a', value: 'a', ...props }, void 0, void 0, void 0, 4)"
+        ),
+        "{js}"
+    );
+    // All together: bind entry in the object, class/style args, input flags.
+    let js = compile_js(
+        "<script>let props = $state({}); let x = $state(1); let v = $state(''); let w = $state('');</script>\n<input class:a={x} style:color={v} bind:value={w} {...props}/>",
+    );
+    assert!(
+        js.contains("$.attributes({ value: w, ...props }, void 0, { a: x }, { color: v }, 4)"),
+        "{js}"
+    );
+}
+
+#[test]
+fn compile_element_spread_directive_scoping_and_drops() {
+    // A `class:` directive NAME matching a scoped selector scopes the element — the
+    // hash rides the `css_hash` (2nd) argument, the classes object the 3rd.
+    let js = compile_js(
+        "<script>let props = $state({}); let x = $state(1);</script>\n<div class:foo={x} {...props}></div>\n<style>.foo { color: red }</style>",
+    );
+    assert!(
+        js.contains("$.attributes({ ...props }, 'svelte-tsvhash', { foo: x })"),
+        "{js}"
+    );
+    // The drop family (`use:`/`transition:`) contributes nothing — a bare
+    // `$.attributes({ ...props })`.
+    let js =
+        compile_js("<script>let props = $state({});</script>\n<div use:action {...props}></div>");
+    assert!(js.contains("$.attributes({ ...props })"), "{js}");
+    let js = compile_js(
+        "<script>let props = $state({});</script>\n<div transition:fade {...props}></div>",
+    );
+    assert!(js.contains("$.attributes({ ...props })"), "{js}");
+}
+
+#[test]
+fn compile_element_spread_refuses_invalid_directives() {
+    // A `bind:value` on a non-`<input>` element is `bind_invalid_target` (an oracle
+    // error) — the slice-3 gate still applies with a spread.
     assert_unsupported(
-        "<script>let props = $state({}); let x = $state(1);</script>\n<div class:a={x} {...props}></div>",
-        "alongside a directive",
+        "<script>let props = $state({}); let v = $state('');</script>\n<div bind:value={v} {...props}></div>",
+        "bind: directive value",
+    );
+    // A `style:` directive with an invalid modifier still refuses.
+    assert_unsupported(
+        "<script>let props = $state({}); let v = $state('');</script>\n<div style:color|foo={v} {...props}></div>",
+        "style: directive with an invalid modifier",
+    );
+    // A deferred (content-editable) bind still refuses.
+    assert_unsupported(
+        "<script>let props = $state({}); let h = $state('');</script>\n<div contenteditable=\"true\" bind:innerHTML={h} {...props}></div>",
+        "bind: directive innerHTML",
+    );
+    // A legacy `on:` directive and `let:` alongside a spread stay refused (the
+    // oracle drops them, but tsv declines to reproduce that).
+    assert_unsupported(
+        "<script>let props = $state({});</script>\n<div on:click={() => {}} {...props}></div>",
+        "non-plain attribute (directive)",
     );
     assert_unsupported(
-        "<script>let props = $state({}); let x = $state(1);</script>\n<div style:color={x} {...props}></div>",
-        "alongside a directive",
-    );
-    assert_unsupported(
-        "<script>let props = $state({}); let v = $state('');</script>\n<input bind:value={v} {...props}/>",
-        "alongside a directive",
+        "<script>let props = $state({});</script>\n<div let:x {...props}></div>",
+        "non-plain attribute (directive)",
     );
 }
 
