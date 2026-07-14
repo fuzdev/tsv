@@ -221,9 +221,14 @@ Svelte ❌ / Prettier ✅ / tsv ✅ in every case below:
 - Import type options — [dynamic_attributes](../tests/fixtures/typescript/modules/imports/dynamic_attributes_svelte_divergence/)
 - ES2024 v-flag regex — [unicode_sets_advanced](../tests/fixtures/typescript/expressions/literals/regex/unicode_sets_advanced_svelte_divergence/)
 - `export default class implements I {}` (anonymous default class, implements-first heritage) — [export_default_implements](../tests/fixtures/typescript/declarations/class/export_default_implements_svelte_divergence/)
+- A cast as the left operand of `**` (`x as number ** 2`) — see below; the rejection itself is not pinnable
 - Async generic arrow params — see fixtures below
 
 **`using` keyword-name comments**: Both acorn and tsv reject comments between `using` and the binding name (`using /* c */ x = fn()`), and between `await` and `using` (`await /* c */ using x = fn()`). Per the ECMAScript spec, comments behave like white space and are discarded between any two tokens (§12.4), so these should be valid. However, since `using` is a contextual keyword requiring lookahead disambiguation, both parsers check the next token before comment processing. tsv matches acorn's behavior here. If acorn adds support, tsv should follow.
+
+**Cast as the left operand of `**`**: acorn-typescript rejects `x as number ** 2` / `x satisfies number ** 2` (`Unexpected token` at the `**`). tsc accepts both — it parses the cast as the `**` left operand, and its "unary expression is not allowed in the left-hand side of an exponentiation expression" grammar error (TS17006) fires only for a *prefix-unary* operand (`-2 ** 3`), not for a cast. Prettier agrees, printing `(x as number) ** 2`, and tsv matches. **Upstream candidate**: acorn-typescript exponentiation after `as`/`satisfies`.
+
+The rejection is the one case here that **cannot be pinned**. The `expected_svelte.json` = `{"error": "failed to parse"}` sentinel every fixture above uses attaches to `input.*`, and an `input.*` must be a formatting fixed point (F1) — `x as number ** 2` is not one, since both formatters normalize it to `(x as number) ** 2`. The source form can therefore only live in an `unformatted_*` variant, and the validator runs the canonical parser over `input.*` and `input_invalid_*` only, never over variants. So [as_satisfies_exponentiation](../tests/fixtures/typescript/expressions/as_satisfies_exponentiation/) is a *regular* fixture: it pins the parse shape and the paren insertion (both operand sides — a cast on the right needs parens too, since `as` otherwise binds looser and takes the whole exponentiation), and its `unformatted_no_parens` variant carries the source form. That variant formats at all only because prettier-plugin-svelte re-parses `<script>` content with prettier's own TypeScript parser rather than with Svelte's — Svelte's parser sees the fixture's parenthesized `input.svelte` and is happy.
 
 **Async generic arrow params**: acorn-typescript drops all function parameters from `async` arrow functions that have type parameters (`async <T,>(x: T) => x` → `params: []`). Non-async generic arrows are unaffected. This is semantic corruption — tools consuming the AST would see zero-argument functions. **Upstream candidate**: acorn-typescript async arrow parsing.
 
@@ -232,11 +237,14 @@ import-phase syntax — `import defer * as ns from '…'` / `import source x fro
 and the dynamic `import.defer(…)` / `import.source(…)` — and emits a `phase` field
 (`'defer'` / `'source'`) on the `ImportDeclaration` / `ImportExpression` wire node
 (declared in `crates/tsv_wasm/types/tsv_ast.d.ts`). Unlike every case above, this one
-is **un-fixturable**: acorn-typescript **and** Svelte's parser both *reject*
-import-phase, so no canonical `expected.json` exists to gate the shape against (a
-`_svelte_divergence` fixture needs the oracle to *accept*, which it does not), and the
-syntax is not yet in the finished ECMAScript standard. prettier is no oracle here
-either — it drops the `defer` keyword and rejects `import source`. The emitted `phase`
+is **un-fixturable** — and not because the canonical parsers reject it. A canonical
+rejection on its own is pinnable, via the `expected_svelte.json` = `{"error": "failed
+to parse"}` sentinel that every fixture above uses; what those fixtures still have, and
+import-phase does not, is a *second* oracle. **prettier** is no oracle here — it drops
+the `defer` keyword (silent content loss) and rejects `import source`, so there is no
+format claim to pin. With `expected_ours.json` self-generated and no formatter to check
+it against, the fixture would assert only that tsv agrees with tsv. The syntax is also
+not yet in the finished ECMAScript standard. The emitted `phase`
 shape mirrors the TC39 proposals' AST; because there is no oracle, it is a deliberate
 extension rather than a drop-in guarantee, and **if acorn-typescript later implements
 import-phase with a different shape, tsv should re-align to it**. Emitted from

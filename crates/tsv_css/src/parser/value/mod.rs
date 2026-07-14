@@ -9,6 +9,7 @@ pub mod dimensions;
 pub mod functions;
 pub mod lists;
 pub(crate) mod parser;
+pub(crate) mod scan;
 pub mod strings;
 
 use crate::ast::internal::CssValue;
@@ -111,7 +112,7 @@ pub(crate) fn parse_single_value<'arena>(
         && let Some((name, args, true)) = extract_function_parts(s, paren_pos)
     {
         // Try color function first
-        if let Some(color) = parse_color_function(&name.to_lowercase(), args) {
+        if let Some(color) = parse_color_function(name, args) {
             return Some(CssValue::Color { color, span });
         }
         // Fall back to generic function

@@ -108,7 +108,7 @@ pub fn build_chain_doc<'a, P: ChainPrinter>(
     // path reads this to skip per-member comment classification on comment-free chains,
     // and `build_chain_doc_impl` reads it below instead of recomputing the search.
     let prev_has_comments = printer
-        .set_chain_has_comments(printer.has_comments_between(chain_span.start, chain_span.end));
+        .set_chain_has_comments(printer.has_any_comments_between(chain_span.start, chain_span.end));
     let result = build_chain_doc_impl(groups, printer);
     printer.restore_chain_has_comments(prev_has_comments);
     printer.exit_chain_arg_share(was_active);
@@ -367,25 +367,33 @@ fn build_short_chain_doc<'a, P: ChainPrinter>(
         // group boundaries rather than inside the parenthesized expression.
         // When there ARE calls, the inner group breaks naturally via group(oneLine).
         if first_has_parens && !has_calls {
-            // A single trailing member on a parenthesized base hugs the base's
-            // closing `)` when it fits after the base's last line, and drops to
-            // its own indented line otherwise — Prettier's `printMemberExpression`
-            // (`[objectDoc, group(indent([softline, lookup]))]`, member.js). The
-            // base breaks on its own (parens hang-break or inner call args), so we
-            // must not force the member onto its own line just because the base is
-            // multi-line; the softline lets it hug the `)`.
-            if rest_docs.len() == 1 {
-                let member = d.group(d.indent(d.concat(&[d.softline(), rest_docs[0]])));
-                return d.concat(&[first_doc, member]);
+            // `rest_groups` is the single trailing lookup group: `group_chain_nodes` only
+            // opens a new group at a memberish AFTER a call, so a call-free chain never
+            // splits past the first group. (`concat` is total — it can't drop a doc should
+            // that ever stop holding.)
+            let lookup = d.concat(&rest_docs);
+
+            // A computed lookup takes no break point before it, ever — member.js's
+            // `shouldInline` includes `node.computed` — so `(x as T)![i]` and
+            // `(x as T)[i][j]` stay glued to the base and shed width by breaking their own
+            // brackets instead (`computed_lookup_doc`). Same rule as `starts_segment` in
+            // the member-only path.
+            if rest_groups
+                .first()
+                .and_then(|g| g.nodes.first())
+                .is_some_and(ChainNode::is_computed)
+            {
+                return d.concat(&[first_doc, lookup]);
             }
-            // Multiple trailing members: expand with hardlines between ALL groups.
-            let mut rest_parts: DocBuf = DocBuf::with_capacity(rest_docs.len() * 2);
-            for &rest_doc in &rest_docs {
-                rest_parts.push(d.hardline());
-                rest_parts.push(rest_doc);
-            }
-            let expanded = d.concat(&[first_doc, d.indent(d.concat(&rest_parts))]);
-            return d.conditional_group(&[on_line, expanded]);
+
+            // A `.prop` lookup hugs the base's closing `)` when it fits after the base's
+            // last line, and drops to its own indented line otherwise — prettier's
+            // `printMemberExpression` (`[objectDoc, group(indent([softline, lookup]))]`).
+            // The base breaks on its own (parens hang-break or inner call args), so we must
+            // not force the lookup onto its own line just because the base is multi-line;
+            // the softline lets it hug the `)`.
+            let member = d.group(d.indent(d.concat(&[d.softline(), lookup])));
+            return d.concat(&[first_doc, member]);
         }
         return d.group(on_line);
     }

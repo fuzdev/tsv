@@ -170,6 +170,10 @@ impl<'a> ChainPrinter for Printer<'a> {
             .is_some()
     }
 
+    fn has_any_comments_between(&self, start: u32, end: u32) -> bool {
+        tsv_lang::has_any_comments_in_range(self.comments, start, end)
+    }
+
     fn chain_has_comments(&self) -> bool {
         self.chain_has_comments.get()
     }

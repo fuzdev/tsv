@@ -19,7 +19,8 @@ tsv has no config that changes its formatting style behavior, and none will be a
   `bracketSpacing: true` and `trailingComma: 'none'`
   [#78](https://github.com/fuzdev/tsv/pull/78)
 - feat: rework to block style wrapping using Svelte 5 whitespace changes
-  [#76](https://github.com/fuzdev/tsv/pull/76)
+  ([#76](https://github.com/fuzdev/tsv/pull/76), [#447](https://github.com/fuzdev/tsv/pull/447),
+  [#449](https://github.com/fuzdev/tsv/pull/449))
 - feat: `tsv format` directory discovery now honors `.gitignore` and the tsv-native
   `.formatignore` hierarchically (one per directory, repo-rooted like git —
   unlike Prettier, which reads only one `.gitignore` and one `.prettierignore`

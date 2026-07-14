@@ -1730,9 +1730,13 @@ impl<'arena> Eraser<'arena, '_> {
             // (it parses without `preserveParens`), so its AST is the inner
             // expression carrying the JSDoc as a detached leading comment: it
             // prints `= /** @type {T} */ 1` and folds the `1`. Unwrap to match on
-            // both counts. Valid JavaScript, so this is NOT a TypeScript erasure
-            // — it records no region and never trips the `lang="ts"` gate; the
-            // JSDoc sits before the wrapper's own span and survives untouched.
+            // both counts. Valid JavaScript, so this is NOT a TypeScript erasure —
+            // it records no region and never trips the `lang="ts"` gate.
+            //
+            // The wrapper OWNS its JSDoc comment (`Comment::owned_by_node`), and
+            // dropping the wrapper leaves that comment printed by nothing. The
+            // compile path releases it back to the positional machinery — see
+            // `transform_server::collect_script_comments`.
             Expression::JsdocCast(cast) => {
                 Some(self.expr(cast.inner)?.unwrap_or_else(|| cast.inner.clone()))
             }

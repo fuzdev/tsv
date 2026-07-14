@@ -98,13 +98,12 @@ impl<'a> Printer<'a> {
     /// Used to correctly detect blank lines - need to check from after trailing
     /// comments, not just after the statement.
     pub(in crate::printer) fn find_end_with_trailing_comments(&self, after_pos: u32) -> u32 {
-        let first_idx = tsv_lang::find_first_comment_from(self.comments, after_pos);
         let mut end = after_pos;
         // Track the "current line" reference — follows multi-line block comments
         // to their closing */ line (same logic as build_trailing_same_line_comment_docs)
         let mut line_ref = after_pos;
 
-        for comment in &self.comments[first_idx..] {
+        for comment in tsv_lang::comments_after(self.comments, after_pos) {
             if self.is_same_line(line_ref, comment.span.start) {
                 end = comment.span.end;
                 // Follow multi-line block comments to their closing line

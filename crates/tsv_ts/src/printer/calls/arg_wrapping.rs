@@ -6,12 +6,12 @@
 // - Building argument lists split into head/last patterns
 
 use super::super::{
-    ArrowChainContext, CommentFilter, CommentSpacing, Printer, has_newline_before_position,
+    ArrowChainContext, CommentSpacing, Printer, has_newline_before_position,
     is_curried_arrow_chain, is_multiline_template_expression,
 };
 use super::arg_comments::{
     emit_first_arg_leading_comments, find_comma_pos, has_blank_line_between_args,
-    is_inline_block_after_comma, is_inline_block_before_comma,
+    is_inline_block_after_comma, is_inline_block_before_comma, push_empty_args,
 };
 use super::arg_predicates::{
     arrow_body_is_call_through_non_null, is_block_function, is_short_second_arg_for_expand_first,
@@ -39,17 +39,10 @@ pub(crate) fn build_arrow_inline_signature(
         sig_parts.push(d.text("async "));
     }
     if arrow.params.is_empty() {
-        if let Some(open) = arrow.params_start
-            && let Some(close_after) = printer.find_closing_paren(open, arrow.body.span().start)
-            && let Some(comment_doc) = printer
-                .build_inline_comments_between_doc_no_leading_space_opt(open + 1, close_after - 1)
-        {
-            sig_parts.push(d.text("("));
-            sig_parts.push(comment_doc);
-            sig_parts.push(d.text(")"));
-        } else {
-            sig_parts.push(d.text("()"));
-        }
+        sig_parts.push(
+            printer
+                .build_empty_params_with_comments_doc(arrow.params_start, arrow.body.span().start),
+        );
     } else {
         sig_parts.push(d.text("("));
         sig_parts.push(
@@ -887,34 +880,9 @@ pub(super) fn build_empty_args_doc(
     after_type_args: u32,
     paren_close: u32,
 ) -> DocId {
-    let d = printer.d();
     let mut parts: DocBuf = smallvec![callee];
-    if let Some(paren_pos) = printer.find_char_outside_comments(after_type_args, paren_close, b'(')
-    {
-        let pre_paren_comments = printer.build_comments_between_filtered_opt(
-            after_type_args,
-            paren_pos,
-            CommentSpacing::Leading,
-            CommentFilter::All,
-        );
-        let inside_paren_comments = printer
-            .build_inline_comments_between_doc_no_leading_space_opt(paren_pos + 1, paren_close);
-        if let Some(pre) = pre_paren_comments {
-            parts.push(pre);
-        }
-        match inside_paren_comments {
-            Some(inner) => {
-                parts.push(d.text("("));
-                parts.push(inner);
-                parts.push(d.text(")"));
-            }
-            None => parts.push(d.text("()")),
-        }
-    } else {
-        // Fallback: no `(` found (shouldn't happen for valid code)
-        parts.push(d.text("()"));
-    }
-    d.concat(&parts)
+    push_empty_args(printer, &mut parts, after_type_args, paren_close, "(", "()");
+    printer.d().concat(&parts)
 }
 
 /// Single multiline-template argument on the same line as `(` — hug it,

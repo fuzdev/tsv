@@ -168,15 +168,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
             // export async function foo() {}
             //
-            // `async` is only a declaration head when `function` actually follows it —
-            // the same guard the statement dispatch applies (`statement/mod.rs`). In an
-            // export position nothing else is legal (`export async x` is a syntax error,
-            // and an async arrow is not a declaration), so a non-`function` token is
-            // rejected here rather than handed to `parse_async_function_declaration`,
-            // whose contract is "positioned at `function`".
+            // `async` is only a declaration keyword here when `function` follows — there
+            // is no `export async` arrow form. Without this check a stray `export async
+            // foo()` would reach `parse_function_or_overload` on a non-`function` token,
+            // violating its precondition. `peek_kind` skips comments, matching the
+            // statement-position dispatch in `statement/mod.rs`.
             TokenKind::Keyword(KeywordKind::Async) => {
                 if self.peek_kind() != TokenKind::Keyword(KeywordKind::Function) {
-                    return Err(self.error_expected("function"));
+                    return Err(self.error_expected_after("'function'", "export async"));
                 }
                 let decl = self.parse_async_function_declaration()?;
                 Ok(self.export_named(start, decl, ExportKind::Value))

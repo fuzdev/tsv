@@ -203,7 +203,13 @@ fn render_line_break(
     }
 }
 
-/// Flush pending line suffix content.
+/// Flush pending line suffix content, in the order it was queued.
+///
+/// Prettier flushes by re-pushing the buffer onto its command *stack*
+/// (`commands.push(line, ...lineSuffix.reverse())`, `printer.js`) — the `reverse()`
+/// there exists only to cancel the stack's LIFO pop, so the net emission order is
+/// FIFO. This renderer drives the suffixes directly, so it must iterate forward:
+/// reversing here would emit two suffixes queued on one line back-to-front.
 #[allow(clippy::too_many_arguments)]
 fn flush_line_suffix<R: TextResolver + ?Sized>(
     arena: &DocArena,
@@ -218,7 +224,7 @@ fn flush_line_suffix<R: TextResolver + ?Sized>(
     if line_suffix.is_empty() {
         return;
     }
-    for suffix_cmd in std::mem::take(line_suffix).into_iter().rev() {
+    for suffix_cmd in std::mem::take(line_suffix) {
         render_single_doc_inner(
             arena,
             suffix_cmd.doc,
@@ -507,9 +513,10 @@ trait RenderPolicy {
     /// real command stack at top level, nothing in the single-doc sub-render.
     fn with_context_fill_rest<'a>(&self, commands: &'a [ArenaCommand]) -> &'a [ArenaCommand];
 
-    // Opt-in swallow diagnostic hooks (`swallow_check` feature): live only on
-    // the top-level policy — the sub-renders never carried the check. See
-    // `crate::doc::swallow`.
+    // Opt-in swallow diagnostic hooks (`swallow_check` feature). Both policies carry
+    // them: a swallow is a property of the physical output line, and the sub-renders
+    // append to the same line as the main loop, so every renderer drives the one
+    // shared state machine. See `crate::doc::swallow`.
     #[cfg(feature = "swallow_check")]
     fn swallow_enabled(&self) -> bool;
     #[cfg(feature = "swallow_check")]
@@ -580,6 +587,10 @@ impl RenderPolicy for TopLevelPolicy {
 /// pending-command lookahead through `WithContext`.
 struct SingleDocPolicy {
     tracking_suffix: bool,
+    /// Joins the enclosing render's swallow state machine — see
+    /// [`SwallowTracker::join_render`].
+    #[cfg(feature = "swallow_check")]
+    swallow: SwallowTracker,
 }
 
 impl RenderPolicy for SingleDocPolicy {
@@ -603,19 +614,28 @@ impl RenderPolicy for SingleDocPolicy {
         &[]
     }
 
+    // A sub-render appends to the same physical output line as the main loop, so it
+    // drives the same state machine rather than opting out. Without this the
+    // line-suffix flush was a blind spot: two trailing `//` comments flushed at one
+    // line break land back-to-back (`x; // c1 // c2`) and the first swallows the
+    // second.
     #[cfg(feature = "swallow_check")]
     #[inline]
     fn swallow_enabled(&self) -> bool {
-        false
+        self.swallow.enabled()
     }
 
     #[cfg(feature = "swallow_check")]
     #[inline]
-    fn swallow_on_text(&mut self, _is_line_comment: bool, _text: &str, _output: &str) {}
+    fn swallow_on_text(&mut self, is_line_comment: bool, text: &str, output: &str) {
+        self.swallow.on_text(is_line_comment, text, output);
+    }
 
     #[cfg(feature = "swallow_check")]
     #[inline]
-    fn swallow_on_newline(&mut self, _emitted: bool) {}
+    fn swallow_on_newline(&mut self, emitted: bool) {
+        self.swallow.on_newline(emitted);
+    }
 }
 
 /// Command-stack-based rendering with look-ahead — the top-level renderer
@@ -640,7 +660,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
     let mut policy = TopLevelPolicy {
         group_mode_map: GroupModeMap::default(),
         #[cfg(feature = "swallow_check")]
-        swallow: SwallowTracker::new(),
+        swallow: SwallowTracker::begin_render(),
     };
     // Borrow the arena-pooled work buffers for the duration of this top-level
     // render: their spill capacity warms once per arena instead of
@@ -1188,6 +1208,8 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
 ) {
     let mut policy = SingleDocPolicy {
         tracking_suffix: suffix_buffer.is_some(),
+        #[cfg(feature = "swallow_check")]
+        swallow: SwallowTracker::join_render(),
     };
     let mut dummy_suffix: LineSuffixBuf = SmallVec::new();
     let line_suffix = suffix_buffer.unwrap_or(&mut dummy_suffix);

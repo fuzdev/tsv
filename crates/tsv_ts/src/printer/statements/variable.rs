@@ -7,10 +7,10 @@ use crate::printer::{
     CommentFilter, CommentSpacing, CommentVec, ParenContext, analysis, class_expr_has_decorators,
     conditional_should_break_after_op, is_call_on_member_chain, is_curried_arrow_chain,
     is_curried_arrow_with_return_type, is_literal_member_chain, is_module_path_fluid_call,
-    is_multiline_string_literal, is_poorly_breakable_chain, is_pure_property_chain,
-    is_regex_root_chain, is_self_expanding_value, is_simple_self_expanding, is_simple_value,
-    is_single_call_on_member_chain, is_string_literal, is_type_assertion_call, needs_parens,
-    should_inline_logical_expression,
+    is_multiline_string_literal, is_own_line_jsdoc_cast, is_poorly_breakable_chain,
+    is_pure_property_chain, is_regex_root_chain, is_self_expanding_value, is_simple_self_expanding,
+    is_simple_value, is_single_call_on_member_chain, is_string_literal, is_type_assertion_call,
+    needs_parens, should_inline_logical_expression,
 };
 use smallvec::smallvec;
 use tsv_lang::comments_in_range;
@@ -558,7 +558,11 @@ impl<'a> Printer<'a> {
 
                 let is_break_after_op_rhs = should_break_after_op_rhs
                     || needs_break_after_op_layout
-                    || is_decorated_class_expr;
+                    || is_decorated_class_expr
+                    // An own-line JSDoc-cast comment hangs after `=`. The cast owns its
+                    // comment, so `has_comments_after_eq` below can't see it — this
+                    // node-level check is the only signal left.
+                    || is_own_line_jsdoc_cast(init, self.source);
 
                 // Breakable LHS (destructuring patterns) with non-self-expanding RHS:
                 // Use fluid layout so the printer breaks at `=` before expanding the

@@ -390,11 +390,13 @@ impl<'a> Printer<'a> {
         d.concat(&child_docs)
     }
 
-    /// Check if a node is an expression-like tag (ExpressionTag, HtmlTag, RenderTag).
+    /// Whether a node is a **tag** — `{expr}`, `{@html …}`, or `{@render …}`. All three,
+    /// not just `ExpressionTag` (the old name said `is_expression_tag` and read as if it
+    /// meant only the first).
     ///
     /// These tags use the leading/trailing line fill approach instead of group wrapping,
     /// because group wrapping forces line breaks after multiline expressions.
-    fn is_expression_tag(node: &FragmentNode<'_>) -> bool {
+    fn is_tag_node(node: &FragmentNode<'_>) -> bool {
         matches!(
             node,
             FragmentNode::ExpressionTag(_) | FragmentNode::HtmlTag(_) | FragmentNode::RenderTag(_)
@@ -451,9 +453,9 @@ impl<'a> Printer<'a> {
         let prev_node = i.checked_sub(1).map(|j| &trimmed_nodes[j]);
         let next_node = trimmed_nodes.get(i + 1);
         let prev_is_inline = prev_node.is_some_and(is_inline_content);
-        let prev_is_tag = prev_node.is_some_and(Self::is_expression_tag);
+        let prev_is_tag = prev_node.is_some_and(Self::is_tag_node);
         let next_is_inline = next_node.is_some_and(is_inline_content);
-        let next_is_tag = next_node.is_some_and(Self::is_expression_tag);
+        let next_is_tag = next_node.is_some_and(Self::is_tag_node);
         // Whether the next sibling is an HTML *inline* element vs a *block* element —
         // the two kinds prettier-plugin-svelte trims boundary whitespace *into* (the
         // trimmed text emits nothing; the element's own group([line, …]) /
@@ -502,8 +504,29 @@ impl<'a> Printer<'a> {
                 return;
             }
             if !multiline {
-                // Legacy inline callers: signal the next inline element to lead with a line.
-                *handle_whitespace_of_prev_text = true;
+                // Before a tag the separator is a bare collapsible break — a space while
+                // the fragment fits, a newline once it breaks — exactly as the multiline
+                // arm below emits it. `group([line, tag])` (the inline-element form) would
+                // instead decide the separator on its own width, independently of whether
+                // the parent broke: a compact `<small>{a} {b}</small>` that overflows would
+                // pack `{a} {b}` onto the block-style content line, while the same document
+                // authored across lines splits them. That makes the layout follow the
+                // content-boundary whitespace — which is render-free under Svelte 5, and
+                // which tsv *injects* when it converts an authoring to block-style, so the
+                // emitted form would reflow on the next pass.
+                //
+                // An inline ELEMENT or component keeps `group([line, el])` deliberately: it
+                // carries its own tags, so the group is what lets a wide element drop to its
+                // own line whole instead of breaking its tag in place, and both formatters
+                // settle on a stable (if authoring-dependent) form there — the sanctioned
+                // Tier-2 element-expansion class, not this bug. A tag has no such structure
+                // to protect, so the bare break is strictly better.
+                if next_is_tag {
+                    child_docs.push(d.line());
+                } else {
+                    // Signal the next inline element to lead with a line.
+                    *handle_whitespace_of_prev_text = true;
+                }
                 return;
             }
             // Multiline middle whitespace-only text — mirror prettier-plugin-svelte's
@@ -1193,12 +1216,9 @@ impl<'a> Printer<'a> {
                 has_preceding_breakable,
                 gt_prefix,
             ),
-            FragmentNode::SnippetBlock(b) => self.build_snippet_block_doc_with_full_context(
-                b,
-                in_multiline_context,
-                has_preceding_breakable,
-                gt_prefix,
-            ),
+            FragmentNode::SnippetBlock(b) => {
+                self.build_snippet_block_doc_with_full_context(b, gt_prefix)
+            }
             _ => return None,
         })
     }

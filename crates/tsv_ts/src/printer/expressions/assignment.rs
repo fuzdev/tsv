@@ -13,7 +13,7 @@
 //
 // - prettier/src/language-js/print/assignment.js
 
-use crate::ast::internal::{self, Expression};
+use crate::ast::internal::{self, Expression, JsdocCast};
 use crate::printer::ArrowChainContext;
 use crate::printer::Printer;
 use crate::printer::conditional_should_break_after_op;
@@ -54,6 +54,49 @@ pub enum AssignmentLayout {
     Fluid,
 }
 
+/// Whether the author gave a JSDoc cast's comment a line of its own — a newline on
+/// **both** sides of it, as in `const a =⏎\t/** @type {A} */⏎\t(expr)`.
+///
+/// Both sides is the rule prettier applies, and only that shape hangs. A newline on
+/// one side alone collapses to a space:
+///
+/// ```js
+/// const a = /** @type {A} */⏎  (expr);  // →  const a = /** @type {A} */ (expr);
+/// const a =⏎  /** @type {A} */ (expr);  // →  const a = /** @type {A} */ (expr);
+/// ```
+///
+/// The single source of truth for both consequences of that shape: the hang itself
+/// (`choose_layout` below, and the declarator's own predicates in
+/// `statements/variable.rs`) and the hardline the cast prints between the comment and
+/// its `(` (`build_jsdoc_cast_doc`). They must agree — a hang without the hardline
+/// leaves the `(` stranded, and a hardline without the hang un-indents it.
+pub fn jsdoc_cast_comment_is_own_line(cast: &JsdocCast<'_>, source: &str) -> bool {
+    let bytes = source.as_bytes();
+    // Only whitespace between the start of the line and the comment.
+    let mut i = cast.comment.span.start as usize;
+    let newline_before = loop {
+        if i == 0 {
+            break true;
+        }
+        i -= 1;
+        match bytes[i] {
+            b'\n' => break true,
+            b' ' | b'\t' | b'\r' => {}
+            _ => break false,
+        }
+    };
+    newline_before
+        && !tsv_lang::printing::is_same_line(source, cast.comment.span.end, cast.span.start)
+}
+
+/// `jsdoc_cast_comment_is_own_line` for an arbitrary expression — the assignment-layout
+/// entry point. The cast **owns** its comment (`Comment::owned_by_node`), so the generic
+/// comment-in-the-gap signal that used to select the hang no longer sees it; this
+/// node-level predicate is the only signal left.
+pub fn is_own_line_jsdoc_cast(expr: &Expression<'_>, source: &str) -> bool {
+    matches!(expr, Expression::JsdocCast(cast) if jsdoc_cast_comment_is_own_line(cast, source))
+}
+
 /// Choose the layout strategy for an assignment
 ///
 /// Follows prettier's `chooseLayout` logic in assignment.js
@@ -61,13 +104,26 @@ pub enum AssignmentLayout {
 /// `is_short_key`: True for property keys shorter than `tabWidth + MIN_OVERLAP_FOR_BREAK`.
 /// Short keys don't benefit from breaking after the colon. For non-property assignments
 /// (e.g., `x = value`), pass `false`.
+///
+/// `can_break_left`: Whether the printed left-hand side contains a break point
+/// (prettier's `canBreakLeftDoc`). It gates the `never-break-after-operator` cases: an
+/// unbreakable RHS may only stay welded to the operator when the LHS has nowhere to
+/// break either — otherwise the assignment falls through to `fluid` and breaks after the
+/// operator, rather than letting the LHS break inside the assignment target.
 pub fn choose_layout(
     right_expr: &Expression<'_>,
     is_short_key: bool,
+    can_break_left: bool,
     source: &str,
     print_width: usize,
     comments: &[Comment],
 ) -> AssignmentLayout {
+    // A JSDoc cast whose comment the author put on its own line keeps that shape —
+    // hang it after the operator (see `is_own_line_jsdoc_cast`).
+    if is_own_line_jsdoc_cast(right_expr, source) {
+        return AssignmentLayout::BreakAfterOperator;
+    }
+
     // Untyped curried arrow chains (`(a) => (b) => …`) use fluid layout: break
     // after `=` only when the signature heads don't fit on the operator line,
     // letting a hugging body (object/array/block) expand in place otherwise.
@@ -127,18 +183,23 @@ pub fn choose_layout(
 
     // Short property keys → never break after operator
     // (wrapping object properties with very short keys usually doesn't add much value)
-    if is_short_key {
+    if is_short_key && !can_break_left {
         return AssignmentLayout::NeverBreakAfterOperator;
     }
 
     // Check if RHS is a poorly breakable chain (should break after operator)
-    // Note: is_short_key is false here due to early return above
     if should_break_after_operator(right_expr, source, print_width, comments) {
         return AssignmentLayout::BreakAfterOperator;
     }
 
-    // Simple values that shouldn't break → never break after operator
-    if is_simple_value(right_expr) {
+    // Simple values that shouldn't break → never break after operator.
+    //
+    // Only when the LHS can't break either (prettier's `!canBreakLeftDoc`, assignment.js
+    // chooseLayout:181-191). When it CAN — `params['key'] = \`template\`;`, whose computed
+    // lookup is a breakable group — welding the unbreakable RHS to the operator would
+    // force the overflow into the assignment *target*, splitting `params[⏎ 'key'⏎] =`.
+    // Prettier instead falls through to `fluid` and breaks after the `=`.
+    if is_simple_value(right_expr) && !can_break_left {
         return AssignmentLayout::NeverBreakAfterOperator;
     }
 
@@ -867,6 +928,7 @@ impl<'a> Printer<'a> {
         let mut layout = choose_layout(
             right_expr,
             is_short_key,
+            d.can_break(left_doc),
             self.source,
             PRINT_WIDTH,
             self.comments,

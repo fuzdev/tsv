@@ -862,7 +862,18 @@ fn collect_script_comments(
         if text.contains("prettier-ignore") || text.contains("format-ignore") {
             return Err(unsupported(Refusal::FormatIgnoreComment));
         }
-        comments.push(comment.clone());
+        let mut comment = comment.clone();
+        // Release a JSDoc cast's comment back to the positional machinery. `tsv_ts`
+        // binds it to its `JsdocCast` node (`Comment::owned_by_node`) so a synthesized
+        // paren can't land between the comment and the `(` it glues to — the owning
+        // node becomes the only thing that prints it, and the range lookups skip it.
+        // Erasure unwraps *every* `JsdocCast` (the compile path matches the oracle,
+        // which has no such node and drops the parens), so in the emitted program that
+        // owner does not exist: left owned, the comment is printed by nothing and
+        // silently dropped. Un-owned, it prints from its gap exactly as the oracle
+        // prints it — `const x = /** @type {number} */ 1`.
+        comment.owned_by_node = false;
+        comments.push(comment);
     }
     for node in root.fragment.nodes {
         if node.span().start < content.end {

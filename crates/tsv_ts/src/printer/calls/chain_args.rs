@@ -3,13 +3,13 @@
 // Handles building call arguments in chain contexts where the callee
 // is handled separately by the chain printer.
 
-use super::super::comments::{CommentFilter, CommentSpacing};
+use super::super::comments::CommentSpacing;
 use super::super::{Printer, has_newline_before_position, is_multiline_template_expression};
 use super::arg_comments::{
     PartitionedComments, any_comment_forces_expansion, build_after_comma_leading_comments,
     build_before_comma_trailing_comments, first_arg_has_any_comments, has_blank_line_between_args,
     has_inter_argument_comments, has_trailing_comments_on_args, is_comment_inline_with_next,
-    last_arg_has_comments,
+    last_arg_has_comments, push_empty_args,
 };
 use super::arg_predicates::{
     arrow_body_is_call_through_non_null, arrow_has_trailing_param_comments, is_block_function,
@@ -341,7 +341,6 @@ fn build_chain_args_empty(
     ctx: ChainArgsContext,
     mut parts: DocBuf,
 ) -> DocId {
-    let d = printer.d();
     let ChainArgsContext {
         paren_open, prefix, ..
     } = ctx;
@@ -349,33 +348,15 @@ fn build_chain_args_empty(
     // empty-args form is one of two statics — no transient `format!` String.
     let empty_pair: &'static str = if prefix == "?.(" { "?.()" } else { "()" };
 
-    // Separate pre-paren comments (between > and () from inside-paren comments
-    let paren_close = call.span.end;
-    let actual_paren = printer.find_char_outside_comments(paren_open, paren_close, b'(');
-    if let Some(paren_pos) = actual_paren {
-        let pre_paren_comments = printer.build_comments_between_filtered_opt(
-            paren_open,
-            paren_pos,
-            CommentSpacing::Leading,
-            CommentFilter::All,
-        );
-        let inside_paren_comments = printer
-            .build_inline_comments_between_doc_no_leading_space_opt(paren_pos + 1, paren_close);
-        if let Some(pre) = pre_paren_comments {
-            parts.push(pre);
-        }
-        match inside_paren_comments {
-            Some(inner) => {
-                parts.push(d.text(prefix));
-                parts.push(inner);
-                parts.push(d.text(")"));
-            }
-            None => parts.push(d.text(empty_pair)),
-        }
-    } else {
-        parts.push(d.text(empty_pair));
-    }
-    d.concat(&parts)
+    push_empty_args(
+        printer,
+        &mut parts,
+        paren_open,
+        call.span.end,
+        prefix,
+        empty_pair,
+    );
+    printer.d().concat(&parts)
 }
 
 /// Forced-expansion argument layout (`force_expand` true): hardlines instead of

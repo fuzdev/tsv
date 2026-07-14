@@ -281,7 +281,9 @@ fn check(src: &str, parser: ParserType, render: bool) -> Outcome {
 
 /// One recorded finding, enough to reproduce and triage.
 struct Finding {
-    iteration: usize,
+    /// The mutation iteration that produced it, or `None` when the *unmutated*
+    /// seed file itself violated an invariant (the pristine pass).
+    iteration: Option<usize>,
     parser: ParserType,
     outcome: Outcome,
     seed_path: String,
@@ -294,6 +296,55 @@ struct Seed {
     display: String,
     bytes: Vec<u8>,
     parser: ParserType,
+}
+
+/// The findings a run accumulates: exact counts plus a **bounded** store of the
+/// findings themselves (they hold the mutant text, so a noisy discovery run must not
+/// balloon memory — the counts stay exact regardless).
+///
+/// Owns the counters so both passes (pristine seeds, then mutants) share one
+/// [`Self::record`] rather than threading a `&mut` per counter through a closure.
+struct Found {
+    hard: usize,
+    soft: usize,
+    store: Vec<Finding>,
+    cap: usize,
+}
+
+impl Found {
+    fn new(cap: usize) -> Self {
+        Self {
+            hard: 0,
+            soft: 0,
+            store: Vec::new(),
+            cap,
+        }
+    }
+
+    /// Count a finding and store it if there is room. `iteration` is `None` for a
+    /// pristine (unmutated) seed.
+    fn record(&mut self, outcome: Outcome, iteration: Option<usize>, seed: &Seed, src: &str) {
+        if outcome.is_hard() {
+            self.hard += 1;
+        } else {
+            self.soft += 1;
+        }
+        if self.store.len() < self.cap {
+            let panic = if outcome == Outcome::Panic {
+                LAST_PANIC.with(|c| c.borrow_mut().take())
+            } else {
+                None
+            };
+            self.store.push(Finding {
+                iteration,
+                parser: seed.parser,
+                outcome,
+                seed_path: seed.display.clone(),
+                input: src.to_string(),
+                panic,
+            });
+        }
+    }
 }
 
 impl FuzzCommand {
@@ -357,13 +408,59 @@ impl FuzzCommand {
         let mut skipped_non_utf8 = 0usize;
         let mut rejected = 0usize;
         let mut ok = 0usize;
-        let mut hard_count = 0usize;
-        let mut soft_count = 0usize;
-        let mut findings: Vec<Finding> = Vec::new();
+        let mut pristine_reflow = 0usize;
+        // Paths of the pristine seeds that reflowed (see the pass-1 soft arm). Bounded
+        // like the findings store, though each entry is only a path; the count stays exact.
+        let mut reflow_paths: Vec<String> = Vec::new();
         // Bound stored findings (they hold the mutant text) so a noisy discovery
-        // run can't balloon memory; the counts above stay exact.
-        let store_cap = self.max_findings.max(20) * 4;
+        // run can't balloon memory; the counts inside stay exact.
+        let mut found = Found::new(self.max_findings.max(20) * 4);
 
+        // Pass 1 — every seed **as authored**. The mutation loop below only ever drives
+        // mutants, so a pristine corpus file is never itself checked; yet the corpus is
+        // the richest source of real, formatter-reachable inputs. Over `tests/fixtures`
+        // this is the only gate that drives the *non-`input.*`* fixture files — the
+        // validator claims F1 on `input.*` alone, so `output_prettier.*`, `variant_*`
+        // and `unformatted_*` (all real, formatter-reachable code) went unchecked.
+        for seed in &seeds {
+            let Ok(src) = std::str::from_utf8(&seed.bytes) else {
+                skipped_non_utf8 += 1;
+                continue;
+            };
+            tested += 1;
+
+            LAST_PANIC.with(|c| *c.borrow_mut() = None);
+            let outcome = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                check(src, seed.parser, render)
+            })) {
+                Ok(o) => o,
+                Err(_) => Outcome::Panic,
+            };
+
+            match outcome {
+                Outcome::Rejected => rejected += 1,
+                Outcome::Ok => ok += 1,
+                // The soft (structural_divergence) verdict does not FAIL a pristine
+                // seed: over `tests/fixtures` the corpus deliberately holds
+                // mis-formatted files (`unformatted_*`) whose formatting legitimately
+                // reflows the whitespace skeleton, and structural reparse is
+                // `roundtrip_audit`'s gate anyway (it has the canonical confirmation
+                // this compare lacks). It is still REPORTED: over a real-code corpus
+                // (`deno task idempotency:sweep`) there are no `unformatted_*` files,
+                // so every one of these wants triage — and a count with no paths is
+                // not actionable. The seed path IS the reproduction (an unmutated file
+                // on disk), so record that rather than dumping the input.
+                f if !f.is_hard() => {
+                    pristine_reflow += 1;
+                    if reflow_paths.len() < REFLOW_PATH_CAP {
+                        reflow_paths.push(seed.display.clone());
+                    }
+                }
+                finding => found.record(finding, None, seed, src),
+            }
+        }
+
+        // Pass 2 — mutants.
         for iteration in 0..self.iterations {
             let seed = &seeds[rng.below(seeds.len())];
             let mutated = mutate(&mut rng, &seed.bytes, self.max_mutations);
@@ -385,29 +482,10 @@ impl FuzzCommand {
                 Outcome::Rejected => rejected += 1,
                 Outcome::Ok => ok += 1,
                 finding => {
-                    if finding.is_hard() {
-                        hard_count += 1;
-                    } else {
-                        soft_count += 1;
-                    }
-                    if findings.len() < store_cap {
-                        let panic = if finding == Outcome::Panic {
-                            LAST_PANIC.with(|c| c.borrow_mut().take())
-                        } else {
-                            None
-                        };
-                        findings.push(Finding {
-                            iteration,
-                            parser: seed.parser,
-                            outcome: finding,
-                            seed_path: seed.display.clone(),
-                            input: src.to_string(),
-                            panic,
-                        });
-                    }
+                    found.record(finding, Some(iteration), seed, src);
                     // Only HARD findings stop the run early — soft ones (render-
                     // model-noisy structural divergences) are counted, not fatal.
-                    if self.max_findings > 0 && hard_count >= self.max_findings {
+                    if self.max_findings > 0 && found.hard >= self.max_findings {
                         break;
                     }
                 }
@@ -416,16 +494,18 @@ impl FuzzCommand {
 
         std::panic::set_hook(prev_hook);
 
-        self.dump_findings(&findings);
+        self.dump_findings(&found.store);
         let stats = Stats {
             tested,
             skipped_non_utf8,
             rejected,
             ok,
-            hard_count,
-            soft_count,
+            hard_count: found.hard,
+            soft_count: found.soft,
+            pristine_reflow,
+            reflow_paths,
         };
-        self.report(&stats, &findings)
+        self.report(&stats, &found.store)
     }
 
     /// Write each finding's input to `--dump-dir` (if set) for reproduction.
@@ -480,6 +560,8 @@ impl FuzzCommand {
                 "ok": stats.ok,
                 "hard_findings": stats.hard_count,
                 "soft_findings": stats.soft_count,
+                "pristine_reflow": stats.pristine_reflow,
+                "pristine_reflow_paths": stats.reflow_paths,
                 "strict": self.strict,
                 "findings": findings_json,
             });
@@ -496,6 +578,10 @@ impl FuzzCommand {
             stats.rejected
         );
         println!("  {:>7}  ok (parsed, idempotent, reparses equal)", stats.ok);
+        println!(
+            "  {:>7}  seed files that reflow structurally when formatted, as authored\n           (not a failure — see below)",
+            stats.pristine_reflow
+        );
         println!(
             "  {:>7}  HARD findings (panic / unreparseable / non-idempotent)",
             stats.hard_count
@@ -544,6 +630,33 @@ impl FuzzCommand {
             println!();
         }
 
+        if stats.pristine_reflow > 0 {
+            println!(
+                "○ {} seed file(s) whose format reflows the structural skeleton, AS AUTHORED.",
+                stats.pristine_reflow
+            );
+            println!(
+                "  Not a run failure: over tests/fixtures the `unformatted_*` seeds reflow by"
+            );
+            println!(
+                "  design, and structural reparse is roundtrip_audit's gate (it has the canonical"
+            );
+            println!(
+                "  confirmation this compare lacks). Over a REAL-CODE corpus there are no such"
+            );
+            println!("  seeds — triage each with `roundtrip_audit --canonical-all <path>`:");
+            for p in stats.reflow_paths.iter().take(20) {
+                println!("    {p}");
+            }
+            if stats.pristine_reflow > stats.reflow_paths.len().min(20) {
+                println!(
+                    "    … and {} more",
+                    stats.pristine_reflow - stats.reflow_paths.len().min(20)
+                );
+            }
+            println!();
+        }
+
         if self.dump_dir.is_none() && !findings.is_empty() {
             println!("(pass --dump-dir DIR to write each failing input for reproduction)");
         }
@@ -559,10 +672,14 @@ impl FuzzCommand {
 
 /// Print one finding line (kind, provenance, panic message, input preview).
 fn print_finding(f: &Finding) {
+    let origin = match f.iteration {
+        Some(i) => format!("iter {i}"),
+        None => "as authored".to_string(),
+    };
     println!(
-        "  [{}] iter {} · {} · seed {}",
+        "  [{}] {} · {} · seed {}",
         f.outcome.label(),
-        f.iteration,
+        origin,
         f.parser.name(),
         f.seed_path
     );
@@ -580,7 +697,16 @@ struct Stats {
     ok: usize,
     hard_count: usize,
     soft_count: usize,
+    /// Pristine seeds whose formatting reflows the whitespace skeleton. Not a run
+    /// failure (the `unformatted_*` fixtures reflow by design), but reported with
+    /// paths — over a real-code corpus every one wants triage.
+    pristine_reflow: usize,
+    /// The seed paths behind `pristine_reflow`, capped at [`REFLOW_PATH_CAP`].
+    reflow_paths: Vec<String>,
 }
+
+/// Cap on stored `reflow_paths` — enough to triage, bounded on a noisy corpus.
+const REFLOW_PATH_CAP: usize = 50;
 
 /// A single-line, length-capped preview of a (possibly multi-line) mutant.
 fn preview(input: &str) -> String {

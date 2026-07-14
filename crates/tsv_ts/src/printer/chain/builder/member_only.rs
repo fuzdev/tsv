@@ -3,9 +3,11 @@
 // Handles chains that contain only member accesses (no calls) using
 // fill() for greedy packing of segments.
 
-use super::super::printing::{ChainPrinter, print_node, print_node_inner};
+use super::super::printing::{
+    ChainPrinter, node_comment_gap, print_node, print_node_inner, push_gap_comments_and_break,
+};
 use super::super::types::{ChainGroup, ChainNode, ChainNodeRefVec};
-use super::helpers::push_gap_comments_and_break;
+
 use crate::ast::internal::Expression;
 use smallvec::smallvec;
 use tsv_lang::doc::{DocBuf, arena::DocId};
@@ -23,7 +25,7 @@ pub(super) fn member_only_has_interior_line_comments<'a, P: ChainPrinter>(
     groups
         .iter()
         .flat_map(|g| g.nodes.iter())
-        .any(|node| match node.comment_range() {
+        .any(|node| match node_comment_gap(node, printer) {
             Some((start, end)) => {
                 let c = printer.classify_comments(start, end);
                 !c.trailing_line.is_empty() || !c.leading_line.is_empty()
@@ -70,9 +72,12 @@ pub(super) fn build_member_only_chain_with_comments_doc<'a, P: ChainPrinter>(
     // print the node skipping its own comments; otherwise just break before it.
     let mut rest = DocBuf::new();
     for node in &all_nodes[first_doc_end..] {
-        match node.comment_range() {
-            Some((obj_end, prop_start)) if printer.has_comments_between(obj_end, prop_start) => {
-                push_gap_comments_and_break(&mut rest, printer, obj_end, prop_start, true);
+        // `gap_end` is the property start for a plain member, but the `[` for a
+        // computed one — the comments inside its brackets belong to the bracket
+        // builder, not to this chain gap. See `node_comment_gap`.
+        match node_comment_gap(node, printer) {
+            Some((obj_end, gap_end)) if printer.has_comments_between(obj_end, gap_end) => {
+                push_gap_comments_and_break(&mut rest, printer, obj_end, gap_end, true);
                 rest.push(print_node_inner(node, printer, false, true));
             }
             _ => {
@@ -85,10 +90,24 @@ pub(super) fn build_member_only_chain_with_comments_doc<'a, P: ChainPrinter>(
     d.concat(&[first_doc, d.indent(d.concat(&rest))])
 }
 
+/// Whether a node opens a new fill segment — i.e. whether a break point may precede it.
+///
+/// A `.prop` lookup may break onto its own line; a computed `[i]` / `?.[i]` lookup may
+/// NOT. Prettier's `printMemberExpression` (member.js) inlines every computed lookup
+/// (`shouldInline` includes `node.computed`), so a computed access stays glued to the
+/// object and sheds width by breaking its own brackets instead (`computed_lookup_doc`).
+/// Giving it a segment of its own would put a softline before the `[`, which prettier
+/// never emits — and, because the brackets used to be unbreakable, was tsv's only way to
+/// fit an overlong computed access.
+fn starts_segment(node: &ChainNode<'_>) -> bool {
+    node.is_member() && !node.is_computed()
+}
+
 /// Build doc for member-only chains using fill for greedy packing
 ///
-/// Break points are ONLY at member access (`.foo`), not at non-null (`!`).
-/// This ensures `.foo!` stays together as a unit.
+/// Break points are ONLY at member access (`.foo`), not at non-null (`!`) and not at a
+/// computed lookup (`[i]` — see `starts_segment`). This ensures `.foo!` stays together as
+/// a unit.
 ///
 /// Example: `a!.b!.c!` breaks as:
 /// ```text
@@ -133,7 +152,7 @@ pub(super) fn build_member_only_chain_doc<'a, P: ChainPrinter>(
     // each member access to be a separate segment.
     let mut first_doc_end = 0;
     for (i, node) in all_nodes.iter().enumerate() {
-        if node.is_member() {
+        if starts_segment(node) {
             // Stop at first member - that starts the fill segments
             break;
         }
@@ -176,7 +195,7 @@ pub(super) fn build_member_only_chain_doc<'a, P: ChainPrinter>(
     for (i, node) in remaining_nodes.iter().enumerate() {
         // Check if this is a member and we already have content that includes a member
         // If so, flush before adding this member
-        if node.is_member() && seen_member {
+        if starts_segment(node) && seen_member {
             segments.push(d.concat(&std::mem::take(&mut current_segment)));
             seen_member = false;
         }
@@ -184,7 +203,7 @@ pub(super) fn build_member_only_chain_doc<'a, P: ChainPrinter>(
         // print_node handles block comments for member nodes
         current_segment.push(print_node(node, printer));
 
-        if node.is_member() {
+        if starts_segment(node) {
             seen_member = true;
         }
 

@@ -28,6 +28,7 @@ fn expression_comment(
         span,
         emit_character_field,
         bump_pattern_columns: false,
+        owned_by_node: false,
     }
 }
 

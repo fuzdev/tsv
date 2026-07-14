@@ -1,0 +1,193 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 570,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 464,
+				"data": " A boundary break on ONE side is not an expansion signal. Content-boundary whitespace is\n     render-free under Svelte 5, and a component expands only when the author broke BOTH content\n     boundaries (see ../expr_child_multiline/). Authored with just the opening newline, the content\n     collapses back inline. Prettier keeps the half-authored break and dangles the closing tag to\n     hold the content against it — see prettier_variant_opening_newline. "
+			},
+			{
+				"type": "Text",
+				"start": 464,
+				"end": 465,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 465,
+				"end": 484,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 6,
+						"column": 1,
+						"character": 466
+					},
+					"end": {
+						"line": 6,
+						"column": 5,
+						"character": 470
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 471,
+							"end": 477,
+							"expression": {
+								"type": "Identifier",
+								"start": 472,
+								"end": 476,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 11
+									}
+								},
+								"name": "expr"
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 484,
+				"end": 486,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 486,
+				"end": 532,
+				"data": " Same with several expression children "
+			},
+			{
+				"type": "Text",
+				"start": 532,
+				"end": 533,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 533,
+				"end": 569,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 9,
+						"column": 1,
+						"character": 534
+					},
+					"end": {
+						"line": 9,
+						"column": 5,
+						"character": 538
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 539,
+							"end": 546,
+							"expression": {
+								"type": "Identifier",
+								"start": 540,
+								"end": 545,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 7
+									},
+									"end": {
+										"line": 9,
+										"column": 12
+									}
+								},
+								"name": "expr1"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 546,
+							"end": 547,
+							"raw": " ",
+							"data": " "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 547,
+							"end": 554,
+							"expression": {
+								"type": "Identifier",
+								"start": 548,
+								"end": 553,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 15
+									},
+									"end": {
+										"line": 9,
+										"column": 20
+									}
+								},
+								"name": "expr2"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 554,
+							"end": 555,
+							"raw": " ",
+							"data": " "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 555,
+							"end": 562,
+							"expression": {
+								"type": "Identifier",
+								"start": 556,
+								"end": 561,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 23
+									},
+									"end": {
+										"line": 9,
+										"column": 28
+									}
+								},
+								"name": "expr3"
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

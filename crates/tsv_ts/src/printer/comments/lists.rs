@@ -559,17 +559,11 @@ impl<'a> Printer<'a> {
         end: u32,
     ) -> Option<DocId> {
         let d = self.d();
-        // Single binary search to find first comment
-        let first_idx = tsv_lang::find_first_comment_from(self.comments, start);
-        let first = self.comments.get(first_idx).filter(|c| c.span.end <= end)?;
+        let mut in_range = comments_in_range(self.comments, start, end).peekable();
+        in_range.peek()?;
 
-        // Build parts starting from found comment
         let mut parts = DocBuf::new();
-        for comment in std::iter::once(first).chain(
-            self.comments[first_idx + 1..]
-                .iter()
-                .take_while(|c| c.span.end <= end),
-        ) {
+        for comment in in_range {
             parts.push(d.text(" "));
             parts.push(self.build_comment_doc(comment));
         }
@@ -688,6 +682,68 @@ impl<'a> Printer<'a> {
         self.build_empty_inline_with_comments_doc(body_start, body_end, "[]", sep)
     }
 
+    /// Build a Doc for an empty paren list whose only content is a dangling
+    /// comment, keeping a fitting block comment inline (`fn(/* c */)`).
+    ///
+    /// The paren counterpart of [`Self::build_empty_brackets_inline_with_comments_doc`],
+    /// shared by every empty paren list: call and `new` arguments (including the
+    /// member-chain and optional-call `?.(` forms, hence the `opening` prefix),
+    /// value parameter lists (function, method, arrow), and signature-level type
+    /// params. A line comment inside `()` cannot stay inline — `//` runs to the end
+    /// of the line and would swallow the `)` — so it forces the break; this is the
+    /// one delimiter pair where inlining is a correctness bug rather than a layout
+    /// choice.
+    ///
+    /// `paren_open` is the `(` position and `paren_close_after` the position past
+    /// the `)` (as returned by `find_closing_paren`).
+    // TODO: the sibling swallow in CALLEE position is NOT covered here. A line comment
+    // between a callee and its `(` — `call // c⏎()`, and the optional-call `call?. // c⏎()`
+    // — is emitted by the callee/member-chain path, not by this emitter, and still prints
+    // inline (`call // c();`), swallowing the `()`. Same bug class, different mechanism
+    // (callee-position trivia, not a dangling comment inside a delimiter pair), so it wants
+    // its own fixtures-first fix. `swallow_audit` cannot see it — that gate runs over
+    // `tests/fixtures` only, and no fixture carries the shape; prettier's own
+    // `js/call/no-argument/no-arguments.js` does.
+    pub(crate) fn build_empty_parens_inline_with_comments_doc(
+        &self,
+        paren_open: u32,
+        paren_close_after: u32,
+        opening: &'static str,
+    ) -> DocId {
+        let d = self.d();
+        let sep = d.softline();
+        self.build_empty_bracketed_with_comments_doc(
+            paren_open,
+            paren_close_after,
+            d.text(opening),
+            ")",
+            sep,
+        )
+    }
+
+    /// Build a Doc for an empty parameter list, preserving any dangling comments
+    /// inside the parens (`fn(/* c */)`). Shared by every empty parameter list —
+    /// value params (function, method, arrow) and signature-level type params — so
+    /// the dangling rule of
+    /// [`Self::build_empty_parens_inline_with_comments_doc`] reaches all of them.
+    ///
+    /// `search_limit` bounds the depth-tracked `)` search, which skips comment and
+    /// string content so a `)` inside a comment can't be mistaken for the closer.
+    /// Callers that know a tighter bound (an arrow's body start) pass it; the rest
+    /// pass the source length. Yields a bare `()` when there is no `(` to anchor to.
+    pub(crate) fn build_empty_params_with_comments_doc(
+        &self,
+        params_start: Option<u32>,
+        search_limit: u32,
+    ) -> DocId {
+        if let Some(open) = params_start
+            && let Some(close_after) = self.find_closing_paren(open, search_limit)
+        {
+            return self.build_empty_parens_inline_with_comments_doc(open, close_after, "(");
+        }
+        self.d().text("()")
+    }
+
     /// Build a Doc for an empty delimited container whose only content is a
     /// dangling comment, matching prettier 3.9's `printDanglingCommentsInList`
     /// (prettier PRs #18617 / #18615): a block comment that fits stays inline
@@ -729,12 +785,8 @@ impl<'a> Printer<'a> {
         let body_start = span_start + 1; // After opening delimiter
         let body_end = span_end.saturating_sub(1); // Before closing delimiter
 
-        // Single binary search to find comments
-        let first_idx = tsv_lang::find_first_comment_from(self.comments, body_start);
-        let comments: CommentVec<'_> = self.comments[first_idx..]
-            .iter()
-            .take_while(|c| c.span.end <= body_end)
-            .collect();
+        let comments: CommentVec<'_> =
+            comments_in_range(self.comments, body_start, body_end).collect();
 
         if comments.is_empty() {
             return d.concat(&[opening, d.text(closing)]);
