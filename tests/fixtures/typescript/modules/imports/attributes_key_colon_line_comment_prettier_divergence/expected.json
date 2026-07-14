@@ -1,0 +1,318 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 147,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 44,
+			"end": 48,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 7
+				},
+				"end": {
+					"line": 3,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 114,
+			"end": 118,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 20
+				},
+				"end": {
+					"line": 8,
+					"column": 24
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 146,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 137,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ImportDeclaration",
+					"start": 10,
+					"end": 64,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 3
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 17,
+							"end": 18,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 8
+								},
+								"end": {
+									"line": 2,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 17,
+								"end": 18,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 8
+									},
+									"end": {
+										"line": 2,
+										"column": 9
+									}
+								},
+								"name": "x"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 24,
+						"end": 29,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 15
+							},
+							"end": {
+								"line": 2,
+								"column": 20
+							}
+						},
+						"value": "./x",
+						"raw": "'./x'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 39,
+							"end": 60,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 2
+								},
+								"end": {
+									"line": 4,
+									"column": 11
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 39,
+								"end": 43,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 2
+									},
+									"end": {
+										"line": 3,
+										"column": 6
+									}
+								},
+								"name": "type",
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c",
+										"start": 44,
+										"end": 48
+									}
+								]
+							},
+							"value": {
+								"type": "Literal",
+								"start": 54,
+								"end": 60,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 5
+									},
+									"end": {
+										"line": 4,
+										"column": 11
+									}
+								},
+								"value": "json",
+								"raw": "'json'"
+							}
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 67,
+					"end": 136,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 3
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 74,
+							"end": 75,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 8
+								},
+								"end": {
+									"line": 7,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 74,
+								"end": 75,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 8
+									},
+									"end": {
+										"line": 7,
+										"column": 9
+									}
+								},
+								"name": "y"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 81,
+						"end": 86,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 15
+							},
+							"end": {
+								"line": 7,
+								"column": 20
+							}
+						},
+						"value": "./y",
+						"raw": "'./y'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 96,
+							"end": 132,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 2
+								},
+								"end": {
+									"line": 9,
+									"column": 13
+								}
+							},
+							"key": {
+								"type": "Literal",
+								"start": 96,
+								"end": 113,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 19
+									}
+								},
+								"value": "resolution-mode",
+								"raw": "'resolution-mode'",
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c",
+										"start": 114,
+										"end": 118
+									}
+								]
+							},
+							"value": {
+								"type": "Literal",
+								"start": 124,
+								"end": 132,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 5
+									},
+									"end": {
+										"line": 9,
+										"column": 13
+									}
+								},
+								"value": "import",
+								"raw": "'import'"
+							}
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
