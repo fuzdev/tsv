@@ -205,6 +205,27 @@ pub fn is_foreign_element(tag_name: &str) -> bool {
     is_svg_element(tag_name) || is_mathml_element(tag_name)
 }
 
+/// A `PCENChar` — a character the [HTML "valid custom element name"][spec] grammar
+/// admits in a custom element's name after its ASCII start, i.e. in the run after the
+/// first hyphen (`<my-café>`, `<emotion-😍>`, `<a-·>`). The ranges are the grammar's
+/// (`PotentialCustomElementName`) verbatim; surrogate code points are unreachable,
+/// since a Rust `char` is never a surrogate.
+///
+/// Used both by the tokenizer (to keep a whole custom-element name in one token,
+/// including the non-alphanumeric members `·`/ZWNJ/ZWJ/astral) and by the name
+/// validator (the hyphen-tail run) — a single source of truth for the ranges.
+///
+/// [spec]: https://html.spec.whatwg.org/multipage/custom-elements.html#valid-custom-element-name
+pub fn is_pcen_char(c: char) -> bool {
+    c.is_ascii_alphanumeric()
+        || matches!(c, '-' | '.' | '_' | '\u{00B7}')
+        || matches!(c,
+            '\u{00C0}'..='\u{00D6}' | '\u{00D8}'..='\u{00F6}' | '\u{00F8}'..='\u{037D}'
+            | '\u{037F}'..='\u{1FFF}' | '\u{200C}'..='\u{200D}' | '\u{203F}'..='\u{2040}'
+            | '\u{2070}'..='\u{218F}' | '\u{2C00}'..='\u{2FEF}' | '\u{3001}'..='\u{D7FF}'
+            | '\u{F900}'..='\u{FDCF}' | '\u{FDF0}'..='\u{FFFD}' | '\u{10000}'..='\u{EFFFF}')
+}
+
 // Elements whose end tag HTML lets you omit when a particular sibling or parent
 // boundary follows — the WHATWG optional-end-tag subset Svelte's parser implements
 // (../svelte/packages/svelte/src/html-tree-validation.js `autoclosing_children`,

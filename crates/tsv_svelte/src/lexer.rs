@@ -354,6 +354,13 @@ impl<'a> Lexer<'a> {
                 // Advance past first char — ! is a valid start but not a continuation char
                 self.advance();
                 while let Some(ch) = self.current {
+                    // `is_alphanumeric` already covers Unicode *letters* (so `<my-café>`
+                    // works); `is_pcen_char` adds the non-alphanumeric members of the HTML
+                    // custom-element name grammar (`·`, ZWNJ/ZWJ, astral emoji) so a whole
+                    // custom-element name stays in one token. It sits last: ASCII
+                    // short-circuits on `is_alphanumeric` before reaching it. Over-admitting
+                    // (e.g. a PCENChar with no preceding hyphen) is harmless — the parser's
+                    // `is_valid_tag_name` gate rejects any name that isn't valid.
                     if ch.is_alphanumeric()
                         || ch == '_'
                         || ch == '$'
@@ -361,6 +368,7 @@ impl<'a> Lexer<'a> {
                         || ch == ':'
                         || ch == '|'
                         || ch == '.'
+                        || tsv_html::is_pcen_char(ch)
                     {
                         self.advance();
                     } else {
