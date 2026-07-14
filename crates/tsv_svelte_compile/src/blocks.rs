@@ -303,7 +303,9 @@ pub(crate) fn emit_if_block<'arena>(
 /// whose body has at most one child once `Comment`/`ConstTag`/`DeclarationTag`/
 /// whitespace-only `Text` are filtered out, and that child is a regular element.
 /// Returns that element (whose span the emitter matches) or `None`.
-fn animate_host_element<'arena>(each: &'arena EachBlock<'arena>) -> Option<&'arena Element<'arena>> {
+fn animate_host_element<'arena>(
+    each: &'arena EachBlock<'arena>,
+) -> Option<&'arena Element<'arena>> {
     each.key.as_ref()?;
     let mut count = 0usize;
     let mut sole_element: Option<&'arena Element<'arena>> = None;
