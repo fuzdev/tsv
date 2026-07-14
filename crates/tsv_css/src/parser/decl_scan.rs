@@ -269,6 +269,58 @@ fn scan_rule_or_declaration_tokens(source: &str, from: usize) -> Result<bool, Pa
     }
 }
 
+/// The kind of the next significant token after `from`, when the bytes settle it.
+///
+/// Every block child that starts with an identifier asks this once, and asks it only to
+/// learn whether a `:` follows the name — `color` is a property, `span` is a type selector,
+/// and the colon is the whole difference. So a `:` is the one kind recognized here:
+/// whitespace and comments are trivia and get skipped, and **everything else declines**
+/// (`None`), including bytes whose token is perfectly obvious.
+///
+/// Declining on the negative is deliberate. It costs one short whitespace scan on the rarer
+/// nested-rule child, and it buys the property the rest of this module rests on: the scan
+/// never has to *reject*, so a lexer error stays `peek_past_whitespace`'s alone, reported at
+/// its own position. Widening the accept set would mean re-deriving which bytes the lexer
+/// can error on — the same bet `scan_value_bytes` declines to make.
+fn peek_significant_kind_bytes(bytes: &[u8], from: usize) -> Option<TokenKind> {
+    let len = bytes.len();
+    let mut i = from;
+    loop {
+        while i < len && is_ascii_css_whitespace(bytes[i]) {
+            i += 1;
+        }
+        match bytes.get(i)? {
+            b':' => return Some(TokenKind::Colon),
+            b'/' if bytes.get(i + 1) == Some(&b'*') => i = comment_end(bytes, i)?,
+            _ => return None,
+        }
+    }
+}
+
+/// Byte scan first, `peek_past_whitespace` on decline — and in debug the token lookahead
+/// runs behind a successful byte scan and must agree, so the test suite proves the
+/// equivalence.
+pub(super) fn peek_significant_kind(parser: &CssParser<'_, '_>) -> Result<TokenKind, ParseError> {
+    match peek_significant_kind_bytes(parser.source().as_bytes(), parser.current_end) {
+        Some(kind) => {
+            #[cfg(debug_assertions)]
+            {
+                // An `Err` here fails the assert too, and must: it would mean the byte scan
+                // accepted a lookahead the lexer rejects.
+                let expected = parser.peek_past_whitespace();
+                assert!(
+                    expected.as_ref().is_ok_and(|expected| *expected == kind),
+                    "significant-kind byte scan disagreed with the token lookahead at {}: \
+                     scan said {kind:?}, lookahead said {expected:?}",
+                    parser.current_end
+                );
+            }
+            Ok(kind)
+        }
+        None => parser.peek_past_whitespace(),
+    }
+}
+
 /// Scan a declaration's value from `value_start` (the start of its first token — the
 /// caller has already consumed the `:` and the whitespace after it).
 ///
