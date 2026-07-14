@@ -883,6 +883,15 @@ fn bind_target_root(expr: &Expression<'_>, source: &str) -> Option<String> {
     }
 }
 
+/// A `{get, set}` bind target: a `SequenceExpression` of exactly two expressions
+/// (`() => x, (v) => x = v`), the third valid bind form the oracle accepts beside
+/// an Identifier / member chain (`SequenceExpression` + `expressions.length === 2`
+/// in its `BindDirective` analysis). Recognized only so `bind:this` can OMIT it at
+/// parity — the value/checked/group arms still refuse it (no attr value to emit).
+fn is_get_set_pair(expr: &Expression<'_>) -> bool {
+    matches!(expr, Expression::SequenceExpression(seq) if seq.expressions.len() == 2)
+}
+
 /// Erase + guard + gate the bind target, returning the emitted expression. The
 /// expression-validity gate keeps tsv on the SAFE side of the oracle's assignable
 /// lvalue rule: emit only a `$state`-rooted `Identifier`/member chain (the crate's
@@ -972,7 +981,10 @@ fn build_companion_value<'arena>(
 /// Emit a `bind:` directive on a regular `<input>`/element (the oracle's server
 /// `BindDirective` handling in `shared/element.js`). The handled core kinds:
 ///
-/// - **`bind:this`** → omit (emit nothing). Valid on any variable / any element.
+/// - **`bind:this`** → omit (emit nothing). Valid on any variable / any element,
+///   with no `$state` gate, but the target must be one of the oracle's three
+///   accepted forms — an Identifier, a member chain, or a `{get, set}` pair; any
+///   other shape is `bind_invalid_expression` (refuse).
 /// - **`bind:value`** on `<input>` → `$.attr('value', expr)`. A bare `type` is
 ///   `attribute_invalid_type` (refuse); a static `type="file"` is the files trap
 ///   the oracle silently drops the bind for (refuse rather than emit a divergent
@@ -1001,10 +1013,18 @@ pub(crate) fn emit_bind_directive<'arena>(
     let bind_name = directive.name_span.extract(env.source).to_string();
 
     // `bind:this` omits on any regular element (the oracle's early `continue`) and
-    // works for any variable — no `$state` gate, nothing emitted (so it is
-    // comment-safe: no synthetic call whose windows could sweep).
+    // works for any variable — no `$state` gate, so a plain `let` is a valid target,
+    // not only `$state`. But the target must still be a valid bind expression: gate
+    // to an Identifier/member chain, or the `{get, set}` pair (the oracle's three
+    // accepted forms — anything else is `bind_invalid_expression`), erasing a
+    // `bind:this={x as T}` TS wrapper first. Nothing is emitted for a valid target
+    // (so it stays comment-safe: no synthetic call whose windows could sweep).
     if bind_name == "this" {
-        return Ok(());
+        let expr = env.erase(&directive.expression)?;
+        if bind_target_root(expr, env.source).is_some() || is_get_set_pair(expr) {
+            return Ok(());
+        }
+        return refuse_bind(&bind_name);
     }
 
     match (bind_name.as_str(), element_name) {

@@ -2591,6 +2591,32 @@ fn compile_bind_non_state_expression_refuses() {
 }
 
 #[test]
+fn compile_bind_this_non_lvalue_refuses() {
+    // `bind:this` binds any variable (no `$state` gate), but the target must still
+    // be an assignable lvalue — an Identifier or member chain. A non-lvalue target
+    // (call, literal, logical) is the oracle's `bind_invalid_expression`; refuse
+    // rather than silently omit the bind.
+    assert_unsupported(
+        "<script>let f = () => '';</script>\n<div bind:this={f()}></div>",
+        "bind: directive this",
+    );
+    assert_unsupported("<div bind:this={42}></div>", "bind: directive this");
+    assert_unsupported("<div bind:this={a && b}></div>", "bind: directive this");
+    // A plain `let` (no `$state`) is a valid `bind:this` target and still omits, as
+    // does a member-chain lvalue — both compile with no `this` attribute.
+    let js = compile_js("<script>let el;</script>\n<div bind:this={el}>t</div>");
+    assert!(js.contains("`<div>t</div>`"), "{js}");
+    let js = compile_js("<script>let obj = {};</script>\n<div bind:this={obj.x}>t</div>");
+    assert!(js.contains("`<div>t</div>`"), "{js}");
+    // A `{get, set}` pair (the oracle's third valid bind form) also omits in SSR —
+    // it is not an lvalue but is a legal bind target, so refuse-don't-omit would
+    // over-refuse a valid component (the corpus's `bind-getter-setter-loop`).
+    let js =
+        compile_js("<script>let el;</script>\n<div bind:this={() => el, (v) => (el = v)}>t</div>");
+    assert!(js.contains("`<div>t</div>`"), "{js}");
+}
+
+#[test]
 fn compile_empty_class_attribute_drops() {
     // A static string-valued class that collapses+trims to empty is
     // dropped entirely (oracle-probed); a bare `class` (boolean form)

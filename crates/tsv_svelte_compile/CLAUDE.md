@@ -366,8 +366,11 @@ project-wide conventions.
   attribute loop pre-scans the `class:` and `style:` directives and calls these at
   the authored slot (or after all plain attributes when synthetic). Also
   `emit_bind_directive` — a `bind:` **core kind** on a regular element, emitted
-  inline at its source slot: `bind:this` omits (any variable, any element);
-  `bind:value` on `<input>` → `$.attr('value', expr)`; `bind:checked` on a static
+  inline at its source slot: `bind:this` omits (any variable, any element — no
+  `$state` gate), but only for a valid bind target (an Identifier/member chain or a
+  `{get, set}` pair); a non-lvalue target (a call/literal/logical) refuses
+  (`bind_invalid_expression`). `bind:value` on `<input>` → `$.attr('value', expr)`;
+  `bind:checked` on a static
   `<input type="checkbox">` → `$.attr('checked', expr, true)`; `bind:group` on a
   static-`type` `<input>` → a synthesized `$.attr('checked', <synth>, true)` where
   `<synth>` is `group.includes(<value>)` (checkbox) / `group === <value>`
