@@ -1307,9 +1307,10 @@ enum BindEmission<'arena> {
     /// companion `value` attribute (the oracle silently drops it).
     Omit,
     /// An `omit_in_ssr` bind ([`OMIT_IN_SSR_BINDS`]): the oracle drops it from SSR
-    /// entirely (its early `continue`). The inline path **refuses** it (a safe
-    /// over-refusal, unchanged from the non-spread slice); the spread path **skips**
-    /// it, matching the oracle.
+    /// entirely (its early `continue`). **Both** paths **refuse** it (a safe
+    /// over-refusal — the oracle rejects the ill-formed shapes that reach here, and
+    /// tsv declines to reproduce the drop for the well-formed ones rather than
+    /// silently emit nothing; well-formed `omit_in_ssr`+spread parity is deferred).
     OmitInSsr,
 }
 
@@ -1322,7 +1323,7 @@ enum BindEmission<'arena> {
 ///   any element, no `$state` gate, but the (erased) target must be one of the
 ///   oracle's three accepted forms — an Identifier, a member chain, or a
 ///   `{get, set}` pair; any other shape is `bind_invalid_expression` (refuse).
-/// - **`omit_in_ssr` binds** → [`BindEmission::OmitInSsr`] (each caller decides).
+/// - **`omit_in_ssr` binds** → [`BindEmission::OmitInSsr`] (both callers refuse).
 /// - **`bind:value`** on `<input>` → `Attr { "value", .. }`. A bare `type` is
 ///   `attribute_invalid_type` (refuse); a static `type="file"` is the files trap
 ///   the oracle silently drops (refuse rather than emit a divergent value); a
@@ -1472,8 +1473,8 @@ pub(crate) fn emit_bind_directive<'arena>(
 ///   flag is an `$.attr` concern and is dropped), with the object-shorthand collapse
 ///   (`bind:value={value}` → `{ value }`);
 /// - `Omit` (a valid `bind:this`, a no-companion `bind:group`) → `None`;
-/// - `OmitInSsr` → `None` (the oracle skips these in SSR — parity, not an
-///   over-refusal like the inline path).
+/// - `OmitInSsr` → refuse, exactly as the inline path does (a safe over-refusal;
+///   well-formed `omit_in_ssr`+spread parity is deferred to a future slice).
 pub(crate) fn build_bind_object_property<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     directive: &'arena BindDirective<'arena>,
@@ -1502,7 +1503,12 @@ pub(crate) fn build_bind_object_property<'arena>(
                 span: key_span,
             }))
         }
-        BindEmission::Omit | BindEmission::OmitInSsr => Ok(None),
+        // A valid `bind:this` / no-companion `bind:group` drops with no entry.
+        BindEmission::Omit => Ok(None),
+        // An `omit_in_ssr` bind refuses here too — consistent with the inline
+        // path's `refuse_bind`, and the SAFE side (the oracle rejects these
+        // shapes; tsv declines rather than silently drop them).
+        BindEmission::OmitInSsr => refuse_bind(directive.name_span.extract(env.source)),
     }
 }
 

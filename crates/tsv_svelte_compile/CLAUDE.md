@@ -439,9 +439,9 @@ project-wide conventions.
   for a dropped attribute (a single-expression event handler — still guarded — and
   `defaultValue`/`defaultChecked`). And the three spread-directive builders:
   `build_bind_object_property` (a `bind:` core kind's `value`/`checked` property via
-  the shared `resolve_bind_directive` — `bind:this`/a no-companion `bind:group`/an
-  `omit_in_ssr` bind yield `None`, the last **skipped** on the spread path where the
-  inline path refuses it), `build_spread_class_object` (the `classes` argument —
+  the shared `resolve_bind_directive` — `bind:this`/a no-companion `bind:group` yield
+  `None`, and an `omit_in_ssr` bind **refuses** on both the spread and inline paths, a
+  safe over-refusal), `build_spread_class_object` (the `classes` argument —
   identifier keys, case-preserved, with the object-shorthand collapse the oracle's
   `b.init` applies, checked on the RAW directive expression), and
   `build_spread_style_object` (the `styles` argument — a FLAT object, `|important`

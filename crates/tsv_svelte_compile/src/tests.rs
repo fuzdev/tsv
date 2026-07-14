@@ -1232,6 +1232,36 @@ fn compile_element_spread_refuses_invalid_directives() {
 }
 
 #[test]
+fn compile_element_spread_refuses_omit_in_ssr_binds() {
+    // An `omit_in_ssr` bind (media/dimension/window binding) co-present with a
+    // `{...spread}` refuses on the spread path too — consistent with the inline
+    // path, and the SAFE side (the oracle rejects these shapes; tsv declines rather
+    // than silently drop them). Well-formed `omit_in_ssr`+spread parity is deferred.
+    let prefix =
+        "<script>let props = $state({}); let w = $state(''); let x = $state(1);</script>\n";
+    // `bind:files` needs `type=\"file\"` (an oracle `bind_invalid_target`).
+    assert_unsupported(
+        &format!("{prefix}<input bind:files={{w}} {{...props}}/>"),
+        "bind: directive files",
+    );
+    // A dimension binding on a non-matching element (oracle `bind_invalid_target`).
+    assert_unsupported(
+        &format!("{prefix}<div bind:clientWidth={{x}} {{...props}}></div>"),
+        "bind: directive clientWidth",
+    );
+    // A window binding on a non-window element (oracle `bind_invalid_target`).
+    assert_unsupported(
+        &format!("{prefix}<div bind:scrollX={{w}} {{...props}}></div>"),
+        "bind: directive scrollX",
+    );
+    // A non-lvalue target on an `omit_in_ssr` bind (oracle `bind_invalid_expression`).
+    assert_unsupported(
+        &format!("{prefix}<div bind:clientWidth={{f()}} {{...props}}></div>"),
+        "bind: directive clientWidth",
+    );
+}
+
+#[test]
 fn compile_component_anchor_when_not_standalone() {
     // Inside an element the component is not standalone → trailing `<!---->`.
     let js = compile_js("<div><Foo /></div>");
