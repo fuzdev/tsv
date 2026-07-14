@@ -76,22 +76,40 @@ impl OutputBuffer {
     ///
     /// Used for width calculations when embedding doc-builder output into
     /// imperative printing. Tabs are counted as `tab_width` characters.
+    ///
+    /// One backward byte pass answers all three questions the column needs — where the
+    /// line begins, whether it is ASCII, and how many tabs it holds. Asking them
+    /// separately (`rposition`, then `visual_width`'s `is_ascii` and tab count) means
+    /// three scans, each paying a vectorized-loop setup that does not shrink with the
+    /// haystack — and the haystack here is the printer's *current line*, a partly-written
+    /// one at that: a property name and its colon, ~9 bytes. The setup was the whole cost.
+    ///
+    /// A `\n` is never a UTF-8 continuation byte, so scanning back to it is exact whatever
+    /// the line holds, and a non-ASCII byte hands the **whole** line to `visual_width` —
+    /// never the remainder scanned so far, since a grapheme cluster can begin on the ASCII
+    /// byte before it.
     #[inline]
     pub fn current_column(&self, tab_width: usize) -> usize {
-        // Find the last newline and count chars after it. A manual reverse byte
-        // scan avoids `str::rfind('\n')`'s `CharSearcher` encode/`memrchr` setup —
-        // the current line is short, so there is no SIMD payoff, only the
-        // per-call tax. `\n` is single-byte ASCII, so its byte index is a char
-        // boundary and the resulting slice is identical.
-        let line_start = self
-            .buffer
-            .as_bytes()
-            .iter()
-            .rposition(|&b| b == b'\n')
-            .map_or(0, |pos| pos + 1);
-        let line = &self.buffer[line_start..];
+        let bytes = self.buffer.as_bytes();
+        let mut line_start = bytes.len();
+        let mut tabs = 0usize;
+        let mut ascii = true;
+        while line_start > 0 {
+            match bytes[line_start - 1] {
+                b'\n' => break,
+                b'\t' => tabs += 1,
+                b if !b.is_ascii() => ascii = false,
+                _ => {}
+            }
+            line_start -= 1;
+        }
 
-        visual_width(line, tab_width)
+        if ascii {
+            // `visual_width`'s ASCII arm, with the scans it would repeat already done:
+            // one column per byte, and a tab is worth `tab_width` of them.
+            return (bytes.len() - line_start) + tabs * (tab_width - 1);
+        }
+        visual_width(&self.buffer[line_start..], tab_width)
     }
 }
 
@@ -116,5 +134,75 @@ impl Default for OutputBuffer {
 pub fn write_indent(buf: &mut OutputBuffer, level: usize, indent: &str) {
     for _ in 0..level {
         buf.write(indent);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::TAB_WIDTH;
+
+    /// The column, spelled out independently of [`OutputBuffer::current_column`]: find the
+    /// last newline, then measure what follows it. This is the oracle — the fused single
+    /// backward pass must agree with it on every buffer.
+    ///
+    /// It has to be graded here because **no corpus can grade it**. The column only changes
+    /// the output once a fits verdict crosses the print width, so an arithmetic slip on a
+    /// rare byte (a tab, a control char, a wide grapheme) leaves every formatted file
+    /// byte-identical and sails through the fixtures and any size of format or wire diff.
+    fn reference(buffer: &str, tab_width: usize) -> usize {
+        let line_start = buffer
+            .as_bytes()
+            .iter()
+            .rposition(|&b| b == b'\n')
+            .map_or(0, |pos| pos + 1);
+        visual_width(&buffer[line_start..], tab_width)
+    }
+
+    fn assert_agrees(s: &str) {
+        let mut buf = OutputBuffer::new();
+        buf.write(s);
+        assert_eq!(
+            buf.current_column(TAB_WIDTH),
+            reference(s, TAB_WIDTH),
+            "current_column disagrees with the reference on {s:?}"
+        );
+    }
+
+    #[test]
+    fn agrees_on_exhaustive_short_buffers() {
+        // Every string of length 0-3 over an alphabet spanning each arm of the scan: plain
+        // ASCII, the two bytes the loop singles out (`\n`, `\t`), a control char, DEL, and
+        // multi-byte UTF-8 (2-, 3- and 4-byte, plus a combining mark, a ZWJ and a variation
+        // selector — the clusters that can cross the boundary onto a preceding ASCII byte).
+        let alphabet = [
+            "a", "Z", "0", "-", " ", "\t", "\n", "\r", "\x00", "\x1b", "\x7f", "é", "中", "🎉",
+            "\u{0301}", "\u{200d}", "\u{fe0f}", "\u{00a0}",
+        ];
+        assert_agrees("");
+        for a in alphabet {
+            assert_agrees(a);
+            for b in alphabet {
+                assert_agrees(&format!("{a}{b}"));
+                for c in alphabet {
+                    assert_agrees(&format!("{a}{b}{c}"));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn agrees_on_realistic_printer_lines() {
+        // What the printers actually hand it: an indented, partly-written line — and the
+        // multi-line buffer that makes the backward scan's stop condition load-bearing.
+        for s in [
+            "\tcolor: ",
+            "\t\t\tgrid-template-columns: ",
+            ".selector {\n\tbackground-color: ",
+            "a {\n\tb: c;\n}\n",
+            "\t/* é 中 🎉 */ margin: ",
+        ] {
+            assert_agrees(s);
+        }
     }
 }
