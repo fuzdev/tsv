@@ -52,9 +52,10 @@ project-wide conventions.
     ordinary JS and clones through), `svelte/internal*` imports and
     `beforeUpdate`/`afterUpdate` imports from `svelte` (the oracle's runes-mode
     import rules), `{@debug}`, the still-refused attribute directives
-    (`style:`/`bind:`, a legacy `on:` directive, `let:`, and an element
-    `{...spread}`) — a `class:` directive on a **regular element** is instead
-    **emitted** as the fused `$.attr_class(base, hash, {…})` call (`element.rs` /
+    (`bind:`, a legacy `on:` directive, `let:`, and an element
+    `{...spread}`) — a `class:` / `style:` directive on a **regular element** is
+    instead **emitted** as the fused `$.attr_class(base, hash, {…})` /
+    `$.attr_style(base, {…})` call (`element.rs` /
     `attribute.rs`); the no-op drop family (`use:`/`transition:`/`in:`/`out:`/
     `animate:`/`{@attach}`) is instead **dropped** on a regular element, its
     expression still guarded (a stray rune / `await` refuses) and still walked for
@@ -179,13 +180,14 @@ project-wide conventions.
   one and not the other). Three levels:
   - the element-attribute pair — `each_attribute_expression`, the emitted-path
     view (everything not refused at emission: plain values, component spreads, a
-    `class:` directive expression on a regular element (emitted as `$.attr_class`),
+    `class:` / `style:` directive's expression-bearing value on a regular element
+    (emitted as `$.attr_class` / `$.attr_style`),
     and the no-op drop family `use:`/`transition:`/`in:`/`out:`/`animate:`/`{@attach}`
     on a regular element, dropped-but-analyzed like an event handler; its
     `each_emitted_directive_name` companion surfaces the drop-family directive
-    *names* an expression traversal can't reach; the still-refused positions —
-    element spread, `style:`/`bind:`/legacy `on:`/`let:` — are skipped,
-    the refusal keeping their references out of output), and
+    *names* plus a `style:` shorthand name an expression traversal can't reach; the
+    still-refused positions — element spread, `bind:`/legacy `on:`/`let:` — are
+    skipped, the refusal keeping their references out of output), and
     `each_reference_bearing_attribute_expression` (+ the directive-name and
     special-element entry points), the **dropped-fragment** view, which includes
     every position. An attribute shape that newly reaches emission must be added
@@ -318,9 +320,10 @@ project-wide conventions.
   `{...spread}` attribute is present — the implicit `children` snippet prop
   for default-slot content, and named `{#snippet}` children as named snippet
   props (`$$slots: { key: true, … }` alongside). The attribute loop pre-scans a
-  regular element's `class:` directives and defers them to
-  `attribute::emit_class_directives` (fused `$.attr_class` at the authored-`class`
-  slot, or after all plain attributes when synthetic).
+  regular element's `class:` and `style:` directives and defers them to
+  `attribute::emit_class_directives` / `attribute::emit_style_directives` (each
+  fused at its authored-`class`/`style` slot, or after all plain attributes when
+  synthetic — the synthetic `class` before the synthetic `style`).
 - `attribute.rs` — attribute emission: dynamic and mixed attributes →
   `$.attr(name, expr[, true])` / `$.attr_class` / `$.attr_style` with
   `$.stringify` interpolations (a mixed attribute whose every part folds
@@ -339,9 +342,21 @@ project-wide conventions.
   or rides the 2nd argument; the element is scoped when a static-class token or a
   `class:` directive name matches a scoped selector (recorded in
   `matched_classes`). A mixed-value `class="a {b}"` base refuses
-  (`ClassDirectiveWithMixedClass`). `element.rs`'s attribute loop pre-scans the
-  `class:` directives and calls this at the authored-`class` slot (or after all
-  plain attributes when synthetic).
+  (`ClassDirectiveWithMixedClass`). And `emit_style_directives` — the `style:`
+  analog (the oracle's `build_attr_style`): `$.attr_style(base, directives)`, TWO
+  arguments (no css-hash — style is never scoped). The base mirrors the class base
+  MINUS `$.clsx` (a dynamic `style={expr}` is the bare expression) and MINUS
+  scoping; `directives` is a plain object `{ name: value, … }` or, when any
+  directive carries `|important`, the 2-element `[ {normal}, {important} ]` array
+  (empty `{}` normal object when all are important; source order within each
+  group). Keys lowercase unless `--`-prefixed, then bare-identifier-or-quoted;
+  values are the expression / a static literal / a shorthand's same-name
+  identifier (object-shorthand `{ color }`). A mixed-value `style="a {b}"` base
+  refuses (`StyleDirectiveWithMixedStyle`), a mixed directive value
+  `style:x="a {b}"` refuses (`StyleDirectiveWithMixedValue`), and any modifier but
+  a single `|important` refuses (`StyleDirectiveInvalidModifier`). `element.rs`'s
+  attribute loop pre-scans the `class:` and `style:` directives and calls these at
+  the authored slot (or after all plain attributes when synthetic).
 - `css_scope.rs` — minimal CSS scoping (single class selectors: the
   `svelte-tsvhash` class appended to matched elements and
   **source-spliced** into the style text — the author's whitespace is

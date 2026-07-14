@@ -436,6 +436,21 @@ pub enum Refusal {
     /// base; tsv defers reproducing that rare shape rather than build it.
     #[error("class: directive alongside a mixed-value class attribute")]
     ClassDirectiveWithMixedClass,
+    /// A `style:` directive alongside a **mixed-value** `style="a {b}"` attribute.
+    /// The oracle passes the mixed template value to `build_attr_style` as the
+    /// base; tsv defers reproducing that rare shape rather than build it.
+    #[error("style: directive alongside a mixed-value style attribute")]
+    StyleDirectiveWithMixedStyle,
+    /// A `style:` directive with a **mixed-value** `style:color="a {b}"` value
+    /// (text interleaved with an expression). The oracle builds a template
+    /// concatenation for the property value; tsv defers that rare shape.
+    #[error("style: directive with a mixed-value (text + expression) value")]
+    StyleDirectiveWithMixedValue,
+    /// A `style:` directive with an invalid modifier — the oracle allows only a
+    /// single `|important`, so any other modifier, or two or more modifiers,
+    /// is `style_directive_invalid_modifier` (an oracle error).
+    #[error("style: directive with an invalid modifier (only |important, once, is allowed)")]
+    StyleDirectiveInvalidModifier,
     /// A string-literal expression attribute value (inline-literal path).
     #[error("string-literal expression attribute value (inline-literal path)")]
     StringLiteralExprAttribute,
@@ -762,6 +777,15 @@ impl Refusal {
             Self::ClassDirectiveWithMixedClass => {
                 Cow::Borrowed("class: directive alongside a mixed-value class attribute")
             }
+            Self::StyleDirectiveWithMixedStyle => {
+                Cow::Borrowed("style: directive alongside a mixed-value style attribute")
+            }
+            Self::StyleDirectiveWithMixedValue => {
+                Cow::Borrowed("style: directive with a mixed-value (text + expression) value")
+            }
+            Self::StyleDirectiveInvalidModifier => Cow::Borrowed(
+                "style: directive with an invalid modifier (only |important, once, is allowed)",
+            ),
             Self::StringLiteralExprAttribute => {
                 Cow::Borrowed("string-literal expression attribute value (inline-literal path)")
             }

@@ -23,15 +23,16 @@
 //!
 //! Two traversals share that definition. `each_attribute_expression` is the
 //! **emitted-path** view: it visits everything not refused at emission — plain
-//! attribute values, component spreads, a `class:` directive on a regular element
-//! (emitted as `$.attr_class`), and the no-op drop family
-//! (`use:`/`transition:`/`in:`/`out:`/`animate:`/`{@attach}`) on a regular
-//! element, which is dropped-but-analyzed exactly like an event handler. It skips
-//! the positions that *do* refuse (an element spread, `style:`/`bind:`/
+//! attribute values, component spreads, a `class:` / `style:` directive on a
+//! regular element (emitted as `$.attr_class` / `$.attr_style`), and the no-op
+//! drop family (`use:`/`transition:`/`in:`/`out:`/`animate:`/`{@attach}`) on a
+//! regular element, which is dropped-but-analyzed exactly like an event handler.
+//! It skips the positions that *do* refuse (an element spread, `bind:`/
 //! legacy `on:`/`let:`), because the emission refusal is what keeps their
 //! references out of output — and its `each_emitted_directive_name` companion
-//! surfaces the drop-family directive *names* (which an expression traversal can't
-//! reach). `each_reference_bearing_attribute_expression` is the **dropped-fragment**
+//! surfaces the drop-family directive *names* plus a `style:` shorthand name
+//! (which an expression traversal can't reach).
+//! `each_reference_bearing_attribute_expression` is the **dropped-fragment**
 //! view (a `{:catch}` branch the emitter discards without walking): there no
 //! emission refusal fires, so every attribute reference must be counted to match
 //! the oracle. The dropped-fragment view has two more entry points for the same
@@ -269,9 +270,11 @@ pub(crate) fn fragment_any<'arena>(
 ///   chunks) on any element;
 /// - `{...spread}` expressions on **components** (emitted as `$.spread_props`
 ///   array elements);
-/// - a `class:` directive expression on a regular HTML element (fused into the
-///   element's `$.attr_class(base, hash, { name: expr, … })` call). On a
-///   component `class:` refuses at emission, so it is skipped there;
+/// - a `class:` / `style:` directive's expression-bearing value on a regular HTML
+///   element (fused into the element's `$.attr_class(base, hash, { name: expr, … })`
+///   / `$.attr_style(base, { name: value, … })` call). A `style:` shorthand carries
+///   no expression — its reference rides `each_emitted_directive_name`. On a
+///   component both refuse at emission, so they are skipped there;
 /// - the **no-op drop family** on a regular HTML element (`use:`/`transition:`/
 ///   `in:`/`out:`/`animate:` expressions and `{@attach}`). These contribute
 ///   nothing to the tag but are dropped-but-analyzed, exactly like an event
@@ -283,7 +286,7 @@ pub(crate) fn fragment_any<'arena>(
 ///
 /// An *element* spread is refused at emission, so its expression never reaches
 /// output — and visiting it here would let an analysis refusal fire before the
-/// emission refusal, shifting corpus buckets. `style:`/`bind:`/legacy `on:`/`let:`
+/// emission refusal, shifting corpus buckets. `bind:`/legacy `on:`/`let:`
 /// are likewise refused at emission and not visited.
 ///
 /// A drop-family directive's **name** (`use:action`, `transition:fade`) is also a
@@ -317,6 +320,22 @@ pub(crate) fn each_attribute_expression<'a, 'arena>(
             // component `class:` refuses at emission (a `ComponentDirective`), so it
             // is skipped there.
             AttributeNode::ClassDirective(d) if is_html => f(&d.expression),
+            // A `style:` directive on a regular element is emitted (`$.attr_style`),
+            // so its expression-bearing values reach output. The `True` shorthand
+            // (`style:color`) carries NO expression node — its same-name binding
+            // reference rides `each_emitted_directive_name` instead. On a component
+            // `style:` refuses at emission (a `ComponentDirective`), so it is skipped.
+            AttributeNode::StyleDirective(d) if is_html => match &d.value {
+                StyleDirectiveValue::ExpressionTag(tag) => f(&tag.expression),
+                StyleDirectiveValue::Parts(parts) => {
+                    for value in *parts {
+                        if let AttributeValue::ExpressionTag(tag) = value {
+                            f(&tag.expression);
+                        }
+                    }
+                }
+                StyleDirectiveValue::True => {}
+            },
             // The no-op drop family: dropped-but-analyzed on a regular element.
             AttributeNode::AttachTag(attach) if is_html => f(&attach.expression),
             AttributeNode::UseDirective(d) if is_html => {
@@ -339,18 +358,26 @@ pub(crate) fn each_attribute_expression<'a, 'arena>(
     }
 }
 
-/// Visit the NAME of every no-op-drop-family directive that names a value binding
-/// on an **emitted** regular element: `use:` (action), `transition:`/`in:`/`out:`
-/// (transition fn), `animate:` (animation fn). Dropped from the tag output, but
-/// the oracle still counts the referenced binding — a top-level `{#snippet}` whose
-/// only instance-binding reference is such a directive name must **not**
-/// module-hoist. The name may be a member path (`use:a.b`); the raw slice is
-/// surfaced for the consumer to reduce to its root identifier.
+/// Visit the NAME of every directive that names a value binding on an **emitted**
+/// regular element and whose reference an expression traversal can't reach:
+/// `use:` (action), `transition:`/`in:`/`out:` (transition fn), `animate:`
+/// (animation fn), and a `style:` **shorthand** (`style:color` ≡
+/// `style:color={color}`). The drop-family names are dropped from the tag output;
+/// the `style:` shorthand emits as the object-shorthand value `{ color }`. Either
+/// way the oracle counts the referenced binding — a top-level `{#snippet}` whose
+/// only instance-binding reference is such a name must **not** module-hoist. The
+/// name may be a member path (`use:a.b`); the raw slice is surfaced for the
+/// consumer to reduce to its root identifier.
+///
+/// A `style:` shorthand is the one directive whose shorthand does NOT
+/// auto-generate an `expression` node (`class:` shorthands do, so their reference
+/// flows through [`each_attribute_expression`]); a non-shorthand
+/// `style:color={…}` / `style:color="…"` yields its expression there too — so only
+/// the shorthand contributes a name here.
 ///
 /// Components refuse these at emission, so their names are skipped (the refusal
 /// fires). The dropped-`{:catch}` path uses
-/// [`each_reference_bearing_directive_name`], whose wider set also includes a
-/// `style:` shorthand (which refuses on the emitted path). A bare name never fires
+/// [`each_reference_bearing_directive_name`], the same set. A bare name never fires
 /// `needs_context`, so only the snippet-hoist analysis consumes this.
 pub(crate) fn each_emitted_directive_name<'s>(
     element: &Element<'_>,
@@ -365,6 +392,9 @@ pub(crate) fn each_emitted_directive_name<'s>(
             AttributeNode::UseDirective(d) => d.name_span,
             AttributeNode::TransitionDirective(d) => d.name_span,
             AttributeNode::AnimateDirective(d) => d.name_span,
+            AttributeNode::StyleDirective(d) if matches!(d.value, StyleDirectiveValue::True) => {
+                d.name_span
+            }
             _ => continue,
         };
         f(name_span.extract(source));
@@ -469,7 +499,10 @@ pub(crate) fn each_reference_bearing_attribute_expression<'a, 'arena>(
 ///
 /// Consumed only by the snippet-hoist analysis on the dropped-`{:catch}` path: a
 /// bare name reference never triggers `needs_context` (which fires on `new` /
-/// member-call roots only), and on the emitted path these directives refuse.
+/// member-call roots only). The **emitted**-path counterpart is
+/// [`each_emitted_directive_name`], the same set (a `style:` shorthand now emits as
+/// `$.attr_style`'s `{ color }` shorthand, so its name is counted on both paths);
+/// only `use:`/`transition:`/`animate:` refuse on a component there.
 pub(crate) fn each_reference_bearing_directive_name<'s>(
     attributes: &[AttributeNode<'_>],
     source: &'s str,

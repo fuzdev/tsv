@@ -12,7 +12,7 @@ use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{InfallibleResolve, Span};
 use tsv_svelte::ast::internal::{
     Attribute, AttributeNode, AttributeValue, ClassDirective, Element, ElementKind, Fragment,
-    FragmentNode,
+    FragmentNode, StyleDirective,
 };
 use tsv_ts::ast::internal::{
     ArrayExpression, BlockStatement, Expression, ExpressionStatement, ObjectExpression,
@@ -21,7 +21,9 @@ use tsv_ts::ast::internal::{
 
 use crate::analyze::{BindingKind, evaluate, stringify_value};
 use crate::attr_refs::fragment_any;
-use crate::attribute::{emit_attribute, emit_class_directives, is_load_error_element};
+use crate::attribute::{
+    emit_attribute, emit_class_directives, emit_style_directives, is_load_error_element,
+};
 use crate::build::escape_template_text;
 use crate::fragment::{
     BodyBuilder, FragmentCtx, emit_child_body, emit_fragment, guard_dropped, wrap_value_expr,
@@ -82,10 +84,21 @@ fn validate_directive_combinations(
 /// Whether `attr` is the element's `class` attribute (case-insensitive, matching
 /// the oracle's lowercasing of attribute names on non-foreign elements).
 fn attribute_is_class(env: &EmitEnv<'_, '_>, attr: &Attribute<'_>) -> bool {
+    attribute_name_eq(env, attr, "class")
+}
+
+/// Whether `attr` is the element's `style` attribute (see [`attribute_is_class`]).
+fn attribute_is_style(env: &EmitEnv<'_, '_>, attr: &Attribute<'_>) -> bool {
+    attribute_name_eq(env, attr, "style")
+}
+
+/// Case-insensitive attribute-name test (the oracle lowercases attribute names on
+/// non-foreign elements).
+fn attribute_name_eq(env: &EmitEnv<'_, '_>, attr: &Attribute<'_>, name: &str) -> bool {
     let interner = env.b.interner.borrow();
     interner
         .resolve_infallible(attr.name)
-        .eq_ignore_ascii_case("class")
+        .eq_ignore_ascii_case(name)
 }
 
 /// Emit one element's open tag, children, and close tag into the template.
@@ -152,13 +165,14 @@ pub(crate) fn emit_element<'arena>(
     let animate_host = env.animate_host_span == Some(element.span);
     validate_directive_combinations(element, animate_host)?;
 
-    // Pre-scan the `class:` directives (source order). When present, the authored
-    // `class` attribute (if any) and the directives fuse into one
-    // `$.attr_class(base, hash, { name: expr, … })` call (the oracle's
-    // `build_attr_class`), emitted at the authored `class` slot — or, with no
-    // authored `class`, after all plain attributes (the oracle's phase-2 synthetic
-    // empty-`class` injection appends to the attribute list). Designed to extend
-    // symmetrically to `style:` (which fuses into `$.attr_style`).
+    // Pre-scan the `class:` and `style:` directives (source order). When present,
+    // the authored `class`/`style` attribute (if any) and the same-family directives
+    // fuse into one `$.attr_class(base, hash, { name: expr, … })` /
+    // `$.attr_style(base, { name: value, … })` call (the oracle's `build_attr_class`
+    // / `build_attr_style`), emitted at the authored `class`/`style` slot — or, with
+    // no authored attribute, after all plain attributes (the oracle's phase-2
+    // synthetic empty-`class`/`style` injection appends to the attribute list, class
+    // before style).
     let class_directives: Vec<&'arena ClassDirective<'arena>> = element
         .attributes
         .iter()
@@ -167,31 +181,46 @@ pub(crate) fn emit_element<'arena>(
             _ => None,
         })
         .collect();
+    let style_directives: Vec<&'arena StyleDirective<'arena>> = element
+        .attributes
+        .iter()
+        .filter_map(|attr_node| match attr_node {
+            AttributeNode::StyleDirective(d) => Some(d),
+            _ => None,
+        })
+        .collect();
     let has_class_directives = !class_directives.is_empty();
+    let has_style_directives = !style_directives.is_empty();
     let mut class_call_emitted = false;
+    let mut style_call_emitted = false;
 
     out.push_text(&format!("<{name}"));
     for attr_node in element.attributes {
         match attr_node {
             AttributeNode::Attribute(attr) => {
-                // With `class:` directives present, the authored `class` attribute is
-                // not emitted inline — it becomes the base of the fused
-                // `$.attr_class(...)` call, emitted here at its source slot.
-                if has_class_directives
-                    && !class_call_emitted
-                    && attribute_is_class(env, attr)
-                {
+                // With `class:`/`style:` directives present, the authored
+                // `class`/`style` attribute is not emitted inline — it becomes the
+                // base of the fused `$.attr_class(...)`/`$.attr_style(...)` call,
+                // emitted here at its source slot.
+                if has_class_directives && !class_call_emitted && attribute_is_class(env, attr) {
                     emit_class_directives(env, Some(attr), &class_directives, out)?;
                     class_call_emitted = true;
+                } else if has_style_directives
+                    && !style_call_emitted
+                    && attribute_is_style(env, attr)
+                {
+                    emit_style_directives(env, Some(attr), &style_directives, out)?;
+                    style_call_emitted = true;
                 } else {
                     emit_attribute(env, attr, &name, out)?;
                 }
             }
-            // `class:` directives fuse into the single `$.attr_class(...)` call
-            // (emitted at the authored `class` slot, or after all plain attributes
-            // when synthetic) — never inline here. A `ClassDirective` node implies
-            // `has_class_directives`, so this arm only runs for the fused case.
-            AttributeNode::ClassDirective(_) => {}
+            // `class:`/`style:` directives fuse into the single
+            // `$.attr_class(...)`/`$.attr_style(...)` call (emitted at the authored
+            // slot, or after all plain attributes when synthetic) — never inline
+            // here. A directive node implies its `has_*_directives` flag, so these
+            // arms only run for the fused case.
+            AttributeNode::ClassDirective(_) | AttributeNode::StyleDirective(_) => {}
             // The no-op drop family: `use:`/`transition:`/`in:`/`out:`/`animate:`/
             // `{@attach}` contribute nothing to the tag — SSR runs no client
             // lifecycle, so the oracle discards their output (the discarded
@@ -225,23 +254,25 @@ pub(crate) fn emit_element<'arena>(
                 }
             }
             AttributeNode::AttachTag(attach) => guard_dropped(env, &attach.expression)?,
-            // `style:`/`bind:`, a legacy `on:` directive, `let:`, and an element
-            // `{...spread}` are not emitted yet — refuse. (`class:` alongside one of
-            // these still refuses here, via the sibling, until its slice lands.)
+            // `bind:`, a legacy `on:` directive, `let:`, and an element `{...spread}`
+            // are not emitted yet — refuse. (`class:`/`style:` alongside one of these
+            // still refuses here, via the sibling.)
             AttributeNode::SpreadAttribute(_)
             | AttributeNode::OnDirective(_)
             | AttributeNode::BindDirective(_)
-            | AttributeNode::StyleDirective(_)
             | AttributeNode::LetDirective(_) => {
                 return Err(unsupported(Refusal::NonPlainAttribute));
             }
         }
     }
-    // No authored `class` attribute: the fused `$.attr_class(...)` call emits after
-    // all plain attributes (the oracle appends the synthetic empty `class` to the
-    // end of the attribute list).
+    // No authored `class`/`style` attribute: the fused call emits after all plain
+    // attributes (the oracle appends the synthetic empty `class`, then the synthetic
+    // empty `style`, to the end of the attribute list — class before style).
     if has_class_directives && !class_call_emitted {
         emit_class_directives(env, None, &class_directives, out)?;
+    }
+    if has_style_directives && !style_call_emitted {
+        emit_style_directives(env, None, &style_directives, out)?;
     }
 
     if tsv_html::is_void_element(&name) {

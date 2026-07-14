@@ -3,9 +3,12 @@
 
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{InfallibleResolve, Span};
-use tsv_svelte::ast::internal::{Attribute, AttributeValue, ClassDirective};
+use tsv_svelte::ast::internal::{
+    Attribute, AttributeValue, ClassDirective, StyleDirective, StyleDirectiveValue,
+};
 use tsv_ts::ast::internal::{
-    Expression, LiteralValue, ObjectExpression, ObjectProperty, Property, PropertyKind,
+    ArrayExpression, Expression, LiteralValue, ObjectExpression, ObjectProperty, Property,
+    PropertyKind,
 };
 
 use crate::analyze::{evaluate, stringify_value};
@@ -588,6 +591,236 @@ pub(crate) fn emit_class_directives<'arena>(
     args.push(css_hash);
     args.push(directives);
     let call = env.b.member_call("$", "attr_class", args.into_bump_slice());
+    out.push_expr(call);
+    Ok(())
+}
+
+/// Whether `name` is a valid JS identifier (`/^[a-zA-Z_$][a-zA-Z_$0-9]*$/`) — the
+/// oracle's `regex_is_valid_identifier` gate (`b.key`), which decides whether a
+/// style property key prints as a bare identifier or a quoted string. `format_canonical`
+/// applies the same test when dropping quotes off a string-literal key, so a
+/// non-shorthand key can always be a string literal; the identifier form matters
+/// only for the object-shorthand `{ color }` a `style:color` shorthand builds.
+fn is_js_identifier(name: &str) -> bool {
+    let mut chars = name.chars();
+    match chars.next() {
+        Some(c) if c.is_ascii_alphabetic() || c == '_' || c == '$' => {}
+        _ => return false,
+    }
+    chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
+}
+
+/// The `style:` allowed-modifier gate: the oracle accepts only a single
+/// `|important` (or none). Any other modifier, or two or more, is
+/// `style_directive_invalid_modifier` — an oracle *error*, so tsv refuses rather
+/// than compile it.
+fn validate_style_modifiers(directive: &StyleDirective<'_>) -> Result<(), CompileError> {
+    match directive.modifiers {
+        [] | ["important"] => Ok(()),
+        _ => Err(unsupported(Refusal::StyleDirectiveInvalidModifier)),
+    }
+}
+
+/// Build the base (1st) argument of a `$.attr_style(base, directives)` call from
+/// the authored `style` attribute (`None` = no authored `style` → the oracle's
+/// phase-2 synthetic empty `''`). Mirrors `build_class_base` MINUS `$.clsx` and
+/// MINUS any CSS scoping (style is never scoped): a dynamic `style={expr}` is the
+/// bare expression, not `$.clsx(expr)`.
+fn build_style_base<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    style_attr: Option<&'arena Attribute<'arena>>,
+) -> Result<Expression<'arena>, CompileError> {
+    let Some(attr) = style_attr else {
+        // No authored `style` — the oracle injects a synthetic `style=""`
+        // (2-analyze/index.js), so the base is the empty string literal.
+        return Ok(env.b.string_literal_expr(""));
+    };
+    let Some(values) = attr.value else {
+        // A bare boolean `style` — the oracle's `build_attribute_value(true)` → `true`.
+        return Ok(env.b.true_literal());
+    };
+    match values {
+        [AttributeValue::Text(text)] => {
+            // Static style value: whitespace-insensitive collapse + trim, then the
+            // attribute HTML-escape the oracle applies to a text base literal
+            // (`build_attribute_value`, non-component → `escape_html(data, true)`).
+            let decoded = text.data(env.source);
+            let collapsed = collapse_attr_whitespace(&decoded);
+            Ok(env.b.string_literal_expr(&escape_html_attr(&collapsed)))
+        }
+        [AttributeValue::ExpressionTag(tag)] => {
+            // Dynamic `style={expr}` / `style="{expr}"` — the bare expression (NO
+            // `$.clsx`, unlike `class`). A string-literal expression takes the
+            // oracle's inline-literal path we don't reproduce — refuse, matching the
+            // standalone dynamic-attribute path (`emit_dynamic_attribute`).
+            let expr = env.erase(&tag.expression)?;
+            if matches!(expr, Expression::Literal(lit)
+                if matches!(lit.value, LiteralValue::String(_)))
+            {
+                return Err(unsupported(Refusal::StringLiteralExprAttribute));
+            }
+            Ok(wrap_value_expr(env, expr)?[0].clone())
+        }
+        // A mixed-value `style="a {b}"` base — deferred (rare).
+        _ => Err(unsupported(Refusal::StyleDirectiveWithMixedStyle)),
+    }
+}
+
+/// Build one `{ name: value }` property for a `style:` directive (the oracle's
+/// `build_attr_style` per-directive `b.init`). The key is the property name,
+/// lowercased unless it starts with `--` (custom properties keep case); a
+/// shorthand `style:color` prints as object-shorthand `{ color }` when the
+/// (lowercased) key coincides with the raw same-name identifier value.
+fn build_style_property<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    directive: &'arena StyleDirective<'arena>,
+) -> Result<Property<'arena>, CompileError> {
+    let raw_name = directive.name_span.extract(env.source).to_string();
+    // The oracle lowercases the property name unless it is a `--custom-property`.
+    let key_name = if raw_name.starts_with("--") {
+        raw_name.clone()
+    } else {
+        raw_name.to_ascii_lowercase()
+    };
+
+    // The value, and whether it is the same-name shorthand identifier.
+    let (value, is_shorthand_id) = match &directive.value {
+        StyleDirectiveValue::True => {
+            // Shorthand `style:color` → `b.id(directive.name)` (RAW name).
+            (Expression::Identifier(env.b.ident(&raw_name)), true)
+        }
+        StyleDirectiveValue::ExpressionTag(tag) => {
+            // The template borrow point: erase once, then guard + rewrite a bare
+            // derived read to `d()`. `|important` does NOT wrap the value.
+            let expr = env.erase(&tag.expression)?;
+            (wrap_value_expr(env, expr)?[0].clone(), false)
+        }
+        StyleDirectiveValue::Parts(parts) => match parts {
+            // A static `style:color="red"` → the string literal, collapsed +
+            // trimmed + attribute-escaped like the base text value.
+            [AttributeValue::Text(text)] => {
+                let decoded = text.data(env.source);
+                let collapsed = collapse_attr_whitespace(&decoded);
+                (
+                    env.b.string_literal_expr(&escape_html_attr(&collapsed)),
+                    false,
+                )
+            }
+            // A mixed `style:color="a {b}"` value — deferred (rare).
+            _ => return Err(unsupported(Refusal::StyleDirectiveWithMixedValue)),
+        },
+    };
+
+    // Object-shorthand `{ color }` requires an identifier key equal to the value
+    // identifier's name — i.e. a shorthand whose lowercased name is unchanged and
+    // identifier-safe. Otherwise a string-literal key (whose quotes
+    // `format_canonical` drops when the name is identifier-safe) with an explicit
+    // value.
+    let shorthand = is_shorthand_id && key_name == raw_name && is_js_identifier(&key_name);
+    let (key, key_span) = if shorthand {
+        let id = env.b.ident(&key_name);
+        let span = id.span;
+        (Expression::Identifier(id), span)
+    } else {
+        let key = env.b.string_literal_expr(&key_name);
+        let span = key.span();
+        (key, span)
+    };
+
+    Ok(Property {
+        key,
+        value,
+        kind: PropertyKind::Init,
+        shorthand,
+        computed: false,
+        method: false,
+        span: key_span,
+    })
+}
+
+/// Build the directives (2nd) argument of `$.attr_style`: a plain object
+/// `{ normal… }`, or — when any directive carries `|important` — a 2-element
+/// array `[ { normal… }, { important… } ]` (the normal object is `{}` when all are
+/// important). Source order is preserved within each group.
+fn build_style_directives_arg<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    style_directives: &[&'arena StyleDirective<'arena>],
+) -> Result<Expression<'arena>, CompileError> {
+    let arena = env.b.arena;
+    let obrace = env.b.mint("{").start;
+    let mut normal: BumpVec<'arena, ObjectProperty<'arena>> = BumpVec::new_in(arena);
+    let mut important: BumpVec<'arena, ObjectProperty<'arena>> = BumpVec::new_in(arena);
+    for directive in style_directives {
+        validate_style_modifiers(directive)?;
+        let property = ObjectProperty::Property(build_style_property(env, directive)?);
+        if directive.modifiers.contains(&"important") {
+            important.push(property);
+        } else {
+            normal.push(property);
+        }
+    }
+    // An object span is only the printer's newline-scan region for the expansion
+    // heuristic — both minted `{…}` regions are appendix-only and newline-free, so
+    // each collapses when it fits (same rationale as `build_props_object`). The
+    // properties render from their own key/value spans, so the normal span
+    // enclosing the (source-order-interleaved) important property text is harmless.
+    let cbrace = env.b.mint("}").end;
+    let normal_obj = Expression::ObjectExpression(ObjectExpression {
+        properties: normal.into_bump_slice(),
+        spread_trailing_comma: false,
+        span: Span::new(obrace, cbrace),
+    });
+    if important.is_empty() {
+        return Ok(normal_obj);
+    }
+    // Any `|important` → the partitioned `[ {normal}, {important} ]` array.
+    let normal_alloc = arena.alloc(normal_obj);
+    let iobrace = env.b.mint("{").start;
+    let icbrace = env.b.mint("}").end;
+    let important_obj = Expression::ObjectExpression(ObjectExpression {
+        properties: important.into_bump_slice(),
+        spread_trailing_comma: false,
+        span: Span::new(iobrace, icbrace),
+    });
+    let important_alloc = arena.alloc(important_obj);
+    let lbracket = env.b.mint("[").start;
+    let rbracket = env.b.mint("]").end;
+    let mut elements: BumpVec<'arena, Option<Expression<'arena>>> = BumpVec::new_in(arena);
+    elements.push(Some(normal_alloc.clone()));
+    elements.push(Some(important_alloc.clone()));
+    Ok(Expression::ArrayExpression(ArrayExpression {
+        elements: elements.into_bump_slice(),
+        spread_trailing_comma: false,
+        span: Span::new(lbracket, rbracket),
+    }))
+}
+
+/// Emit the fused `$.attr_style(base, { name: value, … })` call for a regular
+/// element carrying `style:` directives (the oracle's `build_attr_style`,
+/// `shared/element.js`). `style_attr` is the authored `style` attribute when
+/// present (its value is the base), else `None` (the oracle's synthetic empty
+/// `''`). Unlike `$.attr_class`, there is no css-hash argument (style is never
+/// scoped) and the directives argument may be an important-partitioned array.
+pub(crate) fn emit_style_directives<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    style_attr: Option<&'arena Attribute<'arena>>,
+    style_directives: &[&'arena StyleDirective<'arena>],
+    out: &mut BodyBuilder<'arena>,
+) -> Result<(), CompileError> {
+    // The synthetic `$.attr_style` call interleaves minted (appendix) and borrowed
+    // (host) argument spans; with carried script comments their windows would
+    // sweep — refuse, matching the dynamic-attribute path.
+    if env.has_comments {
+        return Err(unsupported(Refusal::CommentsAlongsideExprAttributes));
+    }
+
+    let base = build_style_base(env, style_attr)?;
+    let directives = build_style_directives_arg(env, style_directives)?;
+
+    let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(env.b.arena);
+    args.push(base);
+    args.push(directives);
+    let call = env.b.member_call("$", "attr_style", args.into_bump_slice());
     out.push_expr(call);
     Ok(())
 }
