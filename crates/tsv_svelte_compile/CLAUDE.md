@@ -51,7 +51,13 @@ project-wide conventions.
     statements (invalid in runes mode — a nested `$` label or a plain label is
     ordinary JS and clones through), `svelte/internal*` imports and
     `beforeUpdate`/`afterUpdate` imports from `svelte` (the oracle's runes-mode
-    import rules), `{@debug}`, directives/spread,
+    import rules), `{@debug}`, the still-refused attribute directives
+    (`class:`/`style:`/`bind:`, a legacy `on:` directive, `let:`, and an element
+    `{...spread}`) — the no-op drop family (`use:`/`transition:`/`in:`/`out:`/
+    `animate:`/`{@attach}`) is instead **dropped** on a regular element, its
+    expression still guarded (a stray rune / `await` refuses) and still walked for
+    scope analysis, except a `use:` on a load-error element, which refuses because
+    the oracle adds `onload`/`onerror` capture attributes there —
     top-level `await`,
     `<option>` / populated `<select>`/`<optgroup>` (the oracle emits closure
     calls / `<!>` anchors there), template-expression comments, and every
@@ -170,12 +176,17 @@ project-wide conventions.
   its own walk and drifts (which is how the component-spread arm once existed in
   one and not the other). Three levels:
   - the element-attribute pair — `each_attribute_expression`, the emitted-path
-    view (skips the positions refused at emission: element spreads, directives,
-    `{@attach}` — that refusal is what keeps their references out of output), and
+    view (everything not refused at emission: plain values, component spreads, and
+    the no-op drop family `use:`/`transition:`/`in:`/`out:`/`animate:`/`{@attach}`
+    on a regular element, dropped-but-analyzed like an event handler; its
+    `each_emitted_directive_name` companion surfaces the drop-family directive
+    *names* an expression traversal can't reach; the still-refused positions —
+    element spread, `class:`/`style:`/`bind:`/legacy `on:`/`let:` — are skipped,
+    the refusal keeping their references out of output), and
     `each_reference_bearing_attribute_expression` (+ the directive-name and
     special-element entry points), the **dropped-fragment** view, which includes
-    them. An attribute shape that newly reaches emission must be added HERE so
-    every analysis sees it at once;
+    every position. An attribute shape that newly reaches emission must be added
+    HERE so every analysis sees it at once;
   - `each_template_item`, the whole-fragment walk over the dropped-fragment view,
     yielding every borrowed expression (plus a `{#snippet}`'s `<T>` clause, which
     is TypeScript with no expression to yield). Its two consumers ask what a

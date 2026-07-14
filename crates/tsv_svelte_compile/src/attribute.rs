@@ -21,7 +21,7 @@ const LOAD_ERROR_ELEMENTS: &[&str] = &[
 ];
 
 /// Whether `name` is a load-error element (see [`LOAD_ERROR_ELEMENTS`]).
-fn is_load_error_element(name: &str) -> bool {
+pub(crate) fn is_load_error_element(name: &str) -> bool {
     LOAD_ERROR_ELEMENTS.contains(&name)
 }
 

@@ -745,12 +745,17 @@ fn walk_render_tag(tag: &RenderTag<'_>, nc: &mut Nc<'_>) {
 
 fn walk_element(element: &Element<'_>, nc: &mut Nc<'_>) {
     // The shared traversal (`attr_refs`) defines which attribute expressions are
-    // reference-bearing: plain attribute values on any element, plus component
-    // `{...spread}` expressions (emitted as `$.spread_props` elements); element
-    // spreads and directives are refused at emission and not visited. Inside a
-    // dropped `{:catch}` the emitter never walks the fragment, so those emission
-    // refusals never fire — there a `new`/prop-rooted access in a skipped position
-    // must still trigger the wrapper, so every attribute reference is walked.
+    // reference-bearing on the emitted path: plain attribute values on any element,
+    // component `{...spread}` expressions (emitted as `$.spread_props` elements),
+    // and the no-op drop family (`use:`/`transition:`/`animate:`/`{@attach}`) on a
+    // regular element — dropped from the tag but still walked, so a prop-rooted
+    // access inside a `use:` argument still fires the wrapper. Element spreads and
+    // the still-refused directives are not visited (their emission refusal fires).
+    // A bare directive *name* never triggers `needs_context`, so the name walk is
+    // the snippet analysis's alone. Inside a dropped `{:catch}` the emitter never
+    // walks the fragment, so those emission refusals never fire — there a
+    // `new`/prop-rooted access in any skipped position must still trigger the
+    // wrapper, so every attribute reference is walked.
     if nc.in_dropped_catch {
         each_reference_bearing_attribute_expression(element.attributes, &mut |expr| {
             walk_expr(expr, nc);

@@ -286,7 +286,9 @@ A **static** component invocation compiles to `Name($$renderer, props)` (`shared
 | event attributes (`on*` single expression) → **dropped** from SSR output (`is_event_attribute`, server `element.js:71`) — decided on the **raw authored name**, case-sensitively (lowercasing is emission-only): `onClick` drops; `ONCLICK`/`oNclick` are NOT events and emit `$.attr('onclick', …)`. The dropped handler still feeds `needs_context`, so a `new`/prop-rooted member or call inside it forces the wrapper | Supported |
 | raw `onload`/`onerror` (exact match — `onLoad` on `<img>` is a plain drop) on a load-error element (`img`, `iframe`, `object`, …) → the oracle injects `on{name}="this.__e=event"` capture markup | **Refused**: `event capture attribute on a load-error element` |
 | mixed-value raw-`on*` (`onclick="a {b}"`) | oracle-rejected input (`attribute_invalid_event_handler`); tsv refuses `event attribute {name}`. `ONCLICK="a {b}"` is not an event (raw test) and emits through the normal mixed path |
-| directives / spread | **Refused**: `non-plain attribute (directive/spread)` |
+| the no-op drop family on a regular element — `use:` / `transition:` / `in:` / `out:` / `animate:` (with or without an expression / modifiers), and `{@attach expr}` (single or multiple) → **dropped** from SSR output. SSR runs no client lifecycle, so the oracle discards their output (the final discarded `context.visit` in `shared/element.js`). Their expressions are still walked for scope / `needs_context` (a `new`/prop-rooted access inside a `use:` argument or `{@attach}` still forces the wrapper) and still validated (a misplaced rune or a top-level `await` inside the expression refuses); a `use:` / `transition:` / `animate:` *name* is a binding reference that blocks a top-level `{#snippet}` from module-hoisting | Supported |
+| `use:` on a load-error element (`img`, `iframe`, `object`, …) — the oracle adds `onload`/`onerror` capture attributes (`events_to_capture`, `shared/element.js`); only `use:` (and a spread) triggers this, the other drop-family kinds still drop cleanly there | **Refused**: `use: directive on a load-error element (event-capture markup not implemented)` |
+| the still-refused directives / spread — `class:` / `style:` / `bind:`, a legacy `on:` event directive, `let:`, and an element `{...spread}` | **Refused**: `non-plain attribute (directive/spread)` |
 | string-literal expression value (`name={'s'}`) | **Refused**: `string-literal expression attribute value (inline-literal path)` |
 | dynamic `class`/`style` on a styled component | **Refused**: `dynamic class attribute on a styled component` / `dynamic style attribute on a styled component` / `interpolated {name} attribute on a styled component` |
 | `value` attribute on `<textarea>` / `<select>` (child content / `select_value` bookkeeping in the oracle) | **Refused**: `value attribute on <{name}>` |
@@ -306,6 +308,20 @@ A **static** component invocation compiles to `Name($$renderer, props)` (`shared
 | `<svelte:head>` with attributes / sharing a fragment with `{@const}` | **Refused**: `attributes on <svelte:head>` / `<svelte:head> alongside a {@const} in the same fragment (hoist order)` |
 | other special elements (`<slot>`, `<svelte:window>`, `<title>`, …) | **Refused**: `template node special element` |
 | `<svelte:options>` | **Refused**: `<svelte:options>` |
+
+### select-family
+
+A trap for the later spread/`bind:` slices: the oracle routes a **children-free**
+`<select {...props}>` or `<select bind:value={v}>` through `$$renderer.select(...)`
+(a closure form), **not** the ordinary `$.attributes` / `$.attr` attribute path
+(`is_select_special` / `is_option_special`, `RegularElement.js`). tsv's existing
+"populated `<select>`/`<optgroup>`" refusal catches only the *populated* case, so
+the children-free select escapes it. Today both shapes refuse anyway — a spread or
+`bind:` is a still-refused directive (`non-plain attribute (directive/spread)`) —
+and `compile_select_family_spread_and_bind_refuse` pins that. When spread / `bind:`
+land (slices 4 / 3), an empty `<select {...props}>` / `<select bind:value>` must
+grow its **own** select-family refusal (or emission) rather than fall through to
+`$.attributes`, or it will silently mis-route.
 
 ### Styles (CSS scoping)
 

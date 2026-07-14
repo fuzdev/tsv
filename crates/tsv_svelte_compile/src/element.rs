@@ -20,9 +20,11 @@ use tsv_ts::ast::internal::{
 
 use crate::analyze::{BindingKind, evaluate, stringify_value};
 use crate::attr_refs::fragment_any;
-use crate::attribute::emit_attribute;
+use crate::attribute::{emit_attribute, is_load_error_element};
 use crate::build::escape_template_text;
-use crate::fragment::{BodyBuilder, FragmentCtx, emit_child_body, emit_fragment, wrap_value_expr};
+use crate::fragment::{
+    BodyBuilder, FragmentCtx, emit_child_body, emit_fragment, guard_dropped, wrap_value_expr,
+};
 use crate::script_rewrite::plain_identifier_name;
 use crate::snippet_emit::build_snippet_function;
 use crate::transform_server::{EmitEnv, unsupported};
@@ -87,10 +89,52 @@ pub(crate) fn emit_element<'arena>(
 
     out.push_text(&format!("<{name}"));
     for attr_node in element.attributes {
-        let AttributeNode::Attribute(attr) = attr_node else {
-            return Err(unsupported(Refusal::NonPlainAttribute));
-        };
-        emit_attribute(env, attr, &name, out)?;
+        match attr_node {
+            AttributeNode::Attribute(attr) => emit_attribute(env, attr, &name, out)?,
+            // The no-op drop family: `use:`/`transition:`/`in:`/`out:`/`animate:`/
+            // `{@attach}` contribute nothing to the tag — SSR runs no client
+            // lifecycle, so the oracle discards their output (the discarded
+            // `context.visit` in `shared/element.js`). Their expressions are still
+            // walked for scope/`needs_context` (up front, via `attr_refs`) and
+            // still validated: a misplaced rune or a top-level `await` inside the
+            // expression must refuse, exactly as for a dropped event handler, so
+            // guard the expression here.
+            //
+            // The one exception: a `use:` on a load-error element makes the oracle
+            // add `onload`/`onerror` capture attributes (its `events_to_capture`
+            // set) — not implemented, so refuse. `transition:`/`animate:`/`{@attach}`
+            // on such an element still drop cleanly (only `use:` and a spread
+            // trigger the capture — `shared/element.js`).
+            AttributeNode::UseDirective(directive) => {
+                if is_load_error_element(&name) {
+                    return Err(unsupported(Refusal::UseDirectiveOnLoadErrorElement));
+                }
+                if let Some(expr) = &directive.expression {
+                    guard_dropped(env, expr)?;
+                }
+            }
+            AttributeNode::TransitionDirective(directive) => {
+                if let Some(expr) = &directive.expression {
+                    guard_dropped(env, expr)?;
+                }
+            }
+            AttributeNode::AnimateDirective(directive) => {
+                if let Some(expr) = &directive.expression {
+                    guard_dropped(env, expr)?;
+                }
+            }
+            AttributeNode::AttachTag(attach) => guard_dropped(env, &attach.expression)?,
+            // `class:`/`style:`/`bind:`, a legacy `on:` directive, `let:`, and an
+            // element `{...spread}` are not emitted yet — refuse.
+            AttributeNode::SpreadAttribute(_)
+            | AttributeNode::OnDirective(_)
+            | AttributeNode::BindDirective(_)
+            | AttributeNode::ClassDirective(_)
+            | AttributeNode::StyleDirective(_)
+            | AttributeNode::LetDirective(_) => {
+                return Err(unsupported(Refusal::NonPlainAttribute));
+            }
+        }
     }
 
     if tsv_html::is_void_element(&name) {

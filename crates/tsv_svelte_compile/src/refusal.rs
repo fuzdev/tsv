@@ -389,7 +389,18 @@ pub enum Refusal {
         /// The event attribute name (`onload` or `onerror`).
         name: String,
     },
-    /// A directive or spread attribute.
+    /// A `use:` directive on a load-error element (`img`, `iframe`, …). The oracle
+    /// adds `onload`/`onerror` capture attributes there (its `events_to_capture`
+    /// set — `shared/element.js`), which tsv does not yet reproduce, so the `use:`
+    /// drop that applies on every other element refuses here. Only `use:` (and a
+    /// spread) triggers this; `transition:`/`in:`/`out:`/`animate:`/`{@attach}` on
+    /// a load-error element drop cleanly.
+    #[error("use: directive on a load-error element (event-capture markup not implemented)")]
+    UseDirectiveOnLoadErrorElement,
+    /// A directive or spread attribute the transform does not yet emit —
+    /// `class:`/`style:`/`bind:`, a legacy `on:` event directive, `let:`, or an
+    /// element `{...spread}`. The no-op drop family (`use:`/`transition:`/`in:`/
+    /// `out:`/`animate:`/`{@attach}`) is dropped, not refused, on a regular element.
     #[error("non-plain attribute (directive/spread)")]
     NonPlainAttribute,
     /// A string-literal expression attribute value (inline-literal path).
@@ -705,6 +716,9 @@ impl Refusal {
             }
             Self::HtmlTagStaticValue => Cow::Borrowed("{@html} with a statically-known value"),
             Self::MutationInTemplateExpr => Cow::Borrowed("mutation inside a template expression"),
+            Self::UseDirectiveOnLoadErrorElement => Cow::Borrowed(
+                "use: directive on a load-error element (event-capture markup not implemented)",
+            ),
             Self::NonPlainAttribute => Cow::Borrowed("non-plain attribute (directive/spread)"),
             Self::StringLiteralExprAttribute => {
                 Cow::Borrowed("string-literal expression attribute value (inline-literal path)")

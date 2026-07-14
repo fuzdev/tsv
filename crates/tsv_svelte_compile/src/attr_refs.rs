@@ -22,14 +22,20 @@
 //! analysis sees it at once.
 //!
 //! Two traversals share that definition. `each_attribute_expression` is the
-//! **emitted-path** view: it skips the positions refused at emission (element
-//! spreads, directives, `{@attach}`), because the emission refusal is what keeps
-//! their references out of output. `each_reference_bearing_attribute_expression`
-//! is the **dropped-fragment** view (a `{:catch}` branch the emitter discards
-//! without walking): there no emission refusal fires, so every attribute
-//! reference must be counted to match the oracle. The dropped-fragment view has
-//! two more entry points for the same reason — `each_reference_bearing_directive_name`
-//! (a directive whose *name* is a value binding) and
+//! **emitted-path** view: it visits everything not refused at emission — plain
+//! attribute values, component spreads, and the no-op drop family
+//! (`use:`/`transition:`/`in:`/`out:`/`animate:`/`{@attach}`) on a regular
+//! element, which is dropped-but-analyzed exactly like an event handler. It skips
+//! the positions that *do* refuse (an element spread, `class:`/`style:`/`bind:`/
+//! legacy `on:`/`let:`), because the emission refusal is what keeps their
+//! references out of output — and its `each_emitted_directive_name` companion
+//! surfaces the drop-family directive *names* (which an expression traversal can't
+//! reach). `each_reference_bearing_attribute_expression` is the **dropped-fragment**
+//! view (a `{:catch}` branch the emitter discards without walking): there no
+//! emission refusal fires, so every attribute reference must be counted to match
+//! the oracle. The dropped-fragment view has two more entry points for the same
+//! reason — `each_reference_bearing_directive_name` (a directive whose *name* is a
+//! value binding, the wider set including a `style:` shorthand) and
 //! `special_element_reference_expression` (a `<svelte:element>`/`<svelte:component>`
 //! `this={…}`); every special element is refused at emission elsewhere, so its
 //! references, too, are only reachable through the dropped-fragment path.
@@ -255,23 +261,37 @@ pub(crate) fn fragment_any<'arena>(
     })
 }
 
-/// Visit every attribute expression of `element` that can reach compiled
-/// output:
+/// Visit every attribute expression of `element` the oracle walks for scope /
+/// `needs_context` on the **emitted** path — everything not refused at emission:
 ///
 /// - plain attribute expression values (single-expression and mixed-value
 ///   chunks) on any element;
 /// - `{...spread}` expressions on **components** (emitted as `$.spread_props`
-///   array elements).
+///   array elements);
+/// - the **no-op drop family** on a regular HTML element (`use:`/`transition:`/
+///   `in:`/`out:`/`animate:` expressions and `{@attach}`). These contribute
+///   nothing to the tag but are dropped-but-analyzed, exactly like an event
+///   handler: the oracle discards their output yet still walks the expression
+///   (its `context.visit`), so a `new`/prop-rooted access inside one must still
+///   fire the `$$renderer.component` wrapper. On a **component** these refuse at
+///   emission (a `ComponentDirective`), so they are skipped there — visiting them
+///   would let an analysis refusal fire first and shift corpus buckets.
 ///
 /// An *element* spread is refused at emission, so its expression never reaches
 /// output — and visiting it here would let an analysis refusal fire before the
-/// emission refusal, shifting corpus buckets. Directives and `{@attach}` are
-/// likewise refused at emission (on elements and components both) and are not
-/// visited.
+/// emission refusal, shifting corpus buckets. `class:`/`style:`/`bind:`/legacy
+/// `on:`/`let:` are likewise refused at emission and not visited.
+///
+/// A drop-family directive's **name** (`use:action`, `transition:fade`) is also a
+/// binding reference the oracle counts, but tsv stores it as a verbatim name span
+/// rather than an `Expression`, so an expression traversal cannot reach it — it is
+/// surfaced separately by [`each_emitted_directive_name`] (needed by the
+/// snippet-hoist analysis; a bare name never fires `needs_context`).
 pub(crate) fn each_attribute_expression<'a, 'arena>(
     element: &'a Element<'arena>,
     f: &mut impl FnMut(&'a Expression<'arena>),
 ) {
+    let is_html = element.kind == ElementKind::Html;
     for attr_node in element.attributes {
         match attr_node {
             AttributeNode::Attribute(attr) => {
@@ -286,8 +306,57 @@ pub(crate) fn each_attribute_expression<'a, 'arena>(
             AttributeNode::SpreadAttribute(spread) if element.kind == ElementKind::Component => {
                 f(&spread.expression);
             }
+            // The no-op drop family: dropped-but-analyzed on a regular element.
+            AttributeNode::AttachTag(attach) if is_html => f(&attach.expression),
+            AttributeNode::UseDirective(d) if is_html => {
+                if let Some(expr) = &d.expression {
+                    f(expr);
+                }
+            }
+            AttributeNode::TransitionDirective(d) if is_html => {
+                if let Some(expr) = &d.expression {
+                    f(expr);
+                }
+            }
+            AttributeNode::AnimateDirective(d) if is_html => {
+                if let Some(expr) = &d.expression {
+                    f(expr);
+                }
+            }
             _ => {}
         }
+    }
+}
+
+/// Visit the NAME of every no-op-drop-family directive that names a value binding
+/// on an **emitted** regular element: `use:` (action), `transition:`/`in:`/`out:`
+/// (transition fn), `animate:` (animation fn). Dropped from the tag output, but
+/// the oracle still counts the referenced binding — a top-level `{#snippet}` whose
+/// only instance-binding reference is such a directive name must **not**
+/// module-hoist. The name may be a member path (`use:a.b`); the raw slice is
+/// surfaced for the consumer to reduce to its root identifier.
+///
+/// Components refuse these at emission, so their names are skipped (the refusal
+/// fires). The dropped-`{:catch}` path uses
+/// [`each_reference_bearing_directive_name`], whose wider set also includes a
+/// `style:` shorthand (which refuses on the emitted path). A bare name never fires
+/// `needs_context`, so only the snippet-hoist analysis consumes this.
+pub(crate) fn each_emitted_directive_name<'s>(
+    element: &Element<'_>,
+    source: &'s str,
+    f: &mut impl FnMut(&'s str),
+) {
+    if element.kind != ElementKind::Html {
+        return;
+    }
+    for attr_node in element.attributes {
+        let name_span = match attr_node {
+            AttributeNode::UseDirective(d) => d.name_span,
+            AttributeNode::TransitionDirective(d) => d.name_span,
+            AttributeNode::AnimateDirective(d) => d.name_span,
+            _ => continue,
+        };
+        f(name_span.extract(source));
     }
 }
 

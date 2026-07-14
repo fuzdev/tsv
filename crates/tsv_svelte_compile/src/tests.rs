@@ -2382,6 +2382,66 @@ fn compile_rejects_load_error_event_capture() {
     );
 }
 
+/// Assert `compile` refuses with any `Unsupported` reason (bucket-agnostic — a
+/// durable pin that survives a later slice re-bucketing the same shape).
+fn assert_refuses(source: &str) {
+    let err = compile(source, &CompileOptions::default()).unwrap_err();
+    assert!(
+        matches!(&err, CompileError::Unsupported(_)),
+        "expected Unsupported, got {err:?} for:\n{source}"
+    );
+}
+
+#[test]
+fn compile_use_directive_on_load_error_element_refuses() {
+    // `use:` on a load-error element makes the oracle add onload/onerror capture
+    // attributes (its `events_to_capture` set) — not implemented, so refuse.
+    // Only `use:` (and a spread) triggers this; the other drop-family kinds drop.
+    assert_unsupported("<img use:action />", "load-error element");
+    assert_unsupported("<iframe use:action></iframe>", "load-error element");
+    // `transition:`/`{@attach}` on the same element are a plain drop.
+    let out = compile("<img transition:fade />", &CompileOptions::default()).unwrap();
+    assert!(
+        out.js.contains("`<img/>`"),
+        "transition on img must plain-drop: {}",
+        out.js
+    );
+    let out = compile("<img {@attach a} />", &CompileOptions::default()).unwrap();
+    assert!(
+        out.js.contains("`<img/>`"),
+        "attach on img must plain-drop: {}",
+        out.js
+    );
+}
+
+#[test]
+fn compile_await_in_dropped_directive_expression_refuses() {
+    // The oracle rejects `await` inside a directive expression
+    // (`illegal_await_expression` / the async gate); tsv's dropped-expression
+    // guard refuses the top-level await, the correct analog.
+    assert_unsupported("<div use:action={await f()}></div>", "top-level await");
+    assert_unsupported("<div {@attach await mk()}></div>", "top-level await");
+}
+
+#[test]
+fn compile_rune_in_dropped_directive_expression_refuses() {
+    // A dropped directive expression is still validated: a misplaced rune is an
+    // oracle analysis-phase error (`state_invalid_placement`), so tsv refuses.
+    assert_unsupported("<div use:action={$state(1)}></div>", "rune $state");
+    assert_unsupported("<div {@attach $derived(1)}></div>", "rune $derived");
+}
+
+#[test]
+fn compile_select_family_spread_and_bind_refuse() {
+    // The `<select>` trap: an empty `<select {...props}>` / `<select bind:value>`
+    // routes through `$$renderer.select(...)` in the oracle, NOT `$.attributes`.
+    // Spread and `bind:` are refused in this slice, so both refuse today — pin it
+    // so the later spread/bind slices can't silently mis-route the select family.
+    // See docs/checklist_svelte_compiler.md §select-family.
+    assert_refuses("<select {...props}></select>");
+    assert_refuses("<script>let v = $state('');</script><select bind:value={v}></select>");
+}
+
 #[test]
 fn compile_slots_reference_injects_sanitize() {
     // A `$$slots` reference injects the binding and takes `$$props`.

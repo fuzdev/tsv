@@ -34,8 +34,9 @@ use tsv_ts::ast::internal::{
 
 use crate::analyze::{NameSet, pattern_binding_names};
 use crate::attr_refs::{
-    each_attribute_expression, each_child_fragment, each_reference_bearing_attribute_expression,
-    each_reference_bearing_directive_name, special_element_reference_expression,
+    each_attribute_expression, each_child_fragment, each_emitted_directive_name,
+    each_reference_bearing_attribute_expression, each_reference_bearing_directive_name,
+    special_element_reference_expression,
 };
 use crate::{CompileError, Refusal};
 
@@ -345,18 +346,24 @@ impl<'s> Collector<'s> {
 
     fn element(&mut self, element: &Element<'_>) {
         // The shared traversal (`attr_refs`) defines which attribute expressions
-        // are reference-bearing — including component `{...spread}` expressions,
-        // whose free references must disqualify hoisting exactly like a plain
-        // attribute value's (a module-hoisted snippet referencing an instance
-        // binding is a runtime ReferenceError). Inside a dropped `{:catch}` the
-        // emitter never walks the fragment, so the emission refusals that let the
-        // default traversal skip element spreads / directives / `{@attach}` never
-        // fire — there every attribute reference must be counted, including the
-        // directive names (`use:`/`transition:`/`animate:`) that name a binding.
+        // are reference-bearing — including component `{...spread}` expressions and
+        // the no-op drop family (`use:`/`transition:`/`animate:`/`{@attach}`) on a
+        // regular element, whose free references must disqualify hoisting exactly
+        // like a plain attribute value's (a module-hoisted snippet referencing an
+        // instance binding is a runtime ReferenceError). The drop-family directive
+        // *names* (a use/transition/animate action reference) ride the companion
+        // name walk. Inside a dropped `{:catch}` the emitter never walks the
+        // fragment, so the emission refusals that let the default traversal skip
+        // element spreads / the still-refused directives never fire — there every
+        // attribute reference must be counted, `style:` shorthand names included.
         if self.in_dropped_catch {
             self.dropped_attribute_refs(element.attributes);
         } else {
             each_attribute_expression(element, &mut |expr| self.expr(expr));
+            let source = self.source;
+            each_emitted_directive_name(element, source, &mut |name| {
+                self.directive_name_ref(name);
+            });
         }
         self.fragment(&element.fragment);
     }
