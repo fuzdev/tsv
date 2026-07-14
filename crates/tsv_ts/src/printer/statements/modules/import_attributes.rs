@@ -151,18 +151,14 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let key_end = attr.key.span().end;
         let value_start = attr.value.span.start;
+        let key_doc = self.build_import_attribute_key_doc(&attr.key);
+        let value_doc = self.build_literal_doc(&attr.value);
 
-        // Check for comments between key and value (around the `:`)
-        // **on page**: a zero-comment fast gate — it short-circuits the layout work below.
-        let has_comments = self.has_comments_on_page_between(key_end, value_start);
-
-        if !has_comments {
-            // Fast path: no comments
-            return d.concat(&[
-                self.build_import_attribute_key_doc(&attr.key),
-                d.text(": "),
-                self.build_literal_doc(&attr.value),
-            ]);
+        // Fast path: no comments around the `:`. The **on-page** gate short-circuits the
+        // layout work below (an owned glued block comment on the value is printed by the
+        // value's own doc, so it never needs the layout branches).
+        if !self.has_comments_on_page_between(key_end, value_start) {
+            return d.concat(&[key_doc, d.text(": "), value_doc]);
         }
 
         // Find `:` position to split comments
@@ -175,24 +171,52 @@ impl<'a> Printer<'a> {
         )
         .expect("colon must exist in import attribute") as u32;
 
-        let mut parts = smallvec![self.build_import_attribute_key_doc(&attr.key)];
+        // A line comment in the key→`:` gap stays trailing the key; `: value` drops to
+        // a continuation line indented one level (`type // c⏎\t: 'json'`) — the uniform
+        // forced-continuation indent shared with the object-property / type-member
+        // key→`:` line-comment paths. Prettier instead relocates the comment past the
+        // value to trail it. See attributes_key_colon_line_comment_prettier_divergence.
+        if self.has_line_comments_between(key_end, colon_pos) {
+            let value_doc = self.prepend_rhs_comments(value_doc, colon_pos + 1, value_start);
+            let tail = d.concat(&[d.text(": "), value_doc]);
+            return d.concat(&[
+                key_doc,
+                self.build_continuation_indent(key_end, colon_pos, tail),
+            ]);
+        }
 
-        // Comments between key and `:`
+        let mut parts = smallvec![key_doc];
+
+        // Block comments between the key and `:` trail the key inline (`type /* c */:`).
         self.append_trailing_inline_block_comments(&mut parts, key_end, colon_pos);
 
         parts.push(d.text(":"));
 
-        // Comments between `:` and value
+        // Comments between `:` and the value.
         let after_colon = colon_pos + 1;
-        parts.push(d.text(" "));
-        for comment in comments_to_emit_in_range(self.comments, after_colon, value_start) {
-            if comment.is_block {
+        if self.has_line_comments_between(after_colon, value_start) {
+            // A line comment can't trail the `:` inline without swallowing the
+            // value, so break after `:` and indent the value one level, each gap
+            // comment on its own line — `type:⏎\t// c⏎\t'json'`. Matches prettier's
+            // value-leading break, which puts any block comment sharing the gap on
+            // its own line too.
+            let mut cont: DocBuf = smallvec![d.hardline()];
+            for comment in comments_to_emit_in_range(self.comments, after_colon, value_start) {
+                cont.push(self.build_comment_doc(comment));
+                cont.push(d.hardline());
+            }
+            cont.push(value_doc);
+            parts.push(d.indent(d.concat(&cont)));
+        } else {
+            // Block comments only (or none): trail the `:` inline (` /* c */ `),
+            // matching prettier when the attribute fits on one line.
+            parts.push(d.text(" "));
+            for comment in comments_to_emit_in_range(self.comments, after_colon, value_start) {
                 parts.push(self.build_comment_doc(comment));
                 parts.push(d.text(" "));
             }
+            parts.push(value_doc);
         }
-
-        parts.push(self.build_literal_doc(&attr.value));
 
         d.concat(&parts)
     }
