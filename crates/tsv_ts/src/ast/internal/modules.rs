@@ -132,7 +132,7 @@ pub enum ImportKind {
     Type,
 }
 
-/// Import phase for the Stage-3 import-phase proposals (source-phase imports and
+/// Import phase for the import-phase proposals (source-phase imports and
 /// import defer). `None` is an ordinary import; `Source`/`Defer` tag the static
 /// `import source …` / `import defer …` declaration or the dynamic
 /// `import.source(…)` / `import.defer(…)` call. Neither proposal is in acorn yet,

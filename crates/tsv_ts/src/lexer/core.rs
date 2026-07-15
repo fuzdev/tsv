@@ -1278,8 +1278,17 @@ impl<'a> Lexer<'a> {
         let mut in_class = false; // Inside character class [...]
         let mut escaped = false; // Previous char was \
 
-        // Read pattern until unescaped / outside character class
-        // TODO: Validate pattern syntax (e.g., reject invalid escape sequences like \c without letter)
+        // Read pattern until unescaped / outside character class.
+        //
+        // The pattern body is deliberately NOT validated here, and this loose scan is
+        // exactly what the spec asks a lexer for: the `RegularExpressionBody` productions
+        // exist so "the input element scanner [can] find the end of the regular expression
+        // literal", and the body/flags "are subsequently parsed again using the more
+        // stringent ECMAScript Regular Expression grammar" (ecma262
+        // sec-literals-regular-expression-literals). That second parse failing is an
+        // *early error* — `IsValidRegularExpressionLiteral` — not a grammar error, so it
+        // belongs to the diagnostics layer with the other deferred early errors, and the
+        // formatter (which only ever re-emits the body verbatim) never needs it.
         loop {
             match self.cur_byte() {
                 None => {
@@ -1342,10 +1351,16 @@ impl<'a> Lexer<'a> {
 
         self.advance(); // Consume closing /
 
-        // Read flags (IdentifierPartChar = ID_Continue, plus $ for ECMAScript)
-        // TODO: Validate flags are only valid regex flags (d, g, i, m, s, u, v, y)
-        // TODO: Reject duplicate flags (e.g., /test/gg)
-        // TODO: Support Unicode escape sequences in flags (e.g., /test/\u0067 for 'g')
+        // Read flags. This IS the whole spec production — `RegularExpressionFlags ::
+        // [empty] | RegularExpressionFlags IdentifierPartChar`, and `IdentifierPartChar ::
+        // UnicodeIDContinue | $`. Note what that excludes: there is no backslash, so an
+        // escaped flag is not a flags production at all and correctly fails here, as it
+        // does in acorn — there is nothing to "support".
+        //
+        // Which flags are *legal* (`d`/`g`/`i`/`m`/`s`/`u`/`v`/`y`, each at most once) is
+        // not this loop's business: that is the first two steps of the early error
+        // `IsValidRegularExpressionLiteral`, deferred to the diagnostics layer along with
+        // the pattern parse (see the body scan above). So `/a/qqq` and `/a/gg` lex fine.
         // The flags text is recovered from the span by the parser, not sliced here;
         // this loop only advances `self.position` to the token end.
         while let Some(b) = self.cur_byte() {

@@ -1326,7 +1326,7 @@ Two surfaces summarize what was skipped:
 - **Skipped files report**: total counts + per-benchmark skip counts always
   shown. Per-file detail (paths, error messages, failure sets) is opt-in
   via `--verbose` since most universal-tsv failures are unsupported-syntax
-  fixtures (SCSS in `.css`, JSX in `.js`, stage-1 proposals, etc.). When
+  fixtures (SCSS in `.css`, JSX in `.js`, early-stage proposals, etc.). When
   verbose, entries are sorted ascending by failure-set size so rare /
   impl-specific failures land at the top, and the `Failed in:` line
   collapses to `all tsv variants` when the failure set matches the

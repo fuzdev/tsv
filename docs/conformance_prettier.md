@@ -535,7 +535,7 @@ tsv treats these like any other function call—no special-casing for module pat
 
 #### Import-phase proposals
 
-The Stage-3 **source-phase imports** and **import defer** proposals (`import source x
+The **source-phase imports** and **import defer** proposals (`import source x
 from 'mod'` / `import.source('mod')`, `import defer * as ns from 'mod'` /
 `import.defer('mod')`) are a tsv-native parser divergence — acorn rejects them, so
 they are **not** in the "Prettier rejects valid input" set above (that set is keyed
