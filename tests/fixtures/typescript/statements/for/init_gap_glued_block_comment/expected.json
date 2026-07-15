@@ -1,0 +1,633 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 505,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A block glued to the next declarator leads it, even when a line comment shares the gap.",
+			"start": 10,
+			"end": 100,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 91
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line",
+			"start": 122,
+			"end": 129,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 14
+				},
+				"end": {
+					"line": 4,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " block ",
+			"start": 133,
+			"end": 144,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 3
+				},
+				"end": {
+					"line": 5,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Blocks glued to each other but not to the declarator stay together on their own line.",
+			"start": 179,
+			"end": 267,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " block1 ",
+			"start": 363,
+			"end": 375,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 3
+				},
+				"end": {
+					"line": 13,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " block2 ",
+			"start": 376,
+			"end": 388,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 16
+				},
+				"end": {
+					"line": 13,
+					"column": 28
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 504,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 495,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 18,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ForStatement",
+					"start": 102,
+					"end": 176,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 5
+						}
+					},
+					"init": {
+						"type": "VariableDeclaration",
+						"start": 110,
+						"end": 151,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 2
+							},
+							"end": {
+								"line": 5,
+								"column": 21
+							}
+						},
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 114,
+								"end": 120,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 6
+									},
+									"end": {
+										"line": 4,
+										"column": 12
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 114,
+									"end": 116,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 6
+										},
+										"end": {
+											"line": 4,
+											"column": 8
+										}
+									},
+									"name": "i1"
+								},
+								"init": {
+									"type": "Literal",
+									"start": 119,
+									"end": 120,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 11
+										},
+										"end": {
+											"line": 4,
+											"column": 12
+										}
+									},
+									"value": 0,
+									"raw": "0"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " line",
+										"start": 122,
+										"end": 129
+									}
+								]
+							},
+							{
+								"type": "VariableDeclarator",
+								"start": 145,
+								"end": 151,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 15
+									},
+									"end": {
+										"line": 5,
+										"column": 21
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 145,
+									"end": 147,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 15
+										},
+										"end": {
+											"line": 5,
+											"column": 17
+										}
+									},
+									"name": "j1"
+								},
+								"init": {
+									"type": "Literal",
+									"start": 150,
+									"end": 151,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 20
+										},
+										"end": {
+											"line": 5,
+											"column": 21
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " block ",
+										"start": 133,
+										"end": 144
+									}
+								]
+							}
+						],
+						"kind": "let"
+					},
+					"test": {
+						"type": "BinaryExpression",
+						"start": 155,
+						"end": 162,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 2
+							},
+							"end": {
+								"line": 6,
+								"column": 9
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 155,
+							"end": 157,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 2
+								},
+								"end": {
+									"line": 6,
+									"column": 4
+								}
+							},
+							"name": "i1"
+						},
+						"operator": "<",
+						"right": {
+							"type": "Identifier",
+							"start": 160,
+							"end": 162,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 9
+								}
+							},
+							"name": "j1"
+						}
+					},
+					"update": {
+						"type": "UpdateExpression",
+						"start": 166,
+						"end": 170,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 2
+							},
+							"end": {
+								"line": 7,
+								"column": 6
+							}
+						},
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 166,
+							"end": 168,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 2
+								},
+								"end": {
+									"line": 7,
+									"column": 4
+								}
+							},
+							"name": "i1"
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 174,
+						"end": 176,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 3
+							},
+							"end": {
+								"line": 8,
+								"column": 5
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block glued to the next declarator leads it, even when a line comment shares the gap.",
+							"start": 10,
+							"end": 100
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 269,
+					"end": 494,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 5
+						}
+					},
+					"init": {
+						"type": "VariableDeclaration",
+						"start": 277,
+						"end": 398,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 2
+							},
+							"end": {
+								"line": 14,
+								"column": 9
+							}
+						},
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 281,
+								"end": 358,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 6
+									},
+									"end": {
+										"line": 12,
+										"column": 83
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 281,
+									"end": 354,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 6
+										},
+										"end": {
+											"line": 12,
+											"column": 79
+										}
+									},
+									"name": "indexAaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+								},
+								"init": {
+									"type": "Literal",
+									"start": 357,
+									"end": 358,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 82
+										},
+										"end": {
+											"line": 12,
+											"column": 83
+										}
+									},
+									"value": 0,
+									"raw": "0"
+								}
+							},
+							{
+								"type": "VariableDeclarator",
+								"start": 392,
+								"end": 398,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 3
+									},
+									"end": {
+										"line": 14,
+										"column": 9
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 392,
+									"end": 394,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 3
+										},
+										"end": {
+											"line": 14,
+											"column": 5
+										}
+									},
+									"name": "j2"
+								},
+								"init": {
+									"type": "Literal",
+									"start": 397,
+									"end": 398,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 8
+										},
+										"end": {
+											"line": 14,
+											"column": 9
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " block1 ",
+										"start": 363,
+										"end": 375
+									},
+									{
+										"type": "Block",
+										"value": " block2 ",
+										"start": 376,
+										"end": 388
+									}
+								]
+							}
+						],
+						"kind": "let"
+					},
+					"test": {
+						"type": "BinaryExpression",
+						"start": 402,
+						"end": 480,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 2
+							},
+							"end": {
+								"line": 15,
+								"column": 80
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 402,
+							"end": 475,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 2
+								},
+								"end": {
+									"line": 15,
+									"column": 75
+								}
+							},
+							"name": "indexAaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+						},
+						"operator": "<",
+						"right": {
+							"type": "Identifier",
+							"start": 478,
+							"end": 480,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 78
+								},
+								"end": {
+									"line": 15,
+									"column": 80
+								}
+							},
+							"name": "j2"
+						}
+					},
+					"update": {
+						"type": "UpdateExpression",
+						"start": 484,
+						"end": 488,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 2
+							},
+							"end": {
+								"line": 16,
+								"column": 6
+							}
+						},
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 484,
+							"end": 486,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 2
+								},
+								"end": {
+									"line": 16,
+									"column": 4
+								}
+							},
+							"name": "j2"
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 492,
+						"end": 494,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 3
+							},
+							"end": {
+								"line": 17,
+								"column": 5
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Blocks glued to each other but not to the declarator stay together on their own line.",
+							"start": 179,
+							"end": 267
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

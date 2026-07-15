@@ -1,0 +1,431 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 560,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A block glued to the next heritage item leads it, even when a line comment shares the gap.",
+			"start": 20,
+			"end": 113,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 94
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line",
+			"start": 195,
+			"end": 202,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 53
+				},
+				"end": {
+					"line": 5,
+					"column": 60
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " block ",
+			"start": 206,
+			"end": 217,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 3
+				},
+				"end": {
+					"line": 6,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Blocks glued to each other but not to the item stay together on their own line.",
+			"start": 276,
+			"end": 358,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " block1 ",
+			"start": 457,
+			"end": 469,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 3
+				},
+				"end": {
+					"line": 12,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " block2 ",
+			"start": 470,
+			"end": 482,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 16
+				},
+				"end": {
+					"line": 12,
+					"column": 28
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 559,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 550,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 14,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 115,
+					"end": 273,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 70
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 125,
+						"end": 131,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 11
+							},
+							"end": {
+								"line": 3,
+								"column": 17
+							}
+						},
+						"name": "Single"
+					},
+					"extends": [
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 145,
+							"end": 193,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 3
+								},
+								"end": {
+									"line": 5,
+									"column": 51
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 145,
+								"end": 193,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 3
+									},
+									"end": {
+										"line": 5,
+										"column": 51
+									}
+								},
+								"name": "Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+							},
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " line",
+									"start": 195,
+									"end": 202
+								}
+							]
+						},
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 218,
+							"end": 270,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 15
+								},
+								"end": {
+									"line": 6,
+									"column": 67
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 218,
+								"end": 270,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 15
+									},
+									"end": {
+										"line": 6,
+										"column": 67
+									}
+								},
+								"name": "Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " block ",
+									"start": 206,
+									"end": 217
+								}
+							]
+						}
+					],
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 271,
+						"end": 273,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 68
+							},
+							"end": {
+								"line": 6,
+								"column": 70
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block glued to the next heritage item leads it, even when a line comment shares the gap.",
+							"start": 20,
+							"end": 113
+						}
+					]
+				},
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 360,
+					"end": 549,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 66
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 370,
+						"end": 378,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 11
+							},
+							"end": {
+								"line": 9,
+								"column": 19
+							}
+						},
+						"name": "Multiple"
+					},
+					"extends": [
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 392,
+							"end": 452,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 3
+								},
+								"end": {
+									"line": 11,
+									"column": 63
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 392,
+								"end": 452,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 3
+									},
+									"end": {
+										"line": 11,
+										"column": 63
+									}
+								},
+								"name": "Cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+							}
+						},
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 486,
+							"end": 546,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 3
+								},
+								"end": {
+									"line": 13,
+									"column": 63
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 486,
+								"end": 546,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 3
+									},
+									"end": {
+										"line": 13,
+										"column": 63
+									}
+								},
+								"name": "Dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " block1 ",
+									"start": 457,
+									"end": 469
+								},
+								{
+									"type": "Block",
+									"value": " block2 ",
+									"start": 470,
+									"end": 482
+								}
+							]
+						}
+					],
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 547,
+						"end": 549,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 64
+							},
+							"end": {
+								"line": 13,
+								"column": 66
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Blocks glued to each other but not to the item stay together on their own line.",
+							"start": 276,
+							"end": 358
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

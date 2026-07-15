@@ -389,7 +389,7 @@ impl<'a> Printer<'a> {
             // Inline block comments before the first clause (on the same line)
             // e.g., `for (/* before init */ let j = 0; ...)`
             for comment in comments_to_emit_in_range(self.comments, open + 1, first_start) {
-                if comment.is_block && self.is_same_line(comment.span.end, first_start) {
+                if self.comment_hugs_next(comment, first_start) {
                     inner_parts.push(self.build_comment_doc(comment));
                     inner_parts.push(d.text(" "));
                 }
@@ -1333,14 +1333,16 @@ impl<'a> Printer<'a> {
         let comma_pos = self.comma_between(prev_end, curr_start);
 
         if self.has_line_comments_between(prev_end, curr_start) {
-            // A line comment forces the break. The whole declarator run is wrapped
-            // in a `d.indent()` by the caller, so continuation lines need no
-            // explicit indent text (empty). The trailing break to the next
-            // declarator is the `hardline` below.
-            let comments: CommentVec<'_> =
-                comments_to_emit_in_range(self.comments, prev_end, curr_start).collect();
-            self.push_inter_declarator_line_comment_gap(decl_docs, &comments, comma_pos, d.empty());
-            decl_docs.push(d.hardline());
+            // A line comment forces the break, which the gap owns. The whole declarator
+            // run is wrapped in a `d.indent()` by the caller, so continuation lines need
+            // no explicit indent text (empty).
+            self.push_inter_item_line_comment_gap(
+                decl_docs,
+                prev_end,
+                comma_pos,
+                curr_start,
+                d.empty(),
+            );
         } else {
             // Blocks only: a before-comma block trails the previous initializer; the
             // width-based `line` separates; after-comma blocks lead the next
@@ -1361,7 +1363,8 @@ impl<'a> Printer<'a> {
                 decl_docs,
                 after.iter().copied(),
                 curr_start,
-                LeadingGlue::Terminal,
+                LeadingGlue::Adjacent,
+                d.empty(),
             );
         }
     }
