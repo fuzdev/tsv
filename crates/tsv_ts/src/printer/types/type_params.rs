@@ -100,7 +100,7 @@ impl<'a> Printer<'a> {
             // Leading comments (after previous comma or `<`); for the first param,
             // exclude comments already pulled onto the `<` line.
             let skip_delim = if i == 0 { angle_pull_pos } else { None };
-            inner_parts.extend(self.build_leading_comments_multiline_opt(
+            inner_parts.extend(self.build_leading_comments_multiline(
                 prev_end,
                 param_start,
                 skip_delim,
@@ -684,7 +684,9 @@ impl<'a> Printer<'a> {
             );
             if has_line && !has_trailing {
                 let leading =
-                    self.build_leading_comments_multiline(inst.span.start + 1, param_start);
+                    // `None`: this hug path emits no delimiter-line prefix, so nothing
+                    // was pulled onto the `<` line to exclude here.
+                    self.build_leading_comments_multiline(inst.span.start + 1, param_start, None);
                 if !leading.is_empty() {
                     let param_doc = if type_position {
                         self.build_type_arg_doc(param, is_multi)
@@ -719,7 +721,7 @@ impl<'a> Printer<'a> {
             // drop comments pulled onto the `<` line (emitted as the angle-line
             // prefix below).
             let skip_delim = if i == 0 { delimiter_pull_pos } else { None };
-            inner_parts.extend(self.build_leading_comments_multiline_opt(
+            inner_parts.extend(self.build_leading_comments_multiline(
                 prev_end,
                 param_start,
                 skip_delim,

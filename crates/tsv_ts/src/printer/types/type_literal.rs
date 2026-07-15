@@ -9,7 +9,7 @@
 use super::super::CommentVec;
 use super::super::comments_to_emit_in_range;
 use super::Printer;
-use super::helpers::{immediate_union_paren, unwrap_parenthesized};
+use super::helpers::{immediate_paren, unwrap_parenthesized};
 use crate::ast::internal::{
     TSIntersectionType, TSParenthesizedType, TSType, TSTypeElement, TSTypeLiteral, TSUnionType,
 };
@@ -195,17 +195,16 @@ impl<'a> Printer<'a> {
                 && let Some(last) = intersection.types.last()
                 && let TSType::TypeLiteral(obj) = unwrap_parenthesized(last)
             {
-                return self
-                    .build_parenthesized_intersection_trailing_object_doc(intersection, obj);
+                return self.build_parenthesized_intersection_trailing_object_doc(
+                    intersection,
+                    obj,
+                    immediate_paren(ts_type),
+                );
             }
 
             // Special case: parenthesized union type
             if let TSType::Union(union) = unwrap_parenthesized(ts_type) {
-                return self.build_parenthesized_union_doc(
-                    union,
-                    immediate_union_paren(ts_type),
-                    false,
-                );
+                return self.build_parenthesized_union_doc(union, immediate_paren(ts_type), false);
             }
 
             // Default case: parenthesize and indent the inner type. The closing
@@ -334,10 +333,45 @@ impl<'a> Printer<'a> {
         &self,
         intersection: &TSIntersectionType<'_>,
         trailing_obj: &TSTypeLiteral<'_>,
+        paren: Option<&TSParenthesizedType<'_>>,
     ) -> DocId {
         let d = self.d();
         // Build opening: (A & B & {
         let mut opening_parts: DocBuf = smallvec![d.text("(")];
+
+        // Comments the author wrote inside retained parens, ahead of the intersection
+        // (`(/* c */ a & { … })`, `(// c⏎a & { … })`) — kept in place, as the union
+        // sibling `build_parenthesized_union_doc` keeps them. This function is handed the
+        // already-unwrapped `intersection`, so the paren's own gap is invisible to every
+        // other emitter and a comment there would be silently DROPPED.
+        //
+        // A *line* comment reaches here only for a FIRST union member: a later member's
+        // is relocated to trail the previous member by
+        // `build_union_type_doc_with_line_comments`, which then builds the inner type
+        // directly and never routes here — so there is no double-print to guard against.
+        if let Some(p) = paren {
+            let mut lead: DocBuf = DocBuf::new();
+            for comment in
+                comments_to_emit_in_range(self.comments, p.span.start + 1, intersection.span.start)
+            {
+                lead.push(self.build_comment_doc(comment));
+                if comment.is_block {
+                    lead.push(d.text(" "));
+                } else {
+                    // A `//` runs to end-of-line — without the break it would swallow the
+                    // intersection that follows it on the line.
+                    lead.push(d.hardline());
+                }
+            }
+            if !lead.is_empty() {
+                // `indent`, because that break places the intersection's own first line:
+                // it belongs one level in from the `(`, matching the default-paren path
+                // (`d.indent(self.build_type_doc(…))` above) that every other paren-retained
+                // member shape takes. A block comment carries no break, so the indent is
+                // inert for it.
+                opening_parts.push(d.indent(d.concat(&lead)));
+            }
+        }
 
         // Build intersection types except the last one (the object)
         let types_before_object = &intersection.types[..intersection.types.len() - 1];

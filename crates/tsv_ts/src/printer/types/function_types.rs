@@ -1013,7 +1013,7 @@ impl<'a> Printer<'a> {
             // Leading comments (after previous comma or `(`); for the first param,
             // exclude comments already pulled onto the `(` line.
             let skip_delim = if i == 0 { paren_pull_pos } else { None };
-            inner_parts.extend(self.build_leading_comments_multiline_opt(
+            inner_parts.extend(self.build_leading_comments_multiline(
                 prev_end,
                 param_start,
                 skip_delim,

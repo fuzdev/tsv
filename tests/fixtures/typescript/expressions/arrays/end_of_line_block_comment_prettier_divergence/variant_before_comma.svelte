@@ -26,7 +26,9 @@
 		'cccc'
 	];
 
-	// A newline after the comment unglues it - the comment takes its own line
+	// A newline after the comment is ours to reflow - it lands on the element's line,
+	// the same fixed point the glued authoring reaches (e), and matching the inline
+	// cases above, which collapse the identical authoring
 	const g = [
 		'aaaa' /* c1 */,
 		'bbbb', // c2

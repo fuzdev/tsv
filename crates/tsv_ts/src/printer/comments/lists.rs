@@ -6,7 +6,7 @@
 // comment splitting, inline-block comment runs, and comma emission in forced-
 // multiline lists.
 
-use super::{CommentVec, Printer};
+use super::{CommentVec, LeadingGlue, Printer};
 use crate::ast::internal;
 use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
@@ -45,25 +45,21 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Build docs for leading comments in a forced-multiline context.
+    /// Build the leading-comment run over `[start, end)` for a list whose comments have
+    /// forced it multiline (tuples, type params/args, function-type params, unions, the
+    /// bracket-break shell, the broken cast).
     ///
-    /// Comments between `start` and `end` (where `end` is the element start):
-    /// - Block comments on the same line as the element: `/*content*/ ` (inline with trailing space)
-    /// - Block comments on their own line: `/*content*/` + hardline
-    /// - Line comments: `//content` + hardline (always on own line)
+    /// A thin adapter over the shared leading-comment emitter
+    /// ([`Printer::push_leading_comment_run`]), so the separator after each comment
+    /// follows prettier's `printLeadingComment` (space / soft `line` / hardline, keyed on
+    /// the source around *that* comment, never on where `end` is).
     ///
-    /// Used when expanding comments force multiline formatting (unions, tuples, etc.)
-    pub(crate) fn build_leading_comments_multiline(&self, start: u32, end: u32) -> DocBuf {
-        self.build_leading_comments_multiline_opt(start, end, None)
-    }
-
-    /// Like `build_leading_comments_multiline`, but when `skip_delim` is `Some(pos)`,
-    /// comments sharing `pos`'s source line are skipped — they were already emitted
-    /// as a trailing prefix on the opening delimiter's line (see
-    /// `delimiter_line_comment_prefix`), so emitting them here too would duplicate
-    /// them. Pass the `Option<u32>` that `delimiter_line_comment_prefix` returns
-    /// (gated to the first element of the list; `None` for the rest).
-    pub(in crate::printer) fn build_leading_comments_multiline_opt(
+    /// `skip_delim` drops the comments sharing `pos`'s source line: they were already
+    /// emitted as a trailing prefix on the opening delimiter's line (see
+    /// [`Self::delimiter_line_comment_prefix`]), so emitting them here too would
+    /// **duplicate** them. Pass the `Option<u32>` that helper returns — gated to the list's
+    /// first element, `None` for the rest, and `None` where no delimiter is involved.
+    pub(in crate::printer) fn build_leading_comments_multiline(
         &self,
         start: u32,
         end: u32,
@@ -71,21 +67,67 @@ impl<'a> Printer<'a> {
     ) -> DocBuf {
         let d = self.d();
         let mut parts = DocBuf::new();
-        let mut comments = comments_to_emit_in_range(self.comments, start, end)
-            .filter(|c| !skip_delim.is_some_and(|pos| self.comment_on_delimiter_line(pos, c)))
-            .peekable();
-        while let Some(comment) = comments.next() {
-            parts.push(self.build_comment_doc(comment));
-            if self.comment_hugs_next(comment, end) {
-                parts.push(d.text(" "));
-            } else {
-                // Preserve a blank line the author left between this comment and what
-                // follows it (the next own-line comment, or the element at `end`).
-                let next = comments.peek().map_or(end, |c| c.span.start);
-                self.push_blank_preserving_hardline(&mut parts, comment.span.end, next);
-            }
-        }
+        self.push_leading_comment_run(
+            &mut parts,
+            comments_to_emit_in_range(self.comments, start, end)
+                .filter(|c| !skip_delim.is_some_and(|pos| self.comment_on_delimiter_line(pos, c))),
+            end,
+            LeadingGlue::Adjacent,
+            d.empty(),
+        );
         parts
+    }
+
+    /// Assemble one **element** of an array-like list: its leading-comment run plus the
+    /// element, wrapped in a single `group`.
+    ///
+    /// The group is what lets a leading comment's soft `line` (prettier's
+    /// `printLeadingComment`) be measured against *this element alone* and collapse
+    /// (`/* c1 */ /* c2 */ a`) even though the list itself is broken. Prettier's
+    /// `printArrayElements` (`src/language-js/print/array.js`) does the same — it pushes
+    /// `group(print())` per element and `print()` carries the element's leading comments —
+    /// and array literals, array patterns, and tuple types all route through it. A line
+    /// comment (or an author blank line) in the run puts a `hardline` inside the group, so
+    /// it breaks and the element drops below, also matching prettier.
+    ///
+    /// This grouping is what separates the array family from the params family: function /
+    /// type-parameter / type-argument / call-argument lists use a bare `join([",", line])`
+    /// with **no** per-element group, so the identical soft `line` rides the broken outer
+    /// group and breaks. That one fact predicts the layout at every one of those sites —
+    /// don't re-derive it. See conformance_prettier.md §Comment relocation.
+    ///
+    /// A list with holes passes only its real elements here; a hole carries no comments and
+    /// takes no group.
+    pub(crate) fn build_list_element_group(&self, mut leading: DocBuf, element: DocId) -> DocId {
+        let d = self.d();
+        leading.push(element);
+        d.group(d.concat(&leading))
+    }
+
+    /// [`Self::build_list_element_group`] for a caller holding the element's leading
+    /// comments as a list rather than a range — the array literal and array pattern, whose
+    /// per-element filter (which same-line block comments trail the *previous* element
+    /// across its comma) is too specific to express as a range.
+    ///
+    /// Builds the run here so the separator policy every array-family element shares
+    /// (`LeadingGlue::Adjacent`, no continuation indent) is stated once rather than at each
+    /// call. The range-holding sibling is
+    /// [`Self::build_leading_comments_multiline`].
+    pub(crate) fn build_list_element_group_from_comments<'c>(
+        &self,
+        comments: impl Iterator<Item = &'c internal::Comment>,
+        element_start: u32,
+        element: DocId,
+    ) -> DocId {
+        let mut leading = DocBuf::new();
+        self.push_leading_comment_run(
+            &mut leading,
+            comments,
+            element_start,
+            LeadingGlue::Adjacent,
+            self.d().empty(),
+        );
+        self.build_list_element_group(leading, element)
     }
 
     /// Build docs for trailing comments in a forced-multiline context.
@@ -247,106 +289,80 @@ impl<'a> Printer<'a> {
         docs
     }
 
-    /// Build docs for leading comments before a node with blank line preservation.
+    /// Build the leading-comment run before `target_start` — the member, statement, or
+    /// element the comments lead.
     ///
-    /// Handles comments that appear before a member/statement, preserving blank lines
-    /// between consecutive comments and after the last comment. Returns a Vec of docs
-    /// to append directly before the target node.
+    /// A thin adapter over the shared leading-comment emitter
+    /// ([`Printer::push_leading_comment_run`]), for the callers holding their run as a
+    /// slice rather than a range (each applies a per-site filter — dropping the previous
+    /// statement's same-line trailing comments, or the ones pulled onto the delimiter
+    /// line). The separator after each comment is prettier's `printLeadingComment`
+    /// (space / soft `line` / blank-preserving hardline), keyed on the source around
+    /// *that* comment.
     ///
-    /// Used by: class body members, block statement bodies, interface members, type literals.
+    /// Every caller is an already-broken context — an expanded pattern, a multiline
+    /// member prefix, a class/interface body, a statement list — so the soft `line`
+    /// renders as a break here. That is why this reads as "hardline between own-line
+    /// comments" at every site; it is the general rule landing in a broken group, not a
+    /// policy of its own. A caller that ever measures this run inside a group that can
+    /// *fit* gets prettier's collapse for free, which is the point of routing here.
     ///
-    /// `force_non_inline`: when true, the *last* comment never glues to
-    /// `target_start` (no trailing space, no trailing hardline) — used when
-    /// `target_start` doesn't correspond to a node that will actually be
-    /// printed next (e.g. comments orphaned by a dropped `EmptyStatement`).
-    /// The caller's own next emission supplies the separator hardline; only a
-    /// blank line, which that caller can't rediscover on its own, is still
-    /// recorded here (as a bare `literalline`, so the caller's hardline completes it).
-    pub(crate) fn build_leading_comments_with_blank_lines(
+    /// Used by: class body members, interface/enum members, block statement bodies,
+    /// type literals, expanded object patterns. The orphaned-comment sibling is
+    /// [`Self::build_orphaned_comment_run`].
+    pub(crate) fn build_leading_comments_before(
         &self,
         comments: &[&internal::Comment],
         target_start: u32,
-        force_non_inline: bool,
     ) -> DocBuf {
-        if comments.is_empty() {
-            return DocBuf::new();
+        let mut parts = DocBuf::new();
+        self.push_leading_comment_run(
+            &mut parts,
+            comments.iter().copied(),
+            target_start,
+            LeadingGlue::Adjacent,
+            self.d().empty(),
+        );
+        parts
+    }
+
+    /// Build the run for comments **orphaned by a dropped statement** — a bare `;`
+    /// (`EmptyStatement`) never prints in a body list, so the comments in its gap have
+    /// no node to lead. `gap_end` is a source position, not something that will be
+    /// emitted.
+    ///
+    /// So the last comment must not glue to `gap_end`, and takes no separator at all —
+    /// the caller's own next emission supplies it. Only an author blank line is recorded
+    /// (a bare `literalline`, which the caller's hardline completes), because the
+    /// caller's gap check starts later in the source and cannot rediscover it.
+    ///
+    /// Every *other* comment in the run leads the next comment, which is an ordinary
+    /// leading run — so it routes through the shared emitter unchanged, and only the
+    /// last comment is special-cased here.
+    ///
+    /// A sibling of [`Self::build_leading_comments_before`] rather than a flag on it:
+    /// what differs is not a separator policy but whether the run has a target at all.
+    pub(crate) fn build_orphaned_comment_run(
+        &self,
+        comments: &[&internal::Comment],
+        gap_end: u32,
+    ) -> DocBuf {
+        let mut parts = DocBuf::new();
+        let Some((last, leading)) = comments.split_last() else {
+            return parts;
+        };
+        self.push_leading_comment_run(
+            &mut parts,
+            leading.iter().copied(),
+            last.span.start,
+            LeadingGlue::Adjacent,
+            self.d().empty(),
+        );
+        parts.push(self.build_comment_doc(last));
+        if self.has_blank_line_between(last.span.end, gap_end) {
+            parts.push(self.d().literalline());
         }
-
-        let d = self.d();
-
-        // Check if there's a blank line after the last comment
-        let has_blank_after_last_comment = comments
-            .last()
-            .is_some_and(|c| self.has_blank_line_between(c.span.end, target_start));
-
-        let mut docs = DocBuf::new();
-        let mut last_pos = comments[0].span.start;
-
-        for (j, comment) in comments.iter().enumerate() {
-            let is_last_comment = j == comments.len() - 1;
-
-            // Check if there's a blank line after this comment
-            // (to next comment or to target if last comment)
-            let has_blank_after = if is_last_comment {
-                has_blank_after_last_comment
-            } else {
-                self.has_blank_line_between(comment.span.end, comments[j + 1].span.start)
-            };
-
-            // Check if the next item (comment or target) is on the same line as this comment's end.
-            // This handles multi-line block comments where the closing */ is followed by another
-            // comment on the same line: `/*\nmulti\n*/ /* after */`
-            let next_on_same_line = if is_last_comment {
-                self.is_same_line(comment.span.end, target_start)
-            } else {
-                self.is_same_line(comment.span.end, comments[j + 1].span.start)
-            };
-
-            // For subsequent comments, determine separator from previous comment
-            if j > 0 {
-                if self.is_same_line(last_pos, comment.span.start) {
-                    // Same line as previous comment's end — keep inline (space is
-                    // handled by the previous comment's suffix, so no space here)
-                } else if self.has_blank_line_between(last_pos, comment.span.start) {
-                    docs.push(d.literalline());
-                    docs.push(d.hardline());
-                }
-                // else: no separator needed (previous comment's suffix handled it)
-            }
-
-            docs.push(self.build_comment_doc(comment));
-
-            if force_non_inline && is_last_comment {
-                // Nothing glues to `target_start` here — defer the separator
-                // to the caller's next emission. Only a blank line needs
-                // recording (the caller's own gap check starts later in the
-                // source and can't see it).
-                if has_blank_after {
-                    docs.push(d.literalline());
-                }
-            } else if !comment.is_block {
-                // Line comment: add hardline after unless there's a blank line after
-                // (the blank line separator will handle it)
-                if !has_blank_after {
-                    docs.push(d.hardline());
-                }
-            } else if next_on_same_line {
-                // Block comment on same line as next item - space before next
-                docs.push(d.text(" "));
-            } else if !has_blank_after {
-                // Block comment on its own line: add hardline unless there's blank after
-                docs.push(d.hardline());
-            }
-            last_pos = comment.span.end;
-        }
-
-        // Add blank line after last comment if present
-        if has_blank_after_last_comment && !force_non_inline {
-            docs.push(d.literalline());
-            docs.push(d.hardline());
-        }
-
-        docs
+        parts
     }
 
     /// Build docs for trailing comments at the end of a body (before closing `}`).
@@ -467,7 +483,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let (line_prefix, pull_pos) = self.delimiter_line_comment_prefix(bracket_char, body_start);
         let mut inner =
-            self.build_leading_comments_multiline_opt(bracket_char + 1, body_start, pull_pos);
+            self.build_leading_comments_multiline(bracket_char + 1, body_start, pull_pos);
         inner.push(body);
         d.group_break(d.concat(&[
             d.text(open),

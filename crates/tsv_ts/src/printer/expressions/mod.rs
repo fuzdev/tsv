@@ -541,10 +541,17 @@ impl<'a> Printer<'a> {
         let angle_end = open_pos + 1; // after `<`
         let (angle_prefix, angle_pull_pos) =
             self.delimiter_line_comment_prefix(open_pos, type_start);
-        let leading =
-            self.build_leading_comments_multiline_opt(angle_end, type_start, angle_pull_pos);
+        let leading = self.build_leading_comments_multiline(angle_end, type_start, angle_pull_pos);
         let trailing = self.build_trailing_comments_multiline(type_end, close_angle);
-        d.concat(&[
+        // `group_break`, not a bare concat: this is the already-broken form, and saying
+        // so contains the leading run's soft `line` (prettier's `printLeadingComment`)
+        // here rather than letting it escape to the enclosing assignment group — which
+        // would measure it against that group and wrongly pull the type up onto the
+        // comment's line. Prettier gives the cast no per-element group, so the `line`
+        // rides the broken group and breaks. The sibling angle/paren lists
+        // (type params, type args, function-type params) are already grouped by their
+        // own callers, which is why they land on the break without this.
+        d.group_break(d.concat(&[
             d.text("<"),
             d.concat(&angle_prefix),
             d.indent(d.concat(&[
@@ -555,7 +562,7 @@ impl<'a> Printer<'a> {
             ])),
             d.hardline(),
             d.text(">"),
-        ])
+        ]))
     }
 
     /// Build a Doc for a TypeScript binary cast expression — `expr as Type` or

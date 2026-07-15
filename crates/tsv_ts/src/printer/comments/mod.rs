@@ -550,8 +550,19 @@ impl<'a> Printer<'a> {
     /// [`build_rhs_comments_opt`](Self::build_rhs_comments_opt),
     /// [`build_rhs_comments_glued_opt`](Self::build_rhs_comments_glued_opt), the
     /// arrow-body run, the member-leading sites (interface / intersection members),
-    /// and the comma-separated inter-item gaps (declarators, for-init, heritage,
-    /// switch cases).
+    /// the comma-separated inter-item gaps (declarators, for-init, heritage,
+    /// switch cases), the forced-multiline lists via
+    /// [`build_leading_comments_multiline`](Self::build_leading_comments_multiline)
+    /// (tuples, type params/args, function-type params, the union's first member, the
+    /// bracket-break shell, the broken `<T>` cast), and the array literal / array
+    /// pattern element runs.
+    ///
+    /// Three loops still emit a leading run themselves, because their surrounding
+    /// separator policy genuinely differs — the import/export specifier list, the
+    /// for-clause leading gap, and the union's inter-member run (which brackets the
+    /// `| ` separator and preserves blanks in different positions). Each calls
+    /// [`comment_hugs_next`](Self::comment_hugs_next) rather than re-deriving the rule,
+    /// so what differs there is the loop, never the decision.
     pub(crate) fn push_leading_comment_run<'c>(
         &self,
         parts: &mut DocBuf,

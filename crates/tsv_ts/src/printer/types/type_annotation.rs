@@ -5,7 +5,7 @@
 // - Width-aware wrapping for type arguments
 // - Return type annotations
 
-use super::helpers::{should_hug_union_type, type_args_should_wrap_for_return_type};
+use super::helpers::type_args_should_wrap_for_return_type;
 use super::{CommentSpacing, Printer};
 use crate::ast::internal::{self, TSType};
 use crate::printer::layout::hang_after_operator;
@@ -252,8 +252,8 @@ impl<'a> Printer<'a> {
             // break-after-colon fallback. `union_return_hugs` scopes it: a
             // `Promise<…> | null` `TSTypeReference` member is excluded (the sanctioned
             // `return_type_generic_union` print-width family, handled by the
-            // `should_hug_union_type` branch below), and a member/gap comment
-            // disqualifies the hug.
+            // `union_prints_hugged` branch below), and any comment that makes the printer
+            // decline the hug disqualifies it here too.
             if self.union_return_hugs(value_type, u, colon_end, value_type_start) {
                 return match comments_doc {
                     Some(c) => d.concat(&[d.text(": "), c, type_doc]),
@@ -261,7 +261,7 @@ impl<'a> Printer<'a> {
                 };
             }
 
-            if should_hug_union_type(u) {
+            if self.union_prints_hugged(u) {
                 // A should-hug union that didn't take the brace-hug above: a
                 // `TSTypeReference` object-like member with only void siblings
                 // (`Promise<…> | null`), or a brace union whose member/gap comment
