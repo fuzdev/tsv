@@ -80,9 +80,20 @@ impl<'a> Printer<'a> {
     ///   `i + 1` is a hole the next real element lies past that comma, and a scan running
     ///   that far reads the hole's own line break as an author's blank line.
     ///
-    /// `upper_override` bounds the scan instead, for the expanding printer: it stops at
-    /// slot `i + 1`'s first own-line leading comment, where a blank line belongs before
-    /// the comment rather than before the element.
+    /// The scan stops where slot `i + 1`'s printed content begins, so a blank line the
+    /// author left ahead of that content is inside the measured range. `upper_override`
+    /// supplies that position for a caller that already knows it — the expanding printer,
+    /// which stops at slot `i + 1`'s first leading comment. With `None` the position is
+    /// derived here, and it is **not** simply the next element's start: an OWNED comment
+    /// prints ahead of the element's first token from inside its own doc, so the content
+    /// begins at the comment. Bounding past it puts the author's blank line — which lies
+    /// *before* the comment — outside the range, where it is silently dropped.
+    ///
+    /// The derivation lives here rather than at the call sites because a glued block
+    /// comment is not itself an expansion trigger (it is neither a line, a multi-line, nor
+    /// an own-line comment), so it reaches the width-wrapping and multiline-content
+    /// printers too — every caller needs this, and one that forgets it loses blank lines
+    /// silently.
     ///
     /// The hole guard runs first, so the scan always anchors on a real element's end —
     /// which also keeps a nested element's commas (`[[1, 2], , x]`) behind it.
@@ -103,12 +114,19 @@ impl<'a> Printer<'a> {
             if matches!(arr.elements.get(i + 1), Some(None)) {
                 // A hole terminates at its own comma: the second past this element, the
                 // first being this element's own separator.
-                self.find_comma_in_range(elem_end, next_real)
+                return self
+                    .find_comma_in_range(elem_end, next_real)
                     .and_then(|comma| self.find_comma_in_range(comma + 1, next_real))
-                    .unwrap_or(next_real)
-            } else {
-                next_real
+                    .unwrap_or(next_real);
             }
+            // Slot `i + 1`'s owned comment, when it has one — guarded to this gap, since
+            // the lookup is keyed on the element's own span start.
+            arr.elements
+                .get(i + 1)
+                .and_then(|e| e.as_ref())
+                .and_then(|e| self.owned_leading_comment_start(e))
+                .filter(|&p| p > elem_end && p < next_real)
+                .unwrap_or(next_real)
         });
         self.has_blank_line_after_comma(elem_end, upper)
     }
@@ -475,14 +493,20 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Own-line block comments after the last element (before closing bracket).
-        // These appear as siblings after the last element, forcing the array to break.
-        // Also picks up comments from spread with stripped parens that
-        // build_spread_doc intentionally skips.
+        // Own-line block comments before the closing bracket, emitted as siblings after the
+        // last element and forcing the array to break. Only a spread's stripped-paren
+        // comments (which `build_spread_doc` skips) actually reach here: any *other*
+        // own-line block comment past the last element lies outside every element span, so
+        // `has_own_line_block_comments_in_array` sees it and `build_array_doc` routes the
+        // array to the expanding printer before this path runs. The collection stays
+        // general — it costs nothing and the spread case shares its shape.
         let mut trailing_own_line_comments: CommentVec<'_> = smallvec![];
-        // Same-line block comment trailing the LAST element's comma — preserved
-        // after the comma (prettier relocates before; see conformance_prettier.md
-        // §Comment relocation). Own-line comments are handled below as siblings.
+        // Same-line block comment past the LAST element's comma — a dangling comment with
+        // no element after it to lead. Under `trailingComma: 'none'` the comma it followed
+        // is dropped, so it renders directly against the element: `['a', 'b', /* c */]` →
+        // `['a', 'b' /* c */]`. Prettier emits the same. Own-line comments are siblings
+        // (above); this is not a relocation tsv chose, it is the only position left once
+        // the separator the author wrote it against is gone.
         let mut trailing_same_line_after_comma: CommentVec<'_> = smallvec![];
         // Zero-comment fast gate: both lists collect nothing but comments, so with none
         // anywhere in the array the whole scan is a no-op.

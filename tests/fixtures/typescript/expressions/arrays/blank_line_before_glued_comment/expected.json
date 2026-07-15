@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 750,
+	"end": 1413,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -249,24 +249,152 @@
 					"column": 18
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " Expansion forced by WIDTH, not by a comment - a glued block comment is not itself",
+			"start": 742,
+			"end": 826,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 1
+				},
+				"end": {
+					"line": 38,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an expansion trigger, so this reaches the width-wrapping printer rather than the",
+			"start": 828,
+			"end": 911,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 1
+				},
+				"end": {
+					"line": 39,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment-expanding one",
+			"start": 913,
+			"end": 937,
+			"loc": {
+				"start": {
+					"line": 40,
+					"column": 1
+				},
+				"end": {
+					"line": 40,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 964,
+			"end": 971,
+			"loc": {
+				"start": {
+					"line": 44,
+					"column": 2
+				},
+				"end": {
+					"line": 44,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Same, with a bundler annotation - the shape that occurs in real code",
+			"start": 1070,
+			"end": 1141,
+			"loc": {
+				"start": {
+					"line": 48,
+					"column": 1
+				},
+				"end": {
+					"line": 48,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " @__PURE__ ",
+			"start": 1166,
+			"end": 1181,
+			"loc": {
+				"start": {
+					"line": 52,
+					"column": 2
+				},
+				"end": {
+					"line": 52,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Expansion forced by MULTILINE CONTENT - the third printer",
+			"start": 1290,
+			"end": 1350,
+			"loc": {
+				"start": {
+					"line": 56,
+					"column": 1
+				},
+				"end": {
+					"line": 56,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 1384,
+			"end": 1391,
+			"loc": {
+				"start": {
+					"line": 61,
+					"column": 2
+				},
+				"end": {
+					"line": 61,
+					"column": 9
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 749,
+		"end": 1412,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 740,
+			"end": 1403,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 37,
+					"line": 63,
 					"column": 9
 				}
 			},
@@ -971,6 +1099,431 @@
 							"value": " belongs before the comment, not before the `(`",
 							"start": 619,
 							"end": 668
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 939,
+					"end": 1067,
+					"loc": {
+						"start": {
+							"line": 41,
+							"column": 1
+						},
+						"end": {
+							"line": 46,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 945,
+							"end": 1066,
+							"loc": {
+								"start": {
+									"line": 41,
+									"column": 7
+								},
+								"end": {
+									"line": 46,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 945,
+								"end": 946,
+								"loc": {
+									"start": {
+										"line": 41,
+										"column": 7
+									},
+									"end": {
+										"line": 41,
+										"column": 8
+									}
+								},
+								"name": "f"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 949,
+								"end": 1066,
+								"loc": {
+									"start": {
+										"line": 41,
+										"column": 11
+									},
+									"end": {
+										"line": 46,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Literal",
+										"start": 953,
+										"end": 959,
+										"loc": {
+											"start": {
+												"line": 42,
+												"column": 2
+											},
+											"end": {
+												"line": 42,
+												"column": 8
+											}
+										},
+										"value": "aaaa",
+										"raw": "'aaaa'"
+									},
+									{
+										"type": "Literal",
+										"start": 972,
+										"end": 978,
+										"loc": {
+											"start": {
+												"line": 44,
+												"column": 10
+											},
+											"end": {
+												"line": 44,
+												"column": 16
+											}
+										},
+										"value": "bbbb",
+										"raw": "'bbbb'",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 964,
+												"end": 971
+											}
+										]
+									},
+									{
+										"type": "Literal",
+										"start": 982,
+										"end": 1063,
+										"loc": {
+											"start": {
+												"line": 45,
+												"column": 2
+											},
+											"end": {
+												"line": 45,
+												"column": 83
+											}
+										},
+										"value": "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+										"raw": "'ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc'"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Expansion forced by WIDTH, not by a comment - a glued block comment is not itself",
+							"start": 742,
+							"end": 826
+						},
+						{
+							"type": "Line",
+							"value": " an expansion trigger, so this reaches the width-wrapping printer rather than the",
+							"start": 828,
+							"end": 911
+						},
+						{
+							"type": "Line",
+							"value": " comment-expanding one",
+							"start": 913,
+							"end": 937
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1143,
+					"end": 1287,
+					"loc": {
+						"start": {
+							"line": 49,
+							"column": 1
+						},
+						"end": {
+							"line": 54,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1149,
+							"end": 1286,
+							"loc": {
+								"start": {
+									"line": 49,
+									"column": 7
+								},
+								"end": {
+									"line": 54,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1149,
+								"end": 1150,
+								"loc": {
+									"start": {
+										"line": 49,
+										"column": 7
+									},
+									"end": {
+										"line": 49,
+										"column": 8
+									}
+								},
+								"name": "g"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 1153,
+								"end": 1286,
+								"loc": {
+									"start": {
+										"line": 49,
+										"column": 11
+									},
+									"end": {
+										"line": 54,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 1157,
+										"end": 1161,
+										"loc": {
+											"start": {
+												"line": 50,
+												"column": 2
+											},
+											"end": {
+												"line": 50,
+												"column": 6
+											}
+										},
+										"name": "aaaa"
+									},
+									{
+										"type": "CallExpression",
+										"start": 1182,
+										"end": 1199,
+										"loc": {
+											"start": {
+												"line": 52,
+												"column": 18
+											},
+											"end": {
+												"line": 52,
+												"column": 35
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 1182,
+											"end": 1193,
+											"loc": {
+												"start": {
+													"line": 52,
+													"column": 18
+												},
+												"end": {
+													"line": 52,
+													"column": 29
+												}
+											},
+											"name": "createThing"
+										},
+										"arguments": [
+											{
+												"type": "Identifier",
+												"start": 1194,
+												"end": 1198,
+												"loc": {
+													"start": {
+														"line": 52,
+														"column": 30
+													},
+													"end": {
+														"line": 52,
+														"column": 34
+													}
+												},
+												"name": "bbbb"
+											}
+										],
+										"optional": false,
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " @__PURE__ ",
+												"start": 1166,
+												"end": 1181
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 1203,
+										"end": 1283,
+										"loc": {
+											"start": {
+												"line": 53,
+												"column": 2
+											},
+											"end": {
+												"line": 53,
+												"column": 82
+											}
+										},
+										"name": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Same, with a bundler annotation - the shape that occurs in real code",
+							"start": 1070,
+							"end": 1141
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1352,
+					"end": 1402,
+					"loc": {
+						"start": {
+							"line": 57,
+							"column": 1
+						},
+						"end": {
+							"line": 62,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1358,
+							"end": 1401,
+							"loc": {
+								"start": {
+									"line": 57,
+									"column": 7
+								},
+								"end": {
+									"line": 62,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1358,
+								"end": 1359,
+								"loc": {
+									"start": {
+										"line": 57,
+										"column": 7
+									},
+									"end": {
+										"line": 57,
+										"column": 8
+									}
+								},
+								"name": "h"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 1362,
+								"end": 1401,
+								"loc": {
+									"start": {
+										"line": 57,
+										"column": 11
+									},
+									"end": {
+										"line": 62,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Literal",
+										"start": 1366,
+										"end": 1379,
+										"loc": {
+											"start": {
+												"line": 58,
+												"column": 2
+											},
+											"end": {
+												"line": 59,
+												"column": 5
+											}
+										},
+										"value": "multiline",
+										"raw": "'multi\\\nline'"
+									},
+									{
+										"type": "Literal",
+										"start": 1392,
+										"end": 1398,
+										"loc": {
+											"start": {
+												"line": 61,
+												"column": 10
+											},
+											"end": {
+												"line": 61,
+												"column": 16
+											}
+										},
+										"value": "bbbb",
+										"raw": "'bbbb'",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 1384,
+												"end": 1391
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Expansion forced by MULTILINE CONTENT - the third printer",
+							"start": 1290,
+							"end": 1350
 						}
 					]
 				}

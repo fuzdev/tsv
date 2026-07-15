@@ -34,4 +34,30 @@
 		/** @type {T} */ ('bbbb'),
 		'cccc'
 	];
+
+	// Expansion forced by WIDTH, not by a comment - a glued block comment is not itself
+	// an expansion trigger, so this reaches the width-wrapping printer rather than the
+	// comment-expanding one
+	const f = [
+		'aaaa',
+
+		/* c */ 'bbbb',
+		'ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc'
+	];
+
+	// Same, with a bundler annotation - the shape that occurs in real code
+	const g = [
+		aaaa,
+
+		/* @__PURE__ */ createThing(bbbb),
+		cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+	];
+
+	// Expansion forced by MULTILINE CONTENT - the third printer
+	const h = [
+		'multi\
+line',
+
+		/* c */ 'bbbb'
+	];
 </script>

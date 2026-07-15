@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 186,
+	"end": 515,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -41,24 +41,136 @@
 					"column": 30
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " a blank line before a glued block comment is preserved - the comment leads its param,",
+			"start": 178,
+			"end": 266,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " so the blank line sits between the previous param's trailing comment and the comment",
+			"start": 268,
+			"end": 355,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " x",
+			"start": 375,
+			"end": 379,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 5
+				},
+				"end": {
+					"line": 15,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 383,
+			"end": 390,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 2
+				},
+				"end": {
+					"line": 17,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a JSDoc cast owns its comment the same way",
+			"start": 401,
+			"end": 446,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 46
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " x",
+			"start": 466,
+			"end": 470,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 5
+				},
+				"end": {
+					"line": 22,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 478,
+			"end": 494,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 6
+				},
+				"end": {
+					"line": 24,
+					"column": 22
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 185,
+		"end": 514,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 176,
+			"end": 505,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 11,
+					"line": 26,
 					"column": 9
 				}
 			},
@@ -244,6 +356,259 @@
 							"value": " no blank line stays inline",
 							"start": 124,
 							"end": 153
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 357,
+					"end": 398,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 5
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 366,
+						"end": 368,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 10
+							},
+							"end": {
+								"line": 14,
+								"column": 12
+							}
+						},
+						"name": "f3"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 372,
+							"end": 373,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 2
+								},
+								"end": {
+									"line": 15,
+									"column": 3
+								}
+							},
+							"name": "a",
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " x",
+									"start": 375,
+									"end": 379
+								}
+							]
+						},
+						{
+							"type": "Identifier",
+							"start": 391,
+							"end": 392,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 10
+								},
+								"end": {
+									"line": 17,
+									"column": 11
+								}
+							},
+							"name": "b",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 383,
+									"end": 390
+								}
+							]
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 396,
+						"end": 398,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 3
+							},
+							"end": {
+								"line": 18,
+								"column": 5
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a blank line before a glued block comment is preserved - the comment leads its param,",
+							"start": 178,
+							"end": 266
+						},
+						{
+							"type": "Line",
+							"value": " so the blank line sits between the previous param's trailing comment and the comment",
+							"start": 268,
+							"end": 355
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 448,
+					"end": 504,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 5
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 457,
+						"end": 459,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 10
+							},
+							"end": {
+								"line": 21,
+								"column": 12
+							}
+						},
+						"name": "f4"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 463,
+							"end": 464,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 2
+								},
+								"end": {
+									"line": 22,
+									"column": 3
+								}
+							},
+							"name": "a",
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " x",
+									"start": 466,
+									"end": 470
+								}
+							]
+						},
+						{
+							"type": "AssignmentPattern",
+							"start": 474,
+							"end": 498,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 2
+								},
+								"end": {
+									"line": 24,
+									"column": 26
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 474,
+								"end": 475,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 2
+									},
+									"end": {
+										"line": 24,
+										"column": 3
+									}
+								},
+								"name": "b"
+							},
+							"right": {
+								"type": "Identifier",
+								"start": 496,
+								"end": 497,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 24
+									},
+									"end": {
+										"line": 24,
+										"column": 25
+									}
+								},
+								"name": "c",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {T} ",
+										"start": 478,
+										"end": 494
+									}
+								]
+							}
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 502,
+						"end": 504,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 3
+							},
+							"end": {
+								"line": 25,
+								"column": 5
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a JSDoc cast owns its comment the same way",
+							"start": 401,
+							"end": 446
 						}
 					]
 				}
