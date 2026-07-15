@@ -180,65 +180,50 @@ impl<'a> Printer<'a> {
     /// (`/*c*/ elem`). Used by both the first-element and subsequent-element
     /// paths in the non-expanding array printers.
     ///
-    /// `prev` is the preceding real element's end and its separator comma — `None` for the
-    /// first element, which has nothing before it. A comment that trails that element
-    /// ([`Self::block_comment_trails_prev_element`]) is emitted *there*, so it must not also
-    /// be emitted here.
+    /// No trailing-side filter is needed: `search_start` is already past slot `i - 1`'s
+    /// comma ([`Self::leading_comment_search_start_for`]), and a block comment trails the
+    /// previous element only from *before* that comma — so this range holds none of them,
+    /// and the trailing emitter's own comma test excludes exactly what this one keeps.
     fn add_inline_leading_block_comments(
         &self,
         search_start: u32,
         elem_start: u32,
-        prev: Option<(u32, Option<u32>)>,
         parts: &mut DocBuf,
     ) {
         for comment in comments_to_emit_in_range(self.comments, search_start, elem_start) {
-            if !comment.is_block {
-                continue;
+            if comment.is_block {
+                parts.push(self.format_inline_block_comment(comment, true));
             }
-            if let Some((prev_end, comma_pos)) = prev
-                && self.block_comment_trails_prev_element(prev_end, comment, comma_pos)
-            {
-                continue;
-            }
-            parts.push(self.format_inline_block_comment(comment, true));
         }
     }
 
-    /// The leading-comment scan for the array element at `i`: where to start searching, plus
-    /// the `prev` pair [`Self::add_inline_leading_block_comments`] takes — the preceding real
-    /// element's end and its separator comma (`None` at `i == 0`, which has nothing before it).
+    /// Where to start searching for the array element at `i`'s leading comments — just past
+    /// the comma that terminates slot `i - 1`.
     ///
-    /// One walk answers both, because they are two points on the same comma run: the search
-    /// starts just past the comma that terminates slot `i - 1`, and slot `i - 1`'s own
-    /// separator is the *first* comma the walk steps over.
-    ///
-    /// A hole has no span to anchor on, so when holes sit before `i` the terminating comma is
-    /// located by **counting** from the last real element: its own separator is the first comma
-    /// past the anchor, and each hole after it adds one more. Anchoring on the array's first
-    /// comma instead would start the search before earlier elements and re-collect their
-    /// comments.
-    fn leading_comment_scan_for(
+    /// A hole has no span to anchor on, so when holes sit before `i` that comma is located by
+    /// **counting** from the last real element: its own separator is the first comma past the
+    /// anchor, and each hole after it adds one more. Anchoring on the array's first comma
+    /// instead would start the search before earlier elements and re-collect their comments.
+    fn leading_comment_search_start_for(
         &self,
         arr: &internal::ArrayExpression<'_>,
         i: usize,
-    ) -> (u32, Option<(u32, Option<u32>)>) {
+    ) -> u32 {
         if i == 0 {
-            return (arr.span.start + 1, None);
+            return arr.span.start + 1;
         }
         let (anchor, r) = self.prev_real_element_end(arr, i);
         let upper = arr.elements[i]
             .as_ref()
             .map_or(arr.span.end - 1, |e| e.span().start);
         let mut pos = anchor;
-        let mut first_comma = None;
         for _ in 0..(i - r) {
             let Some(comma) = self.find_comma_in_range(pos, upper) else {
                 break;
             };
-            first_comma.get_or_insert(comma);
             pos = comma + 1;
         }
-        (pos, Some((anchor, first_comma)))
+        pos
     }
 
     /// Add trailing block comments for an array element — the ones
@@ -371,11 +356,10 @@ impl<'a> Printer<'a> {
                 // no comment can lie in this element's leading/trailing gap, so skip
                 // the inline block-comment collection (and its comma scan).
                 if has_comments {
-                    let (search_start, prev) = self.leading_comment_scan_for(arr, i);
+                    let search_start = self.leading_comment_search_start_for(arr, i);
                     self.add_inline_leading_block_comments(
                         search_start,
                         expr.span().start,
-                        prev,
                         &mut parts,
                     );
                 }
@@ -427,11 +411,10 @@ impl<'a> Printer<'a> {
                 // inline block-comment collection (and its comma scan). The blank-line
                 // detection below is comment-independent and stays outside the gate.
                 if has_comments {
-                    let (search_start, prev) = self.leading_comment_scan_for(arr, i);
+                    let search_start = self.leading_comment_search_start_for(arr, i);
                     self.add_inline_leading_block_comments(
                         search_start,
                         expr.span().start,
-                        prev,
                         &mut parts,
                     );
                 }
@@ -502,25 +485,34 @@ impl<'a> Printer<'a> {
         // These appear as siblings after the last element, forcing the array to break.
         // Also picks up comments from spread with stripped parens that
         // build_spread_doc intentionally skips.
-        let last_elem_end = arr.elements.last().and_then(|e| e.as_ref()).map(|e| {
-            // For spread elements, also check inside the spread span for
-            // comments from stripped parens (argument.end to spread.end)
-            if let Expression::SpreadElement(spread) = e {
-                let has_inner =
-                    self.has_comments_to_emit_between(spread.argument.span().end, spread.span.end);
-                if has_inner {
-                    return spread.argument.span().end;
-                }
-            }
-            e.span().end
-        });
         let mut trailing_own_line_comments: CommentVec<'_> = smallvec![];
         // Same-line block comment trailing the LAST element's comma — preserved
         // after the comma (prettier relocates before; see conformance_prettier.md
         // §Comment relocation). Own-line comments are handled below as siblings.
         let mut trailing_same_line_after_comma: CommentVec<'_> = smallvec![];
+        // Zero-comment fast gate: both lists collect nothing but comments, so with none
+        // anywhere in the array the whole scan is a no-op.
+        let last_elem_end = has_comments
+            .then(|| arr.elements.last().and_then(|e| e.as_ref()))
+            .flatten()
+            .map(|e| {
+                // For spread elements, also check inside the spread span for
+                // comments from stripped parens (argument.end to spread.end)
+                if let Expression::SpreadElement(spread) = e {
+                    let has_inner = self
+                        .has_comments_to_emit_between(spread.argument.span().end, spread.span.end);
+                    if has_inner {
+                        return spread.argument.span().end;
+                    }
+                }
+                e.span().end
+            });
         if let Some(search_start) = last_elem_end {
-            let comma_pos = self.find_comma_after(search_start);
+            // Bounded at `]`: under `trailingComma: 'none'` the last element has no
+            // separator, so an unbounded probe would scan the rest of the file for a comma
+            // that is not this array's. Every candidate is in range, so `None` tie-breaks
+            // them all the same way a comma past the array would.
+            let comma_pos = self.find_comma_in_range(search_start, arr.span.end - 1);
             for comment in comments_to_emit_in_range(self.comments, search_start, arr.span.end - 1)
             {
                 if !comment.is_block {
@@ -679,7 +671,7 @@ impl<'a> Printer<'a> {
             };
             let leading_comments: CommentVec<'_> = if let Some(upper) = leading_upper {
                 let prev_comma_pos = (i > 0)
-                    .then(|| self.find_comma_after(last_real_emit_end))
+                    .then(|| self.find_comma_in_range(last_real_emit_end, upper))
                     .flatten();
                 comments_to_emit_in_range(self.comments, last_real_emit_end, upper)
                     .filter(|c| {
@@ -764,7 +756,7 @@ impl<'a> Printer<'a> {
 
             // Same-line trailing comments (real elements only).
             let trailing: CommentVec<'_> = if elem.is_some() {
-                let comma_pos = self.find_comma_after(elem_end);
+                let comma_pos = self.find_comma_in_range(elem_end, next_boundary);
                 comments_to_emit_in_range(self.comments, elem_end, next_boundary)
                     .filter(|c| self.is_same_line(elem_end, c.span.start))
                     .filter(|c| {
