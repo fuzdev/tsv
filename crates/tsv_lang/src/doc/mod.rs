@@ -49,7 +49,7 @@ pub use swallow::{SwallowReport, set_swallow_check, swallow_check_enabled, take_
 
 // Arena render
 pub use arena_render::{
-    arena_print_doc, arena_print_doc_at_column, arena_print_doc_flat_resolved,
+    arena_measure_doc_flat_resolved, arena_print_doc, arena_print_doc_at_column,
     arena_print_doc_with_indent, arena_print_doc_with_indent_resolved,
     arena_print_doc_with_indent_resolved_into,
     arena_print_doc_with_indent_resolved_preserve_whitespace,
@@ -123,6 +123,7 @@ mod arena_tests {
         let render = RenderConfig {
             print_width,
             indent: "  ",
+            ..RenderConfig::default()
         };
         render_test(arena, doc, &render, 0)
     }
@@ -132,6 +133,7 @@ mod arena_tests {
         let render = RenderConfig {
             print_width,
             indent: "\t",
+            ..RenderConfig::default()
         };
         render_test(arena, doc, &render, 0)
     }
@@ -584,6 +586,7 @@ mod arena_tests {
         let render = RenderConfig {
             print_width: 12,
             indent: "\t",
+            ..RenderConfig::default()
         };
         assert_eq!(
             render_test(&a, doc, &render, 0),
@@ -717,6 +720,7 @@ mod arena_tests {
         let render = RenderConfig {
             print_width: 100,
             indent: "\t",
+            ..RenderConfig::default()
         };
         let embed = EmbedContext {
             base_indent_offset: 1,

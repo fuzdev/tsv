@@ -87,7 +87,7 @@ impl<'a> Printer<'a> {
         let keyword = kind_text.trim_end();
         if let Some(kw_pos) = self.find_keyword_in_range(*cursor, bound, keyword) {
             if self.has_comments_to_emit_between(*cursor, kw_pos) {
-                parts.push(self.build_trailing_comments_break_for_line(*cursor, kw_pos));
+                parts.push(self.build_trailing_comments_hang_next(*cursor, kw_pos));
             }
             *cursor = kw_pos + keyword.len() as u32;
         }
@@ -104,7 +104,7 @@ impl<'a> Printer<'a> {
         name_start: u32,
     ) {
         if self.has_comments_to_emit_between(cursor, name_start) {
-            parts.push(self.build_trailing_comments_break_for_line(cursor, name_start));
+            parts.push(self.build_trailing_comments_hang_next(cursor, name_start));
         }
     }
 
@@ -238,7 +238,7 @@ impl<'a> Printer<'a> {
 
     /// The uniform forced-continuation indent shape, the single definition shared by
     /// every `head // c⏎ tail` continuation. Emits a leading space, then the gap's
-    /// comments via `build_trailing_comments_break_for_line` (each line comment
+    /// comments via `build_trailing_comments_hang_next` (each line comment
     /// terminated at end-of-line so a `//` can't swallow what follows), then `tail` —
     /// all wrapped in one `indent`, so only the first comment stays flush on the head
     /// line and everything after (remaining comments and `tail`) drops one level and
@@ -254,7 +254,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         d.indent(d.concat(&[
             d.text(" "),
-            self.build_trailing_comments_break_for_line(start, end),
+            self.build_trailing_comments_hang_next(start, end),
             tail,
         ]))
     }

@@ -651,7 +651,7 @@ impl<'a> Printer<'a> {
         // following `in`/constraint.
         interior_parts.push(self.build_leading_comments_break_for_line(name_end, in_start));
         interior_parts.push(d.text(" in "));
-        interior_parts.push(self.build_trailing_comments_break_for_line(in_end, constraint_start));
+        interior_parts.push(self.build_trailing_comments_hang_next(in_end, constraint_start));
         interior_parts.push(self.build_type_doc(m.type_parameter.constraint));
 
         // as clause: `as NewKeyType`
@@ -674,8 +674,7 @@ impl<'a> Printer<'a> {
             interior_parts
                 .push(self.build_leading_comments_break_for_line(constraint_end, as_start));
             interior_parts.push(d.text(" as "));
-            interior_parts
-                .push(self.build_trailing_comments_break_for_line(as_end, name_type_start));
+            interior_parts.push(self.build_trailing_comments_hang_next(as_end, name_type_start));
             interior_parts.push(self.build_type_doc(name_type));
             last_inner_end = name_type.span().end;
         }

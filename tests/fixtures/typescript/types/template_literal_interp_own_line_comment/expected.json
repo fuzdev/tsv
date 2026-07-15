@@ -1,0 +1,499 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 471,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A comment authored on its OWN LINE after a template-literal type's `${` keeps that",
+			"start": 20,
+			"end": 105,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line: the interpolation expands and the type drops below the comment. Both formatters",
+			"start": 107,
+			"end": 195,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " agree here, so there is no divergence. The trailing authoring, which tsv keeps",
+			"start": 197,
+			"end": 278,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing `${` and prettier moves down, is",
+			"start": 280,
+			"end": 324,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 45
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " template_literal_interp_trailing_comment_prettier_divergence.",
+			"start": 326,
+			"end": 390,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 408,
+			"end": 412,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 2
+				},
+				"end": {
+					"line": 8,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c\nd ",
+			"start": 440,
+			"end": 451,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 2
+				},
+				"end": {
+					"line": 14,
+					"column": 6
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 470,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 461,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 17,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 392,
+					"end": 421,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 397,
+						"end": 398,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 6
+							},
+							"end": {
+								"line": 7,
+								"column": 7
+							}
+						},
+						"name": "T"
+					},
+					"typeAnnotation": {
+						"type": "TSLiteralType",
+						"start": 401,
+						"end": 420,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 10
+							},
+							"end": {
+								"line": 10,
+								"column": 3
+							}
+						},
+						"literal": {
+							"type": "TemplateLiteral",
+							"start": 401,
+							"end": 420,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 10
+								},
+								"end": {
+									"line": 10,
+									"column": 3
+								}
+							},
+							"expressions": [
+								{
+									"type": "TSTypeReference",
+									"start": 415,
+									"end": 416,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 3
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 415,
+										"end": 416,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 2
+											},
+											"end": {
+												"line": 9,
+												"column": 3
+											}
+										},
+										"name": "B"
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 408,
+											"end": 412
+										}
+									]
+								}
+							],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 402,
+									"end": 403,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 11
+										},
+										"end": {
+											"line": 7,
+											"column": 12
+										}
+									},
+									"value": {
+										"raw": "a",
+										"cooked": "a"
+									},
+									"tail": false
+								},
+								{
+									"type": "TemplateElement",
+									"start": 419,
+									"end": 419,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 2
+										},
+										"end": {
+											"line": 10,
+											"column": 2
+										}
+									},
+									"value": {
+										"raw": "",
+										"cooked": ""
+									},
+									"tail": true
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment authored on its OWN LINE after a template-literal type's `${` keeps that",
+							"start": 20,
+							"end": 105
+						},
+						{
+							"type": "Line",
+							"value": " line: the interpolation expands and the type drops below the comment. Both formatters",
+							"start": 107,
+							"end": 195
+						},
+						{
+							"type": "Line",
+							"value": " agree here, so there is no divergence. The trailing authoring, which tsv keeps",
+							"start": 197,
+							"end": 278
+						},
+						{
+							"type": "Line",
+							"value": " trailing `${` and prettier moves down, is",
+							"start": 280,
+							"end": 324
+						},
+						{
+							"type": "Line",
+							"value": " template_literal_interp_trailing_comment_prettier_divergence.",
+							"start": 326,
+							"end": 390
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 424,
+					"end": 460,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 429,
+						"end": 430,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 6
+							},
+							"end": {
+								"line": 12,
+								"column": 7
+							}
+						},
+						"name": "U"
+					},
+					"typeAnnotation": {
+						"type": "TSLiteralType",
+						"start": 433,
+						"end": 459,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 10
+							},
+							"end": {
+								"line": 16,
+								"column": 3
+							}
+						},
+						"literal": {
+							"type": "TemplateLiteral",
+							"start": 433,
+							"end": 459,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 10
+								},
+								"end": {
+									"line": 16,
+									"column": 3
+								}
+							},
+							"expressions": [
+								{
+									"type": "TSTypeReference",
+									"start": 454,
+									"end": 455,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 2
+										},
+										"end": {
+											"line": 15,
+											"column": 3
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 454,
+										"end": 455,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 2
+											},
+											"end": {
+												"line": 15,
+												"column": 3
+											}
+										},
+										"name": "B"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c\nd ",
+											"start": 440,
+											"end": 451
+										}
+									]
+								}
+							],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 434,
+									"end": 435,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 11
+										},
+										"end": {
+											"line": 12,
+											"column": 12
+										}
+									},
+									"value": {
+										"raw": "a",
+										"cooked": "a"
+									},
+									"tail": false
+								},
+								{
+									"type": "TemplateElement",
+									"start": 458,
+									"end": 458,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 2
+										},
+										"end": {
+											"line": 16,
+											"column": 2
+										}
+									},
+									"value": {
+										"raw": "",
+										"cooked": ""
+									},
+									"tail": true
+								}
+							]
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

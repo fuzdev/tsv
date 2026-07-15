@@ -665,7 +665,6 @@ DOUBLE-PRINTED	>⟨⟩()	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	?,⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	?⟨⟩,	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	?⟨⟩]	annotation,block,jsdoc_cast,line,multiline
-DOUBLE-PRINTED	?⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	@⟨⟩IDENT	line
 DOUBLE-PRINTED	IDENT⟨⟩(	line
 DOUBLE-PRINTED	IDENT⟨⟩)	annotation,block,jsdoc_cast,line,multiline
@@ -700,7 +699,6 @@ DOUBLE-PRINTED	]:⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	]?:⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	]]:⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	]⟨⟩]	annotation,block,jsdoc_cast,line,multiline
-DOUBLE-PRINTED	extends⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	{⟨⟩IDENT	line
 DOUBLE-PRINTED	{⟨⟩type	line
 DOUBLE-PRINTED	{⟨⟩␣	line
@@ -717,9 +715,7 @@ DOUBLE-PRINTED	␣⟨⟩*/,	line
 DOUBLE-PRINTED	␣⟨⟩...	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	␣⟨⟩/*	line,multiline
 DOUBLE-PRINTED	␣⟨⟩//	annotation,block,jsdoc_cast,multiline
-DOUBLE-PRINTED	␣⟨⟩:	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	␣⟨⟩;	line
-DOUBLE-PRINTED	␣⟨⟩?	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	␣⟨⟩@	line
 DOUBLE-PRINTED	␣⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	␣⟨⟩[	annotation,block,jsdoc_cast,line,multiline
@@ -727,7 +723,6 @@ DOUBLE-PRINTED	␣⟨⟩[[	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	␣⟨⟩[{	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	␣⟨⟩as	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	␣⟨⟩async	annotation,block,jsdoc_cast,multiline
-DOUBLE-PRINTED	␣⟨⟩extends	annotation,block,jsdoc_cast
 DOUBLE-PRINTED	␣⟨⟩from	annotation,block,jsdoc_cast,multiline
 DOUBLE-PRINTED	␣⟨⟩private	line
 DOUBLE-PRINTED	␣⟨⟩protected	line
