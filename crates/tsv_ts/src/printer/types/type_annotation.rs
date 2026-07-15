@@ -30,8 +30,18 @@ impl<'a> Printer<'a> {
         let colon_end = annotation.span.start + 1; // After the `:`
         let type_start = annotation.type_annotation.span().start;
 
+        // Zero-comment gate over the `:`→type gap, computed once and reused by every
+        // arm below (the union arm and the simple fall-through ask for this exact
+        // range; a type annotation is among the most frequent TS constructs and a
+        // comment inside one is rare). It also subsumes the line-comment check that
+        // follows: ownership only ever binds a *block* comment (`owned ⇒ is_block`),
+        // so a line comment is always in the to-emit set and no gap without to-emit
+        // comments can hold one. The wrapping sibling
+        // (`build_type_annotation_doc_with_wrapping`) already hoists this way.
+        let gap_has_comments = self.has_comments_to_emit_between(colon_end, type_start);
+
         // Check if there's a line comment between : and the type
-        if self.has_line_comments_between(colon_end, type_start) {
+        if gap_has_comments && self.has_line_comments_between(colon_end, type_start) {
             // Uniform forced-continuation indent (`build_continuation_indent`): the
             // first comment trails `:` on its line, then the remaining comments and the
             // type drop one indent level so the continuation reads as part of this
@@ -66,7 +76,7 @@ impl<'a> Printer<'a> {
                     let type_doc = self.build_union_type_doc(u);
                     // Comments between `:` and the union type (e.g., `: /* c */ A | B`);
                     // omit the empty child on the comment-free common path. Byte-identical.
-                    let hung = if self.has_comments_to_emit_between(colon_end, type_start) {
+                    let hung = if gap_has_comments {
                         let comments_doc = self.build_comments_between(
                             colon_end,
                             type_start,
@@ -88,7 +98,7 @@ impl<'a> Printer<'a> {
                     colon_end,
                     type_start,
                     annotation.type_annotation,
-                    self.has_comments_to_emit_between(colon_end, type_start),
+                    gap_has_comments,
                 ),
             }
         }

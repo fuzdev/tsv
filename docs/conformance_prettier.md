@@ -279,7 +279,7 @@ The boolean **connectors** `and`/`or`/`not` are **preserved** (`@supports (a: b)
 
 ### CSS: Layout
 
-**Greedy fill overflow** (◆print_width) — [comma_separated_greedy_fill](../tests/fixtures/css/comma_separated_greedy_fill_prettier_divergence/): Prettier's `fill()` algorithm allows lines to exceed `printWidth` by 1 char when fill segments exactly consume remaining width and the parent adds trailing punctuation. tsv treats `printWidth` as a hard limit.
+**Greedy fill overflow** (◆print_width) — [comma_separated_greedy_fill](../tests/fixtures/css/values/lists/comma_separated_greedy_fill_prettier_divergence/): Prettier's `fill()` algorithm allows lines to exceed `printWidth` by 1 char when fill segments exactly consume remaining width and the parent adds trailing punctuation. tsv treats `printWidth` as a hard limit.
 
 > **Related fill boundary divergences**: Several fixtures test variations of Prettier allowing lines to exceed `printWidth`. These share a common root cause—Prettier's `fill()` algorithm boundary conditions:
 >

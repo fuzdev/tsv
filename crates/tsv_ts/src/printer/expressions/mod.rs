@@ -691,6 +691,16 @@ impl<'a> Printer<'a> {
         type_annotation: &TSType<'_>,
         type_start: u32,
     ) -> Option<DocId> {
+        // The discriminant first: it is free, and the overwhelmingly common cast
+        // (`x as Foo`) is not a union — it paid a binary search only to learn that.
+        // Deliberately a guard here rather than moving the gap search below
+        // `build_union_hanging_indent_doc`: that function BUILDS the union doc before
+        // it can return, so a reorder would build-then-discard on a commented gap.
+        // This mirrors its own first check exactly (a bare match on the type, no paren
+        // unwrapping), so it only ever retires work the callee would redo.
+        if !matches!(type_annotation, TSType::Union(_)) {
+            return None;
+        }
         let keyword_len = keyword.len() as u32;
         if keyword_pos
             .is_some_and(|pos| self.has_comments_to_emit_between(pos + keyword_len, type_start))
@@ -717,15 +727,18 @@ impl<'a> Printer<'a> {
         type_annotation: &TSType<'_>,
         type_start: u32,
     ) -> Option<DocId> {
+        // Discriminant before the gap search: it is free, and both checks only ever
+        // `return None`, so the order is unobservable. The overwhelmingly common cast
+        // (`x as Foo`) is not an intersection, and paid a binary search to learn it.
+        let TSType::Intersection(i) = type_annotation else {
+            return None;
+        };
         let keyword_len = keyword.len() as u32;
         if keyword_pos
             .is_some_and(|pos| self.has_comments_to_emit_between(pos + keyword_len, type_start))
         {
             return None;
         }
-        let TSType::Intersection(i) = type_annotation else {
-            return None;
-        };
         let d = self.d();
         let body = self.intersection_hanging_with_indent(i);
         Some(d.concat(&[d.text(" "), d.text(keyword), d.text(" "), body]))

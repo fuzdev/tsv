@@ -335,7 +335,17 @@ impl<'a> Printer<'a> {
                 // Check for blank lines between statements — up to the first comment
                 // physically in the gap, which is not always the first one this gap
                 // *emits* (an owned annotation is printed by the statement it leads).
-                let blank_line_check_end = self.blank_scan_end(prev_end, stmt_start);
+                //
+                // Inside the window gate: `blank_scan_end` is itself a comment search,
+                // and with no comment anywhere in the block it provably returns
+                // `stmt_start`. The gate is an *on-page* question and this is an
+                // *in-source* one, which is sound because only the *to-emit* axis skips
+                // an owned comment — on-page and in-source have the same membership.
+                let blank_line_check_end = if body_has_comments {
+                    self.blank_scan_end(prev_end, stmt_start)
+                } else {
+                    stmt_start
+                };
                 if self.has_blank_line_between(prev_end, blank_line_check_end) {
                     body_parts.push(d.literalline());
                 }
