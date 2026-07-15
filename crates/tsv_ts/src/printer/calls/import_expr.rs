@@ -102,8 +102,8 @@ pub(super) fn build_import_expression_doc(
 
             // A line comment (runs to EOL), any own-line comment, or an own-line leading
             // comment before the source forces the multiline layout; a lone same-line
-            // block stays inline and breaks only on width. (NOT isolated_group — it
-            // causes indent issues; variable.rs special-cases the assignment break.)
+            // block stays inline and breaks only on width. (variable.rs special-cases
+            // the assignment break.)
             if pc.has_trailing_line() || !pc.leading.is_empty() || leading_forces_break {
                 return wrap_import_hardline(d, open, inner);
             }

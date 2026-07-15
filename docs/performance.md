@@ -178,7 +178,7 @@ perf record --call-graph=dwarf -- target/profiling/tsv_debug profile ~/dev/zzz/s
 perf report --stdio
 
 # Line-level hotspots within a specific function (exact demangled name from perf report)
-perf annotate --stdio -s 'tsv_lang::doc::arena::DocArena::will_break_deep_inner'
+perf annotate --stdio -s 'tsv_lang::doc::arena::DocArena::will_break_fill'
 
 # Collapsed stacks (greppable text, one line per unique stack; cargo install inferno)
 perf script | inferno-collapse-perf > stacks.txt
