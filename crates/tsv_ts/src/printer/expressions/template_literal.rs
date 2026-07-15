@@ -129,12 +129,12 @@ impl<'a> Printer<'a> {
                 // `next_quasi.span.start` at the closing `}`, so the range is the
                 // interpolation interior — the equivalent of prettier's
                 // `hasNewlineInRange(locEnd(quasi[i]), locStart(quasi[i + 1]))`.
-                // `will_break_deep` stands in for prettier's re-render at
+                // `will_break` stands in for prettier's re-render at
                 // `printWidth: Infinity`: a doc breaks at infinite width iff it
                 // carries a hardline / forced break, i.e. renders with a newline.
                 let interpolation_has_newline = self
                     .has_newline_between(quasi.span.end, next_quasi.span.start)
-                    || d.will_break_deep(full_expr_doc);
+                    || d.will_break(full_expr_doc);
 
                 let inner = if interpolation_has_newline {
                     // Qualifying types and trailing line comments use softline

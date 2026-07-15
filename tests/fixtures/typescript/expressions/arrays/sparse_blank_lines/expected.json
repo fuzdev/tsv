@@ -1,0 +1,1313 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1185,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Hole in a breaking array - the hole's own line is structure, not a blank line",
+			"start": 10,
+			"end": 90,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Hole in a fitting array - stays inline",
+			"start": 215,
+			"end": 256,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 42
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Blank line before a hole - preserved",
+			"start": 280,
+			"end": 319,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Trailing hole - mandatory comma, no blank line before it",
+			"start": 445,
+			"end": 504,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 60
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Consecutive holes",
+			"start": 632,
+			"end": 652,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 1
+				},
+				"end": {
+					"line": 36,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Multiline template forces expansion - hole gains no blank line",
+			"start": 781,
+			"end": 846,
+			"loc": {
+				"start": {
+					"line": 47,
+					"column": 1
+				},
+				"end": {
+					"line": 47,
+					"column": 66
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Blank line before a hole - preserved when a line comment expands the array",
+			"start": 893,
+			"end": 970,
+			"loc": {
+				"start": {
+					"line": 55,
+					"column": 1
+				},
+				"end": {
+					"line": 55,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 1006,
+			"end": 1011,
+			"loc": {
+				"start": {
+					"line": 57,
+					"column": 22
+				},
+				"end": {
+					"line": 57,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Line comment expands the array - hole gains no blank line",
+			"start": 1044,
+			"end": 1104,
+			"loc": {
+				"start": {
+					"line": 63,
+					"column": 1
+				},
+				"end": {
+					"line": 63,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 1140,
+			"end": 1145,
+			"loc": {
+				"start": {
+					"line": 65,
+					"column": 22
+				},
+				"end": {
+					"line": 65,
+					"column": 27
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1184,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 1175,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 69,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 92,
+					"end": 212,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 98,
+							"end": 211,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 10,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 98,
+								"end": 99,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 102,
+								"end": 211,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 10,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Literal",
+										"start": 106,
+										"end": 124,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 2
+											},
+											"end": {
+												"line": 4,
+												"column": 20
+											}
+										},
+										"value": "aaaaaaaaaaaaaaaa",
+										"raw": "'aaaaaaaaaaaaaaaa'"
+									},
+									null,
+									{
+										"type": "Literal",
+										"start": 132,
+										"end": 150,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 2
+											},
+											"end": {
+												"line": 6,
+												"column": 20
+											}
+										},
+										"value": "bbbbbbbbbbbbbbbb",
+										"raw": "'bbbbbbbbbbbbbbbb'"
+									},
+									{
+										"type": "Literal",
+										"start": 154,
+										"end": 172,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 2
+											},
+											"end": {
+												"line": 7,
+												"column": 20
+											}
+										},
+										"value": "cccccccccccccccc",
+										"raw": "'cccccccccccccccc'"
+									},
+									{
+										"type": "Literal",
+										"start": 176,
+										"end": 194,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 2
+											},
+											"end": {
+												"line": 8,
+												"column": 20
+											}
+										},
+										"value": "dddddddddddddddd",
+										"raw": "'dddddddddddddddd'"
+									},
+									{
+										"type": "Literal",
+										"start": 198,
+										"end": 208,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 2
+											},
+											"end": {
+												"line": 9,
+												"column": 12
+											}
+										},
+										"value": "eeeeeeee",
+										"raw": "'eeeeeeee'"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Hole in a breaking array - the hole's own line is structure, not a blank line",
+							"start": 10,
+							"end": 90
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 258,
+					"end": 277,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 20
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 264,
+							"end": 276,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 7
+								},
+								"end": {
+									"line": 13,
+									"column": 19
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 264,
+								"end": 265,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 7
+									},
+									"end": {
+										"line": 13,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 268,
+								"end": 276,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 11
+									},
+									"end": {
+										"line": 13,
+										"column": 19
+									}
+								},
+								"elements": [
+									{
+										"type": "Literal",
+										"start": 269,
+										"end": 270,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 12
+											},
+											"end": {
+												"line": 13,
+												"column": 13
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									},
+									null,
+									{
+										"type": "Literal",
+										"start": 274,
+										"end": 275,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 17
+											},
+											"end": {
+												"line": 13,
+												"column": 18
+											}
+										},
+										"value": 2,
+										"raw": "2"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Hole in a fitting array - stays inline",
+							"start": 215,
+							"end": 256
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 321,
+					"end": 442,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 327,
+							"end": 441,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 7
+								},
+								"end": {
+									"line": 24,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 327,
+								"end": 328,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 7
+									},
+									"end": {
+										"line": 16,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 331,
+								"end": 441,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 11
+									},
+									"end": {
+										"line": 24,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Literal",
+										"start": 335,
+										"end": 353,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 2
+											},
+											"end": {
+												"line": 17,
+												"column": 20
+											}
+										},
+										"value": "aaaaaaaaaaaaaaaa",
+										"raw": "'aaaaaaaaaaaaaaaa'"
+									},
+									null,
+									{
+										"type": "Literal",
+										"start": 362,
+										"end": 380,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 2
+											},
+											"end": {
+												"line": 20,
+												"column": 20
+											}
+										},
+										"value": "bbbbbbbbbbbbbbbb",
+										"raw": "'bbbbbbbbbbbbbbbb'"
+									},
+									{
+										"type": "Literal",
+										"start": 384,
+										"end": 402,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 2
+											},
+											"end": {
+												"line": 21,
+												"column": 20
+											}
+										},
+										"value": "cccccccccccccccc",
+										"raw": "'cccccccccccccccc'"
+									},
+									{
+										"type": "Literal",
+										"start": 406,
+										"end": 424,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 2
+											},
+											"end": {
+												"line": 22,
+												"column": 20
+											}
+										},
+										"value": "dddddddddddddddd",
+										"raw": "'dddddddddddddddd'"
+									},
+									{
+										"type": "Literal",
+										"start": 428,
+										"end": 438,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 2
+											},
+											"end": {
+												"line": 23,
+												"column": 12
+											}
+										},
+										"value": "eeeeeeee",
+										"raw": "'eeeeeeee'"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Blank line before a hole - preserved",
+							"start": 280,
+							"end": 319
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 506,
+					"end": 629,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 34,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 512,
+							"end": 628,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 7
+								},
+								"end": {
+									"line": 34,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 512,
+								"end": 513,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 7
+									},
+									"end": {
+										"line": 27,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 516,
+								"end": 628,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 11
+									},
+									"end": {
+										"line": 34,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Literal",
+										"start": 520,
+										"end": 538,
+										"loc": {
+											"start": {
+												"line": 28,
+												"column": 2
+											},
+											"end": {
+												"line": 28,
+												"column": 20
+											}
+										},
+										"value": "aaaaaaaaaaaaaaaa",
+										"raw": "'aaaaaaaaaaaaaaaa'"
+									},
+									{
+										"type": "Literal",
+										"start": 542,
+										"end": 560,
+										"loc": {
+											"start": {
+												"line": 29,
+												"column": 2
+											},
+											"end": {
+												"line": 29,
+												"column": 20
+											}
+										},
+										"value": "bbbbbbbbbbbbbbbb",
+										"raw": "'bbbbbbbbbbbbbbbb'"
+									},
+									{
+										"type": "Literal",
+										"start": 564,
+										"end": 582,
+										"loc": {
+											"start": {
+												"line": 30,
+												"column": 2
+											},
+											"end": {
+												"line": 30,
+												"column": 20
+											}
+										},
+										"value": "cccccccccccccccc",
+										"raw": "'cccccccccccccccc'"
+									},
+									{
+										"type": "Literal",
+										"start": 586,
+										"end": 604,
+										"loc": {
+											"start": {
+												"line": 31,
+												"column": 2
+											},
+											"end": {
+												"line": 31,
+												"column": 20
+											}
+										},
+										"value": "dddddddddddddddd",
+										"raw": "'dddddddddddddddd'"
+									},
+									{
+										"type": "Literal",
+										"start": 608,
+										"end": 620,
+										"loc": {
+											"start": {
+												"line": 32,
+												"column": 2
+											},
+											"end": {
+												"line": 32,
+												"column": 14
+											}
+										},
+										"value": "eeeeeeeeee",
+										"raw": "'eeeeeeeeee'"
+									},
+									null
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Trailing hole - mandatory comma, no blank line before it",
+							"start": 445,
+							"end": 504
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 654,
+					"end": 778,
+					"loc": {
+						"start": {
+							"line": 37,
+							"column": 1
+						},
+						"end": {
+							"line": 45,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 660,
+							"end": 777,
+							"loc": {
+								"start": {
+									"line": 37,
+									"column": 7
+								},
+								"end": {
+									"line": 45,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 660,
+								"end": 661,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 7
+									},
+									"end": {
+										"line": 37,
+										"column": 8
+									}
+								},
+								"name": "e"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 664,
+								"end": 777,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 11
+									},
+									"end": {
+										"line": 45,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Literal",
+										"start": 668,
+										"end": 686,
+										"loc": {
+											"start": {
+												"line": 38,
+												"column": 2
+											},
+											"end": {
+												"line": 38,
+												"column": 20
+											}
+										},
+										"value": "aaaaaaaaaaaaaaaa",
+										"raw": "'aaaaaaaaaaaaaaaa'"
+									},
+									null,
+									null,
+									{
+										"type": "Literal",
+										"start": 698,
+										"end": 716,
+										"loc": {
+											"start": {
+												"line": 41,
+												"column": 2
+											},
+											"end": {
+												"line": 41,
+												"column": 20
+											}
+										},
+										"value": "bbbbbbbbbbbbbbbb",
+										"raw": "'bbbbbbbbbbbbbbbb'"
+									},
+									{
+										"type": "Literal",
+										"start": 720,
+										"end": 738,
+										"loc": {
+											"start": {
+												"line": 42,
+												"column": 2
+											},
+											"end": {
+												"line": 42,
+												"column": 20
+											}
+										},
+										"value": "cccccccccccccccc",
+										"raw": "'cccccccccccccccc'"
+									},
+									{
+										"type": "Literal",
+										"start": 742,
+										"end": 760,
+										"loc": {
+											"start": {
+												"line": 43,
+												"column": 2
+											},
+											"end": {
+												"line": 43,
+												"column": 20
+											}
+										},
+										"value": "dddddddddddddddd",
+										"raw": "'dddddddddddddddd'"
+									},
+									{
+										"type": "Literal",
+										"start": 764,
+										"end": 774,
+										"loc": {
+											"start": {
+												"line": 44,
+												"column": 2
+											},
+											"end": {
+												"line": 44,
+												"column": 12
+											}
+										},
+										"value": "eeeeeeee",
+										"raw": "'eeeeeeee'"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Consecutive holes",
+							"start": 632,
+							"end": 652
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 848,
+					"end": 890,
+					"loc": {
+						"start": {
+							"line": 48,
+							"column": 1
+						},
+						"end": {
+							"line": 53,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 854,
+							"end": 889,
+							"loc": {
+								"start": {
+									"line": 48,
+									"column": 7
+								},
+								"end": {
+									"line": 53,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 854,
+								"end": 855,
+								"loc": {
+									"start": {
+										"line": 48,
+										"column": 7
+									},
+									"end": {
+										"line": 48,
+										"column": 8
+									}
+								},
+								"name": "f"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 858,
+								"end": 889,
+								"loc": {
+									"start": {
+										"line": 48,
+										"column": 11
+									},
+									"end": {
+										"line": 53,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "TemplateLiteral",
+										"start": 862,
+										"end": 875,
+										"loc": {
+											"start": {
+												"line": 49,
+												"column": 2
+											},
+											"end": {
+												"line": 50,
+												"column": 6
+											}
+										},
+										"expressions": [],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 863,
+												"end": 874,
+												"loc": {
+													"start": {
+														"line": 49,
+														"column": 3
+													},
+													"end": {
+														"line": 50,
+														"column": 5
+													}
+												},
+												"value": {
+													"raw": "line1\nline2",
+													"cooked": "line1\nline2"
+												},
+												"tail": true
+											}
+										]
+									},
+									null,
+									{
+										"type": "Literal",
+										"start": 883,
+										"end": 886,
+										"loc": {
+											"start": {
+												"line": 52,
+												"column": 2
+											},
+											"end": {
+												"line": 52,
+												"column": 5
+											}
+										},
+										"value": "b",
+										"raw": "'b'"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Multiline template forces expansion - hole gains no blank line",
+							"start": 781,
+							"end": 846
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 972,
+					"end": 1041,
+					"loc": {
+						"start": {
+							"line": 56,
+							"column": 1
+						},
+						"end": {
+							"line": 61,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 978,
+							"end": 1040,
+							"loc": {
+								"start": {
+									"line": 56,
+									"column": 7
+								},
+								"end": {
+									"line": 61,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 978,
+								"end": 979,
+								"loc": {
+									"start": {
+										"line": 56,
+										"column": 7
+									},
+									"end": {
+										"line": 56,
+										"column": 8
+									}
+								},
+								"name": "g"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 982,
+								"end": 1040,
+								"loc": {
+									"start": {
+										"line": 56,
+										"column": 11
+									},
+									"end": {
+										"line": 61,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Literal",
+										"start": 986,
+										"end": 1004,
+										"loc": {
+											"start": {
+												"line": 57,
+												"column": 2
+											},
+											"end": {
+												"line": 57,
+												"column": 20
+											}
+										},
+										"value": "aaaaaaaaaaaaaaaa",
+										"raw": "'aaaaaaaaaaaaaaaa'",
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " c1",
+												"start": 1006,
+												"end": 1011
+											}
+										]
+									},
+									null,
+									{
+										"type": "Literal",
+										"start": 1019,
+										"end": 1037,
+										"loc": {
+											"start": {
+												"line": 60,
+												"column": 2
+											},
+											"end": {
+												"line": 60,
+												"column": 20
+											}
+										},
+										"value": "bbbbbbbbbbbbbbbb",
+										"raw": "'bbbbbbbbbbbbbbbb'"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Blank line before a hole - preserved when a line comment expands the array",
+							"start": 893,
+							"end": 970
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1106,
+					"end": 1174,
+					"loc": {
+						"start": {
+							"line": 64,
+							"column": 1
+						},
+						"end": {
+							"line": 68,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1112,
+							"end": 1173,
+							"loc": {
+								"start": {
+									"line": 64,
+									"column": 7
+								},
+								"end": {
+									"line": 68,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1112,
+								"end": 1113,
+								"loc": {
+									"start": {
+										"line": 64,
+										"column": 7
+									},
+									"end": {
+										"line": 64,
+										"column": 8
+									}
+								},
+								"name": "h"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 1116,
+								"end": 1173,
+								"loc": {
+									"start": {
+										"line": 64,
+										"column": 11
+									},
+									"end": {
+										"line": 68,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Literal",
+										"start": 1120,
+										"end": 1138,
+										"loc": {
+											"start": {
+												"line": 65,
+												"column": 2
+											},
+											"end": {
+												"line": 65,
+												"column": 20
+											}
+										},
+										"value": "aaaaaaaaaaaaaaaa",
+										"raw": "'aaaaaaaaaaaaaaaa'",
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " c2",
+												"start": 1140,
+												"end": 1145
+											}
+										]
+									},
+									null,
+									{
+										"type": "Literal",
+										"start": 1152,
+										"end": 1170,
+										"loc": {
+											"start": {
+												"line": 67,
+												"column": 2
+											},
+											"end": {
+												"line": 67,
+												"column": 20
+											}
+										},
+										"value": "bbbbbbbbbbbbbbbb",
+										"raw": "'bbbbbbbbbbbbbbbb'"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Line comment expands the array - hole gains no blank line",
+							"start": 1044,
+							"end": 1104
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

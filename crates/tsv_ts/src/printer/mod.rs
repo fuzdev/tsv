@@ -38,7 +38,6 @@ mod program;
 mod statements;
 mod types;
 
-use analysis::needs_isolation_for_hugging;
 // Layout predicates re-exported from the crate root for embedders (tsv_svelte's
 // {@const} assignment layout reuses Prettier's break-after-operator rules).
 pub use analysis::conditional_should_break_after_op;
@@ -437,20 +436,6 @@ impl<'a> Printer<'a> {
             (d.indent(d.indent(inner)), d.indent(closing_line))
         } else {
             (d.indent(inner), closing_line)
-        }
-    }
-
-    /// Build expression doc with IsolatedGroup wrapping for huggable expressions.
-    ///
-    /// Wraps templates and arrow-with-template-body in `isolated_group` to prevent
-    /// internal breaks from forcing parent calls/arrays to break (enables hugging).
-    pub(crate) fn build_huggable_expression_doc(&self, expr: &internal::Expression<'_>) -> DocId {
-        let d = self.d();
-        let base_doc = self.build_arg_expression_doc(expr);
-        if needs_isolation_for_hugging(expr) {
-            d.isolated_group(base_doc)
-        } else {
-            base_doc
         }
     }
 

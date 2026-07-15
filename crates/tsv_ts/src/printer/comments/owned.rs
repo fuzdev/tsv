@@ -113,6 +113,33 @@ impl<'a> Printer<'a> {
             .is_some_and(|c| !c.is_block || c.multiline || !self.is_same_line(c.span.end, start))
     }
 
+    /// **on page**: where `expr`'s printed content begins in source — the start of the owned
+    /// comment it prints ahead of its own first token, or `None` when it owns none.
+    ///
+    /// The counterpart to [`Self::prepend_owned_leading_comment`] for a caller that needs the
+    /// comment's *position* rather than its doc. A gap emitter must not ask this — an owned
+    /// comment is not the gap's to print. A caller measuring the gap must: the comment travels
+    /// inside `expr`'s doc, so a **to emit** lookup reports the gap as empty and any bound taken
+    /// from one lands past the comment, on the element's own token. Anything the author wrote
+    /// *before* the comment — a blank line, most of all — then falls outside the measured range
+    /// and is silently dropped.
+    ///
+    /// The left-spine walk [`Self::prepend_owned_leading_comment`] makes is irrelevant here:
+    /// whichever node on the spine ends up printing the comment, they all start where `expr`
+    /// does, so the position is the same.
+    pub(crate) fn owned_leading_comment_start(&self, expr: &Expression<'_>) -> Option<u32> {
+        // A JSDoc cast carries its own copy and always prints it (`build_jsdoc_cast_doc`), so
+        // it is the one node that answers from the node rather than the glued-comment lookup.
+        // It must: `JsdocCast::span` covers the `(`…`)` only — the comment sits *outside* it —
+        // and the cast's comment may be a newline away from the `(`, which the glue rule below
+        // deliberately does not match. Asking the lookup would miss exactly the own-line cast.
+        if let Expression::JsdocCast(cast) = expr {
+            return Some(cast.comment.span.start);
+        }
+        self.owned_leading_comment_at(expr.span().start)
+            .map(|c| c.span.start)
+    }
+
     /// The owned comment ending immediately before `start`, glued to the token there.
     fn owned_leading_comment_at(&self, start: u32) -> Option<&'a internal::Comment> {
         // Cheap reject before the span search — almost every expression bails here.

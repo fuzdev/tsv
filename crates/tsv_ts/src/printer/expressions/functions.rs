@@ -1320,23 +1320,46 @@ impl<'a> Printer<'a> {
                 params[i - 1].span().end
             };
 
+            // The three facts that decide which comments lead this param, derived ONCE and
+            // shared by the separator and the leading-comment emitter below. They are the
+            // whole input to that split, so two derivations of them are two answers — the
+            // separator would measure its gap against a boundary the emitter never agrees to.
+            let prev_comma_pos = (i > 0)
+                .then(|| self.find_comma_after(params[i - 1].span().end))
+                .flatten();
+            // The first param excludes any comment already pulled onto the `(`
+            // line by `delimiter_line_comment_prefix`, so it isn't emitted twice.
+            let skip_delim = if i == 0 { paren_pull_pos } else { None };
+            let param_render_start = self.param_start_with_decorators(param);
+
             // Add separator before non-first params
             if i > 0 {
                 // Use hardline when forcing break (trailing line comments or param properties)
                 if force_break {
-                    // Preserve a blank line the author left before this param's
-                    // leading comment (or the param itself) — prettier keeps one blank
-                    // line in the expanded list. `search_start` is the previous param's
-                    // end, so the gap spans the comma too.
-                    // **in source**: bounds a raw blank-line scan (see `blank_scan_end`).
-                    let check_pos = if comments_present {
-                        self.comments_in_source_between(search_start, param_start)
-                            .next()
-                            .map_or(param_start, |c| c.span.start)
+                    // Preserve a blank line the author left before this param's printed
+                    // content — prettier keeps one blank line in the expanded list.
+                    // `search_start` is the previous param's end, so the gap spans the comma.
+                    //
+                    // The scan stops at this param's content start, and
+                    // `has_blank_line_after_comma` steps its start past every comment inside
+                    // that range — so the previous param's trailing comment (`a, // x`) is
+                    // stepped over rather than treated as the boundary, and a blank line
+                    // *after* it still lands in the measured range.
+                    let content_start = if comments_present {
+                        self.param_content_start(
+                            search_start,
+                            param_render_start,
+                            prev_comma_pos,
+                            skip_delim,
+                            param,
+                        )
                     } else {
                         param_start
                     };
-                    self.push_blank_preserving_hardline(&mut inner_parts, search_start, check_pos);
+                    if self.has_blank_line_after_comma(search_start, content_start) {
+                        inner_parts.push(d.literalline());
+                    }
+                    inner_parts.push(d.hardline());
                 } else {
                     inner_parts.push(d.line());
                 }
@@ -1344,19 +1367,10 @@ impl<'a> Printer<'a> {
 
             // Add leading comments for this param
             // Use proper line breaks for line comments on their own line
-            // For non-first params, find comma position to filter properly
             if comments_present {
-                let prev_comma_pos = if i > 0 {
-                    self.find_comma_after(params[i - 1].span().end)
-                } else {
-                    None
-                };
-                // The first param excludes any comment already pulled onto the `(`
-                // line by `delimiter_line_comment_prefix`, so it isn't emitted twice.
-                let skip_delim = if i == 0 { paren_pull_pos } else { None };
                 inner_parts.push(self.build_leading_param_comments(
                     search_start,
-                    self.param_start_with_decorators(param),
+                    param_render_start,
                     prev_comma_pos,
                     skip_delim,
                 ));
@@ -1542,6 +1556,84 @@ impl<'a> Printer<'a> {
         })
     }
 
+    /// **to emit**: the comments this gap prints ahead of the param at `param_render_start` —
+    /// the ones that lead it, as opposed to those trailing the *previous* param.
+    ///
+    /// The single definition of that split. Both the leading-comment emitter and the
+    /// separator ([`Self::param_content_start`]) read it, so neither can drift from the
+    /// other's idea of which comments belong to this param.
+    fn leading_param_comments(
+        &self,
+        start: u32,
+        param_render_start: u32,
+        prev_comma_pos: Option<u32>,
+        skip_delim: Option<u32>,
+    ) -> CommentVec<'_> {
+        comments_to_emit_in_range(self.comments, start, param_render_start)
+            .filter(|c| {
+                // A comment already pulled onto the opening `(` line (first param)
+                // must not be re-emitted as a leading comment here.
+                if let Some(dpos) = skip_delim
+                    && self.comment_on_delimiter_line(dpos, c)
+                {
+                    return false;
+                }
+                let Some(comma) = prev_comma_pos else {
+                    return true; // First param - keep all comments
+                };
+                // A stranded after-comma block (on the comma's line, newline before
+                // this param) trails the comma — emitted by the loop's
+                // `push_stranded_after_comma_blocks`, not led here.
+                if c.is_block
+                    && c.span.start >= comma
+                    && self.is_stranded_after_comma_block(c, comma, param_render_start)
+                {
+                    return false;
+                }
+                // Different line from prev param - definitely a leading comment
+                if !self.is_same_line(start, c.span.start) {
+                    return true;
+                }
+                // Same line as prev param: only keep block comments after the comma
+                // (line comments go in line_suffix, block comments before comma are trailing)
+                c.is_block && c.span.start >= comma
+            })
+            .collect()
+    }
+
+    /// **on page**: where the param at `param_render_start`'s printed content begins in
+    /// source — the position a blank-line scan over the gap before it must stop at, so that
+    /// a blank line the author left ahead of that content is inside the measured range.
+    ///
+    /// Three answers, in order: a comment this gap leads with; else the comment the param
+    /// OWNS, which prints from inside the param's own doc and so is invisible to the **to
+    /// emit** axis above; else the param itself.
+    ///
+    /// Bounding at the first comment *in source* instead is the subtle wrong answer: that
+    /// comment may be the **previous** param's trailing one (`a, // x`), which ends the
+    /// previous param's line rather than starting this one's — leaving any blank line
+    /// after it inside no one's range, and silently dropped.
+    fn param_content_start(
+        &self,
+        start: u32,
+        param_render_start: u32,
+        prev_comma_pos: Option<u32>,
+        skip_delim: Option<u32>,
+        param: &internal::Expression<'_>,
+    ) -> u32 {
+        self.leading_param_comments(start, param_render_start, prev_comma_pos, skip_delim)
+            .first()
+            .map(|c| c.span.start)
+            .or_else(|| {
+                // Guarded to this gap: the lookup is keyed on the param's own span start,
+                // which a leading decorator run sits ahead of, so a hit outside
+                // `[start, param_render_start)` is not this gap's to measure against.
+                self.owned_leading_comment_start(param)
+                    .filter(|&p| p >= start && p < param_render_start)
+            })
+            .unwrap_or(param_render_start)
+    }
+
     /// Build doc for leading comments before a parameter
     /// Handles line comments on their own line with proper hardlines
     /// `prev_comma_pos`: if Some, filter out trailing comments for the previous param
@@ -1562,37 +1654,8 @@ impl<'a> Printer<'a> {
         skip_delim: Option<u32>,
     ) -> DocId {
         let d = self.d();
-        let comments: CommentVec<'_> =
-            comments_to_emit_in_range(self.comments, start, param_render_start)
-                .filter(|c| {
-                    // A comment already pulled onto the opening `(` line (first param)
-                    // must not be re-emitted as a leading comment here.
-                    if let Some(dpos) = skip_delim
-                        && self.comment_on_delimiter_line(dpos, c)
-                    {
-                        return false;
-                    }
-                    let Some(comma) = prev_comma_pos else {
-                        return true; // First param - keep all comments
-                    };
-                    // A stranded after-comma block (on the comma's line, newline before
-                    // this param) trails the comma — emitted by the loop's
-                    // `push_stranded_after_comma_blocks`, not led here.
-                    if c.is_block
-                        && c.span.start >= comma
-                        && self.is_stranded_after_comma_block(c, comma, param_render_start)
-                    {
-                        return false;
-                    }
-                    // Different line from prev param - definitely a leading comment
-                    if !self.is_same_line(start, c.span.start) {
-                        return true;
-                    }
-                    // Same line as prev param: only keep block comments after the comma
-                    // (line comments go in line_suffix, block comments before comma are trailing)
-                    c.is_block && c.span.start >= comma
-                })
-                .collect();
+        let comments =
+            self.leading_param_comments(start, param_render_start, prev_comma_pos, skip_delim);
         if comments.is_empty() {
             return d.empty();
         }

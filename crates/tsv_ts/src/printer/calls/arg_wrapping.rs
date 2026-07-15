@@ -439,8 +439,8 @@ pub(crate) fn build_args_split_last(
     has_comments: bool,
 ) -> (DocBuf, DocId, DocId) {
     let d = printer.d();
-    // Build all args (using build_huggable_expression_doc for proper parens on assignments
-    // and isolated_group wrapping for templates).
+    // Build all args (using build_arg_expression_doc for argument-context parens on
+    // assignments, and the indented binary/conditional layouts).
     //
     // A curried arrow-chain argument (`fn(x, (a) => (b) => …)`) routes through the
     // progressive call-arg chain layout: set the context so the outermost chain
@@ -454,10 +454,10 @@ pub(crate) fn build_args_split_last(
             if is_curried_arrow_chain(arg) {
                 printer
                     .build_with_arrow_chain_context(ArrowChainContext::CallArgOrBinaryish, || {
-                        printer.build_huggable_expression_doc(arg)
+                        printer.build_arg_expression_doc(arg)
                     })
             } else {
-                printer.build_huggable_expression_doc(arg)
+                printer.build_arg_expression_doc(arg)
             }
         })
         .collect();

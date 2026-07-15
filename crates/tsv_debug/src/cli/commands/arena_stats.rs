@@ -67,7 +67,6 @@ const NODE_KINDS: &[&str] = &[
     "LineSuffix",
     "LineSuffixBoundary",
     "BreakParent",
-    "IsolatedGroup",
     "Align",
 ];
 const TEXT_KINDS: &[&str] = &["Static", "Pooled", "SourceSpan", "Symbol"];
@@ -363,7 +362,6 @@ fn classify_node(n: &DocNode) -> &'static str {
         DocNode::LineSuffix(_) => "LineSuffix",
         DocNode::LineSuffixBoundary => "LineSuffixBoundary",
         DocNode::BreakParent => "BreakParent",
-        DocNode::IsolatedGroup { .. } => "IsolatedGroup",
     }
 }
 

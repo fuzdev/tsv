@@ -805,15 +805,14 @@ fn build_chain_args_single(
         return d.concat(&parts);
     }
 
-    // Build arg doc, wrapping certain expressions in isolated_group to prevent
-    // internal breaks from propagating to parent groups (enables call hugging).
+    // Build arg doc in argument context.
     // For curried arrows (body is another arrow), skip chain detection so the
     // outer arrow hugs its body — matches prettier's expandLastArg behavior.
     let curried = is_curried_arrow(arg);
     if curried {
         printer.skip_arrow_chain.set(true);
     }
-    let arg_doc = printer.build_huggable_expression_doc(arg);
+    let arg_doc = printer.build_arg_expression_doc(arg);
     if curried {
         printer.skip_arrow_chain.set(false);
     }

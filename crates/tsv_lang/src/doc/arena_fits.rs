@@ -90,9 +90,6 @@ fn flat_width_fill<R: TextResolver + ?Sized>(
                 flat_width_memo(*contents, nodes, children, cache, resolver)
             }
         }
-        DocNode::IsolatedGroup { contents } => {
-            flat_width_memo(*contents, nodes, children, cache, resolver)
-        }
         DocNode::Indent(inner) | DocNode::Dedent(inner) => {
             flat_width_memo(*inner, nodes, children, cache, resolver)
         }
@@ -251,11 +248,6 @@ pub(super) fn arena_fits_with_lookahead<R: TextResolver + ?Sized>(
                         *contents
                     };
                     (current_id, current_mode) = (doc_to_check, mode_for_group);
-                    continue;
-                }
-
-                DocNode::IsolatedGroup { contents } => {
-                    current_id = *contents;
                     continue;
                 }
 
