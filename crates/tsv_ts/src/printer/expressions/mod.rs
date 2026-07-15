@@ -138,9 +138,7 @@ impl<'a> Printer<'a> {
                 self.is_expression_statement.set(was_expr_stmt);
                 self.build_member_doc(member)
             }
-            Expression::ConditionalExpression(cond) => {
-                self.build_conditional_doc_with_wrapping(cond)
-            }
+            Expression::ConditionalExpression(cond) => self.build_conditional_doc(cond),
             Expression::ArrowFunctionExpression(arrow) => self.build_arrow_doc(arrow),
             Expression::FunctionExpression(func) => {
                 self.maybe_wrap_expr_stmt_paren(func.span, self.build_function_doc(func))

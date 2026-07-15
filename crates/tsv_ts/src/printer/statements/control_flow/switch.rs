@@ -15,7 +15,7 @@ impl<'a> Printer<'a> {
     ///
     /// Matches Prettier's architecture: the discriminant wraps to multiple lines
     /// when the `switch (discriminant) {` line exceeds print width.
-    fn build_switch_statement_with_wrapping_doc(
+    pub(in crate::printer::statements) fn build_switch_statement_doc(
         &self,
         stmt: &internal::SwitchStatement<'_>,
     ) -> DocId {
@@ -408,14 +408,5 @@ impl<'a> Printer<'a> {
         // `find_end_with_trailing_comments`) so it is not re-emitted there.
 
         d.concat(&parts)
-    }
-
-    #[inline]
-    pub(in crate::printer::statements) fn build_switch_statement_doc(
-        &self,
-        stmt: &internal::SwitchStatement<'_>,
-    ) -> DocId {
-        // Delegate to the wrapping version which handles proper indentation structure
-        self.build_switch_statement_with_wrapping_doc(stmt)
     }
 }

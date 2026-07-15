@@ -86,8 +86,11 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Build a Doc for a conditional expression with wrapping support
-    pub(in crate::printer) fn build_conditional_doc_with_wrapping(
+    /// Build a Doc for a conditional expression — the default layout.
+    ///
+    /// The paired [`Self::build_conditional_doc_with_binary_test_indent`] is the same
+    /// thing with `indent_binary_test`, which is the only axis between them.
+    pub(in crate::printer) fn build_conditional_doc(
         &self,
         cond: &internal::ConditionalExpression<'_>,
     ) -> DocId {

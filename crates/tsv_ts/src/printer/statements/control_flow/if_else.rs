@@ -191,7 +191,7 @@ impl<'a> Printer<'a> {
     ///   adjustClause(consequent),  // body handling
     /// ])
     /// ```
-    fn build_if_statement_with_wrapping_doc(&self, stmt: &internal::IfStatement<'_>) -> DocId {
+    fn build_if_statement_plain_doc(&self, stmt: &internal::IfStatement<'_>) -> DocId {
         let d = self.d();
         // Find paren positions for comment handling
         let open_paren = self.find_open_paren_after(stmt.span.start);
@@ -288,19 +288,19 @@ impl<'a> Printer<'a> {
             self.has_comments_to_emit_between(consequent_end, alternate_start)
         });
 
+        // A comment in the consequent→alternate gap is the only axis here; both paths
+        // group and wrap the condition identically.
         if has_if_else_comments {
-            // Build doc with inline comments between } and else
             self.build_if_statement_with_comments_doc(stmt)
         } else {
-            // Delegate to the sophisticated version that handles width-based wrapping
-            self.build_if_statement_with_wrapping_doc(stmt)
+            self.build_if_statement_plain_doc(stmt)
         }
     }
 
     /// Build if statement doc with comments between consequent and alternate
     fn build_if_statement_with_comments_doc(&self, stmt: &internal::IfStatement<'_>) -> DocId {
         let d = self.d();
-        // Build condition group (same as build_if_statement_with_wrapping_doc)
+        // Build condition group (same as build_if_statement_plain_doc)
         let open_paren = self.find_open_paren_after(stmt.span.start);
         let close_paren = open_paren.and_then(|o| self.matching_close_paren(o));
         let if_keyword_end = stmt.span.start + "if".len() as u32;
