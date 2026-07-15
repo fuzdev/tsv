@@ -1,4 +1,5 @@
 use crate::ast::internal::{AngleUnit, Color, ColorChannel};
+use crate::color::is_hex_color_body;
 use crate::keyword_set::ascii_keyword_set;
 
 /// Parse a color value: hex, named, rgb(), hsl(), etc.
@@ -6,13 +7,12 @@ use crate::keyword_set::ascii_keyword_set;
 /// `Hex`/`Named` carry no text — their source is recovered from the value's span at
 /// print time — so this only classifies and needs no arena.
 pub fn parse_color(s: &str) -> Option<Color> {
-    // Hex color: #RGB, #RGBA, #RRGGBB, or #RRGGBBAA
-    // Length includes the # prefix:
-    // - 4: #RGB (3-digit)
-    // - 5: #RGBA (4-digit with alpha)
-    // - 7: #RRGGBB (6-digit)
-    // - 9: #RRGGBBAA (8-digit with alpha)
-    if s.starts_with('#') && matches!(s.len(), 4 | 5 | 7 | 9) {
+    // Hex color: #RGB, #RGBA, #RRGGBB, or #RRGGBBAA. `is_hex_color_body` (shared with
+    // the printer's value-text normalizer) also requires the body be all hex digits,
+    // so a same-length non-hex hash (`#ZZZ`, `#12G`) stays a plain hash token — else
+    // `format_color_from_source` would lowercase a non-color and the linter would
+    // read it as one. The `#` is ASCII, so `strip_prefix` gives the exact body bytes.
+    if s.strip_prefix('#').is_some_and(is_hex_color_body) {
         return Some(Color::Hex);
     }
 
@@ -380,4 +380,21 @@ ascii_keyword_set! {
     "inherit",
     "initial",
     "unset",
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // The hex-body rule itself is exercised in `crate::color`; here we only confirm
+    // `parse_color` routes a `#`-hash through it — a valid hex classifies, a
+    // same-length non-hex hash does NOT (the linter-facing fact, invisible to
+    // formatted output only for `Named`, but visible for `Hex` via lowercasing).
+    #[test]
+    fn hash_classification_requires_hex_digits() {
+        assert!(matches!(parse_color("#ABC"), Some(Color::Hex)));
+        assert!(matches!(parse_color("#AABBCCDD"), Some(Color::Hex)));
+        assert!(parse_color("#ZZZ").is_none());
+        assert!(parse_color("#12G").is_none());
+    }
 }

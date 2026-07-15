@@ -1,0 +1,129 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 395,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 386,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 76,
+							"end": 87,
+							"property": "color",
+							"value": "#abc"
+						},
+						{
+							"type": "Declaration",
+							"start": 91,
+							"end": 110,
+							"property": "border-color",
+							"value": "#abcd"
+						},
+						{
+							"type": "Declaration",
+							"start": 114,
+							"end": 139,
+							"property": "background-color",
+							"value": "#aabbcc"
+						},
+						{
+							"type": "Declaration",
+							"start": 143,
+							"end": 167,
+							"property": "outline-color",
+							"value": "#aabbccdd"
+						},
+						{
+							"type": "Declaration",
+							"start": 243,
+							"end": 260,
+							"property": "caret-color",
+							"value": "#ZZZ"
+						},
+						{
+							"type": "Declaration",
+							"start": 264,
+							"end": 292,
+							"property": "text-decoration-color",
+							"value": "#GGGG"
+						},
+						{
+							"type": "Declaration",
+							"start": 296,
+							"end": 319,
+							"property": "column-rule-color",
+							"value": "#12G"
+						},
+						{
+							"type": "Declaration",
+							"start": 323,
+							"end": 348,
+							"property": "border-top-color",
+							"value": "#XYZABC"
+						},
+						{
+							"type": "Declaration",
+							"start": 352,
+							"end": 382,
+							"property": "border-bottom-color",
+							"value": "#ZZZZZZZZ"
+						}
+					]
+				},
+				"start": 9,
+				"end": 386
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 387,
+			"styles": "\n\tdiv {\n\t\t/* valid hex — lowercased (all four lengths: 3/4/6/8) */\n\t\tcolor: #abc;\n\t\tborder-color: #abcd;\n\t\tbackground-color: #aabbcc;\n\t\toutline-color: #aabbccdd;\n\t\t/* body is not all hex digits: not a hex color, preserved verbatim */\n\t\tcaret-color: #ZZZ;\n\t\ttext-decoration-color: #GGGG;\n\t\tcolumn-rule-color: #12G;\n\t\tborder-top-color: #XYZABC;\n\t\tborder-bottom-color: #ZZZZZZZZ;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 396,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

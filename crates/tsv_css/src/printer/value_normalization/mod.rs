@@ -17,6 +17,7 @@ pub(crate) use splitting::{
 
 use std::borrow::Cow;
 
+use crate::color::is_hex_color_body;
 use numbers::{canonical_unit, is_known_css_unit, normalize_css_number};
 use tsv_lang::printing::format_string_literal;
 
@@ -215,14 +216,6 @@ pub(crate) fn normalize_value_text(input: &str, lowercase_hex: bool) -> String {
     }
 
     out
-}
-
-/// Whether `body` (the chars after `#`) is a hex **color**: 3, 4, 6, or 8 ASCII
-/// hex digits and nothing else. These are prettier's lowercased lengths (`#rgb`,
-/// `#rgba`, `#rrggbb`, `#rrggbbaa`); an off-length run (`#ABCDE`) or any non-hex
-/// char is not a color and keeps its case.
-fn is_hex_color_body(body: &str) -> bool {
-    matches!(body.len(), 3 | 4 | 6 | 8) && body.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
 /// Whether the `url(` opening at `open` (the `(` byte index) is immediately
