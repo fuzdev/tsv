@@ -537,6 +537,58 @@ impl SpecialElementTag {
     }
 }
 
+/// The `this=` binding of `<svelte:element>`, in the two forms Svelte lets it be spelled.
+///
+/// Svelte's public AST holds the expression bare (`SvelteElement.tag`) with no
+/// `ExpressionTag` around it. Keeping the tag here instead of unwrapping to the expression
+/// is what preserves the `{…}` span, and with it the `{`→expression and expression→`}`
+/// gaps: a comment lives in either (`this={/* c */ tag}`), and an unwrapped expression
+/// leaves nowhere to look for one.
+///
+/// `<svelte:component>` does **not** use this type: it accepts only the braced form (a
+/// non-`{expression}` `this` is a parse error), so it carries an `ExpressionTag` directly.
+/// The asymmetry is Svelte's — `<svelte:element this="div">` merely *warns*, deliberately
+/// preserving Svelte 4 behavior, where the component errors.
+#[derive(Debug, Clone)]
+pub enum SpecialThis<'arena> {
+    /// `this={expr}` — the expression form. The tag's span covers the braces, so the
+    /// printer emits it as the `{…}` attribute value it is.
+    Braced(ExpressionTag<'arena>),
+    /// `this="value"` — the plain HTML-attribute form. No braces (so no gap a comment could
+    /// occupy) and **no expression parse at all**: the value is the attribute's decoded
+    /// text, held as such. Svelte's wire reports it as a `Literal`, which the writer emits
+    /// from these two fields directly — synthesizing an `Expression::Literal` here only to
+    /// take it apart again at every consumer bought nothing but an unreachable arm in each
+    /// of their matches.
+    Plain {
+        /// Decoded attribute text (entities resolved, quotes stripped).
+        content: &'arena str,
+        /// Span of that text in source — no quotes, so `raw` is not recoverable from it.
+        span: Span,
+    },
+}
+
+impl<'arena> SpecialThis<'arena> {
+    /// Span of the bound value: the braced form's expression, or the plain form's text.
+    /// Both sit hard against whatever delimits them, so this is the region a comment can
+    /// be adjacent to.
+    pub fn span(&self) -> Span {
+        match self {
+            Self::Braced(tag) => tag.expression.span(),
+            Self::Plain { span, .. } => *span,
+        }
+    }
+
+    /// The `{…}` span of the braced form, braces included; `None` for the plain-string
+    /// form, which has no braces and therefore no gap a comment could occupy.
+    pub fn braces(&self) -> Option<Span> {
+        match self {
+            Self::Braced(tag) => Some(tag.span),
+            Self::Plain { .. } => None,
+        }
+    }
+}
+
 /// Kind of Svelte special element
 ///
 /// These are elements with special behavior in Svelte:
@@ -559,9 +611,11 @@ pub enum SpecialElementKind<'arena> {
     /// `<svelte:document>` - bind to document events
     SvelteDocument,
     /// `<svelte:element this={tag}>` - dynamic element tag
-    SvelteElement { tag: Expression<'arena> },
-    /// `<svelte:component this={Component}>` - dynamic component (legacy)
-    SvelteComponent { expression: Expression<'arena> },
+    SvelteElement { tag: SpecialThis<'arena> },
+    /// `<svelte:component this={Component}>` - dynamic component (legacy). Always the
+    /// braced form: a missing or non-`{expression}` `this` is rejected at parse, as Svelte
+    /// does — so unlike `<svelte:element>` there is no plain-string variant to model.
+    SvelteComponent { expression: ExpressionTag<'arena> },
     /// `<svelte:self>` - recursive self-reference
     SvelteSelf,
     /// `<slot>` - content slot
@@ -626,18 +680,24 @@ impl<'arena> SpecialElementKind<'arena> {
         }
     }
 
-    /// Get the tag expression for SvelteElement
-    pub fn tag(&self) -> Option<&Expression<'arena>> {
+    /// The `<svelte:element>` `this` binding — the wire's `tag` field.
+    ///
+    /// Yields the whole [`SpecialThis`], not just its expression, because the two forms
+    /// serialize differently: the plain-string `this="x"` is a fused Svelte-style `Literal`,
+    /// the braced `this={x}` an island. Which form it is, is the binding's own structure —
+    /// the writer must not re-derive it from the source bytes.
+    pub fn tag(&self) -> Option<&SpecialThis<'arena>> {
         match self {
             Self::SvelteElement { tag } => Some(tag),
             _ => None,
         }
     }
 
-    /// Get the component expression for SvelteComponent
+    /// The `<svelte:component>` `this` expression — the wire's `expression` field. Always an
+    /// island, so the bare expression is all its writer needs.
     pub fn expression(&self) -> Option<&Expression<'arena>> {
         match self {
-            Self::SvelteComponent { expression } => Some(expression),
+            Self::SvelteComponent { expression } => Some(&expression.expression),
             _ => None,
         }
     }

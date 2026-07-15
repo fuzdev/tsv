@@ -475,9 +475,9 @@ fn write_special_element(w: &mut JsonWriter, elem: &internal::SpecialElement<'_>
     // Svelte-style `Literal` (no `loc`, single-quoted `raw`) that carries no
     // expression parse, so no template comment can attach — emit it fused.
     // Every other `this={…}` is a generic island keyed on the element's span.
-    if let Some(tag_expr) = elem.kind.tag() {
+    if let Some(tag) = elem.kind.tag() {
         w.raw(",\"tag\":");
-        write_special_tag(w, tag_expr, elem.span, ctx);
+        write_special_tag(w, tag, elem.span, ctx);
     }
     // `<svelte:component this={…}>` expression — a generic island.
     if let Some(expr) = elem.kind.expression() {
@@ -487,33 +487,36 @@ fn write_special_element(w: &mut JsonWriter, elem: &internal::SpecialElement<'_>
     w.raw("}");
 }
 
-/// A `<svelte:element this={…}>` tag. A plain-string value is a Svelte-style
-/// `Literal` (`{type, value, raw, start, end}` — no `loc`, single-quoted `raw`)
-/// fused directly; everything else is a generic island keyed on the element's
-/// span (the window Svelte's own comment attach uses for `SvelteElement`).
+/// A `<svelte:element this={…}>` tag. The plain-string form (`this="x"`) is a Svelte-style
+/// `Literal` (`{type, value, raw, start, end}` — no `loc`, single-quoted `raw`) fused
+/// directly; the braced form is a generic island keyed on the element's span (the window
+/// Svelte's own comment attach uses for `SvelteElement`).
+///
+/// The form is read off [`internal::SpecialThis`], never sniffed back out of the source: it
+/// is the parser's own answer, and a second way to ask the same question is a second way to
+/// get it wrong.
 fn write_special_tag(
     w: &mut JsonWriter,
-    tag_expr: &tsv_ts::ast::internal::Expression<'_>,
+    this: &internal::SpecialThis<'_>,
     elem_span: Span,
     ctx: &Ctx<'_>,
 ) {
-    if let tsv_ts::ast::internal::Expression::Literal(lit) = tag_expr
-        && let tsv_ts::ast::internal::LiteralValue::String(cooked) = &lit.value
-        && !lit.span.extract(ctx.source).starts_with(['\'', '"'])
-    {
-        let content = cooked.resolve(lit.span, ctx.source);
-        w.raw("{\"type\":\"Literal\",\"value\":");
-        w.string(content);
-        w.raw(",\"raw\":");
-        // Svelte reports the raw as a single-quoted string regardless of source.
-        w.string(&format!("'{content}'"));
-        w.raw(",\"start\":");
-        w.u32(ctx.pos(lit.span.start));
-        w.raw(",\"end\":");
-        w.u32(ctx.pos(lit.span.end));
-        w.raw("}");
-    } else {
-        write_generic_island(w, tag_expr, elem_span.start, elem_span.end, ctx);
+    match this {
+        internal::SpecialThis::Plain { content, span } => {
+            w.raw("{\"type\":\"Literal\",\"value\":");
+            w.string(content);
+            w.raw(",\"raw\":");
+            // Svelte reports the raw as a single-quoted string regardless of source.
+            w.string(&format!("'{content}'"));
+            w.raw(",\"start\":");
+            w.u32(ctx.pos(span.start));
+            w.raw(",\"end\":");
+            w.u32(ctx.pos(span.end));
+            w.raw("}");
+        }
+        internal::SpecialThis::Braced(tag) => {
+            write_generic_island(w, &tag.expression, elem_span.start, elem_span.end, ctx);
+        }
     }
 }
 
