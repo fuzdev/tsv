@@ -196,7 +196,7 @@ format everything well-formed. So a "correction" below is tsv matching **tsc/spe
 Svelte ❌ / Prettier ✅ / tsv ✅ in every case below:
 
 - `using` declarations (Explicit Resource Management — a finished/Stage 4 proposal, not ES2024; see [checklist_typescript.md](./checklist_typescript.md#explicit-resource-management)) — [basic](../tests/fixtures/typescript/typescript_specific/using/basic_svelte_divergence/)
-- `await using` declarations — [await](../tests/fixtures/typescript/typescript_specific/using/await_svelte_divergence/)
+- `await using` declarations — [await](../tests/fixtures/typescript/typescript_specific/using/await_svelte_divergence/); with a comment inside the keyword (`await /* c */ using`), which tsv preserves where prettier relocates it past `using` — [await_keyword_comment](../tests/fixtures/typescript/typescript_specific/using/await_keyword_comment_svelte_prettier_divergence/)
 - `const` type params in classes — [const_type_param_class](../tests/fixtures/typescript/typescript_specific/generics/const_type_param_class_svelte_divergence/)
 - `const` type params in interfaces, incl. `const` before variance (`<const in T>`) — [const_type_param_interface](../tests/fixtures/typescript/typescript_specific/generics/const_type_param_interface_svelte_divergence/). acorn rejects the `const` token (tsc defers it to the TS1277 checker error); the mis-ordered `<in const T>` is instead a *grammar* error tsv rejects like acorn, pinned by the regular fixture [type_param_modifier_order](../tests/fixtures/typescript/typescript_specific/generics/type_param_modifier_order/)
 - Import type options — [dynamic_attributes](../tests/fixtures/typescript/modules/imports/dynamic_attributes_svelte_divergence/)

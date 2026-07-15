@@ -757,6 +757,18 @@ Prettier moves comments between syntactic boundaries into adjacent blocks, paren
 - Namespace import header comments → Binding side of `type` — [namespace_keyword_comment](../tests/fixtures/typescript/modules/imports/namespace_keyword_comment_prettier_divergence/)
 - Export-all header comments → After `from` — [all_keyword_comment](../tests/fixtures/typescript/modules/exports/all_keyword_comment_prettier_divergence/)
 - Export-all namespace `*` to `as` → After `as` (before binding) — [all_namespace_keyword_comment](../tests/fixtures/typescript/modules/exports/all_namespace_keyword_comment_prettier_divergence/)
+- `export`→`default` (block) → After `default`, leading the value (`export default /* c */ 1`); tsv keeps it after `export`. The interior gap of a multi-word keyword — see [Comments inside a multi-word keyword](#comments-inside-a-multi-word-keyword) — [default_keyword_comment](../tests/fixtures/typescript/modules/exports/default_keyword_comment_prettier_divergence/)
+- `export`→`default` (line) → After `default`, with the value pulled back flush (`export default // c⏎1;`); tsv keeps it after `export` and indents the `default 1;` continuation one level (the uniform forced-continuation indent) — [default_keyword_line_comment](../tests/fixtures/typescript/modules/exports/default_keyword_line_comment_prettier_divergence/)
+- `export`→`default`, decorated class expression → After `default` (`export default /* c */⏎@dec⏎class {}`); tsv keeps it after `export`. The decorated-class path of the same gap — [default_keyword_decorator_comment](../tests/fixtures/typescript/modules/exports/default_keyword_decorator_comment_prettier_divergence/)
+- `export default` keyword gaps, decorators-*first* class → Both the `export`→`default` and `default`→`class` gaps relocated onto the decorator line and stacked (`@dec /* c1 */ /* c2 */⏎export default class A {}`), collapsing two authored positions into one; tsv keeps each where it was written. Decorators before `export` keep the class a *declaration*, so it is a third path of the same keyword — [decorator_first_default_keyword_comment](../tests/fixtures/typescript/modules/exports/decorator_first_default_keyword_comment_prettier_divergence/)
+- `declare`→kind keyword (`const`/`let`/`var`) → After the kind keyword, leading the binding (`declare const /* c */ a`); tsv keeps it after `declare` — [declare_keyword_comment](../tests/fixtures/typescript/declarations/variable/declare_keyword_comment_prettier_divergence/)
+- `await`→`using` → After `using`, leading the binding (`await using /* c */ a`); tsv keeps it after `await`. Comments on *both* sides of `using` collapse to one position under Prettier (`await using /* c2 */ /* c3 */ b`), losing the before/after distinction; tsv keeps each on its authored side — [await_keyword_comment](../tests/fixtures/typescript/typescript_specific/using/await_keyword_comment_svelte_prettier_divergence/)
+- `export`→`=` (export assignment) → After the `=`, leading the value (`export = /* c */ value`); tsv keeps it after `export`, matching the `export`→`const`/`function` gap both formatters preserve. The operand-side gap agrees in both — [export_equals_keyword_comment](../tests/fixtures/typescript/modules/exports/export_equals_keyword_comment_prettier_divergence/)
+- `export as namespace` keyword-interior gaps (`export`→`as`, `as`→`namespace`) → Both relocated past the whole keyword and stacked before the name (`export as namespace /* c1 */ /* c2 */ Foo`), collapsing two distinct positions into one; tsv keeps each on its authored side. The `namespace`→name gap agrees in both (regular [export_as_namespace_name_comment](../tests/fixtures/typescript/modules/exports/export_as_namespace_name_comment/)) — [export_as_namespace_keyword_comment](../tests/fixtures/typescript/modules/exports/export_as_namespace_keyword_comment_prettier_divergence/)
+- Meta-property dot gaps (line) → Out of the meta property entirely: past the `;` for `new.target` (`return new.target; // c`), or after `.meta` for `import.meta`; tsv keeps it in the gap and continues `.property` one level down. Block comments in the same gaps agree in both (regular [dot_gap_comments](../tests/fixtures/typescript/expressions/misc/meta_property/dot_gap_comments/)) — [dot_gap_line_comment](../tests/fixtures/typescript/expressions/misc/meta_property/dot_gap_line_comment_prettier_divergence/)
+- `export as namespace` keyword gaps (line) → All relocated past the whole keyword and stacked flush before the name (`export as namespace // c1⏎// c2⏎// c3⏎Foo`); tsv keeps each on its authored side, continuing the header at **one** indent level rather than a staircase — [export_as_namespace_line_comment](../tests/fixtures/typescript/modules/exports/export_as_namespace_line_comment_prettier_divergence/)
+- Import-equals `import`→`type` → Binding side of `type` (`import type /* c */ C = require('./c')`, the same rule as a default import); tsv preserves. The **only** diverging gap of that header — the other four agree in both and are pinned by the regular [equals_header_comment](../tests/fixtures/typescript/modules/imports/equals_header_comment/) — [equals_type_keyword_comment](../tests/fixtures/typescript/modules/imports/equals_type_keyword_comment_prettier_divergence/)
+- `export default`→first decorator, comment **glued** to `@dec` → Relocated back past `default` (`export default /* c */`), then one blank line added per pass, saturating at two (Prettier non-idempotent; `output_prettier.*` is its first pass, `audit_signature.txt` pins the chain); tsv keeps it glued to `@dec`, where the parser bound it. The complementary own-line authoring is *not* glued, so it is emitted by the keyword→decorator gap instead — both authorings preserved — [default_decorator_lead_comment](../tests/fixtures/typescript/modules/exports/default_decorator_lead_comment_prettier_divergence/)
 - Import binding to `from` (line) → After `;` — [from_comment](../tests/fixtures/typescript/modules/imports/from_comment_prettier_divergence/)
 - Import specifiers to `from` → Into the specifier braces — [from_comment](../tests/fixtures/typescript/modules/imports/from_comment_prettier_divergence/)
 - Export specifiers to `from` → Into the specifier braces — [from_comment](../tests/fixtures/typescript/modules/exports/from_comment_prettier_divergence/)
@@ -957,6 +969,84 @@ tsv's rule is therefore about the **comment**, not the node: a comment glued to 
 **Every glued block comment is owned, not just bundler annotations.** The position — a block comment glued to the token after it — is an authoring choice that binds the comment to the operand it leads, so there is no content sniff: `/* @__PURE__ */` and a plain `/* c */` bind their token identically, and no synthesized paren lands between them. An ordinary leading comment in a stripped-grouping-paren position is therefore preserved glued where prettier relocates it out — `(/* c */ x ?? y)` stays put, prettier hoists to `/* c */ (x ?? y)` — at every operand position: the ternary operand ([test_paren_leading_comment](../tests/fixtures/typescript/expressions/ternary/test_paren_leading_comment_prettier_divergence/)), the sequence operand ([operand_edge_comment](../tests/fixtures/typescript/expressions/sequence/operand_edge_comment_prettier_divergence/)), the unary assignment operand ([assignment_operand_leading_comment](../tests/fixtures/typescript/expressions/unary/assignment_operand_leading_comment_prettier_divergence/)), and the non-null / await / yield grouped operands ([§Comment relocation](#comment-relocation)). The annotation **convention** (`@`/`#` plus `__NAME__`) is retired as an ownership gate; the only remaining content sniff is `is_jsdoc_type_cast_comment`, and it governs *cast paren-retention* (the `JsdocCast` node below), never ownership — ownership flows to a cast the same as to any other glued comment.
 
 **Ownership makes a comment invisible to emit-decisions, NOT to layout.** This is the rule for anyone extending the mechanism. An owned comment is skipped by the *to-emit* lookups (`comments_to_emit_in_range`) — the owning node prints it — so any gate deciding *who emits* must use them (`has_comments_to_emit_in_range`). But the comment is still on the page, still occupies width, and still means to prettier's rules exactly what an ordinary comment means. So any gate deciding *layout* must use the *on-page* lookups (`has_comments_on_page_in_range`), which count it. Get this backwards and the comment silently disappears from a layout decision: a unary operand loses the parens that keep the comment bound to the operand rather than the operator (`!(/* @__PURE__ */ f())` → `!/* @__PURE__ */ f()`), and a last argument loses the leading comment that refuses the expand-last hug. Both were real bugs. The unary wrap is decided **positionally** — the comment sits in the operator→operand gap, so `build_unary_doc` sees it there and adds the parens itself; `needs_parens` deliberately does *not* (it would double-wrap), and needs no left-spine walk, which is why an instantiation-expression operand (`!(/** @type {A} */ (x)<T>)`) gets the wrap for free.
+
+#### Comments inside a multi-word keyword
+
+A comment can sit **inside** a keyword that spans two or more words — `await /* c */ using`,
+`export /* c */ default`, `declare /* c */ const`. tsv preserves it there; Prettier relocates it
+past the keyword's last word, onto the value (`await using /* c */ y`).
+
+Preserving is the [Comment Position Philosophy](#comment-position-philosophy) default, and three
+things confirm it rather than merely permit it:
+
+1. **The carve-out doesn't reach.** tsv trails a comment past a *pure separator* — a list
+   element's comma, which is structure. A keyword's words are not separators; `using`,
+   `default`, and the kind keyword each carry meaning, so the gap before them is a position an
+   author can mean.
+2. **Prettier's own sibling gap preserves.** `export /* c */ const x = 1` and
+   `export /* c */ function fn() {}` keep the comment after `export` in *both* formatters — only
+   `export /* c */ default` relocates. Preserving makes the whole `export`→X family read one way;
+   matching Prettier would split it on nothing but the follower.
+3. **Relocation collapses a distinction.** With comments on both sides of the second word,
+   Prettier lands them in one place (`await /* c2 */ using /* c3 */ b` →
+   `await using /* c2 */ /* c3 */ b`), so before-`using` and after-`using` become
+   indistinguishable. Text survives; the association does not.
+
+`for await /* c */ (…)` — the gap *after* the same class of keyword — already preserves for the
+same reason ([for_await_keyword_comment](../tests/fixtures/typescript/statements/for/for_await_keyword_comment_prettier_divergence/)),
+so preserving the interior gap makes the treatment uniform.
+
+A *line* comment in such a gap takes the [uniform forced-continuation
+indent](#uniform-forced-continuation-indent) (`export // c⏎\tdefault 1;`); Prettier pulls the
+value back flush. Both the authored and the relocated positions are stable under tsv.
+
+"Uniform" is meant literally, and a multi-gap keyword is where it has to be said: a header whose
+gaps break **more than once** continues at **one** level, not one per gap
+([export_as_namespace_line_comment](../tests/fixtures/typescript/modules/exports/export_as_namespace_line_comment_prettier_divergence/)).
+Each gap is emitted without its own indent and the whole tail is wrapped once. Indenting per gap
+compounds, and the staircase is not merely deep — the keyword→value gap is emitted at the header's
+own level, so the keyword's last word would sit *below* the value following it. Only a three-word
+keyword (`export as namespace`, the import-equals header) can show the difference.
+
+Not every multi-word keyword admits an interior comment: `declare // c⏎const x` ASI-splits into
+two statements, and `await /* c⏎ */ using` demotes (the comment *is* a `LineTerminator`, and
+`await [no LT] using` requires none) — see the exclusions under [Declaration- and module-header
+line-comment continuation indent](#comment-relocation).
+
+The same rule covers a keyword whose second word is a punctuator (`export /* c */ = value`) and
+multi-gap headers (`export /* c1 */ as /* c2 */ namespace Foo`, the import-equals header).
+
+It reaches past keywords, too: a **meta property** is the same shape — `new` `.` `target` — and both
+gaps around its dot are positions an author can mean (`new /* c */.target`, `new./* c */ target`).
+tsv keeps each on its authored side, which is what prettier does for a block comment; a *line*
+comment there is a divergence
+([dot_gap_line_comment](../tests/fixtures/typescript/expressions/misc/meta_property/dot_gap_line_comment_prettier_divergence/)).
+That case is worth knowing for a different reason: the detector for this class — a `d.text` literal
+with an *interior* space — **cannot see it**, because the joining literal is `"."`. The class is
+"a header that concatenates fixed pieces without scanning the gaps between them"; the interior-space
+grep is a proxy for it, not a definition of it, so a punctuator-joined header needs finding by hand.
+
+**Preserving is not the same as diverging, and most of these gaps are neither.** Prettier's
+treatment is not uniform: it relocates the `export as namespace` keyword-interior gaps, but
+**preserves** the `namespace`→name gap and four of the five import-equals gaps. Where Prettier
+preserves, tsv's old behavior was not a divergence at all — it **dropped** the comment, which is
+content loss and strictly worse. Those gaps are pinned by *regular* fixtures
+([export_as_namespace_name_comment](../tests/fixtures/typescript/modules/exports/export_as_namespace_name_comment/),
+[equals_header_comment](../tests/fixtures/typescript/modules/imports/equals_header_comment/)), not
+divergence ones; a divergence fixture states an opinion, and there is no opinion to state where the
+two formatters already agree.
+
+Catalogued in [§Comment relocation](#comment-relocation):
+[default_keyword_comment](../tests/fixtures/typescript/modules/exports/default_keyword_comment_prettier_divergence/),
+[default_keyword_line_comment](../tests/fixtures/typescript/modules/exports/default_keyword_line_comment_prettier_divergence/),
+[default_keyword_decorator_comment](../tests/fixtures/typescript/modules/exports/default_keyword_decorator_comment_prettier_divergence/),
+[decorator_first_default_keyword_comment](../tests/fixtures/typescript/modules/exports/decorator_first_default_keyword_comment_prettier_divergence/),
+[declare_keyword_comment](../tests/fixtures/typescript/declarations/variable/declare_keyword_comment_prettier_divergence/),
+[await_keyword_comment](../tests/fixtures/typescript/typescript_specific/using/await_keyword_comment_svelte_prettier_divergence/),
+[export_equals_keyword_comment](../tests/fixtures/typescript/modules/exports/export_equals_keyword_comment_prettier_divergence/),
+[export_as_namespace_keyword_comment](../tests/fixtures/typescript/modules/exports/export_as_namespace_keyword_comment_prettier_divergence/),
+[export_as_namespace_line_comment](../tests/fixtures/typescript/modules/exports/export_as_namespace_line_comment_prettier_divergence/),
+[equals_type_keyword_comment](../tests/fixtures/typescript/modules/imports/equals_type_keyword_comment_prettier_divergence/).
 
 #### JSDoc / paren semantics
 
