@@ -38,6 +38,10 @@ It's a high-effort project that prioritizes quality.
 
 ## Status
 
+pre-alpha - v0.1 is for feedback only not production use; tsv v0.2 is closer but not yet published
+
+## About
+
 tsv is derived from:
 
 - HTML/CSS/JS
