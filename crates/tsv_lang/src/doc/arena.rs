@@ -32,6 +32,21 @@ use super::types::{
     TEXT_WIDTH_NOT_COMPUTED,
 };
 
+/// Whether a line-flattening walk may delete a **hard** line.
+///
+/// The two answers are two different operations wearing one walk — see
+/// [`DocArena::remove_lines`] (prettier's `removeLines`, [`Self::Keep`]) versus
+/// [`DocArena::flatten_all_lines`] (atomize, [`Self::Drop`]). Naming the axis is the point:
+/// dropping a hard line deletes a newline the content required, so it is only ever sound
+/// where the caller has proved none is required.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum HardLines {
+    /// Leave hard/literal lines (and `MultilineText`) alone — prettier's `!doc.hard` gate.
+    Keep,
+    /// Delete them, fusing whatever sat on either side.
+    Drop,
+}
+
 /// Index into `DocArena.nodes`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct DocId(u32);
@@ -1537,14 +1552,61 @@ impl DocArena {
         }
     }
 
-    /// Remove all line breaks from a doc, forcing it to stay on a single line.
+    /// Statically flatten a doc's **soft and normal** lines.
     /// Creates new nodes; old nodes remain in the arena (they're just unused).
+    ///
+    /// **A hard line is deliberately left alone** — prettier's `removeLinesFn`
+    /// (`src/document/utilities/index.js`) gates on `!doc.hard` and says why: *"Hard lines
+    /// should still output because there's too great of a chance of breaking existing
+    /// assumptions otherwise."* Removing one doesn't relayout the doc, it **deletes a
+    /// newline the content required**, and the content on either side fuses. A multi-line
+    /// block comment in a flattened arrow signature is the case that bit us: `/* a⏎b */`
+    /// came out `/* ab */`, silently gluing `a` to `b` (fixture
+    /// `typescript/expressions/calls/arrow_array_return_multiline_comment`).
+    ///
+    /// [`DocNode::MultilineText`] is left alone for the same reason: its `\n`s *are* hard
+    /// lines — the render arm emits each as a context-indented hardline — merely
+    /// pre-joined into one pooled body. Flattening it is removing hard lines by another
+    /// name.
+    ///
+    /// So this cannot promise a single line, and never could: a caller flattening a doc
+    /// that contains a hard line gets a shorter doc, not a one-line one. That is prettier's
+    /// contract too — `expandLastArg` flattens the signature so *breakable* params can't
+    /// break, not to overrule content that must break. A caller that genuinely needs
+    /// one line no matter what wants [`Self::flatten_all_lines`] — a different question,
+    /// and now a different name.
     pub fn remove_lines(&self, id: DocId) -> DocId {
+        self.remove_lines_impl(id, HardLines::Keep)
+    }
+
+    /// Flatten **every** line — hard ones included — onto a single line.
+    ///
+    /// Not prettier's `removeLines` (that is [`Self::remove_lines`], which keeps hard
+    /// lines). This is the stronger, un-prettier-like *atomize*: force a doc onto one line
+    /// even past the print width. Prettier reaches the same place by re-rendering the doc
+    /// at `printWidth: Infinity` and substituting the resulting string
+    /// (`template-literal.js`); this achieves it as a doc transform.
+    ///
+    /// **Only sound where the content provably has no required newline.** Deleting a hard
+    /// line does not relayout anything — it deletes a newline the content demanded, fusing
+    /// whatever sat on either side (`/* a⏎b */` → `/* ab */`, gluing `a` to `b`). Its one
+    /// caller, the template-interpolation atomizer, first routes any interpolation
+    /// containing a comment or a source newline down a *different* branch, so nothing that
+    /// must break can reach here.
+    ///
+    /// The two used to be one function that kept prettier's name while quietly doing this,
+    /// which is how a multi-line comment in a flattened arrow signature got its newline
+    /// deleted. Two questions, two names.
+    pub fn flatten_all_lines(&self, id: DocId) -> DocId {
+        self.remove_lines_impl(id, HardLines::Drop)
+    }
+
+    fn remove_lines_impl(&self, id: DocId, hard: HardLines) -> DocId {
         // Extract node info while borrowing, then release borrow before allocating.
         // This pattern avoids RefCell conflicts since alloc() needs borrow_mut().
         enum Info {
             Keep, // Return id unchanged
-            MultilineText(String),
+            FlattenedMultilineText(String),
             Line(LineKind),
             Indent(DocId),
             Dedent(DocId),
@@ -1568,13 +1630,15 @@ impl DocArena {
             let nodes = self.nodes.borrow();
             match &nodes[id.index()] {
                 DocNode::Text(_) | DocNode::LineSuffixBoundary => Info::Keep,
-                // Flatten: drop the internal hardlines (→ empty) and join the
-                // lines with no separator — identical to remove_lines over the
-                // per-line `concat([text, hardline, text, …])` this replaces.
-                DocNode::MultilineText { span, .. } => {
-                    let pool = self.text_pool.borrow();
-                    Info::MultilineText(span.slice(&pool).replace('\n', ""))
-                }
+                // `MultilineText`'s `\n`s are hard lines pre-joined into one body, so it
+                // follows `hard` for the same reason a `Line(Hard)` does — see the fn docs.
+                DocNode::MultilineText { span, .. } => match hard {
+                    HardLines::Keep => Info::Keep,
+                    HardLines::Drop => {
+                        let pool = self.text_pool.borrow();
+                        Info::FlattenedMultilineText(span.slice(&pool).replace('\n', ""))
+                    }
+                },
                 DocNode::Line(kind) => Info::Line(*kind),
                 DocNode::Indent(inner) => Info::Indent(*inner),
                 DocNode::Dedent(inner) => Info::Dedent(*inner),
@@ -1608,21 +1672,29 @@ impl DocArena {
 
         match info {
             Info::Keep => id,
-            Info::MultilineText(flat) => self.text_pooled(&flat),
+            Info::FlattenedMultilineText(flat) => self.text_pooled(&flat),
             Info::Line(kind) => match kind {
                 LineKind::Normal => self.text(" "),
-                LineKind::Soft | LineKind::Hard | LineKind::Literal => self.empty(),
+                LineKind::Soft => self.empty(),
+                // Prettier's `!doc.hard` gate: a hard line passes through untouched, because
+                // removing one deletes a required newline rather than relayouting anything.
+                // Only `flatten_all_lines`, whose content provably has no required newline,
+                // drops them.
+                LineKind::Hard | LineKind::Literal => match hard {
+                    HardLines::Keep => id,
+                    HardLines::Drop => self.empty(),
+                },
             },
             Info::Indent(inner) => {
-                let new_inner = self.remove_lines(inner);
+                let new_inner = self.remove_lines_impl(inner, hard);
                 self.indent(new_inner)
             }
             Info::Dedent(inner) => {
-                let new_inner = self.remove_lines(inner);
+                let new_inner = self.remove_lines_impl(inner, hard);
                 self.dedent(new_inner)
             }
             Info::Align(n, contents) => {
-                let new_contents = self.remove_lines(contents);
+                let new_contents = self.remove_lines_impl(contents, hard);
                 self.align(n, new_contents)
             }
             Info::Group {
@@ -1631,7 +1703,7 @@ impl DocArena {
                 id: group_id,
                 should_break,
             } => {
-                let flat_contents = self.remove_lines(contents);
+                let flat_contents = self.remove_lines_impl(contents, hard);
                 if should_break {
                     self.alloc(DocNode::Group {
                         contents: flat_contents,
@@ -1647,8 +1719,10 @@ impl DocArena {
                             let children = self.children.borrow();
                             DocBuf::from_slice(expanded_states.resolve(&children))
                         };
-                        let new_kids: DocBuf =
-                            kids.into_iter().map(|kid| self.remove_lines(kid)).collect();
+                        let new_kids: DocBuf = kids
+                            .into_iter()
+                            .map(|kid| self.remove_lines_impl(kid, hard))
+                            .collect();
                         self.alloc_children(&new_kids)
                     };
                     self.alloc(DocNode::Group {
@@ -1659,25 +1733,29 @@ impl DocArena {
                     })
                 }
             }
-            Info::IfBreakFlat(flat_doc) => self.remove_lines(flat_doc),
-            Info::IndentIfBreakContents(contents) => self.remove_lines(contents),
+            Info::IfBreakFlat(flat_doc) => self.remove_lines_impl(flat_doc, hard),
+            Info::IndentIfBreakContents(contents) => self.remove_lines_impl(contents, hard),
             Info::Concat(kids) => {
-                let flattened: DocBuf =
-                    kids.into_iter().map(|kid| self.remove_lines(kid)).collect();
+                let flattened: DocBuf = kids
+                    .into_iter()
+                    .map(|kid| self.remove_lines_impl(kid, hard))
+                    .collect();
                 self.concat(&flattened)
             }
             Info::Fill(kids) => {
                 // Fill becomes regular concat when flattened
-                let flattened: DocBuf =
-                    kids.into_iter().map(|kid| self.remove_lines(kid)).collect();
+                let flattened: DocBuf = kids
+                    .into_iter()
+                    .map(|kid| self.remove_lines_impl(kid, hard))
+                    .collect();
                 self.concat(&flattened)
             }
             Info::WithContext(doc, context) => {
-                let new_doc = self.remove_lines(doc);
+                let new_doc = self.remove_lines_impl(doc, hard);
                 self.with_context(new_doc, context)
             }
             Info::LineSuffix(inner) => {
-                let new_inner = self.remove_lines(inner);
+                let new_inner = self.remove_lines_impl(inner, hard);
                 self.line_suffix(new_inner)
             }
             Info::BreakParent => self.empty(),

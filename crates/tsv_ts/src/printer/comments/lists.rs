@@ -926,6 +926,32 @@ impl<'a> Printer<'a> {
         )
     }
 
+    /// The [`split_separator_gap_comments`](Self::split_separator_gap_comments) caller
+    /// idiom for a **`;` terminator**, in one call: the gap's pre-`;` comments, the `;`,
+    /// then the comments that belong after it.
+    ///
+    /// The ordering is the reason this exists rather than three lines at each site: the
+    /// returned docs must be pushed *after* the `;` text, and a site that inlines the
+    /// idiom can invert it silently — an own-line comment emitted before the separator
+    /// puts the `;` on the comment's line, where a `//` swallows it outright.
+    ///
+    /// `block_after_separator` is the terminator's own axis, not a caller preference:
+    /// `true` for a statement/member `;` (prettier trails a same-line block past it —
+    /// `expr; /* c */`), `false` where the operand keeps it (`import =` / `export =` /
+    /// `export as namespace`). A caller whose split is *conditional* keeps the raw idiom.
+    pub(crate) fn push_semicolon_with_gap_comments(
+        &self,
+        parts: &mut DocBuf,
+        start: u32,
+        semicolon_pos: u32,
+        block_after_separator: bool,
+    ) {
+        let after =
+            self.split_separator_gap_comments(parts, start, semicolon_pos, block_after_separator);
+        parts.push(self.d().text(";"));
+        parts.extend(after);
+    }
+
     /// The **type-member `;`** variant of `split_separator_gap_comments`: a same-line
     /// block stays *before* the `;` (`a: A /* c */;`, like a list separator) **but** a
     /// blank line before an own-line comment IS preserved (like a statement terminator).

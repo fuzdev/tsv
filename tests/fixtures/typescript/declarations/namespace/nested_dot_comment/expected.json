@@ -1,0 +1,755 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 349,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Block comment before the `.` of a dotted namespace — stays there",
+			"start": 20,
+			"end": 87,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 101,
+			"end": 109,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 13
+				},
+				"end": {
+					"line": 3,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Block comment after the `.` — stays on that side",
+			"start": 141,
+			"end": 192,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 52
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 206,
+			"end": 214,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 13
+				},
+				"end": {
+					"line": 8,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Both gaps in a deeper chain",
+			"start": 246,
+			"end": 276,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 290,
+			"end": 298,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 13
+				},
+				"end": {
+					"line": 13,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c4 ",
+			"start": 301,
+			"end": 309,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 24
+				},
+				"end": {
+					"line": 13,
+					"column": 32
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 348,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 339,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 16,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSModuleDeclaration",
+					"start": 89,
+					"end": 138,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 99,
+						"end": 100,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 11
+							},
+							"end": {
+								"line": 3,
+								"column": 12
+							}
+						},
+						"name": "A",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c1 ",
+								"start": 101,
+								"end": 109
+							}
+						]
+					},
+					"body": {
+						"type": "TSModuleDeclaration",
+						"start": 110,
+						"end": 138,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 22
+							},
+							"end": {
+								"line": 5,
+								"column": 2
+							}
+						},
+						"id": {
+							"type": "Identifier",
+							"start": 110,
+							"end": 111,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 22
+								},
+								"end": {
+									"line": 3,
+									"column": 23
+								}
+							},
+							"name": "B"
+						},
+						"body": {
+							"type": "TSModuleBlock",
+							"start": 112,
+							"end": 138,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 24
+								},
+								"end": {
+									"line": 5,
+									"column": 2
+								}
+							},
+							"body": [
+								{
+									"type": "ExportNamedDeclaration",
+									"start": 116,
+									"end": 135,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 21
+										}
+									},
+									"exportKind": "value",
+									"declaration": {
+										"type": "VariableDeclaration",
+										"start": 123,
+										"end": 135,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 9
+											},
+											"end": {
+												"line": 4,
+												"column": 21
+											}
+										},
+										"declarations": [
+											{
+												"type": "VariableDeclarator",
+												"start": 129,
+												"end": 134,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 15
+													},
+													"end": {
+														"line": 4,
+														"column": 20
+													}
+												},
+												"id": {
+													"type": "Identifier",
+													"start": 129,
+													"end": 130,
+													"loc": {
+														"start": {
+															"line": 4,
+															"column": 15
+														},
+														"end": {
+															"line": 4,
+															"column": 16
+														}
+													},
+													"name": "a"
+												},
+												"init": {
+													"type": "Literal",
+													"start": 133,
+													"end": 134,
+													"loc": {
+														"start": {
+															"line": 4,
+															"column": 19
+														},
+														"end": {
+															"line": 4,
+															"column": 20
+														}
+													},
+													"value": 1,
+													"raw": "1"
+												}
+											}
+										],
+										"kind": "const"
+									},
+									"specifiers": [],
+									"source": null
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Block comment before the `.` of a dotted namespace — stays there",
+							"start": 20,
+							"end": 87
+						}
+					]
+				},
+				{
+					"type": "TSModuleDeclaration",
+					"start": 194,
+					"end": 243,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 204,
+						"end": 205,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 11
+							},
+							"end": {
+								"line": 8,
+								"column": 12
+							}
+						},
+						"name": "C"
+					},
+					"body": {
+						"type": "TSModuleDeclaration",
+						"start": 215,
+						"end": 243,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 22
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"id": {
+							"type": "Identifier",
+							"start": 215,
+							"end": 216,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 22
+								},
+								"end": {
+									"line": 8,
+									"column": 23
+								}
+							},
+							"name": "D"
+						},
+						"body": {
+							"type": "TSModuleBlock",
+							"start": 217,
+							"end": 243,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 24
+								},
+								"end": {
+									"line": 10,
+									"column": 2
+								}
+							},
+							"body": [
+								{
+									"type": "ExportNamedDeclaration",
+									"start": 221,
+									"end": 240,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 21
+										}
+									},
+									"exportKind": "value",
+									"declaration": {
+										"type": "VariableDeclaration",
+										"start": 228,
+										"end": 240,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 9
+											},
+											"end": {
+												"line": 9,
+												"column": 21
+											}
+										},
+										"declarations": [
+											{
+												"type": "VariableDeclarator",
+												"start": 234,
+												"end": 239,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 15
+													},
+													"end": {
+														"line": 9,
+														"column": 20
+													}
+												},
+												"id": {
+													"type": "Identifier",
+													"start": 234,
+													"end": 235,
+													"loc": {
+														"start": {
+															"line": 9,
+															"column": 15
+														},
+														"end": {
+															"line": 9,
+															"column": 16
+														}
+													},
+													"name": "a"
+												},
+												"init": {
+													"type": "Literal",
+													"start": 238,
+													"end": 239,
+													"loc": {
+														"start": {
+															"line": 9,
+															"column": 19
+														},
+														"end": {
+															"line": 9,
+															"column": 20
+														}
+													},
+													"value": 1,
+													"raw": "1"
+												}
+											}
+										],
+										"kind": "const"
+									},
+									"specifiers": [],
+									"source": null
+								}
+							]
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c2 ",
+								"start": 206,
+								"end": 214
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Block comment after the `.` — stays on that side",
+							"start": 141,
+							"end": 192
+						}
+					]
+				},
+				{
+					"type": "TSModuleDeclaration",
+					"start": 278,
+					"end": 338,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 288,
+						"end": 289,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 11
+							},
+							"end": {
+								"line": 13,
+								"column": 12
+							}
+						},
+						"name": "E"
+					},
+					"body": {
+						"type": "TSModuleDeclaration",
+						"start": 299,
+						"end": 338,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 22
+							},
+							"end": {
+								"line": 15,
+								"column": 2
+							}
+						},
+						"id": {
+							"type": "Identifier",
+							"start": 299,
+							"end": 300,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 22
+								},
+								"end": {
+									"line": 13,
+									"column": 23
+								}
+							},
+							"name": "F",
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c4 ",
+									"start": 301,
+									"end": 309
+								}
+							]
+						},
+						"body": {
+							"type": "TSModuleDeclaration",
+							"start": 310,
+							"end": 338,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 33
+								},
+								"end": {
+									"line": 15,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 310,
+								"end": 311,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 33
+									},
+									"end": {
+										"line": 13,
+										"column": 34
+									}
+								},
+								"name": "G"
+							},
+							"body": {
+								"type": "TSModuleBlock",
+								"start": 312,
+								"end": 338,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 35
+									},
+									"end": {
+										"line": 15,
+										"column": 2
+									}
+								},
+								"body": [
+									{
+										"type": "ExportNamedDeclaration",
+										"start": 316,
+										"end": 335,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 2
+											},
+											"end": {
+												"line": 14,
+												"column": 21
+											}
+										},
+										"exportKind": "value",
+										"declaration": {
+											"type": "VariableDeclaration",
+											"start": 323,
+											"end": 335,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 9
+												},
+												"end": {
+													"line": 14,
+													"column": 21
+												}
+											},
+											"declarations": [
+												{
+													"type": "VariableDeclarator",
+													"start": 329,
+													"end": 334,
+													"loc": {
+														"start": {
+															"line": 14,
+															"column": 15
+														},
+														"end": {
+															"line": 14,
+															"column": 20
+														}
+													},
+													"id": {
+														"type": "Identifier",
+														"start": 329,
+														"end": 330,
+														"loc": {
+															"start": {
+																"line": 14,
+																"column": 15
+															},
+															"end": {
+																"line": 14,
+																"column": 16
+															}
+														},
+														"name": "a"
+													},
+													"init": {
+														"type": "Literal",
+														"start": 333,
+														"end": 334,
+														"loc": {
+															"start": {
+																"line": 14,
+																"column": 19
+															},
+															"end": {
+																"line": 14,
+																"column": 20
+															}
+														},
+														"value": 1,
+														"raw": "1"
+													}
+												}
+											],
+											"kind": "const"
+										},
+										"specifiers": [],
+										"source": null
+									}
+								]
+							}
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c3 ",
+								"start": 290,
+								"end": 298
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Both gaps in a deeper chain",
+							"start": 246,
+							"end": 276
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -1,0 +1,359 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 389,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 83,
+				"data": " line comment breaks the head: continuation indents, } dangles (divergence) "
+			},
+			{
+				"type": "Text",
+				"start": 83,
+				"end": 84,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 84,
+				"end": 121,
+				"test": {
+					"type": "Identifier",
+					"start": 96,
+					"end": 100,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 5
+						}
+					},
+					"name": "cond",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c1",
+							"start": 89,
+							"end": 94
+						}
+					]
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 102,
+							"end": 104,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 104,
+							"end": 115,
+							"name": "p",
+							"name_loc": {
+								"start": {
+									"line": 5,
+									"column": 2,
+									"character": 105
+								},
+								"end": {
+									"line": 5,
+									"column": 3,
+									"character": 106
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 107,
+										"end": 111,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 115,
+							"end": 116,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 121,
+				"end": 123,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 123,
+				"end": 224,
+				"data": " multiline block comment breaks the head; its interior stays verbatim, } dangles (divergence) "
+			},
+			{
+				"type": "Text",
+				"start": 224,
+				"end": 225,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 225,
+				"end": 267,
+				"test": {
+					"type": "Identifier",
+					"start": 242,
+					"end": 246,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 6
+						},
+						"end": {
+							"line": 10,
+							"column": 10
+						}
+					},
+					"name": "cond",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c1\nc2 ",
+							"start": 230,
+							"end": 241
+						}
+					]
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 248,
+							"end": 250,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 250,
+							"end": 261,
+							"name": "p",
+							"name_loc": {
+								"start": {
+									"line": 12,
+									"column": 2,
+									"character": 251
+								},
+								"end": {
+									"line": 12,
+									"column": 3,
+									"character": 252
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 253,
+										"end": 257,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 261,
+							"end": 262,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 267,
+				"end": 269,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 269,
+				"end": 349,
+				"data": " single-line block comment breaks nothing: head stays inline, both agree "
+			},
+			{
+				"type": "Text",
+				"start": 349,
+				"end": 350,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 350,
+				"end": 388,
+				"test": {
+					"type": "Identifier",
+					"start": 364,
+					"end": 368,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 14
+						},
+						"end": {
+							"line": 16,
+							"column": 18
+						}
+					},
+					"name": "cond",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c1 ",
+							"start": 355,
+							"end": 363
+						}
+					]
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 369,
+							"end": 371,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 371,
+							"end": 382,
+							"name": "p",
+							"name_loc": {
+								"start": {
+									"line": 17,
+									"column": 2,
+									"character": 372
+								},
+								"end": {
+									"line": 17,
+									"column": 3,
+									"character": 373
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 374,
+										"end": 378,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 382,
+							"end": 383,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"alternate": null
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 89,
+			"end": 94,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 5
+				},
+				"end": {
+					"line": 2,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1\nc2 ",
+			"start": 230,
+			"end": 241,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 5
+				},
+				"end": {
+					"line": 10,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 355,
+			"end": 363,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 5
+				},
+				"end": {
+					"line": 16,
+					"column": 13
+				}
+			}
+		}
+	]
+}

@@ -1,0 +1,523 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 510,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A line comment in each gap of the import-equals header — each stays where the",
+			"start": 20,
+			"end": 100,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " author wrote it, and the whole header continues at ONE indent level",
+			"start": 102,
+			"end": 172,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 181,
+			"end": 186,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 8
+				},
+				"end": {
+					"line": 4,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 196,
+			"end": 201,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 9
+				},
+				"end": {
+					"line": 5,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 206,
+			"end": 211,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 4
+				},
+				"end": {
+					"line": 6,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 216,
+			"end": 221,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 4
+				},
+				"end": {
+					"line": 7,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The module reference continues one level down, and its own breaks nest inside",
+			"start": 242,
+			"end": 322,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " that level — its contents one deeper than `require(`, its `)` back at the",
+			"start": 324,
+			"end": 400,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " reference's own level",
+			"start": 402,
+			"end": 426,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 439,
+			"end": 444,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 12
+				},
+				"end": {
+					"line": 13,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c6",
+			"start": 459,
+			"end": 464,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 3
+				},
+				"end": {
+					"line": 15,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c7",
+			"start": 474,
+			"end": 479,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 9
+				},
+				"end": {
+					"line": 16,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c8",
+			"start": 483,
+			"end": 488,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 3
+				},
+				"end": {
+					"line": 17,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c9",
+			"start": 494,
+			"end": 499,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 5
+				},
+				"end": {
+					"line": 18,
+					"column": 10
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 509,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 500,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 19,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSImportEqualsDeclaration",
+					"start": 174,
+					"end": 239,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 17
+						}
+					},
+					"importKind": "value",
+					"isExport": true,
+					"id": {
+						"type": "Identifier",
+						"start": 204,
+						"end": 205,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 2
+							},
+							"end": {
+								"line": 6,
+								"column": 3
+							}
+						},
+						"name": "A",
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c1",
+								"start": 181,
+								"end": 186
+							},
+							{
+								"type": "Line",
+								"value": " c2",
+								"start": 196,
+								"end": 201
+							}
+						],
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c3",
+								"start": 206,
+								"end": 211
+							}
+						]
+					},
+					"moduleReference": {
+						"type": "TSExternalModuleReference",
+						"start": 224,
+						"end": 238,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 2
+							},
+							"end": {
+								"line": 8,
+								"column": 16
+							}
+						},
+						"expression": {
+							"type": "Literal",
+							"start": 232,
+							"end": 237,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 10
+								},
+								"end": {
+									"line": 8,
+									"column": 15
+								}
+							},
+							"value": "./a",
+							"raw": "'./a'"
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c4",
+								"start": 216,
+								"end": 221
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A line comment in each gap of the import-equals header — each stays where the",
+							"start": 20,
+							"end": 100
+						},
+						{
+							"type": "Line",
+							"value": " author wrote it, and the whole header continues at ONE indent level",
+							"start": 102,
+							"end": 172
+						}
+					]
+				},
+				{
+					"type": "TSImportEqualsDeclaration",
+					"start": 428,
+					"end": 493,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 4
+						}
+					},
+					"importKind": "value",
+					"isExport": false,
+					"id": {
+						"type": "Identifier",
+						"start": 435,
+						"end": 436,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 8
+							},
+							"end": {
+								"line": 13,
+								"column": 9
+							}
+						},
+						"name": "B"
+					},
+					"moduleReference": {
+						"type": "TSExternalModuleReference",
+						"start": 447,
+						"end": 492,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 2
+							},
+							"end": {
+								"line": 18,
+								"column": 3
+							}
+						},
+						"expression": {
+							"type": "Literal",
+							"start": 468,
+							"end": 473,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 3
+								},
+								"end": {
+									"line": 16,
+									"column": 8
+								}
+							},
+							"value": "./b",
+							"raw": "'./b'",
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c6",
+									"start": 459,
+									"end": 464
+								}
+							],
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " c7",
+									"start": 474,
+									"end": 479
+								}
+							]
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c5",
+								"start": 439,
+								"end": 444
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The module reference continues one level down, and its own breaks nest inside",
+							"start": 242,
+							"end": 322
+						},
+						{
+							"type": "Line",
+							"value": " that level — its contents one deeper than `require(`, its `)` back at the",
+							"start": 324,
+							"end": 400
+						},
+						{
+							"type": "Line",
+							"value": " reference's own level",
+							"start": 402,
+							"end": 426
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c8",
+							"start": 483,
+							"end": 488
+						},
+						{
+							"type": "Line",
+							"value": " c9",
+							"start": 494,
+							"end": 499
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

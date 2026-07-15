@@ -836,33 +836,45 @@ impl<'a> Printer<'a> {
             return self.build_empty_array_pattern_doc(arr);
         }
 
-        // Expand if line comments or own-line block comments. One whole-span
-        // comment pre-check gates both scans; array patterns don't force-expand on
-        // blank lines, so a comment-free pattern skips the element scan entirely.
+        // Expand if line comments, multi-line block comments, or own-line block comments.
+        // One whole-span comment pre-check gates the scans; array patterns don't
+        // force-expand on blank lines, so a comment-free pattern skips the element scan
+        // entirely.
+        //
+        // The three sub-questions must match the array EXPRESSION's gate
+        // (`arrays.rs`'s `has_expanding_comments`) — this asked only two, and a comment
+        // shape that expands `[a, b /* x⏎y */]` but not `const [a, b /* x⏎y */] = arr` is
+        // a bug every time. It was: only the expanded path emits the dangling comments
+        // after the last element, so a multi-line one landed on the grouped path and was
+        // DROPPED outright (fixture `array_own_line_multiline_comment_expand`).
+        // `has_own_line_block_comments_in_bracket_list` deliberately skips multi-line
+        // comments — the multi-line question is this separate predicate's, not its.
         let boundary = arr
             .type_annotation
             .as_ref()
             .map_or(arr.span.end, |t| t.span.start);
         let has_comments = self.has_comments_on_page_between(arr.span.start, boundary);
-        let (has_line_comments, has_own_line_block) = if has_comments {
-            // Flatten once (skip holes) and share across both scans.
+        let (has_line_comments, has_multiline_block, has_own_line_block) = if has_comments {
+            // Flatten once (skip holes) and share across the scans.
             let non_null: SmallVec<[_; 8]> = arr.elements.iter().flatten().collect();
             let has_line_comments = self
                 .collection_formatting_hints(arr.span.start, boundary, &non_null, true, |elem| {
                     elem.span()
                 })
                 .0;
+            let has_multiline_block =
+                self.has_multiline_block_comments_on_page_between(arr.span.start, boundary);
             let has_own_line_block = self.has_own_line_block_comments_in_bracket_list(
                 Span::new(arr.span.start, boundary),
                 &non_null,
                 |elem| elem.span(),
             );
-            (has_line_comments, has_own_line_block)
+            (has_line_comments, has_multiline_block, has_own_line_block)
         } else {
-            (false, false)
+            (false, false, false)
         };
 
-        if has_line_comments || has_own_line_block {
+        if has_line_comments || has_multiline_block || has_own_line_block {
             self.build_expanded_array_pattern_doc(arr)
         } else {
             self.build_grouped_array_pattern_doc(arr, has_comments)

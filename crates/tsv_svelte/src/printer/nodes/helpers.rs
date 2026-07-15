@@ -630,7 +630,27 @@ impl<'a> Printer<'a> {
             .map(|c| self.build_trailing_js_comment_doc(c))
             .collect();
 
-        self.concat_with_surrounding_comments(leading_docs, expr_doc, trailing_docs)
+        let body = self.concat_with_surrounding_comments(leading_docs, expr_doc, trailing_docs);
+
+        // A leading LINE comment breaks the head (`build_leading_js_comment_doc` ends it
+        // with a hardline), so what follows starts a genuine continuation line and takes the
+        // continuation indent — the same shape a width-wrapped head gets:
+        //
+        //     {#if a &&        {#if // c1
+        //         b            \tcond
+        //     }                }
+        //
+        // The rule is keyed on *that* the head broke, not on why; without the indent the
+        // condition sits at base with the `}` dangling below it, closing nothing.
+        //
+        // A leading BLOCK comment is deliberately excluded, multi-line or not. It ends with
+        // a space, never a hardline: a single-line one doesn't break the head at all, and a
+        // multi-line one's newlines live *inside* its verbatim source span, which renders
+        // with no context indent by design (the interior stays as authored), so its
+        // continuation is the comment's own line and there is nothing to indent.
+        let breaks_head =
+            comments_to_emit_in_range(self.comments, span_start, expr_start).any(|c| !c.is_block);
+        if breaks_head { d.indent(body) } else { body }
     }
 
     /// Build a block head's expression doc, deriving both the comment-scan start offset

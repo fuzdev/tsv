@@ -199,10 +199,7 @@ impl<'a> Printer<'a> {
             // (`break loop; /* c */`, prettier 3.9), a same-line line via `line_suffix`,
             // an own-line comment on its own line after. See `split_separator_gap_comments`.
             let semicolon_pos = span.end.saturating_sub(1);
-            let after =
-                self.split_separator_gap_comments(&mut parts, label.span.end, semicolon_pos, true);
-            parts.push(d.text(";"));
-            parts.extend(after);
+            self.push_semicolon_with_gap_comments(&mut parts, label.span.end, semicolon_pos, true);
             d.concat(&parts)
         } else {
             // No label: a bare keyword closed by `;`. It swallows a following explicit

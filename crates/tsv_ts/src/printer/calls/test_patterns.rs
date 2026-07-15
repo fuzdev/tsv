@@ -7,7 +7,6 @@ use super::super::Printer;
 use crate::ast::internal::{self, IdentName};
 use smallvec::SmallVec;
 use tsv_lang::SymbolResolver;
-use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
 /// Test function patterns that Prettier keeps on a single line
@@ -45,9 +44,9 @@ pub(super) const TEST_CALL_PATTERNS: &[&str] = &[
 ];
 
 /// Get the name channel (+ span start) of an identifier if it's a simple identifier
-fn get_identifier_name(expr: &internal::Expression<'_>) -> Option<(IdentName, u32)> {
+fn get_identifier_name(expr: &internal::Expression<'_>) -> Option<(IdentName, u32, u32)> {
     if let internal::Expression::Identifier(id) = expr {
-        Some((id.ident_name(), id.span.start))
+        Some((id.ident_name(), id.span.start, id.span.end))
     } else {
         None
     }
@@ -66,34 +65,45 @@ fn get_identifier_name(expr: &internal::Expression<'_>) -> Option<(IdentName, u3
 /// pattern list against the same chain parts directly (also no allocation) via
 /// the shared [`get_member_chain_parts`], so the two stay in lockstep on which
 /// callees qualify.
+///
+/// Each `.` goes through the shared dotted-pair printer, which emits the gaps
+/// around it — the positions an author can comment in (`describe /* c */.only`,
+/// `test./* c */ skip`). Joining the parts with a bare `d.text(".")` scans none of
+/// them and drops what's there. It stays break-free: with no comment in a gap the
+/// pair is the same three text nodes as before.
 pub(super) fn build_test_callee_flat_doc(
     expr: &internal::Expression<'_>,
     printer: &Printer<'_>,
 ) -> Option<DocId> {
     let parts = get_member_chain_parts(expr)?;
-    let d = printer.d();
-    // Parts come out leaf→root; reverse to root→leaf (`test.describe.only`).
-    let mut doc_parts = DocBuf::new();
-    for (i, (name, name_start)) in parts.iter().rev().enumerate() {
-        if i > 0 {
-            doc_parts.push(d.text("."));
-        }
-        doc_parts.push(printer.ident_name_doc(*name, *name_start));
+    // Parts come out leaf→root; reverse to root→leaf (`test.describe.only`), which is
+    // also the AST's own association — each pair's left is everything before its dot.
+    let mut iter = parts.iter().rev();
+    // A single-part callee (`it`) is the bare name: the loop never runs.
+    let &(name, start, mut prev_end) = iter.next()?;
+    let mut doc = printer.ident_name_doc(name, start);
+    for &(name, start, end) in iter {
+        doc = printer.build_dotted_pair_doc(
+            doc,
+            printer.ident_name_doc(name, start),
+            prev_end,
+            start,
+        );
+        prev_end = end;
     }
-    // `concat` short-circuits a single-part callee (`it`) to the bare symbol.
-    Some(d.concat(&doc_parts))
+    Some(doc)
 }
 
 /// Get the member chain parts from an expression
 /// Returns parts reversed, e.g. `["skip", "test"]` for `test.skip`.
 fn get_member_chain_parts(
     expr: &internal::Expression<'_>,
-) -> Option<SmallVec<[(IdentName, u32); 8]>> {
-    let mut parts: SmallVec<[(IdentName, u32); 8]> = SmallVec::new();
+) -> Option<SmallVec<[(IdentName, u32, u32); 8]>> {
+    let mut parts: SmallVec<[(IdentName, u32, u32); 8]> = SmallVec::new();
 
     match expr {
         internal::Expression::Identifier(id) => {
-            parts.push((id.ident_name(), id.span.start));
+            parts.push((id.ident_name(), id.span.start, id.span.end));
             Some(parts)
         }
         internal::Expression::MemberExpression(member) => {
@@ -182,7 +192,7 @@ pub(super) fn is_test_call(call: &internal::CallExpression<'_>, printer: &Printe
     let names: SmallVec<[&str; 8]> = parts
         .iter()
         .rev()
-        .map(|&(name, name_start)| name.resolve(name_start, printer.source, &interner))
+        .map(|&(name, name_start, _)| name.resolve(name_start, printer.source, &interner))
         .collect();
     TEST_CALL_PATTERNS
         .iter()

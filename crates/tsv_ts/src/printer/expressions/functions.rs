@@ -97,6 +97,41 @@ pub(in crate::printer) fn has_leftmost_object_expression(expr: &internal::Expres
 /// keeping `({` and `}: Type)` together while letting the pattern's content break.
 ///
 /// Shared with the signature-param path (`build_signature_params_doc`) so bodyless
+/// Whether `arrow`'s signature — its params' `(` through its `=>` — holds a comment that
+/// **forces** a break.
+///
+/// The expand-last-arg hug renders that signature on one line, which such a comment makes
+/// impossible: the break is forced out mid-hug (`map(([/* a⏎b */ x, y]) => …`) instead of
+/// breaking the call, which is neither layout anyone asked for.
+///
+/// Prettier reaches the same conclusion by another route: the hug state's hard line
+/// propagates a break to its enclosing `conditionalGroup`, whose printer then jumps
+/// straight to the most-expanded state (`call-arguments.js`, `printer.js`'s `doc.break`
+/// arm). tsv has no break-propagation pass — `should_break` is only ever set explicitly —
+/// so the question is asked here instead, of the **source**, before either hug path builds
+/// anything. Asking pre-build is also what keeps this off the exponential-rebuild rake: the
+/// alternative, building the arrow and inspecting `will_break`, needs a second build of the
+/// same subtree on the fall-through.
+///
+/// Both hug paths (`call_formatting.rs`'s plain call, `chain_args.rs`'s member chain) route
+/// through this one predicate — the two disagreeing about when a hug is legal is exactly
+/// how the mangle survived on `arr.map(…)` while `fn(…)` was fine.
+///
+/// A **single-line** block comment is deliberately absent: `fn(([/* c */ x, y]) => [y, x])`
+/// hugs, in tsv and prettier alike, because it inlines without forcing anything.
+pub(in crate::printer) fn arrow_signature_has_breaking_comments(
+    printer: &Printer<'_>,
+    arrow: &internal::ArrowFunctionExpression<'_>,
+) -> bool {
+    // `arrow_token` is the `=>`, captured by the parser for exactly this kind of question.
+    // An unparenthesized `x => …` has no `(`, so the signature starts at the arrow node
+    // itself — which still catches `x /* a⏎b */ => y`.
+    let start = arrow.params_start.unwrap_or(arrow.span.start);
+    let end = arrow.arrow_token;
+    printer.has_line_comments_between(start, end)
+        || printer.has_multiline_block_comments_on_page_between(start, end)
+}
+
 /// declarations (declare / overload) and type-member signatures (method / call /
 /// construct) hug the lone param exactly like value-param functions do.
 pub(in crate::printer) fn is_huggable_pattern(expr: &internal::Expression<'_>) -> bool {
