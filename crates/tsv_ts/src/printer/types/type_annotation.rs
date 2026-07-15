@@ -5,7 +5,7 @@
 // - Width-aware wrapping for type arguments
 // - Return type annotations
 
-use super::helpers::{should_hug_union_type, type_args_should_wrap_for_return_type};
+use super::helpers::type_args_should_wrap_for_return_type;
 use super::{CommentSpacing, Printer};
 use crate::ast::internal::{self, TSType};
 use crate::printer::layout::hang_after_operator;
@@ -30,8 +30,18 @@ impl<'a> Printer<'a> {
         let colon_end = annotation.span.start + 1; // After the `:`
         let type_start = annotation.type_annotation.span().start;
 
+        // Zero-comment gate over the `:`→type gap, computed once and reused by every
+        // arm below (the union arm and the simple fall-through ask for this exact
+        // range; a type annotation is among the most frequent TS constructs and a
+        // comment inside one is rare). It also subsumes the line-comment check that
+        // follows: ownership only ever binds a *block* comment (`owned ⇒ is_block`),
+        // so a line comment is always in the to-emit set and no gap without to-emit
+        // comments can hold one. The wrapping sibling
+        // (`build_type_annotation_doc_with_wrapping`) already hoists this way.
+        let gap_has_comments = self.has_comments_to_emit_between(colon_end, type_start);
+
         // Check if there's a line comment between : and the type
-        if self.has_line_comments_between(colon_end, type_start) {
+        if gap_has_comments && self.has_line_comments_between(colon_end, type_start) {
             // Uniform forced-continuation indent (`build_continuation_indent`): the
             // first comment trails `:` on its line, then the remaining comments and the
             // type drop one indent level so the continuation reads as part of this
@@ -66,7 +76,7 @@ impl<'a> Printer<'a> {
                     let type_doc = self.build_union_type_doc(u);
                     // Comments between `:` and the union type (e.g., `: /* c */ A | B`);
                     // omit the empty child on the comment-free common path. Byte-identical.
-                    let hung = if self.has_comments_to_emit_between(colon_end, type_start) {
+                    let hung = if gap_has_comments {
                         let comments_doc = self.build_comments_between(
                             colon_end,
                             type_start,
@@ -88,7 +98,7 @@ impl<'a> Printer<'a> {
                     colon_end,
                     type_start,
                     annotation.type_annotation,
-                    self.has_comments_to_emit_between(colon_end, type_start),
+                    gap_has_comments,
                 ),
             }
         }
@@ -252,8 +262,8 @@ impl<'a> Printer<'a> {
             // break-after-colon fallback. `union_return_hugs` scopes it: a
             // `Promise<…> | null` `TSTypeReference` member is excluded (the sanctioned
             // `return_type_generic_union` print-width family, handled by the
-            // `should_hug_union_type` branch below), and a member/gap comment
-            // disqualifies the hug.
+            // `union_prints_hugged` branch below), and any comment that makes the printer
+            // decline the hug disqualifies it here too.
             if self.union_return_hugs(value_type, u, colon_end, value_type_start) {
                 return match comments_doc {
                     Some(c) => d.concat(&[d.text(": "), c, type_doc]),
@@ -261,7 +271,7 @@ impl<'a> Printer<'a> {
                 };
             }
 
-            if should_hug_union_type(u) {
+            if self.union_prints_hugged(u) {
                 // A should-hug union that didn't take the brace-hug above: a
                 // `TSTypeReference` object-like member with only void siblings
                 // (`Promise<…> | null`), or a brace union whose member/gap comment

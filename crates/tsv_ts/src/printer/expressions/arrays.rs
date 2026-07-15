@@ -730,42 +730,14 @@ impl<'a> Printer<'a> {
                 parts.push(d.hardline());
             }
 
-            // Emit leading comments BEFORE real element.
-            if elem.is_some() {
-                for (ci, comment) in leading_comments.iter().enumerate() {
-                    if ci > 0 {
-                        let prev_comment_end = leading_comments[ci - 1].span.end;
-                        if self.has_blank_line_between(prev_comment_end, comment.span.start) {
-                            parts.push(d.literalline());
-                            parts.push(d.hardline());
-                        }
-                    }
-                    parts.push(self.build_comment_doc(comment));
-                    // If a blank line follows, the next iter's literalline+hardline
-                    // handles the separator — emit nothing here.
-                    let next_is_separated_by_blank =
-                        leading_comments.get(ci + 1).is_some_and(|next| {
-                            self.has_blank_line_between(comment.span.end, next.span.start)
-                        });
-                    if !next_is_separated_by_blank {
-                        if self.comment_hugs_next(comment, elem_start) {
-                            parts.push(d.text(" "));
-                        } else {
-                            // Last comment before the element: preserve a blank line
-                            // the author left between the comment and the element.
-                            if leading_comments.get(ci + 1).is_none()
-                                && self.has_blank_line_between(comment.span.end, elem_start)
-                            {
-                                parts.push(d.literalline());
-                            }
-                            parts.push(d.hardline());
-                        }
-                    }
-                }
-            }
-
+            // The element's leading run and the element form one group — see
+            // `build_list_element_group` for why. A hole takes neither.
             if let Some(e) = elem {
-                parts.push(self.build_arg_expression_doc(e));
+                parts.push(self.build_list_element_group_from_comments(
+                    leading_comments.iter().copied(),
+                    elem_start,
+                    self.build_arg_expression_doc(e),
+                ));
             }
 
             // Same-line trailing comments (real elements only).

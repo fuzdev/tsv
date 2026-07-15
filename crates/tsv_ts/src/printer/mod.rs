@@ -60,7 +60,7 @@ pub(crate) use expressions::assignment::{
     is_type_assertion_call, jsdoc_cast_comment_is_own_line,
 };
 pub(crate) use needs_parens::{ParenContext, is_in_binary, needs_parens};
-pub(crate) use types::{should_hug_union_type, unwrap_parenthesized};
+pub(crate) use types::unwrap_parenthesized;
 
 use crate::PrinterInputs;
 use crate::ast::internal;

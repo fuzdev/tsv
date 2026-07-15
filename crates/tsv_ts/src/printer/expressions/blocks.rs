@@ -300,11 +300,8 @@ impl<'a> Printer<'a> {
                     } else if has_leading {
                         body_parts.push(d.hardline());
                     }
-                    body_parts.extend(self.build_leading_comments_with_blank_lines(
-                        &leading_comments,
-                        search_end,
-                        true,
-                    ));
+                    body_parts
+                        .extend(self.build_orphaned_comment_run(&leading_comments, search_end));
                     prev_stmt_end = Some(stmt_end);
                 }
 
@@ -338,7 +335,17 @@ impl<'a> Printer<'a> {
                 // Check for blank lines between statements — up to the first comment
                 // physically in the gap, which is not always the first one this gap
                 // *emits* (an owned annotation is printed by the statement it leads).
-                let blank_line_check_end = self.blank_scan_end(prev_end, stmt_start);
+                //
+                // Inside the window gate: `blank_scan_end` is itself a comment search,
+                // and with no comment anywhere in the block it provably returns
+                // `stmt_start`. The gate is an *on-page* question and this is an
+                // *in-source* one, which is sound because only the *to-emit* axis skips
+                // an owned comment — on-page and in-source have the same membership.
+                let blank_line_check_end = if body_has_comments {
+                    self.blank_scan_end(prev_end, stmt_start)
+                } else {
+                    stmt_start
+                };
                 if self.has_blank_line_between(prev_end, blank_line_check_end) {
                     body_parts.push(d.literalline());
                 }
@@ -346,11 +353,7 @@ impl<'a> Printer<'a> {
             }
 
             // Print leading comments before this statement (with blank line preservation)
-            body_parts.extend(self.build_leading_comments_with_blank_lines(
-                &leading_comments,
-                stmt_start,
-                false,
-            ));
+            body_parts.extend(self.build_leading_comments_before(&leading_comments, stmt_start));
 
             // format-ignore: emit raw source instead of formatting
             if body_has_comments && self.has_format_ignore_in_range(prev_end, stmt_start) {

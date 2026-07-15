@@ -9,6 +9,16 @@
 			)
 		| C;
 
+	// first member is a retained-paren intersection with a trailing object, which
+	// supplies its own aligned layout - the comment is kept inside the parens the same
+	// way, hugging the `(` above the intersection
+	type FirstIntersection =
+		| (// c
+			A & {
+				a: 1;
+			})
+		| C;
+
 	// a leading line comment inside a LATER member's parens relocates to trail the
 	// previous member; only the first member - with no previous member to relocate
 	// onto - keeps the comment inside the parens

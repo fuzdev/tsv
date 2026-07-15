@@ -1837,7 +1837,7 @@ const fill_101_boundary: DivergencePattern = {
 	languages: ['svelte', 'typescript', 'css'],
 	conformance_sections: ['CSS: Layout', 'CSS: Values', 'Svelte/HTML', 'TypeScript'],
 	fixtures: [
-		'css/comma_separated_greedy_fill_prettier_divergence',
+		'css/values/lists/comma_separated_greedy_fill_prettier_divergence',
 		'css/values/lists/comma_space_separated_long_prettier_divergence',
 		'svelte/elements/inline_element_fill_long_prettier_divergence',
 		'svelte/elements/inline_component_fill_long_prettier_divergence',

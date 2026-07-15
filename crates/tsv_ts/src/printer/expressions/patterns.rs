@@ -610,11 +610,7 @@ impl<'a> Printer<'a> {
                 CommentVec::new()
             };
 
-            prop_parts.extend(self.build_leading_comments_with_blank_lines(
-                &leading_comments,
-                prop_start,
-                false,
-            ));
+            prop_parts.extend(self.build_leading_comments_before(&leading_comments, prop_start));
 
             // A preceding format-ignore directive keeps the property's source verbatim
             // (trailing comment/comma handled normally)
@@ -1007,13 +1003,14 @@ impl<'a> Printer<'a> {
                                     .is_some_and(|dpos| self.comment_on_delimiter_line(dpos, c)))
                         })
                         .collect();
-                parts.extend(self.build_leading_comments_with_blank_lines(
-                    &leading_comments,
+                // The element's leading run and the element form one group — see
+                // `build_list_element_group` for why (prettier routes `ArrayPattern`
+                // through the same `printArray` as an array literal).
+                parts.push(self.build_list_element_group_from_comments(
+                    leading_comments.iter().copied(),
                     elem_start,
-                    false,
+                    self.build_expression_doc(e),
                 ));
-
-                parts.push(self.build_expression_doc(e));
 
                 let elem_end = e.span().end;
 

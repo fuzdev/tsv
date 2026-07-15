@@ -29,7 +29,7 @@ mod type_params;
 mod union_intersection;
 
 // Re-export public items from helpers
-pub use helpers::{should_hug_union_type, unwrap_parenthesized};
+pub use helpers::unwrap_parenthesized;
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`
 pub(super) use super::{CommentFilter, CommentSpacing, Printer};

@@ -12,7 +12,7 @@ punctuation; it never exceeds by more — a value content of 101 wraps for both)
 
 Print width. tsv treats printWidth as a hard limit, so it breaks one item early rather than let the
 trailing terminator push the line to 101; Prettier leaves it on one line. Same precise 1-char
-trailing-punctuation overage documented at [comma_separated_greedy_fill](../../../comma_separated_greedy_fill_prettier_divergence/).
+trailing-punctuation overage documented at [comma_separated_greedy_fill](../comma_separated_greedy_fill_prettier_divergence/).
 See [conformance_prettier.md §CSS: Values](../../../../../../docs/conformance_prettier.md#css-values) ("Space-separated value wrap").
 
 ## Related

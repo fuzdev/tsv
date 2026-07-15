@@ -975,11 +975,8 @@ impl<'a> Printer<'a> {
             // element, drop comments pulled onto the `[` line (emitted as the
             // bracket-line prefix below).
             let skip_delim = if i == 0 { delimiter_pull_pos } else { None };
-            inner_parts.extend(
-                self.build_leading_comments_multiline_opt(prev_end, elem_start, skip_delim),
-            );
-
-            inner_parts.push(self.build_type_doc(elem));
+            let leading = self.build_leading_comments_multiline(prev_end, elem_start, skip_delim);
+            inner_parts.push(self.build_list_element_group(leading, self.build_type_doc(elem)));
 
             if !is_last {
                 let next_start = t.element_types[i + 1].span().start;
