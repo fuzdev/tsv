@@ -64,3 +64,11 @@ then val}
 	use:fn={expr // c
 	}
 ></div>
+<svelte:element
+	this={tag // c
+	}
+></svelte:element>
+<svelte:component
+	this={Comp // c
+	}
+></svelte:component>

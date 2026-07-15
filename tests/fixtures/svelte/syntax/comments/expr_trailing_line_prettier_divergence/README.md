@@ -24,7 +24,12 @@ the comment and stays idempotent.
 Affected contexts mirror the block-comment sibling, plus the buffer-printed tags:
 `{expr}`, `{@html}`, `{@render}`, `{@debug}`, `{@const}`, `{#if}` / `{:else if}`,
 `{#each}` (collection and key), `{#await}`, `{#key}`, `{...spread}`, `bind:value={}`,
-`{@attach}`, `data-attr={}`, `on:event={}`, `class:name={}`, `use:action={}`.
+`{@attach}`, `data-attr={}`, `on:event={}`, `class:name={}`, `use:action={}`,
+`<svelte:element this={}>`, `<svelte:component this={}>`.
+
+A `this={}` line comment also expands its element (the `//` forces the attribute to break,
+so the attributes can no longer sit on the tag's own line) — prettier expands it the same
+way for the positions it does keep, e.g. [expr_special_this](../expr_special_this/).
 
 `{@const x = value // c}` drops the comment like the rest. Under
 prettier-plugin-svelte 3.5.2 this one case instead produced broken output with an

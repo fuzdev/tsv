@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 725,
+	"end": 836,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -1475,6 +1475,114 @@
 					"type": "Fragment",
 					"nodes": []
 				}
+			},
+			{
+				"type": "Text",
+				"start": 724,
+				"end": 725,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteElement",
+				"start": 725,
+				"end": 777,
+				"name": "svelte:element",
+				"name_loc": {
+					"start": {
+						"line": 22,
+						"column": 1,
+						"character": 726
+					},
+					"end": {
+						"line": 22,
+						"column": 15,
+						"character": 740
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				},
+				"tag": {
+					"type": "Identifier",
+					"start": 747,
+					"end": 750,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 22
+						},
+						"end": {
+							"line": 22,
+							"column": 25
+						}
+					},
+					"name": "tag",
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " c ",
+							"start": 751,
+							"end": 758
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 777,
+				"end": 778,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteComponent",
+				"start": 778,
+				"end": 835,
+				"name": "svelte:component",
+				"name_loc": {
+					"start": {
+						"line": 23,
+						"column": 1,
+						"character": 779
+					},
+					"end": {
+						"line": 23,
+						"column": 17,
+						"character": 795
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				},
+				"expression": {
+					"type": "Identifier",
+					"start": 802,
+					"end": 806,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 24
+						},
+						"end": {
+							"line": 23,
+							"column": 28
+						}
+					},
+					"name": "Comp",
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " c ",
+							"start": 807,
+							"end": 814
+						}
+					]
+				}
 			}
 		]
 	},
@@ -1813,6 +1921,38 @@
 				"end": {
 					"line": 21,
 					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 751,
+			"end": 758,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 26
+				},
+				"end": {
+					"line": 22,
+					"column": 33
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 807,
+			"end": 814,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 29
+				},
+				"end": {
+					"line": 23,
+					"column": 36
 				}
 			}
 		}

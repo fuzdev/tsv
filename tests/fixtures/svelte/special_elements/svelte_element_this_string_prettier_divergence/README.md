@@ -37,15 +37,24 @@ hardcoded path. Concatenations (`this={'a' + 'b'}`), template literals
 (`` this={`hello`} ``), ternaries, and every other expression delegate to the JS
 printer and format identically in both tools — covered by
 [svelte_element_this](../svelte_element_this/). One adjacent quirk *is* encoded
-here: a *parenthesized* literal `this={('hello')}` fails prettier's
+here: anything between the `{` and the literal fails prettier's
 `{`-precedes-literal check, so prettier takes the unbraced branch and collapses
 the whole binding to the plain attribute `this="hello"` — a structural rewrite,
-not just a quote swap. tsv strips the redundant parens but keeps the expression
-form, `this={'hello'}`. `unformatted_ours_paren.svelte` holds the paren input
-(tsv normalizes it to `input`); `variant_paren_collapse.svelte` holds prettier's
-collapsed target (both formatters keep it stable), pinning prettier's output via
-the cross-path discovery rule. The escaping cases above, by contrast, stay
-prose-only — their output is invalid/non-convergent, so no stable oracle exists.
+not just a quote swap. Two things do it, and the second also loses content:
+
+- a *parenthesized* literal, `this={('hello')}`. tsv strips the redundant parens
+  but keeps the expression form, `this={'hello'}`.
+- a *leading comment*, `this={/* c */ 'hello'}` (input line 2). Collapsing to a
+  plain attribute leaves the comment nowhere to go, so prettier **drops** it; tsv
+  keeps both the comment and the expression form. The comment positions that
+  prettier does preserve live in
+  [syntax/comments/expr_special_this](../../syntax/comments/expr_special_this/).
+
+`unformatted_ours_paren.svelte` holds the paren inputs (tsv normalizes them to
+`input`); `variant_paren_collapse.svelte` holds prettier's collapsed target (both
+formatters keep it stable), pinning prettier's output via the cross-path discovery
+rule. The escaping cases above, by contrast, stay prose-only — their output is
+invalid/non-convergent, so no stable oracle exists.
 
 A fix has been prepared for prettier-plugin-svelte that restores delegation to the
 JS printer (the pre-modern-ast behavior). Once it releases and tsv's formatting
