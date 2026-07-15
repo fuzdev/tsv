@@ -67,9 +67,9 @@
 //! payload is inert in a `.css` file (harmless: it simply never registers).
 //!
 //! It also inherits **[`code_regions`]' reach**: a gap the region walk doesn't name is a
-//! gap never probed. Today that means a `.svelte` file's `<style>` content and the
-//! non-expression interior of a block tag (the `{#if ⟨here⟩ a.b}` prefix) are unprobed —
-//! see that function's TODO.
+//! gap never probed. Today that means a `.svelte` file's `<style>` content is unprobed, so
+//! a Svelte file containing only a `<style>` block yields **zero sites** — see that
+//! function's TODO for why the ledger's scope, not difficulty, is what holds it back.
 
 use argh::FromArgs;
 use std::collections::{BTreeMap, BTreeSet};
@@ -415,14 +415,28 @@ impl Utf16ToByte {
 /// AST, because the markup around the code is *not* a comment context — see the module docs
 /// on why tsv's own acceptance can't be used for this.
 ///
-/// Two carriers, both read straight off the wire shape rather than by scanning source:
-/// a `Script`'s `content` (the `Program` span is exactly the `>`-to-`</script>` region),
-/// and an `ExpressionTag`'s brace interior (`{ /* c */ x.y }` is legal).
+/// Svelte regions come from **two walks**, because no one AST expresses them all:
 ///
-/// TODO: `<style>` content and the non-expression interior of a block tag (`{#if ⟨here⟩
-/// a.b}`) are not yet named, so no comment is ever probed there. The block-tag prefix needs
-/// the tag's own span rather than its expression's; `<style>` needs the `StyleSheet`'s
-/// content region, which the wire shape only gives via its children's extent.
+/// - [`collect_regions`] over the **wire** shape names the two carriers a canonical node's
+///   own span already is: a `Script`'s `content` (the `Program` span is exactly the
+///   `>`-to-`</script>` region), and an `ExpressionTag`'s brace interior
+///   (`{ /* c */ x.y }` is legal). It finds them by recursive walk, so it cannot miss a
+///   path an `ExpressionTag` hides in (an attribute value, a `<svelte:element this={…}>`).
+/// - [`svelte_only_regions`] over tsv's **internal** AST names the rest, which exist only
+///   as tsv's own parse bookkeeping: a block's `opening_tag_span` and a directive's
+///   `head_span`. Svelte's AST carries neither, so the wire cannot express them — an
+///   `IfBlock`'s span covers the whole block (body included) and its `test` span is the
+///   expression alone, so the head is not derivable from either without a scan.
+///
+/// TODO: `<style>` content is still unnamed, so no comment is probed there. `Style` carries
+/// a `content_span` that names it in one line — the reason to hold off is **yield**, not
+/// difficulty: measured over `tests/fixtures` it is +154k sites (+20% gate runtime) for 3
+/// finding shapes, all `@import`-prelude double-prints. That thinness is structural, not
+/// incidental: the ledger only registers **detached** comments, while a CSS in-block comment
+/// is a `CssBlockChild::Comment` AST node and a declaration-VALUE comment is never lexed as
+/// a `Comment` at all. Probing `<style>` mostly tests the registration gap, so the honest
+/// prerequisite is extending the ledger to AST-node comments (see `comment_ledger`'s own
+/// TODO) — after which this region earns its cost.
 fn code_regions(source: &str, parser: ParserType) -> Vec<(usize, usize)> {
     match parser {
         ParserType::TypeScript | ParserType::Css => vec![(0, source.len())],
@@ -433,13 +447,172 @@ fn code_regions(source: &str, parser: ParserType) -> Vec<(usize, usize)> {
             let mut wire_spans = Vec::new();
             collect_regions(&wire, &mut wire_spans);
             let map = Utf16ToByte::new(source);
-            let byte_spans = wire_spans
+            let mut byte_spans: Vec<(usize, usize)> = wire_spans
                 .into_iter()
                 .filter_map(|(s, e)| Some((map.byte(s)?, map.byte(e)?)))
                 .collect();
+            byte_spans.extend(svelte_only_regions(source));
             merge_regions(byte_spans)
         }
     }
+}
+
+/// The Svelte regions the wire shape cannot express — read off tsv's internal AST.
+///
+/// Every one is a **head**: the run from a construct's opening delimiter to the code it
+/// introduces. Svelte's public AST records only the finished expression, so a head is not
+/// derivable from it; tsv's parser already keeps the two spans this needs
+/// (`opening_tag_span`, `head_span`) for its own comment lookup.
+///
+/// **Interiors only** — never the enclosing delimiter's outside. A tag's `}` is where the
+/// code region ends; the byte *after* it is markup (harmless, but noise), and for a
+/// directive it is the middle of an element tag, where tsv over-accepts a comment Svelte
+/// would reject (the `<script lang="ts"/* c */>` class the module docs name). So a block /
+/// tag contributes `span` minus its two delimiters, and a directive contributes
+/// `head_span.end ..= span.end - 1`, which stops on the closing `}`.
+///
+/// What this deliberately does **not** do is filter the positions within a head where a
+/// comment is illegal — `{#each list as ⟨⟩item}` and `{#await p then ⟨⟩v}` are Svelte's
+/// own hand-read pattern slots, not acorn's, and it rejects a comment in them. No
+/// whitelist is needed because **tsv rejects there too**, so `Formatted::Rejected` filters
+/// them exactly as it does a word interior. The same covers `{⟨⟩#if` and `{#⟨⟩if`.
+fn svelte_only_regions(source: &str) -> Vec<(usize, usize)> {
+    use tsv_svelte::ast::internal::{AttributeNode, Fragment, FragmentNode, SpecialElementKind};
+
+    /// A `{…}`-delimited construct: its interior, both delimiters excluded.
+    fn interior(span: tsv_lang::Span, out: &mut Vec<(usize, usize)>) {
+        let (s, e) = (span.start as usize, span.end as usize);
+        if e > s + 1 {
+            out.push((s + 1, e - 1));
+        }
+    }
+
+    /// A span taken as-is (a bare expression already bounded by its delimiters).
+    fn span_of(span: tsv_lang::Span, out: &mut Vec<(usize, usize)>) {
+        if span.end > span.start {
+            out.push((span.start as usize, span.end as usize));
+        }
+    }
+
+    fn attributes(attrs: &[AttributeNode<'_>], out: &mut Vec<(usize, usize)>) {
+        for a in attrs {
+            match a {
+                // `{...rest}` / `{@attach f()}` — brace-delimited, like an ExpressionTag.
+                AttributeNode::SpreadAttribute(x) => interior(x.span, out),
+                AttributeNode::AttachTag(x) => interior(x.span, out),
+                // A directive's value: `on:click⟨={handler}⟩`. Bounded below by the head
+                // (`on:click|once` is not a comment context) and above by the closing `}`.
+                AttributeNode::OnDirective(x) => directive_value(x.head_span, x.span, out),
+                AttributeNode::BindDirective(x) => directive_value(x.head_span, x.span, out),
+                AttributeNode::ClassDirective(x) => directive_value(x.head_span, x.span, out),
+                AttributeNode::StyleDirective(x) => directive_value(x.head_span, x.span, out),
+                AttributeNode::UseDirective(x) => directive_value(x.head_span, x.span, out),
+                AttributeNode::TransitionDirective(x) => directive_value(x.head_span, x.span, out),
+                AttributeNode::AnimateDirective(x) => directive_value(x.head_span, x.span, out),
+                AttributeNode::LetDirective(x) => directive_value(x.head_span, x.span, out),
+                // A plain attribute's expression value is an `ExpressionTag`, which the
+                // wire walk already names.
+                AttributeNode::Attribute(_) => {}
+            }
+        }
+    }
+
+    /// `head_span.end ..= span.end - 1` — the `={expr}` run, stopping on the `}`. Empty for
+    /// a shorthand directive (`bind:value`), which has no value to probe.
+    fn directive_value(head: tsv_lang::Span, span: tsv_lang::Span, out: &mut Vec<(usize, usize)>) {
+        let (s, e) = (head.end as usize, span.end as usize);
+        if e > s + 1 {
+            out.push((s, e - 1));
+        }
+    }
+
+    fn walk(frag: &Fragment<'_>, out: &mut Vec<(usize, usize)>) {
+        for node in frag.nodes {
+            match node {
+                FragmentNode::IfBlock(b) => {
+                    interior(b.opening_tag_span, out);
+                    walk(&b.consequent, out);
+                    if let Some(alt) = &b.alternate {
+                        walk(alt, out);
+                    }
+                }
+                FragmentNode::EachBlock(b) => {
+                    interior(b.opening_tag_span, out);
+                    walk(&b.body, out);
+                    if let Some(fallback) = &b.fallback {
+                        walk(fallback, out);
+                    }
+                }
+                FragmentNode::AwaitBlock(b) => {
+                    interior(b.opening_tag_span, out);
+                    for f in [&b.pending, &b.then, &b.catch].into_iter().flatten() {
+                        walk(f, out);
+                    }
+                }
+                FragmentNode::KeyBlock(b) => {
+                    interior(b.opening_tag_span, out);
+                    walk(&b.fragment, out);
+                }
+                FragmentNode::SnippetBlock(b) => {
+                    interior(b.opening_tag_span, out);
+                    walk(&b.body, out);
+                }
+                // `{@html x}` / `{@const a = b}` / `{@render f()}` / `{@debug a}` — the
+                // whole tag is one brace-delimited head, expression included.
+                FragmentNode::HtmlTag(t) => interior(t.span, out),
+                FragmentNode::ConstTag(t) => interior(t.span, out),
+                FragmentNode::DeclarationTag(t) => interior(t.span, out),
+                FragmentNode::DebugTag(t) => interior(t.span, out),
+                FragmentNode::RenderTag(t) => interior(t.span, out),
+                FragmentNode::Element(e) => {
+                    attributes(e.attributes, out);
+                    walk(&e.fragment, out);
+                }
+                FragmentNode::SpecialElement(e) => {
+                    // `<svelte:element this={tag}>` / `<svelte:component this={x}>` hold
+                    // their expression **bare**, not wrapped in an `ExpressionTag` — so the
+                    // wire walk does not name it and this is its only cover. The expression
+                    // span alone is the region: its ends already sit against the two
+                    // braces, so the brace-adjacent gaps come along.
+                    // Listed exhaustively rather than with a `_` arm, deliberately: a
+                    // future variant that carries an expression would otherwise go
+                    // unprobed **silently**, which is the exact failure this walk exists to
+                    // fix. Let it break the build instead.
+                    match &e.kind {
+                        SpecialElementKind::SvelteElement { tag } => span_of(tag.span(), out),
+                        SpecialElementKind::SvelteComponent { expression } => {
+                            span_of(expression.span(), out);
+                        }
+                        SpecialElementKind::SvelteHead
+                        | SpecialElementKind::SvelteWindow
+                        | SpecialElementKind::SvelteBody
+                        | SpecialElementKind::SvelteDocument
+                        | SpecialElementKind::SvelteSelf
+                        | SpecialElementKind::SlotElement
+                        | SpecialElementKind::SvelteFragment
+                        | SpecialElementKind::SvelteBoundary
+                        | SpecialElementKind::TitleElement => {}
+                    }
+                    attributes(e.attributes, out);
+                    walk(&e.fragment, out);
+                }
+                FragmentNode::ExpressionTag(_)
+                | FragmentNode::Text(_)
+                | FragmentNode::Comment(_) => {}
+            }
+        }
+    }
+
+    let arena = bumpalo::Bump::new();
+    // A parse failure is not this function's business to report: the caller already skipped
+    // any seed file tsv rejects, and an injected source that stops parsing is a `Rejected`
+    // the inject loop drops on the floor.
+    let Ok(root) = tsv_svelte::parse(source, &arena) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    walk(&root.fragment, &mut out);
+    out
 }
 
 /// Walk the wire AST accumulating [`code_regions`]' carriers.
@@ -1661,6 +1834,109 @@ mod tests {
         assert_eq!(regions.len(), 1, "one script body: {regions:?}");
         let (s, e) = regions[0];
         assert_eq!(&src[s..e], "\n\tconst a = 1;\n");
+    }
+
+    /// Every region as a source slice, for tests that care about *what* was named rather
+    /// than where it sits.
+    fn named(src: &str) -> Vec<&str> {
+        code_regions(src, ParserType::Svelte)
+            .into_iter()
+            .map(|(s, e)| &src[s..e])
+            .collect()
+    }
+
+    /// A block's head is the region the wire shape cannot express: `IfBlock`'s own span
+    /// covers the whole block (body included) and its `test` span is the expression alone,
+    /// so neither names `#if cond`. The head is where the `{#if ⟨here⟩ a.b}` class lives.
+    #[test]
+    fn code_regions_name_a_block_head_without_its_body() {
+        // One region, and it stops at the head's `}` — the body is markup, not a comment
+        // context, and `x` must not appear in it.
+        assert_eq!(named("{#if a.b}x{/if}"), ["#if a.b"]);
+        // `{:else if}` is a nested IfBlock and gets its own head.
+        assert_eq!(named("{#if a}x{:else if b}y{/if}"), ["#if a", ":else if b"]);
+    }
+
+    /// Each head kind, plus the tags — one case per construct, because each carries its
+    /// span on a different field and a typo in the walk would silently name nothing.
+    #[test]
+    fn code_regions_name_every_head_kind() {
+        assert_eq!(named("{#each xs as x}{/each}"), ["#each xs as x"]);
+        assert_eq!(named("{#await p}{/await}"), ["#await p"]);
+        assert_eq!(named("{#key k}{/key}"), ["#key k"]);
+        assert_eq!(named("{#snippet f(a)}{/snippet}"), ["#snippet f(a)"]);
+        assert_eq!(named("{@html x}"), ["@html x"]);
+        assert_eq!(named("{@render f()}"), ["@render f()"]);
+        assert_eq!(named("{@const a = b}"), ["@const a = b"]);
+        assert_eq!(named("{@debug a}"), ["@debug a"]);
+    }
+
+    /// A directive's value is named from `head_span.end` to the closing `}` — never the
+    /// head itself (`on:click|once` is not a comment context) and never the byte *after*
+    /// the `}`, which is the middle of an element tag: tsv over-accepts a comment there
+    /// while Svelte rejects it, so naming it would manufacture the junk shapes the module
+    /// docs warn about. A shorthand directive has no value and contributes nothing.
+    #[test]
+    fn code_regions_name_a_directive_value_not_its_head() {
+        // The slice stops *before* the `}` because a range's end is exclusive — but a
+        // region's end is an injection site (see `injection_sites`), so the closing `}` is
+        // still probed. That inclusive end is what reaches `on:click={h/* c */}`; the byte
+        // after it — inside the element tag — is what stays out.
+        let src = "<div on:click={h}></div>";
+        let regions = code_regions(src, ParserType::Svelte);
+        assert_eq!(regions.len(), 1, "one directive value: {regions:?}");
+        let (s, e) = regions[0];
+        assert_eq!(&src[s..e], "={h", "the head `on:click` is not named");
+        assert_eq!(
+            &src[e..=e],
+            "}",
+            "the last site is the closing brace, not past it"
+        );
+
+        assert_eq!(named("<div on:click|once={h}></div>"), ["={h"]);
+        assert!(
+            named("<input bind:value />").is_empty(),
+            "a shorthand directive has no value to probe"
+        );
+        // A plain attribute's value is an `ExpressionTag`, which the wire walk names —
+        // the interior only, so the braces stay out.
+        assert_eq!(named("<div class={c}></div>"), ["c"]);
+        // `{...rest}` is brace-delimited like an ExpressionTag.
+        assert_eq!(named("<div {...rest}></div>"), ["...rest"]);
+    }
+
+    /// `<svelte:element this={tag}>` holds its expression **bare** — Svelte's AST has no
+    /// `ExpressionTag` around it — so the wire walk never names it and this is its only
+    /// cover. Regression guard for a real drop: the comment survives in `{'a' + 'b'}` and
+    /// vanished in `this={'a' + 'b'}`.
+    #[test]
+    fn code_regions_name_a_bare_special_element_expression() {
+        assert_eq!(named("<svelte:element this={tag} />"), ["tag"]);
+        assert_eq!(named("<svelte:component this={C} />"), ["C"]);
+    }
+
+    /// The walk names a head **whole**, including the slots where Svelte hand-reads a
+    /// pattern and rejects a comment (`{#each xs as ⟨here⟩ x}`). That is deliberate: tsv
+    /// rejects in exactly those slots too, so `Formatted::Rejected` filters them the same
+    /// way it filters a word interior — no whitelist to keep in sync with Svelte's parser.
+    #[test]
+    fn a_head_region_covers_slots_the_parser_filters() {
+        let src = "{#each xs as x}{/each}";
+        let (s, e) = code_regions(src, ParserType::Svelte)[0];
+        let as_slot = src.find(" x}").expect("the pattern slot") + 1;
+        assert!(
+            (s..=e).contains(&as_slot),
+            "the `as` pattern slot is inside the named head"
+        );
+        // ...and tsv rejects a comment there, so no site survives to a finding.
+        let injected = format!("{}/* c */{}", &src[..as_slot], &src[as_slot..]);
+        assert!(
+            matches!(
+                ledger_format(&injected, ParserType::Svelte),
+                Formatted::Rejected
+            ),
+            "tsv must reject a comment in Svelte's pattern slot, as Svelte does"
+        );
     }
 
     /// The shape is the **ratchet key** — the thing the gate diffs against the snapshot —
