@@ -936,7 +936,7 @@ impl<'a> Printer<'a> {
                     ) {
                         h_parts.push(doc);
                     }
-                    h_parts.push(self.build_type_arguments_doc_wrapping(type_args));
+                    h_parts.push(self.build_type_arguments_doc(type_args));
                 }
                 if let Some(next) = items.get(i + 1) {
                     let item_end = heritage_item_end(heritage);
