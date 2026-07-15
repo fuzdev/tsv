@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 625,
+	"end": 738,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -1317,6 +1317,114 @@
 					"type": "Fragment",
 					"nodes": []
 				}
+			},
+			{
+				"type": "Text",
+				"start": 624,
+				"end": 625,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteElement",
+				"start": 625,
+				"end": 678,
+				"name": "svelte:element",
+				"name_loc": {
+					"start": {
+						"line": 67,
+						"column": 1,
+						"character": 626
+					},
+					"end": {
+						"line": 67,
+						"column": 15,
+						"character": 640
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				},
+				"tag": {
+					"type": "Identifier",
+					"start": 648,
+					"end": 651,
+					"loc": {
+						"start": {
+							"line": 68,
+							"column": 7
+						},
+						"end": {
+							"line": 68,
+							"column": 10
+						}
+					},
+					"name": "tag",
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c",
+							"start": 652,
+							"end": 656
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 678,
+				"end": 679,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteComponent",
+				"start": 679,
+				"end": 737,
+				"name": "svelte:component",
+				"name_loc": {
+					"start": {
+						"line": 71,
+						"column": 1,
+						"character": 680
+					},
+					"end": {
+						"line": 71,
+						"column": 17,
+						"character": 696
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				},
+				"expression": {
+					"type": "Identifier",
+					"start": 704,
+					"end": 708,
+					"loc": {
+						"start": {
+							"line": 72,
+							"column": 7
+						},
+						"end": {
+							"line": 72,
+							"column": 11
+						}
+					},
+					"name": "Comp",
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c",
+							"start": 709,
+							"end": 713
+						}
+					]
+				}
 			}
 		]
 	},
@@ -1607,6 +1715,38 @@
 				"end": {
 					"line": 64,
 					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 652,
+			"end": 656,
+			"loc": {
+				"start": {
+					"line": 68,
+					"column": 11
+				},
+				"end": {
+					"line": 68,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 709,
+			"end": 713,
+			"loc": {
+				"start": {
+					"line": 72,
+					"column": 12
+				},
+				"end": {
+					"line": 72,
+					"column": 16
 				}
 			}
 		}

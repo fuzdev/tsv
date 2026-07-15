@@ -5,7 +5,12 @@ Prettier drops trailing comments in template expressions. tsv preserves them.
 tsv: `{#if condition /* c */}` (preserved)
 Prettier: `{#if condition}` (comment stripped)
 
-Affected contexts: `{expr}`, `{@html}`, `{@render}`, `{@const}`, `{#if}`, `{:else if}`, `{#each}` (collection and key), `{#await}`, `{#key}`, `{...spread}`, `bind:value={}`, `{@attach}`, `data-attr={}`, `on:event={}`, `class:name={}`, `use:action={}`, `style:prop={}`, `transition:fn={}`, `animate:fn={}`, `let:name={}`.
+Affected contexts: `{expr}`, `{@html}`, `{@render}`, `{@const}`, `{#if}`, `{:else if}`, `{#each}` (collection and key), `{#await}`, `{#key}`, `{...spread}`, `bind:value={}`, `{@attach}`, `data-attr={}`, `on:event={}`, `class:name={}`, `use:action={}`, `style:prop={}`, `transition:fn={}`, `animate:fn={}`, `let:name={}`, `<svelte:element this={}>`, `<svelte:component this={}>`.
+
+The two `this={}` bindings are the same `{…}` value as any other attribute's, even though
+Svelte's AST holds their expression bare (no `ExpressionTag` around it) — see
+[expr_special_this](../expr_special_this/) for the leading/interior positions, which both
+formatters preserve.
 
 (`{@const x = value /* c */}` drops the comment like the rest. Under
 prettier-plugin-svelte 3.5.2 this one case instead produced broken output with an

@@ -89,11 +89,18 @@ pub(crate) enum ParsedElement<'arena> {
     SpecialElement(SpecialElement<'arena>),
 }
 
-/// Result of parsing special element attributes: (attributes, tag_expr for svelte:element, component_expr for svelte:component)
+/// Result of parsing special element attributes: the attribute list with any `this` lifted
+/// out of it, plus that `this` binding for whichever of the two tags carries one.
+///
+/// Two slots rather than one because the tags accept different forms — `<svelte:element>`
+/// takes either (`this="div"` and `this={tag}` are both legal), `<svelte:component>` only
+/// the braced one, a non-`{expression}` being rejected as it is parsed. So what survives
+/// for the component is always an `ExpressionTag`, and the two slots' types differ: they
+/// cannot be transposed at the call site, and only the one matching `tag` is ever `Some`.
 type SpecialElementAttrs<'arena> = (
     BumpVec<'arena, AttributeNode<'arena>>,
-    Option<tsv_ts::ast::internal::Expression<'arena>>,
-    Option<tsv_ts::ast::internal::Expression<'arena>>,
+    Option<SpecialThis<'arena>>,
+    Option<ExpressionTag<'arena>>,
 );
 
 impl<'a, 'arena> SvelteParser<'a, 'arena> {
@@ -256,20 +263,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Parse attributes, extracting `this` for SvelteElement and SvelteComponent
         let (attributes, tag_expr, component_expr) = self.parse_special_element_attributes(tag)?;
 
-        // `<svelte:element>` requires a `this` attribute *with a value* — Svelte's
-        // parser rejects it otherwise, and tsv is a drop-in for that parser. Without
-        // this reject the missing `this` was fabricated as a zero-span placeholder
-        // literal that panics when formatted (`format_string_literal_from_ast` slices
-        // the empty span `""[1..len-1]`) and injects a spurious `this=""` on output.
-        if tag == SpecialElementTag::SvelteElement && tag_expr.is_none() {
-            return Err(self.error_msg_at(
-                "`<svelte:element>` must have a 'this' attribute with a value",
-                name_span.start as usize,
-            ));
-        }
-
-        // Construct the final SpecialElementKind with associated data
-        let kind = self.build_special_element_kind(tag, tag_expr, component_expr);
+        // Construct the final SpecialElementKind, rejecting a `this`-less element/component
+        // the way Svelte's parser does.
+        let kind = self.build_special_element_kind(tag, tag_expr, component_expr, name_span)?;
 
         // Check for self-closing tag
         let self_closing = self.check(TokenKind::Slash);
@@ -328,37 +324,43 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         }))
     }
 
-    /// Build the final SpecialElementKind from the tag and extracted expressions
+    /// Build the final SpecialElementKind from the tag and the extracted `this` binding.
+    ///
+    /// The two tags that take a `this` require one: Svelte's parser rejects the element
+    /// without it (`svelte_element_missing_this`) and the component likewise
+    /// (`svelte_component_missing_this`), and tsv is a drop-in for that parser. Rejecting
+    /// here rather than fabricating a placeholder is load-bearing, not pedantry — the
+    /// invented binding used to reach the printer and be emitted as source the author never
+    /// wrote (a spurious `this=""` / `this={null}`), and the element's zero-span placeholder
+    /// literal panicked when formatted (`format_string_literal_from_ast` slicing `""[1..len-1]`).
+    ///
+    /// The component's *other* rejection — a `this` that is not an `{expression}` — belongs
+    /// to [`Self::parse_special_element_attributes`] instead, which is where the difference
+    /// between "no `this` at all" and "a `this` we cannot use" is still visible.
     fn build_special_element_kind(
         &self,
         tag: SpecialElementTag,
-        tag_expr: Option<tsv_ts::ast::internal::Expression<'arena>>,
-        component_expr: Option<tsv_ts::ast::internal::Expression<'arena>>,
-    ) -> SpecialElementKind<'arena> {
-        match tag {
+        tag_expr: Option<SpecialThis<'arena>>,
+        component_expr: Option<ExpressionTag<'arena>>,
+        name_span: Span,
+    ) -> Result<SpecialElementKind<'arena>, ParseError> {
+        Ok(match tag {
             SpecialElementTag::SvelteElement => {
-                // `parse_special_element_body` rejects a `this`-less `<svelte:element>`
-                // upstream, so `tag_expr` is always `Some` here. This fallback stays
-                // as a defensive belt-and-suspenders (a `Decoded("")` cooked value, not
-                // a `Verbatim` span slice that would underflow on the zero-length span).
-                let tag = tag_expr.unwrap_or_else(|| {
-                    tsv_ts::ast::internal::Expression::Literal(tsv_ts::ast::internal::Literal {
-                        value: tsv_ts::ast::internal::LiteralValue::String(
-                            tsv_ts::ast::internal::StringCooked::Decoded(self.alloc_str_in("")),
-                        ),
-                        span: Span { start: 0, end: 0 },
-                    })
-                });
+                let Some(tag) = tag_expr else {
+                    return Err(self.error_msg_at(
+                        "`<svelte:element>` must have a 'this' attribute with a value",
+                        name_span.start as usize,
+                    ));
+                };
                 SpecialElementKind::SvelteElement { tag }
             }
             SpecialElementTag::SvelteComponent => {
-                // For svelte:component, we need the `this` attribute
-                let expression = component_expr.unwrap_or(
-                    tsv_ts::ast::internal::Expression::Literal(tsv_ts::ast::internal::Literal {
-                        value: tsv_ts::ast::internal::LiteralValue::Null,
-                        span: Span { start: 0, end: 0 },
-                    }),
-                );
+                let Some(expression) = component_expr else {
+                    return Err(self.error_msg_at(
+                        "`<svelte:component>` must have a 'this' attribute",
+                        name_span.start as usize,
+                    ));
+                };
                 SpecialElementKind::SvelteComponent { expression }
             }
             SpecialElementTag::SvelteHead => SpecialElementKind::SvelteHead,
@@ -370,7 +372,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             SpecialElementTag::SvelteFragment => SpecialElementKind::SvelteFragment,
             SpecialElementTag::SvelteBoundary => SpecialElementKind::SvelteBoundary,
             SpecialElementTag::TitleElement => SpecialElementKind::TitleElement,
-        }
+        })
     }
 
     /// Parse attributes for a special element, extracting `this` for svelte:element and svelte:component
@@ -379,8 +381,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         tag: SpecialElementTag,
     ) -> Result<SpecialElementAttrs<'arena>, ParseError> {
         let mut attributes = self.bvec();
-        let mut tag_expr: Option<tsv_ts::ast::internal::Expression<'arena>> = None;
-        let mut component_expr: Option<tsv_ts::ast::internal::Expression<'arena>> = None;
+        let mut tag_expr: Option<SpecialThis<'arena>> = None;
+        let mut component_expr: Option<ExpressionTag<'arena>> = None;
 
         // Parse all attributes
         let all_attrs = self.parse_attributes()?;
@@ -395,33 +397,36 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                             // Extract expression from the attribute value
                             if let Some(values) = a.value {
                                 if let Some(AttributeValue::ExpressionTag(et)) = values.first() {
-                                    tag_expr = Some(et.expression.clone());
+                                    // Keep the whole tag, not just its expression: the `{…}`
+                                    // span is where the printer looks for comments.
+                                    tag_expr = Some(SpecialThis::Braced(et.clone()));
                                     continue; // Don't add to attributes
                                 } else if let Some(AttributeValue::Text(t)) = values.first() {
-                                    // String value: create a literal expression. The
-                                    // decoded text is copied once into the arena as a
-                                    // `Decoded` cooked value (the source slice carries
-                                    // entities / no quotes, so it is not `Verbatim`).
-                                    let content = self.alloc_str_in(&t.data(self.source));
-                                    tag_expr = Some(tsv_ts::ast::internal::Expression::Literal(
-                                        tsv_ts::ast::internal::Literal {
-                                            value: tsv_ts::ast::internal::LiteralValue::String(
-                                                tsv_ts::ast::internal::StringCooked::Decoded(
-                                                    content,
-                                                ),
-                                            ),
-                                            span: t.span,
-                                        },
-                                    ));
+                                    // String value: no expression is parsed, so keep the
+                                    // decoded text itself. It is copied once into the arena
+                                    // (the source slice carries entities and no quotes, so
+                                    // it is not a verbatim slice of it).
+                                    tag_expr = Some(SpecialThis::Plain {
+                                        content: self.alloc_str_in(&t.data(self.source)),
+                                        span: t.span,
+                                    });
                                     continue;
                                 }
                             }
-                        } else if tag == SpecialElementTag::SvelteComponent
-                            && let Some(values) = a.value
-                            && let Some(AttributeValue::ExpressionTag(et)) = values.first()
-                        {
-                            // Extract expression from the attribute value
-                            component_expr = Some(et.expression.clone());
+                        } else if tag == SpecialElementTag::SvelteComponent {
+                            // Svelte's `is_expression_attribute`: exactly one chunk, and an
+                            // `{expression}`. A bare `this`, a string, or a multi-chunk
+                            // value (`this="a{b}"`, `this={a}{b}`) is rejected outright —
+                            // where `<svelte:element>` above merely warns and keeps the
+                            // first chunk, a Svelte 4 behaviour it preserves on purpose.
+                            let Some([AttributeValue::ExpressionTag(et)]) = a.value else {
+                                return Err(self.error_msg_at(
+                                    "Invalid component definition — must be an `{expression}`",
+                                    a.span.start as usize,
+                                ));
+                            };
+                            // Keep the whole tag — see the `svelte:element` arm above.
+                            component_expr = Some(et.clone());
                             continue; // Don't add to attributes
                         }
                     }

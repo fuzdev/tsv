@@ -1285,7 +1285,7 @@ Two corollaries worth naming, because each was a whole family of bugs:
   step over every comment in the gap (`blank_scan_start` / `blank_scan_end`), not just the ones
   this caller emits.
 
-⚠️ **Two hazards, both of which have bitten.** Ownership is a sharp tool: it takes a comment out
+⚠️ **Three hazards, all of which have bitten.** Ownership is a sharp tool: it takes a comment out
 of the positional model, so every consumer of that model has to be re-examined.
 
 1. **An owned comment nothing prints is a DROPPED comment.** Ownership assumes the owning node
@@ -1299,12 +1299,22 @@ of the positional model, so every consumer of that model has to be re-examined.
    `owned_leading_comment_hangs_value`. It is the single seam for that question (the declarator,
    the class property, the object value, and the `is_poorly_breakable_chain` invariant all route
    through it).
+3. **A region the parser LIFTS OUT of its container is still inside the container's gap** — so two
+   emitters print it, where hazard 1 has none. `<svelte:element this={…}>` keeps its `this` out of
+   `Element::attributes` (it rides in the kind), yet the braces still sit in the name→`>` gap the
+   attribute scan probes: the tag's own doc prints the comment, then the scan prints it again.
+   `AttrGaps::claimed` is that seam — the region whose comments the scan must skip. What makes this
+   one nasty is that **ownership masks it**: a glued *block* comment is owned, so the gap skips it
+   and the double-print never appears; only a **line** comment (never owned — `owned ⇒ is_block`)
+   exposes it. A lifted region needs a claim on *both* axes, and testing with block comments alone
+   will tell you it is fine.
 
-Both hazards are what the **print-once comment ledger** exists to catch — the structural
+All three hazards are what the **print-once comment ledger** exists to catch — the structural
 guard on this model: every comment a document parses must be emitted exactly once, or the
 audit reports it as DROPPED or DOUBLE-PRINTED (`deno task comments:audit`, gated in
 `deno task check`; see [Comment Ledger Audit](#debug-tooling)). Nothing else in the
-detached model forces a parsed comment to reach the output.
+detached model forces a parsed comment to reach the output. Hazard 3 was found by it, not by
+review — the block-comment repro looked clean.
 
 Prettier, oxfmt and biome all get the paren binding wrong — see
 [conformance_prettier.md §Comment relocation](docs/conformance_prettier.md#comment-relocation)

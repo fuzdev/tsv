@@ -30,3 +30,5 @@
 <button on:click={fn}> text </button>
 <div class:class1={cond}></div>
 <div use:fn={expr}></div>
+<svelte:element this={tag}></svelte:element>
+<svelte:component this={Comp}></svelte:component>

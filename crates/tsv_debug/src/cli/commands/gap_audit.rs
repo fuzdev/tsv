@@ -581,7 +581,7 @@ fn svelte_only_regions(source: &str) -> Vec<(usize, usize)> {
                     match &e.kind {
                         SpecialElementKind::SvelteElement { tag } => span_of(tag.span(), out),
                         SpecialElementKind::SvelteComponent { expression } => {
-                            span_of(expression.span(), out);
+                            span_of(expression.expression.span(), out);
                         }
                         SpecialElementKind::SvelteHead
                         | SpecialElementKind::SvelteWindow
