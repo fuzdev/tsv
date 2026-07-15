@@ -332,7 +332,7 @@ impl<'a> Printer<'a> {
             } else if type_has_internal_breaking(value_type) {
                 // Types with internal breaking (braces, brackets, parens, angle brackets) stay hugged
                 // Use wrapping version so TypeReference type args break internally when too long
-                let type_doc = self.build_type_doc_with_wrapping_type_args(value_type);
+                let type_doc = self.build_type_doc(value_type);
                 parts.push(d.text(" "));
                 parts.push(type_doc);
             } else if has_complex_params {

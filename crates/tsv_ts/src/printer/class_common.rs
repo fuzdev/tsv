@@ -147,7 +147,7 @@ impl<'a> Printer<'a> {
                     ) {
                         value_parts.push(doc);
                     }
-                    value_parts.push(self.build_type_arguments_doc_wrapping(type_args));
+                    value_parts.push(self.build_type_arguments_doc(type_args));
                 }
                 let value_doc = d.concat(&value_parts);
                 let mut ext_parts = smallvec![d.text("extends")];
@@ -181,7 +181,7 @@ impl<'a> Printer<'a> {
             ) {
                 ext_parts.push(doc);
             }
-            ext_parts.push(self.build_type_arguments_doc_wrapping(type_args));
+            ext_parts.push(self.build_type_arguments_doc(type_args));
         }
         Some(d.concat(&ext_parts))
     }

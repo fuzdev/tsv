@@ -138,9 +138,7 @@ impl<'a> Printer<'a> {
                 self.is_expression_statement.set(was_expr_stmt);
                 self.build_member_doc(member)
             }
-            Expression::ConditionalExpression(cond) => {
-                self.build_conditional_doc_with_wrapping(cond)
-            }
+            Expression::ConditionalExpression(cond) => self.build_conditional_doc(cond),
             Expression::ArrowFunctionExpression(arrow) => self.build_arrow_doc(arrow),
             Expression::FunctionExpression(func) => {
                 self.maybe_wrap_expr_stmt_paren(func.span, self.build_function_doc(func))
@@ -409,7 +407,7 @@ impl<'a> Printer<'a> {
         let type_end = type_assert.type_annotation.span().end;
         let expr_start = type_assert.expression.span().start;
         let close_angle = self.find_assertion_close_angle(type_end, expr_start);
-        let type_doc = self.build_type_doc_with_wrapping_type_args(type_assert.type_annotation);
+        let type_doc = self.build_type_doc(type_assert.type_annotation);
 
         // Comments in the cast stay where the author wrote them. Block comments hug
         // inline (`</* c */ T>`, `<T /* c */>`, `<T>/* c */ expr`); a `//` runs to
@@ -620,7 +618,7 @@ impl<'a> Printer<'a> {
             if self.comments_force_own_line_between(kw_end, type_start) {
                 parts.push(d.text(" "));
                 parts.push(d.text(keyword));
-                let type_doc = self.build_type_doc_with_wrapping_type_args(type_annotation);
+                let type_doc = self.build_type_doc(type_annotation);
                 self.append_keyword_value_line_comments(&mut parts, kw_end, type_start, type_doc);
                 return d.concat(&parts);
             }
@@ -663,9 +661,9 @@ impl<'a> Printer<'a> {
                     CommentSpacing::Trailing,
                 ));
             }
-            parts.push(self.build_type_doc_with_wrapping_type_args(type_annotation));
+            parts.push(self.build_type_doc(type_annotation));
         } else {
-            parts.push(self.build_type_doc_with_wrapping_type_args(type_annotation));
+            parts.push(self.build_type_doc(type_annotation));
         }
 
         d.concat(&parts)

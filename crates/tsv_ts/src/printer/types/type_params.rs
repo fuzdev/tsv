@@ -558,7 +558,7 @@ impl<'a> Printer<'a> {
         // (`union_type_arg_hug_shape`), whose object member carries its own group and
         // breaks block-style inside the hugged `<…>` rather than breaking the `<…>` onto
         // its own lines. Matches Prettier's `shouldInline`/`shouldHugType` and tsv's own
-        // type-position builder (`build_type_arguments_doc_wrapping`), via the shared
+        // type-position builder (`build_type_arguments_doc`), via the shared
         // predicates. Without it the fall-through group below gives the argument a
         // softline break point, so an overflowing call head (`callee<Ref>(`) breaks the
         // `<Ref>` instead of the arguments (and, as an assignment RHS, keeps the RHS on
@@ -768,7 +768,7 @@ impl<'a> Printer<'a> {
     /// The object/mapped type carries its own width-aware group, so an inline
     /// `<{ ... }>` that overflows breaks block-style (members on their own lines)
     /// rather than spilling an inner union/intersection — matching the type-reference
-    /// type-argument path (`build_type_arguments_doc_wrapping`).
+    /// type-argument path (`build_type_arguments_doc`).
     fn try_build_hugging_curly_type_doc(&self, ty: &TSType<'_>) -> Option<DocId> {
         match ty {
             // Object type literal: { a: number; b: string } or { /* comment */ }

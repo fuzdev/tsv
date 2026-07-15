@@ -218,7 +218,7 @@ impl<'a> Printer<'a> {
             // wrapping type-args path so a nested non-huggable generic like
             // `Outer<Inner<...>>` wraps the outer `Outer<>` instead of force-inlining
             // the single arg and breaking only the inner `Inner<>`.
-            self.build_type_doc_with_wrapping_type_args(ts_type)
+            self.build_type_doc(ts_type)
         }
     }
 
