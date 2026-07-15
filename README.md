@@ -47,8 +47,8 @@ tsv is derived from:
 
 tsv currently supports:
 
-- [x] formatter matching Prettier + prettier-plugin-svelte (with intentional divergences)
-- [x] parser, drop-in for Svelte+acorn+acorn-typescript
+- [x] formatter following Prettier + prettier-plugin-svelte (with intentional divergences)
+- [x] parser for TypeScript/JS + CSS + Svelte, drop-in for Svelte+acorn+acorn-typescript
 - [ ] [vscode formatter plugin](https://github.com/fuzdev/vscode_extension_tsv_format) - `fuzdev.tsv-format`
 - [ ] ts-to-js conversion (types-to-whitespace only)
 - [ ] module lexer
