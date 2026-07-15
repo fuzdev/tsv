@@ -494,9 +494,12 @@ impl<'a> Printer<'a> {
     /// operator (not on its own line) hugs the value with a space even when the
     /// value follows on the next source line — prettier pulls the value up in the
     /// assignment/call layout (`= /* c */⏎v` → `= /* c */ v`). Positions that keep
-    /// the author's line break for a glued block (decorators, `return`/`throw`/`await`
-    /// keyword operands, object property values, …) stay on the non-gluing
-    /// `build_rhs_comments_opt`.
+    /// the author's line break for a glued block (decorators, `await` operands,
+    /// object property values, …) stay on the non-gluing `build_rhs_comments_opt`.
+    ///
+    /// `return`/`throw` arguments pull up here too, but for a stronger reason than
+    /// layout: they are restricted productions, so keeping the break would be ASI and
+    /// would change the program. See `build_keyword_argument_doc`.
     pub(crate) fn build_rhs_comments_glued_opt(&self, start: u32, end: u32) -> Option<DocId> {
         self.build_leading_comment_run_opt(start, end, LeadingGlue::AdjacentGlued)
     }
