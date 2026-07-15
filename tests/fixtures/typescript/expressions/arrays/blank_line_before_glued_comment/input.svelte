@@ -25,4 +25,13 @@
 
 	// Nothing expands the array - it fits on one line, so the blank line collapses
 	const d = ['aaaa', /* c */ 'bbbb', 'cccc'];
+
+	// A JSDoc cast owns its comment too - the cast prints it, so the blank line
+	// belongs before the comment, not before the `(`
+	const e = [
+		'aaaa', // x
+
+		/** @type {T} */ ('bbbb'),
+		'cccc'
+	];
 </script>

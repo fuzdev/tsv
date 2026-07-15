@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 549,
+	"end": 750,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -185,24 +185,88 @@
 					"column": 27
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " A JSDoc cast owns its comment too - the cast prints it, so the blank line",
+			"start": 541,
+			"end": 617,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 1
+				},
+				"end": {
+					"line": 29,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " belongs before the comment, not before the `(`",
+			"start": 619,
+			"end": 668,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 1
+				},
+				"end": {
+					"line": 30,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " x",
+			"start": 692,
+			"end": 696,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 10
+				},
+				"end": {
+					"line": 32,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 700,
+			"end": 716,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 2
+				},
+				"end": {
+					"line": 34,
+					"column": 18
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 548,
+		"end": 749,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 539,
+			"end": 740,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 28,
+					"line": 37,
 					"column": 9
 				}
 			},
@@ -760,6 +824,153 @@
 							"value": " Nothing expands the array - it fits on one line, so the blank line collapses",
 							"start": 414,
 							"end": 493
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 670,
+					"end": 739,
+					"loc": {
+						"start": {
+							"line": 31,
+							"column": 1
+						},
+						"end": {
+							"line": 36,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 676,
+							"end": 738,
+							"loc": {
+								"start": {
+									"line": 31,
+									"column": 7
+								},
+								"end": {
+									"line": 36,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 676,
+								"end": 677,
+								"loc": {
+									"start": {
+										"line": 31,
+										"column": 7
+									},
+									"end": {
+										"line": 31,
+										"column": 8
+									}
+								},
+								"name": "e"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 680,
+								"end": 738,
+								"loc": {
+									"start": {
+										"line": 31,
+										"column": 11
+									},
+									"end": {
+										"line": 36,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Literal",
+										"start": 684,
+										"end": 690,
+										"loc": {
+											"start": {
+												"line": 32,
+												"column": 2
+											},
+											"end": {
+												"line": 32,
+												"column": 8
+											}
+										},
+										"value": "aaaa",
+										"raw": "'aaaa'",
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " x",
+												"start": 692,
+												"end": 696
+											}
+										]
+									},
+									{
+										"type": "Literal",
+										"start": 718,
+										"end": 724,
+										"loc": {
+											"start": {
+												"line": 34,
+												"column": 20
+											},
+											"end": {
+												"line": 34,
+												"column": 26
+											}
+										},
+										"value": "bbbb",
+										"raw": "'bbbb'",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": "* @type {T} ",
+												"start": 700,
+												"end": 716
+											}
+										]
+									},
+									{
+										"type": "Literal",
+										"start": 729,
+										"end": 735,
+										"loc": {
+											"start": {
+												"line": 35,
+												"column": 2
+											},
+											"end": {
+												"line": 35,
+												"column": 8
+											}
+										},
+										"value": "cccc",
+										"raw": "'cccc'"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A JSDoc cast owns its comment too - the cast prints it, so the blank line",
+							"start": 541,
+							"end": 617
+						},
+						{
+							"type": "Line",
+							"value": " belongs before the comment, not before the `(`",
+							"start": 619,
+							"end": 668
 						}
 					]
 				}

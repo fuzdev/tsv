@@ -32,4 +32,12 @@
 		'bbbb', // c2
 		'cccc'
 	];
+
+	// A blank line after the comment - it takes its own line and the blank line survives
+	const h = [
+		'aaaa' /* c1 */,
+
+		'bbbb', // c2
+		'cccc'
+	];
 </script>

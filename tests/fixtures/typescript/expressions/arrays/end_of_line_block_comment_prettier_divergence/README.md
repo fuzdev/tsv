@@ -14,6 +14,11 @@ each idempotent under both formatters (`variant_before_comma`). The divergence i
 normalization — prettier normalizes the newline-after form to before the comma, while we
 normalize it to after the comma (`unformatted_ours_newline_after`).
 
+An authored **blank** line after the comment separates the two facts the comment carries. The
+comment still leads the element, so it stays after the comma and takes its own line; the blank
+line is authorship *about the element* and survives between them (`h`). Only the comment's own
+line break is ours to reflow.
+
 This is *not* the sanctioned pure-separator trail. That carve-out covers a same-line **line**
 comment (`A // c⏎, B` → `A, // c`), where the comment trails `A` in both forms — only the comma
 slides across it, the binding never changes, and a `//` runs to end-of-line so no other
