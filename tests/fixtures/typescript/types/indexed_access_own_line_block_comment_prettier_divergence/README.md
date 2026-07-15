@@ -18,6 +18,13 @@ whether the comment stays inside the brackets (tsv, in place) or moves out befor
 form — it is the reason to diverge, not merely the position preference. Per [Comment Position Philosophy](../../../../../docs/conformance_prettier.md#comment-position-philosophy),
 tsv keeps the comment where the author wrote it relative to the index. Only a **line**
 comment ([indexed_access_line_comment](../indexed_access_line_comment_prettier_divergence/))
-or an **own-line multiline** block comment still hangs the index on its own line (a glued multiline block collapses inline).
+or an **own-line multiline** block comment
+([indexed_access_own_line_multiline_block_comment](../indexed_access_own_line_multiline_block_comment_prettier_divergence/))
+still hangs the index on its own line (a glued multiline block collapses inline).
+
+The multiline case is not merely the same story at a different size: there, Prettier's
+relocation is **content-corrupting** rather than dual-stable, because the comment's interior
+newline breaks the index suffix off the type. That is why this fixture can pin Prettier's
+relocated form as a `variant_own_line` and the multiline one cannot.
 
 See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).

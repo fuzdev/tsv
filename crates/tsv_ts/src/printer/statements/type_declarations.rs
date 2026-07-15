@@ -187,18 +187,24 @@ impl<'a> Printer<'a> {
     /// between `=` and the value. `lead_space` controls the leading space before
     /// `=` (true for the inline `... =` form, false when the caller has already
     /// emitted a hardline, e.g. after an own-line pre-`=` comment).
-    /// A prefix type operator (`keyof` / `typeof`) whose keyword→operand gap holds
-    /// a comment that forces the operand onto its own line — a **line** comment or an
-    /// **own-line multiline** block comment. Such a value hangs the operand, so the
-    /// type-alias RHS keeps the operator on the `=` line (the operand hangs via the
-    /// operator's own layout) instead of breaking after `=` — consistent with the
-    /// conditional / internal-breaking arms. A **single-line** block comment (any
-    /// position) or a **glued** multiline block comment collapses inline, so this
-    /// returns false; the comment-free `=` layout then keeps the (short) value on the
-    /// `=` line, and a long *comment-free* operator still breaks after `=` (the
-    /// hanging-indent arm). Mirrors the printer-side gate
-    /// (`comments_force_own_line_between`) so the two stay in lockstep.
-    fn type_operator_comment_forces_operand_own_line(&self, ty: &TSType<'_>) -> bool {
+    /// A value whose own comment layout already breaks it internally, so the type-alias RHS
+    /// keeps the value's head on the `=` line and lets the value hang its own tail — instead
+    /// of *also* breaking after `=`, which would indent the whole thing a second level for
+    /// nothing. The comment-driven sibling of the `conditional` / `type_has_internal_breaking`
+    /// arms. Two shapes qualify:
+    ///
+    /// - a prefix type operator (`keyof` / `typeof`) whose keyword→operand gap holds a comment
+    ///   that hangs the operand — the operator stays on `=`, the operand hangs beneath it;
+    /// - a template-literal type with an expanding interpolation — the backtick stays on `=`,
+    ///   the `${…}` expands beneath it (matching prettier).
+    ///
+    /// A **single-line** block comment (any position) or a **glued** multiline block collapses
+    /// inline, so this returns false; the comment-free `=` layout then keeps the (short) value
+    /// on the `=` line, and a long *comment-free* value still breaks after `=` (the
+    /// hanging-indent arm). Each arm asks the same predicate the value's own printer asks
+    /// (`comments_force_own_line_between` / `template_literal_type_breaks_for_comment`), so the `=` can't
+    /// disagree with the value about whether the value breaks.
+    fn value_owns_its_comment_break(&self, ty: &TSType<'_>) -> bool {
         match ty {
             TSType::TypeOperator(o) => {
                 let kw_end = o.span.start + o.operator.as_str().len() as u32;
@@ -207,6 +213,9 @@ impl<'a> Printer<'a> {
             TSType::TypeQuery(q) => {
                 let kw_end = q.span.start + "typeof".len() as u32;
                 self.comments_force_own_line_between(kw_end, q.expr_name.span().start)
+            }
+            TSType::Literal(internal::TSLiteralType::TemplateLiteral(t)) => {
+                self.template_literal_type_breaks_for_comment(t)
             }
             _ => false,
         }
@@ -366,7 +375,7 @@ impl<'a> Printer<'a> {
                 // A comment-free value that doesn't `will_break` hangs (long case).
                 let type_doc = self.build_type_doc(value_type);
                 let value_span = value_type.span();
-                let hug = self.type_operator_comment_forces_operand_own_line(value_type)
+                let hug = self.value_owns_its_comment_break(value_type)
                     || (d.will_break(type_doc)
                         && tsv_lang::has_comments_to_emit_in_range(
                             self.comments,

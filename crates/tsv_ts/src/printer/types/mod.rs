@@ -317,7 +317,7 @@ impl<'a> Printer<'a> {
                 // indexed_access_own_line_block_comment.
                 let index_comments = bracket_open.map(|bp| {
                     if self.comments_force_own_line_between(bp + 1, index_type_start) {
-                        self.build_trailing_comments_break_for_line(bp + 1, index_type_start)
+                        self.build_trailing_comments_hang_next(bp + 1, index_type_start)
                     } else {
                         self.build_comments_between(
                             bp + 1,
@@ -347,8 +347,7 @@ impl<'a> Printer<'a> {
                 let dots_end = r.span.start + "...".len() as u32;
                 let type_start = r.type_annotation.span().start;
                 // Break a line comment so it can't swallow the rest-element type.
-                let comments_doc =
-                    self.build_trailing_comments_break_for_line(dots_end, type_start);
+                let comments_doc = self.build_trailing_comments_hang_next(dots_end, type_start);
                 d.concat(&[
                     d.text("..."),
                     comments_doc,
@@ -393,9 +392,7 @@ impl<'a> Printer<'a> {
                 // can't swallow the type.
                 let comments_doc = after_colon.map_or_else(
                     || d.empty(),
-                    |after_colon| {
-                        self.build_trailing_comments_break_for_line(after_colon, type_start)
-                    },
+                    |after_colon| self.build_trailing_comments_hang_next(after_colon, type_start),
                 );
                 // A long union/intersection element hangs after `:` (redundant parens
                 // stripped first); everything else stays inline after `: `.
@@ -444,8 +441,7 @@ impl<'a> Printer<'a> {
                     return d.concat(&parts);
                 }
                 // A block comment glued to the name stays inline (`infer /* c */ R`).
-                let comments_doc =
-                    self.build_trailing_comments_break_for_line(infer_end, name_start);
+                let comments_doc = self.build_trailing_comments_hang_next(infer_end, name_start);
                 d.concat(&[d.text("infer "), comments_doc, type_param_doc])
             }
             TSType::ThisType(_) => d.text("this"),
@@ -501,8 +497,7 @@ impl<'a> Printer<'a> {
             let dot_area_start = paren_close + 1;
             let qualifier_start = qualifier.span().start;
             parts.push(d.text("."));
-            parts
-                .push(self.build_trailing_comments_break_for_line(dot_area_start, qualifier_start));
+            parts.push(self.build_trailing_comments_hang_next(dot_area_start, qualifier_start));
             parts.push(self.build_entity_name_doc(qualifier));
         }
         if let Some(type_args) = &i.type_arguments {
