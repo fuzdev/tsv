@@ -153,10 +153,16 @@ impl<'a> Printer<'a> {
                     }
                 } else {
                     // No newline in the interpolation and nothing forces a break:
-                    // atomize by removing all soft breaks so the `${…}` stays on one
-                    // line even past print width (prettier replaces the expression
-                    // doc with its `printWidth: Infinity` rendering here).
-                    d.remove_lines(full_expr_doc)
+                    // atomize so the `${…}` stays on one line even past print width
+                    // (prettier replaces the expression doc with its `printWidth: Infinity`
+                    // rendering here).
+                    //
+                    // `flatten_all_lines`, not `remove_lines`: this genuinely wants ONE
+                    // line, hard lines included, which prettier's `removeLines` deliberately
+                    // won't do. Sound only because the branches above already claimed every
+                    // interpolation holding a comment or a source newline — so nothing that
+                    // must break reaches here.
+                    d.flatten_all_lines(full_expr_doc)
                 };
 
                 // Apply alignment based on quasi indent (Prettier's addAlignmentToDoc).

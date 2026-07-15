@@ -185,6 +185,8 @@ deno task binding:audit              # comment↔token binding audit: does forma
 deno task authoring:audit            # authoring-independence over Svelte boundary whitespace: every render-equivalent authoring of one document (hug ↔ space ↔ newline at a tag's content boundary; space ↔ newline between siblings) must reach ONE tsv fixed point (pure Rust, no sidecar; gated in `deno task check`) — exits 1 on any non-idempotency, site-level or a base-non-idempotent FILE; see Debug Tooling
 deno task fuzz:audit                 # seeded mutational fuzzer over tests/fixtures (fixed --seed 0 --iterations 5000; pure Rust, no sidecar; gated in `deno task check`) — asserts no-panic + idempotency + structural-reparse, on every seed file AS AUTHORED and then on mutated input; see Debug Tooling
 deno task comments:audit             # print-once comment ledger: every comment a document PARSES must be EMITTED exactly once (pure Rust, no sidecar; gated in `deno task check`) — reports DROPPED (silent content loss) and DOUBLE-PRINTED; the structural guard on the detached comment model, tsv's `ensureAllCommentsPrinted`; see Debug Tooling
+deno task gaps:audit                 # gap-injection audit: inject a comment into EVERY gap (five payloads, one per ownership path) and re-run the ledger — the discovery arm `comments:audit` can't be, since it only formats each file AS AUTHORED and no fixture covers most positions (eight such drops were found BY HAND, all green on every gate). Pure Rust, no sidecar; gated in `deno task check` as a RATCHET over a generated shape snapshot (`gap_audit_known.txt`): every line is a known bug and the file shrinking is the goal, so a shape not on the list, one on it that no longer fires, or any PANIC, FAILS. ~17 s. Full reference: ./docs/gap_audit.md
+deno task gaps:audit:update          # regenerate that snapshot after fixing a shape (or when a new fixture merely REACHES a pre-existing one); refuses a narrowed run
 deno task idempotency:sweep          # F1 (idempotency) sweep over the real-code corpus (the `perf` view — sibling dev repos + upstream framework source). NOT in `deno task check`: machine-dependent corpus, minutes not seconds. Run at conformance cadence or after a printer change; see Debug Tooling
 ```
 
@@ -881,6 +883,30 @@ cargo run -p tsv_debug --features comment_check comment_audit ~/dev/zzz/src   # 
 # declaration-VALUE comments are never lexed as `Comment`s at all (re-derived from
 # source), so they are outside the model by construction.
 ```
+
+**Gap-Injection Audit (dropped-comment discovery):**
+
+```bash
+# gap_audit - inject a comment into EVERY gap and re-run the print-once ledger. The
+# DISCOVERY arm `comments:audit` can't be: the ledger only ever sees a document AS
+# AUTHORED, so a gap no fixture puts a comment in is one it never checks (eight such
+# drops were found BY HAND, all green on every gate). Pure Rust, no sidecar.
+cargo run --profile corpus -p tsv_debug --features comment_check gap_audit   # tests/fixtures
+cargo run --profile corpus -p tsv_debug --features comment_check gap_audit ~/dev/zzz/src
+# Also: --json, --jobs N, --limit N, --payload <one>, --all-bytes, --update.
+# Build with `--profile corpus` (release + panic=unwind): plain `--release` is
+# panic=abort, so a formatter panic kills the process instead of being caught + reported.
+#
+# GATED as a RATCHET, not a green gate: `gap_audit_known.txt` is a machine-generated
+# snapshot of the ~717 shapes tests/fixtures produces, every line a KNOWN BUG, the file
+# shrinking is the goal. A shape not on the list, one on it that no longer fires, or any
+# PANIC, FAILS. `--limit`/`--payload`/`--all-bytes`/a path narrow a run, so they skip the
+# ratchet and refuse `--update`. ~17 s.
+```
+
+Full reference — flags, the ratchet, reading a finding, triage + re-pin workflow,
+scope: ./docs/gap_audit.md. Design rationale (why byte offsets and not tokens, why the
+ledger is the oracle, why five payloads) lives in the `gap_audit` module docs.
 
 **Build-Fanout Audit (exponential-rebuild regression guard):**
 

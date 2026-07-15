@@ -27,6 +27,7 @@ use super::module_paths::{get_module_path_chain_break, is_boolean_call, is_modul
 use super::test_patterns::{build_test_callee_flat_doc, is_test_call};
 use crate::ast::internal;
 use crate::printer::CommentVec;
+use crate::printer::expressions::functions::arrow_signature_has_breaking_comments;
 use smallvec::smallvec;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
@@ -651,12 +652,17 @@ fn try_single_arg_hug(
                     internal::Expression::ObjectExpression(_)
                         | internal::Expression::ArrayExpression(_)
                 ) {
-                    return Some(d.concat(&[
-                        callee,
-                        d.text("("),
-                        printer.build_expression_doc(arg),
-                        d.text(")"),
-                    ]));
+                    // A break forced inside the signature invalidates the hug — see
+                    // `arrow_signature_has_breaking_comments`. Route to the broken-out
+                    // layout instead, which is where prettier's conditionalGroup lands.
+                    // Only a FORCED break counts: a merely long body array breaks on fits,
+                    // not on a hard line, so it still hugs and expands internally — the
+                    // whole point of this arm.
+                    let arg_doc = printer.build_expression_doc(arg);
+                    if arrow_signature_has_breaking_comments(printer, arrow) {
+                        return Some(wrap_call_with_soft_breaks(d, callee, arg_doc));
+                    }
+                    return Some(d.concat(&[callee, d.text("("), arg_doc, d.text(")")]));
                 }
 
                 // Expandable body (ternary): use conditional parens
