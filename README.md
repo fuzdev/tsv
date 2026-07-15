@@ -45,7 +45,7 @@ tsv is derived from:
 - Svelte
 - Prettier and prettier-plugin-svelte
 
-### Features
+tsv's features:
 
 - [x] formatter following Prettier + prettier-plugin-svelte (with intentional divergences)
 - [x] parser for TypeScript/JS + CSS + Svelte, drop-in for Svelte+acorn+acorn-typescript
