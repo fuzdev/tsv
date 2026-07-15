@@ -4,7 +4,7 @@
 // - Dynamic import: `import('module')`, `import('module', options)`
 // - Meta properties: `import.meta`, `new.target`
 
-use super::super::{CommentSpacing, Printer};
+use super::super::Printer;
 use super::arg_comments::{
     PartitionedComments, has_blank_line_between_args, should_force_expansion_for_comments,
 };
@@ -254,68 +254,18 @@ pub(super) fn build_import_expression_doc(
 
 /// Build a Doc for a meta property: `import.meta`, `new.target`
 ///
-/// Both gaps around the `.` are real source positions an author can comment in
-/// (`new /* c */.target`, `new./* c */ target`), so each is located and emitted.
-/// Concatenating the three pieces scans neither gap and drops whatever is in it — the
-/// same class as a comment inside a multi-word keyword (see `build_keyword_words_doc`
-/// in `printer/comments/declarations.rs`), and the reason that class's usual detector
-/// (a `d.text` literal with an *interior* space) is only a proxy: here the pieces are
-/// joined by `"."`, which has no space to find.
-///
-/// Each side stays where it was authored, which is also what prettier prints: the
-/// comment hugs the `.` and keeps its space on the identifier's side. A *line* comment
-/// before the `.` ends its line, so `.property` continues one level down
-/// (`new // c⏎\t.target`) — the shape a member access already takes.
+/// A meta property is a dotted pair of names, so it delegates to the shared
+/// [`Printer::build_dotted_pair_doc`] — which emits both gaps around the `.`, the
+/// positions an author can comment in (`new /* c */.target`, `new./* c */ target`).
+/// A qualified name (`ns.Type`) is the same shape and shares that printer.
 pub(super) fn build_meta_property_doc(
     printer: &Printer<'_>,
     meta: &internal::MetaProperty<'_>,
 ) -> DocId {
-    let d = printer.d();
-    let meta_doc = printer.identifier_name_doc(&meta.meta);
-    let prop_doc = printer.identifier_name_doc(&meta.property);
-    let gap_start = meta.meta.span.end;
-    let gap_end = meta.property.span.start;
-
-    // `new.target` / `import.meta` with both gaps empty — every ordinary occurrence.
-    if !printer.has_comments_to_emit_between(gap_start, gap_end) {
-        return d.concat(&[meta_doc, d.text("."), prop_doc]);
-    }
-
-    let Some(dot) = printer.find_char_outside_comments(gap_start, gap_end, b'.') else {
-        debug_assert!(
-            false,
-            "a meta property always spells a `.` between its two names"
-        );
-        return d.concat(&[meta_doc, d.text("."), prop_doc]);
-    };
-
-    // `.`→property: a block comment keeps its space on the property's side
-    // (`./* c */ target`); a line comment ends the line, so the property drops a level.
-    let after_dot = if !printer.has_comments_to_emit_between(dot + 1, gap_end) {
-        prop_doc
-    } else if printer.has_line_comments_between(dot + 1, gap_end) {
-        printer.build_continuation_indent(dot + 1, gap_end, prop_doc)
-    } else {
-        d.concat(&[
-            printer.build_comments_between(dot + 1, gap_end, CommentSpacing::Trailing),
-            prop_doc,
-        ])
-    };
-    let tail = d.concat(&[d.text("."), after_dot]);
-
-    // meta→`.`: a line comment takes the whole `.property` onto the next line with it.
-    if printer.has_line_comments_between(gap_start, dot) {
-        return d.concat(&[
-            meta_doc,
-            printer.build_continuation_indent(gap_start, dot, tail),
-        ]);
-    }
-    if printer.has_comments_to_emit_between(gap_start, dot) {
-        return d.concat(&[
-            meta_doc,
-            printer.build_comments_between(gap_start, dot, CommentSpacing::Leading),
-            tail,
-        ]);
-    }
-    d.concat(&[meta_doc, tail])
+    printer.build_dotted_pair_doc(
+        printer.identifier_name_doc(&meta.meta),
+        printer.identifier_name_doc(&meta.property),
+        meta.meta.span.end,
+        meta.property.span.start,
+    )
 }

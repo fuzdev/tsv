@@ -212,10 +212,7 @@ impl<'a> Printer<'a> {
         if let Some(close) = close_paren {
             parts.push(d.text(")"));
             let semicolon_pos = stmt.span.end.saturating_sub(1);
-            let after =
-                self.split_separator_gap_comments(&mut parts, close + 1, semicolon_pos, true);
-            parts.push(d.text(";"));
-            parts.extend(after);
+            self.push_semicolon_with_gap_comments(&mut parts, close + 1, semicolon_pos, true);
         } else {
             parts.push(d.text(");"));
         }

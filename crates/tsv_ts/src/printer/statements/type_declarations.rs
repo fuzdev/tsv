@@ -1153,13 +1153,29 @@ impl<'a> Printer<'a> {
                     ),
                 );
             }
-            match &decl.id {
-                internal::TSModuleName::Identifier(id) => {
-                    parts.push(self.identifier_name_doc(id));
+            let name_doc = match &decl.id {
+                internal::TSModuleName::Identifier(id) => self.identifier_name_doc(id),
+                internal::TSModuleName::Literal(lit) => self.build_literal_doc(lit),
+            };
+            // A dotted namespace (`namespace Outer.Inner {}`) pairs this name with the
+            // nested one, and both gaps around that `.` are positions an author can
+            // comment in — so the shared dotted-pair printer emits the name, the dot and
+            // the gaps together (it needs the left doc, hence holding it until here).
+            // Pushing name + `d.text(".")` scans neither gap and drops what's in it.
+            match &decl.body {
+                Some(internal::TSModuleDeclarationBody::TSModuleDeclaration(nested)) => {
+                    let name_end = match &decl.id {
+                        internal::TSModuleName::Identifier(id) => id.span.end,
+                        internal::TSModuleName::Literal(lit) => lit.span.end,
+                    };
+                    parts.push(self.build_dotted_pair_doc(
+                        name_doc,
+                        self.build_module_declaration_doc_inner(nested, false),
+                        name_end,
+                        nested.span.start,
+                    ));
                 }
-                internal::TSModuleName::Literal(lit) => {
-                    parts.push(self.build_literal_doc(lit));
-                }
+                _ => parts.push(name_doc),
             }
         }
 
@@ -1223,11 +1239,11 @@ impl<'a> Printer<'a> {
                     parts.push(d.text("}"));
                 }
             }
-            Some(internal::TSModuleDeclarationBody::TSModuleDeclaration(nested)) => {
-                // Nested namespace: `namespace Outer.Inner { }`
-                // Print as `Outer.Inner` (dot-separated)
-                parts.push(d.text("."));
-                parts.push(self.build_module_declaration_doc_inner(nested, false));
+            Some(internal::TSModuleDeclarationBody::TSModuleDeclaration(_)) => {
+                // A dotted namespace (`namespace Outer.Inner {}`) is emitted with the
+                // name above — the `.` and both its gaps belong to that pair, and only
+                // that path holds the left doc the shared printer needs. A `global`
+                // namespace can't be dotted, so the name path always ran.
             }
             None => {
                 // Shorthand ambient module: `declare module 'name';`

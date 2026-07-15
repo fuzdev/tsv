@@ -354,6 +354,79 @@ impl<'a> Printer<'a> {
         ])
     }
 
+    /// A dotted pair of names, with **both** gaps around the `.` emitted: a meta property
+    /// (`new` `.` `target`, `import` `.` `meta`) or a qualified name (`ns` `.` `Type`).
+    ///
+    /// Concatenating `left` + `"."` + `right` scans neither gap and drops whatever an
+    /// author wrote in one. That is the punctuator-joined member of the multi-word-keyword
+    /// class (see [`build_keyword_words_doc`](Self::build_keyword_words_doc)) — and the
+    /// case that shows why the class's usual detector, a `d.text` literal with an
+    /// *interior* space, is only a proxy: the joining literal is `"."`, which has no space
+    /// to find. Both shapes route here so neither can regrow the hole independently.
+    ///
+    /// Each side stays where it was authored, which is what prettier prints for a **block**
+    /// comment: it hugs the `.` and keeps its space on the identifier's side. A **line**
+    /// comment ends its line, so the tail continues one level down — that half is a
+    /// divergence (prettier relocates it out of the construct, past the `;`).
+    ///
+    /// `gap_start` is `left`'s source end; `gap_end` is `right`'s source start.
+    pub(crate) fn build_dotted_pair_doc(
+        &self,
+        left: DocId,
+        right: DocId,
+        gap_start: u32,
+        gap_end: u32,
+    ) -> DocId {
+        let d = self.d();
+        // Both gaps empty — every ordinary occurrence, and the only one that is hot.
+        if !self.has_comments_to_emit_between(gap_start, gap_end) {
+            return d.concat(&[left, d.text("."), right]);
+        }
+        let Some(dot) = self.find_char_outside_comments(gap_start, gap_end, b'.') else {
+            debug_assert!(
+                false,
+                "a dotted pair always spells a `.` between its two names"
+            );
+            return d.concat(&[left, d.text("."), right]);
+        };
+        // `.`→right, then left→`.` wrapping it: the tail is built first so a line comment
+        // in the left gap takes the whole `.right` down with it.
+        let tail = d.concat(&[
+            d.text("."),
+            self.build_dot_gap_doc(dot + 1, gap_end, right, CommentSpacing::Trailing),
+        ]);
+        d.concat(&[
+            left,
+            self.build_dot_gap_doc(gap_start, dot, tail, CommentSpacing::Leading),
+        ])
+    }
+
+    /// One of the two gaps around a dotted pair's `.`: the comments authored in
+    /// `[start, end)`, then `tail`.
+    ///
+    /// Both sides obey the same rule, so both call this — a *line* comment ends its line
+    /// and `tail` continues one level down; a block comment stays inline ahead of it. Only
+    /// the spacing differs, since a gap's comment sits after the `.` on one side and
+    /// before it on the other.
+    fn build_dot_gap_doc(
+        &self,
+        start: u32,
+        end: u32,
+        tail: DocId,
+        spacing: CommentSpacing,
+    ) -> DocId {
+        // The caller established that *some* comment lies between the two names, but not
+        // which side of the `.` — so each gap still gates, and an empty one adds nothing.
+        if !self.has_comments_to_emit_between(start, end) {
+            return tail;
+        }
+        if self.has_line_comments_between(start, end) {
+            return self.build_continuation_indent(start, end, tail);
+        }
+        self.d()
+            .concat(&[self.build_comments_between(start, end, spacing), tail])
+    }
+
     /// Build a **multi-word keyword** (`export default`, `await using`, `declare
     /// const`, `export as namespace`), preserving a comment authored in one of its
     /// interior gaps.
@@ -411,8 +484,20 @@ impl<'a> Printer<'a> {
             return (d.text(word), start + word.len() as u32);
         }
 
-        let mut starts: SmallVec<[u32; 4]> = SmallVec::new();
+        // Left-to-right and FLAT: every gap emits its comments where the author wrote
+        // them, but none of them indents on its own — the whole tail is wrapped once,
+        // below. Indenting per gap would compound, and the staircase it builds is not
+        // just deep, it is wrong: the caller emits the keyword→value gap at the header's
+        // own level, so a two-broken-gap keyword would leave its last word sitting a
+        // level *below* the value that follows it.
+        //
+        // Locating and emitting ride one pass: a word's gap runs from the previous
+        // word's end (`cursor`) to this word's start, both of which this loop already
+        // holds — so nothing needs to remember where the earlier words landed.
+        let mut tail: DocBuf = DocBuf::new();
+        let mut any_line = false;
         let mut cursor = start;
+        let mut in_gap = false;
         for word in words {
             let Some(pos) = self.find_keyword_in_range(cursor, search_end, word) else {
                 // The source doesn't hold the shape the caller named — only reachable
@@ -428,36 +513,29 @@ impl<'a> Printer<'a> {
                      — caller passed a synthetic span or a bad search_end"
                 );
                 let mut parts: DocBuf = DocBuf::new();
+                let mut measured = start;
                 for (i, w) in words.iter().enumerate() {
                     if i > 0 {
                         parts.push(d.text(" "));
+                        measured += 1;
                     }
                     parts.push(d.text(w));
+                    measured += w.len() as u32;
                 }
-                let width: u32 = words.iter().map(|w| w.len() as u32).sum();
-                let measured = start + width + words.len() as u32 - 1;
                 return (d.concat(&parts), measured);
             };
-            starts.push(pos);
+            // The first word is emitted by the caller below, outside the indent — it
+            // leads the header, so no gap precedes it.
+            if in_gap {
+                let (gap_doc, has_line) = self.build_keyword_gap_doc(cursor, pos);
+                any_line |= has_line;
+                tail.push(gap_doc);
+                tail.push(d.text(word));
+            }
+            in_gap = true;
             cursor = pos + word.len() as u32;
         }
         let keyword_end = cursor;
-
-        // Left-to-right and FLAT: every gap emits its comments where the author wrote
-        // them, but none of them indents on its own — the whole tail is wrapped once,
-        // below. Indenting per gap would compound, and the staircase it builds is not
-        // just deep, it is wrong: the caller emits the keyword→value gap at the header's
-        // own level, so a two-broken-gap keyword would leave its last word sitting a
-        // level *below* the value that follows it.
-        let mut tail: DocBuf = DocBuf::new();
-        let mut any_line = false;
-        for i in 0..words.len() - 1 {
-            let gap_start = starts[i] + words[i].len() as u32;
-            let (gap_doc, has_line) = self.build_keyword_gap_doc(gap_start, starts[i + 1]);
-            any_line |= has_line;
-            tail.push(gap_doc);
-            tail.push(d.text(words[i + 1]));
-        }
         let tail_doc = d.concat(&tail);
         // One level for the whole header — the same thing the single-gap rule says: a
         // broken gap reads as one statement continuation, never as N nested ones. With
@@ -525,8 +603,13 @@ impl<'a> Printer<'a> {
     /// so a caller with *several* gaps can emit each one and then decide **once** what
     /// to indent. Indenting per gap compounds: two broken gaps would put the keyword's
     /// last word two levels deep, below the value that follows it at one.
+    ///
+    /// Two callers: [`build_keyword_words_doc`](Self::build_keyword_words_doc) for a
+    /// keyword's interior gaps, and the import-equals header — the one multi-gap header
+    /// whose words aren't contiguous (its name sits between `import` and `=`), so it
+    /// drives this directly instead.
     #[inline]
-    fn build_keyword_gap_doc(&self, start: u32, end: u32) -> (DocId, bool) {
+    pub(crate) fn build_keyword_gap_doc(&self, start: u32, end: u32) -> (DocId, bool) {
         let d = self.d();
         // One search settles the gap. With no comment there is nothing to emit but the
         // separator — no empty child, and neither of the per-shape searches below runs.
