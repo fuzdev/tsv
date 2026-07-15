@@ -4,13 +4,13 @@ use super::Printer;
 use crate::ast::internal::{self, Expression};
 use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use crate::printer::{
-    CommentFilter, CommentSpacing, CommentVec, ParenContext, analysis, class_expr_has_decorators,
-    conditional_should_break_after_op, is_call_on_member_chain, is_curried_arrow_chain,
-    is_curried_arrow_with_return_type, is_literal_member_chain, is_module_path_fluid_call,
-    is_multiline_string_literal, is_poorly_breakable_chain, is_pure_property_chain,
-    is_regex_root_chain, is_self_expanding_value, is_simple_self_expanding, is_simple_value,
-    is_single_call_on_member_chain, is_string_literal, is_type_assertion_call, needs_parens,
-    should_inline_logical_expression,
+    CommentFilter, CommentSpacing, CommentVec, LeadingGlue, ParenContext, analysis,
+    class_expr_has_decorators, conditional_should_break_after_op, is_call_on_member_chain,
+    is_curried_arrow_chain, is_curried_arrow_with_return_type, is_literal_member_chain,
+    is_module_path_fluid_call, is_multiline_string_literal, is_poorly_breakable_chain,
+    is_pure_property_chain, is_regex_root_chain, is_self_expanding_value, is_simple_self_expanding,
+    is_simple_value, is_single_call_on_member_chain, is_string_literal, is_type_assertion_call,
+    needs_parens, should_inline_logical_expression,
 };
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::comments_to_emit_in_range;
@@ -191,33 +191,31 @@ impl<'a> Printer<'a> {
 
                 // Check for comments between declarators
                 let has_line_comment = self.has_line_comments_between(prev_end, curr_start);
-                let has_block_comment = self.has_comments_to_emit_between(prev_end, curr_start);
+                let has_gap_comment = self.has_comments_to_emit_between(prev_end, curr_start);
                 // The declarator-separating comma. A block comment keeps the author's
                 // side of it: before → trails the previous init; after → leads the next
-                // declarator. (Only consulted when `has_block_comment`.)
+                // declarator. (Only consulted when `has_gap_comment`.)
                 let comma_pos = self.comma_between(prev_end, curr_start);
 
                 if should_break {
                     if has_line_comment {
-                        // Line comment(s) between declarators: comma must go before
+                        // Line comment(s) between declarators: the comma must go before
                         // the first line comment, block comments go before the comma.
                         // e.g. `a = 1 /* c1 */,\n// c2\nb = 2` or `a = 1, // c1\n// c2\nb = 2`.
-                        // These declarators aren't wrapped in `d.indent()`, so the
-                        // continuation break carries explicit `INDENT` text.
-                        let comments: CommentVec<'_> =
-                            comments_to_emit_in_range(self.comments, prev_end, curr_start)
-                                .collect();
-                        self.push_inter_declarator_line_comment_gap(
+                        // The gap owns its own break; these declarators aren't wrapped in
+                        // `d.indent()`, so it carries explicit `INDENT` text.
+                        self.push_inter_item_line_comment_gap(
                             &mut parts,
-                            &comments,
+                            prev_end,
                             comma_pos,
+                            curr_start,
                             d.text(INDENT),
                         );
                     } else {
                         // Block comment(s) before the comma trail the previous init
                         // (`a = 1 /* c */,`); after-comma comments lead the next
                         // declarator (below the break). Prettier preserves the side.
-                        if has_block_comment {
+                        if has_gap_comment {
                             self.push_before_comma_blocks(&mut parts, prev_end, comma_pos);
                         }
                         parts.push(d.text(","));
@@ -226,56 +224,61 @@ impl<'a> Printer<'a> {
                         // preserving the author's placement (prettier relocates it
                         // before the comma). Emitted before the break below.
                         self.push_stranded_after_comma_blocks(&mut parts, comma_pos, curr_start);
-                    }
-                    // Break to new line with indentation for next declarator
-                    parts.push(d.hardline());
-                    parts.push(d.text(INDENT));
-                    if has_block_comment && !has_line_comment {
-                        // After-comma block comment(s) leading the next declarator: a
-                        // block inline-adjacent to the declarator hugs it (`/* c */ b`),
-                        // an own-line one keeps its line (with any author blank line
-                        // preserved before the declarator/next comment). A stranded
-                        // block already trailed the comma above, so skip it here.
-                        let comments: CommentVec<'_> =
-                            comments_to_emit_in_range(self.comments, comma_pos, curr_start)
-                                .collect();
-                        for (ci, comment) in comments.iter().enumerate() {
-                            if self.is_stranded_after_comma_block(comment, comma_pos, curr_start) {
-                                continue;
-                            }
-                            parts.push(self.build_comment_doc(comment));
-                            if comment.is_block && self.is_same_line(comment.span.end, curr_start) {
-                                parts.push(d.text(" "));
-                            } else {
-                                let next =
-                                    comments.get(ci + 1).map_or(curr_start, |c| c.span.start);
-                                self.push_blank_preserving_hardline(
-                                    &mut parts,
-                                    comment.span.end,
-                                    next,
-                                );
-                                parts.push(d.text(INDENT));
-                            }
+                        // Break to new line with indentation for next declarator
+                        parts.push(d.hardline());
+                        parts.push(d.text(INDENT));
+                        if has_gap_comment {
+                            // After-comma block comment(s) lead the next declarator. A
+                            // stranded block already trailed the comma above.
+                            let comments: CommentVec<'_> =
+                                comments_to_emit_in_range(self.comments, comma_pos, curr_start)
+                                    .filter(|c| {
+                                        !self
+                                            .is_stranded_after_comma_block(c, comma_pos, curr_start)
+                                    })
+                                    .collect();
+                            self.push_leading_comment_run(
+                                &mut parts,
+                                comments.iter().copied(),
+                                curr_start,
+                                LeadingGlue::Adjacent,
+                                d.text(INDENT),
+                            );
                         }
                     }
                 } else {
-                    // Non-break case: block comments keep their side of the comma
-                    // (preserve position). The first continuation's comma sits in
-                    // `parts` (after declarator 0), later commas in `rest_parts`;
-                    // after-comma comments lead the next declarator.
-                    let comma_target = if i == 1 { &mut parts } else { &mut rest_parts };
-                    if has_block_comment {
-                        self.push_before_comma_blocks(comma_target, prev_end, comma_pos);
-                    }
-                    comma_target.push(d.text(","));
-                    // Soft break for declarations without initializers
-                    rest_parts.push(d.line());
-                    if has_block_comment {
-                        for comment in
-                            comments_to_emit_in_range(self.comments, comma_pos, curr_start)
-                        {
-                            rest_parts.push(self.build_comment_doc(comment));
-                            rest_parts.push(d.text(" "));
+                    // Non-break case (no initializers): every continuation declarator
+                    // lives in `rest_parts`, which is wrapped in `d.indent()` below — so
+                    // the continuation indent comes from the doc tree and each break here
+                    // carries an empty one. The comma goes there too: nothing breaks
+                    // before it, so the enclosing indent is inert on it.
+                    if has_line_comment {
+                        // A line comment runs to EOL, so the comma must precede it and the
+                        // next declarator must drop below — the soft `line` used for the
+                        // comment-free case would let the comment absorb both.
+                        self.push_inter_item_line_comment_gap(
+                            &mut rest_parts,
+                            prev_end,
+                            comma_pos,
+                            curr_start,
+                            d.empty(),
+                        );
+                    } else {
+                        // Block comments keep their side of the comma (preserve position).
+                        if has_gap_comment {
+                            self.push_before_comma_blocks(&mut rest_parts, prev_end, comma_pos);
+                        }
+                        rest_parts.push(d.text(","));
+                        // Soft break for declarations without initializers
+                        rest_parts.push(d.line());
+                        if has_gap_comment {
+                            self.push_leading_comment_run(
+                                &mut rest_parts,
+                                comments_to_emit_in_range(self.comments, comma_pos, curr_start),
+                                curr_start,
+                                LeadingGlue::Adjacent,
+                                d.empty(),
+                            );
                         }
                     }
                 }

@@ -3,7 +3,7 @@
 // Switch head, case labels, and case-body layout with comment handling.
 
 use crate::ast::internal::{self, Statement};
-use crate::printer::{CommentVec, Printer, next_printed_stmt_start};
+use crate::printer::{CommentVec, LeadingGlue, Printer, next_printed_stmt_start};
 use smallvec::smallvec;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
@@ -67,30 +67,23 @@ impl<'a> Printer<'a> {
             // update below), so this range holds only genuine own-line comments.
             let comments: CommentVec<'_> =
                 comments_to_emit_in_range(self.comments, prev_end, case.span.start).collect();
-            let mut last_content_end = prev_end;
-            for comment in &comments {
-                // Add hardline before comment (except for very first item - body_doc handles that)
-                // Preserve blank lines before comments (e.g., between `return;` and `// comment`)
-                if !is_first_item {
-                    if self.has_blank_line_between(last_content_end, comment.span.start) {
-                        case_parts.push(d.literalline());
-                    }
-                    case_parts.push(d.hardline());
-                }
-                is_first_item = false;
-                case_parts.push(self.build_comment_doc(comment));
-                last_content_end = comment.span.end;
-            }
-            // Add hardline before case (except for very first item)
-            // Preserve blank lines between cases (check from last content, not prev_end)
+            // The break *into* this run — from the previous case, toward whichever comes
+            // first, a comment or the case. Skipped for the very first item in the body
+            // (`body_doc` owns that break). Everything after it is an ordinary leading
+            // run: a block the author glued to the case leads it (`/* c */ case 2:`), an
+            // own-line comment keeps its line, and author blank lines are preserved.
             if !is_first_item {
-                // Check for blank line between last content (case or comment) and current case
-                if self.has_blank_line_between(last_content_end, case.span.start) {
-                    case_parts.push(d.literalline());
-                }
-                case_parts.push(d.hardline());
+                let run_start = comments.first().map_or(case.span.start, |c| c.span.start);
+                self.push_blank_preserving_hardline(&mut case_parts, prev_end, run_start);
             }
             is_first_item = false;
+            self.push_leading_comment_run(
+                &mut case_parts,
+                comments.iter().copied(),
+                case.span.start,
+                LeadingGlue::Adjacent,
+                d.empty(),
+            );
 
             // Determine the end boundary for inline comments on this case
             // For empty cases (fallthrough), we need to look ahead to the next case

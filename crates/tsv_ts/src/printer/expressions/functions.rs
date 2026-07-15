@@ -505,6 +505,7 @@ impl<'a> Printer<'a> {
                 comments_to_emit_in_range(self.comments, arrow_end, body_start),
                 body_start,
                 LeadingGlue::Adjacent,
+                d.empty(),
             );
             body_parts.push(block_doc);
             parts.push(hang_after_operator(d, d.concat(&body_parts)));
@@ -994,6 +995,7 @@ impl<'a> Printer<'a> {
             comments_to_emit_in_range(self.comments, sig_end, body_start),
             body_start,
             LeadingGlue::Adjacent,
+            d.empty(),
         );
 
         // Add the body expression

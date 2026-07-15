@@ -748,9 +748,7 @@ impl<'a> Printer<'a> {
                             self.has_blank_line_between(comment.span.end, next.span.start)
                         });
                     if !next_is_separated_by_blank {
-                        let inline_block =
-                            comment.is_block && self.is_same_line(comment.span.end, elem_start);
-                        if inline_block {
+                        if self.comment_hugs_next(comment, elem_start) {
                             parts.push(d.text(" "));
                         } else {
                             // Last comment before the element: preserve a blank line

@@ -532,7 +532,7 @@ impl<'a> Printer<'a> {
 
             for comment in &comments {
                 parts.push(self.build_comment_doc(comment));
-                if comment.is_block && self.is_same_line(comment.span.end, item_start) {
+                if self.comment_hugs_next(comment, item_start) {
                     parts.push(d.text(" "));
                 } else {
                     parts.push(d.hardline());
