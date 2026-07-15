@@ -360,6 +360,147 @@ impl<'a> Printer<'a> {
         ])
     }
 
+    /// A whole multi-word header: the keyword (see
+    /// [`build_keyword_words_doc`](Self::build_keyword_words_doc)) plus the
+    /// keyword→`continuation` gap. The shape every caller wants that has no other use
+    /// for the keyword's end — bounding the word search by `continuation_start` also
+    /// keeps a word from ever matching inside the continuation.
+    pub(crate) fn build_keyword_header_doc(
+        &self,
+        words: &[&'static str],
+        start: u32,
+        continuation_start: u32,
+        continuation: DocId,
+    ) -> DocId {
+        let d = self.d();
+        let (keyword_doc, keyword_end) =
+            self.build_keyword_words_doc(words, start, continuation_start);
+        d.concat(&[
+            keyword_doc,
+            self.build_keyword_to_name_continuation(keyword_end, continuation_start, continuation),
+        ])
+    }
+
+    /// Build a **multi-word keyword** (`export default`, `await using`, `declare
+    /// const`, `export as namespace`), preserving a comment authored in one of its
+    /// interior gaps.
+    ///
+    /// Returns the keyword's doc (no trailing space) and the source offset just past
+    /// its final word — the caller's own keyword→value gap starts there.
+    ///
+    /// A keyword spanning two or more words has a gap *between* them that is a real
+    /// source position an author can write a comment in. Deriving the keyword's extent
+    /// by measuring its text (`span.start + "export default".len()`) never locates that
+    /// gap, so nothing scans it and the comment is silently dropped. Locating each word
+    /// instead makes every interior gap emittable, through the same emitter the
+    /// keyword→name gap uses: a block comment stays inline, a line comment indents the
+    /// continuation.
+    ///
+    /// `words` must occur in order within `source[start..search_end]`; each is matched
+    /// whole-word and comment-aware, so a word appearing inside an interior comment
+    /// (`export /* default */ default 1`) never matches.
+    ///
+    /// A word may be a punctuator (`=`). Note what makes that safe: the whole-word test
+    /// rejects a match flanked by *identifier* bytes, and a punctuator has none — so it
+    /// does **not** rule out matching the `=` inside `=>` or `==`. Only `start` and
+    /// `search_end` do: every caller bounds the search at the token before the
+    /// continuation, and no operator can occur in that gap. A caller that widens those
+    /// bounds must re-check that itself.
+    pub(crate) fn build_keyword_words_doc(
+        &self,
+        words: &[&'static str],
+        start: u32,
+        search_end: u32,
+    ) -> (DocId, u32) {
+        let d = self.d();
+        debug_assert!(!words.is_empty(), "a keyword has at least one word");
+
+        // A one-word keyword has no interior gap, so there is nothing to locate: it
+        // begins at `start` and its end is arithmetic. This is the hot path — the
+        // single-word kinds (`const`/`let`/`var`/`using`) run through here for **every**
+        // declaration in every file, and the gap printer they feed is already the
+        // hottest of them (see the internal perf notes on `build_keyword_to_name_continuation`).
+        // Only a genuinely multi-word keyword pays for a scan.
+        if let [word] = words {
+            // That shortcut rests on an invariant nothing else enforces: a single-word
+            // caller's `start` IS the keyword. Locating it would cost the hot path a
+            // scan to prove what every caller already knows, so assert it in debug
+            // instead — a caller passing a wider span (one that leads with `export `,
+            // say) would otherwise silently mis-place `keyword_end` and drop the gap's
+            // comment, which is the very bug this function exists to prevent.
+            debug_assert!(
+                self.source
+                    .as_bytes()
+                    .get(start as usize..)
+                    .is_some_and(|rest| rest.starts_with(word.as_bytes())),
+                "single-word keyword `{word}` must begin at `start` ({start})"
+            );
+            return (d.text(word), start + word.len() as u32);
+        }
+
+        let mut starts: SmallVec<[u32; 4]> = SmallVec::new();
+        let mut cursor = start;
+        for word in words {
+            let Some(pos) = self.find_keyword_in_range(cursor, search_end, word) else {
+                // The source doesn't hold the shape the caller named — only reachable
+                // through a synthetic span or a `search_end` that precedes the words.
+                // Assert it in debug: this arm's measured end is the very arithmetic
+                // this function exists to replace (it assumes one space per gap), so a
+                // caller that lands here silently drops the comment it came for. Prod
+                // still degrades gracefully rather than panicking — a formatter must
+                // not crash on input it parsed.
+                debug_assert!(
+                    false,
+                    "keyword word `{word}` not found in source[{cursor}..{search_end}] \
+                     — caller passed a synthetic span or a bad search_end"
+                );
+                let mut parts: DocBuf = DocBuf::new();
+                for (i, w) in words.iter().enumerate() {
+                    if i > 0 {
+                        parts.push(d.text(" "));
+                    }
+                    parts.push(d.text(w));
+                }
+                let width: u32 = words.iter().map(|w| w.len() as u32).sum();
+                let measured = start + width + words.len() as u32 - 1;
+                return (d.concat(&parts), measured);
+            };
+            starts.push(pos);
+            cursor = pos + word.len() as u32;
+        }
+        let keyword_end = cursor;
+
+        // Left-to-right and FLAT: every gap emits its comments where the author wrote
+        // them, but none of them indents on its own — the whole tail is wrapped once,
+        // below. Indenting per gap would compound, and the staircase it builds is not
+        // just deep, it is wrong: the caller emits the keyword→value gap at the header's
+        // own level, so a two-broken-gap keyword would leave its last word sitting a
+        // level *below* the value that follows it.
+        let mut tail: DocBuf = DocBuf::new();
+        let mut any_line = false;
+        for i in 0..words.len() - 1 {
+            let gap_start = starts[i] + words[i].len() as u32;
+            let (gap_doc, has_line) = self.build_keyword_gap_doc(gap_start, starts[i + 1]);
+            any_line |= has_line;
+            tail.push(gap_doc);
+            tail.push(d.text(words[i + 1]));
+        }
+        let tail_doc = d.concat(&tail);
+        // One level for the whole header — the same thing the single-gap rule says: a
+        // broken gap reads as one statement continuation, never as N nested ones. With
+        // no line comment there is no break to indent, so the wrapper is skipped and a
+        // comment-free keyword stays byte-identical to `words.join(" ")`.
+        let doc = d.concat(&[
+            d.text(words[0]),
+            if any_line {
+                d.indent(tail_doc)
+            } else {
+                tail_doc
+            },
+        ]);
+        (doc, keyword_end)
+    }
+
     /// Build a declaration header's keyword→name gap comment followed by the rest
     /// of the declaration (`continuation`), indenting that continuation one level
     /// when a *line* comment forces the break.
@@ -398,30 +539,40 @@ impl<'a> Printer<'a> {
         continuation: DocId,
     ) -> DocId {
         let d = self.d();
-        // One search settles the gap. With no comment there is nothing to emit and
-        // nothing to indent, so the header is just `" " + continuation` — no empty
-        // child, and neither of the per-shape searches below runs. Every declaration in
-        // every file passes through here, so this is the hottest of the gap printers.
-        if !self.has_comments_to_emit_between(keyword_end, name_start) {
-            return d.concat(&[d.text(" "), continuation]);
+        let (gap_doc, has_line) = self.build_keyword_gap_doc(keyword_end, name_start);
+        let body = d.concat(&[gap_doc, continuation]);
+        if has_line { d.indent(body) } else { body }
+    }
+
+    /// One header gap — the comments authored in it plus the separator that follows —
+    /// with **no** `indent` applied. Also reports whether a *line* comment ended the
+    /// line, which is the caller's cue that a break happened.
+    ///
+    /// Split out from [`build_keyword_to_name_continuation`](Self::build_keyword_to_name_continuation)
+    /// so a caller with *several* gaps can emit each one and then decide **once** what
+    /// to indent. Indenting per gap compounds: two broken gaps would put the keyword's
+    /// last word two levels deep, below the value that follows it at one.
+    #[inline]
+    fn build_keyword_gap_doc(&self, start: u32, end: u32) -> (DocId, bool) {
+        let d = self.d();
+        // One search settles the gap. With no comment there is nothing to emit but the
+        // separator — no empty child, and neither of the per-shape searches below runs.
+        // Every declaration in every file passes through here, so this is the hottest of
+        // the gap printers.
+        if !self.has_comments_to_emit_between(start, end) {
+            return (d.text(" "), false);
         }
-        let has_line = self.has_line_comments_between(keyword_end, name_start);
+        let has_line = self.has_line_comments_between(start, end);
         let comment_doc = if has_line {
-            self.build_name_to_type_params_comments(
-                keyword_end,
-                name_start,
-                CommentSpacing::Leading,
-            )
-        } else if let Some(c) = self.build_inline_comments_between_doc_opt(keyword_end, name_start)
-        {
+            self.build_name_to_type_params_comments(start, end, CommentSpacing::Leading)
+        } else if let Some(c) = self.build_inline_comments_between_doc_opt(start, end) {
             c
         } else {
             d.empty()
         };
         // After a line comment the hardline provides separation; otherwise a space.
         let space_after = if has_line { d.empty() } else { d.text(" ") };
-        let body = d.concat(&[comment_doc, space_after, continuation]);
-        if has_line { d.indent(body) } else { body }
+        (d.concat(&[comment_doc, space_after]), has_line)
     }
 
     /// Build a Doc for comments between a keyword and the following name/token.

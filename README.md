@@ -14,8 +14,8 @@ and a drop-in replacement for [Svelte](https://svelte.dev/)'s parser +
 Compared to Oxc, Biome, and SWC, tsv is a set of focused tools, not a generic language platform,
 so the focus is web standards and there's no support for JSX/SCSS/etc,
 beyond Svelte as the only JS framework.
-The extensibility story is currently limited to using its Rust crates as libraries;
-bridging to JS or WASM plugins is an open question, but may not be supported.
+The extensibility story is currently limited to using its Rust crates as libraries (or forking);
+bridging to JS or WASM plugins is an open question (leaning against).
 
 tsv prioritizes, in order:
 
@@ -38,17 +38,21 @@ It's a high-effort project that prioritizes quality.
 
 ## Status
 
-tsv is derived from:
+pre-alpha - v0.1 is for feedback only not production use; tsv v0.2 is closer but not yet published
 
-- HTML/CSS/JS
+## About
+
+tsv derives its tools from:
+
+- HTML/CSS/JS and other Web specs
 - TypeScript
 - Svelte
 - Prettier and prettier-plugin-svelte
 
-tsv currently supports:
+tsv's features:
 
-- [x] formatter matching Prettier + prettier-plugin-svelte (with intentional divergences)
-- [x] parser, drop-in for Svelte+acorn+acorn-typescript
+- [x] formatter following Prettier + prettier-plugin-svelte (with intentional divergences)
+- [x] parser for TypeScript/JS + CSS + Svelte, drop-in for Svelte+acorn+acorn-typescript
 - [ ] [vscode formatter plugin](https://github.com/fuzdev/vscode_extension_tsv_format) - `fuzdev.tsv-format`
 - [ ] ts-to-js conversion (types-to-whitespace only)
 - [ ] module lexer
@@ -116,7 +120,7 @@ Native builds will be published with v0.2, for v0.1 only WASM builds are publish
     (`printWidth: 100`, `useTabs: true`, `singleQuote: true`, and
     `trailingComma: 'none'`),
     and there are no config files or CLI options for formatting style;
-    i.e. `tsv format` is opinionated like `gofmt` and Python's Black,
+    i.e. `tsv format` is opinionated like `gofmt`, `zig fmt`, and Python's Black,
     see [CLAUDE.md § Configuration](CLAUDE.md#configuration)
   - pushes complexity and mess to the printer and JSON conversion,
     out of the parser and internal AST,

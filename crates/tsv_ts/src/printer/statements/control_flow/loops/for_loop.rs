@@ -1376,19 +1376,20 @@ impl<'a> Printer<'a> {
     /// standalone declaration uses — so the gap comment isn't dropped; byte-identical
     /// to `kind + " " + continuation` when the gap is comment-free, so a caller's
     /// enclosing `group`/`indent` is preserved. A for-header declaration is never
-    /// `declare`, so `keyword_end` is just past the `kind` keyword.
+    /// `declare`, but its kind may still be two words (`await using`), whose own
+    /// interior gap is emitted by `build_keyword_words_doc`.
     fn build_for_decl_keyword_gap(
         &self,
         decl: &internal::VariableDeclaration<'_>,
         binding_start: u32,
         continuation: DocId,
     ) -> DocId {
-        let d = self.d();
-        let keyword_end = decl.span.start + decl.kind.as_str().len() as u32;
-        d.concat(&[
-            d.text(decl.kind.as_str()),
-            self.build_keyword_to_name_continuation(keyword_end, binding_start, continuation),
-        ])
+        self.build_keyword_header_doc(
+            decl.kind.words(),
+            decl.span.start,
+            binding_start,
+            continuation,
+        )
     }
 
     fn build_for_init_doc(&self, init: &internal::ForInit<'_>) -> DocId {

@@ -12,7 +12,7 @@ use crate::printer::{
     is_simple_value, is_single_call_on_member_chain, is_string_literal, is_type_assertion_call,
     needs_parens, should_inline_logical_expression,
 };
-use smallvec::smallvec;
+use smallvec::{SmallVec, smallvec};
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::doc::{DocBuf, GroupId};
@@ -143,23 +143,23 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut prefix: DocBuf = DocBuf::new();
 
-        // Declare modifier
+        let first_decl_start = decl.declarations[0].span.start;
+
+        // The header keyword, word by word: an optional `declare` modifier plus the
+        // kind (`await using` is two words). Every gap *between* those words is a
+        // position an author can comment in, so the words are located rather than
+        // measured — measuring skips the interior gaps and drops what's in them.
+        let mut words: SmallVec<[&'static str; 3]> = SmallVec::new();
         if decl.declare {
-            prefix.push(d.text("declare "));
+            words.push("declare");
         }
-
-        // Keyword (const, let, var)
-        prefix.push(d.text(decl.kind.as_str()));
-
+        words.extend_from_slice(decl.kind.words());
         // The keyword→first-declarator gap. A *line* comment here indents the whole
         // continuation one level (uniform declaration-header rule); block/no-comment
         // cases stay inline. The leading space is supplied by the gap helper below.
-        let keyword_end = if decl.declare {
-            decl.span.start + "declare ".len() as u32 + decl.kind.as_str().len() as u32
-        } else {
-            decl.span.start + decl.kind.as_str().len() as u32
-        };
-        let first_decl_start = decl.declarations[0].span.start;
+        let (keyword_doc, keyword_end) =
+            self.build_keyword_words_doc(&words, decl.span.start, first_decl_start);
+        prefix.push(keyword_doc);
 
         // Everything after the gap is collected into `parts` (the continuation).
         let mut parts = DocBuf::new();
