@@ -44,7 +44,7 @@ pre-alpha - v0.1 is for feedback only not production use; tsv v0.2 is closer but
 
 tsv derives its tools from:
 
-- HTML/CSS/JS
+- HTML/CSS/JS and other Web specs
 - TypeScript
 - Svelte
 - Prettier and prettier-plugin-svelte
