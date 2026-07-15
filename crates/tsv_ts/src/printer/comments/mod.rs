@@ -554,8 +554,12 @@ impl<'a> Printer<'a> {
     /// switch cases), the forced-multiline lists via
     /// [`build_leading_comments_multiline`](Self::build_leading_comments_multiline)
     /// (tuples, type params/args, function-type params, the union's first member, the
-    /// bracket-break shell, the broken `<T>` cast), and the array literal / array
-    /// pattern element runs.
+    /// bracket-break shell, the broken `<T>` cast), the array literal / array pattern
+    /// element runs, the body/member runs via
+    /// [`build_leading_comments_before`](Self::build_leading_comments_before) (class,
+    /// interface and enum members, statement lists, type literals, expanded object
+    /// patterns), and — for all but its last comment —
+    /// [`build_orphaned_comment_run`](Self::build_orphaned_comment_run).
     ///
     /// Three loops still emit a leading run themselves, because their surrounding
     /// separator policy genuinely differs — the import/export specifier list, the

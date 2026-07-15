@@ -610,11 +610,7 @@ impl<'a> Printer<'a> {
                 CommentVec::new()
             };
 
-            prop_parts.extend(self.build_leading_comments_with_blank_lines(
-                &leading_comments,
-                prop_start,
-                false,
-            ));
+            prop_parts.extend(self.build_leading_comments_before(&leading_comments, prop_start));
 
             // A preceding format-ignore directive keeps the property's source verbatim
             // (trailing comment/comma handled normally)

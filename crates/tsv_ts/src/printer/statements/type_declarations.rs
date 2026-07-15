@@ -741,11 +741,7 @@ impl<'a> Printer<'a> {
             parts.push(d.hardline());
 
             // Print leading comments with blank line preservation
-            parts.extend(self.build_leading_comments_with_blank_lines(
-                &leading_comments,
-                member_start,
-                false,
-            ));
+            parts.extend(self.build_leading_comments_before(&leading_comments, member_start));
 
             // A preceding format-ignore directive keeps the member's source verbatim.
             // The member span includes its trailing `;`.

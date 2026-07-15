@@ -300,11 +300,8 @@ impl<'a> Printer<'a> {
                     } else if has_leading {
                         body_parts.push(d.hardline());
                     }
-                    body_parts.extend(self.build_leading_comments_with_blank_lines(
-                        &leading_comments,
-                        search_end,
-                        true,
-                    ));
+                    body_parts
+                        .extend(self.build_orphaned_comment_run(&leading_comments, search_end));
                     prev_stmt_end = Some(stmt_end);
                 }
 
@@ -346,11 +343,7 @@ impl<'a> Printer<'a> {
             }
 
             // Print leading comments before this statement (with blank line preservation)
-            body_parts.extend(self.build_leading_comments_with_blank_lines(
-                &leading_comments,
-                stmt_start,
-                false,
-            ));
+            body_parts.extend(self.build_leading_comments_before(&leading_comments, stmt_start));
 
             // format-ignore: emit raw source instead of formatting
             if body_has_comments && self.has_format_ignore_in_range(prev_end, stmt_start) {
