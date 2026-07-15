@@ -131,7 +131,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         })
     }
 
-    /// Parse `using` declaration (ES2024 Explicit Resource Management)
+    /// Parse `using` declaration (Explicit Resource Management)
     /// `using resource = getResource();`
     pub(super) fn parse_using_declaration(&mut self) -> Result<Statement<'arena>, ParseError> {
         let (start, _) = self.current_pos();
@@ -143,7 +143,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.finish_variable_declaration(VariableDeclarationKind::Using, start)
     }
 
-    /// Parse `await using` declaration (ES2024 Explicit Resource Management)
+    /// Parse `await using` declaration (Explicit Resource Management)
     /// `await using resource = getAsyncResource();`
     pub(super) fn parse_await_using_declaration(
         &mut self,

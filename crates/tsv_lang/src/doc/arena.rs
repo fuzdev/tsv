@@ -21,6 +21,9 @@ use crate::Span;
 use crate::config::TAB_WIDTH;
 use crate::printing::visual_width;
 
+#[cfg(feature = "comment_check")]
+use crate::comment_ledger::{DocumentKey, comment_check_enabled, document_key};
+
 use super::DocBuf;
 #[cfg(feature = "swallow_check")]
 use super::swallow::swallow_check_enabled;
@@ -153,9 +156,6 @@ pub enum DocNode {
 
     /// Force parent group to break
     BreakParent,
-
-    /// A group that prevents hardline propagation to parent groups
-    IsolatedGroup { contents: DocId },
 }
 
 // `DocNode` must stay free of drop glue: dynamically-built text lives in the
@@ -273,6 +273,18 @@ pub(super) type LineSuffixBuf = SmallVec<[ArenaCommand; 4]>;
 pub(super) const FLAT_WIDTH_UNKNOWN: u32 = u32::MAX;
 pub(super) const FLAT_WIDTH_BREAKS: u32 = u32::MAX - 1;
 
+/// Longest slice [`pooled_text_width`] measures with its fused byte walk. Past
+/// it, the scan shape flips to the searcher-based one: `contains('\n')` and
+/// `is_ascii` are SIMD and the tab count auto-vectorizes (it has no early exit),
+/// so on a long slice three vector passes beat one scalar walk — while on a
+/// short one their setup, paid regardless of length, is the entire cost. Text
+/// nodes are short (a CSS property name, a value chunk), but not uniformly: the
+/// TS printer's tail runs long enough that an ungated fused walk measured a real
+/// regression on TS while CSS never noticed the gate at all. The crossover is
+/// broad and 32 sits in the flat middle of it. Only a *speed* switch — both arms
+/// answer identically, and one oracle grades them.
+const FUSED_WIDTH_SCAN_MAX: usize = 32;
+
 /// The eager width-cache policy for doc text: pool-stored text
 /// ([`DocText::Pooled`], `MultilineText` first lines), verbatim source slices
 /// ([`DocArena::source_span`]), and `text()` statics (amortized through the
@@ -298,8 +310,58 @@ pub(super) const FLAT_WIDTH_BREAKS: u32 = u32::MAX - 1;
 /// answer identically. The same holds for the other consumer, `render_text`'s
 /// column advance — the column only feeds threshold comparisons (print width,
 /// `first_line_offset`) far below the clamp, and resets at each newline.
+///
+/// One forward byte pass decides all three facts the width needs — is there a
+/// newline, is the slice ASCII, how many tabs does it hold — because three
+/// separate searchers cost more in *setup* (paid regardless of length) than one
+/// walk costs in total on the short slice that actually arrives here. Slices
+/// past [`FUSED_WIDTH_SCAN_MAX`] take the searcher shape instead.
+///
+/// Answers identically to probing `contains('\n')` and then
+/// [`visual_width`](crate::printing::visual_width): on an all-ASCII slice the
+/// loop accumulates `1` per byte and `TAB_WIDTH` per tab, which is exactly that
+/// function's ASCII fast path, `len + tabs * (TAB_WIDTH - 1)`; a `\n` seen before
+/// any non-ASCII byte yields the same sentinel the `contains` probe would have;
+/// and the first non-ASCII byte hands the **whole** slice to the searcher arm, so
+/// a newline sitting *after* that byte is still found.
+///
+/// ⚠️ It mirrors that **ASCII fast path**, where a control character counts as
+/// one column — deliberately *not* `printing::ascii_char_width`, which counts it
+/// as zero and which only the grapheme-walking path uses (see
+/// `visual_width_mixed`). The two disagree on purpose; a fused walk that reached
+/// for the "obvious" shared helper would silently change every width holding a
+/// control byte. The exhaustive equivalence test grades this arm with `\x00`,
+/// `\x1b` and `\x7f` precisely because no corpus does.
 #[inline]
 fn pooled_text_width(s: &str) -> u16 {
+    if s.len() > FUSED_WIDTH_SCAN_MAX {
+        return pooled_text_width_scanned(s);
+    }
+    let mut width = 0usize;
+    for &b in s.as_bytes() {
+        match b {
+            b'\n' => return TEXT_WIDTH_HAS_NEWLINE,
+            b'\t' => width += TAB_WIDTH,
+            0x00..=0x7f => width += 1,
+            _ => return pooled_text_width_scanned(s),
+        }
+    }
+    width.min(TEXT_WIDTH_NOT_COMPUTED as usize - 1) as u16
+}
+
+/// The searcher-based arm of [`pooled_text_width`]: the whole-slice shape, for a
+/// slice too long for the fused walk or holding a non-ASCII byte. Outlined to
+/// keep that walk lean and inlinable, mirroring the split in
+/// `arena_render::update_pos_for_text` — but, unlike that one's helper,
+/// **not `#[cold]`**: a long slice is a normal input here, not a rare one (the TS
+/// printer's text nodes run past the gate often enough that marking this arm cold
+/// would mispredict against the corpus that needs it most).
+///
+/// Takes the whole slice, not the scanned remainder — a grapheme cluster can
+/// start on the ASCII byte *before* the first non-ASCII one, so only measuring
+/// from the beginning is cluster-correct.
+#[inline(never)]
+fn pooled_text_width_scanned(s: &str) -> u16 {
     if s.contains('\n') {
         TEXT_WIDTH_HAS_NEWLINE
     } else {
@@ -456,6 +518,15 @@ pub struct DocArena {
     /// feature, so production builds carry no diagnostic state.
     #[cfg(feature = "swallow_check")]
     line_comment_ids: RefCell<Vec<u32>>,
+    /// Diagnostic side-set: the doc nodes that *are* a comment, recorded by
+    /// [`Self::tag_comment_doc`] only while the comment ledger is enabled (empty and
+    /// untouched otherwise). Each entry pairs the node with the comment's span and the
+    /// document it was parsed from, because the renderer — which records the emit when it
+    /// reaches the node — holds no `source`. Appended in `alloc` order, so the vec is
+    /// sorted ascending on the id and the renderer looks up by binary search. See
+    /// [`crate::comment_ledger`]. Compiled in only under the `comment_check` feature.
+    #[cfg(feature = "comment_check")]
+    comment_docs: RefCell<Vec<(u32, Span, DocumentKey)>>,
 }
 
 /// One `static_cache` slot: a static string's identity (`ptr`+`len`)
@@ -527,6 +598,8 @@ impl DocArena {
             symbol_nodes: RefCell::new(Vec::new()),
             #[cfg(feature = "swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
+            #[cfg(feature = "comment_check")]
+            comment_docs: RefCell::new(Vec::new()),
         }
     }
 
@@ -578,6 +651,8 @@ impl DocArena {
             symbol_nodes: RefCell::new(Vec::new()),
             #[cfg(feature = "swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
+            #[cfg(feature = "comment_check")]
+            comment_docs: RefCell::new(Vec::new()),
         }
     }
 
@@ -639,6 +714,8 @@ impl DocArena {
         self.flat_width_cache.get_mut().clear();
         #[cfg(feature = "swallow_check")]
         self.line_comment_ids.get_mut().clear();
+        #[cfg(feature = "comment_check")]
+        self.comment_docs.get_mut().clear();
     }
 
     //
@@ -874,6 +951,50 @@ impl DocArena {
     #[inline]
     pub(crate) fn is_line_comment(&self, id: DocId) -> bool {
         self.line_comment_ids.borrow().binary_search(&id.0).is_ok()
+    }
+
+    /// Tag `id` as the doc node that emits the comment at `span` in `source`.
+    ///
+    /// The print-once comment ledger's build-side seam for a doc-based printer: the
+    /// *renderer* records the emit when it reaches this node, so a comment assembled into
+    /// a `conditional_group` candidate that loses never counts (and one assembled only
+    /// into a losing candidate is correctly reported as dropped). `source` is captured as
+    /// a [`DocumentKey`] because the renderer holds no source of its own — the arena is
+    /// shared across a Svelte host and a nested element's re-parsed island, whose spans
+    /// live in different namespaces. A no-op unless the ledger is enabled, and compiled
+    /// out entirely without the `comment_check` feature. See [`crate::comment_ledger`].
+    #[cfg(feature = "comment_check")]
+    #[inline]
+    pub fn tag_comment_doc(&self, id: DocId, span: Span, source: &str) {
+        if comment_check_enabled() {
+            // Recorded in alloc order → sorted ascending (see field doc). Every comment
+            // doc's root is a fresh alloc (a `SourceSpan` / `MultilineText` leaf or a
+            // `Concat` container — none of them interned), so ids strictly increase.
+            self.comment_docs
+                .borrow_mut()
+                .push((id.0, span, document_key(source)));
+        }
+    }
+
+    /// Whether any comment-doc tags were recorded — the renderer's hoisted gate, so a
+    /// document with no comments pays no per-node lookup.
+    #[cfg(feature = "comment_check")]
+    #[inline]
+    pub(crate) fn has_comment_docs(&self) -> bool {
+        !self.comment_docs.borrow().is_empty()
+    }
+
+    /// The comment a doc node emits, if it is one (binary search over the sorted
+    /// side-set). Internal to the renderer's ledger hook — not part of the builder API.
+    #[cfg(feature = "comment_check")]
+    #[inline]
+    pub(crate) fn comment_doc_tag(&self, id: DocId) -> Option<(Span, DocumentKey)> {
+        let tags = self.comment_docs.borrow();
+        let idx = tags
+            .binary_search_by_key(&id.0, |&(node, _, _)| node)
+            .ok()?;
+        let (_, span, key) = tags[idx];
+        Some((span, key))
     }
 
     /// Return the per-document interned node held in `cell`, allocating it on
@@ -1165,11 +1286,6 @@ impl DocArena {
         self.interned_singleton(&self.break_parent_node, || DocNode::BreakParent)
     }
 
-    /// Create an isolated group that prevents hardline propagation.
-    pub fn isolated_group(&self, doc: DocId) -> DocId {
-        self.alloc(DocNode::IsolatedGroup { contents: doc })
-    }
-
     //
     // Convenience builders
     //
@@ -1326,53 +1442,12 @@ impl DocArena {
                 .iter()
                 .any(|&kid| Self::will_break_memo(kid, nodes, children, cache)),
             DocNode::WithContext { doc, .. } => Self::will_break_memo(*doc, nodes, children, cache),
-            DocNode::IsolatedGroup { .. } => false,
             DocNode::LineSuffix(_) => false,
             DocNode::LineSuffixBoundary => false,
             DocNode::BreakParent => true,
         };
         cache[id.index()] = Some(result);
         result
-    }
-
-    /// Like `will_break`, but also traverses into `IsolatedGroup`.
-    ///
-    /// Use this for doc analysis (e.g., chain expansion decisions) where
-    /// rendering isolation is irrelevant — we need to know if the content
-    /// actually contains forced breaks regardless of group isolation.
-    pub fn will_break_deep(&self, id: DocId) -> bool {
-        let nodes = self.nodes.borrow();
-        self.will_break_deep_inner(id, &nodes)
-    }
-
-    fn will_break_deep_inner(&self, id: DocId, nodes: &[DocNode]) -> bool {
-        match &nodes[id.index()] {
-            DocNode::IsolatedGroup { contents, .. } => self.will_break_deep_inner(*contents, nodes),
-            DocNode::Text(_) => false,
-            DocNode::MultilineText { .. } => true,
-            DocNode::Line(kind) => matches!(kind, LineKind::Hard | LineKind::Literal),
-            DocNode::Indent(inner) | DocNode::Dedent(inner) => {
-                self.will_break_deep_inner(*inner, nodes)
-            }
-            DocNode::Align { contents, .. } => self.will_break_deep_inner(*contents, nodes),
-            DocNode::IndentIfBreak { contents, .. } => self.will_break_deep_inner(*contents, nodes),
-            DocNode::Group {
-                contents,
-                should_break,
-                ..
-            } => *should_break || self.will_break_deep_inner(*contents, nodes),
-            DocNode::IfBreak { .. } => false,
-            DocNode::Concat(range) | DocNode::Fill(range) => {
-                let children = self.children.borrow();
-                let kids = range.resolve(&children);
-                kids.iter()
-                    .any(|&kid| self.will_break_deep_inner(kid, nodes))
-            }
-            DocNode::WithContext { doc, .. } => self.will_break_deep_inner(*doc, nodes),
-            DocNode::LineSuffix(_) => false,
-            DocNode::LineSuffixBoundary => false,
-            DocNode::BreakParent => true,
-        }
     }
 
     /// Check if a doc has forced breaks (hardlines only, no should_break groups).
@@ -1402,7 +1477,6 @@ impl DocArena {
                     .any(|&kid| self.has_forced_break_inner(kid, nodes))
             }
             DocNode::WithContext { doc, .. } => self.has_forced_break_inner(*doc, nodes),
-            DocNode::IsolatedGroup { .. } => false,
             DocNode::LineSuffix(_) => false,
             DocNode::LineSuffixBoundary => false,
             DocNode::BreakParent => true,
@@ -1456,7 +1530,6 @@ impl DocArena {
                 kids.iter().any(|&kid| self.can_break_inner(kid, nodes))
             }
             DocNode::WithContext { doc, .. } => self.can_break_inner(*doc, nodes),
-            DocNode::IsolatedGroup { contents, .. } => self.can_break_inner(*contents, nodes),
             DocNode::LineSuffix(inner) => self.can_break_inner(*inner, nodes),
             DocNode::MultilineText { .. } => true,
             DocNode::Text(_) | DocNode::LineSuffixBoundary => false,
@@ -1482,7 +1555,6 @@ impl DocArena {
                 id: Option<GroupId>,
                 should_break: bool,
             },
-            IsolatedGroup(DocId),
             IfBreakFlat(DocId),
             IndentIfBreakContents(DocId),
             Concat(DocBuf),
@@ -1518,7 +1590,6 @@ impl DocArena {
                     id: *group_id,
                     should_break: *should_break,
                 },
-                DocNode::IsolatedGroup { contents } => Info::IsolatedGroup(*contents),
                 DocNode::IfBreak { flat_doc, .. } => Info::IfBreakFlat(*flat_doc),
                 DocNode::IndentIfBreak { contents, .. } => Info::IndentIfBreakContents(*contents),
                 DocNode::Concat(range) => {
@@ -1587,10 +1658,6 @@ impl DocArena {
                         should_break,
                     })
                 }
-            }
-            Info::IsolatedGroup(contents) => {
-                let new_contents = self.remove_lines(contents);
-                self.isolated_group(new_contents)
             }
             Info::IfBreakFlat(flat_doc) => self.remove_lines(flat_doc),
             Info::IndentIfBreakContents(contents) => self.remove_lines(contents),
@@ -1908,5 +1975,116 @@ impl std::fmt::Write for PoolTextWriter<'_> {
     fn write_str(&mut self, s: &str) -> std::fmt::Result {
         self.scratch.push_str(s);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod pooled_text_width_tests {
+    use super::{TEXT_WIDTH_HAS_NEWLINE, TEXT_WIDTH_NOT_COMPUTED, pooled_text_width};
+    use crate::config::TAB_WIDTH;
+    use crate::printing::visual_width;
+
+    /// The width, spelled out independently of [`pooled_text_width`]: probe for a
+    /// newline, then measure. This is the oracle — the fused single-pass scan must
+    /// agree with it on every input.
+    ///
+    /// It has to be graded here because **no corpus can grade it**. A width only
+    /// changes the output once it crosses the print width, so an arithmetic slip
+    /// on a rare byte (a tab, a control char) leaves every formatted file
+    /// byte-identical and sails through the fixtures and any size of format/wire
+    /// diff. Verified: a one-column error in the tab arm is invisible to all of
+    /// them and caught only here.
+    fn reference(s: &str) -> u16 {
+        if s.contains('\n') {
+            TEXT_WIDTH_HAS_NEWLINE
+        } else {
+            visual_width(s, TAB_WIDTH).min(TEXT_WIDTH_NOT_COMPUTED as usize - 1) as u16
+        }
+    }
+
+    fn assert_agrees(s: &str) {
+        assert_eq!(
+            pooled_text_width(s),
+            reference(s),
+            "pooled_text_width disagrees with the reference on {s:?}"
+        );
+    }
+
+    #[test]
+    fn agrees_on_exhaustive_short_strings() {
+        // Every string of length 0-3 over an alphabet spanning each arm of the
+        // scan: plain ASCII, the two special ASCII bytes, a control char, DEL,
+        // and multi-byte UTF-8 (2-, 3- and 4-byte, plus a combining mark and a
+        // ZWJ — the clusters that can cross an ASCII boundary).
+        let alphabet = [
+            "a", "Z", "0", "-", " ", "\t", "\n", "\r", "\x00", "\x1b", "\x7f", "é", "中", "🎉",
+            "\u{0301}", "\u{200d}", "\u{fe0f}", "\u{00a0}",
+        ];
+        assert_agrees("");
+        for a in alphabet {
+            assert_agrees(a);
+            for b in alphabet {
+                assert_agrees(&format!("{a}{b}"));
+                for c in alphabet {
+                    assert_agrees(&format!("{a}{b}{c}"));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn agrees_on_realistic_and_boundary_inputs() {
+        for s in [
+            "color",
+            "--custom-property",
+            "rgb(12 34 56 / 0.5)",
+            "\tindented",
+            "a\tb\tc",
+            "line one\nline two",
+            // A newline positioned AFTER the first non-ASCII byte: the fast
+            // path bails to the cold arm mid-scan, which must still find it.
+            "é\nafter",
+            "中\ttab-after-multibyte",
+            // A combining mark on an ASCII base — the cluster starts on the
+            // byte the fast path already counted, so the cold arm has to
+            // re-measure the whole slice, not the remainder.
+            "e\u{0301}x",
+            "\u{200d}",
+            "1\u{fe0f}\u{20e3}",
+            "👨\u{200d}👩\u{200d}👧",
+        ] {
+            assert_agrees(s);
+        }
+    }
+
+    #[test]
+    fn agrees_at_the_clamp_boundary() {
+        // A single-line text wider than the u16 sentinels must clamp, not alias
+        // TEXT_WIDTH_HAS_NEWLINE or wrap.
+        for len in [
+            TEXT_WIDTH_NOT_COMPUTED as usize - 2,
+            TEXT_WIDTH_NOT_COMPUTED as usize - 1,
+            TEXT_WIDTH_NOT_COMPUTED as usize,
+            TEXT_WIDTH_NOT_COMPUTED as usize + 5,
+        ] {
+            let ascii = "a".repeat(len);
+            assert_agrees(&ascii);
+            assert!(pooled_text_width(&ascii) < TEXT_WIDTH_HAS_NEWLINE);
+            // Tabs multiply the width, so a far shorter run also clamps.
+            let tabs = "\t".repeat(len);
+            assert_agrees(&tabs);
+        }
+    }
+
+    #[test]
+    fn agrees_on_long_ascii_runs() {
+        // The length range where the replaced shape's SIMD scans were at their
+        // best — the fused walk must still agree there.
+        for len in [31, 32, 33, 63, 64, 65, 127, 128, 256, 1000] {
+            assert_agrees(&"x".repeat(len));
+            assert_agrees(&format!("{}\t{}", "x".repeat(len / 2), "y".repeat(len / 2)));
+            assert_agrees(&format!("{}\n{}", "x".repeat(len / 2), "y".repeat(len / 2)));
+            assert_agrees(&format!("{}é{}", "x".repeat(len / 2), "y".repeat(len / 2)));
+        }
     }
 }

@@ -28,7 +28,7 @@ use super::test_patterns::{build_test_callee_flat_doc, is_test_call};
 use crate::ast::internal;
 use crate::printer::CommentVec;
 use smallvec::smallvec;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -160,7 +160,9 @@ pub(super) fn build_call_doc_with_wrapping(
     // within [paren_open, call.span.end], so when the call has no comment they are
     // provably all false/empty — skip them. Canonical reference:
     // build_params_doc_with_comments.
-    let call_has_comments = printer.has_comments_between(paren_open, call.span.end);
+    // Counts owned comments: this asks whether the argument window puts any comment text on
+    // the page (a *layout* question), not who emits it — see `has_comments_on_page_between`.
+    let call_has_comments = printer.has_comments_on_page_between(paren_open, call.span.end);
 
     // Module path calls that should not break at arguments (e.g., require.resolve)
     // Keep the call on one line; let assignment/parent break instead
@@ -210,7 +212,8 @@ pub(super) fn build_call_doc_with_wrapping(
     // Note: Check both trailing line comments AND trailing block comments
     let has_trailing_block_comment = call_has_comments
         && call.arguments.last().is_some_and(|last_arg| {
-            comments_in_range(printer.comments, last_arg.span().end, call.span.end)
+            printer
+                .comments_on_page_between(last_arg.span().end, call.span.end)
                 .any(|c| c.is_block)
         });
     if call.arguments.len() == 1
@@ -452,15 +455,17 @@ fn try_single_arg_comment_paths(
     // branches below — defer to the general comment path (which emits them
     // after the last arg, no trailing comma). Same-line inline trailing block
     // comments (e.g. `fn(/* c */ a /* t */)`) stay on this fast path.
-    let has_own_line_trailing_comment = comments_in_range(printer.comments, arg_end, paren_close)
-        .any(|c| {
-            !c.is_block
-                || !tsv_lang::printing::is_same_line_fast(
-                    printer.comment_line_breaks,
-                    arg_end,
-                    c.span.start,
-                )
-        });
+    let has_own_line_trailing_comment =
+        printer
+            .comments_on_page_between(arg_end, paren_close)
+            .any(|c| {
+                !c.is_block
+                    || !tsv_lang::printing::is_same_line_fast(
+                        printer.comment_line_breaks,
+                        arg_end,
+                        c.span.start,
+                    )
+            });
 
     let has_line_comments = printer.has_line_comments_between(paren_open, arg_start);
     if has_line_comments && !has_own_line_trailing_comment {
@@ -499,13 +504,20 @@ fn try_single_arg_comment_paths(
         ]));
     }
 
-    // Check for inline block comments (single binary search via _opt)
-    // Use build_rhs_comments_opt to get spaces between consecutive block comments:
-    // fn(/** @type {A} */ /** @type {B} */ expr) — not fn(/** @type {A} *//** @type {B} */ expr)
-    if let Some(inline_comments) = printer
-        .build_rhs_comments_glued_opt(paren_open, arg_start)
-        .filter(|_| !has_own_line_trailing_comment)
+    // A block comment before the lone argument — **owned or not** — defeats the
+    // argument hug, exactly as prettier's `couldExpandArg` refuses to hug an arg
+    // whose leading comment sits before it. This is an **on-page** question (does a
+    // comment occupy the page here), not a *to-emit* one: an owned comment (a JSDoc
+    // cast / any glued block comment) travels inside the argument's own doc, so it
+    // isn't emitted here, but it still forces the expansion — a to-emit gate would
+    // go blind to it and wrongly hug.
+    //
+    // `build_rhs_comments_glued_opt` emits only the non-owned comments (with spaces
+    // between consecutive blocks: `fn(/** @type {A} */ /** @type {B} */ expr)`); an
+    // owned one is `None` here and rides on `arg_doc`.
+    if printer.has_comments_on_page_between(paren_open, arg_start) && !has_own_line_trailing_comment
     {
+        let inline_comments = printer.build_rhs_comments_glued_opt(paren_open, arg_start);
         // Argument-context builder so a binary/logical chain gets its
         // continuation indent (matches the no-comment path); see the leading
         // line-comment branch above for the same reasoning.
@@ -513,7 +525,11 @@ fn try_single_arg_comment_paths(
 
         // Build comment + arg, including any trailing comments after the arg
         // Note: build_rhs_comments_opt already adds trailing space after each comment
-        let mut parts: DocBuf = smallvec![inline_comments, arg_doc];
+        let mut parts: DocBuf = DocBuf::new();
+        if let Some(inline) = inline_comments {
+            parts.push(inline);
+        }
+        parts.push(arg_doc);
         if let Some(trailing) = printer.build_inline_comments_between_doc_opt(arg_end, paren_close)
         {
             parts.push(trailing);
@@ -597,11 +613,11 @@ fn try_single_arg_hug(
             let is_truly_empty = match arg {
                 internal::Expression::ArrayExpression(arr) => {
                     arr.elements.is_empty()
-                        && !printer.has_comments_between(arr.span.start, arr.span.end)
+                        && !printer.has_comments_to_emit_between(arr.span.start, arr.span.end)
                 }
                 internal::Expression::ObjectExpression(obj) => {
                     obj.properties.is_empty()
-                        && !printer.has_comments_between(obj.span.start, obj.span.end)
+                        && !printer.has_comments_to_emit_between(obj.span.start, obj.span.end)
                 }
                 _ => false,
             };
@@ -724,7 +740,7 @@ fn build_block_arrow_hug_states(
     let arrow_token = arrow.arrow_token;
     let has_trailing_param_comments =
         arrow_has_trailing_param_comments(arrow, arrow_token, |start, end| {
-            printer.has_comments_between(start, end)
+            printer.has_comments_to_emit_between(start, end)
         });
     if has_trailing_param_comments {
         // Force wrapped state when arrow has trailing param comments
@@ -1188,7 +1204,7 @@ fn build_call_with_arg_comments(
 
     // Check for any comments in arguments (leading, inter-argument, or trailing)
     let has_leading_comments = !call.arguments.is_empty()
-        && printer.has_comments_between(paren_open, call.arguments[0].span().start);
+        && printer.has_comments_to_emit_between(paren_open, call.arguments[0].span().start);
     let has_inter_arg_comments = has_inter_argument_comments(call, printer);
     let has_trailing_arg_comments = has_trailing_comments_on_args(call, printer);
     // Also check for trailing block comments (has_trailing_comments_on_args only checks line comments)
@@ -1199,14 +1215,16 @@ fn build_call_with_arg_comments(
     // Also checks inside spread spans for comments from stripped parens.
     let has_own_line_trailing_block = call.arguments.last().is_some_and(|last_arg| {
         let search_start = printer.last_arg_comment_scan_start(last_arg);
-        comments_in_range(printer.comments, search_start, call.span.end).any(|c| {
-            c.is_block
-                && !tsv_lang::printing::is_same_line_fast(
-                    printer.comment_line_breaks,
-                    search_start,
-                    c.span.start,
-                )
-        })
+        printer
+            .comments_on_page_between(search_start, call.span.end)
+            .any(|c| {
+                c.is_block
+                    && !tsv_lang::printing::is_same_line_fast(
+                        printer.comment_line_breaks,
+                        search_start,
+                        c.span.start,
+                    )
+            })
     });
 
     if !(has_leading_comments
@@ -1264,7 +1282,8 @@ fn build_call_with_arg_comments(
                 // preserved (and forces the call open). A space keeps a block glued
                 // to its arg, so a hug (`/* c */ a`) stays inline.
                 let comments: CommentVec<'_> =
-                    comments_in_range(printer.comments, paren_open, first_arg_start).collect();
+                    comments_to_emit_in_range(printer.comments, paren_open, first_arg_start)
+                        .collect();
                 // A blank between two comments, or between the last and the arg, expands
                 // the call (the comment interiors are skipped — only the gaps matter).
                 let blank_in_gap = comments
@@ -1322,7 +1341,7 @@ fn build_call_with_arg_comments(
                 }
                 force_expansion = true;
                 arg_parts.push(d.hardline());
-            } else if printer.has_comments_between(arg_end, next_arg_start) {
+            } else if printer.has_comments_to_emit_between(arg_end, next_arg_start) {
                 if should_force_expansion_for_comments(printer, arg_end, next_arg_start) {
                     force_expansion = true;
                 }

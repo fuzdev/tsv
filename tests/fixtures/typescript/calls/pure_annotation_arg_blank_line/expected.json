@@ -1,0 +1,877 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 651,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An authored blank line before an argument whose leading annotation is owned is",
+			"start": 10,
+			"end": 91,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " preserved, exactly as a same-width ordinary comment's is: the annotation's own",
+			"start": 93,
+			"end": 174,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " newlines are not an authored blank line, but a real blank line before it is kept.",
+			"start": 176,
+			"end": 260,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Plain call",
+			"start": 263,
+			"end": 276,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " @__PURE__ ",
+			"start": 291,
+			"end": 306,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 2
+				},
+				"end": {
+					"line": 10,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment12 ",
+			"start": 331,
+			"end": 346,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 2
+				},
+				"end": {
+					"line": 15,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " new expression",
+			"start": 359,
+			"end": 376,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " @__PURE__ ",
+			"start": 405,
+			"end": 420,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 2
+				},
+				"end": {
+					"line": 22,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " member-chain call",
+			"start": 433,
+			"end": 453,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " @__PURE__ ",
+			"start": 475,
+			"end": 490,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 2
+				},
+				"end": {
+					"line": 29,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A multi-line annotation with NO authored blank: its own newlines must not read as one",
+			"start": 503,
+			"end": 591,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 1
+				},
+				"end": {
+					"line": 32,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " @__PURE__\n   keep ",
+			"start": 605,
+			"end": 630,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 2
+				},
+				"end": {
+					"line": 36,
+					"column": 12
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 650,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 641,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 38,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 278,
+					"end": 316,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 278,
+						"end": 315,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 1
+							},
+							"end": {
+								"line": 11,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 278,
+							"end": 281,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 1
+								},
+								"end": {
+									"line": 7,
+									"column": 4
+								}
+							},
+							"name": "foo"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 285,
+								"end": 286,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "CallExpression",
+								"start": 307,
+								"end": 312,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 18
+									},
+									"end": {
+										"line": 10,
+										"column": 23
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 307,
+									"end": 310,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 18
+										},
+										"end": {
+											"line": 10,
+											"column": 21
+										}
+									},
+									"name": "bar"
+								},
+								"arguments": [],
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " @__PURE__ ",
+										"start": 291,
+										"end": 306
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An authored blank line before an argument whose leading annotation is owned is",
+							"start": 10,
+							"end": 91
+						},
+						{
+							"type": "Line",
+							"value": " preserved, exactly as a same-width ordinary comment's is: the annotation's own",
+							"start": 93,
+							"end": 174
+						},
+						{
+							"type": "Line",
+							"value": " newlines are not an authored blank line, but a real blank line before it is kept.",
+							"start": 176,
+							"end": 260
+						},
+						{
+							"type": "Line",
+							"value": " Plain call",
+							"start": 263,
+							"end": 276
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 318,
+					"end": 356,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 318,
+						"end": 355,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 1
+							},
+							"end": {
+								"line": 16,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 318,
+							"end": 321,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 1
+								},
+								"end": {
+									"line": 12,
+									"column": 4
+								}
+							},
+							"name": "foo"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 325,
+								"end": 326,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "CallExpression",
+								"start": 347,
+								"end": 352,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 18
+									},
+									"end": {
+										"line": 15,
+										"column": 23
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 347,
+									"end": 350,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 18
+										},
+										"end": {
+											"line": 15,
+											"column": 21
+										}
+									},
+									"name": "bar"
+								},
+								"arguments": [],
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " comment12 ",
+										"start": 331,
+										"end": 346
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 378,
+					"end": 430,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 384,
+							"end": 429,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 7
+								},
+								"end": {
+									"line": 23,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 384,
+								"end": 385,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 7
+									},
+									"end": {
+										"line": 19,
+										"column": 8
+									}
+								},
+								"name": "x"
+							},
+							"init": {
+								"type": "NewExpression",
+								"start": 388,
+								"end": 429,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 11
+									},
+									"end": {
+										"line": 23,
+										"column": 2
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 392,
+									"end": 395,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 15
+										},
+										"end": {
+											"line": 19,
+											"column": 18
+										}
+									},
+									"name": "Foo"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 399,
+										"end": 400,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 2
+											},
+											"end": {
+												"line": 20,
+												"column": 3
+											}
+										},
+										"name": "a"
+									},
+									{
+										"type": "CallExpression",
+										"start": 421,
+										"end": 426,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 18
+											},
+											"end": {
+												"line": 22,
+												"column": 23
+											}
+										},
+										"callee": {
+											"type": "Identifier",
+											"start": 421,
+											"end": 424,
+											"loc": {
+												"start": {
+													"line": 22,
+													"column": 18
+												},
+												"end": {
+													"line": 22,
+													"column": 21
+												}
+											},
+											"name": "bar"
+										},
+										"arguments": [],
+										"optional": false,
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " @__PURE__ ",
+												"start": 405,
+												"end": 420
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " new expression",
+							"start": 359,
+							"end": 376
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 455,
+					"end": 500,
+					"loc": {
+						"start": {
+							"line": 26,
+							"column": 1
+						},
+						"end": {
+							"line": 30,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 455,
+						"end": 499,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 1
+							},
+							"end": {
+								"line": 30,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 455,
+							"end": 465,
+							"loc": {
+								"start": {
+									"line": 26,
+									"column": 1
+								},
+								"end": {
+									"line": 26,
+									"column": 11
+								}
+							},
+							"object": {
+								"type": "Identifier",
+								"start": 455,
+								"end": 458,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 1
+									},
+									"end": {
+										"line": 26,
+										"column": 4
+									}
+								},
+								"name": "obj"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 459,
+								"end": 465,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 5
+									},
+									"end": {
+										"line": 26,
+										"column": 11
+									}
+								},
+								"name": "method"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 469,
+								"end": 470,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 2
+									},
+									"end": {
+										"line": 27,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "CallExpression",
+								"start": 491,
+								"end": 496,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 18
+									},
+									"end": {
+										"line": 29,
+										"column": 23
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 491,
+									"end": 494,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 18
+										},
+										"end": {
+											"line": 29,
+											"column": 21
+										}
+									},
+									"name": "bar"
+								},
+								"arguments": [],
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " @__PURE__ ",
+										"start": 475,
+										"end": 490
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " member-chain call",
+							"start": 433,
+							"end": 453
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 593,
+					"end": 640,
+					"loc": {
+						"start": {
+							"line": 33,
+							"column": 1
+						},
+						"end": {
+							"line": 37,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 593,
+						"end": 639,
+						"loc": {
+							"start": {
+								"line": 33,
+								"column": 1
+							},
+							"end": {
+								"line": 37,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 593,
+							"end": 596,
+							"loc": {
+								"start": {
+									"line": 33,
+									"column": 1
+								},
+								"end": {
+									"line": 33,
+									"column": 4
+								}
+							},
+							"name": "foo"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 600,
+								"end": 601,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 2
+									},
+									"end": {
+										"line": 34,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "CallExpression",
+								"start": 631,
+								"end": 636,
+								"loc": {
+									"start": {
+										"line": 36,
+										"column": 13
+									},
+									"end": {
+										"line": 36,
+										"column": 18
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 631,
+									"end": 634,
+									"loc": {
+										"start": {
+											"line": 36,
+											"column": 13
+										},
+										"end": {
+											"line": 36,
+											"column": 16
+										}
+									},
+									"name": "bar"
+								},
+								"arguments": [],
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " @__PURE__\n   keep ",
+										"start": 605,
+										"end": 630
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A multi-line annotation with NO authored blank: its own newlines must not read as one",
+							"start": 503,
+							"end": 591
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

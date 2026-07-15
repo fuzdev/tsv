@@ -3,9 +3,9 @@
 // Switch head, case labels, and case-body layout with comment handling.
 
 use crate::ast::internal::{self, Statement};
-use crate::printer::{CommentVec, Printer};
+use crate::printer::{CommentVec, LeadingGlue, Printer, next_printed_stmt_start};
 use smallvec::smallvec;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::{TriviaProfile, find_char};
@@ -37,7 +37,7 @@ impl<'a> Printer<'a> {
         let body_open_brace = close_paren
             .and_then(|close| self.find_char_outside_comments(close + 1, stmt.span.end, b'{'));
         let paren_brace_comments = match (close_paren, body_open_brace) {
-            (Some(close), Some(brace)) if self.has_comments_between(close + 1, brace) => {
+            (Some(close), Some(brace)) if self.has_comments_to_emit_between(close + 1, brace) => {
                 self.build_inline_comments_between_doc_opt(close + 1, brace)
             }
             _ => None,
@@ -66,31 +66,24 @@ impl<'a> Printer<'a> {
             // advanced past them via `find_end_with_trailing_comments` (the case-cursor
             // update below), so this range holds only genuine own-line comments.
             let comments: CommentVec<'_> =
-                comments_in_range(self.comments, prev_end, case.span.start).collect();
-            let mut last_content_end = prev_end;
-            for comment in &comments {
-                // Add hardline before comment (except for very first item - body_doc handles that)
-                // Preserve blank lines before comments (e.g., between `return;` and `// comment`)
-                if !is_first_item {
-                    if self.has_blank_line_between(last_content_end, comment.span.start) {
-                        case_parts.push(d.literalline());
-                    }
-                    case_parts.push(d.hardline());
-                }
-                is_first_item = false;
-                case_parts.push(self.build_comment_doc(comment));
-                last_content_end = comment.span.end;
-            }
-            // Add hardline before case (except for very first item)
-            // Preserve blank lines between cases (check from last content, not prev_end)
+                comments_to_emit_in_range(self.comments, prev_end, case.span.start).collect();
+            // The break *into* this run — from the previous case, toward whichever comes
+            // first, a comment or the case. Skipped for the very first item in the body
+            // (`body_doc` owns that break). Everything after it is an ordinary leading
+            // run: a block the author glued to the case leads it (`/* c */ case 2:`), an
+            // own-line comment keeps its line, and author blank lines are preserved.
             if !is_first_item {
-                // Check for blank line between last content (case or comment) and current case
-                if self.has_blank_line_between(last_content_end, case.span.start) {
-                    case_parts.push(d.literalline());
-                }
-                case_parts.push(d.hardline());
+                let run_start = comments.first().map_or(case.span.start, |c| c.span.start);
+                self.push_blank_preserving_hardline(&mut case_parts, prev_end, run_start);
             }
             is_first_item = false;
+            self.push_leading_comment_run(
+                &mut case_parts,
+                comments.iter().copied(),
+                case.span.start,
+                LeadingGlue::Adjacent,
+                d.empty(),
+            );
 
             // Determine the end boundary for inline comments on this case
             // For empty cases (fallthrough), we need to look ahead to the next case
@@ -110,7 +103,7 @@ impl<'a> Printer<'a> {
         // Also handles comments in empty switch bodies
         let switch_end = stmt.span.end - 1; // Before '}'
         let mut last_trailing_end = prev_end;
-        for comment in comments_in_range(self.comments, prev_end, switch_end) {
+        for comment in comments_to_emit_in_range(self.comments, prev_end, switch_end) {
             if !is_first_item {
                 if self.has_blank_line_between(last_trailing_end, comment.span.start) {
                     case_parts.push(d.literalline());
@@ -134,11 +127,8 @@ impl<'a> Printer<'a> {
             ])
         };
 
-        let mut switch_parts: DocBuf = smallvec![d.text("switch")];
-        if let Some(kc) = keyword_comments {
-            switch_parts.push(kc);
-        }
-        switch_parts.push(d.text(" ("));
+        let mut switch_parts: DocBuf = DocBuf::new();
+        self.push_keyword_open_paren(&mut switch_parts, "switch", keyword_comments);
         switch_parts.push(condition_group);
         switch_parts.push(d.text(")"));
         if let Some(pbc) = paren_brace_comments {
@@ -186,7 +176,7 @@ impl<'a> Printer<'a> {
         case_label_end: u32,
     ) -> CommentVec<'_> {
         let comments: CommentVec<'_> =
-            comments_in_range(self.comments, prev_end, boundary).collect();
+            comments_to_emit_in_range(self.comments, prev_end, boundary).collect();
         let anchor = prev_stmt_end.unwrap_or(case_label_end);
         comments
             .iter()
@@ -242,7 +232,8 @@ impl<'a> Printer<'a> {
         let first_stmt_start = case.consequent.first().map(|s| s.span().start);
         let inline_comment_end = first_stmt_start.unwrap_or(inline_comment_boundary);
         let mut has_inline_line_comment = false;
-        for comment in comments_in_range(self.comments, case_label_end, inline_comment_end) {
+        for comment in comments_to_emit_in_range(self.comments, case_label_end, inline_comment_end)
+        {
             if self.is_same_line(case_label_end, comment.span.start) {
                 // A line comment goes through `line_suffix` (zero width) so it never
                 // forces the case test (e.g. a binary expression) to break; it flushes
@@ -331,14 +322,13 @@ impl<'a> Printer<'a> {
             // SwitchCase span) gets relocated to its own line by the switch printer.
             // A line comment trails via `line_suffix`; a block comment renders inline
             // — its continuation lines indent to the statement, so the docs must sit
-            // INSIDE the statement's `indent`. Bound the scan by the next statement's
-            // start, or `inline_comment_boundary` (next case / switch end) for the
-            // last statement, so a comment attaches only to the statement it follows.
+            // INSIDE the statement's `indent`. Bound the scan at the next *printed*
+            // statement's start (skipping dropped `;`s), or `inline_comment_boundary`
+            // (next case / switch end) for the last one, so a comment attaches only to
+            // the statement it follows — while a same-line comment trailing a dropped
+            // `;` (`f();; // c`) still attaches here (the `;` emits nothing to carry it).
             let stmt_end = stmt.span().end;
-            let next_bound = case
-                .consequent
-                .get(i + 1)
-                .map_or(inline_comment_boundary, |s| s.span().start);
+            let next_bound = next_printed_stmt_start(case.consequent, i, inline_comment_boundary);
             let trailing = self.build_trailing_same_line_comment_docs(stmt_end, next_bound);
 
             // First block statement hugs the case label: `case 'a': { ... }`

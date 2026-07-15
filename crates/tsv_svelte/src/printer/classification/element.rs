@@ -1,23 +1,19 @@
-// Element type classification adapters for Svelte printer
+// Element-instance classification overlay for the Svelte printer.
 //
-// These methods extend Printer to provide convenient element classification
-// by wrapping the pure language-level functions from the tsv_html crate.
-//
-// The printer-specific part is resolving symbols (interned strings) to
-// tag names. The actual classification logic lives in tsv_html
-// and can be reused by other tools (linter, type-checker, language server).
+// The name-derived facts are computed once at parse
+// ([`TagFacts`](crate::ast::internal::TagFacts), stored on `Element::facts`); this module holds
+// the printer-specific overlay on top of them — a Component is inline, and a `<script>`/`<style>`
+// with content is block. The pure per-name classification lives in the `tsv_html` crate and can
+// be reused by other tools (linter, type-checker, language server).
 
 use crate::ast::internal;
 use crate::ast::internal::ElementKind;
 use crate::printer::Printer;
-use tsv_html as html;
-use tsv_lang::SymbolResolver;
 
 impl<'a> Printer<'a> {
     /// Check if element is block (flow content)
     ///
-    /// Adapter that resolves the element's tag name and calls the pure
-    /// language-level classification function.
+    /// Reads the parse-time name facts (`Element::facts`) plus the two element-instance overlays.
     ///
     /// Components are treated as inline, not block elements.
     ///
@@ -30,19 +26,17 @@ impl<'a> Printer<'a> {
             return false;
         }
 
-        // Borrow the interned tag rather than allocating a `String` per check:
-        // this predicate runs once per element on the hot Svelte format path.
-        self.with_resolved_symbol(element.name, |tag_name| {
-            // <script>/<style> are block only when they carry real content, which
-            // formats on its own lines. An empty <script></script> / <style></style>
-            // stays inline (prettier parity). The raw-text parser always emits one
-            // (possibly empty) Text node, so node-presence alone is not "has content".
-            if (tag_name == "script" || tag_name == "style") && has_raw_content(element) {
-                return true;
-            }
+        let facts = element.facts;
 
-            html::is_block_element(tag_name)
-        })
+        // <script>/<style> are block only when they carry real content, which
+        // formats on its own lines. An empty <script></script> / <style></style>
+        // stays inline (prettier parity). The raw-text parser always emits one
+        // (possibly empty) Text node, so node-presence alone is not "has content".
+        if (facts.is_script() || facts.is_style()) && has_raw_content(element) {
+            return true;
+        }
+
+        facts.is_block()
     }
 }
 
@@ -62,8 +56,9 @@ fn has_raw_content(element: &internal::Element<'_>) -> bool {
 mod tests {
     use super::*;
     use crate::ast::internal::FragmentNode;
-    use crate::printer::Printer;
     use std::rc::Rc;
+    use tsv_html as html;
+    use tsv_lang::SymbolResolver;
 
     /// Find the first child element of `parent` whose resolved tag name is `tag`.
     fn child<'p, 'arena>(

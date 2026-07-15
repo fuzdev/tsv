@@ -25,7 +25,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_comment_doc(&self, comment: &internal::Comment) -> DocId {
         let d = self.d();
         let content = comment.content(self.source);
-        if comment.is_block {
+        let doc = if comment.is_block {
             // Block comment: /* content */
             if !comment.multiline {
                 // Single-line block comment — the full span is verbatim `/*…*/`,
@@ -51,7 +51,17 @@ impl<'a> Printer<'a> {
             // Line comment: // content. The full span is verbatim `//…`. Tagged
             // for the swallow check (runs to EOL).
             d.line_comment_source_span(comment.span, self.source)
-        }
+        };
+
+        // The single comment-emission seam in this crate — every leading / trailing / gap
+        // / owned comment routes through here, including the JSDoc cast's, which prints
+        // from the copy on its `JsdocCast` node rather than from the shared array (the
+        // ledger keys on the span, so the copy lands on the same entry). The renderer
+        // records the emit when it reaches the node.
+        #[cfg(feature = "comment_check")]
+        d.tag_comment_doc(doc, comment.span, self.source);
+
+        doc
     }
 
     /// Build a multi-line *indentable* block comment (JSDoc `/** … */` and

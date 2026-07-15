@@ -9,8 +9,8 @@ use crate::printer::comments::CommentVec;
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::{
-    Comment, CommentPosition, classify_comment, comments_in_range, doc::arena::DocId,
-    has_comments_in_range, has_line_comments_in_range,
+    Comment, CommentPosition, classify_comment, comments_to_emit_in_range, doc::arena::DocId,
+    has_comments_to_emit_in_range, has_line_comments_in_range,
 };
 
 use super::Printer;
@@ -194,7 +194,7 @@ impl<'a> Printer<'a> {
         // Common case — no comment interleaved with the decorators: emit the bare
         // `@expr <sep> … <sep> binding` flat, skipping the comment scans and the
         // per-decorator segment wrapping the comment-aware path needs.
-        if !has_comments_in_range(self.comments, decorators[0].span.start, inner_start) {
+        if !has_comments_to_emit_in_range(self.comments, decorators[0].span.start, inner_start) {
             let d = self.d();
             let sep = if self.has_newline_after_any_decorator(decorators) {
                 d.hardline()
@@ -261,7 +261,7 @@ impl<'a> Printer<'a> {
             // line) becomes its own segment; a LeadingInline one before the *next
             // decorator* prefixes that decorator.
             let mut own_line_refs: CommentVec<'_> = CommentVec::new();
-            for comment in comments_in_range(self.comments, decorator.span.end, boundary) {
+            for comment in comments_to_emit_in_range(self.comments, decorator.span.end, boundary) {
                 // Same classification as `build_class_member_decorators_doc`:
                 // between two decorators prefer leading the next decorator, and at
                 // the last boundary classify against the binding (a `LeadingInline`
@@ -324,7 +324,7 @@ impl<'a> Printer<'a> {
                 .get(i + 1)
                 .map_or(next_token_start, |next| next.span.start);
             let mut own_line_refs: CommentVec<'_> = CommentVec::new();
-            for comment in comments_in_range(self.comments, decorator.span.end, boundary) {
+            for comment in comments_to_emit_in_range(self.comments, decorator.span.end, boundary) {
                 // Between two decorators, prefer leading the next decorator; at the
                 // decorator→class boundary a same-line comment trails the decorator
                 // and everything else drops to its own line (prettier never
@@ -421,7 +421,7 @@ impl<'a> Printer<'a> {
             // stays own-line. At the last decorator, classify against the member.
             let is_last = i == decorators.len() - 1;
             let mut own_line_refs: CommentVec<'_> = CommentVec::new();
-            for comment in comments_in_range(self.comments, decorator.span.end, boundary) {
+            for comment in comments_to_emit_in_range(self.comments, decorator.span.end, boundary) {
                 if !comment.is_block {
                     has_line_comment = true;
                 }

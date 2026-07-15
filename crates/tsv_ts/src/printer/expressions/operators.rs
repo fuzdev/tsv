@@ -9,7 +9,7 @@ use crate::printer::comments::CommentSpacing;
 use crate::printer::{CommentVec, ParenContext, Printer};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 
 /// Holds information about an operand in a binary expression chain
@@ -93,41 +93,80 @@ impl<'a> Printer<'a> {
         // A single-line block glued to the operator hugs the operand even across a
         // source newline (`!/* c */⏎x` → `!(/* c */ x)`), matching prettier.
         let leading_comments_opt = self.build_rhs_comments_glued_opt(operator_end, argument_start);
+        // Whether a leading comment is *present* — the gate for re-adding the parens — as
+        // opposed to whether this emitter has to print it. A **forward-binding** comment (a
+        // bundler annotation, a JSDoc cast) is `owned_by_node`, so the operand's own doc
+        // prints it and `leading_comments_opt` is `None` — but the parens are still wanted,
+        // for the same reason an ordinary gap comment wants them: bare,
+        // `!/* @__PURE__ */ f()` reads as annotating the *operator* rather than the operand.
+        // Counting the owned comment here is what keeps the wrap, and it is the ONLY thing
+        // that does — `needs_parens` deliberately doesn't (it would double-wrap).
+        //
+        // This is the `has_comments_on_page_in_range` / `has_comments_to_emit_in_range` split: an
+        // emit-decision skips owned comments, a layout/semantic gate counts them.
+        //
+        // An operand that already prints its own value-position pair is the exception:
+        // that pair encloses the owned comment on the plain needs-parens path below
+        // (`!(/** @type {A} */ (x), y)`, `!(/* c */ x = y)`, `!(/* c */ cond ? b : c)`),
+        // so counting the owned comment here would drive the comment-holder wrap and
+        // double the parens (`!((/* c */ x = y))`). Skipping it routes the operand to that
+        // plain path, where its own single pair encloses the owned comment (prepended by
+        // `build_expression_doc`). That's any `needs_parens` operand — assignment, a
+        // conditional, an arrow, await/yield, a type assertion — plus a sequence, whose
+        // own printer supplies the pair (`needs_parens` reports false for it). Binary is
+        // deliberately NOT here: its plain path renders through
+        // `build_binary_chain_doc_ungrouped`, which does not prepend the owned comment, so
+        // binary must take the comment-holder path (where `needs_paren_wrap` excludes it —
+        // one pair either way). A *trailing* comment on such an operand still keeps both
+        // pairs (the comment-holder path via `has_trailing_comments`) — that is the
+        // deliberate `!((x = y) /* c */)` form, pinned by `operand_paren_comment`.
+        // Asked three times below (the exception here, the comment-holder inner wrap,
+        // and the plain path), always with the same operand + context — compute once.
+        let arg_needs_parens = self.needs_parens(
+            unary.argument,
+            ParenContext::UnaryArgument {
+                parent_op: unary.operator,
+            },
+        );
+        let operand_encloses_owned_comment =
+            matches!(unary.argument, Expression::SequenceExpression(_))
+                || (arg_needs_parens && !matches!(unary.argument, Expression::BinaryExpression(_)));
+        let owned_leading_comment = leading_comments_opt.is_none()
+            && !operand_encloses_owned_comment
+            && tsv_lang::has_comments_on_page_in_range(self.comments, operator_end, argument_start);
+        let has_leading_comments = leading_comments_opt.is_some() || owned_leading_comment;
 
         // Check for trailing comments after the argument but inside the original parens.
         // When the parser strips grouping parens from `!(x /* c */)`, the comment
         // between argument end and unary span end is lost if we don't re-add parens.
-        let has_trailing_comments = self.has_comments_between(argument_end, unary.span.end);
+        let has_trailing_comments = self.has_comments_to_emit_between(argument_end, unary.span.end);
 
         // Determine if multiline layout is needed: line comments force newlines,
         // and block comments on their own line (newline in source) preserve structure.
         // For trailing comments, check if the comment itself is on a different line
         // from the argument (not just whether there's a newline in the whole range,
         // which could be between the comment and the closing paren).
-        let has_own_line_trailing_comment =
-            comments_in_range(self.comments, argument_end, unary.span.end)
-                .any(|c| !c.is_block || self.has_newline_between(argument_end, c.span.start));
+        let has_own_line_trailing_comment = self
+            .comments_on_page_between(argument_end, unary.span.end)
+            .any(|c| !c.is_block || self.has_newline_between(argument_end, c.span.start));
         // A line comment is already caught by `has_line_comments_between` above; here
         // a leading block forces the multiline layout only when it can't glue inline
         // (multiline, or own-line with a newline before it).
         let needs_multiline = self.has_line_comments_between(operator_end, argument_start)
             || has_own_line_trailing_comment
-            || comments_in_range(self.comments, operator_end, argument_start)
+            || self
+                .comments_on_page_between(operator_end, argument_start)
                 .any(|c| self.comment_forces_own_line(c));
 
-        let argument_doc = if leading_comments_opt.is_some() || has_trailing_comments {
+        let argument_doc = if has_leading_comments || has_trailing_comments {
             // Comments inside grouping parens — must wrap in parens to preserve them.
             let inner = self.build_expression_doc(unary.argument);
             // The outer comment-holder parens already group the operand, so the inner
             // needs_parens layer is redundant for a binary/logical operand — prettier
             // strips it (`!(x + y /* c */)`). Assignment/ternary operands keep their
             // parens for clarity in both formatters, so leave those untouched.
-            let needs_paren_wrap = self.needs_parens(
-                unary.argument,
-                ParenContext::UnaryArgument {
-                    parent_op: unary.operator,
-                },
-            ) && !matches!(unary.argument, Expression::BinaryExpression(_));
+            let needs_paren_wrap =
+                arg_needs_parens && !matches!(unary.argument, Expression::BinaryExpression(_));
             let inner = if needs_paren_wrap {
                 d.parens(inner)
             } else {
@@ -145,7 +184,9 @@ impl<'a> Printer<'a> {
                 }
                 indent_parts.push(inner);
                 // Add trailing comments with appropriate spacing
-                for comment in comments_in_range(self.comments, argument_end, unary.span.end) {
+                for comment in
+                    comments_to_emit_in_range(self.comments, argument_end, unary.span.end)
+                {
                     if !comment.is_block
                         || !self.has_newline_between(argument_end, comment.span.start)
                     {
@@ -173,19 +214,16 @@ impl<'a> Printer<'a> {
                 }
                 parts.push(inner);
                 // Trailing block comments inline: `expr /* c */`
-                for comment in comments_in_range(self.comments, argument_end, unary.span.end) {
+                for comment in
+                    comments_to_emit_in_range(self.comments, argument_end, unary.span.end)
+                {
                     parts.push(d.text(" "));
                     parts.push(self.build_comment_doc(comment));
                 }
                 parts.push(d.text(")"));
                 d.concat(&parts)
             }
-        } else if self.needs_parens(
-            unary.argument,
-            ParenContext::UnaryArgument {
-                parent_op: unary.operator,
-            },
-        ) {
+        } else if arg_needs_parens {
             // Binary expressions need parens - grouping lets the parens expand when the arg is long
             if let Expression::BinaryExpression(binary) = unary.argument {
                 // Wrap any binaryish arg (logical or not) in a single paren group.
@@ -720,7 +758,7 @@ impl<'a> Printer<'a> {
         // parts concat, and no per-gap comment scan at all. Byte-identical: the gap is
         // comment-free, so the general path below would build `empty()` here (renders to
         // nothing). The gap ⊆ the binary span, so this can only skip work, never a comment.
-        if !self.has_comments_between(operand_end, op_start) {
+        if !self.has_comments_to_emit_between(operand_end, op_start) {
             parts.push(d.text(" "));
             parts.push(d.text(op_str));
             return false;
@@ -736,7 +774,9 @@ impl<'a> Printer<'a> {
 
         // Keep each comment where the author wrote it, then break before the operator.
         let mut pos = operand_end;
-        for (i, comment) in comments_in_range(self.comments, operand_end, op_start).enumerate() {
+        for (i, comment) in
+            comments_to_emit_in_range(self.comments, operand_end, op_start).enumerate()
+        {
             if i == 0 && !self.comment_has_newline_between(pos, comment.span.start) {
                 // On the operand's line (`1 // c`): trail via `line_suffix` (zero width)
                 // so a long comment never forces the preceding operand group to break.
@@ -776,7 +816,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         // Collect all comments in the range between operator and next operand
         let comments: CommentVec<'_> =
-            comments_in_range(self.comments, op_end, operand.span.start).collect();
+            comments_to_emit_in_range(self.comments, op_end, operand.span.start).collect();
 
         if comments.is_empty() {
             // No comments - simple case
@@ -1024,7 +1064,8 @@ impl<'a> Printer<'a> {
         let comments_opt = self.build_rhs_comments_opt(keyword_end, argument_start);
 
         // Trailing comments from stripped grouping parens: `await (x /* c */)` → `await x /* c */`
-        let has_trailing_comments = self.has_comments_between(argument_end, await_expr.span.end);
+        let has_trailing_comments =
+            self.has_comments_to_emit_between(argument_end, await_expr.span.end);
 
         let argument_doc = if comments_opt.is_some() || has_trailing_comments {
             // The grouping parens are required when the operand needs them (`await`
@@ -1090,7 +1131,7 @@ impl<'a> Printer<'a> {
 
             // Trailing comments from stripped grouping parens: `yield (x /* c */)` → `yield x /* c */`
             let has_trailing_comments =
-                self.has_comments_between(argument_end, yield_expr.span.end);
+                self.has_comments_to_emit_between(argument_end, yield_expr.span.end);
 
             if leading_comments_opt.is_some() || has_trailing_comments {
                 if let Some(comments) = leading_comments_opt {
@@ -1171,7 +1212,11 @@ impl<'a> Printer<'a> {
         // trailing comment, which lives outside `seq.span` in value positions) need
         // break handling so the comment isn't swallowed by the following comma/operand
         // or the closing `)`.
-        if comments_in_range(self.comments, seq.span.start, trailing_end).any(|c| !c.is_block) {
+        // Axis-free: the rule looks only at LINE comments, and ownership binds only a block
+        // comment (`owned ⇒ is_block`), so skipping and counting give the same answer.
+        if comments_to_emit_in_range(self.comments, seq.span.start, trailing_end)
+            .any(|c| !c.is_block)
+        {
             return self.build_sequence_doc_with_line_comments(
                 seq,
                 trailing_end,
@@ -1188,7 +1233,7 @@ impl<'a> Printer<'a> {
         // empty. Skip the per-operand comma scans + the `empty()` comment children on the
         // comment-free common path. Byte-identical (the line-comment path already branched
         // off above, so a present comment here is a block, handled by the full path).
-        let seq_has_comments = self.has_comments_between(seq.span.start, seq.span.end);
+        let seq_has_comments = self.has_comments_to_emit_between(seq.span.start, seq.span.end);
 
         // First operand's leading-edge comments float OUT, before the opening `(`.
         let first_start = seq.expressions[0].span().start;
@@ -1240,7 +1285,7 @@ impl<'a> Printer<'a> {
             // (`(a, b /* c */)`). Block-only path, so the comments are blocks. The
             // comment lives between the last operand and the grouping `)`
             // (`trailing_end`), outside `seq.span`.
-            for comment in comments_in_range(self.comments, last_end, trailing_end) {
+            for comment in comments_to_emit_in_range(self.comments, last_end, trailing_end) {
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
             }
@@ -1269,7 +1314,7 @@ impl<'a> Printer<'a> {
     fn append_floated_leading_comments(&self, parts: &mut DocBuf, start: u32, operand_start: u32) {
         let d = self.d();
         let comments: CommentVec<'_> =
-            comments_in_range(self.comments, start, operand_start).collect();
+            comments_to_emit_in_range(self.comments, start, operand_start).collect();
         for (i, comment) in comments.iter().enumerate() {
             parts.push(self.build_comment_doc(comment));
             let next = comments.get(i + 1).map_or(operand_start, |c| c.span.start);
@@ -1326,7 +1371,7 @@ impl<'a> Printer<'a> {
                 let prev_end = seq.expressions[i - 1].span().end;
                 let mut pos = prev_end;
                 let mut in_trailing_run = true;
-                for comment in comments_in_range(self.comments, prev_end, expr_start) {
+                for comment in comments_to_emit_in_range(self.comments, prev_end, expr_start) {
                     // Comment-adjacency read (real even in canonical mode).
                     let own_line = self.comment_has_newline_between(pos, comment.span.start);
                     // Once a comment is own-line (or the trailing run already ended),
@@ -1355,7 +1400,7 @@ impl<'a> Printer<'a> {
             if !is_last {
                 let next_start = seq.expressions[i + 1].span().start;
                 let mut pos = expr_end;
-                for comment in comments_in_range(self.comments, expr_end, next_start) {
+                for comment in comments_to_emit_in_range(self.comments, expr_end, next_start) {
                     // Comment-adjacency read (real even in canonical mode): an
                     // own-line comment must lead the next operand, not merge into
                     // the previous operand's `line_suffix` trailing run.
@@ -1373,7 +1418,7 @@ impl<'a> Printer<'a> {
                 // block inline, a line comment via `line_suffix`. The `softline` before
                 // `)` in the keep-inside assembly below flushes the `line_suffix`. The
                 // comment lives up to the grouping `)` (`trailing_end`), outside `seq.span`.
-                for comment in comments_in_range(self.comments, expr_end, trailing_end) {
+                for comment in comments_to_emit_in_range(self.comments, expr_end, trailing_end) {
                     od.push(self.build_trailing_comment_doc(comment));
                 }
             }

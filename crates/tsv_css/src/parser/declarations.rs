@@ -46,8 +46,10 @@ pub(crate) fn is_nested_rule_start(parser: &CssParser<'_, '_>) -> Result<bool, P
             if parser.current_identifier().starts_with("--") {
                 return Ok(false);
             }
-            // Peek past whitespace and comments to find the significant next token
-            let next_kind = parser.peek_past_whitespace()?;
+            // Peek past whitespace and comments to find the significant next token. A `:`
+            // is settled from the bytes — a property name is followed by one, so this is
+            // the path nearly every block child takes.
+            let next_kind = super::decl_scan::peek_significant_kind(parser)?;
             match next_kind {
                 // Colon after identifier - ambiguous: could be declaration (`color: red`)
                 // or nested rule with pseudo-class (`span:hover { }`)

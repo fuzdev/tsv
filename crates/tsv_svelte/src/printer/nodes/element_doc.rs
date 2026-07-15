@@ -15,10 +15,9 @@ use crate::ast::internal::{self, FragmentNode};
 use crate::printer::Printer;
 use crate::printer::text::TextAnalysis;
 use smallvec::smallvec;
-use string_interner::DefaultSymbol;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::{DocBuf, arena::DocId};
-use tsv_lang::{Span, SymbolResolver, SymbolToU32};
+use tsv_lang::{Span, SymbolToU32};
 
 /// How content relates to an element boundary (opening or closing tag)
 ///
@@ -113,9 +112,9 @@ pub(super) struct ElementParts<'arena> {
 
 /// Everything the printer derives from an element's tag NAME.
 ///
-/// Resolved in ONE borrow of the interner per element (`classify_tag`) — the symbol table
-/// hands out a `&str`, and every tag-name-keyed question is answered while it is held, so the
-/// hot path pays no per-element `String`. Emission uses the symbol, never the string.
+/// Unpacked from the parse-time `Element::facts` ([`TagFacts`](internal::TagFacts)) by
+/// `classify_tag`, so the printer re-derives nothing per element — one field read, no interner
+/// borrow, no per-element `String`. Emission uses the symbol, never the string.
 ///
 /// A named struct rather than a tuple: these are seven independent bools that would otherwise
 /// be positional and silently misorderable at the call site (the same reason
@@ -128,6 +127,8 @@ pub(super) struct TagClass {
     pub(super) is_void: bool,
     /// SVG / MathML — may print self-closing like a component
     pub(super) is_foreign: bool,
+    /// `<foo:bar>` — a namespaced regular element; inline-kinded, but may print self-closing
+    pub(super) is_namespaced: bool,
     pub(super) is_style: bool,
     pub(super) is_script: bool,
     pub(super) is_template: bool,
@@ -178,33 +179,30 @@ impl<'a> Printer<'a> {
         d.concat(&[d.text("</"), d.symbol(name), d.text(">")])
     }
 
-    /// Answer every tag-name-keyed question in one borrow of the interner. The single
-    /// classifier — both element entry points go through it, so they cannot drift.
-    pub(super) fn classify_tag(&self, name: DefaultSymbol) -> TagClass {
-        self.with_resolved_symbol(name, |t| {
-            // Element kind, matching prettier-plugin-svelte's isInlineElement = !isBlockElement:
-            // elements NOT in the block list (table cells included) use inline formatting.
-            let kind = if t.starts_with(|c: char| c.is_ascii_uppercase())
-                || t.contains(':')
-                || t.contains('.')
-            {
-                ElementKind::Component
-            } else if tsv_html::is_block_element(t) {
-                ElementKind::Block
-            } else {
-                ElementKind::Inline
-            };
-            TagClass {
-                kind,
-                is_void: tsv_html::is_void_element(t),
-                is_foreign: tsv_html::is_foreign_element(t),
-                is_style: t == "style",
-                is_script: t == "script",
-                is_template: t == "template",
-                is_ws_sensitive: tsv_html::preserves_whitespace(t),
-                is_declaration: t.starts_with('!'),
-            }
-        })
+    /// Unpack an element's parse-time name facts (`Element::facts`) into the printer's per-tag
+    /// view. The single classifier — both element entry points go through it, so they cannot drift.
+    pub(super) fn classify_tag(&self, element: &internal::Element<'_>) -> TagClass {
+        let facts = element.facts;
+        // Element kind, matching prettier-plugin-svelte's isInlineElement = !isBlockElement:
+        // elements NOT in the block list (table cells included) use inline formatting.
+        let kind = if facts.is_component_name() {
+            ElementKind::Component
+        } else if facts.is_block() {
+            ElementKind::Block
+        } else {
+            ElementKind::Inline
+        };
+        TagClass {
+            kind,
+            is_void: facts.is_void(),
+            is_foreign: facts.is_foreign(),
+            is_namespaced: facts.is_namespaced(),
+            is_style: facts.is_style(),
+            is_script: facts.is_script(),
+            is_template: facts.is_template(),
+            is_ws_sensitive: facts.is_ws_sensitive(),
+            is_declaration: facts.is_declaration(),
+        }
     }
 
     /// Project a regular element onto the shared [`ElementParts`] view.
@@ -217,8 +215,9 @@ impl<'a> Printer<'a> {
             name: self.d().symbol(element.name.to_u32()),
             kind: class.kind,
             is_void: class.is_void,
-            // Only components and foreign (SVG/MathML) elements may print self-closing.
-            can_self_close: class.kind.is_component() || class.is_foreign,
+            // Components, foreign (SVG/MathML), and namespaced (`foo:bar`) elements may print
+            // self-closing (prettier's `didSelfClose`).
+            can_self_close: class.kind.is_component() || class.is_foreign || class.is_namespaced,
             attributes: element.attributes,
             nodes: element.fragment.nodes,
             span: element.span,
@@ -232,7 +231,7 @@ impl<'a> Printer<'a> {
     /// 2. Classify: Determine layout strategy (void, empty, hug modes, etc.)
     /// 3. Build: Construct doc based on layout
     pub(crate) fn build_element_doc(&self, element: &internal::Element<'_>) -> DocId {
-        let class = self.classify_tag(element.name);
+        let class = self.classify_tag(element);
         let is_html = element.kind == internal::ElementKind::Html;
 
         // Build attribute docs (needed for all paths)
@@ -307,7 +306,7 @@ impl<'a> Printer<'a> {
         // Special-content elements (raw `<script>`/`<style>`, foreign `<template>`,
         // whitespace-sensitive `<pre>`/`<textarea>`) never participate — their closing
         // tags aren't the simple hug-both shape.
-        let class = self.classify_tag(element.name);
+        let class = self.classify_tag(element);
         if class.is_style
             || class.is_script
             || class.is_ws_sensitive
@@ -861,11 +860,12 @@ impl<'a> Printer<'a> {
 
         // Every gap this fn probes — each attribute's leading range and the trailing range
         // after the last one — lies inside `[first_range_start, open_tag_end]`. A comment
-        // lands in `has_comments_in_range` only when it sits fully inside the queried range,
+        // lands in `has_comments_to_emit_in_range` only when it sits fully inside the queried range,
         // so a comment-free open tag means every one of those gaps is comment-free: each
         // would take the bare-separator branch below and the trailing block would emit
         // nothing. Answer that with one probe instead of one per attribute plus one.
-        if !tsv_lang::has_comments_in_range(self.comments, first_range_start, open_tag_end) {
+        if !tsv_lang::has_comments_to_emit_in_range(self.comments, first_range_start, open_tag_end)
+        {
             for attr in attrs {
                 docs.push(separator);
                 docs.push(self.build_attribute_node_doc(attr, is_html));
@@ -882,12 +882,12 @@ impl<'a> Printer<'a> {
             };
             let range_end = attr.span().start;
 
-            if !tsv_lang::has_comments_in_range(self.comments, range_start, range_end) {
+            if !tsv_lang::has_comments_to_emit_in_range(self.comments, range_start, range_end) {
                 docs.push(separator);
             } else {
                 let last_is_own_line = self.push_attr_comment_docs(
                     docs,
-                    comments_in_range(self.comments, range_start, range_end),
+                    comments_to_emit_in_range(self.comments, range_start, range_end),
                     range_start,
                 );
                 // Separator before the next attribute
@@ -904,10 +904,10 @@ impl<'a> Printer<'a> {
         // Check for trailing comments after last attribute
         if let Some(last_attr) = attrs.last() {
             let range_start = last_attr.span().end;
-            if tsv_lang::has_comments_in_range(self.comments, range_start, open_tag_end) {
+            if tsv_lang::has_comments_to_emit_in_range(self.comments, range_start, open_tag_end) {
                 self.push_attr_comment_docs(
                     docs,
-                    comments_in_range(self.comments, range_start, open_tag_end),
+                    comments_to_emit_in_range(self.comments, range_start, open_tag_end),
                     range_start,
                 );
             }
@@ -960,7 +960,7 @@ impl<'a> Printer<'a> {
     /// Build a doc for a JS comment's text (without surrounding separators)
     pub(super) fn build_attr_js_comment_doc(&self, comment: &tsv_lang::Comment) -> DocId {
         let d = self.d();
-        if comment.is_block {
+        let doc = if comment.is_block {
             d.concat(&[
                 d.text("/*"),
                 d.source_span(comment.content_span, self.source),
@@ -971,7 +971,12 @@ impl<'a> Printer<'a> {
                 d.text("//"),
                 d.source_span(comment.content_span, self.source),
             ])
-        }
+        };
+        // The renderer records the emit when it reaches the node — see
+        // `tsv_lang::comment_ledger`.
+        #[cfg(feature = "comment_check")]
+        d.tag_comment_doc(doc, comment.span, self.source);
+        doc
     }
 
     /// Whether the source slice for `span` ends with a self-closing `/>` (for doc

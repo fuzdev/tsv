@@ -1,0 +1,493 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 405,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A block glued to the first case leads it.",
+			"start": 25,
+			"end": 69,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 46
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " block ",
+			"start": 72,
+			"end": 83,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 2
+				},
+				"end": {
+					"line": 4,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A block glued to the next case leads it, even when a line comment shares the gap.",
+			"start": 104,
+			"end": 188,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 2
+				},
+				"end": {
+					"line": 6,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line",
+			"start": 199,
+			"end": 206,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 10
+				},
+				"end": {
+					"line": 7,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " block ",
+			"start": 209,
+			"end": 220,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 2
+				},
+				"end": {
+					"line": 8,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Blocks glued to each other but not to the case stay together on their own line.",
+			"start": 241,
+			"end": 323,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 2
+				},
+				"end": {
+					"line": 10,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " block1 ",
+			"start": 346,
+			"end": 358,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 2
+				},
+				"end": {
+					"line": 13,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " block2 ",
+			"start": 359,
+			"end": 371,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 15
+				},
+				"end": {
+					"line": 13,
+					"column": 27
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 404,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 395,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 17,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "SwitchStatement",
+					"start": 10,
+					"end": 394,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 2
+						}
+					},
+					"discriminant": {
+						"type": "Identifier",
+						"start": 18,
+						"end": 19,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 9
+							},
+							"end": {
+								"line": 2,
+								"column": 10
+							}
+						},
+						"name": "a"
+					},
+					"cases": [
+						{
+							"type": "SwitchCase",
+							"start": 84,
+							"end": 101,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 14
+								},
+								"end": {
+									"line": 5,
+									"column": 9
+								}
+							},
+							"consequent": [
+								{
+									"type": "BreakStatement",
+									"start": 95,
+									"end": 101,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 3
+										},
+										"end": {
+											"line": 5,
+											"column": 9
+										}
+									},
+									"label": null
+								}
+							],
+							"test": {
+								"type": "Literal",
+								"start": 89,
+								"end": 90,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 19
+									},
+									"end": {
+										"line": 4,
+										"column": 20
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " A block glued to the first case leads it.",
+									"start": 25,
+									"end": 69
+								},
+								{
+									"type": "Block",
+									"value": " block ",
+									"start": 72,
+									"end": 83
+								}
+							]
+						},
+						{
+							"type": "SwitchCase",
+							"start": 191,
+							"end": 198,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 2
+								},
+								"end": {
+									"line": 7,
+									"column": 9
+								}
+							},
+							"consequent": [],
+							"test": {
+								"type": "Literal",
+								"start": 196,
+								"end": 197,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
+										"column": 8
+									}
+								},
+								"value": 2,
+								"raw": "2"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " A block glued to the next case leads it, even when a line comment shares the gap.",
+									"start": 104,
+									"end": 188
+								}
+							],
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " line",
+									"start": 199,
+									"end": 206
+								}
+							]
+						},
+						{
+							"type": "SwitchCase",
+							"start": 221,
+							"end": 238,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 14
+								},
+								"end": {
+									"line": 9,
+									"column": 9
+								}
+							},
+							"consequent": [
+								{
+									"type": "BreakStatement",
+									"start": 232,
+									"end": 238,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 3
+										},
+										"end": {
+											"line": 9,
+											"column": 9
+										}
+									},
+									"label": null
+								}
+							],
+							"test": {
+								"type": "Literal",
+								"start": 226,
+								"end": 227,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 19
+									},
+									"end": {
+										"line": 8,
+										"column": 20
+									}
+								},
+								"value": 3,
+								"raw": "3"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " block ",
+									"start": 209,
+									"end": 220
+								}
+							]
+						},
+						{
+							"type": "SwitchCase",
+							"start": 326,
+							"end": 343,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 2
+								},
+								"end": {
+									"line": 12,
+									"column": 9
+								}
+							},
+							"consequent": [
+								{
+									"type": "BreakStatement",
+									"start": 337,
+									"end": 343,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 3
+										},
+										"end": {
+											"line": 12,
+											"column": 9
+										}
+									},
+									"label": null
+								}
+							],
+							"test": {
+								"type": "Literal",
+								"start": 331,
+								"end": 332,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 7
+									},
+									"end": {
+										"line": 11,
+										"column": 8
+									}
+								},
+								"value": 4,
+								"raw": "4"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " Blocks glued to each other but not to the case stay together on their own line.",
+									"start": 241,
+									"end": 323
+								}
+							]
+						},
+						{
+							"type": "SwitchCase",
+							"start": 374,
+							"end": 391,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 2
+								},
+								"end": {
+									"line": 15,
+									"column": 9
+								}
+							},
+							"consequent": [
+								{
+									"type": "BreakStatement",
+									"start": 385,
+									"end": 391,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 3
+										},
+										"end": {
+											"line": 15,
+											"column": 9
+										}
+									},
+									"label": null
+								}
+							],
+							"test": {
+								"type": "Literal",
+								"start": 379,
+								"end": 380,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 7
+									},
+									"end": {
+										"line": 14,
+										"column": 8
+									}
+								},
+								"value": 5,
+								"raw": "5"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " block1 ",
+									"start": 346,
+									"end": 358
+								},
+								{
+									"type": "Block",
+									"value": " block2 ",
+									"start": 359,
+									"end": 371
+								}
+							]
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

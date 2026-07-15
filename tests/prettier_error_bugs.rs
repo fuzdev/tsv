@@ -30,7 +30,7 @@ async fn optional_arrow_param_comment_no_annotation() {
 
 #[tokio::test]
 async fn static_import_source_phase() {
-    // Stage-3 source-phase import `import source x from '…'`. acorn rejects it
+    // Source-phase import `import source x from '…'`. acorn rejects it
     // (so it can't be a fixture), and prettier's `typescript` parser reads `source`
     // as a name and throws (`'=' expected`); ours parses + keeps it stable. The
     // parser is graded by test262; see `tests/import_phase.rs` for the printer's

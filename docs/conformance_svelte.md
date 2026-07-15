@@ -214,17 +214,17 @@ format everything well-formed. So a "correction" below is tsv matching **tsc/spe
 
 Svelte ❌ / Prettier ✅ / tsv ✅ in every case below:
 
-- `using` declarations (ES2024) — [basic](../tests/fixtures/typescript/typescript_specific/using/basic_svelte_divergence/)
-- `await using` declarations — [await](../tests/fixtures/typescript/typescript_specific/using/await_svelte_divergence/)
+- `using` declarations (Explicit Resource Management — a finished/Stage 4 proposal, not ES2024; see [checklist_typescript.md](./checklist_typescript.md#explicit-resource-management)) — [basic](../tests/fixtures/typescript/typescript_specific/using/basic_svelte_divergence/)
+- `await using` declarations — [await](../tests/fixtures/typescript/typescript_specific/using/await_svelte_divergence/); with a comment inside the keyword (`await /* c */ using`), which tsv preserves where prettier relocates it past `using` — [await_keyword_comment](../tests/fixtures/typescript/typescript_specific/using/await_keyword_comment_svelte_prettier_divergence/)
 - `const` type params in classes — [const_type_param_class](../tests/fixtures/typescript/typescript_specific/generics/const_type_param_class_svelte_divergence/)
 - `const` type params in interfaces, incl. `const` before variance (`<const in T>`) — [const_type_param_interface](../tests/fixtures/typescript/typescript_specific/generics/const_type_param_interface_svelte_divergence/). acorn rejects the `const` token (tsc defers it to the TS1277 checker error); the mis-ordered `<in const T>` is instead a *grammar* error tsv rejects like acorn, pinned by the regular fixture [type_param_modifier_order](../tests/fixtures/typescript/typescript_specific/generics/type_param_modifier_order/)
 - Import type options — [dynamic_attributes](../tests/fixtures/typescript/modules/imports/dynamic_attributes_svelte_divergence/)
-- ES2024 v-flag regex — [unicode_sets_advanced](../tests/fixtures/typescript/expressions/literals/regex/unicode_sets_advanced_svelte_divergence/)
+- An **invalid** v-flag regex (`/[a-z--[aeiou]]/v` — a range is not a `ClassSetOperand`, so V8 throws too): tsv accepts it by deferring the `IsValidRegularExpressionLiteral` early error, since regex bodies are opaque. Svelte is *correct* to reject; this is not a `v`-flag gap — [unicode_sets_advanced](../tests/fixtures/typescript/expressions/literals/regex/unicode_sets_advanced_svelte_divergence/)
 - `export default class implements I {}` (anonymous default class, implements-first heritage) — [export_default_implements](../tests/fixtures/typescript/declarations/class/export_default_implements_svelte_divergence/)
 - A cast as the left operand of `**` (`x as number ** 2`) — see below; the rejection itself is not pinnable
 - Async generic arrow params — see fixtures below
 
-**`using` keyword-name comments**: Both acorn and tsv reject comments between `using` and the binding name (`using /* c */ x = fn()`), and between `await` and `using` (`await /* c */ using x = fn()`). Per the ECMAScript spec, comments behave like white space and are discarded between any two tokens (§12.4), so these should be valid. However, since `using` is a contextual keyword requiring lookahead disambiguation, both parsers check the next token before comment processing. tsv matches acorn's behavior here. If acorn adds support, tsv should follow.
+**`using` keyword-name comments**: tsv **accepts** a comment between `using` and the binding name (`using /* c */ x = fn()`) and round-trips it, which is correct — per ecma262 §sec-comments a comment "behave[s] like white space and [is] discarded", so any two tokens may be separated by one. A comment *containing a line terminator* is the exception the same clause names: it counts as a `LineTerminator`, which the `[no LineTerminator here]` in `await [no LT] using` and `using [no LT] BindingIdentifier` then demotes — so `await /* c⏎ */ using x = fn()` correctly fails to read as a declaration. acorn's verdict is not comparable here: it rejects `using` / `await using` outright (see the list above), so it never reaches the comment question.
 
 **Cast as the left operand of `**`**: acorn-typescript rejects `x as number ** 2` / `x satisfies number ** 2` (`Unexpected token` at the `**`). tsc accepts both — it parses the cast as the `**` left operand, and its "unary expression is not allowed in the left-hand side of an exponentiation expression" grammar error (TS17006) fires only for a *prefix-unary* operand (`-2 ** 3`), not for a cast. Prettier agrees, printing `(x as number) ** 2`, and tsv matches. **Upstream candidate**: acorn-typescript exponentiation after `as`/`satisfies`.
 
@@ -426,8 +426,8 @@ ternary onto an unparenthesized arrow above the `parseExprOps` arrow guard.
 
 #### Import-phase proposals
 
-The Stage-3 **source-phase imports** and **import defer** proposals add a phase to
-both static and dynamic imports:
+The **source-phase imports** and **import defer** proposals — not yet standard — add a
+phase to both static and dynamic imports:
 
 - `import source x from 'mod'` / `import.source('mod')` — phase `'source'`
 - `import defer * as ns from 'mod'` / `import.defer('mod')` — phase `'defer'`
@@ -529,16 +529,20 @@ All corrections exist because of upstream bugs. If fixed upstream, tsv would rem
 **acorn-typescript** — fix in acorn-typescript, then Svelte updates its dependency:
 
 - Async generic arrow params — params dropped when `async` + type params
-- `using` / `await using` — ES2024 declarations not recognized
+- `using` / `await using` — Explicit Resource Management declarations not recognized
 - `const` type params — `const` modifier on class type params
 - Import type options — `import()` type assertion options
 - Anonymous class-expression `id` — omitted for implements-first heritage
 - `export default class implements I {}` — anonymous default class with implements-first heritage rejected (`implements` read as a reserved-word name)
 - Type assertion vs. generic arrow — `<T>` before any arrow (even a parenthesized one) reads as type parameters; the parenthesized-arrow abort check is dead code
 
-**acorn** — fix in acorn core:
-
-- ES2024 v-flag regex — Unicode sets `v` flag not supported
+(No **acorn core** candidates. The `v`-flag regex entry that used to sit here was withdrawn: acorn
+supports the `v` flag and its set operations, and correctly rejects the one construct
+[unicode_sets_advanced](../tests/fixtures/typescript/expressions/literals/regex/unicode_sets_advanced_svelte_divergence/)
+exercises — `/[a-z--[aeiou]]/v` is invalid ECMAScript, which V8 throws on too. That fixture is not
+an upstream bug at all; it is tsv deferring the `IsValidRegularExpressionLiteral` early error
+because regex bodies are opaque, so it does not meet this section's bar and will become an
+`input_invalid_*` fixture when the diagnostics layer lands.)
 
 **Svelte CSS parser** — fix directly in Svelte:
 

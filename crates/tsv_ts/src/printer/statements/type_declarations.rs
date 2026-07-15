@@ -4,12 +4,12 @@
 use super::{Printer, build_entity_name_doc, is_effectively_empty_body, should_hug_union_type};
 use crate::ast::internal::{self, TSType};
 use crate::printer::layout::hang_after_operator;
-use crate::printer::{CommentFilter, CommentSpacing, CommentVec, HeritageKeyword};
+use crate::printer::{CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue};
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
-use tsv_lang::{Span, comments_in_range};
+use tsv_lang::{Span, comments_to_emit_in_range};
 
 /// Check if a type is "generic" - i.e., has type parameters.
 /// This matches prettier's `isGeneric` function in assignment.js.
@@ -130,7 +130,7 @@ impl<'a> Printer<'a> {
 
         if pre_eq_forces_own_line {
             let mut indent_parts: DocBuf = smallvec![d.hardline()];
-            for comment in comments_in_range(self.comments, header_end, eq_pos) {
+            for comment in comments_to_emit_in_range(self.comments, header_end, eq_pos) {
                 indent_parts.push(self.build_comment_doc(comment));
                 indent_parts.push(d.hardline());
             }
@@ -167,7 +167,7 @@ impl<'a> Printer<'a> {
         // line. These were previously dropped entirely (content loss).
         let value_end = decl.type_annotation.span().end;
         let mut trailing_line_parts = DocBuf::new();
-        for comment in comments_in_range(self.comments, value_end, decl.span.end) {
+        for comment in comments_to_emit_in_range(self.comments, value_end, decl.span.end) {
             if comment.is_block {
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
@@ -230,7 +230,8 @@ impl<'a> Printer<'a> {
         // after `=` and keeps such a comment on its own line rather than hugging it
         // up to `=` — the union/intersection RHS then renders below it.
         let force_break = self.comments_force_own_line_between(eq_pos + 1, type_start)
-            || comments_in_range(self.comments, eq_pos + 1, type_start)
+            || self
+                .comments_on_page_between(eq_pos + 1, type_start)
                 .any(|c| c.is_block && self.is_own_line_comment(c));
 
         if force_break {
@@ -249,7 +250,7 @@ impl<'a> Printer<'a> {
             // comments must not merge onto one line — the second `//` would stop
             // being a delimiter (a boundary loss).
             let comments: CommentVec<'_> =
-                comments_in_range(self.comments, eq_pos + 1, type_start).collect();
+                comments_to_emit_in_range(self.comments, eq_pos + 1, type_start).collect();
             for (idx, comment) in comments.iter().enumerate() {
                 let multiline_block = comment.multiline;
                 let authored_on_eq_line = self.is_same_line(eq_pos, comment.span.start);
@@ -363,7 +364,7 @@ impl<'a> Printer<'a> {
                 let value_span = value_type.span();
                 let hug = self.type_operator_comment_forces_operand_own_line(value_type)
                     || (d.will_break(type_doc)
-                        && tsv_lang::has_comments_in_range(
+                        && tsv_lang::has_comments_to_emit_in_range(
                             self.comments,
                             value_span.start,
                             value_span.end,
@@ -405,8 +406,9 @@ impl<'a> Printer<'a> {
             extends_keyword_start.or_else(|| decl.extends.first().map(|e| e.span.start));
 
         // Comments between name/type-params and extends force group mode
-        let has_heritage_comments = first_extends_start
-            .is_some_and(|ext_start| self.has_comments_between(pre_heritage_end, ext_start));
+        let has_heritage_comments = first_extends_start.is_some_and(|ext_start| {
+            self.has_comments_to_emit_between(pre_heritage_end, ext_start)
+        });
         let has_heritage_line_comments = first_extends_start
             .is_some_and(|ext_start| self.has_line_comments_between(pre_heritage_end, ext_start));
 
@@ -676,7 +678,7 @@ impl<'a> Printer<'a> {
         // is comment-independent and stays outside the gate; `prev_end` here is
         // `member.span().end` (no comma / trailing-comment walk), so it needs no
         // gating either.
-        let body_has_comments = self.has_comments_between(body_start, body_end);
+        let body_has_comments = self.has_comments_on_page_between(body_start, body_end);
 
         for (i, member) in members.iter().enumerate() {
             let member_start = member.span().start;
@@ -684,12 +686,11 @@ impl<'a> Printer<'a> {
 
             // Find comments between previous element and this one
             // Filter out trailing same-line comments from the previous member
-            // BUT keep multi-line block comments even if they start on the same line
             let leading_comments: CommentVec<'_> = if !body_has_comments {
                 CommentVec::new()
             } else {
                 let all_comments: CommentVec<'_> =
-                    comments_in_range(self.comments, prev_end, member_start).collect();
+                    comments_to_emit_in_range(self.comments, prev_end, member_start).collect();
                 if !is_first {
                     all_comments
                         .iter()
@@ -698,15 +699,12 @@ impl<'a> Printer<'a> {
                             if !self.is_same_line(prev_end, c.span.start) {
                                 return true;
                             }
-                            // Also keep multi-line block comments (they're always leading, never trailing)
-                            if c.multiline {
-                                return true;
-                            }
-                            // An inline comment that hugs this member on its line leads it
-                            // (`a: 1, /* c */ b`), even though it shares the previous
-                            // member's line — keep it here rather than letting it trail the
-                            // previous member. (A comment with a newline after it instead
-                            // trails the previous member: the `is_same_line` is false.)
+                            // A comment that hugs this member on its line leads it
+                            // (`a: 1, /* c */ b`, single- or multi-line block), even though
+                            // it shares the previous member's line — keep it here rather than
+                            // letting it trail the previous member. A comment with a newline
+                            // after it instead trails the previous member (the `is_same_line`
+                            // is false), matching prettier and the type-literal/class printers.
                             self.is_same_line(c.span.end, member_start)
                         })
                         .copied()
@@ -727,7 +725,11 @@ impl<'a> Printer<'a> {
                 } else {
                     leading_comments[0].span.start
                 };
-                if self.has_blank_line_between(prev_end, check_pos) {
+                // Step the scan past the previous member's trailing comment(s) so a
+                // multi-line block's interior newlines aren't read as an authored blank
+                // line (`a: 1; /*⏎…⏎*/⏎b` has no blank line between the members).
+                let blank_start = self.blank_scan_start(prev_end, check_pos);
+                if self.has_blank_line_between(blank_start, check_pos) {
                     parts.push(d.literalline());
                 }
             }
@@ -751,20 +753,20 @@ impl<'a> Printer<'a> {
                 };
             parts.push(member_doc);
 
-            // Handle trailing inline comments on same line after member
-            // Skip multi-line block comments - they should be leading comments for the next element
+            // Handle trailing inline comments on the same line after the member —
+            // single- or multi-line block, matching prettier and the type-literal /
+            // class member printers (a multi-line block trailing the last member was
+            // previously skipped here and then dropped entirely).
             if body_has_comments {
                 let upper_bound = members
                     .get(i + 1)
                     .map_or(body_end, |next| next.span().start);
                 let next_start = members.get(i + 1).map(|next| next.span().start);
-                for comment in comments_in_range(self.comments, member.span().end, upper_bound) {
+                for comment in
+                    comments_to_emit_in_range(self.comments, member.span().end, upper_bound)
+                {
                     if self.is_same_line(member.span().end, comment.span.start) {
-                        // Skip multi-line block comments (they're leading comments for next element)
-                        if comment.multiline {
-                            continue;
-                        }
-                        // An inline comment that hugs the next member on its line leads that
+                        // A comment that hugs the next member on its line leads that
                         // member (`a: 1, /* c */ b`) — the leading filter emits it — so it
                         // must not also trail this one (which would duplicate it). A comment
                         // with a newline after it (next member on a later line) trails here.
@@ -842,7 +844,7 @@ impl<'a> Printer<'a> {
         let enum_body_brace =
             self.find_char_outside_comments(decl.id.span.end, decl.span.end, b'{');
         if let Some(brace) = enum_body_brace
-            && self.has_comments_between(decl.id.span.end, brace)
+            && self.has_comments_to_emit_between(decl.id.span.end, brace)
         {
             parts.push(self.build_inline_comments_between_doc(decl.id.span.end, brace));
         }
@@ -882,7 +884,8 @@ impl<'a> Printer<'a> {
             // body all sub-queries are provably empty/false. The comma scan
             // stays — it feeds `prev_end` for blank-line preservation, not
             // comment placement.
-            let body_has_comments = self.has_comments_between(body_span.start, body_span.end);
+            let body_has_comments =
+                self.has_comments_to_emit_between(body_span.start, body_span.end);
 
             for (i, member) in decl.members.iter().enumerate() {
                 let member_start = member.span.start;
@@ -893,7 +896,7 @@ impl<'a> Printer<'a> {
                 // First member: drop comments pulled onto the `{` line (emitted
                 // as the brace-line prefix above).
                 let comments: CommentVec<'_> = if body_has_comments {
-                    comments_in_range(self.comments, prev_end, member_start)
+                    comments_to_emit_in_range(self.comments, prev_end, member_start)
                         .filter(|c| {
                             if is_first {
                                 !delimiter_pull_pos
@@ -918,7 +921,13 @@ impl<'a> Printer<'a> {
                 }
 
                 // Process leading comments
-                self.emit_member_leading_comments(&mut member_parts, &comments, member_start);
+                self.push_leading_comment_run(
+                    &mut member_parts,
+                    comments.iter().copied(),
+                    member_start,
+                    LeadingGlue::Adjacent,
+                    d.empty(),
+                );
 
                 // A preceding format-ignore directive keeps the member's source
                 // verbatim. The member span excludes the
@@ -1059,7 +1068,7 @@ impl<'a> Printer<'a> {
                 d.concat(&[id_doc, cont])
             } else {
                 // Comments between name and `=` (block stays inline: `a /* c */ = 1`)
-                let id_doc = if self.has_comments_between(id_end, eq_pos) {
+                let id_doc = if self.has_comments_to_emit_between(id_end, eq_pos) {
                     d.concat(&[
                         id_doc,
                         self.build_inline_comments_between_doc(id_end, eq_pos),
@@ -1168,7 +1177,7 @@ impl<'a> Printer<'a> {
                     internal::TSModuleName::Identifier(id) => id.span.end,
                     internal::TSModuleName::Literal(lit) => lit.span.end,
                 };
-                if self.has_comments_between(name_end, block.span.start) {
+                if self.has_comments_to_emit_between(name_end, block.span.start) {
                     parts.push(self.build_inline_comments_between_doc(name_end, block.span.start));
                 }
                 parts.push(d.text(" "));

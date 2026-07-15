@@ -4,6 +4,7 @@
 //! Part of the tsv (precise language tools for TypeScript/JS, CSS, and Svelte in Rust) project.
 
 pub mod ast;
+mod color;
 mod escapes;
 mod keyword_set;
 mod lexer;

@@ -194,8 +194,10 @@ deno task pins:audit                 # canonical-oracle version sync (gated in `
 deno task scan:audit                 # guard against new raw find/rfind/match_indices substring scans over source (gated in `deno task check`); see Debug Tooling
 deno task fanout:audit               # guard against super-linear doc-node fanout (the per-layout-candidate rebuild blowup); gated in `deno task check`; see Debug Tooling
 deno task roundtrip:audit            # cheap tripwire that format(tests/fixtures) reparses (pure-Rust phase 1, no *_unreparseable output; gated in `deno task check`) — real yield is external corpora; see Debug Tooling
+deno task binding:audit              # comment↔token binding audit: does format re-bind a forward-binding glued block comment (a plain comment, a bundler annotation, or a JSDoc cast — all owned) to a different subtree — the class invisible to ast_diff/roundtrip/SAFETY because the characters only MOVE (pure Rust, no sidecar; gated in `deno task check`) — HARD (a parser-owned glued comment) fails the gate, SOFT (an unowned glued block comment, now rare) is informational; TS-family files only; real yield on external corpora; see Debug Tooling
 deno task authoring:audit            # authoring-independence over Svelte boundary whitespace: every render-equivalent authoring of one document (hug ↔ space ↔ newline at a tag's content boundary; space ↔ newline between siblings) must reach ONE tsv fixed point (pure Rust, no sidecar; gated in `deno task check`) — exits 1 on any non-idempotency, site-level or a base-non-idempotent FILE; see Debug Tooling
 deno task fuzz:audit                 # seeded mutational fuzzer over tests/fixtures (fixed --seed 0 --iterations 5000; pure Rust, no sidecar; gated in `deno task check`) — asserts no-panic + idempotency + structural-reparse, on every seed file AS AUTHORED and then on mutated input; see Debug Tooling
+deno task comments:audit             # print-once comment ledger: every comment a document PARSES must be EMITTED exactly once (pure Rust, no sidecar; gated in `deno task check`) — reports DROPPED (silent content loss) and DOUBLE-PRINTED; the structural guard on the detached comment model, tsv's `ensureAllCommentsPrinted`; see Debug Tooling
 deno task idempotency:sweep          # F1 (idempotency) sweep over the real-code corpus (the `perf` view — sibling dev repos + upstream framework source). NOT in `deno task check`: machine-dependent corpus, minutes not seconds. Run at conformance cadence or after a printer change; see Debug Tooling
 ```
 
@@ -960,6 +962,44 @@ cargo run -p tsv_debug --features swallow_check swallow_audit ~/dev/zzz/src   # 
 # of scope.
 ```
 
+**Comment Ledger Audit (print-once: dropped / double-printed comments):**
+
+```bash
+# comment_audit - format files with the print-once comment ledger on and report every
+# comment the format DROPPED (parsed, never emitted — silent content loss) or
+# DOUBLE-PRINTED. tsv's answer to prettier's `ensureAllCommentsPrinted`, and the
+# structural guard on the detached comment model: nothing else forces a comment that the
+# parser produced to actually reach the output. Pure Rust, no Deno. Defaults to
+# tests/fixtures; pass dirs/files to audit real code. Exits 1 on any finding.
+cargo run -p tsv_debug --features comment_check comment_audit                 # audit all fixtures
+cargo run -p tsv_debug --features comment_check comment_audit ~/dev/zzz/src   # audit a real codebase
+# Also: --json. The ledger lives in tsv_lang::comment_ledger behind the `comment_check`
+# cargo feature — off by default, so it's compiled out of prod wasm/cli/ffi AND default
+# tsv_debug builds (profile/perf sessions measure production-shaped code); only the
+# `comments:audit` deno task needs the feature. Gated in `deno task check` (via
+# `comments:audit`) over tests/fixtures.
+#
+# Model. A format entry point (`tsv_ts::format_in`, `tsv_css`'s `format_css*`,
+# `tsv_svelte`'s `format_svelte*`) REGISTERS the comment list it is about to print — that
+# is the expectation. A doc-based printer (tsv_ts, tsv_svelte) TAGS each comment's doc
+# node (`DocArena::tag_comment_doc`) and the RENDERER records the emit when it reaches
+# the node; tsv_css, which writes comments straight to its buffer, records at the write.
+# The render-time seam is load-bearing: a builder may assemble the same subtree into two
+# `conditional_group` candidates of which one renders, so counting at build time reads as
+# a double-print (and a comment built only into a LOSING candidate would read as printed
+# while being lost). A `format-ignore` region — and any other raw source slice that
+# carries comments out verbatim (a raw at-rule prelude, a glued CSS compound selector) —
+# records a VERBATIM RANGE that counts as one emit per comment it covers; keep those
+# ranges tight, a too-wide carve-out silently re-opens the hole.
+#
+# Scope. Only the DETACHED comments (the flat `Vec<Comment>` on the language root). A
+# comment modeled as an AST node — a Svelte `<!-- … -->`, a CSS in-block
+# `CssBlockChild::Comment` — is carried by the tree and can't be lost the same way; its
+# emits land in the report's `out-of-scope emits` count, not in a finding. CSS
+# declaration-VALUE comments are never lexed as `Comment`s at all (re-derived from
+# source), so they are outside the model by construction.
+```
+
 **Build-Fanout Audit (exponential-rebuild regression guard):**
 
 ```bash
@@ -1066,6 +1106,42 @@ cargo run -p tsv_debug roundtrip_audit --gate --canonical-all ../prettier/tests/
 # (non-gate) run is a diagnostic — the divergent bucket over tests/fixtures is
 # Svelte-reflow-noisy vs render_normalize's simpler whitespace model.
 cargo run -p tsv_debug roundtrip_audit --canonical-all --verbose ../prettier/tests/format/typescript
+```
+
+**Comment↔Token Binding Audit (re-binding gate):**
+
+```bash
+# binding_audit - does format re-bind a FORWARD-binding comment to a different
+# subtree? Two comment kinds bind to the token AFTER them: a JSDoc type cast
+# (`/** @type {T} */ (x)` — the parens + comment ARE the cast) and a bundler
+# annotation (`/* @__PURE__ */ f()` — marks the call side-effect-free). A paren
+# migrating across such a comment under formatting silently re-binds it (a cast
+# annotating a wider node, an annotation gone inert). This class is INVISIBLE to
+# every other gate — neither a cast, a grouping paren, nor an annotation is a
+# public-AST node, so both forms serialize to byte-identical wire JSON: ast_diff
+# says "equivalent", roundtrip_audit's skeleton can't see it, corpus SAFETY is
+# char-frequency (the characters only MOVE). Pure Rust, no sidecar.
+#
+# Signal: reparse input + tsv-formatted output with `preserve_parens` (grouping
+# parens become ParenthesizedExpression nodes), and per glued comment compare the
+# bound subtree. A cast stays invisible even so (its JsdocCast node emits its bare
+# inner), so the audit anchors INSIDE the cast's `(`. And since the only structural
+# delta formatting can add under preserve_parens is a clarity-paren (roundtrip_audit
+# gates the rest), the skeleton is compared with ParenthesizedExpression STRIPPED —
+# the binding-paren signal rides a separate `anchor_is_paren` flag. So a clarity
+# paren deep inside is not a finding; a paren at the anchor is.
+#
+# HARD (a parser-owned glued comment re-binds) fails --gate — every glued block
+# comment is owned, so a cast, an annotation, and a plain glued comment alike; SOFT
+# (an unowned glued block comment, now rare) is informational. TS-family files
+# only (.ts/.js/.mts/.cts/…); casts/annotations concentrate in JSDoc-typed JS.
+cargo run -p tsv_debug binding_audit                                  # audit tests/fixtures
+cargo run -p tsv_debug binding_audit ../svelte/packages/svelte/src ../prettier/tests/format/js
+cargo run -p tsv_debug binding_audit --gate                          # the check gate (HARD only)
+# Also: --verbose (in→out bound-subtree per finding), --limit N, --json. A bare
+# --gate over tests/fixtures is a cheap tripwire (fixtures are format-stable); the
+# real yield is external corpora, where JSDoc casts + annotations are dense.
+cargo run -p tsv_debug binding_audit --verbose ../svelte/packages/svelte/src
 ```
 
 **Seeded Mutational Fuzzer (panic / idempotency / structural-reparse safety):**
@@ -1244,27 +1320,101 @@ pub struct Comment {
 **Owned comments — the one crack in the detached model.** A comment that is *bound to
 the token after it* can't be located positionally at print time, because a paren the
 printer synthesizes around an enclosing expression lands between the two and re-binds it.
-The single case today is the JSDoc cast: `/** @type {T} */` plus the `(` it glues to
-**are** the cast, so the parser marks the comment `owned_by_node` and hands it to the
-`JsdocCast` node, which prints it. The range lookups (`comments_in_range`,
-`has_comments_in_range`, `comments_after`) **skip** owned comments, so no gap emitter can
-print one and no synthesized paren can be placed inside the pair — at any of the ~29 paren
-sites, present or future. A pure *layout* gate that only asks "does this range print any
-comment text" uses `has_any_comments_in_range` instead (it counts owned comments; the
-member-chain's structural fast path is the case in point). Prettier, oxfmt and biome all
-get this wrong — see [conformance_prettier.md §JSDoc / paren semantics](docs/conformance_prettier.md).
+**Every glued block comment is owned** (`owned_by_node`, set by the parser): the position
+is an authoring choice that binds the comment to the operand it leads, so the operand's own
+doc prints it and no synthesized paren can land between them. There is no content sniff — a
+plain `/* c */` and a bundler annotation `/* @__PURE__ */` bind their token identically. Two
+shapes are worth naming:
+
+- the **glued block comment** (the general case) — printed by the innermost node its token
+  begins (`printer/comments/owned.rs`, via `build_expression_doc`'s
+  `prepend_owned_leading_comment`). Covers an ordinary leading comment and a **bundler
+  annotation** alike (`/* @__PURE__ */` and friends mark the call *after* them as
+  side-effect-free; a paren between the two would leave the annotation leading a paren, so the
+  marked call is no longer droppable). No AST node is involved.
+- the **JSDoc cast** — `/** @type {T} */` plus the `(` it glues to **are** the cast, so the
+  comment is handed to the `JsdocCast` node, which prints it. `is_jsdoc_type_cast_comment` is
+  the **only** remaining content sniff, and it governs the cast's **paren-retention** (building
+  the `JsdocCast`), *not* ownership — ownership flows to a cast the same as to any other glued
+  comment.
+
+An owned comment is always a **block** comment (`owned ⇒ is_block`), and always **glued** to
+its token — a comment the author left on its own line leads the *line*, not the token. The one
+exception is the JSDoc cast, whose comment may sit a newline above its `(` and still be the
+cast; that difference is load-bearing and named at the shared scan
+(`source_scan::CommentGlue`).
+
+**Ownership is a fact about who PRINTS a comment, never about whether it EXISTS.** That one
+sentence is the whole rule, and every bug in this class has been a violation of it. A comment
+can be asked about along exactly **three** axes, and the lookup API (`tsv_lang::comment`) makes
+the caller name which:
+
+| axis | question | owned comments | who asks |
+| --- | --- | --- | --- |
+| **to emit** | "which comments must *I* print here?" | **skipped** | gap emitters (~200 sites) |
+| **on page** | "does any comment OCCUPY THE PAGE here?" | **counted** | layout gates — break / expand / hug / paren / fast-path |
+| **in source** | "what comment BYTES are physically here?" | **counted** | cursors — blank-line scans, offsets, `prev_end` |
+
+`comments_to_emit_in_range` / `has_comments_to_emit_in_range` / `comments_to_emit_after` ·
+`comments_on_page_in_range` / `has_comments_on_page_in_range` /
+`has_multiline_block_comments_on_page_in_range` · `comments_in_source_range` /
+`comments_in_source_after`. Every name states its axis, so a miswire reads as a category error
+at the call site rather than as plausible code. Two facts about the shape:
+
+- **Three questions, but only two membership sets.** *On page* and *in source* both count an
+  owned comment (it is in the output, and its bytes are in the file); only *to emit* skips it.
+  The two names exist because the *question* differs — and naming the wrong one is the bug.
+- `has_line_comments_in_range` carries **no** axis, provably: `owned ⇒ is_block`, so no line
+  comment is ever owned and skip ≡ count. If that ever changes, it must grow an axis.
+
+Two corollaries worth naming, because each was a whole family of bugs:
+
+- A **zero-comment fast gate** (`let has_comments = …` guarding a whole builder) is an
+  **on-page** question. It short-circuits the layout gates it guards, so an emit-keyed one makes
+  every one of them blind.
+- A **blank-line scan** is an **in-source** question. `has_blank_line_between*` is a raw newline
+  count — it cannot tell a comment's own newlines from an author's blank line, so the scan must
+  step over every comment in the gap (`blank_scan_start` / `blank_scan_end`), not just the ones
+  this caller emits.
+
+⚠️ **Two hazards, both of which have bitten.** Ownership is a sharp tool: it takes a comment out
+of the positional model, so every consumer of that model has to be re-examined.
+
+1. **An owned comment nothing prints is a DROPPED comment.** Ownership assumes the owning node
+   prints it, so any builder that **reassembles** a node instead of routing it through
+   `build_expression_doc` must claim it on its own seam (`prepend_owned_leading_comment_at`).
+   Two do: `build_arrow_sig_doc` (every call-argument state) and `build_arrow_chain_doc`'s inner
+   arrows. Adding a third reassembly path means adding a third claim.
+2. **An owned comment travels *inside* its node's doc, so the gap around it can't see it.** The
+   assignment layout inspects the operator→value gap (`rhs_comments`), which is empty for an
+   owned comment — yet the comment still hangs the value. The node has to be asked instead:
+   `owned_leading_comment_hangs_value`. It is the single seam for that question (the declarator,
+   the class property, the object value, and the `is_poorly_breakable_chain` invariant all route
+   through it).
+
+Both hazards are what the **print-once comment ledger** exists to catch — the structural
+guard on this model: every comment a document parses must be emitted exactly once, or the
+audit reports it as DROPPED or DOUBLE-PRINTED (`deno task comments:audit`, gated in
+`deno task check`; see [Comment Ledger Audit](#debug-tooling)). Nothing else in the
+detached model forces a parsed comment to reach the output.
+
+Prettier, oxfmt and biome all get the paren binding wrong — see
+[conformance_prettier.md §Comment relocation](docs/conformance_prettier.md#comment-relocation)
+and [§JSDoc / paren semantics](docs/conformance_prettier.md).
 
 The content is **not stored owned** — comment text is a pure delimiter-stripped
 sub-slice of source, so `Comment` holds a `content_span` and recovers the text on
 demand via `Comment::content(source) -> &str` (`source` must be the host document the
 spans were recorded against); every field is `Copy`, no `String` per comment.
 `multiline` is precomputed so the multi-line-block expansion checks
-(`has_multiline_block_comments_in_range` and the printers) read an O(1), source-free
+(`has_multiline_block_comments_on_page_in_range` and the printers) read an O(1), source-free
 flag instead of re-scanning content. The full comment span includes its delimiters
 (`//` / `/* */` / a `#!` hashbang, whose content includes the `#!`); the lexer is the
 single owner of those widths.
 
-**Printer strategy**: Range-based lookup via `comments_in_range(prev_end, node_start)`. Source string for context (same-line detection, blank line preservation). Tradeoff: simple/efficient AST matching Prettier's model, but printer must manually track `prev_end` positions; edge cases (e.g., arrow function comments) require careful span math.
+**Printer strategy**: Range-based lookup via `comments_to_emit_in_range(prev_end, node_start)` (and its on-page / in-source siblings above). Source string for context (same-line detection, blank line preservation). Tradeoff: simple/efficient AST matching Prettier's model, but printer must manually track `prev_end` positions; edge cases (e.g., arrow function comments) require careful span math.
+
+**Leading comments have one rule and one emitter.** A comment run *before* an item (a value, member, list element, or comma-separated item) is emitted by `Printer::push_leading_comment_run` (`printer/comments/mod.rs`), which implements prettier's `printLeadingComment` and picks the separator after each comment from the source around **that comment only**, never from where the item starts: **space** when nothing but spaces follow its `*/` (so a run the author glued stays glued — `/* a */ /* b */⏎X`), a soft **`line`** when a newline follows but none precedes, and a blank-preserving **`hardline`** for an own-line block or any line comment. The glue test alone is `Printer::comment_hugs_next` — the single statement of the rule, called even by the few sites whose surrounding loop must differ (a separator policy of their own). ⚠️ Do not hand-roll `is_block && is_same_line(c.span.end, X)` at a new site: keying the hug on the *item* rather than on *what follows the comment* splits an author-glued run, and was a whole bug family (unglue / block-run merge). A site that also owns a comma emits the gap via `push_inter_item_line_comment_gap`, which owns the break too — that is what lets the last comment hug the next item.
 
 Higher-fidelity models (attached comments, trivia tokens) may be needed for IDE/linter use cases.
 
@@ -1299,6 +1449,7 @@ formatting behavior. Key files: `src/language-js/print/assignment.js` (assignmen
 **Specs** — consult BEFORE implementing CSS/HTML/JS features (don't search the web):
 
 - CSS — `../csswg-drafts/`
+- CSS Houdini — `../css-houdini-drafts/` (the Houdini Task Force's own repo, not part of `csswg-drafts`; home of `css-properties-values-api`, the `@property` spec)
 - HTML — `../html/`
 - DOM — `../dom/`
 - ECMAScript — `../ecma262/`

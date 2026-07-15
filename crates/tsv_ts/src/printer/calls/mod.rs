@@ -120,7 +120,12 @@ impl<'a> Printer<'a> {
             // Whole-call comment-presence gate (one binary search over the argument
             // window); short-circuits the comment predicates below and threads into
             // build_args_split_last. Canonical reference: build_params_doc_with_comments.
-            let call_has_comments = self.has_comments_between(paren_open, call.span.end);
+            //
+            // Counts owned comments: this asks whether the argument window puts any comment
+            // text on the page (a *layout* question), not who emits it. A bundler annotation
+            // on the last argument must still disable the expand-last hug, exactly as an
+            // ordinary leading comment does — prettier's `shouldExpandLastArg` sees it.
+            let call_has_comments = self.has_comments_on_page_between(paren_open, call.span.end);
             if call.arguments.len() >= 2
                 && call.arguments.last().is_some_and(is_block_function)
                 && !has_blank_lines_between_args

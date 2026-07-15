@@ -1,14 +1,17 @@
 pub mod commands;
 
 use argh::FromArgs;
+#[cfg(feature = "comment_check")]
+use commands::comment_audit::CommentAuditCommand;
 #[cfg(feature = "swallow_check")]
 use commands::swallow_audit::SwallowAuditCommand;
 use commands::{
     arena_stats::ArenaStatsCommand, ast_diff::AstDiffCommand,
-    authoring_audit::AuthoringAuditCommand, buffer_sizes::BufferSizesCommand,
-    build_fanout_audit::BuildFanoutAuditCommand, canonical_compile::CanonicalCompileCommand,
-    canonical_parse::CanonicalParseCommand, canonicalize_audit::CanonicalizeAuditCommand,
-    check::CheckCommand, compare::CompareCommand, compile_compare::CompileCompareCommand,
+    authoring_audit::AuthoringAuditCommand, binding_audit::BindingAuditCommand,
+    buffer_sizes::BufferSizesCommand, build_fanout_audit::BuildFanoutAuditCommand,
+    canonical_compile::CanonicalCompileCommand, canonical_parse::CanonicalParseCommand,
+    canonicalize_audit::CanonicalizeAuditCommand, check::CheckCommand, compare::CompareCommand,
+    compile_compare::CompileCompareCommand,
     compile_conformance_audit::CompileConformanceAuditCommand,
     compile_corpus_compare::CompileCorpusCompareCommand,
     compile_fixture_init::CompileFixtureInitCommand,
@@ -20,7 +23,8 @@ use commands::{
     fixtures_update_parsed::FixturesUpdateParsedCommand,
     fixtures_validate::FixturesValidateCommand, format_prettier::FormatPrettierCommand,
     fuzz::FuzzCommand, json_profile::JsonProfileCommand, lex_diff::LexDiffCommand,
-    line_width::LineWidthCommand, metrics::MetricsCommand, profile::ProfileCommand,
+    line_width::LineWidthCommand, metrics::MetricsCommand,
+    neutrality_audit::NeutralityAuditCommand, profile::ProfileCommand,
     roundtrip_audit::RoundtripAuditCommand, scan_audit::ScanAuditCommand, test262::Test262Command,
     ts_fixture_audit::TsFixtureAuditCommand,
 };
@@ -71,8 +75,14 @@ pub enum Subcommand {
     Check(CheckCommand),
     ArenaStats(ArenaStatsCommand),
     AuthoringAudit(AuthoringAuditCommand),
+    BindingAudit(BindingAuditCommand),
     BufferSizes(BufferSizesCommand),
     BuildFanoutAudit(BuildFanoutAuditCommand),
+    // Requires the `comment_check` feature so default builds keep the comment ledger's
+    // registration + record hooks compiled out (production-shaped profiles); the
+    // `comments:audit` deno task passes it.
+    #[cfg(feature = "comment_check")]
+    CommentAudit(CommentAuditCommand),
     Compare(CompareCommand),
     ConformanceAudit(ConformanceAuditCommand),
     AstDiff(AstDiffCommand),
@@ -99,6 +109,7 @@ pub enum Subcommand {
     JsonProfile(JsonProfileCommand),
     LexDiff(LexDiffCommand),
     Metrics(MetricsCommand),
+    NeutralityAudit(NeutralityAuditCommand),
     RoundtripAudit(RoundtripAuditCommand),
     ScanAudit(ScanAuditCommand),
     // Requires the `swallow_check` feature so default builds keep the
@@ -122,8 +133,11 @@ impl TopLevel {
             Subcommand::Check(c) => c.run(),
             Subcommand::ArenaStats(c) => c.run(),
             Subcommand::AuthoringAudit(c) => c.run(),
+            Subcommand::BindingAudit(c) => c.run(),
             Subcommand::BufferSizes(c) => c.run(),
             Subcommand::BuildFanoutAudit(c) => c.run(),
+            #[cfg(feature = "comment_check")]
+            Subcommand::CommentAudit(c) => c.run(),
             Subcommand::Compare(c) => c.run(),
             Subcommand::ConformanceAudit(c) => c.run(),
             Subcommand::AstDiff(c) => c.run(),
@@ -150,6 +164,7 @@ impl TopLevel {
             Subcommand::JsonProfile(c) => c.run(),
             Subcommand::LexDiff(c) => c.run(),
             Subcommand::Metrics(c) => c.run(),
+            Subcommand::NeutralityAudit(c) => c.run(),
             Subcommand::RoundtripAudit(c) => c.run(),
             Subcommand::ScanAudit(c) => c.run(),
             #[cfg(feature = "swallow_check")]

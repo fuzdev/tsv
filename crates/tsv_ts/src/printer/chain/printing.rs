@@ -134,12 +134,12 @@ pub trait ChainPrinter: SymbolLookup {
     fn get_layout_line_breaks(&self) -> &[u32];
 
     /// Check if there are any comments between two positions
-    fn has_comments_between(&self, start: u32, end: u32) -> bool;
+    fn has_comments_to_emit_between(&self, start: u32, end: u32) -> bool;
 
-    /// As `has_comments_between`, but counts comments a node owns and prints itself.
+    /// As `has_comments_to_emit_between`, but counts comments a node owns and prints itself.
     /// The chain-level flag is a *structural* gate (it selects the doc shape, not who
     /// emits), so an owned-comment-only chain must still take the commented path.
-    fn has_any_comments_between(&self, start: u32, end: u32) -> bool;
+    fn has_comments_on_page_between(&self, start: u32, end: u32) -> bool;
 
     /// Whether the chain currently being built contains any comment anywhere in its
     /// span. Set once per chain (save/restore) at [`build_chain_doc`] and read by the
@@ -284,7 +284,7 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
                             d.text(")"),
                         ]);
                     }
-                    if printer.has_comments_between(start, end) {
+                    if printer.has_comments_to_emit_between(start, end) {
                         let trailing = printer.build_block_comments_doc(
                             start,
                             end,
@@ -430,8 +430,8 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
                 //       /** @type {string} */ d
                 //   ]
                 let has_inside_comments = printer
-                    .has_comments_between(inside_start, prop_span.start)
-                    || printer.has_comments_between(prop_span.end, *bracket_end);
+                    .has_comments_on_page_between(inside_start, prop_span.start)
+                    || printer.has_comments_on_page_between(prop_span.end, *bracket_end);
                 computed_lookup_doc(
                     printer,
                     open,
@@ -689,8 +689,8 @@ pub(crate) fn has_inside_bracket_comments<'a, P: ChainPrinter>(
         let prop_span = printer.get_property_span(expr);
         let bracket_open_pos = find_bracket_position(printer, *object_end, prop_span.start);
         let inside_start = bracket_open_pos + if *optional { 3 } else { 1 };
-        printer.has_comments_between(inside_start, prop_span.start)
-            || printer.has_comments_between(prop_span.end, *bracket_end)
+        printer.has_comments_on_page_between(inside_start, prop_span.start)
+            || printer.has_comments_on_page_between(prop_span.end, *bracket_end)
     } else {
         false
     }
@@ -878,7 +878,7 @@ pub(crate) fn build_chain_line_break<P: ChainPrinter>(
     // This avoids false positives when the parser strips grouping parens, leaving `)` between
     // newlines (e.g., `(fn({...}))\n.method()` → inner span ends before `)`, creating `\n)\n`).
     let source = printer.get_source();
-    let has_comments = printer.has_comments_between(object_end, property_start);
+    let has_comments = printer.has_comments_to_emit_between(object_end, property_start);
 
     if !has_comments && has_blank_line_between_strict(source, object_end, property_start) {
         // Preserve blank line: literalline (no indent) + hardline (with indent for next content)

@@ -114,7 +114,7 @@ impl<'a> Printer<'a> {
         if matches!(alternate, Statement::EmptyStatement(_)) {
             // Empty alternate: `} else;`, `} else /* c */ ;`, or `} else // c\n;`
             if let Some(else_end) = else_end
-                && self.has_comments_between(else_end, alt_start)
+                && self.has_comments_to_emit_between(else_end, alt_start)
             {
                 let has_line = self.has_line_comments_between(else_end, alt_start);
                 parts.push(d.text(" else"));
@@ -131,7 +131,7 @@ impl<'a> Printer<'a> {
                 parts.push(d.text(" else;"));
             }
         } else if let Some(else_end) = else_end
-            && self.has_comments_between(else_end, alt_start)
+            && self.has_comments_to_emit_between(else_end, alt_start)
         {
             // Comments between `else` and body
             let has_line = self.has_line_comments_between(else_end, alt_start);
@@ -210,11 +210,8 @@ impl<'a> Printer<'a> {
         if let Statement::BlockStatement(block) = stmt.consequent {
             // Block consequent: group(["if (" + condition + ") " + block])
             // Outer group controls whether the whole if statement breaks
-            let mut parts = smallvec![d.text("if")];
-            if let Some(kc) = keyword_comments {
-                parts.push(kc);
-            }
-            parts.push(d.text(" ("));
+            let mut parts: DocBuf = DocBuf::new();
+            self.push_keyword_open_paren(&mut parts, "if", keyword_comments);
             parts.push(condition_group);
 
             // Check for comments between ) and block body
@@ -235,11 +232,8 @@ impl<'a> Printer<'a> {
             let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
             let empty_start = stmt.consequent.span().start;
 
-            let mut empty_parts = smallvec![d.text("if")];
-            if let Some(kc) = keyword_comments {
-                empty_parts.push(kc);
-            }
-            empty_parts.push(d.text(" ("));
+            let mut empty_parts: DocBuf = DocBuf::new();
+            self.push_keyword_open_paren(&mut empty_parts, "if", keyword_comments);
             empty_parts.push(condition_group);
             self.append_close_paren_empty_stmt_with_comments(
                 &mut empty_parts,
@@ -262,11 +256,8 @@ impl<'a> Printer<'a> {
             let body_start = stmt.consequent.span().start;
             let consequent_doc = self.build_statement_doc(stmt.consequent, false);
 
-            let mut head_parts: DocBuf = smallvec![d.text("if")];
-            if let Some(kc) = keyword_comments {
-                head_parts.push(kc);
-            }
-            head_parts.push(d.text(" ("));
+            let mut head_parts: DocBuf = DocBuf::new();
+            self.push_keyword_open_paren(&mut head_parts, "if", keyword_comments);
             head_parts.push(condition_group);
             let head_and_body = self.build_adjust_clause_with_comments(
                 &head_parts,
@@ -294,7 +285,7 @@ impl<'a> Printer<'a> {
         let has_if_else_comments = stmt.alternate.as_ref().is_some_and(|alt| {
             let consequent_end = stmt.consequent.span().end;
             let alternate_start = alt.span().start;
-            self.has_comments_between(consequent_end, alternate_start)
+            self.has_comments_to_emit_between(consequent_end, alternate_start)
         });
 
         if has_if_else_comments {
@@ -317,11 +308,8 @@ impl<'a> Printer<'a> {
         let condition_group =
             self.build_statement_condition_doc(&stmt.test, open_paren, close_paren);
 
-        let mut parts = smallvec![d.text("if")];
-        if let Some(kc) = keyword_comments {
-            parts.push(kc);
-        }
-        parts.push(d.text(" ("));
+        let mut parts: DocBuf = DocBuf::new();
+        self.push_keyword_open_paren(&mut parts, "if", keyword_comments);
         parts.push(condition_group);
 
         // Build consequent (with head-body comment extraction)
@@ -337,7 +325,7 @@ impl<'a> Printer<'a> {
             let body_start = stmt.consequent.span().start;
             let consequent_doc = self.build_statement_doc(stmt.consequent, false);
 
-            if self.has_comments_between(paren_end, body_start) {
+            if self.has_comments_to_emit_between(paren_end, body_start) {
                 let has_line = self.has_line_comments_between(paren_end, body_start);
                 let comment_doc =
                     self.build_inline_comments_between_doc_no_leading_space(paren_end, body_start);
@@ -377,7 +365,7 @@ impl<'a> Printer<'a> {
 
             // Comments between } and "else"
             let before_else_end = else_start.unwrap_or(alternate_start);
-            if self.has_comments_between(consequent_end, before_else_end) {
+            if self.has_comments_to_emit_between(consequent_end, before_else_end) {
                 let (inline_prev, own_line, inline_next) =
                     self.partition_comments_by_line(consequent_end, before_else_end);
 
@@ -413,7 +401,7 @@ impl<'a> Printer<'a> {
             if matches!(alternate, Statement::EmptyStatement(_)) {
                 // Empty alternate: `else;`, `else /* c */ ;`, or `else // c\n;`
                 if let Some(else_e) = else_end
-                    && self.has_comments_between(else_e, alternate_start)
+                    && self.has_comments_to_emit_between(else_e, alternate_start)
                 {
                     let has_line = self.has_line_comments_between(else_e, alternate_start);
                     parts.push(d.text("else"));
@@ -430,7 +418,7 @@ impl<'a> Printer<'a> {
                     parts.push(d.text("else;"));
                 }
             } else if let Some(else_e) = else_end
-                && self.has_comments_between(else_e, alternate_start)
+                && self.has_comments_to_emit_between(else_e, alternate_start)
             {
                 let has_line = self.has_line_comments_between(else_e, alternate_start);
                 let is_non_block_non_if = !matches!(

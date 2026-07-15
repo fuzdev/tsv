@@ -6,7 +6,7 @@
 use crate::ast::internal::{self, Expression, Statement};
 use crate::printer::{CommentVec, LeadingGlue, Printer};
 use smallvec::smallvec;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::{TriviaProfile, find_char, skip_comment};
@@ -52,7 +52,7 @@ impl<'a> Printer<'a> {
         let body_start = body.span().start;
         let body_doc = self.build_statement_doc(body, false);
 
-        if !self.has_comments_between(paren_end, body_start) {
+        if !self.has_comments_to_emit_between(paren_end, body_start) {
             parts.push(d.text(")"));
             if matches!(body, Statement::EmptyStatement(_)) {
                 // Prettier's `adjustClause` returns `";"` directly for an empty
@@ -254,7 +254,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut prev = anchor;
         let mut first = true;
-        for comment in comments_in_range(self.comments, start, end) {
+        for comment in comments_to_emit_in_range(self.comments, start, end) {
             if comment.is_block {
                 if cur.pending_break {
                     inner.push(d.hardline());
@@ -308,7 +308,8 @@ impl<'a> Printer<'a> {
 
         // Build "for" + optional keyword comments + " (" prefix
         let for_open = if let Some(kc) = keyword_comments {
-            d.concat(&[d.text("for"), kc, d.text(" (")])
+            // `kc` carries its own trailing space (block) or hardline (line).
+            d.concat(&[d.text("for"), kc, d.text("(")])
         } else {
             d.text("for (")
         };
@@ -318,7 +319,7 @@ impl<'a> Printer<'a> {
         let close_paren_approx = open_paren.and_then(|p| self.matching_close_paren(p));
         let has_comments_inside =
             if let (Some(open), Some(close)) = (open_paren, close_paren_approx) {
-                self.has_comments_between(open, close)
+                self.has_comments_to_emit_between(open, close)
             } else {
                 false
             };
@@ -387,8 +388,8 @@ impl<'a> Printer<'a> {
 
             // Inline block comments before the first clause (on the same line)
             // e.g., `for (/* before init */ let j = 0; ...)`
-            for comment in comments_in_range(self.comments, open + 1, first_start) {
-                if comment.is_block && self.is_same_line(comment.span.end, first_start) {
+            for comment in comments_to_emit_in_range(self.comments, open + 1, first_start) {
+                if self.comment_hugs_next(comment, first_start) {
                     inner_parts.push(self.build_comment_doc(comment));
                     inner_parts.push(d.text(" "));
                 }
@@ -521,7 +522,7 @@ impl<'a> Printer<'a> {
     ) -> DocBuf {
         let d = self.d();
         let mut parts = DocBuf::new();
-        for comment in comments_in_range(self.comments, search_start, clause_start) {
+        for comment in comments_to_emit_in_range(self.comments, search_start, clause_start) {
             // Only include comments that are:
             // 1. NOT on the same line as the next clause
             // 2. NOT on the same line as the previous expression (inline comments)
@@ -664,7 +665,7 @@ impl<'a> Printer<'a> {
         end: u32,
     ) {
         let d = self.d();
-        for comment in comments_in_range(self.comments, range_start, boundary) {
+        for comment in comments_to_emit_in_range(self.comments, range_start, boundary) {
             if self.is_same_line(end, comment.span.start) {
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
@@ -694,7 +695,7 @@ impl<'a> Printer<'a> {
 
         // Inline block comments on the same line just before the clause
         // e.g., `for (let i = 0; /* before test */ i < 10; ...)`
-        for comment in comments_in_range(self.comments, search_start, clause_start) {
+        for comment in comments_to_emit_in_range(self.comments, search_start, clause_start) {
             if comment.is_block
                 && self.is_same_line(comment.span.end, clause_start)
                 && prev_end.is_none_or(|pe| !self.is_same_line(pe, comment.span.start))
@@ -725,7 +726,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let first = seq.expressions[0].span().start;
         let last = seq.expressions[seq.expressions.len() - 1].span().end;
-        if !self.has_comments_between(first, last) {
+        if !self.has_comments_to_emit_between(first, last) {
             return d.join(seq.expressions.iter().map(&build_elem), ", ");
         }
         let mut docs = DocBuf::new();
@@ -877,8 +878,11 @@ impl<'a> Printer<'a> {
         let close_paren = open_paren.and_then(|o| self.matching_close_paren(o));
         let (for_await_comments, await_paren_comments) = if is_await {
             let await_pos = self.find_keyword_in_range(for_keyword_end, left_start, "await");
+            // Same line-safe builder as the `await`→`(` gap below: a line comment in
+            // the `for`→`await` gap breaks `await` onto the next line so the `//`
+            // can't swallow it; a block comment keeps its glue space.
             let for_await_c = await_pos
-                .and_then(|ap| self.build_inline_comments_between_doc_opt(for_keyword_end, ap));
+                .and_then(|ap| self.build_keyword_paren_comments(for_keyword_end, Some(ap)));
             let await_paren_c = await_pos
                 .map(|ap| ap + "await".len() as u32)
                 .and_then(|ae| self.build_keyword_paren_comments(ae, open_paren));
@@ -931,7 +935,7 @@ impl<'a> Printer<'a> {
 
         // Comments between ( and left
         if let Some(open) = open_paren {
-            for comment in comments_in_range(self.comments, open + 1, left_start) {
+            for comment in comments_to_emit_in_range(self.comments, open + 1, left_start) {
                 if comment.is_block {
                     parts.push(self.build_comment_doc(comment));
                     parts.push(d.text(" "));
@@ -1009,7 +1013,7 @@ impl<'a> Printer<'a> {
 
         // Comments before left (after open paren)
         if let Some(open) = open_paren {
-            for comment in comments_in_range(self.comments, open + 1, left_start) {
+            for comment in comments_to_emit_in_range(self.comments, open + 1, left_start) {
                 inner.push(d.hardline());
                 inner.push(self.build_comment_doc(comment));
             }
@@ -1020,7 +1024,7 @@ impl<'a> Printer<'a> {
         inner.push(self.build_for_in_of_left_doc(left, wrap_async_paren));
 
         // Comments after left, before keyword — emit all (own-line comments normalize to inline)
-        for comment in comments_in_range(self.comments, left_end, keyword_pos) {
+        for comment in comments_to_emit_in_range(self.comments, left_end, keyword_pos) {
             inner.push(d.text(" "));
             inner.push(self.build_comment_doc(comment));
         }
@@ -1034,7 +1038,7 @@ impl<'a> Printer<'a> {
         let mut keyword_parts: DocBuf = smallvec![d.hardline(), keyword_doc];
 
         // Comments after keyword, before right — emit all (own-line comments normalize to inline)
-        for comment in comments_in_range(self.comments, keyword_end, right_start) {
+        for comment in comments_to_emit_in_range(self.comments, keyword_end, right_start) {
             keyword_parts.push(d.text(" "));
             keyword_parts.push(self.build_comment_doc(comment));
         }
@@ -1045,7 +1049,7 @@ impl<'a> Printer<'a> {
 
         // Comments after right, before close paren
         if let Some(close) = close_paren {
-            for comment in comments_in_range(self.comments, right_end, close) {
+            for comment in comments_to_emit_in_range(self.comments, right_end, close) {
                 keyword_parts.push(d.text(" "));
                 keyword_parts.push(self.build_comment_doc(comment));
             }
@@ -1081,19 +1085,29 @@ impl<'a> Printer<'a> {
     ) {
         let d = self.d();
         parts.push(d.text("for"));
+        // `for` → (`await` | `(`) transition. Both `keyword_comments` (the non-await
+        // `for`→`(` gap) and `for_await_comments` (the `for`→`await` gap) are built by
+        // `build_keyword_paren_comments`, so each already carries its own trailing
+        // space (block) or hardline (line) — a line comment breaks the next token
+        // (`(` or `await`) onto its own line so the `//` can't swallow it. The two are
+        // mutually exclusive (keyword_comments only non-await, for_await_comments only
+        // await).
         if let Some(kc) = keyword_comments {
             parts.push(kc);
-        }
-        if let Some(fac) = for_await_comments {
+        } else if let Some(fac) = for_await_comments {
             parts.push(fac);
+        } else {
+            parts.push(d.text(" "));
         }
-        parts.push(d.text(" "));
         if is_await {
             parts.push(d.text("await"));
+            // `await` → `(` transition: `await_paren_comments` carries its own
+            // trailing space/break; otherwise a plain space.
             if let Some(apc) = await_paren_comments {
                 parts.push(apc);
+            } else {
+                parts.push(d.text(" "));
             }
-            parts.push(d.text(" "));
         }
         parts.push(d.text("("));
     }
@@ -1143,7 +1157,7 @@ impl<'a> Printer<'a> {
     fn append_for_in_of_block_comments(&self, parts: &mut DocBuf, start: u32, end: u32) -> bool {
         let d = self.d();
         let mut added = false;
-        for comment in comments_in_range(self.comments, start, end) {
+        for comment in comments_to_emit_in_range(self.comments, start, end) {
             if comment.is_block {
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
@@ -1160,7 +1174,7 @@ impl<'a> Printer<'a> {
     /// Own-line comments normalize to inline. No trailing space.
     fn append_for_in_of_trailing_comments(&self, parts: &mut DocBuf, start: u32, end: u32) {
         let d = self.d();
-        for comment in comments_in_range(self.comments, start, end) {
+        for comment in comments_to_emit_in_range(self.comments, start, end) {
             if comment.is_block {
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
@@ -1185,7 +1199,7 @@ impl<'a> Printer<'a> {
         let header_end = self.get_for_header_end(stmt);
         let body_start = stmt.body.span().start;
 
-        if has_pre_paren_comments || self.has_comments_between(header_end, body_start) {
+        if has_pre_paren_comments || self.has_comments_to_emit_between(header_end, body_start) {
             // Check if we have line comments (need special handling)
             let has_line_comment = self.has_line_comments_between(header_end, body_start);
 
@@ -1206,7 +1220,7 @@ impl<'a> Printer<'a> {
             // A C-style `for` collapses its empty block body (`for (…) {}`).
             let body_doc = self.build_collapsing_body_doc(stmt.body);
 
-            let (tail, group_it) = if self.has_comments_between(header_end, body_start) {
+            let (tail, group_it) = if self.has_comments_to_emit_between(header_end, body_start) {
                 if has_line_comment && !is_block_body {
                     // Line comment(s), non-block body: each comment on its own
                     // indented line, then the body — break-safe so a `//` can't
@@ -1214,7 +1228,8 @@ impl<'a> Printer<'a> {
                     // adjustClause; multiple comments previously collapsed inline).
                     let mut inner = DocBuf::new();
                     let mut prev = header_end;
-                    for comment in comments_in_range(self.comments, header_end, body_start) {
+                    for comment in comments_to_emit_in_range(self.comments, header_end, body_start)
+                    {
                         if prev != header_end
                             && self.has_blank_line_between(prev, comment.span.start)
                         {
@@ -1310,7 +1325,7 @@ impl<'a> Printer<'a> {
     /// clauses (`build_for_sequence_clause_doc`).
     fn push_for_clause_comma_gap(&self, decl_docs: &mut DocBuf, prev_end: u32, curr_start: u32) {
         let d = self.d();
-        if !self.has_comments_between(prev_end, curr_start) {
+        if !self.has_comments_to_emit_between(prev_end, curr_start) {
             decl_docs.push(d.text(","));
             decl_docs.push(d.line());
             return;
@@ -1318,14 +1333,16 @@ impl<'a> Printer<'a> {
         let comma_pos = self.comma_between(prev_end, curr_start);
 
         if self.has_line_comments_between(prev_end, curr_start) {
-            // A line comment forces the break. The whole declarator run is wrapped
-            // in a `d.indent()` by the caller, so continuation lines need no
-            // explicit indent text (empty). The trailing break to the next
-            // declarator is the `hardline` below.
-            let comments: CommentVec<'_> =
-                comments_in_range(self.comments, prev_end, curr_start).collect();
-            self.push_inter_declarator_line_comment_gap(decl_docs, &comments, comma_pos, d.empty());
-            decl_docs.push(d.hardline());
+            // A line comment forces the break, which the gap owns. The whole declarator
+            // run is wrapped in a `d.indent()` by the caller, so continuation lines need
+            // no explicit indent text (empty).
+            self.push_inter_item_line_comment_gap(
+                decl_docs,
+                prev_end,
+                comma_pos,
+                curr_start,
+                d.empty(),
+            );
         } else {
             // Blocks only: a before-comma block trails the previous initializer; the
             // width-based `line` separates; after-comma blocks lead the next
@@ -1338,16 +1355,41 @@ impl<'a> Printer<'a> {
             decl_docs.push(d.text(","));
             self.push_stranded_after_comma_blocks(decl_docs, comma_pos, curr_start);
             decl_docs.push(d.line());
-            let after: CommentVec<'_> = comments_in_range(self.comments, comma_pos, curr_start)
-                .filter(|c| !self.is_stranded_after_comma_block(c, comma_pos, curr_start))
-                .collect();
+            let after: CommentVec<'_> =
+                comments_to_emit_in_range(self.comments, comma_pos, curr_start)
+                    .filter(|c| !self.is_stranded_after_comma_block(c, comma_pos, curr_start))
+                    .collect();
             self.push_leading_comment_run(
                 decl_docs,
                 after.iter().copied(),
                 curr_start,
-                LeadingGlue::Terminal,
+                LeadingGlue::Adjacent,
+                d.empty(),
             );
         }
+    }
+
+    /// Prefix a for-header declaration's `continuation` (the declarator run, or the
+    /// for-of/for-in binding) with its `kind` keyword plus any comment in the
+    /// keyword→binding gap (`for (const /* c */ x of y)`, `for (let /* c */ i = 0;
+    /// …)`). Routes through `build_keyword_to_name_continuation` — the same helper the
+    /// standalone declaration uses — so the gap comment isn't dropped; byte-identical
+    /// to `kind + " " + continuation` when the gap is comment-free, so a caller's
+    /// enclosing `group`/`indent` is preserved. A for-header declaration is never
+    /// `declare`, but its kind may still be two words (`await using`), whose own
+    /// interior gap is emitted by `build_keyword_words_doc`.
+    fn build_for_decl_keyword_gap(
+        &self,
+        decl: &internal::VariableDeclaration<'_>,
+        binding_start: u32,
+        continuation: DocId,
+    ) -> DocId {
+        self.build_keyword_header_doc(
+            decl.kind.words(),
+            decl.span.start,
+            binding_start,
+            continuation,
+        )
     }
 
     fn build_for_init_doc(&self, init: &internal::ForInit<'_>) -> DocId {
@@ -1403,16 +1445,22 @@ impl<'a> Printer<'a> {
                     }
                     decl_docs.push(d.concat(&one));
                 }
-                let kind = d.text(decl.kind.as_str());
+                // The keyword→first-declarator gap carries a comment (`for (let /* c */
+                // i = 0; …)`) that must not be dropped — see `build_for_decl_keyword_gap`.
+                let first_decl_start = decl.declarations[0].span.start;
                 if decl.declarations.len() > 1 {
                     // Multiple declarators break on width: they stay on one line when the
                     // init clause fits and drop onto their own lines (continuation
                     // indented one level) when it doesn't — matching prettier's
                     // `printVariableDeclaration`. A declarator whose `=` comment forces a
                     // break also breaks the group (its hardline propagates).
-                    d.group(d.concat(&[kind, d.text(" "), d.indent(d.concat(&decl_docs))]))
+                    d.group(self.build_for_decl_keyword_gap(
+                        decl,
+                        first_decl_start,
+                        d.indent(d.concat(&decl_docs)),
+                    ))
                 } else {
-                    d.concat(&[kind, d.text(" "), d.concat(&decl_docs)])
+                    self.build_for_decl_keyword_gap(decl, first_decl_start, d.concat(&decl_docs))
                 }
             }
             internal::ForInit::Expression(expr) => {
@@ -1453,11 +1501,14 @@ impl<'a> Printer<'a> {
         let d = self.d();
         match left {
             internal::ForInOfLeft::VariableDeclaration(decl) => {
-                let mut parts: DocBuf = smallvec![d.text(decl.kind.as_str()), d.text(" ")];
-                if let Some(declarator) = decl.declarations.first() {
-                    parts.push(self.build_expression_doc(&declarator.id));
-                }
-                d.concat(&parts)
+                let Some(declarator) = decl.declarations.first() else {
+                    return d.concat(&[d.text(decl.kind.as_str()), d.text(" ")]);
+                };
+                // The keyword→binding gap carries a comment (`for (const /* c */ x of y)`)
+                // that must not be dropped — see `build_for_decl_keyword_gap`. Covers
+                // `const`/`let`/`var`/`using`/`await using` uniformly.
+                let id_doc = self.build_expression_doc(&declarator.id);
+                self.build_for_decl_keyword_gap(decl, declarator.span.start, id_doc)
             }
             // `for ((async) of x)` keeps parens around the bare `async` identifier
             // (the caller decides via `wrap_async_paren` — a non-await for-of, where

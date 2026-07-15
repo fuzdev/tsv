@@ -24,7 +24,7 @@ use super::Printer;
 use super::value_normalization;
 use crate::ast::internal;
 use tsv_lang::Span;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::{DocBuf, DocContext, arena::DocId};
 use tsv_lang::source_scan;
 use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
@@ -131,17 +131,26 @@ impl<'a> Printer<'a> {
                 }
                 // Trailing comments between the last value and the `;` (e.g.
                 // `@import 'a.css' /* c */;`).
-                for comment in comments_in_range(self.comments, prev_end, atrule.span.end) {
+                for comment in comments_to_emit_in_range(self.comments, prev_end, atrule.span.end) {
                     self.write(" ");
                     self.print_css_comment(comment);
                 }
             }
-            internal::PreludeValue::Raw { content, .. } if !content.is_empty() => {
+            internal::PreludeValue::Raw { content, span } if !content.is_empty() => {
                 // `content` is already verbatim (internal whitespace + comments preserved,
                 // outer-trimmed, `url()` inner-trimmed) from the parser's non-normalized
                 // raw path, so it matches prettier as-is — no comment-spacing rewrite.
                 // Embedded newlines survive under Svelte `<style>` because the CSS renders
                 // at its final indent (no post-hoc line re-indent to compound them).
+                //
+                // The prelude's comments ride out inside `content`, never reaching a
+                // comment emitter — see `tsv_lang::comment_ledger`. (They *are* registered
+                // in the stylesheet's flat list; the parser records them while reading the
+                // prelude and also bakes them into `content`.)
+                #[cfg(feature = "comment_check")]
+                tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
+                #[cfg(not(feature = "comment_check"))]
+                let _ = span;
                 self.write(" ");
                 self.write(content);
             }
@@ -591,7 +600,7 @@ impl<'a> Printer<'a> {
     /// `needs_separator`, i.e. this isn't the first value — the leading `@import `
     /// space is already written).
     fn write_import_gap_comments(&mut self, start: u32, end: u32, needs_separator: bool) {
-        let comments: Vec<_> = comments_in_range(self.comments, start, end).collect();
+        let comments: Vec<_> = comments_to_emit_in_range(self.comments, start, end).collect();
         if comments.is_empty() {
             if needs_separator {
                 self.write(" ");

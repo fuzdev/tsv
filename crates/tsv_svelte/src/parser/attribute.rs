@@ -204,11 +204,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// already ends at a terminator or EOF, so return its end without re-scanning.
     //
     // TODO: this covers names that *start* with a lexer-identifier char (the realistic
-    // case). Svelte also accepts names starting with a symbol (`<div %foo>`), where the
-    // lexer chokes before this dispatch runs — handling that needs the in-tag lexer to
-    // stop erroring on symbols AND a port of Svelte's `is_valid_element_name` tag-name
-    // validation (else `<%foo>` would flip from a correct reject to an over-acceptance).
-    // Off-frontier (no corpus/real occurrence), deferred deliberately.
+    // case). Svelte also accepts attribute names starting with a symbol (`<div %foo>`),
+    // where the lexer chokes before this dispatch runs — handling that needs the in-tag
+    // lexer to stop erroring on symbol-led names. The tag-name half of the guard this once
+    // also required now exists — `element.rs`'s `is_valid_tag_name` rejects a symbol-led
+    // *tag* name (`<%foo>`) directly, so a lexer change can't turn that into an
+    // over-acceptance. Off-frontier (no corpus/real occurrence), deferred deliberately.
     fn attribute_name_run_end(&self) -> usize {
         match self.source.as_bytes().get(self.current_end) {
             None => self.current_end,

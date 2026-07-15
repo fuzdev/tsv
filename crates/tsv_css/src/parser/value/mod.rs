@@ -44,40 +44,73 @@ pub fn parse_value_from_source<'arena>(
     base_offset: u32,
     arena: &'arena Bump,
 ) -> CssValue<'arena> {
-    // Extract value directly from source using source-relative positions. The
-    // trailing trim stops at an escaped whitespace (`50px\ ;`) — see
-    // `trim_end_preserving_escape`. `trimmed` becomes the `ValueParser`'s source,
-    // and its length is what the leaf spans are derived from, so cutting the
-    // escape's payload here is what strands the backslash onto the `;`.
     let value_str = source_relative_span.extract(source);
-    let trimmed = trim_end_preserving_escape(trim_start_css(value_str));
+    let absolute_start = base_offset + source_relative_span.start;
 
-    if trimmed.is_empty() {
+    // An all-whitespace (or empty) value keeps the span it was handed.
+    let Some((trimmed, leading)) = locate_value(value_str) else {
         return CssValue::Identifier {
             span: Span {
-                start: base_offset + source_relative_span.start,
+                start: absolute_start,
                 end: base_offset + source_relative_span.end,
             },
         };
+    };
+
+    // The value's own span: where it starts, plus how long it is. The end needs
+    // no separate trailing-whitespace offset — a span that begins at the value
+    // and runs its length already excludes what follows it.
+    let start = absolute_start + leading as u32;
+    let absolute_span = Span {
+        start,
+        end: start + trimmed.len() as u32,
+    };
+
+    // ValueParser re-parses the same source text, so nested value spans stay
+    // accurate through its same-source recursion.
+    parser::ValueParser::new(trimmed, absolute_span).parse(arena)
+}
+
+/// A value's text with its surrounding **CSS** whitespace removed, and how many
+/// bytes of that whitespace preceded it. `None` when the value is entirely
+/// whitespace.
+///
+/// The span a declaration hands over is, in practice, already trimmed — real
+/// stylesheets do not put a whitespace byte at either end of a value — so the
+/// common case answers from two byte comparisons and never walks the text.
+///
+/// The trim is [`trim_start_css`] / [`trim_end_preserving_escape`], **not**
+/// `str::trim`: CSS whitespace is the five ASCII characters of §4.2, so NBSP and
+/// U+3000 are value *content* (`str::trim` would eat them), and the trailing
+/// whitespace a `\` escape owns is content too — `50px\ ;` must keep its escaped
+/// space or the backslash strands onto the `;` and the output stops parsing.
+/// `trimmed` becomes the `ValueParser`'s source and its length is what the leaf
+/// spans are derived from, so cutting an escape's payload here is what does it.
+///
+/// The fast path's guard is therefore exactly `u8::is_ascii_whitespace` — the
+/// same set the trim acts on, so the two arms cannot disagree. A boundary byte
+/// that is not ASCII whitespace settles the question outright, **including a
+/// non-ASCII one**: no byte of a multi-byte char is ASCII whitespace, and the
+/// trim would not have touched that char anyway. ⚠️ The set is
+/// `u8::is_ascii_whitespace`, **not** `char::is_whitespace` (which would eat NBSP)
+/// and not the lexer's `is_ascii_css_whitespace` (which adds the **vertical tab**
+/// to match `parseCss`); the vertical tab is content to this trim.
+fn locate_value(value_str: &str) -> Option<(&str, usize)> {
+    let bytes = value_str.as_bytes();
+    let settled = |b: u8| !b.is_ascii_whitespace();
+    if let (Some(&first), Some(&last)) = (bytes.first(), bytes.last())
+        && settled(first)
+        && settled(last)
+    {
+        return Some((value_str, 0));
     }
 
-    // Calculate adjusted span for trimmed value (relative to source)
-    let trim_start_offset = value_str.len() - trim_start_css(value_str).len();
-    let trim_end_offset = value_str.len() - trim_start_offset - trimmed.len();
-    let source_relative_adjusted = Span {
-        start: source_relative_span.start + trim_start_offset as u32,
-        end: source_relative_span.end - trim_end_offset as u32,
-    };
-
-    // Calculate absolute span for ValueParser (includes base_offset)
-    let absolute_span = Span {
-        start: base_offset + source_relative_adjusted.start,
-        end: base_offset + source_relative_adjusted.end,
-    };
-
-    // Use ValueParser for accurate span tracking through same-source recursion
-    let parser = parser::ValueParser::new(trimmed, absolute_span);
-    parser.parse(arena)
+    let after_leading = trim_start_css(value_str);
+    let trimmed = trim_end_preserving_escape(after_leading);
+    if trimmed.is_empty() {
+        return None;
+    }
+    Some((trimmed, value_str.len() - after_leading.len()))
 }
 
 // Old parsing functions removed - replaced by ValueParser with same-source recursion
@@ -207,4 +240,88 @@ fn extract_function_parts(s: &str, paren_pos: usize) -> Option<(&str, &str, bool
 
     let args = &s[paren_pos + 1..close_pos];
     Some((name_part, args, true))
+}
+
+#[cfg(test)]
+mod value_span_tests {
+    use super::parse_value_from_source;
+    use bumpalo::Bump;
+    use tsv_lang::Span;
+
+    /// The span `parse_value_from_source` gives the value it parsed.
+    fn value_span(source: &str, start: u32, end: u32) -> Span {
+        let arena = Bump::new();
+        parse_value_from_source(source, Span { start, end }, 0, &arena).span()
+    }
+
+    /// The already-trimmed fast path must agree with the trimming path on where
+    /// the value starts and ends. No corpus can grade this: real declaration
+    /// spans arrive pre-trimmed (200K+ of them without one whitespace byte at
+    /// either end), so the trimming path is only ever reached by inputs a
+    /// stylesheet does not contain — and a span error inside it would sail
+    /// through every fixture and corpus diff in the repo.
+    #[test]
+    fn trims_the_span_the_same_either_way() {
+        // Pre-trimmed (the fast path) — the span comes back untouched.
+        assert_eq!(value_span("red", 0, 3), Span { start: 0, end: 3 });
+        assert_eq!(value_span("a red b", 2, 5), Span { start: 2, end: 5 });
+
+        // CSS whitespace at either end must come off the span identically.
+        for (source, span, want) in [
+            (" red", (0, 4), (1, 4)),
+            ("red ", (0, 4), (0, 3)),
+            ("  red  ", (0, 7), (2, 5)),
+            ("\tred\t", (0, 5), (1, 4)),
+            ("\nred\n", (0, 5), (1, 4)),
+            ("\rred\r", (0, 5), (1, 4)),
+            ("\x0cred\x0c", (0, 5), (1, 4)),
+        ] {
+            assert_eq!(
+                value_span(source, span.0, span.1),
+                Span {
+                    start: want.0,
+                    end: want.1
+                },
+                "value span for {source:?}"
+            );
+        }
+    }
+
+    /// Only the five ASCII characters of §4.2 are whitespace to CSS. Everything
+    /// else at a boundary is value **content** and keeps its span — which is also
+    /// what lets the fast path settle a non-ASCII byte outright.
+    ///
+    /// The vertical tab is the sharp edge: `char::is_whitespace` accepts it (so
+    /// `str::trim` would eat it) and so does the *lexer*'s `is_ascii_css_whitespace`
+    /// (which matches `parseCss`), but this trim is §4.2 and must not.
+    #[test]
+    fn non_css_whitespace_is_content() {
+        for (source, span) in [
+            ("\u{a0}red\u{a0}", (0, 7)),     // NBSP
+            ("\u{3000}red\u{3000}", (0, 9)), // ideographic space
+            ("\x0bred\x0b", (0, 5)),         // vertical tab
+            ("é", (0, 2)),
+        ] {
+            assert_eq!(
+                value_span(source, span.0, span.1),
+                Span {
+                    start: span.0,
+                    end: span.1
+                },
+                "value span for {source:?}"
+            );
+        }
+    }
+
+    /// The trailing whitespace a `\` escape owns is content: trimming it strands
+    /// the backslash onto whatever follows (`50px\ ;` → `50px\;`, the `;` now
+    /// escaped) and the declaration no longer parses. Padding past the escaped
+    /// character is ordinary whitespace and still goes.
+    #[test]
+    fn an_escapes_payload_stays_in_the_span() {
+        assert_eq!(value_span(r"50px\ ", 0, 6), Span { start: 0, end: 6 });
+        assert_eq!(value_span(r"50px\   ", 0, 8), Span { start: 0, end: 6 });
+        // An even backslash run is a completed `\\` — the space is just padding.
+        assert_eq!(value_span(r"50px\\ ", 0, 7), Span { start: 0, end: 6 });
+    }
 }

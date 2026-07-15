@@ -14,6 +14,7 @@ Each module's visibility (in parens) reflects `pub use`-only modules (private) v
 - `config` (`config.rs`, private) — `PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` consts + `EmbedContext` / `LayoutMode` (no runtime config)
 - `doc` (`doc/*.rs`, pub) — Document builder — arena-based Prettier-compatible IR
 - `comment` (`comment.rs`, private) — Comment type, classification, and O(log n) range lookup
+- `comment_ledger` (`comment_ledger.rs`, pub, **`comment_check` feature**) — the print-once comment ledger (diagnostic)
 - `printing` (`printing.rs`, pub) — String literal formatting, same-line detection, visual width
 - `source_scan` (`source_scan.rs`, pub) — Trivia-aware source scanning: the `skip_trivia` cursor plus the `find_char` / `find_keyword` / `rfind_keyword` delimiter/keyword finders (skipping JS/CSS comments + strings), the `is_regex_start` / `skip_regex_literal` regex helpers (the one piece of `/`-disambiguation `skip_trivia` deliberately leaves out, since it needs backward token lookback), and the balanced-brace pair `scan_to_matching_brace` (the expression-context `{…}` matcher — trivia + regex + template aware) / `skip_template_literal` (interpolation-aware template skip, since `skip_trivia`'s opaque quote-to-quote scan mis-pairs backticks across a nested template like `` `${`x`}` ``). The single chokepoint for re-scanning source between AST nodes — used by AST conversion, all three printers, the Svelte parser (which wraps `scan_to_matching_brace` for its `{…}` tags and shares `skip_template_literal` in its regex-unaware binding-pattern scan), and the TS parser's arrow-vs-paren / type-args lookahead
 - `interner` (`interner.rs`, private) — String interning traits (`SymbolResolver`, `InfallibleResolve`); implements `doc::TextResolver`
@@ -35,6 +36,14 @@ The doc builder is the core of the formatting architecture. Language printers bu
 - **`DocNode`** — Node variants: `Text`, `MultilineText` (a `\n`-separated body rendered with per-line context indent — one pool-stored body for an indentable multi-line block comment), `Line`, `Indent`, `Dedent`, `Group`, `IfBreak`, `Concat`, `Fill`, etc. `DocNode` carries no drop glue (`const`-asserted via `needs_drop`): dynamic text lives in the arena text pool, so `reset()`/drop never walk the node store running destructors. Its size is also pinned by a companion `const` assert — **32 B on 64-bit** (the native flagship), **16 B on wasm32** (the shipped WASM bundles); the size is pointer-width dependent (`Align`'s `usize`, `DocText::Static`'s fat pointer), so the pin is `cfg`-gated per target. The node store is walked linearly at render, so the AoS layout's cache locality is the point (shrinking the node has been refuted repeatedly on this traversal-bound engine); a variant that bloats it is a deliberate decision, not an accident.
 - **`DocText`** — Four variants: `Static(&'static str)` (punctuation/keywords), `Pooled(PoolSpan)` (dynamic text, stored in the arena text pool), `SourceSpan(Span)` (verbatim source slice — resolved against `source` at print time, like `Symbol` but keyed on a span; zero allocation for unmodified text such as identifier names (via `source_span_ident`), comments, template chunks, already-canonical literals (TS numbers/strings, CSS dimensions), and Svelte markup text, with no `DocArena` lifetime), `Symbol(u32)` (deferred resolution via interner). Width policy: `Pooled`, `SourceSpan`, and `Static` always precompute their visual width at build (a real width or the newline sentinel — fits never borrows the pool, render skips its column byte-scan; `Static`'s precompute is amortized through the arena's static cache, measured once per unique string per arena rather than per node — the same slots that intern `Static` nodes per document), and the exceptions are identifier names (`source_span_ident`) and `Symbol`, which measure on demand (high-frequency, rarely fits-measured — the opposite tradeoff, measured both ways).
 - **`LineKind`** — `Normal` (space in flat, newline in break), `Soft` (nothing in flat), `Hard` (always newline), `Literal` (newline without indent).
+
+### Text width: the corpus cannot grade it — the equivalence test can
+
+`pooled_text_width` (the eager precompute above) answers three questions of a text node in **one** byte pass: is there a newline, is the slice ASCII, how many tabs. Past `FUSED_WIDTH_SCAN_MAX` it flips to a searcher-based shape instead — `contains('\n')` and `is_ascii` are SIMD and the tab count auto-vectorizes, so on a long slice three vector passes beat one scalar walk, while on the short slice that normally arrives their setup (paid regardless of length) is the entire cost. The gate is not decoration: an ungated fused walk is a measurable **regression** on the TS corpus, whose text nodes run longer, while CSS never notices the gate at all.
+
+**What a contributor must know before touching any of this: no corpus can tell you that you got the arithmetic wrong.** A width only changes the output once it crosses the print width, so an error on a rare byte leaves every formatted file byte-identical. Corrupting the tab arm by a single column was verified to pass the **fixture suite**, an **11,696-file format diff**, and an **11,696-file wire diff** — every external gate in the repo — and to be caught **only** by the exhaustive equivalence test beside the function, which grades it against the searcher shape on every string of length 0–3 over an alphabet covering each arm (including the control chars and the boundary-crossing grapheme clusters). Keep that test green; it is the only thing that can fail.
+
+Two traps it exists to catch. The fused walk mirrors `printing::visual_width`'s **ASCII fast path**, where a control character is **one** column — deliberately *not* `printing::ascii_char_width`, which counts it as **zero** and which only the grapheme-walking path uses. And a non-ASCII byte hands the **whole** slice to the searcher arm, never the scanned remainder, because a grapheme cluster can begin on the ASCII byte *before* it.
 
 ### Builder API Categories
 
@@ -130,17 +139,62 @@ let bytes = write_program_json(&program, source, LocationMapper { tracker: &trac
 
 See [../../CLAUDE.md §Comment Handling](../../CLAUDE.md#comment-handling-detached-model) for the detached model rationale and the `Comment` struct.
 
-### Lookup Functions
+### Lookup Functions — three questions, three names
 
-- `comments_in_range()` — Find comments between two positions (O(log n))
-- `comments_after()` — Iterate comments at or after a position (O(log n))
+`Comment::owned_by_node` takes a comment out of the *positional* model: the node its token
+begins prints it. **Ownership is a fact about who PRINTS a comment, never about whether it
+EXISTS** — so the API asks the caller to name which of the three questions it is asking, and
+every name states its axis. A miswire then reads as a category error at the call site rather
+than as plausible code. See [../../CLAUDE.md §Comment Handling](../../CLAUDE.md#comment-handling-detached-model).
+
+**to emit** — "which comments must *I* print here?" — **skips** owned:
+
+- `comments_to_emit_in_range()` / `has_comments_to_emit_in_range()` / `comments_to_emit_after()`
+
+**on page** — "does any comment occupy the page here?" — **counts** owned. Every layout gate
+(break / expand / hug / paren / fast-path / force-multiline):
+
+- `has_comments_on_page_in_range()` / `has_multiline_block_comments_on_page_in_range()`
+
+**in source** — "what comment bytes are physically here?" — **counts** owned. Every cursor
+(blank-line scan, offset, `prev_end`):
+
+- `comments_in_source_range()` / `comments_in_source_after()`
+
+Axis-free (provably): `has_line_comments_in_range()` — ownership only ever binds a **block**
+comment, so skip ≡ count. If a line comment ever becomes ownable, it must grow an axis.
+
+Shared:
+
 - `find_first_comment_from()` — Binary-search index of first comment with `span.start >= pos`
 - `classify_comment()` — Classify as Trailing, LeadingOwnLine, or LeadingInline
 - `classify_comment_fast()` — Same but using precomputed line breaks (faster)
-- `ClassifiedComments::from_range()` — Batch classify all 4 categories in one pass (with precomputed line breaks)
-- `has_comments_in_range()` — Quick existence check
-- `has_line_comments_in_range()` — Existence check restricted to line comments
-- `has_multiline_block_comments_in_range()` — Existence check for multi-line block comments (force expansion)
+- `ClassifiedComments::from_range()` — Batch classify all 4 categories in one pass (emit-keyed)
+
+### Print-Once Ledger (`comment_check` feature)
+
+Nothing in the detached model forces a parsed comment to be *printed* — a gap emitter that
+never runs, an owned comment whose node reassembles off the ownership seam, a builder
+handed `&[]` for its comment slice each silently lose one. `comment_ledger` is the
+structural guard (tsv's `ensureAllCommentsPrinted`): each format entry point registers the
+comment list it is about to print (`register_parsed`), each emission records one
+(`record_emitted`), each raw source slice that carries comments out verbatim records its
+range (`record_verbatim_range`), and `take_comment_ledger` reports every comment whose
+emit count isn't exactly one — DROPPED or DOUBLE-PRINTED.
+
+The **doc-based** printers (`tsv_ts`, `tsv_svelte`) don't record at build: they tag the
+comment's doc node (`DocArena::tag_comment_doc`) and the *renderer* records the emit when
+it reaches that node. A builder may assemble one subtree into two `conditional_group`
+candidates of which only one renders, so build-time counting reads as a double-print — and
+a comment built only into a *losing* candidate would read as printed while being lost.
+`tsv_css`, whose printer writes comments straight to its output buffer, records at the
+write itself.
+
+Off by default (like `swallow_check`), so production builds — and default `tsv_debug`
+builds, whose profiles must measure production-shaped code — compile out the registration,
+the `DocArena` side-set, and the render hook. Output is byte-identical either way.
+`tsv_debug` forwards the feature and gates `comment_audit` behind it; `deno task
+comments:audit` drives it over `tests/fixtures` and is gated in `deno task check`.
 
 ### Directive Recognition
 

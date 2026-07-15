@@ -9,11 +9,11 @@
  *    tsv targets standard CSS via Svelte's `parseCss` and strictly rejects these.
  *    Prettier/oxfmt/biome only "pass" them because they run lenient PostCSS-family
  *    parsers — so tsv rejecting them is correct, not a bug.
- *  - **Non-standard JS/TS proposals** (stage-1/2/3): pipeline (`|>`), source-phase
- *    imports — tsv targets standard ECMAScript/TypeScript; prettier formats them
- *    via Babel plugins. Markers are the proposal's unique operator/keyword
- *    sequences (see the JS/TS section for the discipline, incl. why bind `::` is
- *    deliberately left unmatched).
+ *  - **Non-standard JS/TS proposals**: pipeline (`|>`), source-phase imports — tsv
+ *    targets standard ECMAScript/TypeScript; prettier formats them via Babel
+ *    plugins. Markers are the proposal's unique operator/keyword sequences (see the
+ *    JS/TS section for the discipline, incl. why bind `::` is deliberately left
+ *    unmatched).
  *  - **Test-harness artifacts** (all languages): the `<<<PRETTIER_RANGE_*>>>`
  *    range-format markers, syntactically invalid in every language.
  *
@@ -143,7 +143,7 @@ export const EXPECTED_ERROR_PATTERNS: ExpectedErrorPattern[] = [
 		matches: (content) => /<<<PRETTIER_RANGE_(?:START|END)>>>/.test(content),
 	},
 
-	// --- Non-standard JS/TS proposals (stage-1/2/3). tsv targets standard
+	// --- Non-standard JS/TS proposals. tsv targets standard
 	// ECMAScript/TypeScript and rejects these; prettier formats them via Babel
 	// plugins. Scoped to `typescript` (the .js+.ts bucket). The markers are the
 	// proposal's unique operator/keyword sequences — they can appear in standard
@@ -155,16 +155,21 @@ export const EXPECTED_ERROR_PATTERNS: ExpectedErrorPattern[] = [
 	// risking a hidden genuine gap. ---
 	{
 		name: 'js_pipeline_operator',
-		reason: 'Pipeline operator (`|>`) — a stage-2 proposal, not standard ECMAScript',
+		reason: 'Pipeline operator (`|>`) — a TC39 proposal, not standard ECMAScript',
 		languages: ['typescript'],
 		// Operand `|>` operand — excludes the `|`/`>` regex-alternation forms
 		// (`/>|>(`, `(\+|~|>|\|\|)`) that appear in real parser source.
 		matches: (content) => /[)\]\w$%]\s*\|>\s*[\w$%(]/.test(content),
 	},
+	// Note: tsv now *parses* the valid source-phase forms (`import source x from …`,
+	// `import.source(…)`), so those never reach this classifier. What still lands here
+	// is the grammar-invalid shapes — `import source * as ns from …` / `import source
+	// { a } from …` — which the proposal doesn't allow (`import source ImportedBinding
+	// FromClause` takes a single binding) and tsv correctly rejects.
 	{
 		name: 'js_source_phase_import',
 		reason:
-			'Source-phase import (`import source x from …` / `import.source(…)`) — a stage-3 proposal',
+			'Source-phase import (`import source x from …` / `import.source(…)`) — a TC39 proposal',
 		languages: ['typescript'],
 		// `import.source(` (expression form) or `import source <binding> … from`
 		// (declaration form). The declaration branch requires a binding token AND a

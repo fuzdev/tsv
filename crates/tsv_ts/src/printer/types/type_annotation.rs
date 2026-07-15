@@ -79,7 +79,7 @@ impl<'a> Printer<'a> {
                     let type_doc = self.build_union_type_doc(u);
                     // Comments between `:` and the union type (e.g., `: /* c */ A | B`);
                     // omit the empty child on the comment-free common path. Byte-identical.
-                    let hung = if self.has_comments_between(colon_end, type_start) {
+                    let hung = if self.has_comments_to_emit_between(colon_end, type_start) {
                         let comments_doc = self.build_comments_between(
                             colon_end,
                             type_start,
@@ -101,7 +101,7 @@ impl<'a> Printer<'a> {
                     colon_end,
                     type_start,
                     annotation.type_annotation,
-                    self.has_comments_between(colon_end, type_start),
+                    self.has_comments_to_emit_between(colon_end, type_start),
                 ),
             }
         }
@@ -199,7 +199,8 @@ impl<'a> Printer<'a> {
         // the concats below are never pushed. Byte-identical, and the false path is the
         // overwhelmingly common one — annotations are among the most frequent TS
         // constructs, and comments inside one are rare.
-        let has_comments = self.has_comments_between(annotation.span.start, annotation.span.end);
+        let has_comments =
+            self.has_comments_to_emit_between(annotation.span.start, annotation.span.end);
 
         // First check for line comments between `:` and the type.
         // If there are comments, fall back to build_type_annotation_doc which handles them properly.
@@ -319,7 +320,7 @@ impl<'a> Printer<'a> {
             colon_end,
             type_start,
             annotation.type_annotation,
-            has_comments && self.has_comments_between(colon_end, type_start),
+            has_comments && self.has_comments_to_emit_between(colon_end, type_start),
         )
     }
 

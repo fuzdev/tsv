@@ -6,7 +6,7 @@
 
 use super::{ChainPrinter, SymbolLookup};
 use crate::ast::internal;
-use crate::printer::{CommentSpacing, Printer, comments_in_range};
+use crate::printer::{CommentSpacing, Printer, comments_to_emit_in_range};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::{ClassifiedComments, Comment, Span};
@@ -90,7 +90,7 @@ impl<'a> ChainPrinter for Printer<'a> {
         let block_comments = if same_line_only {
             self.filter_block_comments(start, end, true)
         } else {
-            comments_in_range(self.comments, start, end)
+            comments_to_emit_in_range(self.comments, start, end)
                 .filter(|c| c.is_block)
                 .collect()
         };
@@ -122,7 +122,7 @@ impl<'a> ChainPrinter for Printer<'a> {
         let mut body_parts = DocBuf::new();
         body_parts.push(inner);
         let mut prev = prop_end;
-        for comment in comments_in_range(self.comments, prop_end, bracket_end) {
+        for comment in comments_to_emit_in_range(self.comments, prop_end, bracket_end) {
             if self.is_same_line(prev, comment.span.start) {
                 body_parts.push(d.text(" "));
             } else {
@@ -164,14 +164,14 @@ impl<'a> ChainPrinter for Printer<'a> {
         self.layout_line_breaks
     }
 
-    fn has_comments_between(&self, start: u32, end: u32) -> bool {
-        comments_in_range(self.comments, start, end)
+    fn has_comments_to_emit_between(&self, start: u32, end: u32) -> bool {
+        comments_to_emit_in_range(self.comments, start, end)
             .next()
             .is_some()
     }
 
-    fn has_any_comments_between(&self, start: u32, end: u32) -> bool {
-        tsv_lang::has_any_comments_in_range(self.comments, start, end)
+    fn has_comments_on_page_between(&self, start: u32, end: u32) -> bool {
+        tsv_lang::has_comments_on_page_in_range(self.comments, start, end)
     }
 
     fn chain_has_comments(&self) -> bool {

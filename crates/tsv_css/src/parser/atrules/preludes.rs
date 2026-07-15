@@ -338,7 +338,7 @@ pub(super) fn parse_container_prelude<'arena>(
 
 /// Parse one `@scope` clause — `(<forgiving-selector-list>)` — with the in-paren
 /// leading/trailing gap comments registered (the printer re-emits them from the AST via
-/// `comments_in_range`, the same wrapping `:is()` args use). Assumes the current token
+/// `comments_to_emit_in_range`, the same wrapping `:is()` args use). Assumes the current token
 /// is `(`. The list is **forgiving** (css-cascade-6 makes `<scope-start>`/`<scope-end>`
 /// `<forgiving-selector-list>`s, the same production `:is()`/`:where()` use), so an empty
 /// or invalid list — `@scope ()`, `@scope (.a, , .b)`, `@scope (.)` — parses (each is

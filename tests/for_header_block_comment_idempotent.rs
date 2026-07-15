@@ -4,16 +4,20 @@
 //! A multi-line, non-`*`-aligned block comment leading a `for(…)` init clause is
 //! preserved **verbatim** — its interior lines keep their authored columns, with no
 //! context indent re-applied (matching prettier's non-indentable-block-comment
-//! handling).
+//! handling). When the header breaks, the comment rides with the init onto its own
+//! line (`(` alone) — exactly how tsv lays out a leading multi-line block comment in
+//! any `(`/`[`-delimited list (a call, an array), and what prettier emits here too.
 //!
-//! Regression: the printer used to strip the comment's *start-line* indentation and
-//! re-apply *context* indent per continuation line. When the `for(…)` header breaks,
-//! the init (and its leading comment) render one level deeper than the `for`
-//! keyword's line, so the stripped amount and the re-applied indent differed and the
-//! interior grew a tab **every** format pass — an F1 fixed-point violation. Not a
-//! fixture: the case only reproduces at a non-zero base indent with a broken header,
-//! and it is a comment-position divergence from prettier (which relocates the
-//! comment to its own line), so it is pinned here against tsv itself.
+//! Regression this guards: the printer used to strip the comment's *start-line*
+//! indentation and re-apply *context* indent per continuation line, so the interior
+//! grew a tab **every** format pass — an F1 fixed-point violation. Not a fixture: the
+//! case only reproduces at a non-zero base indent with a broken header.
+//!
+//! Note: tsv formerly kept the comment glued to `for (` (init hugging the `(` line) as
+//! a deliberate divergence. Owning every glued block comment unified that with the
+//! `(`/`[`-list layout above — the owned comment now rides with the init — so tsv
+//! matches prettier here and the over-preservation divergence is closed. The F1
+//! invariant this test guards (no tab compounding) is unaffected.
 
 fn format(source: &str) -> String {
     let arena = bumpalo::Bump::new();
@@ -21,11 +25,13 @@ fn format(source: &str) -> String {
     tsv_ts::format(&program, source)
 }
 
-/// The tsv-stable form: the `for` header breaks (init on line 1, then `;`-separated
-/// clauses), and the block comment's continuation line `clause */` keeps its single
+/// The tsv-stable form: the `for` header breaks with `(` alone, then the init (and
+/// its leading comment) on the next line at the clause indent, then the `;`-separated
+/// clauses. The block comment's continuation line `clause */` keeps its single
 /// authored tab — it is NOT re-indented to the init's depth.
 const STABLE: &str = "function f() {
-\tfor (/* first
+\tfor (
+\t\t/* first
 \tclause */ aaaaaaaaaaaaaaaaaaaa;
 \t\tbbbbbbbbbbbbbbbbbb;
 \t\tcccccccccccccccc

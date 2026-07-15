@@ -14,8 +14,8 @@ use super::helpers::each_expr_comment_end;
 use crate::ast::internal::{self, Fragment, FragmentNode};
 use crate::printer::Printer;
 use smallvec::smallvec;
+use tsv_lang::SymbolToU32;
 use tsv_lang::doc::{DocBuf, arena::DocId};
-use tsv_lang::{SymbolResolver, SymbolToU32};
 
 impl<'a> Printer<'a> {
     /// Build doc for whitespace-sensitive elements (pre, textarea, etc.)
@@ -51,7 +51,7 @@ impl<'a> Printer<'a> {
         // classifier splits `Component` out as its own kind. The two predicates agree on
         // `<pre>`/`<textarea>` themselves but diverge on a nested `<Comp>`, so this stays its own
         // question rather than being folded into the shared one.
-        let is_inline = self.with_resolved_symbol(element.name, |t| !tsv_html::is_block_element(t));
+        let is_inline = !element.facts.is_block();
         let is_html = element.kind == internal::ElementKind::Html;
         let has_content = !element.fragment.nodes.is_empty();
 

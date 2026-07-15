@@ -42,7 +42,7 @@ use helpers::type_needs_parens_for_indexed_access_object;
 use helpers::type_needs_parens_for_optional_element;
 use helpers::type_needs_parens_for_prefix_operator;
 use smallvec::smallvec;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -400,7 +400,7 @@ impl<'a> Printer<'a> {
                 // Comments between label/`?` and `:` (e.g., `[b /* c */: T]`); a line
                 // comment breaks so it can't swallow the `:`.
                 if let Some(after_colon) = after_colon
-                    && self.has_comments_between(after_modifier, after_colon - 1)
+                    && self.has_comments_to_emit_between(after_modifier, after_colon - 1)
                 {
                     parts.push(
                         self.build_leading_comments_break_for_line(after_modifier, after_colon - 1),
@@ -487,7 +487,7 @@ impl<'a> Printer<'a> {
         &self,
         p: &TSParenthesizedType<'_>,
     ) -> CommentVec<'_> {
-        comments_in_range(
+        comments_to_emit_in_range(
             self.comments,
             p.span.start + 1,
             p.type_annotation.span().start,
@@ -577,7 +577,7 @@ impl<'a> Printer<'a> {
             self.build_paren_leading_value_doc(open_paren_end, arg_start, literal_doc);
 
         // Trailing comments between the specifier and `)`.
-        let has_trailing = self.has_comments_between(arg_end, paren_close);
+        let has_trailing = self.has_comments_to_emit_between(arg_end, paren_close);
         let has_trailing_line = self.has_line_comments_between(arg_end, paren_close);
 
         let mut inner = smallvec![arg_doc];
@@ -617,8 +617,8 @@ impl<'a> Printer<'a> {
     ) -> (bool, bool) {
         let inner = p.type_annotation.span();
         (
-            self.has_comments_between(p.span.start, inner.start),
-            self.has_comments_between(inner.end, p.span.end),
+            self.has_comments_to_emit_between(p.span.start, inner.start),
+            self.has_comments_to_emit_between(inner.end, p.span.end),
         )
     }
 
@@ -665,7 +665,7 @@ impl<'a> Printer<'a> {
 
         // Leading comments: between `(` and inner type
         if has_leading {
-            for comment in comments_in_range(self.comments, paren_open, inner_start) {
+            for comment in comments_to_emit_in_range(self.comments, paren_open, inner_start) {
                 if comment.is_block {
                     parts.push(self.build_comment_doc(comment));
                     parts.push(d.text(" "));
@@ -685,7 +685,7 @@ impl<'a> Printer<'a> {
 
         // Trailing comments: between inner type and `)`
         if has_trailing {
-            for comment in comments_in_range(self.comments, inner_end, paren_close) {
+            for comment in comments_to_emit_in_range(self.comments, inner_end, paren_close) {
                 if comment.is_block {
                     parts.push(d.text(" "));
                     parts.push(self.build_comment_doc(comment));

@@ -1,0 +1,660 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 610,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An own-line annotation on a class property value hangs onto an indented continuation",
+			"start": 10,
+			"end": 97,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line after the `=`, exactly as any same-width ordinary comment does.",
+			"start": 99,
+			"end": 170,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * @__PURE__\n ",
+			"start": 191,
+			"end": 217,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 3
+				},
+				"end": {
+					"line": 8,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * hiiiiiiii\n ",
+			"start": 241,
+			"end": 267,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 3
+				},
+				"end": {
+					"line": 13,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A trivial (no-argument) call is a \"poorly breakable chain\" — a static claim that the",
+			"start": 284,
+			"end": 371,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 2
+				},
+				"end": {
+					"line": 15,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " chain has no internal break points. The annotation's own hardlines are in the printed",
+			"start": 374,
+			"end": 462,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 2
+				},
+				"end": {
+					"line": 16,
+					"column": 90
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " value regardless, so the value still hangs.",
+			"start": 465,
+			"end": 511,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 2
+				},
+				"end": {
+					"line": 17,
+					"column": 48
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * @__PURE__\n ",
+			"start": 521,
+			"end": 547,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 3
+				},
+				"end": {
+					"line": 21,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "*\n * hiiiiiiii\n ",
+			"start": 564,
+			"end": 590,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 3
+				},
+				"end": {
+					"line": 26,
+					"column": 6
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 609,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 600,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 28,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 172,
+					"end": 599,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 178,
+						"end": 179,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 7
+							},
+							"end": {
+								"line": 4,
+								"column": 8
+							}
+						},
+						"name": "C"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 180,
+						"end": 599,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 9
+							},
+							"end": {
+								"line": 27,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 184,
+								"end": 230,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 19
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 184,
+									"end": 185,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 2
+										},
+										"end": {
+											"line": 5,
+											"column": 3
+										}
+									},
+									"name": "a"
+								},
+								"value": {
+									"type": "CallExpression",
+									"start": 218,
+									"end": 229,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 7
+										},
+										"end": {
+											"line": 8,
+											"column": 18
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 218,
+										"end": 220,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 7
+											},
+											"end": {
+												"line": 8,
+												"column": 9
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 221,
+											"end": 222,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 10
+												},
+												"end": {
+													"line": 8,
+													"column": 11
+												}
+											},
+											"name": "x"
+										},
+										{
+											"type": "Identifier",
+											"start": 224,
+											"end": 225,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 13
+												},
+												"end": {
+													"line": 8,
+													"column": 14
+												}
+											},
+											"name": "y"
+										},
+										{
+											"type": "Identifier",
+											"start": 227,
+											"end": 228,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 16
+												},
+												"end": {
+													"line": 8,
+													"column": 17
+												}
+											},
+											"name": "z"
+										}
+									],
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": "*\n * @__PURE__\n ",
+											"start": 191,
+											"end": 217
+										}
+									]
+								}
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 234,
+								"end": 280,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 19
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 234,
+									"end": 235,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 2
+										},
+										"end": {
+											"line": 10,
+											"column": 3
+										}
+									},
+									"name": "b"
+								},
+								"value": {
+									"type": "CallExpression",
+									"start": 268,
+									"end": 279,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 7
+										},
+										"end": {
+											"line": 13,
+											"column": 18
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 268,
+										"end": 270,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 7
+											},
+											"end": {
+												"line": 13,
+												"column": 9
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 271,
+											"end": 272,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 10
+												},
+												"end": {
+													"line": 13,
+													"column": 11
+												}
+											},
+											"name": "x"
+										},
+										{
+											"type": "Identifier",
+											"start": 274,
+											"end": 275,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 13
+												},
+												"end": {
+													"line": 13,
+													"column": 14
+												}
+											},
+											"name": "y"
+										},
+										{
+											"type": "Identifier",
+											"start": 277,
+											"end": 278,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 16
+												},
+												"end": {
+													"line": 13,
+													"column": 17
+												}
+											},
+											"name": "z"
+										}
+									],
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": "*\n * hiiiiiiii\n ",
+											"start": 241,
+											"end": 267
+										}
+									]
+								}
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 514,
+								"end": 553,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 21,
+										"column": 12
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 514,
+									"end": 515,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 2
+										},
+										"end": {
+											"line": 18,
+											"column": 3
+										}
+									},
+									"name": "c"
+								},
+								"value": {
+									"type": "CallExpression",
+									"start": 548,
+									"end": 552,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 7
+										},
+										"end": {
+											"line": 21,
+											"column": 11
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 548,
+										"end": 550,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 7
+											},
+											"end": {
+												"line": 21,
+												"column": 9
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": "*\n * @__PURE__\n ",
+											"start": 521,
+											"end": 547
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " A trivial (no-argument) call is a \"poorly breakable chain\" — a static claim that the",
+										"start": 284,
+										"end": 371
+									},
+									{
+										"type": "Line",
+										"value": " chain has no internal break points. The annotation's own hardlines are in the printed",
+										"start": 374,
+										"end": 462
+									},
+									{
+										"type": "Line",
+										"value": " value regardless, so the value still hangs.",
+										"start": 465,
+										"end": 511
+									}
+								]
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 557,
+								"end": 596,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 2
+									},
+									"end": {
+										"line": 26,
+										"column": 12
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 557,
+									"end": 558,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 2
+										},
+										"end": {
+											"line": 23,
+											"column": 3
+										}
+									},
+									"name": "d"
+								},
+								"value": {
+									"type": "CallExpression",
+									"start": 591,
+									"end": 595,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 7
+										},
+										"end": {
+											"line": 26,
+											"column": 11
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 591,
+										"end": 593,
+										"loc": {
+											"start": {
+												"line": 26,
+												"column": 7
+											},
+											"end": {
+												"line": 26,
+												"column": 9
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false,
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": "*\n * hiiiiiiii\n ",
+											"start": 564,
+											"end": 590
+										}
+									]
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An own-line annotation on a class property value hangs onto an indented continuation",
+							"start": 10,
+							"end": 97
+						},
+						{
+							"type": "Line",
+							"value": " line after the `=`, exactly as any same-width ordinary comment does.",
+							"start": 99,
+							"end": 170
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

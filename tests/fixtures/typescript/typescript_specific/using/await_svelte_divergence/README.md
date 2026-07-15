@@ -1,4 +1,4 @@
-# `await using` Declarations (ES2024 Explicit Resource Management)
+# `await using` Declarations (Explicit Resource Management)
 
 ## Status
 

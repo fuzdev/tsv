@@ -31,7 +31,7 @@ use crate::ast::internal::{Comment, CssBlockChild, CssDeclaration, CssNode, CssS
 use crate::lexer::{Lexer, TokenKind};
 use tsv_lang::{
     CommentPosition, EmbedContext, INDENT, OutputBuffer, Span, TAB_WIDTH, classify_comment_fast,
-    comments_in_range,
+    comments_to_emit_in_range,
     doc::{
         self, TextResolver,
         arena::{DocArena, DocId},
@@ -393,7 +393,7 @@ impl<'a> Printer<'a> {
 
             // format-ignore: emit raw source instead of formatting
             if has_ignore {
-                self.write(node.span().extract(self.source));
+                self.write_verbatim_span(node.span());
             } else {
                 self.print_css_node(node);
             }
@@ -442,7 +442,7 @@ impl<'a> Printer<'a> {
             }
 
             // Skip comments that are inside previous node's span (e.g., prelude comments in at-rules)
-            // These are handled by the node's own printing logic via comments_in_range()
+            // These are handled by the node's own printing logic via comments_to_emit_in_range()
             if comment.span.end <= prev_end {
                 *comment_idx += 1;
                 continue;
@@ -508,7 +508,7 @@ impl<'a> Printer<'a> {
 
             // Skip comments inside the node's span (e.g. at-rule prelude comments,
             // block-interior comments). These are emitted by the node's own printing
-            // logic via comments_in_range(); without this guard the loop would break on
+            // logic via comments_to_emit_in_range(); without this guard the loop would break on
             // an interior comment (its start precedes node_end, so is_same_line reverses
             // to false) and the genuine trailing comment after `;`/`}` would be dropped.
             if comment.span.end <= node_end {
@@ -540,7 +540,7 @@ impl<'a> Printer<'a> {
             let comment = &self.comments[*comment_idx];
 
             // Skip comments that are inside previous node's span (e.g., prelude comments in at-rules)
-            // These are handled by the node's own printing logic via comments_in_range()
+            // These are handled by the node's own printing logic via comments_to_emit_in_range()
             if comment.span.end <= prev_end {
                 *comment_idx += 1;
                 continue;
@@ -583,7 +583,28 @@ impl<'a> Printer<'a> {
     }
 
     /// Print a CSS comment
+    /// Write `span` of the source **verbatim**.
+    ///
+    /// The format-ignore seam: the ignored node's own comments ride out inside the raw
+    /// slice, never reaching a comment emitter, so the ledger is told the range is
+    /// covered (see `tsv_lang::comment_ledger`). Doc-side raw slices —
+    /// `d.source_span(…)` for a glued compound selector or an unparseable one — record
+    /// through `record_verbatim_range` at their own sites.
+    pub(crate) fn write_verbatim_span(&mut self, span: Span) {
+        #[cfg(feature = "comment_check")]
+        tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
+
+        self.write(span.extract(self.source));
+    }
+
     pub(crate) fn print_css_comment(&mut self, comment: &Comment) {
+        // One of the crate's two comment-emission seams (the other is
+        // `comment_blocks_in_range`). Also prints the *AST-node* comments — a
+        // `CssBlockChild::Comment` — which are outside the detached model and so aren't
+        // in the ledger's registered set; those land in `unregistered_emits`.
+        #[cfg(feature = "comment_check")]
+        tsv_lang::comment_ledger::record_emitted(self.source, comment.span);
+
         // Write comment with delimiters - content is preserved exactly as written
         self.write("/*");
         self.write(comment.content(self.source));
@@ -598,7 +619,13 @@ impl<'a> Printer<'a> {
     /// column 0 with no post-hoc re-indent.
     pub(crate) fn comment_blocks_in_range(&self, start: u32, end: u32) -> String {
         let mut out = String::new();
-        for comment in comments_in_range(self.comments, start, end) {
+        for comment in comments_to_emit_in_range(self.comments, start, end) {
+            // The crate's other comment-emission seam (see `print_css_comment`). Sound to
+            // record at build time: the CSS printer builds each doc once and renders it
+            // once — no `conditional_group` candidate rebuilds.
+            #[cfg(feature = "comment_check")]
+            tsv_lang::comment_ledger::record_emitted(self.source, comment.span);
+
             if !out.is_empty() {
                 out.push(' ');
             }
@@ -757,7 +784,7 @@ impl<'a> Printer<'a> {
                 CssBlockChild::Rule(rule) => {
                     self.write_indent();
                     if std::mem::take(&mut format_ignore_next) {
-                        self.write(rule.span.extract(self.source));
+                        self.write_verbatim_span(rule.span);
                     } else {
                         self.print_css_rule(rule);
                     }
@@ -768,7 +795,7 @@ impl<'a> Printer<'a> {
                 CssBlockChild::Atrule(atrule) => {
                     self.write_indent();
                     if std::mem::take(&mut format_ignore_next) {
-                        self.write(atrule.span.extract(self.source));
+                        self.write_verbatim_span(atrule.span);
                     } else {
                         self.print_css_atrule(atrule);
                     }
@@ -831,6 +858,11 @@ pub(crate) fn format_css_in(
     source: &str,
     arena: &DocArena,
 ) -> String {
+    // The print-once comment ledger's expectation for this stylesheet (diagnostic; see
+    // `tsv_lang::comment_ledger`).
+    #[cfg(feature = "comment_check")]
+    tsv_lang::comment_ledger::register_parsed(source, &stylesheet.comments);
+
     // Fill the arena-parked line-break table (one warm table across a
     // multi-file driver's files instead of a fresh Vec per file).
     let mut line_breaks = arena.take_line_breaks_scratch();
@@ -884,6 +916,12 @@ pub(crate) fn format_css_embedded_in(
     // same as standalone, matching prettier. This retires the Svelte host's
     // post-hoc line re-indenter, which compounded a preserved newline one indent
     // level per format pass (an F1 non-idempotency; see script_style.rs).
+    // The print-once comment ledger's expectation for this stylesheet (diagnostic; see
+    // `tsv_lang::comment_ledger`). The Svelte host's `Root.comments` deliberately
+    // excludes `<style>` comments, so this is their only registration.
+    #[cfg(feature = "comment_check")]
+    tsv_lang::comment_ledger::register_parsed(source, &stylesheet.comments);
+
     let base = embed.base_indent_offset;
     let embed = EmbedContext {
         base_indent_offset: 0,

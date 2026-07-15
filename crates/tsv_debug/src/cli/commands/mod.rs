@@ -1,12 +1,15 @@
 pub mod arena_stats;
 pub mod ast_diff;
 pub mod authoring_audit;
+pub mod binding_audit;
 pub mod buffer_sizes;
 pub mod build_fanout_audit;
 pub mod canonical_compile;
 pub mod canonical_parse;
 pub mod canonicalize_audit;
 pub mod check;
+#[cfg(feature = "comment_check")]
+pub mod comment_audit;
 pub mod compare;
 pub mod compile_compare;
 pub mod compile_conformance_audit;
@@ -28,6 +31,7 @@ pub mod json_profile;
 pub mod lex_diff;
 pub mod line_width;
 pub mod metrics;
+pub mod neutrality_audit;
 pub mod profile;
 pub mod roundtrip_audit;
 pub mod scan_audit;

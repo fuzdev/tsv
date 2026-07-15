@@ -19,6 +19,13 @@
 	const l = /** @type {A} */ ((b).c, d);
 	const m = /** @type {A} */ ((b).c = d);
 
+	// a unary operand takes the wrapping pair: bare, the comment would read as annotating
+	// the operator rather than the operand (both formatters wrap). A sequence operand does
+	// NOT — its own value-position parens already enclose the comment.
+	const o = !(/** @type {A} */ (b).c);
+	const p = -(/** @type {A} */ (b).c);
+	const q = !(/** @type {A} */ ((b).c, d));
+
 	// no enclosing paren: the comment already sits against its own `(`
 	const n = /** @type {A} */ (b).c ?? d;
 </script>

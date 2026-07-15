@@ -35,7 +35,7 @@ pub struct Root<'arena> {
     /// `<svelte:options>` configuration (not part of fragment)
     pub options: Option<SvelteOptions<'arena>>,
     /// All comments from scripts and template expressions.
-    /// Use `comments_in_range(span)` to find comments for a specific node.
+    /// Use `comments_to_emit_in_range(span)` to find comments for a specific node.
     pub comments: Vec<Comment>,
     pub span: Span,
     pub interner: SharedInterner,
@@ -734,6 +734,137 @@ pub enum ElementKind {
     Component,
 }
 
+/// Whether a tag `name` is a Svelte **component** rather than an HTML element.
+///
+/// A `:`-namespaced tag (`foo:bar`, `Foo:bar`) is never a component — Svelte's
+/// `regex_valid_component_name` excludes `:`, so a namespaced name is a `RegularElement` even
+/// with an uppercase prefix. Otherwise: a dotted tag (member access, e.g. `ns.Comp`,
+/// `Object.component`) is a component, as is any name whose first character is uppercase
+/// (Unicode, so `\p{Lu}` such as `Δ` / `Я` counts, not just ASCII). Mirrors Svelte's
+/// `regex_valid_component_name` (`1-parse/state/element.js`): uppercase-first with optional dots,
+/// or any `ID_Start`-first name with one or more dotted segments.
+///
+/// The single source for component-ness: the parser reads it to set [`ElementKind::Component`],
+/// and the printer's tag classification reads it too (the printer's separate `NAMESPACED` bit
+/// carries the `foo:bar` self-close term). One predicate keeps the two from drifting — the
+/// printer must not classify a Unicode-uppercase component as a plain inline element and strip
+/// its self-close.
+///
+/// Examples: `Comp` → true, `ns.Comp` → true, `Object.component` → true, `div` → false,
+/// `foo:bar` → false, `Foo:bar` → false.
+pub(crate) fn is_component_name(name: &str) -> bool {
+    !name.contains(':')
+        && (name.contains('.') || name.chars().next().is_some_and(char::is_uppercase))
+}
+
+/// Every classification fact derivable from a tag *name* alone, packed into a `u16` and computed
+/// once at parse (stored on [`Element::facts`], read back by the printer's element/fragment/
+/// sibling paths).
+///
+/// Nothing element-instance-specific lives here — a `<script>`'s has-content overlay and the
+/// `Component`/`Block`/`Inline` element-kind split both stay in the printer. Those paths re-ask
+/// the same tag-name questions many times per element, and every answer is a pure function of the
+/// name, so computing them once (where the raw `&str` is already in hand) turns each print-time
+/// read into a single field load. The exhaustive equivalence test below grades each accessor
+/// against the pure predicate it encodes — a mispacked bit changes layout only on rare tags at
+/// rare widths, which no fixture or corpus diff can be relied on to see.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) struct TagFacts(u16);
+
+impl TagFacts {
+    /// `tsv_html::is_block_element` (flow content).
+    const BLOCK: u16 = 1 << 0;
+    /// `tsv_html::is_void_element` (`<br>`, `<img>`, `!doctype`).
+    const VOID: u16 = 1 << 1;
+    /// `tsv_html::is_foreign_element` (SVG or MathML).
+    const FOREIGN: u16 = 1 << 2;
+    /// Component-shaped name — [`is_component_name`] (Unicode-uppercase initial or a dotted member
+    /// name — `Button`, `Δcomp`, `foo.bar`). Drives the `Component` element kind. A `:`-namespaced
+    /// name (`foo:bar`) is a `RegularElement`, not a component, so it is *not* here — it carries
+    /// [`NAMESPACED`](Self::NAMESPACED) instead.
+    const COMPONENT_NAME: u16 = 1 << 3;
+    const STYLE: u16 = 1 << 4;
+    const SCRIPT: u16 = 1 << 5;
+    const TEMPLATE: u16 = 1 << 6;
+    /// `tsv_html::preserves_whitespace` (`<pre>`, `<textarea>`).
+    const WS_SENSITIVE: u16 = 1 << 7;
+    /// `<!DOCTYPE>`-style declaration (leading `!`), which closes with `>`, not `/>`.
+    const DECLARATION: u16 = 1 << 8;
+    /// A `:` in the name (`<foo:bar>`) — a namespaced `RegularElement`. Independent of
+    /// [`COMPONENT_NAME`](Self::COMPONENT_NAME): it takes the inline element kind like any other
+    /// non-block regular element, but may still print self-closing (prettier's `didSelfClose`), so
+    /// it is the third contributor to `can_self_close` alongside component and foreign.
+    const NAMESPACED: u16 = 1 << 9;
+
+    /// Derive the facts from the tag name. The single source: [`Element::facts`] stores exactly
+    /// this, and the equivalence test grades every accessor against the predicates named here.
+    pub(crate) fn compute(tag_name: &str) -> Self {
+        let mut bits: u16 = 0;
+        if tsv_html::is_block_element(tag_name) {
+            bits |= Self::BLOCK;
+        }
+        if tsv_html::is_void_element(tag_name) {
+            bits |= Self::VOID;
+        }
+        if tsv_html::is_foreign_element(tag_name) {
+            bits |= Self::FOREIGN;
+        }
+        if is_component_name(tag_name) {
+            bits |= Self::COMPONENT_NAME;
+        }
+        if tag_name.contains(':') {
+            bits |= Self::NAMESPACED;
+        }
+        if tag_name == "style" {
+            bits |= Self::STYLE;
+        }
+        if tag_name == "script" {
+            bits |= Self::SCRIPT;
+        }
+        if tag_name == "template" {
+            bits |= Self::TEMPLATE;
+        }
+        if tsv_html::preserves_whitespace(tag_name) {
+            bits |= Self::WS_SENSITIVE;
+        }
+        if tag_name.starts_with('!') {
+            bits |= Self::DECLARATION;
+        }
+        Self(bits)
+    }
+
+    pub(crate) fn is_block(self) -> bool {
+        self.0 & Self::BLOCK != 0
+    }
+    pub(crate) fn is_void(self) -> bool {
+        self.0 & Self::VOID != 0
+    }
+    pub(crate) fn is_foreign(self) -> bool {
+        self.0 & Self::FOREIGN != 0
+    }
+    pub(crate) fn is_component_name(self) -> bool {
+        self.0 & Self::COMPONENT_NAME != 0
+    }
+    pub(crate) fn is_namespaced(self) -> bool {
+        self.0 & Self::NAMESPACED != 0
+    }
+    pub(crate) fn is_style(self) -> bool {
+        self.0 & Self::STYLE != 0
+    }
+    pub(crate) fn is_script(self) -> bool {
+        self.0 & Self::SCRIPT != 0
+    }
+    pub(crate) fn is_template(self) -> bool {
+        self.0 & Self::TEMPLATE != 0
+    }
+    pub(crate) fn is_ws_sensitive(self) -> bool {
+        self.0 & Self::WS_SENSITIVE != 0
+    }
+    pub(crate) fn is_declaration(self) -> bool {
+        self.0 & Self::DECLARATION != 0
+    }
+}
+
 /// Svelte Element - HTML/component tag
 ///
 /// Represents an HTML element or Svelte component in the template.
@@ -742,6 +873,10 @@ pub enum ElementKind {
 pub struct Element<'arena> {
     pub name: DefaultSymbol,
     pub kind: ElementKind,
+    /// Name-derived classification, computed once at parse (see [`TagFacts`]). Occupies padding
+    /// beside `kind`, so it costs no extra size; the printer reads it instead of re-deriving.
+    /// Crate-internal like [`TagFacts`] — derived from `name`, not part of the public wire AST.
+    pub(crate) facts: TagFacts,
     pub attributes: &'arena [AttributeNode<'arena>],
     pub fragment: Fragment<'arena>,
     pub span: Span,
@@ -750,6 +885,12 @@ pub struct Element<'arena> {
     /// Used by the printer to find trailing comments between the last attribute and `>`.
     pub open_tag_end: u32,
 }
+
+/// `facts` rides in the tail padding beside `kind`, so the parse-time classification costs no
+/// extra `Element` size. Guards that property against a future field reorder that would spill it.
+/// 64-bit only — the slice fields are half-width on wasm32, a different layout.
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<Element<'static>>() == 64);
 
 /// Svelte Attribute - element attribute
 ///
@@ -1085,5 +1226,114 @@ mod tests {
         assert!(mk("a\n\nb").has_blank_line());
         // 3+ newlines still report the saturated 2.
         assert_eq!(mk("\n\n\n\n").newline_count, 2);
+    }
+
+    /// Grade every packed [`TagFacts`](super::TagFacts) accessor against the pure predicate it
+    /// encodes, over an alphabet covering each bit's positive and negative cases. This is the gate
+    /// with power over the bit packing: a swapped constant or an accessor reading its neighbour's
+    /// bit changes layout only on rare tags at rare widths, which no fixture or corpus diff can be
+    /// relied on to see.
+    #[test]
+    fn tag_facts_bits_agree_with_the_pure_predicates() {
+        use super::{TagFacts, is_component_name};
+        let probes = [
+            // block members (hr is also void; pre is also ws-sensitive)
+            "div",
+            "p",
+            "h1",
+            "menu",
+            "table",
+            "ul",
+            "li",
+            "pre",
+            "hr",
+            "blockquote",
+            // void members (incl. the case-insensitive !doctype family)
+            "br",
+            "img",
+            "input",
+            "command",
+            "keygen",
+            "!doctype",
+            "!DOCTYPE",
+            "!DocType",
+            // foreign members (SVG incl. camelCase + hyphenated; MathML)
+            "svg",
+            "circle",
+            "foreignObject",
+            "color-profile",
+            "math",
+            "annotation-xml",
+            "mi",
+            // the name-compare bits
+            "script",
+            "style",
+            "template",
+            "textarea",
+            // component-shaped names (incl. non-ASCII uppercase initials — Greek, Latin, Cyrillic)
+            "Button",
+            "MyComponent",
+            "svelte:head",
+            "svelte:component",
+            "foo:bar",
+            "foo.bar",
+            "Div",
+            "DIV",
+            "Δcomp",
+            "Écomp",
+            "Яcomp",
+            "étoile",
+            // near-misses and odd inputs
+            "span",
+            "td",
+            "divx",
+            "di",
+            "xdiv",
+            "doctype",
+            "é",
+            "ünknown",
+            "",
+        ];
+        for tag in probes {
+            let facts = TagFacts::compute(tag);
+            assert_eq!(
+                facts.is_block(),
+                tsv_html::is_block_element(tag),
+                "block: {tag:?}"
+            );
+            assert_eq!(
+                facts.is_void(),
+                tsv_html::is_void_element(tag),
+                "void: {tag:?}"
+            );
+            assert_eq!(
+                facts.is_foreign(),
+                tsv_html::is_foreign_element(tag),
+                "foreign: {tag:?}"
+            );
+            assert_eq!(
+                facts.is_component_name(),
+                is_component_name(tag),
+                "component name: {tag:?}"
+            );
+            assert_eq!(
+                facts.is_namespaced(),
+                tag.contains(':'),
+                "namespaced: {tag:?}"
+            );
+            assert_eq!(facts.is_style(), tag == "style", "style: {tag:?}");
+            assert_eq!(facts.is_script(), tag == "script", "script: {tag:?}");
+            assert_eq!(facts.is_template(), tag == "template", "template: {tag:?}");
+            assert_eq!(
+                facts.is_ws_sensitive(),
+                tsv_html::preserves_whitespace(tag),
+                "ws-sensitive: {tag:?}"
+            );
+            assert_eq!(
+                facts.is_declaration(),
+                tag.starts_with('!'),
+                "declaration: {tag:?}"
+            );
+        }
     }
 }

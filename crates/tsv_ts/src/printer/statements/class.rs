@@ -4,7 +4,7 @@ use super::Printer;
 use crate::ast::internal;
 use crate::printer::{CommentSpacing, CommentVec};
 use smallvec::smallvec;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -29,6 +29,27 @@ impl<'a> Printer<'a> {
         decl: &internal::ClassDeclaration<'_>,
     ) -> DocId {
         self.build_class_declaration_doc_inner(decl, false)
+    }
+
+    /// The source position where a class declaration's own doc begins: its first
+    /// keyword (`declare` / `abstract` / `class`), located past any decorators.
+    ///
+    /// A caller that prints the decorators itself and then the *undecorated* class
+    /// (the decorators-first `export default` path) needs this to bound its own
+    /// keyword→value gap. Without it that gap has no end, so nothing scans it and a
+    /// comment authored there is dropped.
+    pub(in crate::printer) fn class_declaration_keyword_start(
+        &self,
+        decl: &internal::ClassDeclaration<'_>,
+    ) -> u32 {
+        let first_keyword = if decl.declare {
+            "declare"
+        } else if decl.r#abstract {
+            "abstract"
+        } else {
+            "class"
+        };
+        self.find_keyword_after_decorators(decl.decorators, first_keyword, decl.span.start)
     }
 
     /// Core implementation for class declaration doc building
@@ -58,10 +79,10 @@ impl<'a> Printer<'a> {
         // Determine group mode: structural reasons OR heritage comments
         let has_heritage_comments = positions
             .first_heritage_start
-            .is_some_and(|hs| self.has_comments_between(positions.pre_heritage_end, hs))
+            .is_some_and(|hs| self.has_comments_on_page_between(positions.pre_heritage_end, hs))
             || positions.extends_clause_end.is_some_and(|ext_end| {
                 !decl.implements.is_empty()
-                    && self.has_comments_between(ext_end, decl.implements[0].span.start)
+                    && self.has_comments_on_page_between(ext_end, decl.implements[0].span.start)
             });
         let group_mode = self.should_class_group_mode(
             decl.super_class,
@@ -86,17 +107,9 @@ impl<'a> Printer<'a> {
 
         let mut parts = smallvec![];
 
-        // Decorators, each on its own line
-        // Find the first keyword after decorators (declare/abstract/class)
-        let first_keyword = if decl.declare {
-            "declare"
-        } else if decl.r#abstract {
-            "abstract"
-        } else {
-            "class"
-        };
-        let keyword_start =
-            self.find_keyword_after_decorators(decl.decorators, first_keyword, decl.span.start);
+        // Decorators, each on its own line; the first keyword after them
+        // (declare/abstract/class) is where this class's own text starts.
+        let keyword_start = self.class_declaration_keyword_start(decl);
 
         if include_decorators
             && let Some(dec_doc) = self.build_decorators_doc(decl.decorators, keyword_start)
@@ -251,7 +264,7 @@ impl<'a> Printer<'a> {
         // + start-sorted and every sub-range lies within the body span, so when
         // none sit inside the body all sub-queries are provably empty/false.
         // Blank-line preservation is comment-independent and stays.
-        let body_has_comments = self.has_comments_between(body.span.start, body.span.end);
+        let body_has_comments = self.has_comments_on_page_between(body.span.start, body.span.end);
 
         for (i, member) in body.body.iter().enumerate() {
             let member_start = member.span().start;
@@ -261,7 +274,7 @@ impl<'a> Printer<'a> {
             // Filter out trailing same-line comments from the previous member
             let comments: CommentVec<'_> = if body_has_comments {
                 let all_comments: CommentVec<'_> =
-                    comments_in_range(self.comments, prev_end, member_start).collect();
+                    comments_to_emit_in_range(self.comments, prev_end, member_start).collect();
                 if !is_first {
                     all_comments
                         .iter()
@@ -563,7 +576,7 @@ impl<'a> Printer<'a> {
         let value_start = value.span().start;
 
         // Comments before `=` stay before `=` (e.g., `b /* c */ = 1;`)
-        if self.has_comments_between(before_eq, eq_pos) {
+        if self.has_comments_to_emit_between(before_eq, eq_pos) {
             parts.push(self.build_inline_comments_between_doc(before_eq, eq_pos));
         }
 

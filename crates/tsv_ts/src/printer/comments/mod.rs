@@ -14,6 +14,9 @@
 //   indentable / preserved block comments, trailing line/block comment docs).
 // - **paren.rs**: Stripped-grouping-paren comment handling (promotion across `=`
 //   / operators, trailing-paren comment preservation, removed-paren prepends).
+// - **owned.rs**: The comment/paren binding seam — a comment glued to the token
+//   after it is printed by the node that token begins, so a synthesized paren
+//   can't land between the two (`Comment::owned_by_node`).
 // - **scan.rs**: Pure source span-math helpers (comma/angle/blank-line scanning).
 // - **declarations.rs**: Member-keyword / modifier-marker / marker→colon /
 //   heritage / keyword→name comment emitters.
@@ -27,6 +30,7 @@
 mod declarations;
 mod element_comma;
 mod lists;
+mod owned;
 mod paren;
 mod render;
 mod scan;
@@ -39,7 +43,7 @@ pub(super) use super::{Printer, calls, layout};
 use smallvec::SmallVec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::{Comment, comments_in_range};
+use tsv_lang::{Comment, comments_to_emit_in_range};
 
 /// Small stack-allocated vector of comment references. Inline capacity 4 keeps
 /// the common comment gaps off the heap: 0–2 comments are the bulk, and a short
@@ -82,26 +86,23 @@ pub(crate) enum CommentFilter {
 /// How a leading-comment run decides whether a *block* comment hugs the token
 /// that follows it (a trailing space, `/* c */ X`) rather than dropping to its
 /// own line. The rest of the run is identical across sites — one
-/// `build_comment_doc` per comment, and a blank-preserving `hardline` toward the
-/// next comment (or the terminal) for every comment that doesn't hug — so only
-/// this glue test varies, and [`push_leading_comment_run`](Printer::push_leading_comment_run)
+/// `build_comment_doc` per comment, and a `line`/`hardline` toward the next
+/// comment (or the terminal) for every comment that doesn't hug — so only this
+/// glue test varies, and [`push_leading_comment_run`](Printer::push_leading_comment_run)
 /// takes it as a mode.
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum LeadingGlue {
-    /// A block hugs when it shares a source line with the *next* comment (or the
-    /// terminal, for the last one). The RHS-of-`=`/`:` / keyword-operand form
-    /// ([`build_rhs_comments_opt`](Printer::build_rhs_comments_opt)).
+    /// A block hugs when it shares a source line with whatever follows it — the
+    /// *next* comment, or the terminal for the last one. Prettier's rule: its
+    /// `printLeadingComment` reads only the source right after the comment's `*/`
+    /// (`hasNewline(text, locEnd(comment))`), never where the terminal starts, so
+    /// a run the author glued together stays glued (`/* a */ /* b */⏎X` keeps the
+    /// pair on one line and breaks before `X`).
     Adjacent,
     /// `Adjacent`, plus a single-line block glued to the operator hugs the value
     /// across a source newline — prettier's assignment/call pull-up
     /// ([`build_rhs_comments_glued_opt`](Printer::build_rhs_comments_glued_opt)).
     AdjacentGlued,
-    /// A block hugs only when it shares a source line with the terminal member.
-    /// The member-leading form (interface / intersection members). Differs from
-    /// `Adjacent` only for a multi-comment run whose interior blocks share a line
-    /// with each other but not with the member (`/* a */ /* b */⏎member`): this
-    /// keeps each on its own line, where `Adjacent` would glue the leading pair.
-    Terminal,
 }
 
 impl<'a> Printer<'a> {
@@ -123,6 +124,23 @@ impl<'a> Printer<'a> {
             || (!self.is_same_line(prev, c.span.start) && !self.is_same_line(c.span.end, next))
     }
 
+    /// Whether a *block* comment is glued to what follows it at `next` (`/* c */ X` —
+    /// nothing but spaces after its `*/`), so it leads that token inline instead of
+    /// taking its own line. Prettier's leading-comment rule, and the reason it is
+    /// keyed on `next` rather than on the item the run leads: `printLeadingComment`
+    /// reads only the source right after the comment (`hasNewline(text,
+    /// locEnd(comment))`), so a run the author glued together stays glued
+    /// (`/* a */ /* b */⏎X` → the pair shares a line, `X` starts a new one).
+    ///
+    /// The single statement of the rule. [`push_leading_comment_run`](Self::push_leading_comment_run)
+    /// is the emitter for the sites whose surrounding loop is the shared one; a site
+    /// whose separator policy genuinely differs (the union member's own-line run,
+    /// which brackets the `| ` separator and preserves blanks in different positions)
+    /// calls this directly rather than re-deriving it.
+    pub(crate) fn comment_hugs_next(&self, comment: &Comment, next: u32) -> bool {
+        comment.is_block && self.is_same_line(comment.span.end, next)
+    }
+
     /// Emit a `hardline` after an own-line comment in a per-line comment list,
     /// preserving an author blank line as a leading `literalline` when the source
     /// left one between `comment_end` and `next` (the following own-line comment, or
@@ -141,72 +159,78 @@ impl<'a> Printer<'a> {
         parts.push(d.hardline());
     }
 
-    /// Emit a run of leading comments before a member/element starting at
-    /// `member_start`: a block comment inline-adjacent to the member hugs it with a
-    /// trailing space (`/* c */ X`); every other comment (own-line block, or line)
-    /// takes its own line via a blank-preserving hardline (toward the next comment, or
-    /// the member). Shared by the member-leading sites whose only difference is the
-    /// member position (interface members, intersection members after `&`).
-    pub(crate) fn emit_member_leading_comments(
+    /// Emit the whole gap between two comma-separated items when the gap contains a
+    /// **line** comment (the forced-break case): the comma, the comments, and the
+    /// break to the next item, leaving `parts` positioned to emit that item.
+    ///
+    /// The gap decomposes at the comma. Block comments before the first line comment
+    /// trail the previous item inline (`= 0 /* c */`) and the comma is placed *before*
+    /// the first line comment — a line comment runs to EOL, so a comma after it would
+    /// be commented out. The first line comment then trails the comma iff it was
+    /// authored on the comma's line (`comma_pos` → no intervening newline). Everything
+    /// from there is the next item's **leading run**, emitted by the shared
+    /// [`push_leading_comment_run`](Self::push_leading_comment_run) toward
+    /// `next_start`, which also owns the final break: a block glued to the next item
+    /// hugs it (`/* c */ b`), anything else drops to its own line. The break between
+    /// the comma's line and the leading run is a bare `hardline` — prettier drops an
+    /// author blank line there (it belongs to the item join, not to the run).
+    ///
+    /// `continuation` is emitted after each own-line break: the variable-declaration
+    /// site passes `INDENT` text (its declarators aren't wrapped in `d.indent()`), the
+    /// for-init and heritage sites pass an empty doc (their runs are). Shared by the
+    /// variable-declarator, for-init, and heritage inter-item sites.
+    ///
+    /// Callers gate on the gap holding a line comment (`has_line_comments_between`) —
+    /// a block-only gap has no forced break and belongs to their own path.
+    pub(crate) fn push_inter_item_line_comment_gap(
         &self,
         parts: &mut DocBuf,
-        comments: &[&Comment],
-        member_start: u32,
-    ) {
-        self.push_leading_comment_run(
-            parts,
-            comments.iter().copied(),
-            member_start,
-            LeadingGlue::Terminal,
-        );
-    }
-
-    /// Emit the comma and inter-declarator comments for a declarator gap that
-    /// contains a **line** comment (the forced-break case). Block comments before
-    /// the first line comment trail the previous initializer inline
-    /// (`= 0 /* c */`); the comma is placed before the first line comment; then
-    /// each remaining comment either trails the comma on the same output line (a
-    /// line comment via `line_suffix`, a same-line block inline) or drops onto its
-    /// own line after a `hardline`. The first line comment trails iff it was
-    /// authored on the comma's line (`comma_pos` → no intervening newline); an
-    /// own-line one drops below. `continuation` is emitted right after each
-    /// own-line `hardline`: the variable-declaration site passes `INDENT` text
-    /// (its declarators aren't wrapped in `d.indent()`), the for-init site passes
-    /// an empty doc (its run is). Does NOT emit the trailing break to the next
-    /// declarator — the caller owns that, since the indent strategy differs.
-    /// Shared by the variable-declarator and for-init inter-declarator sites.
-    pub(crate) fn push_inter_declarator_line_comment_gap(
-        &self,
-        parts: &mut DocBuf,
-        comments: &[&Comment],
+        prev_end: u32,
         comma_pos: u32,
+        next_start: u32,
         continuation: DocId,
     ) {
         let d = self.d();
+        let comments: CommentVec<'_> =
+            comments_to_emit_in_range(self.comments, prev_end, next_start).collect();
+        // Everything before the first line comment trails the previous item, and the
+        // comma is placed there rather than at its authored offset — a `//` runs to
+        // EOL, so a comma after it would be commented out, and any block between the
+        // two rides left with it (`a, /* c */ // x` → `a /* c */, // x`, matching
+        // prettier). With no line comment (the callers' gate makes that unreachable)
+        // this is 0 and the whole run simply leads the next item.
         let first_line_idx = comments.iter().position(|c| !c.is_block).unwrap_or(0);
         for comment in &comments[..first_line_idx] {
             parts.push(d.text(" "));
             parts.push(self.build_comment_doc(comment));
         }
         parts.push(d.text(","));
-        // The first line comment trails the comma when authored on the comma's
-        // line (no newline between); an own-line one drops below. After a line
-        // comment every following comment is on its own line (set in the loop).
+        // The first line comment trails the comma when authored on the comma's line
+        // (no newline between); an own-line one starts the leading run below. The
+        // `is_block` test keeps this honest without leaning on the callers' gate:
+        // only a *line* comment can trail the comma, since a block there would be
+        // the caller's block-only path.
+        //
         // Comment-adjacency read (real even in canonical mode): an own-line line
         // comment must drop below the comma, not merge into the `line_suffix` run.
-        let mut needs_hardline = comments
-            .get(first_line_idx)
-            .is_some_and(|c| self.comment_has_newline_between(comma_pos, c.span.start));
-        for comment in &comments[first_line_idx..] {
-            if needs_hardline {
-                parts.push(d.hardline());
-                parts.push(continuation);
-                parts.push(self.build_comment_doc(comment));
-            } else {
-                parts.push(self.build_trailing_comment_doc(comment));
-            }
-            needs_hardline = !comment.is_block;
-        }
+        let trails_comma = comments.get(first_line_idx).is_some_and(|c| {
+            !c.is_block && !self.comment_has_newline_between(comma_pos, c.span.start)
+        });
+        let run_start = if trails_comma {
+            parts.push(self.build_trailing_comment_doc(comments[first_line_idx]));
+            first_line_idx + 1
+        } else {
+            first_line_idx
+        };
+        parts.push(d.hardline());
+        parts.push(continuation);
+        self.push_leading_comment_run(
+            parts,
+            comments[run_start..].iter().copied(),
+            next_start,
+            LeadingGlue::Adjacent,
+            continuation,
+        );
     }
 
     /// A block comment after the comma that sits on the comma's own line (no
@@ -237,7 +261,7 @@ impl<'a> Printer<'a> {
     /// the site's leading run (a block hugging the next item leads it).
     pub(crate) fn push_before_comma_blocks(&self, parts: &mut DocBuf, start: u32, comma_pos: u32) {
         let d = self.d();
-        for comment in comments_in_range(self.comments, start, comma_pos) {
+        for comment in comments_to_emit_in_range(self.comments, start, comma_pos) {
             parts.push(d.text(" "));
             parts.push(self.build_comment_doc(comment));
         }
@@ -256,7 +280,7 @@ impl<'a> Printer<'a> {
         next_start: u32,
     ) {
         let d = self.d();
-        for comment in comments_in_range(self.comments, comma_pos, next_start) {
+        for comment in comments_to_emit_in_range(self.comments, comma_pos, next_start) {
             if self.is_stranded_after_comma_block(comment, comma_pos, next_start) {
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
@@ -293,7 +317,7 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for inline comments with filtering, returning None if no comments.
     ///
-    /// This is more efficient than `has_comments_between` + `build_comments_between`
+    /// This is more efficient than `has_comments_to_emit_between` + `build_comments_between`
     /// because it uses a single binary search instead of two.
     pub(crate) fn build_comments_between_filtered_opt(
         &self,
@@ -305,7 +329,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
 
         // Check if any comments exist in range (considering filter)
-        let has_comments = comments_in_range(self.comments, start, end)
+        let has_comments = comments_to_emit_in_range(self.comments, start, end)
             .any(|c| !matches!(filter, CommentFilter::BlockOnly) || c.is_block);
 
         if !has_comments {
@@ -323,7 +347,7 @@ impl<'a> Printer<'a> {
         let mut parts = DocBuf::new();
         let mut prev_was_line = false;
         let mut first = true;
-        for comment in comments_in_range(self.comments, start, end) {
+        for comment in comments_to_emit_in_range(self.comments, start, end) {
             // Apply filter
             if matches!(filter, CommentFilter::BlockOnly) && !comment.is_block {
                 continue;
@@ -381,7 +405,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_trailing_comments_break_for_line(&self, start: u32, end: u32) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
-        for comment in comments_in_range(self.comments, start, end) {
+        for comment in comments_to_emit_in_range(self.comments, start, end) {
             parts.push(self.build_comment_doc(comment));
             if comment.is_block {
                 parts.push(d.text(" "));
@@ -402,7 +426,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_leading_comments_break_for_line(&self, start: u32, end: u32) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
-        for comment in comments_in_range(self.comments, start, end) {
+        for comment in comments_to_emit_in_range(self.comments, start, end) {
             parts.push(d.text(" "));
             parts.push(self.build_comment_doc(comment));
             if !comment.is_block {
@@ -415,7 +439,7 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for inline comments, returning None if no comments.
     ///
-    /// Use this instead of `has_comments_between` + `build_inline_comments_between_doc`
+    /// Use this instead of `has_comments_to_emit_between` + `build_inline_comments_between_doc`
     /// to avoid redundant binary searches.
     #[inline]
     pub(crate) fn build_inline_comments_between_doc_opt(
@@ -492,59 +516,90 @@ impl<'a> Printer<'a> {
     /// operator (not on its own line) hugs the value with a space even when the
     /// value follows on the next source line — prettier pulls the value up in the
     /// assignment/call layout (`= /* c */⏎v` → `= /* c */ v`). Positions that keep
-    /// the author's line break for a glued block (decorators, `return`/`throw`/`await`
-    /// keyword operands, object property values, …) stay on the non-gluing
-    /// `build_rhs_comments_opt`.
+    /// the author's line break for a glued block (decorators, `await` operands,
+    /// object property values, …) stay on the non-gluing `build_rhs_comments_opt`.
+    ///
+    /// `return`/`throw` arguments pull up here too, but for a stronger reason than
+    /// layout: they are restricted productions, so keeping the break would be ASI and
+    /// would change the program. See `build_keyword_argument_doc`.
     pub(crate) fn build_rhs_comments_glued_opt(&self, start: u32, end: u32) -> Option<DocId> {
         self.build_leading_comment_run_opt(start, end, LeadingGlue::AdjacentGlued)
     }
 
     /// Emit a run of leading comments before `terminal_pos` — the value, member,
-    /// or body the comments lead. Each comment is emitted with `build_comment_doc`;
-    /// a *block* comment that hugs the following token (per `glue`) gets a trailing
-    /// space (`/* c */ X`), and every other comment (an own-line block, or any line
-    /// comment) drops to its own line via a blank-preserving `hardline` toward the
-    /// next comment (or `terminal_pos` for the last). Preserving an author blank
-    /// line before the value / next comment matches prettier, which keeps one blank
-    /// in this "comment before expression" position everywhere (RHS of `=`/`:`, call
-    /// args, `return`/`await`, unary operands, …). The single loop behind
+    /// item, or body the comments lead. Each comment is emitted with
+    /// `build_comment_doc`, followed by one of three separators — prettier's
+    /// `printLeadingComment` (`src/main/comments/print.js`), which reads only the
+    /// source around *this* comment, never where `terminal_pos` is:
+    ///
+    /// - **space** — no newline after the `*/` (per `glue`): the comment is glued to
+    ///   what follows, so it leads it inline (`/* c */ X`). A run the author glued
+    ///   together therefore stays glued (`/* a */ /* b */⏎X`).
+    /// - **`line`** — a newline after the `*/` but none before the `/*`: soft, so what
+    ///   follows pulls up onto the comment's line when the enclosing group fits and
+    ///   drops below when it breaks.
+    /// - **`hardline`** — a newline on *both* sides (an own-line comment), or any line
+    ///   comment (it must break, or it would absorb what follows). Blank-preserving:
+    ///   an author blank line before the value / next comment is kept, matching
+    ///   prettier everywhere in this "comment before expression" position (RHS of
+    ///   `=`/`:`, call args, `return`/`await`, unary operands, …).
+    ///
+    /// `continuation` is emitted after each break, for a site whose run is not already
+    /// inside a `d.indent()` and so must carry explicit `INDENT` text (the
+    /// variable-declarator gap); every other site passes `d.empty()`.
+    ///
+    /// The single leading-comment emitter: every site that puts comments before an
+    /// item routes here, so the rule lives once. Behind
     /// [`build_rhs_comments_opt`](Self::build_rhs_comments_opt),
-    /// [`build_rhs_comments_glued_opt`](Self::build_rhs_comments_glued_opt),
-    /// [`emit_member_leading_comments`](Self::emit_member_leading_comments), and the
-    /// arrow-body leading run.
+    /// [`build_rhs_comments_glued_opt`](Self::build_rhs_comments_glued_opt), the
+    /// arrow-body run, the member-leading sites (interface / intersection members),
+    /// and the comma-separated inter-item gaps (declarators, for-init, heritage,
+    /// switch cases).
     pub(crate) fn push_leading_comment_run<'c>(
         &self,
         parts: &mut DocBuf,
         comments: impl Iterator<Item = &'c Comment>,
         terminal_pos: u32,
         glue: LeadingGlue,
+        continuation: DocId,
     ) {
         let d = self.d();
         let mut comments = comments.peekable();
         while let Some(comment) = comments.next() {
             parts.push(self.build_comment_doc(comment));
             // The next thing after this comment is the following comment, or the
-            // terminal (value/member/body) for the last one.
+            // terminal (value/member/item/body) for the last one.
             let next = comments.peek().map_or(terminal_pos, |c| c.span.start);
-            let hugs = comment.is_block
-                && match glue {
-                    LeadingGlue::Adjacent => self.is_same_line(comment.span.end, next),
-                    // A glued (not own-line) single-line block hugs across a source
-                    // newline; the same-line-as-next case still hugs as in `Adjacent`.
-                    LeadingGlue::AdjacentGlued => {
-                        self.is_same_line(comment.span.end, next)
-                            || !self.comment_forces_own_line(comment)
-                    }
-                    LeadingGlue::Terminal => self.is_same_line(comment.span.end, terminal_pos),
-                };
+            let hugs = match glue {
+                LeadingGlue::Adjacent => self.comment_hugs_next(comment, next),
+                // A glued (not own-line) single-line block hugs across a source
+                // newline; the same-line-as-next case still hugs as in `Adjacent`.
+                LeadingGlue::AdjacentGlued => {
+                    comment.is_block
+                        && (self.is_same_line(comment.span.end, next)
+                            || !self.comment_forces_own_line(comment))
+                }
+            };
             if hugs {
                 // Value (or next comment) shares the `*/` line — keep it glued.
                 parts.push(d.text(" "));
+            } else if comment.is_block
+                && !self.is_own_line_comment(comment)
+                && !self.has_blank_line_between(comment.span.end, next)
+            {
+                // A block with a newline *after* its `*/` but none before its `/*`:
+                // prettier's `printLeadingComment` emits a soft `line` here, so what
+                // follows pulls up onto the comment's line when the enclosing group
+                // fits and drops below when it breaks. An own-line block (newline on
+                // both sides) takes the `hardline` branch instead.
+                parts.push(d.line());
+                parts.push(continuation);
             } else {
-                // Line comment, or a block whose value/next comment is on a later
-                // source line: keep them on separate lines (preserve the author's
-                // layout; a line comment must break so it can't absorb the value).
+                // Line comment, or an own-line block: keep them on separate lines
+                // (preserve the author's layout; a line comment must break so it
+                // can't absorb the value).
                 self.push_blank_preserving_hardline(parts, comment.span.end, next);
+                parts.push(continuation);
             }
         }
     }
@@ -562,9 +617,10 @@ impl<'a> Printer<'a> {
         let mut parts = DocBuf::new();
         self.push_leading_comment_run(
             &mut parts,
-            comments_in_range(self.comments, start, end),
+            comments_to_emit_in_range(self.comments, start, end),
             end,
             glue,
+            self.d().empty(),
         );
         if parts.is_empty() {
             None
@@ -618,14 +674,14 @@ impl<'a> Printer<'a> {
         build_value: impl FnOnce() -> DocId,
     ) -> Option<DocId> {
         let d = self.d();
-        if !self.has_comments_between(eq_pos + 1, value_start) {
+        if !self.has_comments_to_emit_between(eq_pos + 1, value_start) {
             return None;
         }
         if self.has_line_comments_between(eq_pos + 1, value_start) {
             // Line comment → mandatory break. Partition the run: a comment on the
             // `=`'s line trails it; the rest lead the value on their own lines.
             let after_eq: CommentVec<'_> =
-                comments_in_range(self.comments, eq_pos + 1, value_start).collect();
+                comments_to_emit_in_range(self.comments, eq_pos + 1, value_start).collect();
             let mut trailing = DocBuf::new();
             let mut leading = DocBuf::new();
             for (ci, comment) in after_eq.iter().enumerate() {
@@ -644,7 +700,8 @@ impl<'a> Printer<'a> {
                 d.concat(&trailing),
                 d.indent(d.concat(&[d.hardline(), d.concat(&leading), build_value()])),
             ]))
-        } else if comments_in_range(self.comments, eq_pos + 1, value_start)
+        } else if self
+            .comments_on_page_between(eq_pos + 1, value_start)
             .any(|c| self.comment_forces_own_line(c))
         {
             // Own-line / multiline block → break-after-operator hang.

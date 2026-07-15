@@ -178,7 +178,7 @@ perf record --call-graph=dwarf -- target/profiling/tsv_debug profile ~/dev/zzz/s
 perf report --stdio
 
 # Line-level hotspots within a specific function (exact demangled name from perf report)
-perf annotate --stdio -s 'tsv_lang::doc::arena::DocArena::will_break_deep_inner'
+perf annotate --stdio -s 'tsv_lang::doc::arena::DocArena::will_break_fill'
 
 # Collapsed stacks (greppable text, one line per unique stack; cargo install inferno)
 perf script | inferno-collapse-perf > stacks.txt
@@ -458,6 +458,57 @@ is only comparable to another anchor over the same corpus.
    the full `deno task bench` also runs the node conformance coverage surface — a
    pre-flight parse-coverage pass, no timed phase)
 3. **Record results** — for regression detection, use `deno task bench:deno:run -- --save-baseline` / `-- --compare-baseline` (or the `bench:node:run` / `bench:bun:run` siblings for the other runtimes)
+
+### Before optimizing a scan, print what it finds
+
+A hot scan is not necessarily a scan that is *doing* anything. Stamp a throwaway
+histogram of its input before designing the fix — length distribution, and how
+often each branch it pays for actually fires. Two of the largest small wins on
+record came straight out of one:
+
+- The doc engine's per-text-node width probe ran three searchers looking for a
+  newline, a non-ASCII byte, and tabs. Across every corpus measured, its input
+  held **no newlines and (in CSS) no tabs at all**, and was ≤31 bytes over 99% of
+  the time — three setups, each paid regardless of length, finding nothing on a
+  ~6-byte string.
+- A CSS declaration's value span arrives from the declaration scanner **already
+  trimmed** (0 leading and 0 trailing whitespace bytes across 200K real
+  declarations), so the trimming that recovered its offsets was computing zero.
+
+The histogram also sizes the fix. Fusing N scans into one byte pass is a
+**short-string** lever: on a long slice the searchers are SIMD and a plain byte
+count auto-vectorizes, so three vector passes beat one scalar walk. Gate the
+fused path on length and let the tail keep the vectorized shape — an ungated
+fusion won on CSS and *regressed* pure TS, whose text nodes run longer.
+
+### A corpus cannot grade arithmetic
+
+**Before trusting a green corpus diff, ask what it can physically see.** A width,
+offset, span or count only changes the output once it crosses a threshold (the
+print width, a line break), so an arithmetic error on a rare byte leaves every
+formatted file byte-identical. This is not hypothetical: corrupting the doc
+engine's text-width tab arm by a single column passes the **fixture suite**, an
+**11,696-file format diff**, and an **11,696-file wire diff**, and is caught only
+by the exhaustive equivalence test that sits beside the function.
+
+So a numeric change ships with an **equivalence test at its declaration**, graded
+against the shape it replaced, over inputs chosen to hit every branch (the corpus
+will not) — then **corrupt it and watch the test fail**. An oracle you have never
+seen fail proves nothing. See the same rule applied to CSS keyword sets in
+[`crates/tsv_css/CLAUDE.md`](../crates/tsv_css/CLAUDE.md), and to text width in
+[`crates/tsv_lang/CLAUDE.md`](../crates/tsv_lang/CLAUDE.md).
+
+Two harness rules that fall out of the same skepticism, both of which have faked
+a result here:
+
+- **Self-check any differential A-vs-A first.** Running the baseline binary
+  against itself must report zero. It is how a diff harness that fed files through
+  a shell `$(cat …)` — silently dropping null bytes and the trailing newline — was
+  caught.
+- **Build each placement variant into its own `CARGO_TARGET_DIR`, and hash the
+  binaries.** Building a `codegen-units=16` variant inside the baseline's checkout
+  overwrites its `target/`, after which a "cu1" run silently compares cu16-baseline
+  against cu1-candidate. A build that finishes suspiciously fast is the tell.
 
 ## WASM bundle size
 

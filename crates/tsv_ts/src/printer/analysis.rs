@@ -40,6 +40,27 @@ pub(crate) fn is_effectively_empty_body(body: &[internal::Statement<'_>]) -> boo
         .all(|s| matches!(s, internal::Statement::EmptyStatement(_)))
 }
 
+/// The start of the next statement after `index` that will actually be printed
+/// — the first one that isn't a dropped standalone `EmptyStatement` — falling
+/// back to `body_end` when only dropped statements (or nothing) follow.
+///
+/// Used to bound a statement's trailing same-line comment scan. A comment
+/// physically trailing a dropped `;` on the statement's own line (`a();; // c`)
+/// must attach to that statement: the `;` it follows emits nothing, so bounding
+/// the scan at the `;` — rather than the next *printed* statement — would strand
+/// the comment (neither the statement's trailing scan nor the dropped `;`'s
+/// leading-comment collection claims it) and silently drop it.
+pub(crate) fn next_printed_stmt_start(
+    body: &[internal::Statement<'_>],
+    index: usize,
+    body_end: u32,
+) -> u32 {
+    body[index + 1..]
+        .iter()
+        .find(|s| !matches!(s, internal::Statement::EmptyStatement(_)))
+        .map_or(body_end, |s| s.span().start)
+}
+
 /// Check if an expression is a module path call that should use fluid assignment wrapping
 /// (break after `=` if too long, keeping the call together).
 ///
@@ -89,21 +110,6 @@ pub(crate) fn is_string_literal(expr: &internal::Expression<'_>) -> bool {
         expr,
         internal::Expression::Literal(lit) if matches!(lit.value, internal::LiteralValue::String { .. })
     )
-}
-
-/// Check if an expression needs isolation to enable call hugging
-///
-/// Returns true for expressions that may contain internal breaks but should not
-/// force the parent call/array to break:
-/// - Template literals
-/// - Tagged template expressions
-/// - Arrow functions with template literal bodies
-pub(crate) fn needs_isolation_for_hugging(_expr: &internal::Expression<'_>) -> bool {
-    // Template literals and arrows-with-template-body NO LONGER need isolation.
-    // With replace_end_of_line() adding literalline nodes, template breaks must
-    // propagate to parent groups for correct chain/call expansion decisions.
-    // Isolating them would block will_break() and prevent chains from expanding.
-    false
 }
 
 /// Check if an expression is a pure property chain (member expressions without calls)
