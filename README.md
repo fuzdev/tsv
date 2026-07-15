@@ -116,7 +116,7 @@ Native builds will be published with v0.2, for v0.1 only WASM builds are publish
     (`printWidth: 100`, `useTabs: true`, `singleQuote: true`, and
     `trailingComma: 'none'`),
     and there are no config files or CLI options for formatting style;
-    i.e. `tsv format` is opinionated like `gofmt` and Python's Black,
+    i.e. `tsv format` is opinionated like `gofmt`, `zig fmt`, and Python's Black,
     see [CLAUDE.md § Configuration](CLAUDE.md#configuration)
   - pushes complexity and mess to the printer and JSON conversion,
     out of the parser and internal AST,
