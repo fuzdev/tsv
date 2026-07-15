@@ -257,10 +257,19 @@ export const CORPUS_PARSE_TSV_ERRORS_PIN: Record<Language, number> = {
  *   block-style.
  */
 export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
-	svelte: 1101,
-	typescript: 4170,
+	svelte: 1103,
+	typescript: 4172,
 	css: 125,
 };
+// svelte 1101→1103 + typescript 4170→4172 (2026-07-14, checkouts as in
+// CORPUS_FORMAT_UNKNOWN_PIN below; css 125 unchanged, SAFETY 0). Both rises are live-corpus
+// CHURN, zero behavior: the pre-change binary (5d0789b3, the commit these were last pinned
+// at) measures svelte 1103 / typescript 4172 on today's checkouts too — i.e. the whole match
+// bucket is byte-identical between the two binaries, so nothing in #463–#469 moved it. The
+// pinned CHECKOUTS are unchanged (pins:audit confirms), but the live dev repos the corpus
+// also reads are not tracked by GATE_CHECKOUT_COMMITS and moved since the pin. Re-pinned UP
+// to keep the floor tight per the rule above. #463's two prettier-suite fixes did NOT touch
+// match — they moved `partial`/`unknown`→`known` (see the two pins below).
 // typescript 4168→4170 (2026-07-14, ../svelte b4d1583ae, ../kit da5b08ea7, ../svelte.dev
 // c21c2d0f0, ../prettier 1dcd0b05d, ../prettier-plugin-svelte 7809486, oracle
 // acorn-typescript 1.0.11); svelte + css unchanged, SAFETY 0. The checkouts are UNCHANGED
@@ -316,9 +325,20 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	svelte: 7,
-	typescript: 140,
+	typescript: 139,
 	css: 22,
 };
+// typescript 140→139 (2026-07-14, ../svelte b4d1583ae, ../kit da5b08ea7, ../svelte.dev
+// c21c2d0f0, ../prettier 1dcd0b05d, ../prettier-plugin-svelte 7809486, oracle
+// acorn-typescript 1.0.11); svelte 7 + css 22 unchanged, SAFETY 0. Checkouts UNCHANGED from
+// the 2026-07-13 pin (pins:audit's commit check confirms — zero corpus drift), so the −1 is
+// behavior. Attributed by formatting the whole corpus with the pre-change binary (5d0789b3,
+// the commit this file was last pinned at) and diffing per-file bucket membership: exactly
+// one file leaves, none enter — `js/comments/assignment-pattern.js`, `unknown`→`known`. It
+// is one of the four files #463 fixed (the line-comment-swallow class): the name/key→default
+// `=` gap now breaks the comment onto its own line instead of swallowing the `=`, and the
+// `destructuring/default_equals_line_comment` divergence added with it is what the detector
+// now matches — so the file is a cataloged divergence rather than an unexplained diff.
 // typescript 139→140 (2026-07-14, checkouts as in CORPUS_FORMAT_MATCH_MIN above; svelte 7 +
 // css 22 unchanged, SAFETY 0). Checkouts UNCHANGED from the 2026-07-13 pin (zero corpus
 // drift), so the +1 is behavior from #459 "own every glued block comment": a glued block
@@ -455,10 +475,26 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 // partial→known. A before/after --all diff on the identical corpus confirmed exactly
 // one file moved (0 new unknowns, match/unknown unmoved, SAFETY 0). svelte/css unmoved.
 export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
-	svelte: 4,
-	typescript: 61,
+	svelte: 5,
+	typescript: 60,
 	css: 9,
 };
+// typescript 61→60 + svelte 4→5 (2026-07-14, checkouts as in CORPUS_FORMAT_UNKNOWN_PIN
+// above; css 9 unchanged, SAFETY 0). Two independent moves, each attributed by the
+// pre-change-binary per-file diff described on CORPUS_FORMAT_UNKNOWN_PIN:
+//
+// - typescript −1 is BEHAVIOR: exactly one file leaves, none enter —
+//   `typescript/class-comment/class-implements.ts`, `partial`→`known`. Like the unknown −1
+//   it is a #463 line-comment-swallow fix (the heritage-list keyword→first-element gap no
+//   longer swallows the next element), now matched by the `class/heritage_element_line_comment`
+//   divergence that landed with it.
+// - svelte +1 is live-corpus CHURN, and the 4 was already stale: the pre-change binary
+//   measures svelte partial 5 on today's checkouts too (the whole svelte bucket is
+//   byte-identical between the two binaries), so nothing in #463–#469 moved it. All 5 svelte
+//   partials live in live dev repos that GATE_CHECKOUT_COMMITS does not track, and all 5
+//   share one pre-existing signature (`fill_after_inline` + `fill_101_boundary`) — a doc page
+//   in ../fuz_blog (committed 2026-07-14) joined the same known fill-wrapping divergence. No
+//   new divergence class appeared.
 // typescript 63→61 (2026-07-13, checkouts as in CORPUS_FORMAT_MATCH_MIN above). Pure
 // live-corpus drift, NOT a behavior change: the pre-change binary already measures 61 on
 // today's checkouts, and this branch's computed-lookup work moves the bucket by 0. The −2
