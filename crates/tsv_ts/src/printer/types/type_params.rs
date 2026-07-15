@@ -4,7 +4,7 @@
 // - Type parameter declarations: `<T, U extends V = W>`
 // - Type parameter instantiation (type arguments): `<T, U>`
 
-use super::helpers::{is_hugging_union_type_arg, is_simple_type_arg};
+use super::helpers::is_simple_type_arg;
 use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{self, TSType, TSTypeParameter, TSTypeParameterDeclaration};
 use crate::printer::layout::fluid_after_operator;
@@ -555,7 +555,7 @@ impl<'a> Printer<'a> {
         // A single *simple* or *hugged-union* type argument inlines atomically: no
         // group, no softlines. Simple = keyword, literal, `this`, or a bare type
         // reference (`is_simple_type_arg`); hugged union = `{…} | null` / `null | {…}`
-        // (`is_hugging_union_type_arg`), whose object member carries its own group and
+        // (`union_type_arg_hug_shape`), whose object member carries its own group and
         // breaks block-style inside the hugged `<…>` rather than breaking the `<…>` onto
         // its own lines. Matches Prettier's `shouldInline`/`shouldHugType` and tsv's own
         // type-position builder (`build_type_arguments_doc_wrapping`), via the shared
@@ -567,7 +567,8 @@ impl<'a> Printer<'a> {
         // remain — the shared `build_single_type_arg_inline` preserves them. (The single
         // brace-delimited object/mapped type is handled by the curly-hug case above.)
         if inst.params.len() == 1
-            && (is_simple_type_arg(&inst.params[0]) || is_hugging_union_type_arg(&inst.params[0]))
+            && (is_simple_type_arg(&inst.params[0])
+                || self.type_arg_union_prints_hugged(&inst.params[0]))
         {
             return self.build_single_type_arg_inline(inst, has_comments);
         }

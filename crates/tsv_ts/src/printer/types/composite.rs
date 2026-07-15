@@ -10,9 +10,8 @@
 
 use super::super::comments_to_emit_in_range;
 use super::helpers::{
-    should_hug_union_type, type_needs_parens_for_array_element,
-    type_needs_parens_for_conditional_check, type_needs_parens_for_conditional_extends,
-    unwrap_parenthesized,
+    type_needs_parens_for_array_element, type_needs_parens_for_conditional_check,
+    type_needs_parens_for_conditional_extends, unwrap_parenthesized,
 };
 use super::{CommentSpacing, Printer};
 use crate::ast::internal::{
@@ -199,7 +198,10 @@ impl<'a> Printer<'a> {
     fn build_conditional_check_doc(&self, check: &TSType<'_>) -> DocId {
         let d = self.d();
         match self.unwrap_redundant_parens(check) {
-            TSType::Union(u) if !should_hug_union_type(u) => {
+            // `union_prints_hugged`, not the bare syntactic `union_hug_shape`: a comment
+            // that makes the printer expand the members must make this gate hang too, or
+            // `extends` keeps its operand glued while they explode below it.
+            TSType::Union(u) if !self.union_prints_hugged(u) => {
                 let union_doc = self.build_union_type_doc(u);
                 d.group(d.indent(d.concat(&[d.softline(), union_doc])))
             }
@@ -269,7 +271,10 @@ impl<'a> Printer<'a> {
             }
         };
         match self.unwrap_redundant_parens(branch_type) {
-            TSType::Union(u) if !should_hug_union_type(u) => {
+            // `union_prints_hugged`, not the bare syntactic `union_hug_shape` — see
+            // `build_conditional_check_doc`; here a bare ask left the members one indent
+            // level short of prettier's.
+            TSType::Union(u) if !self.union_prints_hugged(u) => {
                 // `build_union_type_doc` already returns `group(members)` (the bare
                 // `printed`); the branch supplies only one `indent`, so the member
                 // group breaks its continuations one level past the operator.
@@ -768,13 +773,15 @@ impl<'a> Printer<'a> {
                 match self.unwrap_redundant_parens(type_ann) {
                     TSType::Union(u) => {
                         let type_doc = self.build_union_type_doc(u);
-                        // A hugging union (`{ ... } | null`) without forcing line comments
-                        // keeps its inline `: ` since the object owns its own expansion;
-                        // everything else hangs after `:` so it breaks to leading `| `
-                        // instead of gluing (line comments between members force multiline).
-                        if should_hug_union_type(u)
-                            && !self.union_has_line_comments_between_members(u)
-                        {
+                        // A hugging union (`{ ... } | null`) keeps its inline `: ` since the
+                        // object owns its own expansion; everything else hangs after `:` so
+                        // it breaks to leading `| ` instead of gluing. `union_prints_hugged`
+                        // owns that question whole — this site used to pair the bare
+                        // syntactic shape with its own NARROWER comment scan (line comments
+                        // between members only), which let a block comment between members,
+                        // or a line comment in the leading `|`→first-member gap, read as
+                        // "hug" while the printer expanded them.
+                        if self.union_prints_hugged(u) {
                             body_parts.push(d.text(" "));
                             body_parts.push(type_doc);
                         } else {

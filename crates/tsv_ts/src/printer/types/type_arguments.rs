@@ -1,7 +1,7 @@
 // Type-argument instantiation (`<T, U>`) rendering
 
 use super::Printer;
-use super::helpers::{is_hugging_union_type_arg, is_simple_type_arg, unwrap_parenthesized};
+use super::helpers::{is_simple_type_arg, unwrap_parenthesized};
 use crate::ast::internal::{self, TSType};
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
@@ -31,7 +31,7 @@ impl<'a> Printer<'a> {
     /// carries its own group and still breaks block-style within the hugged `<…>`.
     ///
     /// Assumes `args.params.len() == 1`; the caller gates on its own single-arg inline
-    /// predicate (`is_simple_type_arg`, `is_hugging_union_type_arg`, a huggable object,
+    /// predicate (`is_simple_type_arg`, `union_type_arg_hug_shape`, a huggable object,
     /// or always-inline). Own-line and line comments are routed to the multiline path
     /// before this runs, so only inline block comments remain to preserve here. Shared by
     /// the type-position builder and the call/`new`/instantiation builder.
@@ -171,7 +171,7 @@ impl<'a> Printer<'a> {
             let unwrapped = unwrap_parenthesized(&args.params[0]);
             let is_huggable = is_simple_type_arg(&args.params[0])
                 || matches!(unwrapped, TSType::TypeLiteral(_) | TSType::Mapped(_))
-                || is_hugging_union_type_arg(&args.params[0]);
+                || self.type_arg_union_prints_hugged(&args.params[0]);
             if is_huggable {
                 return self.build_single_type_arg_inline(args, has_comments);
             }
