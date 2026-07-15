@@ -190,7 +190,7 @@ impl<'a> Printer<'a> {
             // NOT hugged (the sanctioned `return_type_generic_union` print-width
             // family), and a member/gap comment disqualifies the hug — those fall
             // through to the break-after-operator layout that matches prettier there.
-            if self.union_return_hugs(value_type, u, arrow_end, type_start) {
+            if self.union_return_hugs(value_type, arrow_end, type_start) {
                 return joined(d.text(arrow_sp), type_doc);
             }
             let hung = match comments_doc {
