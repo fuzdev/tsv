@@ -40,17 +40,26 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let expr_doc = self.build_expression_doc(&decl.expression);
         let argument_end = decl.expression.span().end;
+        // `export =` word by word: the `export`→`=` gap is a position an author can
+        // comment in. Emitting the two as one text never scans it — the comment would
+        // be dropped.
+        let head = self.build_keyword_header_doc(
+            &["export", "="],
+            decl.span.start,
+            decl.expression.span().start,
+            expr_doc,
+        );
         let has_trailing_comments = self.has_comments_to_emit_between(argument_end, decl.span.end);
         if has_trailing_comments {
             // `export =` keeps a same-line trailing block comment *before* the `;`
             // (operand-attached — prettier 3.9 does not move it, unlike `export default`
             // / named exports). A line comment still floats after the `;` via `line_suffix`.
-            let mut parts = smallvec![d.text("export = "), expr_doc];
+            let mut parts = smallvec![head];
             self.append_trailing_paren_comments(&mut parts, argument_end, decl.span.end);
             parts.push(d.text(";"));
             d.concat(&parts)
         } else {
-            d.concat(&[d.text("export = "), expr_doc, d.text(";")])
+            d.concat(&[head, d.text(";")])
         }
     }
 
@@ -287,18 +296,25 @@ impl<'a> Printer<'a> {
         let d = self.d();
         // Decorator-*first* `@dec export default class` — the decorators precede
         // `export`, and the whole thing parses as a ClassDeclaration. Emit the
-        // decorators, then `export default `, then the class without them.
-        if let internal::ExportDefaultValue::ClassDeclaration(class) = &decl.declaration
-            && let Some(dec_doc) = self.build_decorators_doc(
-                class.decorators,
-                self.find_keyword_after_decorators(class.decorators, "export", decl.span.start),
-            )
-        {
-            return d.concat(&[
-                dec_doc,
-                d.text("export default "),
-                self.build_class_declaration_without_decorators_doc(class),
-            ]);
+        // decorators, then `export default`, then the class without them.
+        if let internal::ExportDefaultValue::ClassDeclaration(class) = &decl.declaration {
+            let export_start =
+                self.find_keyword_after_decorators(class.decorators, "export", decl.span.start);
+            if let Some(dec_doc) = self.build_decorators_doc(class.decorators, export_start) {
+                // `export default` word by word, bounded by the class's own first
+                // keyword: both the gap *inside* the keyword and the one after it are
+                // positions an author can comment in. Emitting the two words as one
+                // fixed text scans neither, so both comments are dropped.
+                return d.concat(&[
+                    dec_doc,
+                    self.build_keyword_header_doc(
+                        &["export", "default"],
+                        export_start,
+                        self.class_declaration_keyword_start(class),
+                        self.build_class_declaration_without_decorators_doc(class),
+                    ),
+                ]);
+            }
         }
 
         // Decorator-*after*-`default` `export default @dec class {}` — the decorator
@@ -312,17 +328,33 @@ impl<'a> Printer<'a> {
         )) = &decl.declaration
             && let Some(decorators) = class_expr.decorators.filter(|dec| !dec.is_empty())
         {
-            let keyword_end = decl.span.start + "export default".len() as u32;
-            let mut parts: DocBuf = smallvec![d.text("export default")];
+            // `export default` word by word: the gap *inside* the keyword is a
+            // position an author can comment in, so the words are located rather than
+            // measured (measuring never scans that gap — the comment would be dropped).
+            let (keyword_doc, keyword_end) = self.build_keyword_words_doc(
+                &["export", "default"],
+                decl.span.start,
+                decorators[0].span.start,
+            );
+            let mut parts: DocBuf = smallvec![keyword_doc];
             // A comment between `export default` and the first decorator is rare but
-            // must be preserved (never dropped).
+            // must be preserved (never dropped). Two authorings, two owners: a comment
+            // *glued* to `@dec` is owned by the class expression (every glued block
+            // comment is), so it is skipped here by design and claimed below; one the
+            // author left on its own line is unowned and belongs to this gap.
             if let Some(c) =
                 self.build_inline_comments_between_doc_opt(keyword_end, decorators[0].span.start)
             {
                 parts.push(c);
             }
             parts.push(d.hardline());
-            parts.push(self.build_class_expression_doc(class_expr));
+            // This path **reassembles** the class expression rather than routing it
+            // through `build_expression_doc`, so the owned-comment seam there never
+            // runs for it — the comment must be claimed here or nothing prints it.
+            parts.push(self.prepend_owned_leading_comment_at(
+                class_expr.span.start,
+                self.build_class_expression_doc(class_expr),
+            ));
             return d.concat(&parts);
         }
 
@@ -372,9 +404,6 @@ impl<'a> Printer<'a> {
             }
         };
 
-        // The `export default`→value gap (a line comment indents the value).
-        let default_keyword = "export default";
-        let keyword_end = decl.span.start + default_keyword.len() as u32;
         let decl_start = match &decl.declaration {
             internal::ExportDefaultValue::Expression(expr) => expr.span().start,
             internal::ExportDefaultValue::FunctionDeclaration(func) => func.span.start,
@@ -382,6 +411,11 @@ impl<'a> Printer<'a> {
             internal::ExportDefaultValue::ClassDeclaration(class) => class.span.start,
             internal::ExportDefaultValue::TSInterfaceDeclaration(iface) => iface.span.start,
         };
+        // The `export default`→value gap (a line comment indents the value). The
+        // keyword's own words are located, not measured — the gap *between* them is a
+        // position an author can comment in, and measuring never scans it.
+        let (keyword_doc, keyword_end) =
+            self.build_keyword_words_doc(&["export", "default"], decl.span.start, decl_start);
         // A comment that can't stay inline (a line comment, or a block comment with
         // the value authored on a later line) forces the value onto its own indented
         // line, keeping the comment where the author wrote it: own-line stays on its
@@ -390,14 +424,14 @@ impl<'a> Printer<'a> {
         // `as`/`satisfies` cast gap — prettier relocates the comment instead. A
         // same-line block glued to the value (`export default /* c */ x`) stays inline.
         if self.comment_forces_following_own_line(keyword_end, decl_start) {
-            let mut parts: DocBuf = smallvec![d.text("export default")];
+            let mut parts: DocBuf = smallvec![keyword_doc];
             self.append_keyword_value_line_comments(&mut parts, keyword_end, decl_start, value_doc);
             return d.concat(&parts);
         }
         // No forcing comment (inline block / none): the value stays on the keyword
         // line via the shared continuation helper.
         d.concat(&[
-            d.text("export default"),
+            keyword_doc,
             self.build_keyword_to_name_continuation(keyword_end, decl_start, value_doc),
         ])
     }
@@ -712,24 +746,61 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = DocBuf::new();
 
-        // Export prefix if present
+        // The header keyword, word by word — an optional `export` prefix, `import`, and
+        // an optional `type` modifier. Every gap between them is a position an author
+        // can comment in; emitting the words as separate fixed texts scans none of
+        // them, so a comment in any gap is dropped. Prettier preserves all of these
+        // except `import`→`type`, which it moves to the binding side.
+        let mut words: SmallVec<[&'static str; 3]> = SmallVec::new();
         if decl.is_export {
-            parts.push(d.text("export "));
+            words.push("export");
         }
-
-        // import keyword
-        parts.push(d.text("import "));
-
-        // type modifier if present
+        words.push("import");
         if matches!(decl.import_kind, internal::ImportKind::Type) {
-            parts.push(d.text("type "));
+            words.push("type");
         }
+        parts.push(self.build_keyword_header_doc(
+            &words,
+            decl.span.start,
+            decl.id.span.start,
+            self.identifier_name_doc(&decl.id),
+        ));
 
-        // identifier
-        parts.push(self.identifier_name_doc(&decl.id));
-
-        // = sign
-        parts.push(d.text(" = "));
+        // identifier→`=` and `=`→module-reference gaps. Both are preserved in place
+        // (prettier keeps them there too). Nothing else scans them — a module
+        // reference is not an expression, so a comment glued to `require` is not
+        // owned by any node and would be dropped if this gap didn't emit it.
+        let module_ref_start = match &decl.module_reference {
+            internal::TSModuleReference::ExternalModuleReference(ext) => ext.span.start,
+            internal::TSModuleReference::EntityName(entity) => entity.span().start,
+        };
+        match self.find_keyword_in_range(decl.id.span.end, module_ref_start, "=") {
+            Some(eq_start) => {
+                parts.push(self.build_keyword_to_name_continuation(
+                    decl.id.span.end,
+                    eq_start,
+                    d.text("="),
+                ));
+                parts.push(self.build_keyword_to_name_continuation(
+                    eq_start + 1,
+                    module_ref_start,
+                    d.empty(),
+                ));
+            }
+            None => {
+                // Same landmine as `build_keyword_words_doc`'s fallback: this arm scans
+                // no gap, so a comment either side of the `=` is dropped. An
+                // import-equals always spells its `=` between the name and the module
+                // reference, so this is unreachable — assert it in debug rather than
+                // let a future caller degrade silently.
+                debug_assert!(
+                    false,
+                    "import-equals has no `=` in source[{}..{module_ref_start}]",
+                    decl.id.span.end
+                );
+                parts.push(d.text(" = "));
+            }
+        }
 
         // module reference
         match &decl.module_reference {
@@ -807,8 +878,15 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
-        parts.push(d.text("export as namespace "));
-        parts.push(self.identifier_name_doc(&decl.id));
+        // `export as namespace` word by word: each gap between the three is a position
+        // an author can comment in, and the `namespace`→name gap is one prettier keeps
+        // too. Emitting the keyword as one text never scans any of them.
+        parts.push(self.build_keyword_header_doc(
+            &["export", "as", "namespace"],
+            decl.span.start,
+            decl.id.span.start,
+            self.identifier_name_doc(&decl.id),
+        ));
         // Trailing comment between the name and `;` (mirrors `export =` / import-equals):
         // a same-line block comment stays before `;`, a line comment floats after it.
         let semicolon_pos = decl.span.end.saturating_sub(1);

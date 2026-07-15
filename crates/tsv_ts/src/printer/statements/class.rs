@@ -31,6 +31,27 @@ impl<'a> Printer<'a> {
         self.build_class_declaration_doc_inner(decl, false)
     }
 
+    /// The source position where a class declaration's own doc begins: its first
+    /// keyword (`declare` / `abstract` / `class`), located past any decorators.
+    ///
+    /// A caller that prints the decorators itself and then the *undecorated* class
+    /// (the decorators-first `export default` path) needs this to bound its own
+    /// keyword→value gap. Without it that gap has no end, so nothing scans it and a
+    /// comment authored there is dropped.
+    pub(in crate::printer) fn class_declaration_keyword_start(
+        &self,
+        decl: &internal::ClassDeclaration<'_>,
+    ) -> u32 {
+        let first_keyword = if decl.declare {
+            "declare"
+        } else if decl.r#abstract {
+            "abstract"
+        } else {
+            "class"
+        };
+        self.find_keyword_after_decorators(decl.decorators, first_keyword, decl.span.start)
+    }
+
     /// Core implementation for class declaration doc building
     ///
     /// # Arguments
@@ -86,17 +107,9 @@ impl<'a> Printer<'a> {
 
         let mut parts = smallvec![];
 
-        // Decorators, each on its own line
-        // Find the first keyword after decorators (declare/abstract/class)
-        let first_keyword = if decl.declare {
-            "declare"
-        } else if decl.r#abstract {
-            "abstract"
-        } else {
-            "class"
-        };
-        let keyword_start =
-            self.find_keyword_after_decorators(decl.decorators, first_keyword, decl.span.start);
+        // Decorators, each on its own line; the first keyword after them
+        // (declare/abstract/class) is where this class's own text starts.
+        let keyword_start = self.class_declaration_keyword_start(decl);
 
         if include_decorators
             && let Some(dec_doc) = self.build_decorators_doc(decl.decorators, keyword_start)

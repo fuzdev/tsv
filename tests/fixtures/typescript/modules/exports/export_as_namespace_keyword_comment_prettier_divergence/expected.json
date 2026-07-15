@@ -1,0 +1,190 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 212,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Block comments before `as` and before `namespace` — each stays where the author",
+			"start": 20,
+			"end": 102,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " wrote it; prettier relocates both past the keyword",
+			"start": 104,
+			"end": 157,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 54
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 166,
+			"end": 174,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 8
+				},
+				"end": {
+					"line": 4,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 178,
+			"end": 186,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 20
+				},
+				"end": {
+					"line": 4,
+					"column": 28
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 211,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 202,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 5,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSNamespaceExportDeclaration",
+					"start": 159,
+					"end": 201,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 43
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 197,
+						"end": 200,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 39
+							},
+							"end": {
+								"line": 4,
+								"column": 42
+							}
+						},
+						"name": "Foo",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c1 ",
+								"start": 166,
+								"end": 174
+							},
+							{
+								"type": "Block",
+								"value": " c2 ",
+								"start": 178,
+								"end": 186
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Block comments before `as` and before `namespace` — each stays where the author",
+							"start": 20,
+							"end": 102
+						},
+						{
+							"type": "Line",
+							"value": " wrote it; prettier relocates both past the keyword",
+							"start": 104,
+							"end": 157
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
