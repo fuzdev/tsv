@@ -1,7 +1,7 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
 #![allow(clippy::expect_used)]
 
-//! Formatter coverage for the Stage-3 import-phase proposals — source-phase
+//! Formatter coverage for the import-phase proposals — source-phase
 //! imports (`import source …` / `import.source(…)`) and import defer
 //! (`import defer * as ns …` / `import.defer(…)`).
 //!
@@ -16,7 +16,7 @@
 //! also live-pinned in `tests/prettier_error_bugs.rs`; the `import defer` form
 //! (prettier silently drops the phase) is documented-only — a live "prettier
 //! succeeds with wrong output" assertion would gate the suite on a sidecar call
-//! under load, which is needless fragility for a niche Stage-3 divergence.
+//! under load, which is needless fragility for a niche proposal-only divergence.
 //!
 //! One test also pins a *parser* divergence the fixture path can't reach: a
 //! source-phase binding whose name lexes as a contextual keyword (the spec-valid

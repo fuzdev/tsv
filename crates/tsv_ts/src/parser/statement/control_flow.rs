@@ -86,7 +86,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::Keyword(KeywordKind::Const | KeywordKind::Let | KeywordKind::Var)
         );
 
-        // Check for `using` contextual keyword (ES2024 Explicit Resource Management)
+        // Check for `using` contextual keyword (Explicit Resource Management)
         // `for (using resource of resources) { ... }`. The binding must be a
         // same-line binding word that is not `of`: `for (using of items)` is a
         // for-of whose LHS is the plain identifier `using` (a using ForBinding

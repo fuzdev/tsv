@@ -148,7 +148,7 @@ Native builds will be published with v0.2, for v0.1 only WASM builds are publish
     and heavier future layers (incremental parsing, CST for LSP) will be feature-gated so they
     don't regress the focused artifacts
 - modern and Web-conformant
-  - up-to-date with web specs (roughly aiming for stage 3+ proposals)
+  - up-to-date with web specs (roughly aiming for late-stage TC39 proposals and up)
   - JS and TS parse in strict mode only - sloppy-mode-only syntax like `with` is
     rejected, while strict-mode early errors (e.g. duplicate params, reserved-word
     bindings) still parse for now, with enforcement deferred to a future

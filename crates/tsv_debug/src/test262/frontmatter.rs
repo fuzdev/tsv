@@ -11,7 +11,7 @@
 /// scoring it as a positive failure (and the differential manifest drops it too,
 /// since both share `classify`).
 ///
-/// Currently empty: the Stage-3 import-phase proposals (`source-phase-imports`
+/// Currently empty: the import-phase proposals (`source-phase-imports`
 /// with its `…-module-source` companion, and `import-defer`) are now parsed —
 /// `import source …` / `import defer …` and `import.source(…)` / `import.defer(…)`
 /// — so their tests are graded. Add a `features:` name here when tsv meets a new

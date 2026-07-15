@@ -1,4 +1,4 @@
-# `using` Declarations (ES2024 Explicit Resource Management)
+# `using` Declarations (Explicit Resource Management)
 
 ## Status
 

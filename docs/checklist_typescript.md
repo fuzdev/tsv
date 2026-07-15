@@ -4,7 +4,11 @@ Comprehensive reference for TypeScript/JS language features supported by tsv's p
 
 ## Coverage
 
-All strict-mode ECMAScript 2024 and TypeScript 5.x syntax features are supported, as enumerated below; sloppy-mode constructs are excluded by design (see [Out of Scope](#out-of-scope)). ECMAScript conformance is measured against test262 (see [conformance_test262.md](./conformance_test262.md)). Stage 2 proposals and experimental features are listed under [Future Work](#future-work).
+Every syntax feature of the published ECMAScript standard is supported, as enumerated below — through **ES2025**, the most recent edition that added grammar (import attributes; its two RegExp additions ride the opaque regex body, see [Regular Expressions](#regular-expressions)). ES2026 added library APIs only, no new syntax. The finished (Stage 4) `using` declarations, awaiting publication in a later edition, are supported too — see [Explicit Resource Management](#explicit-resource-management). On the TypeScript side every construct the `tsc` oracle parses is parsed here, down to its newest contextual keyword (`defer`); the `conformance:ts-fixtures` and `conformance:ts-repo` gates pin those oracles' versions, so this doc names none.
+
+Sloppy-mode constructs are excluded by design (see [Out of Scope](#out-of-scope)). ECMAScript conformance is measured against test262 (see [conformance_test262.md](./conformance_test262.md)). Constructs tsv does not parse — all of them TC39 proposals — are listed under [Future Work](#future-work).
+
+**On proposal maturity**: this doc deliberately carries **no TC39 stage labels**. A stage can change at any TC39 meeting, and no gate here can catch a label that has gone stale — so a stage quoted in this file would be a claim nothing keeps honest. Year tags on shipped features (`- ES2020`) are a different thing: an edition is a historical fact and does not rot, so those stay. For a construct's current stage, read the oracle — `../../proposals/`, where `finished-proposals.md` is Stage 4, `README.md` is Stage 2 and up, and the rest are `stage-1-proposals.md`, `stage-0-proposals.md`, `inactive-proposals.md`.
 
 **Spec References**:
 
@@ -87,13 +91,33 @@ Foundation for all parsing.
 
 ### Regular Expressions
 
+The pattern body and the flag run are **opaque** — carried verbatim as source slices, never
+parsed. This is what the spec asks a lexer for, not a shortcut: the `RegularExpressionBody` /
+`RegularExpressionFlags` productions exist so "the input element scanner [can] find the end of
+the regular expression literal", and the text they cover is "subsequently parsed again using
+the more stringent ECMAScript Regular Expression grammar"
+(ecma262 §sec-literals-regular-expression-literals). So the lexer scans only far enough to find
+the literal's end — tracking `\` escapes and `[…]` class nesting so a `/` inside either doesn't
+terminate early, and rejecting an unterminated or empty literal. Everything below therefore
+round-trips, at every flag and every pattern grammar, including ones newer than this list:
+
 - Basic patterns (`/pattern/`)
-- Flags: `g`, `i`, `m`, `s`, `u`, `y`
-- Flag: `d` (indices) - ES2022
-- Flag: `v` (unicodeSets) - ES2024
-- Character classes (`[a-z]`, `\d`, `\w`)
-- Escapes in patterns
+- Flags: `d` (indices), `g`, `i`, `m`, `s`, `u`, `v` (unicodeSets), `y`
+- Character classes (`[a-z]`, `\d`, `\w`), escapes in patterns
 - Division vs regex disambiguation
+
+That second, stringent parse is an **early error** — "It is a Syntax Error if
+`IsValidRegularExpressionLiteral(RegularExpressionLiteral)` is false" — which places it with
+the other early errors tsv defers (see [Out of Scope](#out-of-scope)). So an invalid flag
+(`/a/qqq`), a duplicate flag (`/a/gg`), and an invalid pattern (`/(?zz:a)/`, `/a{2,1}/u`) all
+parse here while acorn rejects them; prettier's parser is likewise regex-opaque and formats all
+four. The formatter re-emits the body verbatim and never needs the pattern grammar, so the
+whole check is one self-contained spec operation for the diagnostics layer to run: flags ⊆
+`{d,g,i,m,s,u,v,y}` with no repeats, then `ParsePattern(patternText, u, v)`.
+
+What the lexer *does* enforce is the flags production exactly — `IdentifierPartChar`, i.e.
+`UnicodeIDContinue` or `$`. That admits no backslash, so a unicode-escaped flag (a `\u` escape
+written in the flags position) is not a flags production at all and is rejected, matching acorn.
 
 ---
 
@@ -244,7 +268,7 @@ Foundation for all parsing.
 
 - `import()` expression - ES2020
 - `import.meta` meta-property
-- Phased dynamic import (`import.source(…)` / `import.defer(…)`) - Stage 3; tsv-native, acorn rejects (see [conformance_svelte.md](./conformance_svelte.md#import-phase-proposals))
+- Phased dynamic import (`import.source(…)` / `import.defer(…)`) — the Source Phase Imports / Deferring Module Evaluation proposals, not yet standard; tsv-native, acorn rejects (see [conformance_svelte.md](./conformance_svelte.md#import-phase-proposals))
 
 ---
 
@@ -352,7 +376,7 @@ See [Classes](#classes) section for full details.
 
 ## Modules
 
-ES2015 module syntax with ES2024 additions.
+ES2015 module syntax with ES2025 additions.
 
 ### Import Declarations
 
@@ -363,8 +387,8 @@ ES2015 module syntax with ES2024 additions.
 - Renamed imports (`import {a as b} from 'mod'`)
 - String import name (`import {'str' as b} from 'mod'`) - ES2022
 - Side-effect import (`import 'mod'`)
-- Import attributes (`import x from 'y' with {}`) - ES2024
-- Phased import (`import source x from 'mod'` / `import defer * as ns from 'mod'`) - Stage 3; tsv-native, acorn rejects (see [conformance_svelte.md](./conformance_svelte.md#import-phase-proposals))
+- Import attributes (`import x from 'y' with {}`) - ES2025
+- Phased import (`import source x from 'mod'` / `import defer * as ns from 'mod'`) — the Source Phase Imports / Deferring Module Evaluation proposals, not yet standard; `defer` is TypeScript's newest contextual keyword. tsv-native, acorn rejects (see [conformance_svelte.md](./conformance_svelte.md#import-phase-proposals))
 
 ### Export Declarations
 
@@ -430,7 +454,7 @@ ES2015 module syntax with ES2024 additions.
 - Multiple `implements`
 - `declare class`
 
-**Decorators** (ES2023/TS 5.0):
+**Decorators** (a TC39 proposal — not in any ECMAScript edition; shipped in TS 5.0):
 
 - Class decorators (`@decorator class C {}`)
 - Decorated class expressions (`x = @dec class {}`)
@@ -442,7 +466,7 @@ ES2015 module syntax with ES2024 additions.
 - Decorators on ambient class members (`declare class C { @dec m() {} }`)
 - Decorators after `export` (`export @dec class C {}`) — position preserved relative to `export`
 
-Note: Parameter decorators are legacy-TypeScript syntax (not part of the ES2023 decorator standard), but tsv parses them — the parser attaches them to the parameter's `decorators`, covered by `tests/fixtures/typescript/typescript_specific/decorators/parameter/`. They are accepted in exactly the positions acorn's `parseAssignableListItem` reaches: function declarations/expressions, class methods and the constructor, object-literal methods, and ambient `declare function`s. They are **rejected** on arrow-function parameters (`(@dec a) => a`) and in type-member signatures (interface / type-literal method, call, construct, and accessor signatures) — grammar errors acorn, tsc, and prettier all reject — covered by `tests/fixtures/typescript/typescript_specific/decorators/{parameter_arrow,type_member_signature}/`. The lone divergence is `async <T>(@dec a) => a`, which acorn accepts only because of its async-generic param-drop bug; tsv rejects it to match tsc (see `tests/fixtures/typescript/expressions/arrow/async_generic/param_decorator_svelte_divergence/`).
+Note: Parameter decorators are legacy-TypeScript syntax (not part of the TC39 decorators proposal), but tsv parses them — the parser attaches them to the parameter's `decorators`, covered by `tests/fixtures/typescript/typescript_specific/decorators/parameter/`. They are accepted in exactly the positions acorn's `parseAssignableListItem` reaches: function declarations/expressions, class methods and the constructor, object-literal methods, and ambient `declare function`s. They are **rejected** on arrow-function parameters (`(@dec a) => a`) and in type-member signatures (interface / type-literal method, call, construct, and accessor signatures) — grammar errors acorn, tsc, and prettier all reject — covered by `tests/fixtures/typescript/typescript_specific/decorators/{parameter_arrow,type_member_signature}/`. The lone divergence is `async <T>(@dec a) => a`, which acorn accepts only because of its async-generic param-drop bug; tsv rejects it to match tsc (see `tests/fixtures/typescript/expressions/arrow/async_generic/param_decorator_svelte_divergence/`).
 
 Note: An ambient (`declare class`) member parses decorators exactly like a concrete member — TS's "decorators are not valid here" (TS1206) is a config-dependent early-error (tsc accepts `@dec declare field` under `experimentalDecorators`, rejects it under ES decorators), so the parser accepts structurally and defers the check to the diagnostics layer. Covered by `tests/fixtures/typescript/typescript_specific/declare/class/member_decorators/`.
 
@@ -658,7 +682,13 @@ Note: An ambient (`declare class`) member parses decorators exactly like a concr
 
 ## Explicit Resource Management
 
-Stage 3 proposal, widely supported. Spec: TC39 Explicit Resource Management.
+A **finished (Stage 4)** TC39 proposal — `../../proposals/finished-proposals.md` lists it with an
+expected publication year of 2027, so the grammar is settled but has not yet landed in a
+published edition. It is absent from the `../../ecma262/` draft, and that proves nothing either
+way: a finished proposal is one that "is (or soon will be) included in the latest draft", so
+the draft's silence is not evidence of an earlier stage. Shipped in TS 5.2. Svelte's parser
+rejects it; tsv is native — see
+[conformance_svelte.md](./conformance_svelte.md#typescript-corrections).
 
 - `using` declarations
 - `await using` declarations
@@ -669,19 +699,41 @@ Stage 3 proposal, widely supported. Spec: TC39 Explicit Resource Management.
 
 # Future Work
 
-Stage 2 proposals and experimental features tsv does not yet parse.
+Everything here is a TC39 **proposal** — no published ECMAScript syntax is missing (see
+[Coverage](#coverage)). No stage is quoted, for the reason given there; `../../proposals/` is
+the oracle. Each row below was verified against the binary rather than assumed.
 
-## Stage 3 Proposals (Not Widely Adopted)
+## Not Parsed
 
-- RegExp modifiers (`(?i:pattern)` inline modifiers)
+Rejected outright — a parse error today:
 
-## Stage 2 Proposals
+| Proposal | Syntax |
+| --- | --- |
+| `throw` expressions | `const f = () => throw new Error()` |
+| `do` expressions | `const x = do { 1; }`, `async do { … }` |
+| Pattern matching | `match (x) { when 1: … }` |
+| Pipeline operator | `a \|> f(%)` |
+| `function.sent` metaproperty | `function* g() { const x = function.sent; }` |
+| "Discard" (`void`) bindings | `const void = 1`, `const { a: void } = o` |
+| Extractors | `const Foo(a) = x` |
+| Module Expressions / Declarations | `const m = module { }` |
+| Destructure Private Fields | `class C { #x; m(o) { const { #x: v } = o } }` |
 
-- `throw` expressions
-- `do` expressions
-- Pattern matching
-- Records and tuples
-- Pipeline operator
+## Parsed Generically, Not Modeled
+
+RegExp modifiers (`(?i:pattern)`), duplicate named capture groups (`/(?<y>a)|(?<y>b)/`), and
+the buffer-boundary proposal's `\A` / `\z` / `\Z` all **parse and round-trip today**: the
+regex body is opaque, so no pattern grammar is ever consulted and no proposal can be "not
+parsed" there — see [Regular Expressions](#regular-expressions) for what that costs on the
+invalid-input side. The first two are in fact already standard (ES2025) and acorn accepts
+them; they sit here rather than under Supported only because tsv models nothing about them.
+
+## Not Coming
+
+**Records and tuples** (`#{a: 1}` / `#[1, 2]`) was **withdrawn** — `../../proposals/inactive-proposals.md`
+records it as "Withdrawn; subsumed by [Composites]", and Composites adds a library API, not
+syntax. There is nothing here to parse, now or later. Named only so it is not re-added to the
+list above.
 
 ---
 
@@ -711,6 +763,10 @@ Early errors that still parse (not yet enforced):
 - Duplicate parameter names (`function f(a, a) {}`)
 - Reserved words as identifiers (`var public = 1`)
 - `delete` of a plain name (`delete x`)
+- Invalid regular expressions — an unknown or repeated flag (`/a/qqq`, `/a/gg`), or a body the
+  Pattern grammar rejects (`/(?zz:a)/`, `/a{2,1}/u`). This is the `IsValidRegularExpressionLiteral`
+  early error; the lexical production is satisfied, so it is deferred like the rest, not a
+  grammar hole. See [Regular Expressions](#regular-expressions)
 
 Runtime-only (never a parse concern): `arguments.callee`, assigning to undeclared
 variables.
@@ -735,7 +791,7 @@ Parse output matches acorn-typescript (the parser Svelte uses for `<script lang=
 
 **`<const T>` in classes**: The tsv parser supports const type parameters on classes (`class Foo<const T>`), but acorn-typescript doesn't. See `typescript/generics/const_type_param_class_svelte_divergence/`.
 
-**Parameter decorators**: Parsed as syntax (legacy-TypeScript, predating the ES2023 decorator standard) and attached to the parameter's `decorators` — see `tests/fixtures/typescript/typescript_specific/decorators/parameter/`. tsv accepts decorators in every member position (class, method, field, accessor, auto-accessor) and on parameters in the positions acorn parses them (function/method/constructor/object-method/ambient params), while **rejecting** parameter decorators where acorn + tsc + prettier all reject — arrow parameters and type-member signatures (see the boundary note under §Decorators).
+**Parameter decorators**: Parsed as syntax (legacy-TypeScript, predating the TC39 decorators proposal) and attached to the parameter's `decorators` — see `tests/fixtures/typescript/typescript_specific/decorators/parameter/`. tsv accepts decorators in every member position (class, method, field, accessor, auto-accessor) and on parameters in the positions acorn parses them (function/method/constructor/object-method/ambient params), while **rejecting** parameter decorators where acorn + tsc + prettier all reject — arrow parameters and type-member signatures (see the boundary note under §Decorators).
 
 ---
 
@@ -755,7 +811,7 @@ Key test262 features relevant to parser/formatter:
 - `class-static-fields-private` — Classes; ES2022
 - `computed-property-names` — Objects; ES2015
 - `const` — Declarations; ES2015
-- `decorators` — Classes; ES2023
+- `decorators` — Classes; TC39 proposal (test262 flags it under "Proposed language features")
 - `default-parameters` — Functions; ES2015
 - `destructuring-assignment` — Patterns; ES2015
 - `destructuring-binding` — Patterns; ES2015
@@ -764,7 +820,7 @@ Key test262 features relevant to parser/formatter:
 - `for-of` — Statements; ES2015
 - `generators` — Functions; ES2015
 - `hashbang` — Comments; ES2023
-- `import-attributes` — Modules; ES2024
+- `import-attributes` — Modules; ES2025
 - `import.meta` — Modules; ES2020
 - `let` — Declarations; ES2015
 - `logical-assignment-operators` — Operators; ES2021
@@ -785,4 +841,4 @@ Key test262 features relevant to parser/formatter:
 - `Symbol` — Primitives; ES2015
 - `template` — Literals; ES2015
 - `top-level-await` — Modules; ES2022
-- `explicit-resource-management` — Statements; Stage 3
+- `explicit-resource-management` — Statements; finished (Stage 4) proposal, publication expected 2027. test262 still files it under "Proposed language features" because the spec draft has not merged it yet — that placement tracks the draft, not the stage

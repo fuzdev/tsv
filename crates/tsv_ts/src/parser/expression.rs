@@ -852,7 +852,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse the expression part of a decorator (the `expr` in `@expr`), per the
-    /// ES decorators grammar (TC39 Stage 3, which `tsv` supports):
+    /// TC39 decorators grammar (a proposal, not yet standard, which `tsv` supports):
     ///
     /// - `@(Expression)` — a parenthesized **full** expression, or
     /// - `@Ident(.Ident | .#private)*` — a `DecoratorMemberExpression`: an
@@ -2445,7 +2445,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Handles:
     /// - `import('module')` - dynamic import expression
     /// - `import.source('module')` / `import.defer('module')` - phased dynamic
-    ///   import (Stage-3 source-phase-imports / import-defer proposals)
+    ///   import (the source-phase-imports / import-defer proposals)
     /// - `import.meta` - meta property
     fn parse_import_or_meta_property(&mut self) -> Result<Expression<'arena>, ParseError> {
         let (start, import_end) = self.current_pos();

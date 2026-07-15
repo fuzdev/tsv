@@ -317,9 +317,9 @@ pub enum VariableDeclarationKind {
     Const = 0,
     Let = 1,
     Var = 2,
-    /// ES2024 Explicit Resource Management: `using resource = getResource();`
+    /// Explicit Resource Management: `using resource = getResource();`
     Using = 3,
-    /// ES2024 Explicit Resource Management: `await using resource = getAsyncResource();`
+    /// Explicit Resource Management: `await using resource = getAsyncResource();`
     AwaitUsing = 4,
 }
 

@@ -860,7 +860,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         ));
         self.advance()?;
 
-        // Stage-3 import-phase proposals: `import source <binding> from …` and
+        // The import-phase proposals: `import source <binding> from …` and
         // `import defer * as ns from …`. `source`/`defer` are contextual — a phase
         // keyword only in the phase-specific shape, otherwise an ordinary default
         // binding (`import defer from …` imports a default named `defer`). acorn

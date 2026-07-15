@@ -1017,7 +1017,7 @@ type SkipLang = 'svelte' | 'typescript' | 'css' | 'other';
 /**
  * The "universal tsv failure" pattern per language — the 6 tracking_keys
  * that fail together on unsupported-syntax fixtures (SCSS, JSX in .js,
- * stage-1 proposals, etc.). When a file's failure set matches this
+ * early-stage proposals, etc.). When a file's failure set matches this
  * exactly, the per-file `Failed in:` list collapses to one short label;
  * anything else is rendered explicitly because it might be an
  * impl-specific bug worth chasing.
