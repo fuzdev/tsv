@@ -993,29 +993,6 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
                 continue;
             }
 
-            DocNode::IsolatedGroup { contents } => {
-                let contents = *contents;
-
-                if !policy.tracking_suffix() {
-                    // Suffix-flush render: pass through in the current mode.
-                    cmd = cmd.with_doc(contents);
-                    continue;
-                }
-
-                let fits = arena_fits_with_lookahead(
-                    arena,
-                    contents,
-                    Mode::Flat,
-                    commands,
-                    remaining_width(*pos, render, embed),
-                    embed,
-                    resolver,
-                );
-                let chosen_mode = if fits { Mode::Flat } else { Mode::Break };
-                cmd = cmd.with_mode(chosen_mode, contents);
-                continue;
-            }
-
             DocNode::IfBreak {
                 break_doc,
                 flat_doc,

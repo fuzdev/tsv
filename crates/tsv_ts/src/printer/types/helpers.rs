@@ -365,13 +365,3 @@ pub(super) fn type_needs_parens_in_union_or_intersection(ts_type: &TSType<'_>) -
             | TSType::Conditional(_)
     )
 }
-
-/// Member-parens predicate for a *single-member* union/intersection. Prettier
-/// drops single-element union/intersection nodes in postprocess, so the lone
-/// member prints in the union's own position and needs no precedence parens of
-/// its own — any required parens come from the union's parent context, applied
-/// one level up. Pairs with `type_needs_parens_in_union_or_intersection` (used
-/// for 2+ members).
-pub(super) fn type_never_needs_parens(_ts_type: &TSType<'_>) -> bool {
-    false
-}

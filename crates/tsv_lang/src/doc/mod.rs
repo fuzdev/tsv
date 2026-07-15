@@ -654,31 +654,6 @@ mod arena_tests {
     }
 
     #[test]
-    fn test_arena_isolated_group_prevents_break() {
-        let a = DocArena::new();
-        let inner = a.concat(&[a.text("a"), a.hardline(), a.text("b")]);
-        let iso = a.isolated_group(inner);
-        let doc = a.group(a.concat(&[a.text("fn("), iso, a.text(")")]));
-        assert_eq!(render_pw(&a, doc, 100), "fn(a\nb)");
-    }
-
-    #[test]
-    fn test_arena_will_break_false_for_isolated() {
-        let a = DocArena::new();
-        let doc = a.isolated_group(a.concat(&[a.text("a"), a.hardline(), a.text("b")]));
-        assert!(!a.will_break(doc));
-    }
-
-    #[test]
-    fn test_arena_nested_isolated_groups() {
-        let a = DocArena::new();
-        let inner_iso = a.isolated_group(a.concat(&[a.text("x"), a.hardline(), a.text("y")]));
-        let outer_iso = a.isolated_group(a.concat(&[a.text("b("), inner_iso, a.text(")")]));
-        let doc = a.group(a.concat(&[a.text("a("), outer_iso, a.text(")")]));
-        assert_eq!(render_pw(&a, doc, 100), "a(b(x\ny))");
-    }
-
-    #[test]
     fn test_arena_fill_wraps_last_item_at_101() {
         let a = DocArena::new();
         let items = [
@@ -873,34 +848,6 @@ mod arena_tests {
     }
 
     #[test]
-    fn test_arena_isolated_group_still_breaks_on_width() {
-        let a = DocArena::new();
-        let iso = a.isolated_group(a.text("verylongcontent"));
-        let doc = a.group(a.concat(&[
-            a.text("fn("),
-            a.indent_softline(iso),
-            a.softline(),
-            a.text(")"),
-        ]));
-        assert!(render_pw_spaces(&a, doc, 10).contains('\n'));
-    }
-
-    #[test]
-    fn test_arena_isolated_group_with_softlines() {
-        let a = DocArena::new();
-        let inner_sl = a.softline();
-        let inner_group = a.group(a.concat(&[
-            a.text("inner("),
-            a.indent_softline(a.text("content")),
-            inner_sl,
-            a.text(")"),
-        ]));
-        let iso = a.isolated_group(inner_group);
-        let doc = a.group(a.concat(&[a.text("outer("), iso, a.text(")")]));
-        assert_eq!(render_pw(&a, doc, 100), "outer(inner(content))");
-    }
-
-    #[test]
     fn test_arena_wrap_with_nested_content() {
         let a = DocArena::new();
         let inner = a.concat(&[a.text("a"), a.text(", "), a.text("b")]);
@@ -1016,8 +963,6 @@ mod arena_tests {
         // a non-breaking group recurses into its contents
         let g = a.group(a.concat(&[a.text("ab"), a.line(), a.text("cd")]));
         assert_flat_width(&a, g, 5);
-        // isolated_group recurses too (this mirrors the fits walk, unlike will_break)
-        assert_flat_width(&a, a.isolated_group(a.text("abcde")), 5);
         // indent / dedent / align add no width in flat mode (they matter only at breaks)
         assert_flat_width(&a, a.indent(a.text("abc")), 3);
         assert_flat_width(&a, a.dedent(a.text("abcd")), 4);

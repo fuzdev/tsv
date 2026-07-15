@@ -112,21 +112,6 @@ pub(crate) fn is_string_literal(expr: &internal::Expression<'_>) -> bool {
     )
 }
 
-/// Check if an expression needs isolation to enable call hugging
-///
-/// Returns true for expressions that may contain internal breaks but should not
-/// force the parent call/array to break:
-/// - Template literals
-/// - Tagged template expressions
-/// - Arrow functions with template literal bodies
-pub(crate) fn needs_isolation_for_hugging(_expr: &internal::Expression<'_>) -> bool {
-    // Template literals and arrows-with-template-body NO LONGER need isolation.
-    // With replace_end_of_line() adding literalline nodes, template breaks must
-    // propagate to parent groups for correct chain/call expansion decisions.
-    // Isolating them would block will_break() and prevent chains from expanding.
-    false
-}
-
 /// Check if an expression is a pure property chain (member expressions without calls)
 ///
 /// Pure property chains like `obj.a.b.c` or `obj!.a!.b!` should use fluid assignment wrapping
