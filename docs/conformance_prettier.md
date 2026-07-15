@@ -436,6 +436,18 @@ Standalone head wrap + dangle + body-expand:
 - `{#if}` (binary / member chain / call / `{:else if}`) — [if_long](../tests/fixtures/svelte/blocks/if/long_prettier_divergence/)
 - `{#if}` last block quirk — [last_block](../tests/fixtures/svelte/blocks/if/last_block_prettier_divergence/)
 
+The shape is keyed on **that the head broke, not on why**: tsv's block head hugs its first
+fragment to `{#if`, indents what follows, and drops `}` to base — whether the break came from
+printWidth or from a comment. A head far under printWidth still takes that shape when a *line*
+comment forces the break. (A **multi-line block** comment's newlines live inside its verbatim
+source span, which renders with no context indent by design, so its continuation is the
+comment's own line and only the `}` dangle shows; a **single-line block** comment breaks
+nothing and the head stays inline, both formatters agreeing.) Prettier never dangles a block
+head's `}` whatever broke it, so this is the one divergence on a second trigger — not a
+print-width tolerance:
+
+- `{#if}` (comment-forced head break) — [if/condition_breaking_comment](../tests/fixtures/svelte/blocks/if/condition_breaking_comment_prettier_divergence/)
+
 Same layout inside an inline element (head wraps + body expands, element hugs the outer boundary):
 
 - `{#if}` — [if/inline_element_long](../tests/fixtures/svelte/blocks/if/inline_element_long_prettier_divergence/)
