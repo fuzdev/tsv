@@ -325,9 +325,24 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	svelte: 7,
-	typescript: 139,
+	typescript: 140,
 	css: 22,
 };
+// typescript 139→140 (2026-07-14, checkouts unchanged; svelte 7 + css 22 unchanged, SAFETY 0).
+// A rise, but not a new divergence: `js/comments/return-statement-2.js` moves `known`→`unknown`
+// because its diff SHRANK. It carried the `return`/`throw` leading-comment ASI bug — tsv broke
+// between the keyword and its argument, which is a restricted production, so the output returned
+// `undefined` (and `throw` was a syntax error). Fixing that leaves only tsv's sequence-operand
+// parens (`a, b` → `(a, b)`), which no detector claims — the same residual as the other
+// sequence-paren unknowns (`js/arrows/issue-14702`, `js/sequence-expression/*`), so this file
+// simply joins that existing class. Consciously re-pinned rather than pattern-matched: a detector
+// for the sequence-paren class would cover all four at once and belongs with that divergence, not
+// with an ASI fix.
+//
+// ⚠️ Why the bug hid here: `comment_position` — a deliberately broad detector ("tsv preserves a
+// comment where prettier relocates it") — matched the ASI-corrupted output and classified the file
+// `known`. A pattern that broad can mask a semantic-corruption bug, which is exactly what it did
+// for as long as this file sat in `known`.
 // typescript 140→139 (2026-07-14, ../svelte b4d1583ae, ../kit da5b08ea7, ../svelte.dev
 // c21c2d0f0, ../prettier 1dcd0b05d, ../prettier-plugin-svelte 7809486, oracle
 // acorn-typescript 1.0.11); svelte 7 + css 22 unchanged, SAFETY 0. Checkouts UNCHANGED from
@@ -476,9 +491,17 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 // one file moved (0 new unknowns, match/unknown unmoved, SAFETY 0). svelte/css unmoved.
 export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	svelte: 5,
-	typescript: 60,
+	typescript: 59,
 	css: 9,
 };
+// typescript 60→59 (2026-07-14, checkouts unchanged; svelte 5 + css 9 unchanged, SAFETY 0). One
+// file leaves, none enter — `js/comments-closure-typecast/issue-8045.js`, `partial`→`known`, from
+// the same `return`/`throw` leading-comment fix as the unknown pin below. Its JSDoc cast is
+// written with a newline after the comment (`return (/** @type {T} */⏎(x))`), so the argument now
+// takes the parenthesized form instead of being pulled onto the keyword's line; that matches
+// prettier's structure and drops the file's unexplained hunks. The residual (tsv keeps the cast's
+// parens, prettier-on-`.js` via babel is the oracle there) is the pre-existing cast-preservation
+// divergence, untouched.
 // typescript 61→60 + svelte 4→5 (2026-07-14, checkouts as in CORPUS_FORMAT_UNKNOWN_PIN
 // above; css 9 unchanged, SAFETY 0). Two independent moves, each attributed by the
 // pre-change-binary per-file diff described on CORPUS_FORMAT_UNKNOWN_PIN:
