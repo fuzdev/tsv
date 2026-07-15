@@ -750,7 +750,7 @@ impl<'a> Printer<'a> {
                             && self.has_comments_to_emit_between(eq_pos + 1, rhs_start)
                         {
                             tail.push(
-                                self.build_trailing_comments_break_for_line(eq_pos + 1, rhs_start),
+                                self.build_trailing_comments_hang_next(eq_pos + 1, rhs_start),
                             );
                         }
                         tail.push(self.build_expression_doc(rhs));
@@ -1140,14 +1140,13 @@ impl<'a> Printer<'a> {
         } else {
             rhs_doc
         };
-        let value_doc = if gap_has_comments
-            && self.has_comments_to_emit_between(eq_pos + 1, rhs_start)
-        {
-            let comments_doc = self.build_trailing_comments_break_for_line(eq_pos + 1, rhs_start);
-            d.concat(&[comments_doc, rhs_doc])
-        } else {
-            rhs_doc
-        };
+        let value_doc =
+            if gap_has_comments && self.has_comments_to_emit_between(eq_pos + 1, rhs_start) {
+                let comments_doc = self.build_trailing_comments_hang_next(eq_pos + 1, rhs_start);
+                d.concat(&[comments_doc, rhs_doc])
+            } else {
+                rhs_doc
+            };
 
         tail.push(d.text(eq_text));
         tail.push(value_doc);

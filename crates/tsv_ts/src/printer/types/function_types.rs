@@ -169,7 +169,7 @@ impl<'a> Printer<'a> {
         // reaches one of them.
         let comments_doc = self
             .has_comments_to_emit_between(arrow_end, type_start)
-            .then(|| self.build_trailing_comments_break_for_line(arrow_end, type_start));
+            .then(|| self.build_trailing_comments_hang_next(arrow_end, type_start));
         // `<lead><comments><type>`, skipping the comment slot when the gap is bare.
         let joined = |lead: DocId, ty: DocId| match comments_doc {
             Some(c) => d.concat(&[lead, c, ty]),
@@ -398,7 +398,7 @@ impl<'a> Printer<'a> {
         let return_type_doc =
             self.build_function_type_return_doc(return_type, pre_arrow_line_close.is_none());
         let return_type_doc = if let Some(ac) = pre_arrow_line_close {
-            let pre = self.build_trailing_comments_break_for_line(ac, arrow_start);
+            let pre = self.build_trailing_comments_hang_next(ac, arrow_start);
             d.concat(&[d.text(" "), pre, return_type_doc])
         } else {
             match after_close {
@@ -721,7 +721,7 @@ impl<'a> Printer<'a> {
                 // line comment breaks so it can't swallow the rest parameter.
                 let dots_end = rest.span.start + "...".len() as u32;
                 let arg_start = rest.argument.span().start;
-                let comments_doc = self.build_trailing_comments_break_for_line(dots_end, arg_start);
+                let comments_doc = self.build_trailing_comments_hang_next(dots_end, arg_start);
                 let mut parts: DocBuf = smallvec![
                     d.text("..."),
                     comments_doc,
