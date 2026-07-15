@@ -1329,6 +1329,7 @@ formatting behavior. Key files: `src/language-js/print/assignment.js` (assignmen
 **Specs** — consult BEFORE implementing CSS/HTML/JS features (don't search the web):
 
 - CSS — `../csswg-drafts/`
+- CSS Houdini — `../css-houdini-drafts/` (the Houdini Task Force's own repo, not part of `csswg-drafts`; home of `css-properties-values-api`, the `@property` spec)
 - HTML — `../html/`
 - DOM — `../dom/`
 - ECMAScript — `../ecma262/`
