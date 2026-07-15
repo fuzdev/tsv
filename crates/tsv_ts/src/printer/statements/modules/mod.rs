@@ -17,6 +17,7 @@ mod specifier_list;
 pub(super) use super::{Printer, build_entity_name_doc};
 
 use crate::ast::internal;
+use crate::printer::calls::PartitionedComments;
 use crate::printer::needs_parens::export_default_needs_parens;
 use smallvec::SmallVec;
 use smallvec::smallvec;
@@ -766,26 +767,45 @@ impl<'a> Printer<'a> {
             self.identifier_name_doc(&decl.id),
         ));
 
+        // One walk of the reference: its span bounds and its doc. Built whole (rather
+        // than pushed piecemeal) so the `=`→reference gap below can pass it as its
+        // continuation — a line comment there indents the reference, and every break
+        // *inside* it has to land at that level too.
+        let (module_ref_start, ref_end, module_ref_doc) = match &decl.module_reference {
+            internal::TSModuleReference::ExternalModuleReference(ext) => (
+                ext.span.start,
+                ext.span.end,
+                self.build_external_module_reference_doc(ext),
+            ),
+            internal::TSModuleReference::EntityName(entity) => (
+                entity.span().start,
+                entity.span().end,
+                build_entity_name_doc(self, entity),
+            ),
+        };
+
         // identifier→`=` and `=`→module-reference gaps. Both are preserved in place
         // (prettier keeps them there too). Nothing else scans them — a module
         // reference is not an expression, so a comment glued to `require` is not
         // owned by any node and would be dropped if this gap didn't emit it.
-        let module_ref_start = match &decl.module_reference {
-            internal::TSModuleReference::ExternalModuleReference(ext) => ext.span.start,
-            internal::TSModuleReference::EntityName(entity) => entity.span().start,
-        };
         match self.find_keyword_in_range(decl.id.span.end, module_ref_start, "=") {
             Some(eq_start) => {
-                parts.push(self.build_keyword_to_name_continuation(
-                    decl.id.span.end,
-                    eq_start,
-                    d.text("="),
-                ));
-                parts.push(self.build_keyword_to_name_continuation(
-                    eq_start + 1,
-                    module_ref_start,
-                    d.empty(),
-                ));
+                // Both gaps FLAT, one `indent` for the whole tail — the multi-word
+                // keyword rule (`build_keyword_words_doc`), which this header is the
+                // other instance of. Indenting per gap compounds; and the tail must be
+                // *inside* the indent, not a sibling after it, or the reference's own
+                // line breaks resolve at the outer level — leaving `require(`'s
+                // contents level with it and its `)` a level above.
+                let (before_eq, line_before) =
+                    self.build_keyword_gap_doc(decl.id.span.end, eq_start);
+                let (after_eq, line_after) =
+                    self.build_keyword_gap_doc(eq_start + 1, module_ref_start);
+                let tail = d.concat(&[before_eq, d.text("="), after_eq, module_ref_doc]);
+                parts.push(if line_before || line_after {
+                    d.indent(tail)
+                } else {
+                    tail
+                });
             }
             None => {
                 // Same landmine as `build_keyword_words_doc`'s fallback: this arm scans
@@ -799,59 +819,7 @@ impl<'a> Printer<'a> {
                     decl.id.span.end
                 );
                 parts.push(d.text(" = "));
-            }
-        }
-
-        // module reference
-        match &decl.module_reference {
-            internal::TSModuleReference::ExternalModuleReference(ext_ref) => {
-                // Check for comments inside require() - expand if present
-                // The require() span includes `require(` at start and `)` at end
-                // Comments can be between `require(` and the string literal
-                let require_open_end = ext_ref.span.start + "require(".len() as u32;
-                let literal_start = ext_ref.expression.span.start;
-                let has_comments = self.has_line_comments_between(require_open_end, literal_start);
-
-                if has_comments {
-                    // Multi-line format with comments
-                    // Build comments doc: each comment on its own line
-                    let mut comment_parts = DocBuf::new();
-                    for comment in
-                        comments_to_emit_in_range(self.comments, require_open_end, literal_start)
-                    {
-                        comment_parts.push(self.build_comment_doc(comment));
-                        comment_parts.push(d.hardline());
-                    }
-
-                    parts.push(d.text("require("));
-                    parts.push(d.indent(d.concat(&[
-                        d.hardline(),
-                        d.concat(&comment_parts),
-                        self.build_literal_doc(&ext_ref.expression),
-                    ])));
-                    parts.push(d.hardline());
-                    parts.push(d.text(")"));
-                } else {
-                    // Check for inline block comments
-                    let has_inline_comments =
-                        self.has_comments_to_emit_between(require_open_end, literal_start);
-                    if has_inline_comments {
-                        parts.push(d.text("require("));
-                        parts.push(
-                            self.build_inline_comments_between_doc(require_open_end, literal_start),
-                        );
-                        parts.push(self.build_literal_doc(&ext_ref.expression));
-                        parts.push(d.text(")"));
-                    } else {
-                        // Simple compact format
-                        parts.push(d.text("require("));
-                        parts.push(self.build_literal_doc(&ext_ref.expression));
-                        parts.push(d.text(")"));
-                    }
-                }
-            }
-            internal::TSModuleReference::EntityName(entity_name) => {
-                parts.push(build_entity_name_doc(self, entity_name));
+                parts.push(module_ref_doc);
             }
         }
 
@@ -860,15 +828,93 @@ impl<'a> Printer<'a> {
         // *before* the `;` (operand-attached — prettier 3.9 keeps it), while a same-line
         // **line** comment floats after the `;` via `line_suffix`. So this uses the
         // comma-style `block_after_separator: false`, not `finish_with_pre_semi`.
-        let ref_end = match &decl.module_reference {
-            internal::TSModuleReference::ExternalModuleReference(ext_ref) => ext_ref.span.end,
-            internal::TSModuleReference::EntityName(entity_name) => entity_name.span().end,
-        };
         let semicolon_pos = decl.span.end.saturating_sub(1);
-        let after = self.split_separator_gap_comments(&mut parts, ref_end, semicolon_pos, false);
-        parts.push(d.text(";"));
-        parts.extend(after);
+        self.push_semicolon_with_gap_comments(&mut parts, ref_end, semicolon_pos, false);
         d.concat(&parts)
+    }
+
+    /// The `require('m')` form of an import-equals module reference, as one doc.
+    ///
+    /// **Both** in-paren gaps are emitted — `require(`→literal and literal→`)`. Nothing
+    /// else scans either: a module reference is not an expression, so no node owns a
+    /// comment written here and a gap this printer skips is a gap whose comment is
+    /// dropped outright (silent content loss, which is what the literal→`)` gap used to
+    /// do).
+    ///
+    /// The close gap takes the shape a call's **last argument** already has
+    /// ([`PartitionedComments::emit_last_arg_comments`]): a same-line comment trails the
+    /// literal, an own-line one dangles above the `)`. There is no trailing comma to
+    /// split around (`trailingComma: 'none'`), which is exactly that helper's premise.
+    fn build_external_module_reference_doc(
+        &self,
+        ext_ref: &internal::TSExternalModuleReference<'_>,
+    ) -> DocId {
+        let d = self.d();
+        let require_open_end = ext_ref.span.start + "require(".len() as u32;
+        let literal_start = ext_ref.expression.span.start;
+        let close_paren = ext_ref.span.end.saturating_sub(1);
+
+        // The literal plus whatever trails it inside the parens.
+        let close = PartitionedComments::new(
+            self.comments,
+            self.line_breaks,
+            ext_ref.expression.span.end,
+            close_paren,
+        );
+        let mut value: DocBuf = smallvec![self.build_literal_doc(&ext_ref.expression)];
+        close.emit_last_arg_comments(&mut value, self);
+        let value_doc = d.concat(&value);
+
+        // A line comment runs to EOL and an own-line comment must keep its own line, so
+        // either side having one forces the parens open; a lone same-line block stays
+        // inline. Same rule as the dynamic-import parens (`calls/import_expr.rs`).
+        let open_has_line = self.has_line_comments_between(require_open_end, literal_start);
+        let open_has_any = self.has_comments_to_emit_between(require_open_end, literal_start);
+        let close_forces_break = close.has_trailing_line() || !close.leading.is_empty();
+
+        if open_has_line || close_forces_break {
+            let mut inner = DocBuf::new();
+            if open_has_line {
+                // Each open-gap comment on its own line — a line comment there can't
+                // share one with the literal.
+                for comment in
+                    comments_to_emit_in_range(self.comments, require_open_end, literal_start)
+                {
+                    inner.push(self.build_comment_doc(comment));
+                    inner.push(d.hardline());
+                }
+            } else if open_has_any {
+                // Only the close gap forced the break, so an open-gap block keeps
+                // hugging the literal rather than being relocated to its own line.
+                inner.push(self.build_inline_comments_between_doc_trailing_space(
+                    require_open_end,
+                    literal_start,
+                ));
+            }
+            inner.push(value_doc);
+            return d.concat(&[
+                d.text("require("),
+                d.indent(d.concat(&[d.hardline(), d.concat(&inner)])),
+                d.hardline(),
+                d.text(")"),
+            ]);
+        }
+        if open_has_any {
+            // The comment hugs the `(` and keeps its space on the literal's side
+            // (`require(/* c */ 'm')`) — the dotted pair's after-`.` rule, and prettier's.
+            // An author who wrote it *before* the `(` lands here too: both formatters move
+            // it inside, so the two authorings converge (`unformatted_before_paren`).
+            return d.concat(&[
+                d.text("require("),
+                self.build_inline_comments_between_doc_trailing_space(
+                    require_open_end,
+                    literal_start,
+                ),
+                value_doc,
+                d.text(")"),
+            ]);
+        }
+        d.concat(&[d.text("require("), value_doc, d.text(")")])
     }
 
     /// `export as namespace Foo;` — TypeScript UMD global export declaration.
@@ -890,10 +936,7 @@ impl<'a> Printer<'a> {
         // Trailing comment between the name and `;` (mirrors `export =` / import-equals):
         // a same-line block comment stays before `;`, a line comment floats after it.
         let semicolon_pos = decl.span.end.saturating_sub(1);
-        let after =
-            self.split_separator_gap_comments(&mut parts, decl.id.span.end, semicolon_pos, false);
-        parts.push(d.text(";"));
-        parts.extend(after);
+        self.push_semicolon_with_gap_comments(&mut parts, decl.id.span.end, semicolon_pos, false);
         d.concat(&parts)
     }
 }
