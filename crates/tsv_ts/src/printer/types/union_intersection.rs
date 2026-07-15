@@ -14,6 +14,7 @@ use super::helpers::{
 use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{TSIntersectionType, TSParenthesizedType, TSType, TSUnionType};
 use crate::printer::CommentVec;
+use crate::printer::LeadingGlue;
 use crate::printer::analysis::has_newline_after_position;
 use crate::printer::layout::hang_after_operator;
 use smallvec::smallvec;
@@ -485,7 +486,7 @@ impl<'a> Printer<'a> {
                     let after_pipe = pipe_pos + 1;
                     let own_line: CommentVec<'_> =
                         comments_to_emit_in_range(self.comments, after_pipe, type_start)
-                            .filter(|c| !(c.is_block && self.is_same_line(c.span.end, type_start)))
+                            .filter(|c| !self.comment_hugs_next(c, type_start))
                             .collect();
                     // A blank line the author left *before* the first own-line comment
                     // (`A |⏎⏎/* c */⏎B`) and *between* two own-line comments is preserved,
@@ -502,9 +503,23 @@ impl<'a> Printer<'a> {
                     parts.push(d.hardline());
                     for (j, comment) in own_line.iter().enumerate() {
                         parts.push(self.build_comment_doc(comment));
-                        if let Some(next) = own_line.get(j + 1)
-                            && self.has_blank_line_between(comment.span.end, next.span.start)
-                        {
+                        let Some(next) = own_line.get(j + 1) else {
+                            // The last comment always breaks: the filter above routed
+                            // every member-hugging block onto the post-`| ` path, so
+                            // whatever is left cannot hug. No blank line is emitted
+                            // toward the member (see the blank-line note above).
+                            parts.push(d.hardline());
+                            continue;
+                        };
+                        // A block the author glued to the next comment leads it inline,
+                        // matching prettier's leading-comment rule. This run brackets the
+                        // `| ` separator and has its own blank-line policy, so it can't use
+                        // `push_leading_comment_run` — but it shares the rule.
+                        if self.comment_hugs_next(comment, next.span.start) {
+                            parts.push(d.text(" "));
+                            continue;
+                        }
+                        if self.has_blank_line_between(comment.span.end, next.span.start) {
                             parts.push(d.literalline());
                         }
                         parts.push(d.hardline());
@@ -512,7 +527,7 @@ impl<'a> Printer<'a> {
                     parts.push(d.text("| "));
                     for comment in comments_to_emit_in_range(self.comments, after_pipe, type_start)
                     {
-                        if comment.is_block && self.is_same_line(comment.span.end, type_start) {
+                        if self.comment_hugs_next(comment, type_start) {
                             parts.push(self.build_comment_doc(comment));
                             parts.push(d.text(" "));
                         }
@@ -542,7 +557,7 @@ impl<'a> Printer<'a> {
             let member_on_own_line = i == 0
                 && (self
                     .comments_on_page_between(union.span.start, type_start)
-                    .any(|c| !(c.is_block && self.is_same_line(c.span.end, type_start)))
+                    .any(|c| !self.comment_hugs_next(c, type_start))
                     || matches!(t, TSType::Parenthesized(p) if self.paren_has_leading_line_comment(p)));
 
             // Add the type with the same per-member offset as the main path
@@ -1146,7 +1161,13 @@ impl<'a> Printer<'a> {
             }
             if should_break {
                 unit.push(d.hardline());
-                self.emit_member_leading_comments(&mut unit, &own_line_leading, cur_start);
+                self.push_leading_comment_run(
+                    &mut unit,
+                    own_line_leading.iter().copied(),
+                    cur_start,
+                    LeadingGlue::Adjacent,
+                    d.empty(),
+                );
             } else {
                 unit.push(d.text(" "));
             }

@@ -6,13 +6,40 @@
 // heritage clauses (`extends` / `implements`).
 
 use super::layout::hang_after_operator;
-use super::{CommentSpacing, CommentVec, Printer};
+use super::{CommentSpacing, CommentVec, LeadingGlue, Printer};
 use crate::ast::internal;
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::{TriviaProfile, find_char, find_char_skipping_comments};
+
+/// How one heritage inter-item gap splits between the preceding item's doc and the
+/// join separator. The gap holds a comma, any comments, and the break to the next
+/// item; which of those the item's doc already emitted decides what the separator
+/// must add, so the two are read off one value instead of re-derived.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HeritageGap {
+    /// The whole gap is baked into the preceding item's doc. A line comment in the
+    /// gap forces the break, so the gap emitter owns the comma, the comments, *and*
+    /// the break (it must, to let a block glued to the next item hug it). The
+    /// separator emits nothing.
+    ///
+    /// Why the *preceding* item, when a block-only gap instead leads the **next** one
+    /// (the leading branch in `build_heritage_clause_doc`)? Because this gap's split —
+    /// which comments trail the comma vs lead the next item — is one derivation, and
+    /// `push_inter_item_line_comment_gap` makes it once. Handing the leading half to
+    /// the next item's doc would force *it* to re-derive where the previous item's tail
+    /// stopped, and two derivations of one boundary drift apart (the `bug121` class; a
+    /// block-only gap escapes this only because both sides call
+    /// `is_stranded_after_comma_block` with identical arguments).
+    Baked,
+    /// The comma is baked — a **stranded** after-comma block trails it on its line
+    /// (`A, /* c */⏎B`) — but the break is the separator's.
+    CommaBaked,
+    /// Nothing is baked; the separator emits comma + break.
+    Open,
+}
 
 /// A heritage-clause keyword (`extends` / `implements`). Carried as an enum
 /// rather than `&str` so the keyword text and its spaced form are total — no
@@ -546,7 +573,37 @@ impl<'a> Printer<'a> {
         (inline_parts, indent_parts)
     }
 
+    /// Join heritage item docs, emitting per gap only what that gap's item doc did
+    /// not already write (see [`HeritageGap`]) — so the separator and the item doc
+    /// can't disagree about who owns the comma or the break. `break_doc` is the
+    /// separator's break: a `hardline` where a line comment forces one, a `line`
+    /// for the width-based clause. With every gap `Open` this is exactly
+    /// `d.join(item_docs, "," + break_doc)`.
+    fn join_heritage_items(
+        &self,
+        item_docs: &[DocId],
+        gaps: &[HeritageGap],
+        break_doc: DocId,
+    ) -> DocId {
+        let d = self.d();
+        let comma_break = d.concat(&[d.text(","), break_doc]);
+        let mut joined: DocBuf = smallvec![item_docs[0]];
+        for (idx, &item_doc) in item_docs.iter().enumerate().skip(1) {
+            match gaps[idx - 1] {
+                // The gap emitter already wrote the comma, the comments, and the break.
+                HeritageGap::Baked => {}
+                HeritageGap::CommaBaked => joined.push(break_doc),
+                HeritageGap::Open => joined.push(comma_break),
+            }
+            joined.push(item_doc);
+        }
+        d.concat(&joined)
+    }
+
     /// Build a heritage clause doc: `keyword` + indented, comma-separated heritage items.
+    ///
+    /// See [`HeritageGap`] for how each inter-item gap splits between the preceding
+    /// item's doc and the join separator.
     ///
     /// Handles line comments between items (SAFETY): when a line comment appears after
     /// a heritage item, the comma is placed before the comment to prevent the comment
@@ -572,26 +629,27 @@ impl<'a> Printer<'a> {
             .collect();
         let has_any_item_line_comments = has_trailing_line_comment.iter().any(|&v| v);
 
-        // A gap's comma is *baked into the preceding item's doc* (rather than emitted
-        // by the join separator) when that item has a trailing line comment, or — in
-        // group mode — a **stranded** after-comma block that must stay on the comma's
-        // line (`A, /* c */⏎ B`). The join then uses a bare break for such items and a
-        // comma-break for the rest. Inline (non-group) heritage keeps every after-comma
-        // block leading the next item, so nothing is baked there (the `", "` join owns
-        // the comma). Mirrors the declarator/for-init stranded rule; prettier relocates
-        // the block before the comma.
-        let comma_baked: SmallVec<[bool; 8]> = has_trailing_line_comment
+        // How each gap's pieces split between the preceding item's doc and the join
+        // separator. Inline (non-group) heritage keeps every after-comma block leading
+        // the next item, so nothing is baked there (the `", "` join owns the comma).
+        // Mirrors the declarator/for-init stranded rule; prettier relocates the block
+        // before the comma.
+        let gaps: SmallVec<[HeritageGap; 8]> = has_trailing_line_comment
             .iter()
             .enumerate()
             .map(|(i, &has_line)| {
-                has_line
-                    || (group_mode && {
-                        let next_start = items[i + 1].span.start;
-                        let comma_pos =
-                            self.comma_between(heritage_item_end(&items[i]), next_start);
-                        self.comments_on_page_between(comma_pos, next_start)
-                            .any(|c| self.is_stranded_after_comma_block(c, comma_pos, next_start))
-                    })
+                if has_line {
+                    HeritageGap::Baked
+                } else if group_mode && {
+                    let next_start = items[i + 1].span.start;
+                    let comma_pos = self.comma_between(heritage_item_end(&items[i]), next_start);
+                    self.comments_on_page_between(comma_pos, next_start)
+                        .any(|c| self.is_stranded_after_comma_block(c, comma_pos, next_start))
+                } {
+                    HeritageGap::CommaBaked
+                } else {
+                    HeritageGap::Open
+                }
             })
             .collect();
 
@@ -609,24 +667,27 @@ impl<'a> Printer<'a> {
                 // item (trailing its comma) in group mode, so skip it here. When the
                 // previous gap has a line comment, its after-comma comments were baked
                 // into that item's doc, so skip the lead there entirely.
-                if i > 0 && !has_trailing_line_comment[i - 1] {
+                if i > 0 && gaps[i - 1] != HeritageGap::Baked {
                     let prev_end = heritage_item_end(&items[i - 1]);
                     let comma_pos = self.comma_between(prev_end, heritage.span.start);
-                    for comment in
+                    let leading: CommentVec<'_> =
                         comments_to_emit_in_range(self.comments, comma_pos, heritage.span.start)
-                    {
-                        if group_mode
-                            && self.is_stranded_after_comma_block(
-                                comment,
-                                comma_pos,
-                                heritage.span.start,
-                            )
-                        {
-                            continue;
-                        }
-                        h_parts.push(self.build_comment_doc(comment));
-                        h_parts.push(d.text(" "));
-                    }
+                            .filter(|c| {
+                                !(group_mode
+                                    && self.is_stranded_after_comma_block(
+                                        c,
+                                        comma_pos,
+                                        heritage.span.start,
+                                    ))
+                            })
+                            .collect();
+                    self.push_leading_comment_run(
+                        &mut h_parts,
+                        leading.iter().copied(),
+                        heritage.span.start,
+                        LeadingGlue::Adjacent,
+                        d.empty(),
+                    );
                 }
 
                 h_parts.push(self.build_entity_name_doc(&heritage.expression));
@@ -646,36 +707,34 @@ impl<'a> Printer<'a> {
                 if let Some(next) = items.get(i + 1) {
                     let item_end = heritage_item_end(heritage);
 
-                    if has_trailing_line_comment[i] {
+                    if gaps[i] == HeritageGap::Baked {
                         // Line comment(s) in the gap: before-comma blocks trail this
                         // item, then the comma, then the first line comment trails it
                         // (on the comma's line) or drops below — the same rule as the
                         // declarator/for-init gaps, so route through the shared helper.
-                        // e.g. `I /* c1 */,\n// c2\nJ` or `I, // c1\n// c2\nJ`. The comma
-                        // is baked into this item's doc (the join uses a bare hardline
-                        // after it, via `comma_baked`); the run sits inside the clause's
+                        // e.g. `I /* c1 */,\n// c2\nJ` or `I, // c1\n// c2\nJ`. The whole
+                        // gap is baked into this item's doc, break included (the join adds
+                        // nothing — `HeritageGap::Baked`); the run sits inside the clause's
                         // `d.indent()`, so continuation indent is empty.
-                        let comments: CommentVec<'_> =
-                            comments_to_emit_in_range(self.comments, item_end, next.span.start)
-                                .collect();
                         let comma_pos = self.comma_between(item_end, next.span.start);
-                        self.push_inter_declarator_line_comment_gap(
+                        self.push_inter_item_line_comment_gap(
                             &mut h_parts,
-                            &comments,
+                            item_end,
                             comma_pos,
+                            next.span.start,
                             d.empty(),
                         );
                     } else {
                         // Before-comma block(s) trail this item; a **hugging** after-comma
                         // block leads the NEXT item (its leading branch above). A
                         // **stranded** after-comma block stays on the comma's line: when
-                        // this gap is baked (`comma_baked[i]`, group mode only) the comma
-                        // is emitted here with the stranded block trailing it, and the
-                        // join uses a bare break. Otherwise the comma comes from the join
-                        // separator. Preserves the author's side of the comma.
+                        // this gap's comma is baked (`HeritageGap::CommaBaked`, group mode
+                        // only) the comma is emitted here with the stranded block trailing
+                        // it, and the join uses a bare break. Otherwise the comma comes
+                        // from the join separator. Preserves the author's side of the comma.
                         let comma_pos = self.comma_between(item_end, next.span.start);
                         self.push_before_comma_blocks(&mut h_parts, item_end, comma_pos);
-                        if comma_baked[i] {
+                        if gaps[i] == HeritageGap::CommaBaked {
                             h_parts.push(d.text(","));
                             self.push_stranded_after_comma_blocks(
                                 &mut h_parts,
@@ -707,24 +766,11 @@ impl<'a> Printer<'a> {
             let kw_end = kw_start + keyword.as_str().len() as u32;
             if self.comments_force_own_line_between(kw_end, items[0].span.start) {
                 // Items carrying their own line comments must join with the
-                // comma-baking-aware separators (a bare hardline where the gap's
-                // comma is baked into the preceding item, a comma+hardline
-                // otherwise) — mirroring the group-mode line-comment join below.
-                // A plain `", "` join would let a per-item line comment swallow the
-                // next item (`// c1, B` — non-reparseable content loss).
+                // gap-aware separators — mirroring the group-mode line-comment join
+                // below. A plain `", "` join would let a per-item line comment swallow
+                // the next item (`// c1, B` — non-reparseable content loss).
                 let value_doc = if has_any_item_line_comments {
-                    let comma_hardline = d.concat(&[d.text(","), d.hardline()]);
-                    let hardline = d.hardline();
-                    let mut joined: DocBuf = smallvec![item_docs[0]];
-                    for (idx, &item_doc) in item_docs.iter().enumerate().skip(1) {
-                        joined.push(if comma_baked[idx - 1] {
-                            hardline
-                        } else {
-                            comma_hardline
-                        });
-                        joined.push(item_doc);
-                    }
-                    d.concat(&joined)
+                    self.join_heritage_items(&item_docs, &gaps, d.hardline())
                 } else {
                     d.join(item_docs, ", ")
                 };
@@ -741,43 +787,17 @@ impl<'a> Printer<'a> {
 
         if group_mode {
             if has_any_item_line_comments {
-                // Line comments force hardline breaks. Items whose gap baked its comma
-                // (a line comment, or a stranded block) get just a hardline; others get
-                // comma + hardline from the separator.
-                let comma_hardline = d.concat(&[d.text(","), d.hardline()]);
-                let hardline = d.hardline();
-                let mut joined_parts: DocBuf = smallvec![item_docs[0]];
-                for (idx, &item_doc) in item_docs.iter().enumerate().skip(1) {
-                    joined_parts.push(if comma_baked[idx - 1] {
-                        hardline
-                    } else {
-                        comma_hardline
-                    });
-                    joined_parts.push(item_doc);
-                }
-                let types_joined = d.concat(&joined_parts);
+                // Line comments force hardline breaks.
+                let types_joined = self.join_heritage_items(&item_docs, &gaps, d.hardline());
                 let inner = d.indent(match kw_comments {
                     Some(c) => d.concat(&[d.hardline(), c, types_joined]),
                     None => d.concat(&[d.hardline(), types_joined]),
                 });
                 d.concat(&[d.text(keyword.as_str()), inner])
             } else {
-                // Width-based breaks. An item whose gap baked its comma (a stranded
-                // after-comma block trailing it) gets a bare `line`; others get the
-                // `comma_line` separator. With no baked commas this is exactly
-                // `join_doc(item_docs, comma_line)`.
-                let comma_line = d.concat(&[d.text(","), d.line()]);
-                let line = d.line();
-                let mut joined_parts: DocBuf = smallvec![item_docs[0]];
-                for (idx, &item_doc) in item_docs.iter().enumerate().skip(1) {
-                    joined_parts.push(if comma_baked[idx - 1] {
-                        line
-                    } else {
-                        comma_line
-                    });
-                    joined_parts.push(item_doc);
-                }
-                let types_joined = d.concat(&joined_parts);
+                // Width-based breaks. No gap is `Baked` here — that needs a line
+                // comment, which this branch excludes.
+                let types_joined = self.join_heritage_items(&item_docs, &gaps, d.line());
                 let hung = match kw_comments {
                     Some(c) => d.concat(&[c, types_joined]),
                     None => types_joined,

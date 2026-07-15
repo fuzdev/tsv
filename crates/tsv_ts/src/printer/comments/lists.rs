@@ -76,7 +76,7 @@ impl<'a> Printer<'a> {
             .peekable();
         while let Some(comment) = comments.next() {
             parts.push(self.build_comment_doc(comment));
-            if comment.is_block && self.is_same_line(comment.span.end, end) {
+            if self.comment_hugs_next(comment, end) {
                 parts.push(d.text(" "));
             } else {
                 // Preserve a blank line the author left between this comment and what

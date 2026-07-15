@@ -4,7 +4,7 @@
 use super::{Printer, build_entity_name_doc, is_effectively_empty_body, should_hug_union_type};
 use crate::ast::internal::{self, TSType};
 use crate::printer::layout::hang_after_operator;
-use crate::printer::{CommentFilter, CommentSpacing, CommentVec, HeritageKeyword};
+use crate::printer::{CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue};
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -921,7 +921,13 @@ impl<'a> Printer<'a> {
                 }
 
                 // Process leading comments
-                self.emit_member_leading_comments(&mut member_parts, &comments, member_start);
+                self.push_leading_comment_run(
+                    &mut member_parts,
+                    comments.iter().copied(),
+                    member_start,
+                    LeadingGlue::Adjacent,
+                    d.empty(),
+                );
 
                 // A preceding format-ignore directive keeps the member's source
                 // verbatim. The member span excludes the
