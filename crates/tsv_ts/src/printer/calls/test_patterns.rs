@@ -7,7 +7,6 @@ use super::super::Printer;
 use crate::ast::internal::{self, IdentName};
 use smallvec::SmallVec;
 use tsv_lang::SymbolResolver;
-use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
 /// Test function patterns that Prettier keeps on a single line
