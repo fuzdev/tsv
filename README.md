@@ -14,8 +14,8 @@ and a drop-in replacement for [Svelte](https://svelte.dev/)'s parser +
 Compared to Oxc, Biome, and SWC, tsv is a set of focused tools, not a generic language platform,
 so the focus is web standards and there's no support for JSX/SCSS/etc,
 beyond Svelte as the only JS framework.
-The extensibility story is currently limited to using its Rust crates as libraries;
-bridging to JS or WASM plugins is an open question, but may not be supported.
+The extensibility story is currently limited to using its Rust crates as libraries (or forking);
+bridging to JS or WASM plugins is an open question (leaning against).
 
 tsv prioritizes, in order:
 
