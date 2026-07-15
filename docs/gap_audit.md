@@ -164,9 +164,13 @@ the short version:
   never lexed as `Comment`s at all. All outside the model by construction. CSS also has no
   line comments, so the `line` payload is inert in a `.css` file.
 - **`code_regions`' reach.** A gap the region walk doesn't name is a gap never probed. Today
-  a `.svelte` file's `<style>` content and the non-expression interior of a block tag
-  (`{#if ⟨here⟩ a.b}`) are unprobed — so, for example, a Svelte fixture containing only a
-  `<style>` block yields **zero sites**.
+  a `.svelte` file's `<style>` content is unprobed — so a Svelte fixture containing only a
+  `<style>` block yields **zero sites**. That one is held back by **yield, not difficulty**:
+  `Style::content_span` names it in a line, but measured over `tests/fixtures` it is +154k
+  sites (+20% runtime) for 3 shapes, all `@import`-prelude double-prints. The thinness is
+  structural — the ledger registers only *detached* comments, and CSS keeps its in-block
+  comments as AST nodes and never lexes a declaration-value comment as a `Comment` at all —
+  so extending the ledger (see `comment_ledger`'s TODO) is the honest prerequisite.
 
 Related: [Comment Ledger Audit](../CLAUDE.md#debug-tooling) (the detector this drives),
 [conformance_prettier.md §Comment Position Philosophy](conformance_prettier.md#comment-position-philosophy).
