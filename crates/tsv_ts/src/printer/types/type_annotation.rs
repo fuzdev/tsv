@@ -140,8 +140,8 @@ impl<'a> Printer<'a> {
 
     /// Build type annotation doc with width-aware type argument wrapping.
     ///
-    /// For `TypeReference<Args>`, uses `build_type_arguments_doc_wrapping` so
-    /// type arguments wrap at width boundary.
+    /// For `TypeReference<Args>`, `build_type_arguments_doc` wraps the type
+    /// arguments at the width boundary.
     ///
     /// For Union types, uses break-after-colon layout:
     /// ```text
@@ -229,7 +229,7 @@ impl<'a> Printer<'a> {
             {
                 parts.push(name_ta_comments);
             }
-            parts.push(self.build_type_arguments_doc_wrapping(type_args));
+            parts.push(self.build_type_arguments_doc(type_args));
             return d.concat(&parts);
         }
 
@@ -264,7 +264,7 @@ impl<'a> Printer<'a> {
             // `return_type_generic_union` print-width family, handled by the
             // `union_prints_hugged` branch below), and any comment that makes the printer
             // decline the hug disqualifies it here too.
-            if self.union_return_hugs(value_type, u, colon_end, value_type_start) {
+            if self.union_return_hugs(value_type, colon_end, value_type_start) {
                 return match comments_doc {
                     Some(c) => d.concat(&[d.text(": "), c, type_doc]),
                     None => d.concat(&[d.text(": "), type_doc]),
@@ -360,7 +360,7 @@ impl<'a> Printer<'a> {
             {
                 parts.push(comments_doc);
             }
-            parts.push(self.build_type_doc_with_wrapping_type_args(&intersection.types[0]));
+            parts.push(self.build_type_doc(&intersection.types[0]));
             return d.concat(&parts);
         }
 

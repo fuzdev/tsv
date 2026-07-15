@@ -25,10 +25,23 @@ answer had drifted:
 - `:` — an annotation (`d`), via `union_return_hugs`
 - `=>` — a function-type return (`E`), same gate
 - `as` — a cast (`f`), via `build_union_hanging_indent_doc`
+- a mapped-type value (`G`)
+- a conditional check (`H`) and branch (`I`)
+- a type argument, in type (`J`) and expression (`k`) position
 
-`g`/`H`/`i` are the controls: the same three positions with nothing to disqualify the hug, so
-it still happens and the keyword stays glued. A **block** comment in the gap (`C`) also stays
-hugged and inline — it renders fine there, nothing is lost, and prettier agrees.
+⚠️ **This list is load-bearing, and it has been wrong before.** It once named only the first
+four, which read as "the vein is closed" — while the last five asked the bare syntactic
+predicate and mangled every one of them. An enumeration that trails the code is worse than
+none: it is what stops the next reader from probing. If you add a position that can hold a
+union, add it here, and probe it against prettier rather than trusting this list.
+
+`l`/`M`/`n` are the controls: the same positions with nothing to disqualify the hug, so it
+still happens and the keyword stays glued. A **block** comment in the gap (`C`) also stays
+hugged and inline — it renders fine there, nothing is lost, and prettier agrees. The
+*between-members* block comment — the other clause that declines the hug, and the one the
+narrower duplicate scan used to miss — is pinned by
+[union_hug_member_block_comment](../union_hug_member_block_comment/), which fully matches
+prettier (no alignment is involved, so it is not a divergence).
 
 ## The divergence
 

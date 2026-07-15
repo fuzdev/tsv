@@ -190,7 +190,7 @@ impl<'a> Printer<'a> {
             // NOT hugged (the sanctioned `return_type_generic_union` print-width
             // family), and a member/gap comment disqualifies the hug — those fall
             // through to the break-after-operator layout that matches prettier there.
-            if self.union_return_hugs(value_type, u, arrow_end, type_start) {
+            if self.union_return_hugs(value_type, arrow_end, type_start) {
                 return joined(d.text(arrow_sp), type_doc);
             }
             let hung = match comments_doc {
@@ -218,9 +218,8 @@ impl<'a> Printer<'a> {
                     .as_ref()
                     .is_some_and(type_args_should_wrap_for_return_type) =>
             {
-                // Use build_type_doc_inner with wrap_type_args=true to enable
-                // wrapping inside the type reference's type arguments
-                let type_doc = self.build_type_doc_inner(return_type.type_annotation, true);
+                // The type reference's own type arguments wrap internally when too wide.
+                let type_doc = self.build_type_doc(return_type.type_annotation);
                 joined(d.text(arrow_sp), type_doc)
             }
             _ => joined(

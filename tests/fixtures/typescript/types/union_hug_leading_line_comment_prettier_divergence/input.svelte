@@ -31,8 +31,40 @@
 			{ a: 1 }
 		| null;
 
+	type G = {
+		[K in T]:
+			| // c
+				{ a: 1 }
+			| null;
+	};
+
+	type H =
+		| // c
+			{ a: 1 }
+		| null extends U
+		? 1
+		: 2;
+
+	type I = T extends U
+		? | // c
+				{ a: 1 }
+			| null
+		: 2;
+
+	type J = Foo<
+		| // c
+			{ a: 1 }
+		| null
+	>;
+
+	const k = fn<
+		| // c
+			{ a: 1 }
+		| null
+	>();
+
 	// The same positions still hug when nothing disqualifies it.
-	let g: { a: 1 } | null;
-	type H = () => { a: 1 } | null;
-	const i = expr as { a: 1 } | null;
+	let l: { a: 1 } | null;
+	type M = () => { a: 1 } | null;
+	const n = expr as { a: 1 } | null;
 </script>

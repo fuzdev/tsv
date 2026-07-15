@@ -14,7 +14,7 @@ impl<'a> Printer<'a> {
     ///
     /// Matches Prettier's architecture: the condition wraps to multiple lines
     /// when the `while (condition)` line exceeds print width.
-    fn build_while_statement_with_wrapping_doc(
+    pub(in crate::printer::statements) fn build_while_statement_doc(
         &self,
         stmt: &internal::WhileStatement<'_>,
     ) -> DocId {
@@ -72,14 +72,6 @@ impl<'a> Printer<'a> {
             head_parts.push(condition_group);
             self.build_adjust_clause_with_comments(&head_parts, paren_end, body_start, body_doc)
         }
-    }
-
-    pub(in crate::printer::statements) fn build_while_statement_doc(
-        &self,
-        stmt: &internal::WhileStatement<'_>,
-    ) -> DocId {
-        // Delegate to the wrapping version for proper condition grouping
-        self.build_while_statement_with_wrapping_doc(stmt)
     }
 
     pub(in crate::printer::statements) fn build_do_while_statement_doc(
