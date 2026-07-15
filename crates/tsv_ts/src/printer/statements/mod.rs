@@ -70,6 +70,30 @@ fn is_statement_ambiguous_keyword(name: &str) -> bool {
     matches!(name, "type" | "module")
 }
 
+/// What a leading-comment gap opens at — the axis that decides whether a comment inside it
+/// can be a *trailing* comment of something else instead of leading the node at the far end.
+/// Naming it keeps the two cases from being one `u32` a caller can pass the wrong way:
+/// reading `Keyword` where a node ends (or vice versa) flips
+/// [`Printer::has_leading_own_line_comment_in_range`], and for `return`/`throw` that is an
+/// ASI bug, not a layout nit.
+#[derive(Clone, Copy)]
+enum GapStart {
+    /// A keyword, not a node (`return` / `throw`). Nothing here can own a trailing comment,
+    /// so every comment in the gap leads the node at the far end.
+    Keyword(u32),
+    /// A node ends here. A comment sharing its line trails *it*, not the node at the far end.
+    Node(u32),
+}
+
+impl GapStart {
+    /// Where the gap begins — the same position either way; only the reading differs.
+    const fn position(self) -> u32 {
+        match self {
+            Self::Keyword(p) | Self::Node(p) => p,
+        }
+    }
+}
+
 impl<'a> Printer<'a> {
     /// Build a Doc for a statement.
     ///
@@ -492,10 +516,11 @@ impl<'a> Printer<'a> {
     ///
     /// Matches Prettier's `returnArgumentHasLeadingComment` (function.js:290-318).
     fn argument_has_own_line_comment(&self, keyword_start: u32, arg: &Expression<'_>) -> bool {
-        // Own-line comment before the argument itself (`return (\n// c\nexpr)`). No node
-        // precedes this gap — the keyword is not an expression — so any comment in it leads
-        // the argument.
-        if self.has_leading_own_line_comment_in_range(None, keyword_start, arg.span().start) {
+        // Own-line comment before the argument itself (`return (\n// c\nexpr)`).
+        if self.has_leading_own_line_comment_in_range(
+            GapStart::Keyword(keyword_start),
+            arg.span().start,
+        ) {
             return true;
         }
 
@@ -513,12 +538,10 @@ impl<'a> Printer<'a> {
         match expr {
             Expression::CallExpression(call) => self.chain_has_own_line_comment(call.callee),
             Expression::MemberExpression(member) => {
-                // Leading own-line comment between object and property. The object precedes
-                // the gap, so a comment on its line trails it (`foo() // c`) and leaves the
-                // chain bare.
+                // Leading own-line comment between object and property.
                 let obj_end = member.object.span().end;
                 let prop_start = member.property.span().start;
-                if self.has_leading_own_line_comment_in_range(Some(obj_end), obj_end, prop_start) {
+                if self.has_leading_own_line_comment_in_range(GapStart::Node(obj_end), prop_start) {
                     return true;
                 }
                 self.chain_has_own_line_comment(member.object)
@@ -533,34 +556,32 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Whether a comment in `start..end` *leads* the node at `end` and is followed by a
-    /// newline — Prettier's `hasLeadingOwnLineComment` (`utils/index.js`). Two terms, and
-    /// both are load-bearing:
+    /// Whether a comment in the gap *leads* the node at `end` and is followed by a newline —
+    /// Prettier's `hasLeadingOwnLineComment` (`utils/index.js`). Two terms, and both are
+    /// load-bearing:
     ///
-    /// - **Leads.** A comment sharing `prev_node_end`'s line *trails* that node rather than
-    ///   leading the next one (Prettier attaches it as a trailing comment), so it never
-    ///   counts: `return foo() // c` + `.bar` keeps the chain bare. Pass `None` where no
-    ///   node precedes the gap — after a `return`/`throw` keyword the comment always leads
-    ///   the argument, so nothing can be trailing there.
+    /// - **Leads.** Decided by `gap_start`: a comment sharing a preceding *node*'s line
+    ///   trails that node rather than leading the next one (Prettier attaches it as a
+    ///   trailing comment), so it never counts — `return foo() // c` + `.bar` keeps the
+    ///   chain bare.
     /// - **Followed by a newline.** This is what makes a break unavoidable: the node cannot
-    ///   share the comment's line, so the caller must emit the form that survives one.
-    ///   A block comment with code after it on the same line (`return /* c */ (x)`) fails
-    ///   this term and stays inline.
+    ///   share the comment's line, so the caller must emit the form that survives one. A
+    ///   block comment with code after it on the same line (`return /* c */ (x)`) fails this
+    ///   term and stays inline.
     ///
     /// For `return`/`throw` the second term is an ASI guard, not cosmetics. Both are
     /// restricted productions (`return [no LineTerminator here] Expression`), so putting the
     /// argument on a later line without parens *changes the program*: `return` silently
     /// becomes `return;` plus an unreachable statement, and `throw` becomes a syntax error.
-    fn has_leading_own_line_comment_in_range(
-        &self,
-        prev_node_end: Option<u32>,
-        start: u32,
-        end: u32,
-    ) -> bool {
-        self.comments_in_source_between(start, end).any(|c| {
-            let leads = prev_node_end.is_none_or(|prev| !self.is_same_line(prev, c.span.start));
-            leads && has_newline_after_position(self.source, c.span.end)
-        })
+    fn has_leading_own_line_comment_in_range(&self, gap_start: GapStart, end: u32) -> bool {
+        self.comments_in_source_between(gap_start.position(), end)
+            .any(|c| {
+                let leads = match gap_start {
+                    GapStart::Keyword(_) => true,
+                    GapStart::Node(prev_end) => !self.is_same_line(prev_end, c.span.start),
+                };
+                leads && has_newline_after_position(self.source, c.span.end)
+            })
     }
 
     /// Build unconditional paren-wrapped doc for return/throw with own-line comments.
