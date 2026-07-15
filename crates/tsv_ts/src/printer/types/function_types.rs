@@ -6,7 +6,7 @@
 // - Signature parameters (shared with type members)
 // - Return type annotations
 
-use super::super::comments_in_range;
+use super::super::comments_to_emit_in_range;
 use super::super::expressions::functions::{has_huggable_type_annotation, is_huggable_pattern};
 use super::helpers::type_args_should_wrap_for_return_type;
 use super::{CommentSpacing, Printer};
@@ -164,7 +164,17 @@ impl<'a> Printer<'a> {
         let type_start = return_type.type_annotation.span().start;
         // Use break-for-line variant: line comments must force a hardline before
         // the return type so they don't swallow it (`=> // c\nT`, not `=> // c T`).
-        let comments_doc = self.build_trailing_comments_break_for_line(arrow_end, type_start);
+        // `None` on the comment-free path so none of the five layouts below carries an
+        // empty child — every function type (`() => void`, every callback parameter)
+        // reaches one of them.
+        let comments_doc = self
+            .has_comments_to_emit_between(arrow_end, type_start)
+            .then(|| self.build_trailing_comments_break_for_line(arrow_end, type_start));
+        // `<lead><comments><type>`, skipping the comment slot when the gap is bare.
+        let joined = |lead: DocId, ty: DocId| match comments_doc {
+            Some(c) => d.concat(&[lead, c, ty]),
+            None => d.concat(&[lead, ty]),
+        };
         // Strip redundant comment-free parens so `($A | $B)` / `($A & $B)` return
         // types get the same hanging layout as the bare form (prettier strips them
         // too). Only union/intersection are unwrapped; other parenthesized types
@@ -181,12 +191,13 @@ impl<'a> Printer<'a> {
             // family), and a member/gap comment disqualifies the hug — those fall
             // through to the break-after-operator layout that matches prettier there.
             if self.union_return_hugs(value_type, u, arrow_end, type_start) {
-                return d.concat(&[d.text(arrow_sp), comments_doc, type_doc]);
+                return joined(d.text(arrow_sp), type_doc);
             }
-            return d.concat(&[
-                d.text(arrow),
-                hang_after_operator(d, d.concat(&[comments_doc, type_doc])),
-            ]);
+            let hung = match comments_doc {
+                Some(c) => d.concat(&[c, type_doc]),
+                None => type_doc,
+            };
+            return d.concat(&[d.text(arrow), hang_after_operator(d, hung)]);
         }
         if let TSType::Intersection(i) = value_type {
             // Delegate to the shared bare hanging printer (same layout the type-alias
@@ -197,7 +208,7 @@ impl<'a> Printer<'a> {
             // isn't double-indented). The old inline `group(indent(type_doc))` for the
             // huggable branch double-indented the object body.
             let wrapped = self.intersection_hanging_with_indent(i);
-            return d.concat(&[d.text(arrow_sp), comments_doc, wrapped]);
+            return joined(d.text(arrow_sp), wrapped);
         }
         match return_type.type_annotation {
             // TypeReference with complex type args (like Promise<Result<...>>):
@@ -210,13 +221,12 @@ impl<'a> Printer<'a> {
                 // Use build_type_doc_inner with wrap_type_args=true to enable
                 // wrapping inside the type reference's type arguments
                 let type_doc = self.build_type_doc_inner(return_type.type_annotation, true);
-                d.concat(&[d.text(arrow_sp), comments_doc, type_doc])
+                joined(d.text(arrow_sp), type_doc)
             }
-            _ => d.concat(&[
+            _ => joined(
                 d.text(arrow_sp),
-                comments_doc,
                 self.build_type_doc(return_type.type_annotation),
-            ]),
+            ),
         }
     }
 
@@ -356,15 +366,26 @@ impl<'a> Printer<'a> {
         // Comments between the close paren and `=>` (e.g. `() /* c */ => void`).
         // Without this they are dropped — the params doc ends at `)` and the
         // return doc begins at `=>`, so nothing else covers the gap.
+        //
+        // The two source scans below serve only that gap, and the `(` scan runs to the
+        // end of the source in the worst case — so ask the cheap question first. Any
+        // `after_close` they could find lies at or past `paren_search_start`, so a
+        // comment-free `[paren_search_start, arrow_start]` window means the `filter`
+        // would reject whatever they returned. Skipping them is byte-identical.
         let arrow_start = return_type.span.start;
-        let after_close = find_char_skipping_comments(
-            self.source.as_bytes(),
-            paren_search_start as usize,
-            self.source.len(),
-            b'(',
-        )
-        .and_then(|open| self.find_closing_paren(open as u32, arrow_start))
-        .filter(|&after_close| self.has_comments_between(after_close, arrow_start));
+        let after_close = self
+            .has_comments_to_emit_between(paren_search_start, arrow_start)
+            .then(|| {
+                find_char_skipping_comments(
+                    self.source.as_bytes(),
+                    paren_search_start as usize,
+                    self.source.len(),
+                    b'(',
+                )
+                .and_then(|open| self.find_closing_paren(open as u32, arrow_start))
+                .filter(|&after_close| self.has_comments_to_emit_between(after_close, arrow_start))
+            })
+            .flatten();
 
         // A line comment in the `)`→`=>` gap can't stay inline — it would swallow
         // `=> void` (`() // c => void`). Keep it trailing `)` and force `=>` onto
@@ -381,11 +402,13 @@ impl<'a> Printer<'a> {
             let pre = self.build_trailing_comments_break_for_line(ac, arrow_start);
             d.concat(&[d.text(" "), pre, return_type_doc])
         } else {
-            let pre_arrow_doc = after_close.map_or_else(
-                || d.empty(),
-                |ac| self.build_comments_between(ac, arrow_start, CommentSpacing::Leading),
-            );
-            d.concat(&[pre_arrow_doc, return_type_doc])
+            match after_close {
+                Some(ac) => d.concat(&[
+                    self.build_comments_between(ac, arrow_start, CommentSpacing::Leading),
+                    return_type_doc,
+                ]),
+                None => return_type_doc,
+            }
         };
 
         let params_doc = d.concat(&self.build_function_params_doc(params, paren_search_start));
@@ -404,48 +427,6 @@ impl<'a> Printer<'a> {
     //
     // Signature Helpers (shared with type members)
     //
-
-    /// Build the doc for an empty parameter list, preserving any dangling block
-    /// comments inside the parens (`(/* c */)`). Returns `()` when there are none.
-    ///
-    /// Shared by function/constructor types (`build_function_params_doc`) and
-    /// the type-member signatures (`build_signature_params_doc`) — without this
-    /// the dangling comment is dropped (content loss).
-    fn build_empty_params_doc(&self, paren_pos: Option<u32>) -> DocId {
-        let d = self.d();
-        if let Some(paren_pos) = paren_pos
-            && let Some(close_pos) = self.matching_close_paren(paren_pos)
-            && self.has_comments_between(paren_pos + 1, close_pos)
-        {
-            // A line comment can't stay inline inside `()` — it would swallow the
-            // `)`. With no parameter to lead, prettier 3.9 (#18623) drops the
-            // comment to its own indented line and breaks the `()`; tsv matches.
-            // (Contrast a *non-empty* list, where a line comment trailing `(`
-            // stays on the `(` line via the open-delimiter divergence
-            // `delimiter_line_comment_prefix` — that path doesn't reach here.)
-            // Block comments stay inline (`(/* c */)`), matching prettier.
-            if self.has_line_comments_between(paren_pos + 1, close_pos) {
-                let mut inner = DocBuf::new();
-                for comment in comments_in_range(self.comments, paren_pos + 1, close_pos) {
-                    inner.push(d.hardline());
-                    inner.push(self.build_comment_doc(comment));
-                }
-                let mut parts: DocBuf = smallvec![d.text("(")];
-                parts.push(d.indent(d.concat(&inner)));
-                parts.push(d.hardline());
-                parts.push(d.text(")"));
-                return d.concat(&parts);
-            }
-            let mut parts: DocBuf = smallvec![d.text("(")];
-            for comment in comments_in_range(self.comments, paren_pos + 1, close_pos) {
-                parts.push(self.build_comment_doc(comment));
-            }
-            parts.push(d.text(")"));
-            d.concat(&parts)
-        } else {
-            d.text("()")
-        }
-    }
 
     /// Emit any comments in the `)`→return-type gap, so the caller can append the
     /// `: type` after this prefix.
@@ -480,7 +461,8 @@ impl<'a> Printer<'a> {
         let mut parts: DocBuf = smallvec![];
         let mut last_is_line = false;
         if let Some(close_after) = close_paren_after {
-            for comment in comments_in_range(self.comments, close_after, return_type_start) {
+            for comment in comments_to_emit_in_range(self.comments, close_after, return_type_start)
+            {
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
                 // A `//` line comment can't stay inline — it would swallow the
@@ -601,7 +583,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         if params.is_empty() {
             // Handle comments inside empty params (e.g., `a(/* comment */): void`)
-            return self.build_empty_params_doc(paren_pos);
+            return self.build_empty_params_with_comments_doc(paren_pos, self.source.len() as u32);
         }
 
         // Check for line comments or own-line block comments that force multiline
@@ -615,8 +597,9 @@ impl<'a> Printer<'a> {
         // functions, method/call/construct signatures). Skipped when a comment sits in
         // the `(`→param or param→`)` gap — the breakable path below places those.
         let no_hug_comments = paren_pos
-            .is_none_or(|p| !self.has_comments_between(p + 1, params[0].span().start))
-            && close_paren_pos.is_none_or(|c| !self.has_comments_between(params[0].span().end, c));
+            .is_none_or(|p| !self.has_comments_to_emit_between(p + 1, params[0].span().start))
+            && close_paren_pos
+                .is_none_or(|c| !self.has_comments_to_emit_between(params[0].span().end, c));
         if params.len() == 1
             && (is_huggable_pattern(&params[0]) || has_huggable_type_annotation(&params[0]))
             && no_hug_comments
@@ -634,7 +617,7 @@ impl<'a> Printer<'a> {
         // check is a source blank-line test independent of comments and stays outside
         // the gate. Mirrors `build_params_doc_with_comments`'s fast gate.
         let window_start = paren_pos.map_or_else(|| params[0].span().start, |p| p + 1);
-        let comments_present = self.has_comments_between(window_start, end_boundary);
+        let comments_present = self.has_comments_to_emit_between(window_start, end_boundary);
         // A line comment trailing `(` (`(// c\n p`), or an own-line block comment in
         // the `(`→first-param gap, forces multiline (else the inline path below lets a
         // line comment swallow the following tokens, `(// c p: T)`; mirrors
@@ -676,7 +659,9 @@ impl<'a> Printer<'a> {
         // the zero-comment window check above (the range is inside the window).
         if comments_present && let Some(paren_pos) = paren_pos {
             let first_param_start = params[0].span().start;
-            for comment in comments_in_range(self.comments, paren_pos + 1, first_param_start) {
+            for comment in
+                comments_to_emit_in_range(self.comments, paren_pos + 1, first_param_start)
+            {
                 param_parts.push(self.build_comment_doc(comment));
                 param_parts.push(d.text(" "));
             }
@@ -699,7 +684,7 @@ impl<'a> Printer<'a> {
                     close_paren_pos.unwrap_or(param_end)
                 };
 
-                for comment in comments_in_range(self.comments, param_end, next_boundary) {
+                for comment in comments_to_emit_in_range(self.comments, param_end, next_boundary) {
                     param_parts.push(d.text(" "));
                     param_parts.push(self.build_comment_doc(comment));
                 }
@@ -777,7 +762,9 @@ impl<'a> Printer<'a> {
         .map(|p| p as u32);
 
         if params.is_empty() {
-            parts.push(self.build_empty_params_doc(paren_pos));
+            parts.push(
+                self.build_empty_params_with_comments_doc(paren_pos, self.source.len() as u32),
+            );
         } else {
             // Check for line comments or own-line block comments between/after params (force multiline)
             let close_paren_pos = paren_pos.and_then(|p| self.matching_close_paren(p));
@@ -792,7 +779,7 @@ impl<'a> Printer<'a> {
             // each is provably empty/false.
             let window_has_comments = {
                 let window_start = paren_pos.unwrap_or(0);
-                self.has_comments_between(window_start, end_boundary)
+                self.has_comments_to_emit_between(window_start, end_boundary)
             };
 
             let has_line_comments = window_has_comments
@@ -845,11 +832,12 @@ impl<'a> Printer<'a> {
             //       options: { repo: LocalRepo; log: Logger },
             //   ) => ReturnType
             let no_leading_comments = !window_has_comments
-                || paren_pos
-                    .is_none_or(|pos| !self.has_comments_between(pos + 1, params[0].span().start));
+                || paren_pos.is_none_or(|pos| {
+                    !self.has_comments_to_emit_between(pos + 1, params[0].span().start)
+                });
             let no_trailing_comments = !window_has_comments
                 || close_paren_pos
-                    .is_none_or(|cp| !self.has_comments_between(params[0].span().end, cp));
+                    .is_none_or(|cp| !self.has_comments_to_emit_between(params[0].span().end, cp));
             let huggable_param = if params.len() == 1 && no_leading_comments && no_trailing_comments
             {
                 get_type_literal_from_identifier(&params[0])
@@ -878,18 +866,19 @@ impl<'a> Printer<'a> {
                 let colon_end = type_ann.span.start + 1;
                 let type_start = type_ann.type_annotation.span().start;
                 parts.push(d.text(": "));
-                parts.push(self.build_comments_between(
-                    colon_end,
-                    type_start,
-                    CommentSpacing::Trailing,
-                ));
+                if window_has_comments
+                    && let Some(comments) = self
+                        .build_inline_comments_between_doc_trailing_space_opt(colon_end, type_start)
+                {
+                    parts.push(comments);
+                }
                 parts.push(self.build_type_literal_doc_for_function_param(type_literal));
 
                 // Handle trailing comments after the param (between type literal and
                 // close paren); `end_boundary` is that close paren (or the param end
                 // fallback — identical for this single-param path).
                 let param_end = params[0].span().end;
-                for comment in comments_in_range(self.comments, param_end, end_boundary) {
+                for comment in comments_to_emit_in_range(self.comments, param_end, end_boundary) {
                     parts.push(d.text(" "));
                     parts.push(self.build_comment_doc(comment));
                 }
@@ -929,7 +918,9 @@ impl<'a> Printer<'a> {
                     if i > 0 {
                         param_parts.push(d.text(","));
                         let comma = prev_end - 1;
-                        for comment in comments_in_range(self.comments, comma, p.span().start) {
+                        for comment in
+                            comments_to_emit_in_range(self.comments, comma, p.span().start)
+                        {
                             if !self.is_stranded_after_comma_block(comment, comma, p.span().start) {
                                 break; // stranded blocks are a contiguous prefix on the comma line
                             }

@@ -274,6 +274,12 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
         // The shared rule, plus the `+`/`-` same-sign guard so an operand that
         // would re-tokenize with the parent (`+(+x)`, `-(--x)`, `+(++x)`) is
         // parenthesized (prettier's UnaryExpression/UpdateExpression cases).
+        // An operand led by a *forward-binding* comment (a JSDoc cast, a bundler
+        // annotation) also takes a wrapping pair — `!(/** @type {A} */ (x).y)`, not
+        // `!/** @type {A} */ (x).y` — because bare, the comment reads as annotating the
+        // operator rather than the operand. That is NOT decided here: the comment sits in
+        // the gap between the operator and the operand, so `build_unary_doc` sees it
+        // positionally and adds the parens itself. Deciding it here too would double-wrap.
         ParenContext::UnaryArgument { parent_op } => {
             needs_parens_unary_arg_common(expr) || needs_parens_unary_same_sign(expr, parent_op)
         }
@@ -638,9 +644,12 @@ fn export_default_leftmost<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
         Expression::BinaryExpression(b) => export_default_leftmost(b.left),
         Expression::AssignmentExpression(a) => export_default_leftmost(a.left),
         Expression::ConditionalExpression(c) => export_default_leftmost(c.test),
-        Expression::SequenceExpression(s) => {
-            s.expressions.first().map_or(expr, export_default_leftmost)
-        }
+        // A `SequenceExpression` self-parenthesizes in `build_sequence_doc` (its printed
+        // form always starts with `(`), so — like the paren-aware member/call/tag descents
+        // below — the walk stops here instead of recursing to the leftmost operand.
+        // Recursing would double-wrap a class/function-leftmost sequence:
+        // `export default ((class {}, x))` instead of prettier's `(class {}, x)`.
+        Expression::SequenceExpression(_) => expr,
         Expression::UpdateExpression(u) if !u.prefix => export_default_leftmost(u.argument),
         Expression::TSAsExpression(e) => export_default_leftmost(e.expression),
         Expression::TSSatisfiesExpression(e) => export_default_leftmost(e.expression),

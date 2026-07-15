@@ -317,9 +317,9 @@ pub enum VariableDeclarationKind {
     Const = 0,
     Let = 1,
     Var = 2,
-    /// ES2024 Explicit Resource Management: `using resource = getResource();`
+    /// Explicit Resource Management: `using resource = getResource();`
     Using = 3,
-    /// ES2024 Explicit Resource Management: `await using resource = getAsyncResource();`
+    /// Explicit Resource Management: `await using resource = getAsyncResource();`
     AwaitUsing = 4,
 }
 
@@ -333,6 +333,23 @@ impl VariableDeclarationKind {
             Self::Var => "var",
             Self::Using => "using",
             Self::AwaitUsing => "await using",
+        }
+    }
+
+    /// The kind's source tokens, in order — `await using` is **two**.
+    ///
+    /// A printer must locate these rather than measure [`as_str`](Self::as_str): the
+    /// gap *between* two words is a source position an author can write a comment in
+    /// (`await /* c */ using`), and measuring the joined text never scans it, so the
+    /// comment is dropped.
+    #[inline]
+    pub const fn words(self) -> &'static [&'static str] {
+        match self {
+            Self::Const => &["const"],
+            Self::Let => &["let"],
+            Self::Var => &["var"],
+            Self::Using => &["using"],
+            Self::AwaitUsing => &["await", "using"],
         }
     }
 }

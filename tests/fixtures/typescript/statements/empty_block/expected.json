@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 752,
+	"end": 1112,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -124,9 +124,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " Empty try block (expands), catch (stays inline)",
+			"value": " Empty try block (expands), catch (stays inline) when no finally follows",
 			"start": 413,
-			"end": 463,
+			"end": 487,
 			"loc": {
 				"start": {
 					"line": 29,
@@ -134,15 +134,15 @@
 				},
 				"end": {
 					"line": 29,
-					"column": 51
+					"column": 75
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " Empty finally block (expands)",
-			"start": 489,
-			"end": 521,
+			"start": 513,
+			"end": 545,
 			"loc": {
 				"start": {
 					"line": 33,
@@ -156,9 +156,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " Empty function body (stays inline)",
-			"start": 552,
-			"end": 589,
+			"value": " Empty catch expands too when a finally follows (not the last clause)",
+			"start": 576,
+			"end": 647,
 			"loc": {
 				"start": {
 					"line": 39,
@@ -166,6 +166,38 @@
 				},
 				"end": {
 					"line": 39,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Same for a parameterless catch",
+			"start": 688,
+			"end": 721,
+			"loc": {
+				"start": {
+					"line": 45,
+					"column": 1
+				},
+				"end": {
+					"line": 45,
+					"column": 34
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Empty function body (stays inline)",
+			"start": 758,
+			"end": 795,
+			"loc": {
+				"start": {
+					"line": 51,
+					"column": 1
+				},
+				"end": {
+					"line": 51,
 					"column": 38
 				}
 			}
@@ -173,15 +205,15 @@
 		{
 			"type": "Line",
 			"value": " Empty arrow function body (stays inline)",
-			"start": 610,
-			"end": 653,
+			"start": 816,
+			"end": 859,
 			"loc": {
 				"start": {
-					"line": 42,
+					"line": 54,
 					"column": 1
 				},
 				"end": {
-					"line": 42,
+					"line": 54,
 					"column": 44
 				}
 			}
@@ -189,16 +221,64 @@
 		{
 			"type": "Line",
 			"value": " Empty class method body (stays inline)",
-			"start": 677,
-			"end": 718,
+			"start": 883,
+			"end": 924,
 			"loc": {
 				"start": {
-					"line": 45,
+					"line": 57,
 					"column": 1
 				},
 				"end": {
-					"line": 45,
+					"line": 57,
 					"column": 42
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Bare block statement (expands)",
+			"start": 950,
+			"end": 983,
+			"loc": {
+				"start": {
+					"line": 62,
+					"column": 1
+				},
+				"end": {
+					"line": 62,
+					"column": 34
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Labeled block statement (expands)",
+			"start": 992,
+			"end": 1028,
+			"loc": {
+				"start": {
+					"line": 66,
+					"column": 1
+				},
+				"end": {
+					"line": 66,
+					"column": 37
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Nested bare block inside a block (expands)",
+			"start": 1042,
+			"end": 1087,
+			"loc": {
+				"start": {
+					"line": 70,
+					"column": 1
+				},
+				"end": {
+					"line": 70,
+					"column": 46
 				}
 			}
 		}
@@ -206,19 +286,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 751,
+		"end": 1111,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 742,
+			"end": 1102,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 49,
+					"line": 75,
 					"column": 9
 				}
 			},
@@ -747,8 +827,8 @@
 				},
 				{
 					"type": "TryStatement",
-					"start": 465,
-					"end": 486,
+					"start": 489,
+					"end": 510,
 					"loc": {
 						"start": {
 							"line": 30,
@@ -761,8 +841,8 @@
 					},
 					"block": {
 						"type": "BlockStatement",
-						"start": 469,
-						"end": 473,
+						"start": 493,
+						"end": 497,
 						"loc": {
 							"start": {
 								"line": 30,
@@ -777,8 +857,8 @@
 					},
 					"handler": {
 						"type": "CatchClause",
-						"start": 474,
-						"end": 486,
+						"start": 498,
+						"end": 510,
 						"loc": {
 							"start": {
 								"line": 31,
@@ -791,8 +871,8 @@
 						},
 						"param": {
 							"type": "Identifier",
-							"start": 481,
-							"end": 482,
+							"start": 505,
+							"end": 506,
 							"loc": {
 								"start": {
 									"line": 31,
@@ -807,8 +887,8 @@
 						},
 						"body": {
 							"type": "BlockStatement",
-							"start": 484,
-							"end": 486,
+							"start": 508,
+							"end": 510,
 							"loc": {
 								"start": {
 									"line": 31,
@@ -826,16 +906,16 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " Empty try block (expands), catch (stays inline)",
+							"value": " Empty try block (expands), catch (stays inline) when no finally follows",
 							"start": 413,
-							"end": 463
+							"end": 487
 						}
 					]
 				},
 				{
 					"type": "TryStatement",
-					"start": 523,
-					"end": 549,
+					"start": 547,
+					"end": 573,
 					"loc": {
 						"start": {
 							"line": 34,
@@ -848,8 +928,8 @@
 					},
 					"block": {
 						"type": "BlockStatement",
-						"start": 527,
-						"end": 536,
+						"start": 551,
+						"end": 560,
 						"loc": {
 							"start": {
 								"line": 34,
@@ -863,8 +943,8 @@
 						"body": [
 							{
 								"type": "ExpressionStatement",
-								"start": 531,
-								"end": 533,
+								"start": 555,
+								"end": 557,
 								"loc": {
 									"start": {
 										"line": 35,
@@ -877,8 +957,8 @@
 								},
 								"expression": {
 									"type": "Identifier",
-									"start": 531,
-									"end": 532,
+									"start": 555,
+									"end": 556,
 									"loc": {
 										"start": {
 											"line": 35,
@@ -897,8 +977,8 @@
 					"handler": null,
 					"finalizer": {
 						"type": "BlockStatement",
-						"start": 545,
-						"end": 549,
+						"start": 569,
+						"end": 573,
 						"loc": {
 							"start": {
 								"line": 36,
@@ -915,36 +995,225 @@
 						{
 							"type": "Line",
 							"value": " Empty finally block (expands)",
-							"start": 489,
-							"end": 521
+							"start": 513,
+							"end": 545
 						}
 					]
 				},
 				{
-					"type": "FunctionDeclaration",
-					"start": 591,
-					"end": 607,
+					"type": "TryStatement",
+					"start": 649,
+					"end": 685,
 					"loc": {
 						"start": {
 							"line": 40,
 							"column": 1
 						},
 						"end": {
-							"line": 40,
+							"line": 43,
+							"column": 2
+						}
+					},
+					"block": {
+						"type": "BlockStatement",
+						"start": 653,
+						"end": 657,
+						"loc": {
+							"start": {
+								"line": 40,
+								"column": 5
+							},
+							"end": {
+								"line": 41,
+								"column": 2
+							}
+						},
+						"body": []
+					},
+					"handler": {
+						"type": "CatchClause",
+						"start": 658,
+						"end": 672,
+						"loc": {
+							"start": {
+								"line": 41,
+								"column": 3
+							},
+							"end": {
+								"line": 42,
+								"column": 2
+							}
+						},
+						"param": {
+							"type": "Identifier",
+							"start": 665,
+							"end": 666,
+							"loc": {
+								"start": {
+									"line": 41,
+									"column": 10
+								},
+								"end": {
+									"line": 41,
+									"column": 11
+								}
+							},
+							"name": "e"
+						},
+						"body": {
+							"type": "BlockStatement",
+							"start": 668,
+							"end": 672,
+							"loc": {
+								"start": {
+									"line": 41,
+									"column": 13
+								},
+								"end": {
+									"line": 42,
+									"column": 2
+								}
+							},
+							"body": []
+						}
+					},
+					"finalizer": {
+						"type": "BlockStatement",
+						"start": 681,
+						"end": 685,
+						"loc": {
+							"start": {
+								"line": 42,
+								"column": 11
+							},
+							"end": {
+								"line": 43,
+								"column": 2
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Empty catch expands too when a finally follows (not the last clause)",
+							"start": 576,
+							"end": 647
+						}
+					]
+				},
+				{
+					"type": "TryStatement",
+					"start": 723,
+					"end": 755,
+					"loc": {
+						"start": {
+							"line": 46,
+							"column": 1
+						},
+						"end": {
+							"line": 49,
+							"column": 2
+						}
+					},
+					"block": {
+						"type": "BlockStatement",
+						"start": 727,
+						"end": 731,
+						"loc": {
+							"start": {
+								"line": 46,
+								"column": 5
+							},
+							"end": {
+								"line": 47,
+								"column": 2
+							}
+						},
+						"body": []
+					},
+					"handler": {
+						"type": "CatchClause",
+						"start": 732,
+						"end": 742,
+						"loc": {
+							"start": {
+								"line": 47,
+								"column": 3
+							},
+							"end": {
+								"line": 48,
+								"column": 2
+							}
+						},
+						"param": null,
+						"body": {
+							"type": "BlockStatement",
+							"start": 738,
+							"end": 742,
+							"loc": {
+								"start": {
+									"line": 47,
+									"column": 9
+								},
+								"end": {
+									"line": 48,
+									"column": 2
+								}
+							},
+							"body": []
+						}
+					},
+					"finalizer": {
+						"type": "BlockStatement",
+						"start": 751,
+						"end": 755,
+						"loc": {
+							"start": {
+								"line": 48,
+								"column": 11
+							},
+							"end": {
+								"line": 49,
+								"column": 2
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Same for a parameterless catch",
+							"start": 688,
+							"end": 721
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 797,
+					"end": 813,
+					"loc": {
+						"start": {
+							"line": 52,
+							"column": 1
+						},
+						"end": {
+							"line": 52,
 							"column": 17
 						}
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 600,
-						"end": 602,
+						"start": 806,
+						"end": 808,
 						"loc": {
 							"start": {
-								"line": 40,
+								"line": 52,
 								"column": 10
 							},
 							"end": {
-								"line": 40,
+								"line": 52,
 								"column": 12
 							}
 						},
@@ -956,15 +1225,15 @@
 					"params": [],
 					"body": {
 						"type": "BlockStatement",
-						"start": 605,
-						"end": 607,
+						"start": 811,
+						"end": 813,
 						"loc": {
 							"start": {
-								"line": 40,
+								"line": 52,
 								"column": 15
 							},
 							"end": {
-								"line": 40,
+								"line": 52,
 								"column": 17
 							}
 						},
@@ -974,51 +1243,51 @@
 						{
 							"type": "Line",
 							"value": " Empty function body (stays inline)",
-							"start": 552,
-							"end": 589
+							"start": 758,
+							"end": 795
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 655,
-					"end": 674,
+					"start": 861,
+					"end": 880,
 					"loc": {
 						"start": {
-							"line": 43,
+							"line": 55,
 							"column": 1
 						},
 						"end": {
-							"line": 43,
+							"line": 55,
 							"column": 20
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 661,
-							"end": 673,
+							"start": 867,
+							"end": 879,
 							"loc": {
 								"start": {
-									"line": 43,
+									"line": 55,
 									"column": 7
 								},
 								"end": {
-									"line": 43,
+									"line": 55,
 									"column": 19
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 661,
-								"end": 662,
+								"start": 867,
+								"end": 868,
 								"loc": {
 									"start": {
-										"line": 43,
+										"line": 55,
 										"column": 7
 									},
 									"end": {
-										"line": 43,
+										"line": 55,
 										"column": 8
 									}
 								},
@@ -1026,15 +1295,15 @@
 							},
 							"init": {
 								"type": "ArrowFunctionExpression",
-								"start": 665,
-								"end": 673,
+								"start": 871,
+								"end": 879,
 								"loc": {
 									"start": {
-										"line": 43,
+										"line": 55,
 										"column": 11
 									},
 									"end": {
-										"line": 43,
+										"line": 55,
 										"column": 19
 									}
 								},
@@ -1045,15 +1314,15 @@
 								"params": [],
 								"body": {
 									"type": "BlockStatement",
-									"start": 671,
-									"end": 673,
+									"start": 877,
+									"end": 879,
 									"loc": {
 										"start": {
-											"line": 43,
+											"line": 55,
 											"column": 17
 										},
 										"end": {
-											"line": 43,
+											"line": 55,
 											"column": 19
 										}
 									},
@@ -1067,36 +1336,36 @@
 						{
 							"type": "Line",
 							"value": " Empty arrow function body (stays inline)",
-							"start": 610,
-							"end": 653
+							"start": 816,
+							"end": 859
 						}
 					]
 				},
 				{
 					"type": "ClassDeclaration",
-					"start": 720,
-					"end": 741,
+					"start": 926,
+					"end": 947,
 					"loc": {
 						"start": {
-							"line": 46,
+							"line": 58,
 							"column": 1
 						},
 						"end": {
-							"line": 48,
+							"line": 60,
 							"column": 2
 						}
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 726,
-						"end": 727,
+						"start": 932,
+						"end": 933,
 						"loc": {
 							"start": {
-								"line": 46,
+								"line": 58,
 								"column": 7
 							},
 							"end": {
-								"line": 46,
+								"line": 58,
 								"column": 8
 							}
 						},
@@ -1105,30 +1374,30 @@
 					"superClass": null,
 					"body": {
 						"type": "ClassBody",
-						"start": 728,
-						"end": 741,
+						"start": 934,
+						"end": 947,
 						"loc": {
 							"start": {
-								"line": 46,
+								"line": 58,
 								"column": 9
 							},
 							"end": {
-								"line": 48,
+								"line": 60,
 								"column": 2
 							}
 						},
 						"body": [
 							{
 								"type": "MethodDefinition",
-								"start": 732,
-								"end": 738,
+								"start": 938,
+								"end": 944,
 								"loc": {
 									"start": {
-										"line": 47,
+										"line": 59,
 										"column": 2
 									},
 									"end": {
-										"line": 47,
+										"line": 59,
 										"column": 8
 									}
 								},
@@ -1136,15 +1405,15 @@
 								"computed": false,
 								"key": {
 									"type": "Identifier",
-									"start": 732,
-									"end": 733,
+									"start": 938,
+									"end": 939,
 									"loc": {
 										"start": {
-											"line": 47,
+											"line": 59,
 											"column": 2
 										},
 										"end": {
-											"line": 47,
+											"line": 59,
 											"column": 3
 										}
 									},
@@ -1153,15 +1422,15 @@
 								"kind": "method",
 								"value": {
 									"type": "FunctionExpression",
-									"start": 733,
-									"end": 738,
+									"start": 939,
+									"end": 944,
 									"loc": {
 										"start": {
-											"line": 47,
+											"line": 59,
 											"column": 3
 										},
 										"end": {
-											"line": 47,
+											"line": 59,
 											"column": 8
 										}
 									},
@@ -1172,15 +1441,15 @@
 									"params": [],
 									"body": {
 										"type": "BlockStatement",
-										"start": 736,
-										"end": 738,
+										"start": 942,
+										"end": 944,
 										"loc": {
 											"start": {
-												"line": 47,
+												"line": 59,
 												"column": 6
 											},
 											"end": {
-												"line": 47,
+												"line": 59,
 												"column": 8
 											}
 										},
@@ -1194,8 +1463,128 @@
 						{
 							"type": "Line",
 							"value": " Empty class method body (stays inline)",
-							"start": 677,
-							"end": 718
+							"start": 883,
+							"end": 924
+						}
+					]
+				},
+				{
+					"type": "BlockStatement",
+					"start": 985,
+					"end": 989,
+					"loc": {
+						"start": {
+							"line": 63,
+							"column": 1
+						},
+						"end": {
+							"line": 64,
+							"column": 2
+						}
+					},
+					"body": [],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Bare block statement (expands)",
+							"start": 950,
+							"end": 983
+						}
+					]
+				},
+				{
+					"type": "LabeledStatement",
+					"start": 1030,
+					"end": 1039,
+					"loc": {
+						"start": {
+							"line": 67,
+							"column": 1
+						},
+						"end": {
+							"line": 68,
+							"column": 2
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 1035,
+						"end": 1039,
+						"loc": {
+							"start": {
+								"line": 67,
+								"column": 6
+							},
+							"end": {
+								"line": 68,
+								"column": 2
+							}
+						},
+						"body": []
+					},
+					"label": {
+						"type": "Identifier",
+						"start": 1030,
+						"end": 1033,
+						"loc": {
+							"start": {
+								"line": 67,
+								"column": 1
+							},
+							"end": {
+								"line": 67,
+								"column": 4
+							}
+						},
+						"name": "lbl"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Labeled block statement (expands)",
+							"start": 992,
+							"end": 1028
+						}
+					]
+				},
+				{
+					"type": "BlockStatement",
+					"start": 1089,
+					"end": 1101,
+					"loc": {
+						"start": {
+							"line": 71,
+							"column": 1
+						},
+						"end": {
+							"line": 74,
+							"column": 2
+						}
+					},
+					"body": [
+						{
+							"type": "BlockStatement",
+							"start": 1093,
+							"end": 1098,
+							"loc": {
+								"start": {
+									"line": 72,
+									"column": 2
+								},
+								"end": {
+									"line": 73,
+									"column": 3
+								}
+							},
+							"body": []
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Nested bare block inside a block (expands)",
+							"start": 1042,
+							"end": 1087
 						}
 					]
 				}

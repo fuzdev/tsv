@@ -3,7 +3,7 @@
 use std::borrow::Cow;
 
 use super::numbers::canonical_unit;
-use crate::ast::internal::{Color, ColorChannel};
+use crate::ast::internal::{AngleUnit, Color, ColorChannel};
 use tsv_lang::Span;
 
 /// Format a *computed* color value (`Rgb`/`Hsl`) semantically.
@@ -38,13 +38,7 @@ pub(crate) fn format_color_value(color: &Color) -> String {
             lightness,
             alpha,
         } => {
-            // Format hue with optional unit (canonicalized — `180DEG` → `180deg`)
-            let hue_str = if let Some(unit) = hue_unit {
-                let unit = canonical_unit(unit.as_str());
-                format!("{}{}", format_color_channel(hue), unit)
-            } else {
-                format_color_channel(hue)
-            };
+            let hue_str = format_hue(hue, hue_unit.as_ref());
             let sat_str = format_color_channel(saturation);
             let light_str = format_color_channel(lightness);
 
@@ -75,6 +69,40 @@ fn format_color_channel(channel: &ColorChannel) -> String {
         ColorChannel::Number(n) => format_css_f64(*n),
         ColorChannel::Percentage(p) => format!("{}%", format_css_f64(*p)),
         ColorChannel::None => "none".to_string(),
+    }
+}
+
+/// Format an hsl hue, appending its canonicalized angle unit when present
+/// (`180DEG` → `180deg`; a bare hue → just the number). Shared by the semantic
+/// (`format_color_value`) and source-preserving (`format_color_from_source`) paths.
+fn format_hue(hue: &ColorChannel, hue_unit: Option<&AngleUnit>) -> String {
+    match hue_unit {
+        Some(unit) => format!(
+            "{}{}",
+            format_color_channel(hue),
+            canonical_unit(unit.as_str())
+        ),
+        None => format_color_channel(hue),
+    }
+}
+
+/// Reassemble `name(c1 c2 c3)` in the source's separator syntax, detected on the raw
+/// text: modern slash-alpha (`c1 c2 c3 / a`) and legacy comma (`c1, c2, c3[, a]`) are
+/// the only ways an alpha is written, so a channel-only value keeps its space-or-comma
+/// separator. Shared by `format_color_from_source`'s rgb and hsl arms, which differ
+/// only in how they render their three channels.
+fn format_color_syntax(
+    func_name: &str,
+    [c1, c2, c3]: [String; 3],
+    alpha: Option<String>,
+    has_slash: bool,
+    has_comma: bool,
+) -> String {
+    match (alpha, has_slash) {
+        (Some(a), true) => format!("{func_name}({c1} {c2} {c3} / {a})"),
+        (Some(a), false) => format!("{func_name}({c1}, {c2}, {c3}, {a})"),
+        (None, _) if has_comma => format!("{func_name}({c1}, {c2}, {c3})"),
+        (None, _) => format!("{func_name}({c1} {c2} {c3})"),
     }
 }
 
@@ -123,59 +151,34 @@ pub(crate) fn format_color_from_source<'s>(
         let has_slash = raw.contains('/');
         let has_comma = raw.contains(',');
 
+        // The rgb and hsl arms differ only in how they render their three channels;
+        // `format_color_syntax` owns the shared separator logic (preserving the source's
+        // slash / comma / space choice).
         Cow::Owned(match color {
-            Color::Rgb { r, g, b, alpha } => {
-                let r_str = format_color_channel(r);
-                let g_str = format_color_channel(g);
-                let b_str = format_color_channel(b);
-
-                if let Some(a) = alpha {
-                    let a_str = format_color_channel(a);
-                    if has_slash {
-                        // Preserve original function name with slash syntax
-                        format!("{func_name}({r_str} {g_str} {b_str} / {a_str})")
-                    } else {
-                        // Preserve original function name with comma syntax
-                        format!("{func_name}({r_str}, {g_str}, {b_str}, {a_str})")
-                    }
-                } else if has_comma {
-                    format!("{func_name}({r_str}, {g_str}, {b_str})")
-                } else {
-                    format!("{func_name}({r_str} {g_str} {b_str})")
-                }
-            }
+            Color::Rgb { r, g, b, alpha } => format_color_syntax(
+                func_name,
+                [r, g, b].map(format_color_channel),
+                alpha.as_ref().map(format_color_channel),
+                has_slash,
+                has_comma,
+            ),
             Color::Hsl {
                 hue,
                 hue_unit,
                 saturation,
                 lightness,
                 alpha,
-            } => {
-                // Format hue with optional unit (canonicalized — `180DEG` → `180deg`)
-                let hue_str = if let Some(unit) = hue_unit {
-                    let unit = canonical_unit(unit.as_str());
-                    format!("{}{}", format_color_channel(hue), unit)
-                } else {
-                    format_color_channel(hue)
-                };
-                let sat_str = format_color_channel(saturation);
-                let light_str = format_color_channel(lightness);
-
-                if let Some(a) = alpha {
-                    let a_str = format_color_channel(a);
-                    if has_slash {
-                        // Preserve original function name with slash syntax
-                        format!("{func_name}({hue_str} {sat_str} {light_str} / {a_str})")
-                    } else {
-                        // Preserve original function name with comma syntax
-                        format!("{func_name}({hue_str}, {sat_str}, {light_str}, {a_str})")
-                    }
-                } else if has_comma {
-                    format!("{func_name}({hue_str}, {sat_str}, {light_str})")
-                } else {
-                    format!("{func_name}({hue_str} {sat_str} {light_str})")
-                }
-            }
+            } => format_color_syntax(
+                func_name,
+                [
+                    format_hue(hue, hue_unit.as_ref()),
+                    format_color_channel(saturation),
+                    format_color_channel(lightness),
+                ],
+                alpha.as_ref().map(format_color_channel),
+                has_slash,
+                has_comma,
+            ),
             // Fallback for any other color types (future-proofing)
             _ => format_color_value(color),
         })

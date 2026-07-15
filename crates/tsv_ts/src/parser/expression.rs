@@ -6,12 +6,14 @@ use crate::ast::internal::{
     ImportPhase, JsdocCast, Literal, LiteralValue, MemberExpression, MetaProperty, NewExpression,
     ParenthesizedExpression, RegexLiteral, SequenceExpression, SpreadElement, Statement, Super,
     TSAsExpression, TSInstantiationExpression, TSNonNullExpression, TSSatisfiesExpression,
-    TSTypeAssertion, TaggedTemplateExpression, ThisExpression, UnaryExpression, UnaryOperator,
-    UpdateExpression, UpdateOperator, YieldExpression,
+    TSTypeAssertion, TSTypeParameterInstantiation, TaggedTemplateExpression, TemplateLiteral,
+    ThisExpression, UnaryExpression, UnaryOperator, UpdateExpression, UpdateOperator,
+    YieldExpression,
 };
 use crate::lexer::{KeywordKind, TokenKind};
 use crate::parser::expression_assignable::AssignableContext;
 use tsv_lang::printing::visual_width;
+use tsv_lang::source_scan;
 use tsv_lang::{ParseError, Span, TAB_WIDTH};
 
 use super::Parser;
@@ -186,10 +188,29 @@ enum SubscriptMode {
     ClassHeritage,
 }
 
+// ## Forward-binding comments
+//
+// A comment glued to the token after it is **bound to that token** — read by some other
+// tool (or by tsv's own layout) as modifying the *next* thing, so anything printed between
+// the two changes what it modifies. **Every glued block comment is owned** (`owned_by_node`,
+// set by `bind_leading_comment`): ownership is keyed on *position* (glued-ness), not content.
+// The one content classifier below, `is_jsdoc_type_cast_comment`, is no longer an ownership
+// membership test — it decides a **cast's paren-retention** (whether `(expr)` becomes a
+// `JsdocCast` node). It retains a residual ownership role only because a cast's comment may
+// sit a newline *above* its `(` (`CommentGlue::AnyLine`), which the general `SameLine`-glued
+// rule doesn't reach; a same-line cast comment's ownership is already subsumed by that rule.
+//
+// An owned comment must be printed by some node — an owned comment nothing prints is a
+// *dropped* comment. See `printer/comments/owned.rs`.
+
 /// Mirror of prettier's `isTypeCastComment` (`is-type-cast-comment.js`): the
 /// comment text (between `/*` and `*/`) starts with `*` — i.e. the `/**` form —
 /// and contains `@type` or `@satisfies` followed by a word boundary.
-fn is_jsdoc_type_cast_comment(value: &str) -> bool {
+///
+/// Binds forward to the `(` it glues to: the comment plus those parens **are** the cast.
+///
+/// Re-exported as [`crate::is_jsdoc_type_cast_comment`] for the binding audit.
+pub(crate) fn is_jsdoc_type_cast_comment(value: &str) -> bool {
     value.starts_with('*') && contains_type_or_satisfies_tag(value)
 }
 
@@ -631,6 +652,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse prefix expression returning ParsedExpr with actual end position
     fn parse_prefix_expression(&mut self) -> Result<ParsedExpr<'arena>, Box<ParseError>> {
+        // The head token — the leftmost token of the expression being parsed, and the
+        // only one a leading comment can be glued to. Taken before the match, which
+        // produces exactly the node that token begins (postfix subscripts wrap it after).
+        let (head_start, _) = self.current_pos();
         let parsed = match self.current_kind() {
             TokenKind::Minus | TokenKind::Plus | TokenKind::Bang | TokenKind::Tilde => {
                 let expr = self.parse_unary_expression()?;
@@ -779,6 +804,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             _ => self.parse_primary_expression()?,
         };
 
+        self.bind_leading_comment(head_start, parsed.expr);
+
         // An unparenthesized arrow function — or a bare `yield` inside a generator
         // — is a complete AssignmentExpression, so no `.`-member subscript can
         // follow (`() => {}()` is invalid JS; `yield.a` is too — the `.` doesn't
@@ -825,7 +852,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse the expression part of a decorator (the `expr` in `@expr`), per the
-    /// ES decorators grammar (TC39 Stage 3, which `tsv` supports):
+    /// TC39 decorators grammar (a proposal, not yet standard, which `tsv` supports):
     ///
     /// - `@(Expression)` — a parenthesized **full** expression, or
     /// - `@Ident(.Ident | .#private)*` — a `DecoratorMemberExpression`: an
@@ -1148,14 +1175,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     let arguments = arguments.into_bump_slice();
 
                     let span = Span::new(left.actual_start, paren_end as u32);
-                    // When callee is TSInstantiationExpression (e.g., foo<T>), flatten:
-                    // TSInstantiationExpression + CallExpression → CallExpression with typeArguments
-                    let (callee, type_arguments) = match left.expr {
-                        Expression::TSInstantiationExpression(inst) => {
-                            (inst.expression, Some(inst.type_arguments.clone()))
-                        }
-                        other => (other, None),
-                    };
+                    // A `foo<T>(...)` generic call lifts the callee's `<T>` into
+                    // the call's `typeArguments` (see `flatten_instantiation`).
+                    let (callee, type_arguments) = self.flatten_instantiation(left.expr);
                     left = ParsedExpr::with_start_end(
                         self.arena,
                         Expression::CallExpression(CallExpression {
@@ -1172,7 +1194,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 TokenKind::NoSubstitutionTemplate | TokenKind::TemplateHead => {
                     // Tagged template expression: tag`content`
                     let quasi = self.parse_template_literal(true)?;
-                    let quasi_span = quasi.span();
                     if let Expression::TemplateLiteral(template) = quasi {
                         // An optional chain can't be a template tag (per spec): `a?.b`x``
                         // is a syntax error. A parenthesized chain (`(a?.b)`x``) seals the
@@ -1183,25 +1204,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                                 "Optional chaining cannot appear in the tag of tagged template expressions",
                             )));
                         }
-                        let span = Span::new(left.actual_start, quasi_span.end);
-                        // When tag is TSInstantiationExpression (e.g., tag<T>), flatten:
-                        // TSInstantiationExpression + TaggedTemplate → TaggedTemplate with typeArguments
-                        let (tag, type_arguments) = match left.expr {
-                            Expression::TSInstantiationExpression(inst) => {
-                                (inst.expression, Some(inst.type_arguments.clone()))
-                            }
-                            other => (other, None),
-                        };
-                        left = ParsedExpr::with_start_end(
-                            self.arena,
-                            Expression::TaggedTemplateExpression(TaggedTemplateExpression {
-                                tag,
-                                type_arguments,
-                                quasi: template,
-                                span,
-                            }),
+                        // A `` tag<T>`x` `` tagged template lifts the tag's `<T>`
+                        // into the tag's `typeArguments` (see `flatten_instantiation`).
+                        let (tag, type_arguments) = self.flatten_instantiation(left.expr);
+                        left = self.build_tagged_template(
+                            tag,
                             left.actual_start,
-                            quasi_span.end_usize(),
+                            type_arguments,
+                            template,
                         );
                     }
                 }
@@ -1574,8 +1584,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 ))
             }
             TokenKind::Hash => {
-                // Private identifier as standalone expression (for brand check: #field in obj)
+                // ecma262 `RelationalExpression : PrivateIdentifier in ShiftExpression` — a
+                // private name is an expression ONLY as the left side of a brand check
+                // (`#field in obj`). Anywhere else (`const x = #a`) it is a syntax error,
+                // and the canonical parser rejects it, so require the `in` here rather than
+                // handing a bare `#a` to the binary-expression machinery. Without the guard
+                // tsv over-accepted; in a Svelte attribute value that surfaced as `{#a}`
+                // parsing as an expression the canonical parser refuses.
                 let private_id = self.parse_private_identifier()?;
+                if !matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::In)) {
+                    return Err(Box::new(self.error_expected_after("'in'", "private name")));
+                }
                 let end = private_id.span.end_usize();
                 let start = private_id.span.start;
                 Ok(ParsedExpr::with_start_end(self.arena,
@@ -1646,7 +1665,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // when this expression is used as a callee: (a ? b : c)() should have
         // CallExpression span starting at '(', not at 'a'
         let (paren_start, _) = self.current_pos();
-        let is_jsdoc_cast = self.paren_preceded_by_jsdoc_cast_comment(paren_start);
+        let cast_comment_idx = self.jsdoc_cast_comment_index(paren_start);
         self.expect(&TokenKind::ParenOpen)?; // consume '('
 
         self.grouping_depth += 1;
@@ -1665,17 +1684,29 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // - **JSDoc type cast** (`/** @type {T} */ (expr)`) — the parens are
         //   semantically required (dropping them drops the cast), so a preceding
         //   `@type`/`@satisfies` block comment wraps the inner in a `JsdocCast`. Cast
-        //   semantics subsume grouping, so this wins when both apply.
+        //   semantics subsume grouping, so this wins when both apply. The cast also
+        //   takes **ownership** of that comment: the comment and this `(` are one
+        //   unit, so the cast prints it and the flat-`Vec<Comment>` lookups skip it
+        //   (`Comment::owned_by_node`) — printed from an enclosing gap instead, a
+        //   paren synthesized around an enclosing expression lands between the two
+        //   and the cast silently re-binds to the wider node on reparse. This owning
+        //   is not fully subsumed by the general "every glued block comment is owned"
+        //   rule (`bind_leading_comment`), which binds only a **same-line** glued
+        //   comment (`CommentGlue::SameLine`); a cast comment may sit a newline
+        //   **above** its `(` (`AnyLine`) and still be the cast, so the cast owns it
+        //   here regardless (a same-line cast comment is owned by both, harmlessly).
         // - **Snippet-parameter sub-parse** (`preserve_parens`) — acorn's
         //   `preserveParens` without Svelte's `remove_parens`; wraps in a
         //   layout-transparent `ParenthesizedExpression` so only the wire shape moves.
-        // Comments themselves are still located positionally in the flat
-        // `Vec<Comment>` at print time.
+        // Every other comment stays located positionally at print time.
         let paren_span = Span::new(paren_start as u32, paren_end as u32);
-        let expr = if is_jsdoc_cast {
+        let expr = if let Some(idx) = cast_comment_idx {
+            self.comments[idx].owned_by_node = true;
+            let comment = self.comments[idx].clone();
             self.alloc(Expression::JsdocCast(JsdocCast {
                 inner: parsed.expr,
                 span: paren_span,
+                comment,
             }))
         } else if self.preserve_parens {
             self.alloc(Expression::ParenthesizedExpression(
@@ -1690,46 +1721,109 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok(ParsedExpr::with_bounds(expr, paren_start, paren_end))
     }
 
-    /// Whether a `(` at `paren_start` is immediately preceded by a JSDoc type-cast
-    /// block comment (`/** @type {T} */` / `/** @satisfies {T} */`), making the
-    /// parens a TypeScript cast that must be preserved.
+    /// The index in `self.comments` of the JSDoc type-cast block comment
+    /// (`/** @type {T} */` / `/** @satisfies {T} */`) immediately preceding a `(` at
+    /// `paren_start` — which is what makes those parens a cast that must be preserved.
+    /// `None` when the `(` is an ordinary grouping/call paren.
     ///
     /// Mirrors prettier's predicate (`is-type-cast-comment.js` +
     /// `postprocess/index.js`): a **block** comment whose text starts with `*`
     /// (the `/**` form) and contains `@type`/`@satisfies` (word boundary), with
     /// only whitespace between the comment's `*/` and the `(`.
-    fn paren_preceded_by_jsdoc_cast_comment(&self, paren_start: usize) -> bool {
-        let bytes = self.source.as_bytes();
+    ///
+    /// The caller hands the index to the `JsdocCast`, which takes ownership of the
+    /// comment — so this must identify it *exactly*, never merely "a cast-shaped
+    /// comment somewhere before here" (an owned comment nothing prints is a dropped
+    /// comment).
+    fn jsdoc_cast_comment_index(&self, paren_start: usize) -> Option<usize> {
         // `paren_start` is a full-file offset (`current_pos` adds `base_offset`);
         // `self.source` is the local slice, so translate back to a local index.
-        let mut i = paren_start - self.base_offset;
-        // Walk back over whitespace immediately before '('.
-        while i > 0 && bytes[i - 1].is_ascii_whitespace() {
-            i -= 1;
-        }
-        // The preceding token must be a block comment ending exactly at `i`.
-        if i < 4 || &bytes[i - 2..i] != b"*/" {
-            return false;
-        }
+        //
+        // `AnyLine`: the cast's comment may sit on its own line above the `(`
+        // (`const a =⏎  /** @type {T} */⏎  (v);`) and still be the cast — unlike a bundler
+        // annotation, which binds only when glued to its token (`SameLine`, see
+        // `glued_block_comment_index`).
+        let i = source_scan::block_comment_end_before(
+            self.source.as_bytes(),
+            paren_start - self.base_offset,
+            source_scan::CommentGlue::AnyLine,
+        )?;
         // Resolve the comment through the lexer's spans rather than re-scanning the
-        // source. A `/*` can appear inside this comment's own body *or* a preceding
-        // line comment / string literal, and byte scanning can't tell those apart from
-        // the real opener — mis-slicing the content would drop a real cast
-        // (`/** z /* @type {T} */`) or fabricate one (`/* z /** @type {T} */`). The
-        // comment ending here was just drained into `self.comments`; match it by its
-        // host-coordinate end and test its exact (delimiter-excluded) content.
+        // source (see `block_comment_end_before` — byte scanning cannot find the real
+        // `/*`). The comment ending here was just drained into `self.comments`; match it
+        // by its host-coordinate end and test its exact (delimiter-excluded) content.
         let token_end = (i + self.base_offset) as u32;
-        self.comments
+        let idx = self
+            .comments
             .iter()
-            .rev()
-            .find(|c| c.span.end == token_end)
-            .is_some_and(|c| {
-                c.is_block && {
-                    let start = c.content_span.start as usize - self.base_offset;
-                    let end = c.content_span.end as usize - self.base_offset;
-                    is_jsdoc_type_cast_comment(&self.source[start..end])
-                }
-            })
+            .rposition(|c| c.span.end == token_end)?;
+        let c = &self.comments[idx];
+        let is_cast = c.is_block && {
+            let start = c.content_span.start as usize - self.base_offset;
+            let end = c.content_span.end as usize - self.base_offset;
+            is_jsdoc_type_cast_comment(&self.source[start..end])
+        };
+        is_cast.then_some(idx)
+    }
+
+    /// Give the node beginning at `head_start` **ownership** of a leading comment glued
+    /// to that token, so the printer emits the two together and no paren it synthesizes
+    /// around an enclosing expression can land between them.
+    ///
+    /// **Every** glued block comment is owned — the position is an authoring choice that
+    /// binds the comment to the operand it leads, so a paren the printer synthesizes
+    /// around an enclosing expression must not land between them, and the leading-comment
+    /// hoist out of stripped grouping parens (`(/* c */ x ?? y)` → `/* c */ (x ?? y)`)
+    /// must not fire. There is no content sniff: a bundler annotation
+    /// (`/* @__PURE__ */`) and a plain comment bind their token identically; only the
+    /// JSDoc cast is special, and only for *paren retention* (`jsdoc_cast_comment_index`
+    /// builds the `JsdocCast`), never for ownership — that flows through here too.
+    ///
+    /// `expr` is the node the head token begins — the leftmost leaf of whatever
+    /// expression is being parsed, before any postfix subscript or infix operator wraps
+    /// it. The `span().start == head_start` guard is what makes the binding safe: an
+    /// owned comment nothing prints is a *dropped* comment, so the flag is set only when
+    /// a node genuinely starts at the token, never when the head was a grouping `(` the
+    /// parser discards (`/* c */ (a + b)` — there the comment leads a paren, no node
+    /// begins at it, and it stays an ordinary positional comment).
+    fn bind_leading_comment(&mut self, head_start: usize, expr: &Expression<'arena>) {
+        if expr.span().start as usize != head_start {
+            return;
+        }
+        let Some(idx) = self.glued_block_comment_index(head_start) else {
+            return;
+        };
+        self.comments[idx].owned_by_node = true;
+    }
+
+    /// The index in `self.comments` of a **block** comment glued to the token at
+    /// `head_start` — nothing but spaces/tabs between its `*/` and the token, and no
+    /// newline (a comment the author put on its own line leads the *line*, not the
+    /// token, so it keeps its ordinary positional handling).
+    ///
+    /// Resolves the comment through the lexer's spans rather than re-scanning, for the
+    /// same reason [`Self::jsdoc_cast_comment_index`] does: a `/*` inside this comment's
+    /// own body, a preceding line comment, or a string literal are indistinguishable
+    /// from the real opener by byte scanning.
+    fn glued_block_comment_index(&self, head_start: usize) -> Option<usize> {
+        // `head_start` is a full-file offset (`current_pos` adds `base_offset`);
+        // `self.source` is the local slice, so translate back to a local index.
+        //
+        // `SameLine`: a comment the author put on its own line leads the *line*, not the
+        // token, so it keeps its ordinary positional handling. This is the one axis on
+        // which this differs from `jsdoc_cast_comment_index` (`AnyLine`), and it is
+        // load-bearing — an annotation binds only when glued.
+        let i = source_scan::block_comment_end_before(
+            self.source.as_bytes(),
+            head_start.checked_sub(self.base_offset)?,
+            source_scan::CommentGlue::SameLine,
+        )?;
+        let token_end = (i + self.base_offset) as u32;
+        let idx = self
+            .comments
+            .iter()
+            .rposition(|c| c.span.end == token_end)?;
+        self.comments[idx].is_block.then_some(idx)
     }
 
     /// Parse a TypeScript angle-bracket type assertion: `<Type>expr`
@@ -1800,6 +1894,29 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             left.actual_start,
             end as usize,
         ))
+    }
+
+    /// Flatten a `foo<T>` `TSInstantiationExpression` operand into its inner
+    /// expression plus the lifted `<T>` type arguments — the inverse of
+    /// `parse_instantiation_expression`. When a `(` (generic call) or template
+    /// tag (tagged template) follows the instantiation, the `<T>` belongs to
+    /// that call/tag as its `typeArguments` rather than staying a standalone
+    /// instantiation (acorn parity). A non-instantiation operand passes through
+    /// unchanged with no type arguments. Shared by the subscript loop's call and
+    /// tagged-template arms.
+    fn flatten_instantiation(
+        &self,
+        expr: &'arena Expression<'arena>,
+    ) -> (
+        &'arena Expression<'arena>,
+        Option<TSTypeParameterInstantiation<'arena>>,
+    ) {
+        match expr {
+            Expression::TSInstantiationExpression(inst) => {
+                (inst.expression, Some(inst.type_arguments.clone()))
+            }
+            other => (other, None),
+        }
     }
 
     /// Reject a property access immediately after a TypeScript instantiation
@@ -2131,6 +2248,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse member access chains: new Foo.Bar.Baz()
         let mut callee = callee_parsed;
+        // `<T>` in the callee chain belongs to a trailing tagged template
+        // (`new Foo<T>`x``, part of the callee) when a template follows — consumed
+        // in the loop — otherwise it is the `new`'s own (`new Foo<T>()`) and this
+        // holds it for the argument parse below.
+        let mut type_arguments: Option<TSTypeParameterInstantiation<'arena>> = None;
         loop {
             match self.current_kind() {
                 TokenKind::Dot => {
@@ -2195,16 +2317,35 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // then binds as the `new` argument list, not a call on the callee.
                     callee = self.wrap_non_null_assertion(callee)?;
                 }
+                TokenKind::NoSubstitutionTemplate | TokenKind::TemplateHead => {
+                    // A tagged template extends the callee itself: `new Foo`x`` is
+                    // `new (Foo`x`)()`, not `(new Foo())`x``. Per the grammar, a
+                    // `new` callee is an ordinary MemberExpression, whose production
+                    // includes `MemberExpression TemplateLiteral` — so a trailing tag
+                    // before any explicit `(...)` binds to the callee, not the `new`.
+                    callee = self.attach_new_callee_tag(callee, None)?;
+                }
+                // `<T>` here is either the tag's type arguments (`new Foo<T>`x``,
+                // where they flatten onto a TaggedTemplateExpression callee — acorn
+                // parity) or the `new`'s own (`new Foo<T>()`). A following template
+                // disambiguates: it consumes them into the tag and the callee chain
+                // continues (`new Foo<T>`x`.bar`); otherwise they are the `new`'s and
+                // the chain ends here.
+                _ if self.check_less_than_in_type() && self.is_type_arguments_start() => {
+                    let ta = self.parse_type_parameter_instantiation()?;
+                    if matches!(
+                        self.current_kind(),
+                        TokenKind::NoSubstitutionTemplate | TokenKind::TemplateHead
+                    ) {
+                        callee = self.attach_new_callee_tag(callee, Some(ta))?;
+                    } else {
+                        type_arguments = Some(ta);
+                        break;
+                    }
+                }
                 _ => break,
             }
         }
-
-        // Parse optional type arguments: new Map<K, V>()
-        let type_arguments = if self.check_less_than_in_type() && self.is_type_arguments_start() {
-            Some(self.parse_type_parameter_instantiation()?)
-        } else {
-            None
-        };
 
         // Parse optional arguments: new Date() vs new Date. `new`'s argument list is an
         // `Arguments` grouping delimiter, so it shares `parse_call_arguments` (which
@@ -2238,6 +2379,54 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }))
     }
 
+    /// Extend a `new` callee with the tagged template at the current token,
+    /// carrying the tag's `<T>` in `type_arguments` when present (`new Foo<T>`x``).
+    /// The `new`-callee member loop's two tag sites — with and without a preceding
+    /// instantiation — share this. Returns `tag` unchanged if the parsed quasi is
+    /// not a `TemplateLiteral` (unreachable: `parse_template_literal` yields only
+    /// that).
+    fn attach_new_callee_tag(
+        &mut self,
+        tag: ParsedExpr<'arena>,
+        type_arguments: Option<TSTypeParameterInstantiation<'arena>>,
+    ) -> Result<ParsedExpr<'arena>, ParseError> {
+        let quasi = self.parse_template_literal(true)?;
+        let Expression::TemplateLiteral(template) = quasi else {
+            return Ok(tag);
+        };
+        Ok(self.build_tagged_template(tag.expr, tag.actual_start, type_arguments, template))
+    }
+
+    /// Build a `TaggedTemplateExpression` from an already-parsed tag, its optional
+    /// `<T>` type arguments, and the parsed quasi. Shared by `attach_new_callee_tag`
+    /// (the `new`-callee sites) and the ordinary postfix tagged-template arm so the
+    /// node's span math — the semantic span and the paren bounds are both
+    /// `tag_start..quasi.span.end` (a tag has no parens of its own) — lives in one
+    /// place. `tag` is the resolved tag expression and `tag_start` its
+    /// paren-inclusive start; the postfix arm flattens a `tag<T>`
+    /// `TSInstantiationExpression` off the tag first (via `flatten_instantiation`),
+    /// lifting `<T>` into `type_arguments`.
+    fn build_tagged_template(
+        &self,
+        tag: &'arena Expression<'arena>,
+        tag_start: u32,
+        type_arguments: Option<TSTypeParameterInstantiation<'arena>>,
+        quasi: TemplateLiteral<'arena>,
+    ) -> ParsedExpr<'arena> {
+        let end = quasi.span.end;
+        ParsedExpr::with_start_end(
+            self.arena,
+            Expression::TaggedTemplateExpression(TaggedTemplateExpression {
+                tag,
+                type_arguments,
+                quasi,
+                span: Span::new(tag_start, end),
+            }),
+            tag_start,
+            end as usize,
+        )
+    }
+
     /// Reject a spread element where an `ImportCall` argument (an
     /// `AssignmentExpression`) is expected — `import(...x)` / `import.source(...x)`
     /// are syntax errors (acorn agrees). An `import(...)` argument is a bare
@@ -2256,7 +2445,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Handles:
     /// - `import('module')` - dynamic import expression
     /// - `import.source('module')` / `import.defer('module')` - phased dynamic
-    ///   import (Stage-3 source-phase-imports / import-defer proposals)
+    ///   import (the source-phase-imports / import-defer proposals)
     /// - `import.meta` - meta property
     fn parse_import_or_meta_property(&mut self) -> Result<Expression<'arena>, ParseError> {
         let (start, import_end) = self.current_pos();

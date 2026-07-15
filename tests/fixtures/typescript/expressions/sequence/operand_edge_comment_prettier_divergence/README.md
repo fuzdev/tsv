@@ -1,35 +1,33 @@
 # Sequence operand edge comment divergence
 
-A redundantly-parenthesized sequence-expression operand whose parens hold a
-comment anchored to the *outer edge* of the operand — a leading comment on the
-first operand (`((/* c */ x), y)`) or a trailing comment on the last operand
-(`(x, (y /* d */))`) — has its parens stripped and the comment floated out of
-the sequence parens, matching prettier's fixed point:
+A comment glued to the **leading** edge of a redundantly-parenthesized
+sequence-expression operand — before the first operand, inside the sequence
+parens (`fn((/* c */ x, y))`) — is preserved where the author wrote it. Prettier
+relocates it out of the sequence parens, before `(`:
 
-- `fn(((/* c */ x), y))` → `fn(/* c */ (x, y))`
-- `fn((x, (y /* d */)))` → `fn((x, y) /* d */)`
+- tsv: `fn((/* c */ x, y))` (preserved)
+- Prettier: `fn(/* c */ (x, y))` (relocated out)
 
-The float preserves the comment's source line-treatment (own-line when the
-source has a newline between the comment and the operand, inline otherwise), so
-it stays idempotent even when the sequence is nested inside surrounding
-comments.
+Both authorings are stable under tsv — the glued-inside form (`input`) and the
+outside form (`variant_leading_paren`, also Prettier's fixed point). Every glued
+block comment binds to the operand it leads (`Comment::owned_by_node`), so the
+comment stays inside the parens rather than hoisting across the boundary.
 
-Prettier reaches this same fixed point but is **non-idempotent** getting there —
-it needs two passes:
+The **trailing** edge is not a divergence: a comment on the last operand's outer
+edge floats after the sequence parens (`fn((x, y) /* d */)`) in **both**
+formatters, so that line reads the same in `input` and `output_prettier`. The
+both-edges case combines the two — the leading comment diverges, the trailing one
+matches. Interior operand comments (between two operands) also match prettier —
+see the regular fixture `sequence/operand_comments`.
 
-- pass 1: `fn(((/* c */ x), y))` → `fn((/* c */ x, y))` (comment still inline)
-- pass 2: `fn((/* c */ x, y))` → `fn(/* c */ (x, y))` (floated)
+Symmetric with the other operand positions where tsv preserves a leading comment
+inside kept parens: the ternary operand
+([test_paren_leading_comment](../../ternary/test_paren_leading_comment_prettier_divergence/)),
+the non-null grouped operand
+([grouped_operand_leading_comment](../../non_null/grouped_operand_leading_comment_prettier_divergence/)),
+and the `await`/`yield` grouped operand
+([grouped_operand_comment](../../await_yield/grouped_operand_comment_prettier_divergence/)).
 
-tsv reaches the fixed point in one pass. Because the validator checks prettier's
-*first* pass, the user's paren form is documented as `unformatted_ours_paren`
-(our formatter normalizes it to `input` directly) paired with
-`prettier_intermediate_paren` (prettier's unstable first-pass output, which
-converges to `input` on the second pass).
-
-Unlike an interior operand comment (between two operands, e.g.
-`(x /* c */, /* c */ y)`), which is stable inline without parens and matches
-prettier — see [operand_comments](../operand_comments/).
-
-Reason: comment normalization (stable quirk) — tsv reaches prettier's fixed
-point in one pass where prettier needs two. See
-[conformance_prettier.md §Comment normalization (stable quirks)](../../../../../../docs/conformance_prettier.md#comment-normalization-stable-quirks).
+Reason: comment preservation. See
+[conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+§Comment relocation (Sequence operand leading comment) and §Comment Position Philosophy.

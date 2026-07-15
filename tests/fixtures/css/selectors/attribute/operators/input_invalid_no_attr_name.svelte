@@ -1,0 +1,5 @@
+<style>
+	[=b] {
+		color: red;
+	}
+</style>

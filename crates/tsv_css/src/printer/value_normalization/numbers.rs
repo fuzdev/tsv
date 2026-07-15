@@ -1,5 +1,6 @@
 // Number normalization: canonicalizing numeric value text to prettier's form.
 
+use crate::keyword_set::ascii_keyword_set;
 use std::borrow::Cow;
 
 /// Normalize a dimension value from raw source string
@@ -57,7 +58,12 @@ fn split_number_and_unit(raw: &str) -> (&str, &str) {
 /// borrow invariant (`Cow::Borrowed` ⟺ output byte-identical to `num`) trivially
 /// sound without a canonical-exponent check.
 pub(crate) fn normalize_css_number(num: &str) -> Cow<'_, str> {
-    let Some(e_idx) = num.find(['e', 'E']) else {
+    // A byte scan, not `num.find(['e', 'E'])`: the char-array pattern decodes a
+    // char per step, and this runs once per number — the densest construct in a
+    // stylesheet — for an exponent that is almost never there. `e`/`E` are ASCII,
+    // so neither can occur as a UTF-8 continuation byte and the byte index is the
+    // same char boundary the char search would report.
+    let Some(e_idx) = num.as_bytes().iter().position(|&b| b == b'e' || b == b'E') else {
         // No exponent: the number is exactly its mantissa, so its Cow is the whole
         // number's Cow (borrows `num` unchanged when already canonical).
         return normalize_decimal_preserving_prefix(num);
@@ -85,10 +91,17 @@ pub(crate) fn normalize_css_number(num: &str) -> Cow<'_, str> {
     Cow::Owned(format!("{normalized_mantissa}e{exp_sign}{trimmed_digits}"))
 }
 
-/// Known CSS units (lowercase), used to gate number normalization in raw
-/// prelude text — only a number with a known unit (or no unit) is normalized,
-/// matching prettier's `adjustNumbers` (which checks `css-units-list`).
-static CSS_UNITS: phf::Set<&'static str> = phf::phf_set! {
+ascii_keyword_set! {
+    /// Known CSS units (lowercase), compiled at build time.
+    static CSS_UNITS;
+
+    /// Is `unit` a known CSS unit (ASCII-case-insensitive)?
+    ///
+    /// Gates number normalization in raw prelude text — only a number with a known unit
+    /// (or no unit) is normalized, matching prettier's `adjustNumbers` (which checks
+    /// `css-units-list`).
+    pub(crate) fn is_known_css_unit;
+
     // Absolute length
     "px", "cm", "mm", "in", "pt", "pc", "q",
     // Font-relative length
@@ -110,14 +123,6 @@ static CSS_UNITS: phf::Set<&'static str> = phf::phf_set! {
     "dpi", "dpcm", "dppx", "x",
     // Flex / grid
     "fr",
-};
-
-pub(crate) fn is_known_css_unit(unit: &str) -> bool {
-    // Fast path: units arrive lowercase, so probe directly and only allocate a
-    // lowercased copy when the input actually has uppercase ASCII.
-    CSS_UNITS.contains(unit)
-        || (unit.bytes().any(|b| b.is_ascii_uppercase())
-            && CSS_UNITS.contains(unit.to_ascii_lowercase().as_str()))
 }
 
 /// Map a CSS dimension unit to its canonical case: **lowercase**, for every unit.

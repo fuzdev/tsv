@@ -41,7 +41,7 @@ above are the deferred early-error frontier — **reported, not gated** — so a
 proposal tsv does not implement are skipped, not graded — scoring them as parse
 failures would measure scope, not a conformance gap. The set
 (`UNIMPLEMENTED_FEATURES` in `crates/tsv_debug/src/test262/frontmatter.rs`) is
-**currently empty**: tsv parses the Stage-3 import-phase proposals
+**currently empty**: tsv parses the import-phase proposals
 (`source-phase-imports` / `import.source(…)` and `import-defer` /
 `import.defer(…)`, ~396 graded files) rather than skipping them — a deliberate
 divergence from acorn, which rejects them (see
@@ -217,7 +217,7 @@ entity name (`A.B.C`): a string/number/empty reference (`import x = 'foo'`,
   polarities so the score reflects conformance on syntax tsv aims to support, not
   unimplemented scope. The skip set lives in
   `crates/tsv_debug/src/test262/frontmatter.rs` (`UNIMPLEMENTED_FEATURES`) and is
-  **currently empty** — tsv parses the Stage-3 import-phase proposals
+  **currently empty** — tsv parses the import-phase proposals
   (`source-phase-imports` / `source-phase-imports-module-source` / `import-defer`),
   so their ~396 graded files count. Add a name here when tsv meets a new proposal it
   doesn't parse; drop it once it lands.

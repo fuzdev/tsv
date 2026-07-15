@@ -15,6 +15,16 @@ path = "src/main.rs"
 # `perf` sessions — measure production-shaped render code with no
 # instrumentation branch in the render loop.
 swallow_check = ["tsv_lang/swallow_check"]
+# Opt-in: compiles tsv_lang's print-once comment ledger into this binary and enables the
+# `comment_audit` subcommand (the `comments:audit` deno task passes it). Off by default
+# for the same reason as `swallow_check` — a default build carries no registration in the
+# format entry points and no record hook in the printers' comment seams.
+comment_check = [
+	"tsv_lang/comment_check",
+	"tsv_ts/comment_check",
+	"tsv_css/comment_check",
+	"tsv_svelte/comment_check",
+]
 
 [dependencies]
 tsv_cli = { path = "../tsv_cli" }

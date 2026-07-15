@@ -318,14 +318,14 @@ impl<'a> Lexer<'a> {
                             self.advance();
                         }
                     } else {
-                        // Outside expression tags
-                        if ch == '\\' {
-                            // Escape sequence - skip the backslash and the next character
-                            self.advance();
-                            if self.current.is_some() {
-                                self.advance();
-                            }
-                        } else if ch == quote {
+                        // Outside expression tags — attribute-value text. HTML/Svelte
+                        // attribute values have NO backslash escapes (unlike a JS string
+                        // inside `{expr}`, handled above), so `\` is a literal char:
+                        // `a="{x}\"` closes at the `"` with value `{x}\`, matching
+                        // Svelte's parser. Treating `\` as an escape here read `\"` as an
+                        // escaped quote and ran past the close → "Unterminated string
+                        // literal" (an over-rejection of valid Svelte; the `fuzz` gate).
+                        if ch == quote {
                             self.advance(); // consume closing quote
                             return Ok(self.make_token(TokenKind::String, start));
                         } else if ch == '{' {
@@ -354,6 +354,13 @@ impl<'a> Lexer<'a> {
                 // Advance past first char — ! is a valid start but not a continuation char
                 self.advance();
                 while let Some(ch) = self.current {
+                    // `is_alphanumeric` already covers Unicode *letters* (so `<my-café>`
+                    // works); `is_pcen_char` adds the non-alphanumeric members of the HTML
+                    // custom-element name grammar (`·`, ZWNJ/ZWJ, astral emoji) so a whole
+                    // custom-element name stays in one token. It sits last: ASCII
+                    // short-circuits on `is_alphanumeric` before reaching it. Over-admitting
+                    // (e.g. a PCENChar with no preceding hyphen) is harmless — the parser's
+                    // `is_valid_tag_name` gate rejects any name that isn't valid.
                     if ch.is_alphanumeric()
                         || ch == '_'
                         || ch == '$'
@@ -361,6 +368,7 @@ impl<'a> Lexer<'a> {
                         || ch == ':'
                         || ch == '|'
                         || ch == '.'
+                        || tsv_html::is_pcen_char(ch)
                     {
                         self.advance();
                     } else {
@@ -389,10 +397,10 @@ impl<'a> Lexer<'a> {
             // parses as Svelte's `read_static_attribute` reads it. This arm is
             // reached only inside a tag (template mode stops at `<`/`{`), and it only
             // ever converts a former hard error into a token — so it cannot regress a
-            // previously-valid parse. A symbol-led *tag* name (`<%foo>`) then
-            // over-accepts, joining tsv's other deferred tag-name early-errors
-            // (`<_foo>`): tag-name validity is a diagnostics-layer check tsv defers,
-            // not a parse error.
+            // previously-valid parse. A symbol-led *tag* name (`<%foo>`, `<_foo>`) is then
+            // rejected by the element parser's `is_valid_tag_name` gate (`parser/element.rs`),
+            // which validates the whole name against Svelte's element/component grammar — so
+            // this arm never turns an invalid tag name into an accepted element.
             Some(_) => {
                 self.advance();
                 Ok(self.make_token(TokenKind::Identifier, start))

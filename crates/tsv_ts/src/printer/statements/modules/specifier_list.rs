@@ -10,7 +10,7 @@ use crate::printer::CommentVec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
-use tsv_lang::{Span, comments_in_range};
+use tsv_lang::{Span, comments_to_emit_in_range};
 
 impl<'a> Printer<'a> {
     /// Check if an import declaration has empty named braces `{}` in source.
@@ -201,7 +201,8 @@ impl<'a> Printer<'a> {
         // comments) force the multiline path. One zero-comment window check over
         // the braces gates all three queries (each is bounded within the braces).
         let brace_span = Span::new(brace_start, brace_close + 1);
-        let has_expanding_comments = self.has_comments_between(brace_start, brace_close + 1)
+        let has_expanding_comments = self
+            .has_comments_to_emit_between(brace_start, brace_close + 1)
             && (self.has_line_comments_in_delimited_list(specifiers, &get_span, brace_close)
                 || self.has_line_comments_between(brace_start + 1, first_start)
                 || self.has_own_line_block_comments_in_bracket_list(
@@ -270,15 +271,26 @@ impl<'a> Printer<'a> {
         let (left_span, right_span) = (left.span(), right.span());
         // Compare spans, not values: `{a}` has one span, `{a as a}` has two.
         if left_span != right_span {
-            // Split comments at the `as` keyword: before-as and after-as.
-            if let Some(as_pos) = self.find_keyword_in_range(left_span.end, right_span.start, "as")
+            // Split comments at the `as` keyword: before-as and after-as. The ` as ` is
+            // static text, so the keyword scan exists only to bound those two ranges — a
+            // comment-free `{a as b}` neither scans nor pushes an empty child.
+            if !self.has_comments_to_emit_between(left_span.end, right_span.start) {
+                parts.push(d.text(" as "));
+            } else if let Some(as_pos) =
+                self.find_keyword_in_range(left_span.end, right_span.start, "as")
             {
-                parts.push(self.build_inline_comments_between_doc(left_span.end, as_pos));
+                if let Some(before) =
+                    self.build_inline_comments_between_doc_opt(left_span.end, as_pos)
+                {
+                    parts.push(before);
+                }
                 parts.push(d.text(" as "));
                 let as_end = as_pos + "as".len() as u32;
-                parts.push(
-                    self.build_inline_comments_between_doc_trailing_space(as_end, right_span.start),
-                );
+                if let Some(after) = self
+                    .build_inline_comments_between_doc_trailing_space_opt(as_end, right_span.start)
+                {
+                    parts.push(after);
+                }
             } else {
                 parts.push(d.text(" as "));
             }
@@ -350,7 +362,7 @@ impl<'a> Printer<'a> {
         // braces, so with no comment there the list is plain items joined by
         // `,` + line. Tree-identical: the skipped singleton `concat`s collapse
         // to the item doc, and the skipped pushes are empty docs.
-        if !self.has_comments_between(brace_start, brace_close + 1) {
+        if !self.has_comments_to_emit_between(brace_start, brace_close + 1) {
             let mut inner_parts = d.pooled_docbuf();
             for (i, item) in items.iter().enumerate() {
                 if i > 0 {
@@ -379,14 +391,20 @@ impl<'a> Printer<'a> {
             let mut item_parts = DocBuf::new();
 
             // Leading block comments before this item (after prev comma or `{`)
-            for comment in comments_in_range(self.comments, prev_end, item_start) {
+            for comment in comments_to_emit_in_range(self.comments, prev_end, item_start) {
                 if comment.is_block {
                     // One text node (`/*content*/ `; full span = the verbatim
                     // comment, delimiters included), like the lists.rs twins.
                     let mut w = d.pool_writer();
                     w.push_str(comment.span.extract(self.source));
                     w.push(' ');
-                    item_parts.push(w.finish_text());
+                    let doc = w.finish_text();
+                    // A comment emission that can't route through `build_comment_doc`
+                    // (the trailing space must share the node), so it tags its own
+                    // ledger node.
+                    #[cfg(feature = "comment_check")]
+                    d.tag_comment_doc(doc, comment.span, self.source);
+                    item_parts.push(doc);
                 }
             }
 
@@ -486,7 +504,7 @@ impl<'a> Printer<'a> {
 
             let search_start = self.leading_comment_search_start(prev_end, is_first);
             let comments: CommentVec<'_> =
-                comments_in_range(self.comments, search_start, item_start)
+                comments_to_emit_in_range(self.comments, search_start, item_start)
                     .filter(|c| {
                         is_first || c.is_block || !self.is_same_line(prev_end, c.span.start)
                     })
@@ -514,7 +532,7 @@ impl<'a> Printer<'a> {
 
             for comment in &comments {
                 parts.push(self.build_comment_doc(comment));
-                if comment.is_block && self.is_same_line(comment.span.end, item_start) {
+                if self.comment_hugs_next(comment, item_start) {
                     parts.push(d.text(" "));
                 } else {
                     parts.push(d.hardline());
@@ -530,7 +548,7 @@ impl<'a> Printer<'a> {
                 let comma_pos = self.find_list_comma(item_end, next_start);
 
                 let mut line_ref = item_end;
-                for comment in comments_in_range(self.comments, item_end, comma_pos) {
+                for comment in comments_to_emit_in_range(self.comments, item_end, comma_pos) {
                     if comment.is_block && self.is_same_line(line_ref, comment.span.start) {
                         parts.push(d.text(" "));
                         parts.push(self.build_comment_doc(comment));
@@ -551,7 +569,7 @@ impl<'a> Printer<'a> {
                 let mut prev_pos = item_end;
                 // Track line reference for multi-line block comments
                 let mut line_ref = item_end;
-                for comment in comments_in_range(self.comments, item_end, end_boundary) {
+                for comment in comments_to_emit_in_range(self.comments, item_end, end_boundary) {
                     if self.is_same_line(line_ref, comment.span.start) {
                         if comment.is_block {
                             parts.push(d.text(" "));

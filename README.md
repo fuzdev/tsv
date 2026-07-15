@@ -14,8 +14,8 @@ and a drop-in replacement for [Svelte](https://svelte.dev/)'s parser +
 Compared to Oxc, Biome, and SWC, tsv is a set of focused tools, not a generic language platform,
 so the focus is web standards and there's no support for JSX/SCSS/etc,
 beyond Svelte as the only JS framework.
-The extensibility story is currently limited to using its Rust crates as libraries;
-bridging to JS or WASM plugins is an open question, but may not be supported.
+The extensibility story is currently limited to using its Rust crates as libraries (or forking);
+bridging to JS or WASM plugins is an open question (leaning against).
 
 tsv prioritizes, in order:
 
@@ -38,19 +38,23 @@ It's a high-effort project that prioritizes quality.
 
 ## Status
 
-tsv is derived from:
+pre-alpha - v0.1 is for feedback only not production use; tsv v0.2 is closer but not yet published
 
-- Svelte
+## About
+
+tsv derives its tools from:
+
+- HTML/CSS/JS and other Web specs
 - TypeScript
+- Svelte
 - Prettier and prettier-plugin-svelte
-- HTML/CSS/JS
 
-tsv currently supports:
+tsv's features:
 
-- [x] formatter matching Prettier + prettier-plugin-svelte (with intentional divergences)
-- [x] parser, drop-in for Svelte+acorn+acorn-typescript
-- [ ] [vscode formatter plugin](https://github.com/fuzdev/vscode_extension_tsv_format) - fuzdev.tsv-format
-- [ ] ts->js conversion (types-to-whitespace only)
+- [x] formatter following Prettier + prettier-plugin-svelte (with intentional divergences)
+- [x] parser for TypeScript/JS + CSS + Svelte, drop-in for Svelte+acorn+acorn-typescript
+- [ ] [vscode formatter plugin](https://github.com/fuzdev/vscode_extension_tsv_format) - `fuzdev.tsv-format`
+- [ ] ts-to-js conversion (types-to-whitespace only)
 - [ ] module lexer
 
 Future features (unknown order):
@@ -118,7 +122,7 @@ Native builds will be published with v0.2, for v0.1 only WASM builds are publish
     (`printWidth: 100`, `useTabs: true`, `singleQuote: true`, and
     `trailingComma: 'none'`),
     and there are no config files or CLI options for formatting style;
-    i.e. `tsv format` is opinionated like `gofmt` and Python's Black,
+    i.e. `tsv format` is opinionated like `gofmt`, `zig fmt`, and Python's Black,
     see [CLAUDE.md § Configuration](CLAUDE.md#configuration)
   - pushes complexity and mess to the printer and JSON conversion,
     out of the parser and internal AST,
@@ -150,7 +154,7 @@ Native builds will be published with v0.2, for v0.1 only WASM builds are publish
     and heavier future layers (incremental parsing, CST for LSP) will be feature-gated so they
     don't regress the focused artifacts
 - modern and Web-conformant
-  - up-to-date with web specs (roughly aiming for stage 3+ proposals)
+  - up-to-date with web specs (roughly aiming for late-stage TC39 proposals and up)
   - JS and TS parse in strict mode only - sloppy-mode-only syntax like `with` is
     rejected, while strict-mode early errors (e.g. duplicate params, reserved-word
     bindings) still parse for now, with enforcement deferred to a future
@@ -163,8 +167,8 @@ Each language is a self-contained Rust crate exposing the same
 central `Language` trait, registry, or dynamic dispatch ("closed scope, open convention and crates").
 That means builds tree-shake, so the parse build excludes the printers,
 and the formatter build excludes the JSON-AST conversion layer.
-Languages tree-shake the same way - a build binding only TypeScript would exclude
-Svelte and CSS entirely (publishing minimal builds is a TODO).
+Languages tree-shake the same way - a TypeScript-only build would exclude
+Svelte and CSS entirely (publishing lang-specific builds is a TODO).
 Future LSP/incremental features will be later feature-gated layers that don't bloat
 these artifacts - see [docs/architecture.md](docs/architecture.md)
 

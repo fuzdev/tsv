@@ -10,7 +10,7 @@
 use crate::ast::internal::{self, Fragment, FragmentNode};
 use crate::printer::Printer;
 use smallvec::smallvec;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::doc::{DocBuf, GroupId};
 
@@ -52,21 +52,20 @@ struct AwaitPieces {
     catch_body: Option<DocId>,
 }
 
-/// Build an await block section body with newline-based whitespace detection.
+/// Build one `{#await}` section body (`pending` / `then` / `catch`).
 ///
-/// Returns `(body_doc, has_trailing)` — the indented body doc and whether the
-/// fragment had trailing whitespace (needed for section separator logic).
-fn build_await_section_body(printer: &Printer<'_>, fragment: &Fragment<'_>) -> (DocId, bool) {
-    let has_leading = printer.fragment_has_leading_ws(fragment);
-    let has_trailing = printer.fragment_has_trailing_ws(fragment);
-    let force_break = printer.fragment_should_force_break_content(fragment.nodes);
-    let is_inline = !has_leading && !has_trailing && !force_break;
-    let body_doc = if is_inline {
-        printer.build_fragment_doc(fragment)
-    } else {
+/// `expand` is the construct-wide boundary decision (see `Printer::body_boundaries_break`):
+/// every section's boundaries break together, so a section authored inline still drops to
+/// its own line once any sibling section went multiline. Keying it per-section on that
+/// section's own authored whitespace would let a render-free character weld one section's
+/// body to its keyword while the others break.
+fn build_await_section_body(printer: &Printer<'_>, fragment: &Fragment<'_>, expand: bool) -> DocId {
+    let body_doc = if expand {
         printer.build_nodes_doc_multiline(fragment.nodes)
+    } else {
+        printer.build_fragment_doc(fragment)
     };
-    (indent_body(printer, body_doc, has_leading), has_trailing)
+    indent_body(printer, body_doc, expand)
 }
 
 /// Build `indent([line, body_doc])` for space-only await blocks.
@@ -179,17 +178,21 @@ impl<'a> Printer<'a> {
     /// already drop to the next line. The head dangle (and the flat hug) must then not
     /// add their own break, or a spurious blank line / leading space appears. A trailing
     /// *block* comment carries no `hardline`, so it does not suppress the dangle.
+    ///
+    /// **to emit**, deliberately: the question is whether the comment *this gap prints last*
+    /// is a line comment, because that emission is what carries the closing `hardline`. A
+    /// comment the gap does not print carries no hardline, so it must not answer this.
     pub(super) fn head_trailing_line_comment(&self, start: u32, end: u32) -> bool {
-        comments_in_range(self.comments, start, end)
+        comments_to_emit_in_range(self.comments, start, end)
             .last()
             .is_some_and(|c| !c.is_block)
     }
 
-    /// Whether a wrapped block head may dangle its `}` (and expand its body) here. The
-    /// head expression is allowed to break (`allow_wrapping` or a multiline context) AND
-    /// the context permits the dangle — false only inside a whitespace-significant element
-    /// (`<pre>` / `<textarea>`), gated by [`Printer::block_dangle_allowed`]. Gating it off
-    /// only hugs the `}`; the expression still wraps to respect printWidth either way.
+    /// Whether a wrapped block head may dangle its `}` here. The head expression is
+    /// allowed to break (`allow_wrapping` or a multiline context) AND the context permits
+    /// the dangle — false only inside a whitespace-significant element (`<pre>` /
+    /// `<textarea>`), gated by [`Printer::block_dangle_allowed`]. Gating it off only hugs
+    /// the `}`; the expression still wraps to respect printWidth either way.
     fn block_head_can_wrap(&self, allow_wrapping: bool, in_multiline_context: bool) -> bool {
         (allow_wrapping || in_multiline_context) && self.block_dangle_allowed()
     }
@@ -403,9 +406,20 @@ impl<'a> Printer<'a> {
     /// each candidate in flat mode, so an element body's inline candidate does not
     /// "fit by breaking internally" — it falls through to the expanded (drop) state.
     ///
-    /// **Head forced multiline** (a trailing line comment) → expand directly; its
-    /// hardline would otherwise short-circuit the `conditional_group`'s `fits()` to
-    /// "fits" and wrongly hug the tail.
+    /// **Head or body forced multiline** → expand directly, skipping the
+    /// `conditional_group`. An unconditional break (a `hardline`) anywhere in a candidate
+    /// short-circuits `fits()` to "fits" — it stops the lookahead at the newline — so
+    /// offering the inline candidate would *wrongly hug*. For the head that means hugging
+    /// the tail (a trailing line comment); for the body it means **welding a multiline body
+    /// to the head and close tag** (`{#each xs as x}<tr>⏎…⏎</tr>{/each}`), the block
+    /// analogue of a delimiter dangle — the body's own line structure, which is render-free
+    /// at the boundary, would be picking the layout.
+    ///
+    /// This tests the *inline* tail, so it fires only on an **unconditional** break
+    /// (`will_break` is a sound static superset — hardline / propagated `breakParent`), not
+    /// on a body that merely *might* wrap by width. A body that can only break internally
+    /// (wrapping attributes) still measures flat and falls through to the expanded state on
+    /// overflow, exactly as before.
     fn build_expanding_construct(
         &self,
         head_doc: DocId,
@@ -414,12 +428,38 @@ impl<'a> Printer<'a> {
         gt_prefix: Option<DocId>,
     ) -> DocId {
         let d = self.d();
-        if d.will_break(head_doc) {
+        if d.will_break(head_doc) || d.will_break(inline_tail) {
             return self.fold_gt(gt_prefix, true, d.concat(&[head_doc, multiline_tail]));
         }
         let inline = self.fold_gt(gt_prefix, false, d.concat(&[head_doc, inline_tail]));
         let expanded = self.fold_gt(gt_prefix, true, d.concat(&[head_doc, multiline_tail]));
         d.conditional_group(&[inline, expanded])
+    }
+
+    /// Whether a block's body boundaries — the run between its head tag and its first
+    /// child, and between its last child and the close / next branch tag — must **break**
+    /// rather than hug, given whether every branch is inline-authored.
+    ///
+    /// A block branch is a **fragment**, and every fragment boundary in Svelte is
+    /// **render-free**: the compiler removes start/end-of-content whitespace (only
+    /// *inter-sibling* whitespace and `<pre>`/`<textarea>` are significant). So the
+    /// character at that boundary carries no authorship signal and must not select the
+    /// layout. Two consequences, both encoded here:
+    ///
+    /// - **Hug is all-or-nothing, per construct.** Keying each side on its own authored
+    ///   whitespace lets a render-free character weld the body to one tag while the other
+    ///   breaks (`{#if c}<div>a</div>⏎<div>b</div>{/if}`, `{#if c}⏎<div>a</div>{/if}`) —
+    ///   the block analogue of a delimiter dangle, and a *different stable form per
+    ///   authoring* of one document.
+    /// - **A branch that renders inline still breaks** once any sibling branch went
+    ///   multiline, so `{:else}` never welds its body while `{#if}` holds its own.
+    ///
+    /// The same invariant `ElementLayout::WithContent(BoundaryMode)` encodes for an
+    /// element's content boundary. See conformance_prettier.md §Svelte: Inline content
+    /// block-style. `<pre>`/`<textarea>` never reach here — they are dispatched to the
+    /// whitespace-sensitive builder, where the boundary is literal and the hug mandatory.
+    fn body_boundaries_break(all_branches_inline: bool) -> bool {
+        !all_branches_inline
     }
 
     /// Whether every if-block branch (consequent, each `{:else if}` consequent,
@@ -572,7 +612,7 @@ impl<'a> Printer<'a> {
         // Inline-authored block (consequent + every alternate branch): expand the
         // whole block — bodies, `{:else if}`/`{:else}` sections, and `{/if}` — onto
         // their own lines when the head wraps (or the construct overflows).
-        if self.if_branches_all_inline(block, in_multiline_context) && can_wrap {
+        if self.if_branches_all_inline(block, in_multiline_context) {
             let pieces = self.build_if_pieces(block);
             let inline_tail = self.compose_if_tail(&pieces, false);
             let multiline_tail = self.compose_if_tail(&pieces, true);
@@ -584,6 +624,11 @@ impl<'a> Printer<'a> {
             );
         }
 
+        // Any branch rendering multiline breaks *every* boundary — the consequent, each
+        // `{:else if}` / `{:else}`, and `{/if}`.
+        let expand =
+            Self::body_boundaries_break(self.if_branches_all_inline(block, in_multiline_context));
+
         // Build the consequent body only on the non-fast path — the fast path above
         // builds its own (shared) pieces, so building it eagerly made that path build the
         // consequent twice, keeping the nested-block fanout exponential. For inline: the
@@ -594,30 +639,18 @@ impl<'a> Printer<'a> {
         } else {
             self.build_nodes_doc_multiline(block.consequent.nodes)
         };
-        let indented_body = indent_body(self, body_doc, has_leading);
+        let indented_body = indent_body(self, body_doc, expand);
 
         let mut parts: DocBuf = smallvec![head_doc, indented_body];
 
-        // Handle alternate (else/else-if) and determine final trailing status
-        let final_has_trailing = if let Some(alt) = &block.alternate {
-            // Add break before alternate only if consequent has trailing ws
-            if has_trailing {
+        if let Some(alt) = &block.alternate {
+            if expand {
                 parts.push(d.hardline());
             }
-            parts.push(self.build_if_alternate_doc(
-                alt,
-                has_leading,
-                has_trailing,
-                in_multiline_context,
-            ));
-            // Get trailing status from the final branch
-            self.get_final_branch_trailing(block, in_multiline_context)
-        } else {
-            has_trailing
-        };
+            parts.push(self.build_if_alternate_doc(alt, expand, in_multiline_context));
+        }
 
-        // Add endline before {/if} only if final branch has trailing whitespace
-        if final_has_trailing {
+        if expand {
             parts.push(d.hardline());
         }
 
@@ -685,20 +718,15 @@ impl<'a> Printer<'a> {
         )
     }
 
-    /// Build doc for if block alternate (else or else-if)
+    /// Build doc for if block alternate (else or else-if).
     ///
-    /// Uses separate leading/trailing whitespace handling for proper hugging.
-    /// `parent_has_leading` - whether parent had leading ws (break after opening)
-    /// `parent_has_trailing` - whether parent had trailing ws (break before this alternate)
-    /// `in_multiline_context` - whether we're in a multiline parent context
-    ///
-    /// Returns (doc, final_has_trailing) where final_has_trailing indicates whether
-    /// the last branch of this alternate chain has trailing whitespace.
+    /// `expand` is the construct-wide boundary decision (see `body_boundaries_break`) — it
+    /// is *not* re-derived per branch, because hug is all-or-nothing: a branch that renders
+    /// inline still drops to its own line once any sibling branch went multiline.
     fn build_if_alternate_doc(
         &self,
         alt: &Fragment<'_>,
-        parent_has_leading: bool,
-        parent_has_trailing: bool,
+        expand: bool,
         in_multiline_context: bool,
     ) -> DocId {
         let d = self.d();
@@ -707,23 +735,15 @@ impl<'a> Printer<'a> {
             // {:else if condition}
             let expr_doc = self.build_else_if_expr_doc(else_if, in_multiline_context);
 
-            // Check this branch's own leading/trailing whitespace
-            let (has_leading, has_trailing) =
-                self.fragment_ws_status(&else_if.consequent, in_multiline_context);
-            let force_break = self.fragment_should_force_break_content(else_if.consequent.nodes);
-            let is_inline = !has_leading && !has_trailing && !force_break;
-            let parent_inline = !parent_has_leading && !parent_has_trailing;
-            let is_both_inline = is_inline && parent_inline;
-
-            // For inline: use regular fragment doc (preserves spaces)
-            // For multiline: use multiline doc (preserves line structure)
-            let body_doc = if is_both_inline {
-                self.build_fragment_doc(&else_if.consequent)
-            } else {
+            // Build the body inline only when the whole construct stays inline; once it
+            // expands, every branch body carries multiline line structure.
+            let body_doc = if expand {
                 self.build_nodes_doc_multiline(else_if.consequent.nodes)
+            } else {
+                self.build_fragment_doc(&else_if.consequent)
             };
 
-            let indented_body = indent_body(self, body_doc, has_leading);
+            let indented_body = indent_body(self, body_doc, expand);
 
             // `build_else_if_expr_doc` builds the condition with `in_multiline_context`
             // as its wrapping flag, so the dangle keys on the same condition.
@@ -737,68 +757,26 @@ impl<'a> Printer<'a> {
             );
             let mut parts: DocBuf = smallvec![head_doc, indented_body];
 
-            // Handle nested alternate or trailing
             if let Some(nested_alt) = &else_if.alternate {
-                // Add break before next alternate only if this branch has trailing ws
-                if has_trailing {
+                if expand {
                     parts.push(d.hardline());
                 }
-                parts.push(self.build_if_alternate_doc(
-                    nested_alt,
-                    has_leading,
-                    has_trailing,
-                    in_multiline_context,
-                ));
+                parts.push(self.build_if_alternate_doc(nested_alt, expand, in_multiline_context));
             }
 
             return d.concat(&parts);
         }
 
         // Plain {:else}
-        let (has_leading, has_trailing) = self.fragment_ws_status(alt, in_multiline_context);
-        let force_break = self.fragment_should_force_break_content(alt.nodes);
-        let is_inline = !has_leading && !has_trailing && !force_break;
-        let parent_inline = !parent_has_leading && !parent_has_trailing;
-        let is_both_inline = is_inline && parent_inline;
-
-        // For inline: use regular fragment doc (preserves spaces)
-        // For multiline: use multiline doc
-        let body_doc = if is_both_inline {
-            self.build_nodes_doc(alt.nodes)
-        } else {
+        let body_doc = if expand {
             self.build_nodes_doc_multiline(alt.nodes)
+        } else {
+            self.build_nodes_doc(alt.nodes)
         };
 
-        let indented_body = indent_body(self, body_doc, has_leading);
+        let indented_body = indent_body(self, body_doc, expand);
 
         d.concat(&[d.text("{:else}"), indented_body])
-    }
-
-    /// Get the trailing whitespace status of the final branch in an if-block.
-    ///
-    /// This walks the alternate chain to find the last branch and returns
-    /// whether it has trailing whitespace (for placing `{/if}`).
-    fn get_final_branch_trailing(
-        &self,
-        block: &internal::IfBlock<'_>,
-        in_multiline_context: bool,
-    ) -> bool {
-        // If no alternate, use the consequent's trailing
-        let Some(alt) = &block.alternate else {
-            let (_, has_trailing) =
-                self.fragment_ws_status(&block.consequent, in_multiline_context);
-            return has_trailing;
-        };
-
-        // Check if this is an else-if chain
-        if let Some(else_if) = Self::get_flattenable_else_if(alt) {
-            // Recurse into else-if
-            return self.get_final_branch_trailing(else_if, in_multiline_context);
-        }
-
-        // Plain {:else} - use its trailing
-        let (_, has_trailing) = self.fragment_ws_status(alt, in_multiline_context);
-        has_trailing
     }
 
     /// Whether the each block's body and its optional `{:else}` fallback are both
@@ -935,7 +913,7 @@ impl<'a> Printer<'a> {
         // Inline-authored block (body + `{:else}` fallback): expand the body,
         // `{:else}` section, and `{/each}` onto their own lines when the head wraps
         // (or the construct overflows).
-        if self.each_branches_all_inline(block, in_multiline_context) && can_wrap {
+        if self.each_branches_all_inline(block, in_multiline_context) {
             let (body, fallback) = self.build_each_pieces(block);
             let inline_tail = self.compose_each_tail(body, fallback, false);
             let multiline_tail = self.compose_each_tail(body, fallback, true);
@@ -947,6 +925,11 @@ impl<'a> Printer<'a> {
             );
         }
 
+        // Either branch rendering multiline breaks *every* boundary — the body, `{:else}`,
+        // and `{/each}`.
+        let expand =
+            Self::body_boundaries_break(self.each_branches_all_inline(block, in_multiline_context));
+
         // Build the body only on the non-fast path (the fast path above builds its own
         // shared pieces). For inline: regular fragment doc (preserves spacing); for
         // multiline: the multiline doc (line structure with hardlines).
@@ -955,45 +938,27 @@ impl<'a> Printer<'a> {
         } else {
             self.build_nodes_doc_multiline(block.body.nodes)
         };
-        let indented_body = indent_body(self, body_doc, has_leading);
+        let indented_body = indent_body(self, body_doc, expand);
 
         let mut parts: DocBuf = smallvec![head_doc, indented_body];
 
-        // Determine final trailing status (from body or fallback if present)
-        let final_has_trailing = if let Some(fallback) = &block.fallback {
-            // Add break before {:else} only if body has trailing ws
-            if has_trailing {
+        if let Some(fallback) = &block.fallback {
+            if expand {
                 parts.push(d.hardline());
             }
 
-            let (fallback_has_leading, fallback_has_trailing) =
-                self.fragment_ws_status(fallback, in_multiline_context);
-            let fallback_force_break = self.fragment_should_force_break_content(fallback.nodes);
-            let fallback_inline =
-                !fallback_has_leading && !fallback_has_trailing && !fallback_force_break;
-            let is_both_inline = fallback_inline && is_inline;
-
             parts.push(d.text("{:else}"));
 
-            // For inline: use regular fragment doc
-            // For multiline: use multiline doc
-            let fallback_doc = if is_both_inline {
-                self.build_fragment_doc(fallback)
-            } else {
+            let fallback_doc = if expand {
                 self.build_nodes_doc_multiline(fallback.nodes)
+            } else {
+                self.build_fragment_doc(fallback)
             };
 
-            let indented_fallback =
-                indent_body(self, fallback_doc, fallback_has_leading || has_leading);
-            parts.push(indented_fallback);
+            parts.push(indent_body(self, fallback_doc, expand));
+        }
 
-            fallback_has_trailing
-        } else {
-            has_trailing
-        };
-
-        // Add endline before {/each} only if final has trailing whitespace
-        if final_has_trailing {
+        if expand {
             parts.push(d.hardline());
         }
 
@@ -1148,44 +1113,37 @@ impl<'a> Printer<'a> {
     }
 
     /// Build the await tail for the **newline-authored** layout: section bodies via
-    /// `build_await_section_body` (which reports trailing whitespace), with a `hardline`
-    /// before each keyword and before `{/await}` only when the preceding section had
-    /// trailing whitespace. Mirrors `compose_await_tail`, but respects authored trailing
-    /// whitespace instead of a uniform `multiline` flag (the head is prepended by the
-    /// caller).
-    fn build_await_tail_newline(&self, block: &internal::AwaitBlock<'_>) -> DocId {
+    /// `build_await_section_body`, with a `hardline` before each keyword and before
+    /// `{/await}` when the construct expands. Mirrors `compose_await_tail`; `expand` is the
+    /// construct-wide boundary decision (see `Self::body_boundaries_break`), so every
+    /// section boundary breaks together rather than keying on its own authored whitespace
+    /// (the head is prepended by the caller).
+    fn build_await_tail_newline(&self, block: &internal::AwaitBlock<'_>, expand: bool) -> DocId {
         let d = self.d();
         let (is_then_shorthand, is_catch_shorthand) = Self::await_shorthand_flags(block);
         let mut parts: DocBuf = DocBuf::new();
-        let mut prev_has_trailing = false;
         if let Some(pending) = &block.pending {
-            let (body, has_trailing) = build_await_section_body(self, pending);
-            parts.push(body);
-            prev_has_trailing = has_trailing;
+            parts.push(build_await_section_body(self, pending, expand));
         }
         if !is_then_shorthand && let Some(kw) = self.await_then_keyword(block) {
-            if prev_has_trailing {
+            if expand {
                 parts.push(d.hardline());
             }
             parts.push(kw);
         }
         if let Some(then_block) = &block.then {
-            let (body, has_trailing) = build_await_section_body(self, then_block);
-            parts.push(body);
-            prev_has_trailing = has_trailing;
+            parts.push(build_await_section_body(self, then_block, expand));
         }
         if !is_catch_shorthand && let Some(kw) = self.await_catch_keyword(block) {
-            if prev_has_trailing {
+            if expand {
                 parts.push(d.hardline());
             }
             parts.push(kw);
         }
         if let Some(catch_block) = &block.catch {
-            let (body, has_trailing) = build_await_section_body(self, catch_block);
-            parts.push(body);
-            prev_has_trailing = has_trailing;
+            parts.push(build_await_section_body(self, catch_block, expand));
         }
-        if prev_has_trailing {
+        if expand {
             parts.push(d.hardline());
         }
         parts.push(d.text("{/await}"));
@@ -1291,7 +1249,7 @@ impl<'a> Printer<'a> {
         // Fast path: every present section is inline-authored → body-expand like the other
         // blocks. The section bodies + `{:then}`/`{:catch}` keywords + `{/await}` all drop to
         // their own lines when the head wraps, chosen in one pass by `build_expanding_construct`.
-        if can_wrap && has_section && all_sections_inline {
+        if has_section && all_sections_inline {
             let pieces = self.build_await_pieces(block);
             let inline_tail = self.compose_await_tail(&pieces, false);
             let multiline_tail = self.compose_await_tail(&pieces, true);
@@ -1320,7 +1278,10 @@ impl<'a> Printer<'a> {
             return self.dangle_gt(gt_prefix, d.group(d.concat(&[head_doc, tail])));
         }
 
-        let tail = self.build_await_tail_newline(block);
+        // Any section rendering multiline breaks *every* boundary — each section body, the
+        // `{:then}` / `{:catch}` keywords, and `{/await}`.
+        let expand = Self::body_boundaries_break(all_sections_inline);
+        let tail = self.build_await_tail_newline(block, expand);
         // Non-expanding tail (newline-authored sections): fold a preceding sibling's `>`.
         self.dangle_gt(gt_prefix, d.concat(&[head_doc, tail]))
     }
@@ -1360,6 +1321,9 @@ impl<'a> Printer<'a> {
         let force_break = self.fragment_should_force_break_content(block.fragment.nodes);
         let is_inline = !has_leading && !has_trailing && !force_break;
 
+        // A multiline body breaks both boundaries — the body and `{/key}`.
+        let expand = Self::body_boundaries_break(is_inline);
+
         // For inline: use regular fragment doc (preserves inline spacing)
         // For multiline: use multiline doc (preserves line structure with hardlines)
         let body_doc = if is_inline {
@@ -1368,7 +1332,7 @@ impl<'a> Printer<'a> {
             self.build_nodes_doc_multiline(block.fragment.nodes)
         };
 
-        let indented_body = indent_body(self, body_doc, has_leading);
+        let indented_body = indent_body(self, body_doc, expand);
 
         let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
         let head_doc = self.build_block_head(
@@ -1380,15 +1344,14 @@ impl<'a> Printer<'a> {
             can_wrap,
         );
         let close = d.text("{/key}");
-        if is_inline && can_wrap {
+        if is_inline {
             // Inline-authored body: expand it + `{/key}` when the head wraps.
             return self.build_expanding_block(head_doc, body_doc, close, gt_prefix);
         }
 
         let mut parts: DocBuf = smallvec![head_doc, indented_body];
 
-        // Add endline before {/key} only if trailing whitespace exists
-        if has_trailing {
+        if expand {
             parts.push(d.hardline());
         }
 
@@ -1397,28 +1360,25 @@ impl<'a> Printer<'a> {
         self.dangle_gt(gt_prefix, d.concat(&parts))
     }
 
-    /// Build a doc for a snippet block (no preceding context / sibling `>`).
+    /// Build a doc for a snippet block (no sibling `>` to fold).
     pub(crate) fn build_snippet_block_doc(&self, block: &internal::SnippetBlock<'_>) -> DocId {
-        self.build_snippet_block_doc_with_full_context(block, false, false, None)
+        self.build_snippet_block_doc_with_full_context(block, None)
     }
 
-    /// Build a doc for a snippet block with full context (multiline + preceding content +
-    /// optional sibling `>` fold).
+    /// Build a doc for a snippet block, optionally folding a preceding sibling's `>`.
     ///
     /// Uses same inline/multiline pattern as if blocks. Opening tag uses group() for
-    /// parameter wrapping when they exceed print width. The body-drop keys on `can_wrap`
-    /// (like `{#if}`/`{#each}`/`{#await}`): it hugs in the inline-content/hug-both path
-    /// (`can_wrap` false) and drops in the multiline-fragment path.
+    /// parameter wrapping when they exceed print width. Takes no context: the head wraps by
+    /// its own width (its `BlockHead` group), and the body-drop is likewise decided by
+    /// **width** (the `conditional_group` in `build_expanding_block`) — never by whether the
+    /// head may wrap, which would let a render-free boundary select the layout (see
+    /// `body_boundaries_break`).
     pub(crate) fn build_snippet_block_doc_with_full_context(
         &self,
         block: &internal::SnippetBlock<'_>,
-        in_multiline_context: bool,
-        has_preceding_breakable: bool,
         gt_prefix: Option<DocId>,
     ) -> DocId {
         let d = self.d();
-        let allow_wrapping = !has_preceding_breakable;
-        let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
         // Check leading/trailing whitespace, considering space-only patterns.
         // Space-only whitespace (no newlines) also triggers expansion to match prettier.
         let (has_leading, has_trailing) = self.fragment_ws_status(&block.body, false);
@@ -1514,16 +1474,18 @@ impl<'a> Printer<'a> {
         // Inline-authored body: expand the body + `{/snippet}` onto their own lines
         // when the construct overflows (params wrap, or head + body exceeds width) —
         // uniformly, including paramless snippets. Keyed to the opening group above.
-        if is_inline && can_wrap {
+        if is_inline {
             let close = d.text("{/snippet}");
             return self.build_expanding_block(opening_doc, body_doc, close, gt_prefix);
         }
 
-        let mut parts: DocBuf = smallvec![opening_doc];
-        parts.push(indent_body(self, body_doc, has_leading));
+        // A multiline body breaks both boundaries — the body and `{/snippet}`.
+        let expand = Self::body_boundaries_break(is_inline);
 
-        // Add endline before {/snippet} only if trailing whitespace exists
-        if has_trailing {
+        let mut parts: DocBuf = smallvec![opening_doc];
+        parts.push(indent_body(self, body_doc, expand));
+
+        if expand {
             parts.push(d.hardline());
         }
 

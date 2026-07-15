@@ -136,7 +136,7 @@ const ALLOW: &[Allow] = &[
     ),
     (
         "tsv_css/src/printer/value_normalization/mod.rs",
-        "if let Some(comment_start) = property_part.find(\"/*\") {",
+        "if has_block_comment && let Some(comment_start) = property_part.find(\"/*\") {",
         "comment-marker",
     ),
     (
@@ -151,11 +151,6 @@ const ALLOW: &[Allow] = &[
         "tsv_css/src/printer/value_normalization/mod.rs",
         "match rest.find(\"/*\") {",
         "comment-marker",
-    ),
-    (
-        "tsv_css/src/printer/value_normalization/numbers.rs",
-        "let Some(e_idx) = num.find(['e', 'E']) else {",
-        "number-literal",
     ),
     (
         "tsv_css/src/printer/value_normalization/splitting.rs",

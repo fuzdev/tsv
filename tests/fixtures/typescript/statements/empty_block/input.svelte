@@ -26,13 +26,25 @@
 	// Empty do-while block (stays inline)
 	do {} while (cond);
 
-	// Empty try block (expands), catch (stays inline)
+	// Empty try block (expands), catch (stays inline) when no finally follows
 	try {
 	} catch (e) {}
 
 	// Empty finally block (expands)
 	try {
 		a;
+	} finally {
+	}
+
+	// Empty catch expands too when a finally follows (not the last clause)
+	try {
+	} catch (e) {
+	} finally {
+	}
+
+	// Same for a parameterless catch
+	try {
+	} catch {
 	} finally {
 	}
 
@@ -45,5 +57,19 @@
 	// Empty class method body (stays inline)
 	class C {
 		m() {}
+	}
+
+	// Bare block statement (expands)
+	{
+	}
+
+	// Labeled block statement (expands)
+	lbl: {
+	}
+
+	// Nested bare block inside a block (expands)
+	{
+		{
+		}
 	}
 </script>

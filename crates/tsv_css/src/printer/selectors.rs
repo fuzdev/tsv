@@ -33,10 +33,11 @@ use std::borrow::Cow;
 use std::fmt::Write;
 
 use super::Printer;
+use super::value_normalization;
 use crate::ast::internal;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::source_scan;
-use tsv_lang::{Span, has_comments_in_range};
+use tsv_lang::{Span, has_comments_to_emit_in_range};
 
 /// Trailing punctuation that follows a selector on its last line (`) {` / `,`),
 /// reserved so a selector that would overflow once the brace is appended breaks
@@ -66,6 +67,13 @@ impl<'a> Printer<'a> {
     /// the old `normalize_selector_comment_spacing` string-replace: it preserves each
     /// comment's side of the comma while normalizing the surrounding whitespace.
     fn split_selector_comments_around_comma(&self, start: u32, end: u32) -> (String, String) {
+        // The comma is located only to decide which side of it each comment falls on — it
+        // is re-emitted as static text either way. With no comment in the gap both sides
+        // are empty regardless of where the comma sits, so check that first and skip the
+        // comment-aware byte scan entirely.
+        if !has_comments_to_emit_in_range(self.comments, start, end) {
+            return (String::new(), String::new());
+        }
         let comma = source_scan::find_char_skipping_comments(
             self.source.as_bytes(),
             start as usize,
@@ -93,7 +101,7 @@ impl<'a> Printer<'a> {
         if list.selectors.is_empty() {
             return;
         }
-        if has_comments_in_range(self.comments, list.span.start, list.span.end) {
+        if has_comments_to_emit_in_range(self.comments, list.span.start, list.span.end) {
             let doc = self.build_comma_list_doc(list, false);
             self.write_arena_doc_with_suffix(doc, SELECTOR_SUFFIX_WIDTH);
             return;
@@ -260,11 +268,18 @@ impl<'a> Printer<'a> {
     /// left to the normal builder's own normalize path. Drives the verbatim freeze in
     /// `build_complex_selector_doc`.
     fn complex_has_boundary_comment(&self, complex: &internal::ComplexSelector<'_>) -> bool {
+        // Every gap the loop below probes lies inside the selector's own span, and a
+        // comment registers only when it sits fully inside the queried range — so a
+        // comment-free selector has no boundary comment. One probe answers that, instead
+        // of one per simple selector.
+        if !has_comments_to_emit_in_range(self.comments, complex.span.start, complex.span.end) {
+            return false;
+        }
         let mut prev_end = complex.span.start;
         for rel in complex.children {
             for simple in rel.selectors {
                 let span = simple.span();
-                if has_comments_in_range(self.comments, prev_end, span.start) {
+                if has_comments_to_emit_in_range(self.comments, prev_end, span.start) {
                     return true;
                 }
                 prev_end = span.end;
@@ -346,14 +361,14 @@ impl<'a> Printer<'a> {
                 // drop the comment — a block-comment content loss `swallow_audit` can't
                 // catch (it only sees `//` line-comment swallows in rendered output).
                 debug_assert!(
-                    !has_comments_in_range(self.comments, complex.span.start, first_start),
+                    !has_comments_to_emit_in_range(self.comments, complex.span.start, first_start),
                     "leading gap comment before the first compound has no emission path"
                 );
             }
             let n = rel.selectors.len();
             for (j, simple) in rel.selectors.iter().enumerate() {
                 let sspan = simple.span();
-                if j > 0 && has_comments_in_range(self.comments, prev_end, sspan.start) {
+                if j > 0 && has_comments_to_emit_in_range(self.comments, prev_end, sspan.start) {
                     // Glued compound-internal trivia: emit the source slice verbatim (no
                     // space normalization). The run is fully glued (the parser keeps a
                     // compound together only across glued comments), so normalizing the
@@ -364,6 +379,14 @@ impl<'a> Printer<'a> {
                         start: prev_end,
                         end: sspan.start,
                     };
+                    // The gap's comments ride out inside the raw slice — see
+                    // `tsv_lang::comment_ledger`.
+                    #[cfg(feature = "comment_check")]
+                    tsv_lang::comment_ledger::record_verbatim_range(
+                        self.source,
+                        gap.start,
+                        gap.end,
+                    );
                     parts.push(d.source_span(gap, self.source));
                 }
                 parts.push(self.build_simple_selector_doc(simple, j + 1 == n));
@@ -609,7 +632,19 @@ impl<'a> Printer<'a> {
                 }
             }
             internal::SimpleSelector::Invalid { span } => {
-                d.text_pooled(span.extract(self.source).trim())
+                // A dropped forgiving-list item (`:is(.a > . > .b)`) is emitted
+                // verbatim except that its whitespace runs (spaces, tabs, newlines)
+                // collapse to single spaces — the same normalization every other
+                // selector-argument position gets, and what prettier does inside a
+                // selector.
+                //
+                // The parser registers whatever comments it read before the parse error,
+                // and they ride out inside this slice — see `tsv_lang::comment_ledger`.
+                #[cfg(feature = "comment_check")]
+                tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
+                d.text_pooled(&value_normalization::collapse_whitespace_runs(
+                    span.extract(self.source).trim(),
+                ))
             }
         }
     }
@@ -633,6 +668,13 @@ impl<'a> Printer<'a> {
             None => {
                 // No args: the whole span is the name; drop its escape terminator
                 // when it ends the compound.
+                //
+                // The span also covers an *unreadable* argument list (`:state(/* c */ "x")`,
+                // whose args the parser skipped to `)` after registering the gap comment) —
+                // those comments ride out inside this verbatim slice. See
+                // `tsv_lang::comment_ledger`.
+                #[cfg(feature = "comment_check")]
+                tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
                 let name = self.pseudo_name_text(span, false);
                 let text = if is_last_in_compound {
                     name.trim_end()
@@ -735,6 +777,13 @@ impl<'a> Printer<'a> {
     /// Svelte-matching public-AST node span (it ends *before* the `)`, and convert
     /// reads it verbatim — see `convert_pseudo_class_args`), so it interleaves inline.
     fn wrap_args_gap_comments(&self, inner: DocId, args_span: Span, content_span: Span) -> DocId {
+        // Both gaps sit inside the argument parens, so comment-free parens mean both come
+        // back empty and `wrap_inner_with_comments` hands `inner` straight back. One probe
+        // replaces the two range-collects on the common path — this fires on every
+        // `:not()` / `:where()` / `:is()`, which are dense in real stylesheets.
+        if !has_comments_to_emit_in_range(self.comments, args_span.start, args_span.end) {
+            return inner;
+        }
         let leading = self.comment_blocks_in_range(args_span.start, content_span.start);
         let trailing =
             self.comment_blocks_in_range(content_span.end, args_span.end.saturating_sub(1));
@@ -743,7 +792,7 @@ impl<'a> Printer<'a> {
 
     /// Build the `::part()` identifier run, interleaving any comment that sits in
     /// an interior gap between two names at its authored position with single-space
-    /// separation — the shared selector-comment normalization (`comments_in_range`
+    /// separation — the shared selector-comment normalization (`comments_to_emit_in_range`
     /// lookup, the same rule as `:is()`/combinator-boundary comments). The common
     /// comment-free case (`run_span` has no comment, or a single name) stays a
     /// plain single-space join. `run_span` bounds the run between the first and
@@ -756,7 +805,9 @@ impl<'a> Printer<'a> {
         run_span: Span,
     ) -> DocId {
         let d = self.d();
-        if idents.len() < 2 || !has_comments_in_range(self.comments, run_span.start, run_span.end) {
+        if idents.len() < 2
+            || !has_comments_to_emit_in_range(self.comments, run_span.start, run_span.end)
+        {
             return d.text_pooled(&idents.join(" "));
         }
         let mut parts = DocBuf::new();

@@ -6,7 +6,7 @@ use crate::ast::internal;
 use crate::printer::{CommentVec, Printer, template_literal_has_newlines};
 use smallvec::smallvec;
 use tsv_lang::INDENT;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -184,6 +184,14 @@ impl<'a> Printer<'a> {
         // Parenthesize an `in` test inside a for-header init (`for (a = (b in c) ? …;…)`);
         // a no-op elsewhere. The test is `[~In]`, so the parens are load-bearing.
         let test = self.wrap_for_init_in(cond.test, test);
+        // Comments the parser stripped along with the test's grouping parens
+        // (`(/* c */ a ?? b) ? x : y`) live in the gap between the conditional's own
+        // start (the removed `(`) and the test's — no other emitter covers it, so
+        // without this the comment is silently dropped. Outside the re-added parens,
+        // matching every other operand position. A no-op when the test wasn't
+        // parenthesized (the two starts coincide).
+        let test =
+            self.prepend_removed_paren_comments(cond.span.start, cond.test.span().start, test);
         // Prettier's shouldNotIndent (binaryish.js:109-113) also applies to binaries
         // in consequent/alternate positions: when parent is ConditionalExpression and
         // grandparent is ReturnStatement/ThrowStatement/CallExpression/NewExpression,
@@ -197,38 +205,62 @@ impl<'a> Printer<'a> {
 
         // Split comments around ? and : operators.
         // Comments before ? go after test, comments after ? go before consequent,
-        // comments after : go before alternate.
-        let question_pos = self.find_char_outside_comments(test_end, consequent_start, b'?');
-        let colon_pos = self.find_char_outside_comments(consequent_end, alternate_start, b':');
-
-        // Comments between test and ?
-        let comments_before_question = if let Some(q) = question_pos {
-            self.build_inline_comments_between_doc(test_end, q)
+        // comments after : go before alternate. These positions only bound the comment
+        // scans below, so a ternary with no comment anywhere skips both position scans.
+        let ternary_has_comments = self.has_comments_to_emit_between(test_end, alternate_start);
+        let (question_pos, colon_pos) = if ternary_has_comments {
+            (
+                self.find_char_outside_comments(test_end, consequent_start, b'?'),
+                self.find_char_outside_comments(consequent_end, alternate_start, b':'),
+            )
         } else {
-            self.build_inline_comments_between_doc(test_end, consequent_start)
+            (None, None)
         };
 
-        // Comments between ? and consequent (e.g., `b ? /* comment */ c`)
-        // Trailing space so the comment doesn't touch the consequent
-        let comments_after_question = if let Some(q) = question_pos {
-            self.build_inline_comments_between_doc_trailing_space(q + 1, consequent_start)
-        } else {
-            d.empty()
-        };
+        // The four comment slots (before/after `?`, before/after `:`) are all empty on
+        // the comment-free common path — each gap ⊆ [test_end, alternate_start], so no
+        // comment there means every slot builds to `empty()`. Build them only when the
+        // ternary span carries a comment; otherwise skip the redundant per-gap scan (the
+        // `test_end → consequent_start` one below runs even with no `?` position) and the
+        // four empty children in the `inner` concat. Byte-identical: empty slots render to
+        // nothing, so the lean concat is the same output.
+        let comment_slots = ternary_has_comments.then(|| {
+            // Comments between test and ?
+            let comments_before_question = if let Some(q) = question_pos {
+                self.build_inline_comments_between_doc(test_end, q)
+            } else {
+                self.build_inline_comments_between_doc(test_end, consequent_start)
+            };
 
-        // Comments between consequent and : (e.g., `b ? c /* comment */ : d`)
-        let comments_before_colon = if let Some(c) = colon_pos {
-            self.build_inline_comments_between_doc(consequent_end, c)
-        } else {
-            d.empty()
-        };
+            // Comments between ? and consequent (e.g., `b ? /* comment */ c`)
+            // Trailing space so the comment doesn't touch the consequent
+            let comments_after_question = if let Some(q) = question_pos {
+                self.build_inline_comments_between_doc_trailing_space(q + 1, consequent_start)
+            } else {
+                d.empty()
+            };
 
-        // Comments between : and alternate (e.g., `c : /* comment */ d`)
-        let comments_after_colon = if let Some(c) = colon_pos {
-            self.build_inline_comments_between_doc_trailing_space(c + 1, alternate_start)
-        } else {
-            d.empty()
-        };
+            // Comments between consequent and : (e.g., `b ? c /* comment */ : d`)
+            let comments_before_colon = if let Some(c) = colon_pos {
+                self.build_inline_comments_between_doc(consequent_end, c)
+            } else {
+                d.empty()
+            };
+
+            // Comments between : and alternate (e.g., `c : /* comment */ d`)
+            let comments_after_colon = if let Some(c) = colon_pos {
+                self.build_inline_comments_between_doc_trailing_space(c + 1, alternate_start)
+            } else {
+                d.empty()
+            };
+
+            (
+                comments_before_question,
+                comments_after_question,
+                comments_before_colon,
+                comments_after_colon,
+            )
+        });
 
         // Handle nested conditional in consequent specially:
         // - When flat: parens for parsing `a ? (b ? c : d) : e`
@@ -277,21 +309,42 @@ impl<'a> Printer<'a> {
                 d.indent(self.parenthesize_ternary_branch(cond.alternate, alternate))
             };
 
-        let inner = d.concat(&[
-            test,
+        let inner = if let Some((
             comments_before_question,
-            d.indent(d.concat(&[
-                d.line(),
-                d.text("? "),
-                comments_after_question,
-                consequent_doc,
-                comments_before_colon,
-                d.line(),
-                d.text(": "),
-                comments_after_colon,
-                alternate_doc,
-            ])),
-        ]);
+            comments_after_question,
+            comments_before_colon,
+            comments_after_colon,
+        )) = comment_slots
+        {
+            d.concat(&[
+                test,
+                comments_before_question,
+                d.indent(d.concat(&[
+                    d.line(),
+                    d.text("? "),
+                    comments_after_question,
+                    consequent_doc,
+                    comments_before_colon,
+                    d.line(),
+                    d.text(": "),
+                    comments_after_colon,
+                    alternate_doc,
+                ])),
+            ])
+        } else {
+            // Comment-free common path: no comment slots, so omit the four empty children.
+            d.concat(&[
+                test,
+                d.indent(d.concat(&[
+                    d.line(),
+                    d.text("? "),
+                    consequent_doc,
+                    d.line(),
+                    d.text(": "),
+                    alternate_doc,
+                ])),
+            ])
+        };
 
         // If chained (nested in another conditional), don't wrap in group
         // This allows the parent's break decision to cascade
@@ -328,6 +381,10 @@ impl<'a> Printer<'a> {
         // Parenthesize an `in` test inside a for-header init (`for (a = (b in c) ? …;…)`);
         // a no-op elsewhere. The test is `[~In]`, so the parens are load-bearing.
         let test = self.wrap_for_init_in(cond.test, test);
+        // Stripped-grouping-paren comments on the test — see the sibling in
+        // `build_conditional_doc`; both layouts must emit them or the comment is lost.
+        let test =
+            self.prepend_removed_paren_comments(cond.span.start, cond.test.span().start, test);
 
         // Find the ? and : positions for proper comment categorization
         let question_pos = self.find_char_outside_comments(test_end, consequent_start, b'?');
@@ -468,7 +525,7 @@ impl<'a> Printer<'a> {
     ) -> (bool, bool) {
         let d = self.d();
         let comments: CommentVec<'_> = op_pos
-            .map(|p| comments_in_range(self.comments, p + 1, value_start).collect())
+            .map(|p| comments_to_emit_in_range(self.comments, p + 1, value_start).collect())
             .unwrap_or_default();
         let mut has_line_comment = false;
         let mut last_own_line = false;

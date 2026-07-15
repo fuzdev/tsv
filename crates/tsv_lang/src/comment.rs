@@ -39,6 +39,38 @@ pub struct Comment {
     /// comment is single-line (a multiline block comment ends on an unshifted
     /// later line).
     pub bump_pattern_columns: bool,
+    /// Whether this comment is **bound to the token that follows it**, and so is printed by
+    /// the AST node that token begins rather than by the enclosing gap. Set by `tsv_ts`'s
+    /// parser; always a **block** comment, and only ever when glued to its token (a comment
+    /// the author left on its own line leads the *line*, not the token — the one exception
+    /// is a JSDoc cast, whose comment may sit a newline above its `(` and still be the cast).
+    ///
+    /// **Every glued block comment is owned**, not a special class: the position binds the
+    /// comment to the operand it leads, so a paren the printer synthesizes around an enclosing
+    /// expression would otherwise land between them and re-bind it. There is no content sniff —
+    /// a plain `/* c */`, a **bundler annotation** (`/* @__PURE__ */ f()`, which marks the call
+    /// after it side-effect-free), and a **JSDoc type cast** (`/** @type {T} */ (x)`, whose
+    /// comment plus `(` *are* the cast) all bind their token the same way. Two print shapes:
+    ///
+    /// - the general glued comment (plain or annotation) has no node of its own, so the
+    ///   innermost node its token begins prints it (via `build_expression_doc`);
+    /// - the JSDoc cast is printed by its `JsdocCast` node, which carries its own copy.
+    ///   `is_jsdoc_type_cast_comment` (the only surviving content sniff) decides cast
+    ///   *paren-retention*, i.e. whether that node is built — never ownership itself.
+    ///
+    /// **Ownership is a fact about who PRINTS a comment, never about whether it EXISTS.**
+    /// The lookups below make a caller name which of the three questions it is asking, and
+    /// only the **to emit** one skips an owned comment — so no gap emitter can print it
+    /// twice and no synthesized paren can land between it and its token, while every layout
+    /// gate and source cursor still sees it. Getting that backwards is the recurring bug in
+    /// this model; see the module docs below.
+    ///
+    /// Set this flag exclusively where the owning node also prints — **an owned comment
+    /// nothing prints is a dropped comment.** What makes that safe to rely on is the
+    /// print-once ledger (`crate::comment_ledger`, `comment_check` feature): it asserts that
+    /// every parsed comment is emitted exactly once, so a broken ownership claim fails the
+    /// `comments:audit` gate instead of silently deleting the comment.
+    pub owned_by_node: bool,
 }
 
 impl Comment {
@@ -213,7 +245,7 @@ impl<'a> ClassifiedComments<'a> {
     pub fn from_range(comments: &'a [Comment], start: u32, end: u32, line_breaks: &[u32]) -> Self {
         let mut result = Self::default();
 
-        for comment in comments_in_range(comments, start, end) {
+        for comment in comments_to_emit_in_range(comments, start, end) {
             let same_line = printing::is_same_line_fast(line_breaks, start, comment.span.start);
             match (comment.is_block, same_line) {
                 (true, true) => result.trailing_block.push(comment),
@@ -264,26 +296,142 @@ impl<'a> ClassifiedComments<'a> {
 }
 
 //
-// Efficient Comment Lookup Utilities
+// Comment Lookup: three questions, three names
 //
+// Comments are collected in order during lexing, so they are sorted by `span.start`.
+// Every lookup below binary-searches to the range start: O(log n + k).
 //
-// Comments are collected in order during lexing, so they're naturally sorted
-// by span.start. These functions use binary search for O(log n) range lookups.
+// [`Comment::owned_by_node`] takes a comment out of the *positional* model — the node
+// its token begins prints it, from its own reference. **Ownership is a fact about who
+// PRINTS a comment, never about whether it EXISTS.** A caller that conflates the two
+// asks the wrong question and gets a wrong answer, so the API asks the caller to name
+// the question. There are exactly three:
+//
+// | axis         | question                                          | owned comments |
+// | ------------ | ------------------------------------------------- | -------------- |
+// | **to emit**  | "which comments must *I* print here?"             | **skipped**    |
+// | **on page**  | "does any comment OCCUPY THE PAGE here?"          | **counted**    |
+// | **in source**| "what comment BYTES are physically here?"         | **counted**    |
+//
+// - **to emit** — a gap emitter. Skipping is what keeps an owned comment from being
+//   printed twice, and keeps a synthesized paren from landing between it and its token.
+// - **on page** — a layout gate (break / expand / hug / paren / fast-path / force-
+//   multiline). An owned comment is *still in the output* and *still occupies width*, so
+//   it means to the layout exactly what any comment means. Skipping it here makes the
+//   comment vanish from a decision it is visibly part of.
+// - **in source** — a cursor stepping over comment bytes: a blank-line scan, an offset,
+//   a `prev_end`. The bytes are in the file regardless of who prints them; a scan that
+//   skips them reads the comment's own newlines as an author's blank line.
+//
+// Naming rule: every name states its axis, so a miswire reads as a category error at the
+// call site rather than as plausible code.
 
-/// Find the index of the first comment with span.start >= pos
+/// Find the index of the first comment with `span.start >= pos`.
 ///
-/// Uses binary search: O(log n)
+/// Physical (a raw index into the sorted slice) — the shared entry point of all three
+/// axes, which then apply their own owned-comment policy.
 #[inline]
 pub fn find_first_comment_from(comments: &[Comment], pos: u32) -> usize {
     comments.partition_point(|c| c.span.start < pos)
 }
 
-/// Iterate over comments in the range [start, end)
+/// **to emit**: the comments in `[start, end)` that *this* caller must print.
 ///
-/// Returns an iterator over comments where start <= span.start && span.end <= end.
-/// Uses binary search to find the starting point: O(log n + k) where k is result count.
+/// [`Comment::owned_by_node`] comments are **skipped** — the node their token begins
+/// prints them. Use this only to decide what to *emit*; for a layout decision use
+/// [`has_comments_on_page_in_range`], and for a source cursor use
+/// [`comments_in_source_range`].
 #[inline]
-pub fn comments_in_range(
+pub fn comments_to_emit_in_range(
+    comments: &[Comment],
+    start: u32,
+    end: u32,
+) -> impl Iterator<Item = &Comment> {
+    comments_in_source_range(comments, start, end).filter(|c| !c.owned_by_node)
+}
+
+/// **to emit**: whether this caller has any comment to print in `[start, end)`.
+#[inline]
+pub fn has_comments_to_emit_in_range(comments: &[Comment], start: u32, end: u32) -> bool {
+    comments_to_emit_in_range(comments, start, end)
+        .next()
+        .is_some()
+}
+
+/// **to emit**: the comments at or after `pos` that *this* caller must print.
+#[inline]
+pub fn comments_to_emit_after(comments: &[Comment], pos: u32) -> impl Iterator<Item = &Comment> {
+    comments_in_source_after(comments, pos).filter(|c| !c.owned_by_node)
+}
+
+/// **on page**: whether any comment occupies the page in `[start, end)` —
+/// [`Comment::owned_by_node`] comments **counted**.
+///
+/// The existence check for a *layout* gate. An owned comment is printed by its own node
+/// rather than by this gap, but it is still in the output and still occupies width, so a
+/// decision about break / expand / hug / paren / fast-path must see it. Use
+/// [`has_comments_to_emit_in_range`] for anything that decides who *prints*.
+#[inline]
+pub fn has_comments_on_page_in_range(comments: &[Comment], start: u32, end: u32) -> bool {
+    let first_idx = find_first_comment_from(comments, start);
+    comments.get(first_idx).is_some_and(|c| c.span.end <= end)
+}
+
+/// **on page**: every comment occupying the page in `[start, end)` —
+/// [`Comment::owned_by_node`] comments **counted**.
+///
+/// The iterator form of [`has_comments_on_page_in_range`], for a layout gate whose rule is
+/// per-comment (`.any(|c| …)`) rather than a bare existence check.
+///
+/// Note the shape of the model: there are **three questions but only two membership sets** —
+/// *on page* and *in source* both count an owned comment (it is in the output and its bytes
+/// are in the file), and only *to emit* skips it. So this is [`comments_in_source_range`] by
+/// construction; the two names exist because the *question* differs, and a call site that
+/// names the wrong one is the bug this API is shaped to prevent.
+#[inline]
+pub fn comments_on_page_in_range(
+    comments: &[Comment],
+    start: u32,
+    end: u32,
+) -> impl Iterator<Item = &Comment> {
+    comments_in_source_range(comments, start, end)
+}
+
+/// **on page**: whether a multi-line block comment occupies the page in `[start, end)` —
+/// [`Comment::owned_by_node`] comments **counted**.
+///
+/// A multi-line block comment forces the containing construct (array, object, conditional
+/// type) to expand — a pure layout question, and an owned one forces it just the same.
+#[inline]
+pub fn has_multiline_block_comments_on_page_in_range(
+    comments: &[Comment],
+    start: u32,
+    end: u32,
+) -> bool {
+    comments_in_source_range(comments, start, end).any(|c| c.is_block && c.multiline)
+}
+
+/// Whether any **line** comment lies in `[start, end)`.
+///
+/// Carries no axis in its name because it provably has none: a comment is owned only via
+/// `bind_leading_comment` / the JSDoc cast, both of which take a **block** comment
+/// (`glued_block_comment_index`), so `owned ⇒ is_block` and no line comment is ever
+/// owned. Skipping and counting therefore agree here, on every axis, by construction.
+/// (If a line comment ever becomes ownable, this function must grow an axis.)
+#[inline]
+pub fn has_line_comments_in_range(comments: &[Comment], start: u32, end: u32) -> bool {
+    comments_in_source_range(comments, start, end).any(|c| !c.is_block)
+}
+
+/// **in source**: every comment physically inside `[start, end)` —
+/// [`Comment::owned_by_node`] comments **counted**.
+///
+/// The lookup for a cursor stepping over comment *bytes*: a blank-line scan, an offset
+/// computation, a `prev_end`. The bytes sit in the file regardless of who prints them, so
+/// a scan that skipped an owned comment would read its own newlines as an author's blank
+/// line.
+#[inline]
+pub fn comments_in_source_range(
     comments: &[Comment],
     start: u32,
     end: u32,
@@ -294,39 +442,10 @@ pub fn comments_in_range(
         .take_while(move |c| c.span.end <= end)
 }
 
-/// Check if any comments exist in the range [start, end)
-///
-/// Uses binary search: O(log n)
+/// **in source**: every comment physically at or after `pos` —
+/// [`Comment::owned_by_node`] comments **counted**.
 #[inline]
-pub fn has_comments_in_range(comments: &[Comment], start: u32, end: u32) -> bool {
-    let first_idx = find_first_comment_from(comments, start);
-    comments.get(first_idx).is_some_and(|c| c.span.end <= end)
-}
-
-/// Check if any line comments exist in the range [start, end)
-///
-/// Uses binary search: O(log n + k) where k is comments in range
-#[inline]
-pub fn has_line_comments_in_range(comments: &[Comment], start: u32, end: u32) -> bool {
-    comments_in_range(comments, start, end).any(|c| !c.is_block)
-}
-
-/// Check if any multi-line block comments exist in the range [start, end)
-///
-/// Multi-line block comments contain newlines in their content and force
-/// expansion of containing constructs (arrays, objects, etc.).
-/// Uses binary search: O(log n + k) where k is comments in range
-#[inline]
-pub fn has_multiline_block_comments_in_range(comments: &[Comment], start: u32, end: u32) -> bool {
-    comments_in_range(comments, start, end).any(|c| c.is_block && c.multiline)
-}
-
-/// Iterate over comments after a position (span.start >= pos)
-///
-/// Returns an iterator over all comments starting at or after the given position.
-/// Uses binary search to find the starting point: O(log n + k) where k is result count.
-#[inline]
-pub fn comments_after(comments: &[Comment], pos: u32) -> impl Iterator<Item = &Comment> {
+pub fn comments_in_source_after(comments: &[Comment], pos: u32) -> impl Iterator<Item = &Comment> {
     let first_idx = find_first_comment_from(comments, pos);
     comments[first_idx..].iter()
 }
@@ -346,6 +465,7 @@ mod tests {
             span: Span::new(start, end),
             emit_character_field: false,
             bump_pattern_columns: false,
+            owned_by_node: false,
         }
     }
 
@@ -372,7 +492,7 @@ mod tests {
     }
 
     #[test]
-    fn comments_in_range_respects_start_and_end_boundaries() {
+    fn comments_to_emit_in_range_respects_start_and_end_boundaries() {
         let comments = vec![
             comment(0, 2, true, "a"),
             comment(5, 7, true, "b"),
@@ -380,45 +500,47 @@ mod tests {
         ];
 
         // [5, 12] includes the comments starting at 5 and 10 (both end <= 12).
-        let starts: Vec<u32> = comments_in_range(&comments, 5, 12)
+        let starts: Vec<u32> = comments_to_emit_in_range(&comments, 5, 12)
             .map(|c| c.span.start)
             .collect();
         assert_eq!(starts, vec![5, 10]);
 
         // Tightening `end` to 11 drops the [10,12) comment (its end 12 > 11) —
         // the `take_while(end <= end)` bound, not a filter.
-        let starts: Vec<u32> = comments_in_range(&comments, 5, 11)
+        let starts: Vec<u32> = comments_to_emit_in_range(&comments, 5, 11)
             .map(|c| c.span.start)
             .collect();
         assert_eq!(starts, vec![5]);
 
         // Raising `start` past a comment excludes it via the binary-search entry.
-        let starts: Vec<u32> = comments_in_range(&comments, 6, 12)
+        let starts: Vec<u32> = comments_to_emit_in_range(&comments, 6, 12)
             .map(|c| c.span.start)
             .collect();
         assert_eq!(starts, vec![10]);
     }
 
     #[test]
-    fn has_comments_in_range_agrees_with_iterator() {
+    fn has_comments_to_emit_in_range_agrees_with_iterator() {
         let comments = vec![comment(0, 2, false, "a"), comment(5, 7, false, "b")];
         for (start, end) in [(0, 2), (0, 7), (3, 7), (3, 6), (6, 7), (0, 1)] {
             assert_eq!(
-                has_comments_in_range(&comments, start, end),
-                comments_in_range(&comments, start, end).next().is_some(),
+                has_comments_to_emit_in_range(&comments, start, end),
+                comments_to_emit_in_range(&comments, start, end)
+                    .next()
+                    .is_some(),
                 "range {start}..{end}"
             );
         }
     }
 
     #[test]
-    fn has_comments_in_range_shortcut_only_inspects_first_comment() {
+    fn has_comments_to_emit_in_range_shortcut_only_inspects_first_comment() {
         // A multi-line block comment whose end overruns the query window: the
         // O(log n) shortcut returns false because the first comment at/after
         // `start` ends past `end`, and the iterator agrees (take_while stops there).
         let comments = vec![comment(5, 40, true, "*\n big\n ")];
-        assert!(!has_comments_in_range(&comments, 5, 10));
-        assert!(comments_in_range(&comments, 5, 10).next().is_none());
+        assert!(!has_comments_to_emit_in_range(&comments, 5, 10));
+        assert!(comments_to_emit_in_range(&comments, 5, 10).next().is_none());
     }
 
     #[test]
@@ -427,17 +549,17 @@ mod tests {
         let block_sl = comment(0, 6, true, "a");
         let line = comment(0, 4, false, " x");
 
-        assert!(has_multiline_block_comments_in_range(
+        assert!(has_multiline_block_comments_on_page_in_range(
             std::slice::from_ref(&block_ml),
             0,
             10
         ));
-        assert!(!has_multiline_block_comments_in_range(
+        assert!(!has_multiline_block_comments_on_page_in_range(
             std::slice::from_ref(&block_sl),
             0,
             6
         ));
-        assert!(!has_multiline_block_comments_in_range(
+        assert!(!has_multiline_block_comments_on_page_in_range(
             std::slice::from_ref(&line),
             0,
             4

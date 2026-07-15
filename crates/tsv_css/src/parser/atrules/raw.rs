@@ -61,8 +61,16 @@ pub(super) fn parse_raw_prelude_content<'arena>(
             // - Before ',' (selector lists) - only for selector list preludes
             // - After '[' or before ']' (attribute selectors) - only for selector list preludes
             // - Before/after '=' (attribute selectors) - only for selector list preludes
+            // A whitespace run right after a value colon (`(min-width: )`, empty value)
+            // is the prettier-mandated single space after `:` — keep it before `)`
+            // rather than dropping it, or `(a: )` would collapse to `(a:)` while `(a:)`
+            // gains the space (the colon-space rule below), an F1 oscillation. Gated on
+            // the same query-colon regime that adds the space (`!is_selector_list_prelude
+            // || paren_depth == 0`), so a selector-list pseudo-class `:` is unaffected.
+            let after_value_colon = matches!(prev_token_kind, Some(TokenKind::Colon))
+                && (!is_selector_list_prelude || paren_depth == 0);
             let skip_whitespace = matches!(prev_token_kind, Some(TokenKind::LeftParen))
-                || matches!(parser.peek_kind(), Ok(TokenKind::RightParen))
+                || (matches!(parser.peek_kind(), Ok(TokenKind::RightParen)) && !after_value_colon)
                 || (is_selector_list_prelude
                     && paren_depth > 0
                     && matches!(prev_token_kind, Some(TokenKind::Colon)))

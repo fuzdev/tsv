@@ -13,7 +13,7 @@ use tsv_lang::{ParseError, Span};
 /// lookahead is non-destructive.
 ///
 /// The comments are **registered** (not dropped) so the printer can interleave them
-/// at the comma boundary via `comments_in_range` — the principled replacement for the
+/// at the comma boundary via `comments_to_emit_in_range` — the principled replacement for the
 /// old raw-source selector seam. Not needed by `parse_forgiving_selector_list`, whose
 /// terminator is `)` (not `{`); it registers comments unconditionally before its comma check.
 fn skip_comments_before_comma(parser: &mut CssParser<'_, '_>) -> Result<(), ParseError> {

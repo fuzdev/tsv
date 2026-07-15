@@ -150,11 +150,12 @@ impl<'a> Printer<'a> {
                 .type_parameters
                 .as_ref()
                 .map_or(decl.params_start, |tp| tp.span.start);
-            tail.push(self.build_name_to_type_params_comments(
+            self.push_name_to_type_params_comments(
+                &mut tail,
                 id.span.end,
                 comment_end,
                 CommentSpacing::for_type_params(decl.type_parameters.is_some()),
-            ));
+            );
             id.span.start
         } else {
             // Anonymous function (export default): the gap runs to the params/type-params.

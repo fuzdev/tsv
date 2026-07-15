@@ -13,6 +13,12 @@ convert = ["dep:serde_json", "tsv_lang/json"]
 # Exposes `debug_token_stream` for the differential lexer harness (`tsv_debug
 # lex_diff`). Off in production builds; enabled only by `tsv_debug`.
 debug_lex = []
+# Opt-in print-once comment ledger (`tsv_lang::comment_ledger`): the format entry
+# points register the stylesheet's comments, `print_css_comment` /
+# `comment_blocks_in_range` record each emit, and the raw-slice seams (format-ignore,
+# glued compound selectors, unparseable selectors) record their ranges. Off in
+# production builds.
+comment_check = ["tsv_lang/comment_check"]
 
 [dependencies]
 tsv_lang.workspace = true

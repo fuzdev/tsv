@@ -16,16 +16,20 @@ mod type_declarations;
 mod variable;
 
 // Re-export for submodules to use `super::Printer` instead of `super::super::Printer`
-pub(super) use super::{Printer, build_entity_name_doc, should_hug_union_type};
+pub(super) use super::{
+    Printer, build_entity_name_doc, is_effectively_empty_body, should_hug_union_type,
+};
 
 use super::ParenContext;
 use super::class_expr_has_decorators;
 use super::expressions::literals::format_directive;
+use super::is_string_literal;
 use super::needs_parens::leftmost_no_lookahead;
-use crate::ast::internal::{self, Expression, LiteralValue, Statement};
+use crate::ast::internal::{self, Expression, Statement};
+use crate::printer::analysis::has_newline_after_position;
 use smallvec::smallvec;
 use tsv_lang::Span;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -66,16 +70,59 @@ fn is_statement_ambiguous_keyword(name: &str) -> bool {
     matches!(name, "type" | "module")
 }
 
+/// What a leading-comment gap opens at — the axis that decides whether a comment inside it
+/// can be a *trailing* comment of something else instead of leading the node at the far end.
+/// Naming it keeps the two cases from being one `u32` a caller can pass the wrong way:
+/// reading `Keyword` where a node ends (or vice versa) flips
+/// [`Printer::has_leading_own_line_comment_in_range`], and for `return`/`throw` that is an
+/// ASI bug, not a layout nit.
+#[derive(Clone, Copy)]
+enum GapStart {
+    /// A keyword, not a node (`return` / `throw`). Nothing here can own a trailing comment,
+    /// so every comment in the gap leads the node at the far end.
+    Keyword(u32),
+    /// A node ends here. A comment sharing its line trails *it*, not the node at the far end.
+    Node(u32),
+}
+
+impl GapStart {
+    /// Where the gap begins — the same position either way; only the reading differs.
+    const fn position(self) -> u32 {
+        match self {
+            Self::Keyword(p) | Self::Node(p) => p,
+        }
+    }
+}
+
 impl<'a> Printer<'a> {
-    /// Build a Doc for a statement
-    pub(super) fn build_statement_doc(&self, statement: &Statement<'_>) -> DocId {
+    /// Build a Doc for a statement.
+    ///
+    /// `in_program_or_block` is Prettier's own-terms grandparent check for the
+    /// "avoid becoming a directive" rule (see
+    /// [`Printer::needs_avoid_directive_parens`]) — `true` when `statement`'s
+    /// immediate container is a `Program` or `BlockStatement` (plain blocks,
+    /// control-flow bodies, function/catch bodies), `false` for the containers
+    /// that use a different AST node (`SwitchCase`, `StaticBlock`,
+    /// `TSModuleBlock`). Only the `ExpressionStatement` arm consults it.
+    pub(super) fn build_statement_doc(
+        &self,
+        statement: &Statement<'_>,
+        in_program_or_block: bool,
+    ) -> DocId {
         let d = self.d();
         match statement {
-            Statement::ExpressionStatement(stmt) => self.build_expression_statement_doc(stmt),
+            Statement::ExpressionStatement(stmt) => {
+                self.build_expression_statement_doc(stmt, in_program_or_block)
+            }
             Statement::VariableDeclaration(decl) => self.build_variable_declaration_doc(decl, true),
             Statement::TSTypeAliasDeclaration(decl) => self.build_type_alias_declaration_doc(decl),
             Statement::ReturnStatement(ret) => self.build_return_statement_doc(ret),
-            Statement::BlockStatement(block) => self.build_block_statement_doc(block),
+            // A statement-position block (bare `{ }`, a labeled block's body, or a
+            // block nested directly in another block) expands its empty form to `{\n}`,
+            // matching prettier. Only control-flow *bodies* (while/for/do/catch) and
+            // function/class bodies collapse to `{}`, and those are built by their own
+            // parents — never through this dispatch.
+            Statement::BlockStatement(block) => self.build_block_statement_expand_empty_doc(block),
             Statement::FunctionDeclaration(decl) => self.build_function_declaration_doc(decl),
             Statement::ClassDeclaration(decl) => self.build_class_declaration_doc(decl),
             Statement::ExportNamedDeclaration(decl) => {
@@ -119,9 +166,15 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for an expression statement
     ///
-    /// Handles parentheses for object patterns and comments before semicolon.
-    /// Preserves source parens around string literals: `('hello');` stays parenthesized.
-    fn build_expression_statement_doc(&self, stmt: &internal::ExpressionStatement<'_>) -> DocId {
+    /// Handles parentheses for object patterns and the "avoid becoming a
+    /// directive" rule for bare string literals (see
+    /// [`Printer::needs_avoid_directive_parens`]); `in_program_or_block` is
+    /// threaded from [`Printer::build_statement_doc`].
+    fn build_expression_statement_doc(
+        &self,
+        stmt: &internal::ExpressionStatement<'_>,
+        in_program_or_block: bool,
+    ) -> DocId {
         let d = self.d();
 
         let mut parts = DocBuf::new();
@@ -133,11 +186,12 @@ impl<'a> Printer<'a> {
             let raw = stmt.expression.span().extract(self.source);
             parts.push(d.text_pooled(&format_directive(raw)));
         } else {
-            // Parens required for correctness (object expressions, object pattern assignments)
-            // OR preserved from source for string literals (matches Prettier behavior)
+            // Parens required for correctness (object expressions, object pattern
+            // assignments) OR to avoid a bare string statement being read as a
+            // directive (recomputed fresh, not preserved from source).
             let needs_parens = self
                 .needs_parens(&stmt.expression, ParenContext::ExpressionStatement)
-                || self.has_expression_statement_source_parens(stmt);
+                || self.needs_avoid_directive_parens(stmt, in_program_or_block);
 
             // An own-line comment between a source `(` and the expression
             // (`(// c⏎ expr)` / `(/* c */⏎ expr)` — e.g. a bare parenthesized
@@ -146,14 +200,17 @@ impl<'a> Printer<'a> {
             // comment (never inline) or a block comment with a newline before it; a
             // same-line block comment (`(/* c */ expr)`) is a separate, rarer case
             // (inline) left to the default flow. `stmt.span.start < expr_start` means
-            // a real source `(` precedes the expression (see
-            // `has_expression_statement_source_parens`). prettier hoists the comment
+            // a real source `(` precedes the expression. prettier hoists the comment
             // before `(` — a divergence (`decorated_expr_open_paren_comment`).
             // TODO: a same-line block comment after `(` is still dropped here.
             let expr_start = stmt.expression.span().start;
+            // Deliberately **to emit**, not on-page: this branch also *prints* the comments it
+            // finds, and the non-owned path here already drops them (`(/* c */ fn());` loses the
+            // comment — the ledger reports it). Moving it to the layout axis before that is
+            // fixed would route an owned comment into a path that loses it.
             let paren_open_own_line_comment = needs_parens
                 && stmt.span.start < expr_start
-                && comments_in_range(self.comments, stmt.span.start + 1, expr_start)
+                && comments_to_emit_in_range(self.comments, stmt.span.start + 1, expr_start)
                     .any(|c| self.is_own_line_comment(c));
 
             // When the whole expression isn't wrapped, a nested leftmost
@@ -205,7 +262,9 @@ impl<'a> Printer<'a> {
 
             if paren_open_own_line_comment {
                 let mut inner: DocBuf = smallvec![d.hardline()];
-                for comment in comments_in_range(self.comments, stmt.span.start + 1, expr_start) {
+                for comment in
+                    comments_to_emit_in_range(self.comments, stmt.span.start + 1, expr_start)
+                {
                     inner.push(self.build_comment_doc(comment));
                     inner.push(d.hardline());
                 }
@@ -241,23 +300,28 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    /// Check if an expression statement had parentheses in the source that should be preserved.
+    /// Whether a bare string-literal expression statement needs synthetic parens
+    /// to avoid being read as a directive-prologue entry.
     ///
-    /// Prettier preserves parens around string literal expression statements:
-    /// `('hello');` stays as-is, not stripped to `'hello';`.
-    /// Detected via span: if ExpressionStatement.span.start < Expression.span.start,
-    /// the source had a `(` before the expression.
-    fn has_expression_statement_source_parens(
+    /// Mirrors Prettier's `needs-parentheses.js` `StringLiteral`/`Literal` case:
+    /// recomputed fresh from AST structure, never preserved from source. A
+    /// non-directive string statement gets parens exactly when its immediate
+    /// container is a `Program` or `BlockStatement` (`in_program_or_block`) —
+    /// plain blocks, `if`/`for`/`while`/`try`/`catch` bodies, and function/arrow/
+    /// method bodies all qualify; `SwitchCase`, `StaticBlock`, and
+    /// `TSModuleBlock` (namespace) bodies don't. Because this is recomputed
+    /// rather than preserved, redundant source parens are stripped in an
+    /// ineligible container (`static { ('x'); }` → `'x';`) and any number of
+    /// source parens collapse to exactly one where they're needed.
+    ///
+    /// Only called from the `!stmt.is_directive` branch of
+    /// `build_expression_statement_doc`, so a real directive never reaches here.
+    fn needs_avoid_directive_parens(
         &self,
         stmt: &internal::ExpressionStatement<'_>,
+        in_program_or_block: bool,
     ) -> bool {
-        if stmt.span.start >= stmt.expression.span().start {
-            return false;
-        }
-        matches!(
-            &stmt.expression,
-            Expression::Literal(lit) if matches!(lit.value, LiteralValue::String { .. })
-        )
+        in_program_or_block && is_string_literal(&stmt.expression)
     }
 
     /// Build a Doc for a return statement.
@@ -317,18 +381,27 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
 
-        // Extract inline comments between keyword and argument
-        // Uses line-comment-safe spacing to prevent `return // comment expr`
         let keyword_end = keyword_start + keyword.len() as u32;
-        let inline_comments = self.build_rhs_comments_opt(keyword_end, arg.span().start);
 
         // Trailing comments from stripped grouping parens: `return (x /* c */)` → `return x /* c */;`
         let argument_end = arg.span().end;
-        let has_trailing_comments = self.has_comments_between(argument_end, span_end);
+        let has_trailing_comments = self.has_comments_to_emit_between(argument_end, span_end);
 
+        // A comment that must break takes the parenthesized form, which is what makes the
+        // break legal; there the comment keeps the line the author gave it.
         if self.argument_has_own_line_comment(keyword_start, arg) {
-            return self.build_comment_paren_doc(keyword, arg, inline_comments);
+            let own_line_comments = self.build_rhs_comments_opt(keyword_end, arg.span().start);
+            return self.build_comment_paren_doc(keyword, arg, own_line_comments);
         }
+
+        // Every remaining comment is glued to the keyword with the value after it on some
+        // line, so the value is pulled up onto the comment's line (`return /* c */⏎(v)` →
+        // `return /* c */ v`) rather than keeping the author's break: a break between
+        // `return`/`throw` and its argument is ASI, not layout — these are restricted
+        // productions. (The bare `keyword /* c */⏎value` cannot reach here at all: ASI
+        // splits it at parse, so there would be no argument.) The parenthesized branches
+        // below may still break, because they emit the parens that survive it.
+        let inline_comments = self.build_rhs_comments_glued_opt(keyword_end, arg.span().start);
 
         // Assignment expressions need parentheses for clarity: return (a = b);
         // Comments go BEFORE the parens: return /* comment */ (a = b);
@@ -399,7 +472,7 @@ impl<'a> Printer<'a> {
             // Any comment AFTER the grouping `)` (before the `;`) trails after the `;`;
             // the in-paren comment is already inside `seq_doc`.
             let after_start = grouping_close.saturating_add(1).min(span_end);
-            let after = if self.has_comments_between(after_start, span_end) {
+            let after = if self.has_comments_to_emit_between(after_start, span_end) {
                 self.split_terminator_gap_comments(&mut parts, after_start, span_end, false)
             } else {
                 DocBuf::new()
@@ -410,7 +483,7 @@ impl<'a> Printer<'a> {
         }
 
         if let Expression::BinaryExpression(binary) = arg {
-            return self.build_binary_paren_doc(keyword, binary, inline_comments);
+            return self.build_binary_paren_doc(keyword, binary, span_end, inline_comments);
         }
 
         // Ternary in return/throw: binary test expressions need continuation indent.
@@ -443,9 +516,11 @@ impl<'a> Printer<'a> {
     ///
     /// Matches Prettier's `returnArgumentHasLeadingComment` (function.js:290-318).
     fn argument_has_own_line_comment(&self, keyword_start: u32, arg: &Expression<'_>) -> bool {
-        // Check for own-line comments before the argument itself
-        // (e.g., `return // comment\n expr`)
-        if self.has_leading_own_line_comment_in_range(keyword_start, arg.span().start) {
+        // Own-line comment before the argument itself (`return (\n// c\nexpr)`).
+        if self.has_leading_own_line_comment_in_range(
+            GapStart::Keyword(keyword_start),
+            arg.span().start,
+        ) {
             return true;
         }
 
@@ -463,12 +538,10 @@ impl<'a> Printer<'a> {
         match expr {
             Expression::CallExpression(call) => self.chain_has_own_line_comment(call.callee),
             Expression::MemberExpression(member) => {
-                // Check for leading own-line comments between object and property.
-                // Must NOT be on the same line as the object — trailing comments
-                // like `foo() // comment` don't trigger paren wrapping.
+                // Leading own-line comment between object and property.
                 let obj_end = member.object.span().end;
                 let prop_start = member.property.span().start;
-                if self.has_leading_own_line_comment_in_range(obj_end, prop_start) {
+                if self.has_leading_own_line_comment_in_range(GapStart::Node(obj_end), prop_start) {
                     return true;
                 }
                 self.chain_has_own_line_comment(member.object)
@@ -483,15 +556,32 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Check if there are any leading own-line comments in a range.
+    /// Whether a comment in the gap *leads* the node at `end` and is followed by a newline —
+    /// Prettier's `hasLeadingOwnLineComment` (`utils/index.js`). Two terms, and both are
+    /// load-bearing:
     ///
-    /// "Leading own-line" means the comment is NOT on the same line as `start`
-    /// (i.e., it's on its own line, not trailing the previous expression).
-    /// This matches Prettier's `hasLeadingOwnLineComment` which checks for
-    /// comments with a newline after them that are leading on a node.
-    fn has_leading_own_line_comment_in_range(&self, start: u32, end: u32) -> bool {
-        comments_in_range(self.comments, start, end)
-            .any(|c| !self.is_same_line(start, c.span.start))
+    /// - **Leads.** Decided by `gap_start`: a comment sharing a preceding *node*'s line
+    ///   trails that node rather than leading the next one (Prettier attaches it as a
+    ///   trailing comment), so it never counts — `return foo() // c` + `.bar` keeps the
+    ///   chain bare.
+    /// - **Followed by a newline.** This is what makes a break unavoidable: the node cannot
+    ///   share the comment's line, so the caller must emit the form that survives one. A
+    ///   block comment with code after it on the same line (`return /* c */ (x)`) fails this
+    ///   term and stays inline.
+    ///
+    /// For `return`/`throw` the second term is an ASI guard, not cosmetics. Both are
+    /// restricted productions (`return [no LineTerminator here] Expression`), so putting the
+    /// argument on a later line without parens *changes the program*: `return` silently
+    /// becomes `return;` plus an unreachable statement, and `throw` becomes a syntax error.
+    fn has_leading_own_line_comment_in_range(&self, gap_start: GapStart, end: u32) -> bool {
+        self.comments_in_source_between(gap_start.position(), end)
+            .any(|c| {
+                let leads = match gap_start {
+                    GapStart::Keyword(_) => true,
+                    GapStart::Node(prev_end) => !self.is_same_line(prev_end, c.span.start),
+                };
+                leads && has_newline_after_position(self.source, c.span.end)
+            })
     }
 
     /// Build unconditional paren-wrapped doc for return/throw with own-line comments.
@@ -542,6 +632,7 @@ impl<'a> Printer<'a> {
         &self,
         keyword: &'static str,
         binary: &internal::BinaryExpression<'_>,
+        span_end: u32,
         inline_comments: Option<DocId>,
     ) -> DocId {
         let d = self.d();
@@ -555,12 +646,17 @@ impl<'a> Printer<'a> {
         // Find trailing comments between expression end and semicolon. The scan
         // skips comments so a `;` inside one (`a + b /* ; */ /* c */;`) isn't
         // mistaken for the statement's terminator, which would drop the comments
-        // after it.
+        // after it. Bounded by `span_end` (the statement's own end): under ASI
+        // there is no `;` within the statement, so the scan must not wander past
+        // it into the enclosing source and find a later terminator (the object
+        // literal's `};`, the next statement's `;`) — that would pull the
+        // statement's own trailing comment into this gap AND leave it for the
+        // block's trailing-comment emitter too, printing it twice.
         let expr_end = binary.span.end;
         let semicolon_pos = find_char_skipping_comments(
             self.source.as_bytes(),
             expr_end as usize,
-            self.source.len(),
+            span_end as usize,
             b';',
         )
         .map_or(expr_end, |p| p as u32);
@@ -572,8 +668,11 @@ impl<'a> Printer<'a> {
         // (`return (a && b // c\n);`) likewise stays inside the parens — it forces the
         // break so it never lands on the flat `expr // c;` path. See
         // `split_terminator_gap_comments`.
-        let has_operand_line_comment = comments_in_range(self.comments, expr_end, semicolon_pos)
-            .any(|c| !c.is_block && self.gap_has_close_paren(c.span.end, semicolon_pos));
+        // Axis-free: the rule looks only at LINE comments, and ownership binds only a block
+        // comment (`owned ⇒ is_block`), so skipping and counting give the same answer.
+        let has_operand_line_comment =
+            comments_to_emit_in_range(self.comments, expr_end, semicolon_pos)
+                .any(|c| !c.is_block && self.gap_has_close_paren(c.span.end, semicolon_pos));
         let mut inline_trailing = DocBuf::new();
         let after_semi =
             self.split_terminator_gap_comments(&mut inline_trailing, expr_end, semicolon_pos, true);
@@ -588,14 +687,30 @@ impl<'a> Printer<'a> {
 
         // Broken: keyword (\n  expr\n);
         // Flat: keyword expr;
-        let broken_doc = d.concat(&[
-            d.text(" ("),
-            d.indent(d.concat(&[d.softline(), d.group(expr_doc), trailing_comments_doc])),
-            d.softline(),
-            d.text(")"),
-        ]);
-
-        let flat_doc = d.concat(&[d.text(" "), expr_doc, trailing_comments_doc]);
+        // The trailing-comment doc is `empty()` when the terminator gap has no comment
+        // (the common case) — omit it so neither `if_break` branch (both are materialized)
+        // carries a wasted empty child. Byte-identical: an empty child renders to nothing.
+        let (broken_doc, flat_doc) = if inline_trailing.is_empty() {
+            (
+                d.concat(&[
+                    d.text(" ("),
+                    d.indent(d.concat(&[d.softline(), d.group(expr_doc)])),
+                    d.softline(),
+                    d.text(")"),
+                ]),
+                d.concat(&[d.text(" "), expr_doc]),
+            )
+        } else {
+            (
+                d.concat(&[
+                    d.text(" ("),
+                    d.indent(d.concat(&[d.softline(), d.group(expr_doc), trailing_comments_doc])),
+                    d.softline(),
+                    d.text(")"),
+                ]),
+                d.concat(&[d.text(" "), expr_doc, trailing_comments_doc]),
+            )
+        };
 
         let mut inner_parts: DocBuf = smallvec![
             d.text(keyword),

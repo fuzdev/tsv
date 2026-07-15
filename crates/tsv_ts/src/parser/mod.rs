@@ -24,6 +24,8 @@ mod statement; // Statement parsing (refactored into submodules)
 mod type_members; // Type-literal / interface-body member grammar (property/method/signature elements)
 mod types; // TypeScript type-syntax parsing (annotations, type expressions, type parameters)
 
+pub(crate) use expression::is_jsdoc_type_cast_comment;
+
 /// Build a detached [`Comment`] from a lexed comment token's positions.
 ///
 /// `content_start` / `token_*` are local (pre-`base_offset`) byte offsets; the
@@ -43,23 +45,35 @@ fn comment_from_token(
 ) -> (Comment, bool) {
     let content_end = if is_block { token_end - 2 } else { token_end };
     let content = &source[content_start..content_end];
-    let has_line_terminator = is_block && content.contains(['\n', '\r', '\u{2028}', '\u{2029}']);
+    // Line comments end at the first line terminator, so their content never
+    // contains one — gate both scans below on `is_block` (value unchanged, scan
+    // skipped for every `//` comment).
+    //
+    // Ask the `\n` question first: it is a single-`char` pattern, so it lowers to
+    // a `memchr`, whereas the four-way `['\n', '\r', '\u{2028}', '\u{2029}']`
+    // pattern is a `MultiCharEq` searcher that decodes a char per step of the
+    // whole comment body (a long JSDoc block pays that in full). And a `\n` *is* a
+    // line terminator, so on the common multi-line block comment it answers the
+    // wider question for free; only a block comment with no `\n` at all — a
+    // one-liner like `/* x */` — reaches the rare-terminator scan.
+    let multiline = is_block && content.contains('\n');
+    let has_line_terminator =
+        is_block && (multiline || content.contains(['\r', '\u{2028}', '\u{2029}']));
     let comment = Comment {
         content_span: Span::new(
             (content_start + base_offset) as u32,
             (content_end + base_offset) as u32,
         ),
         is_block,
-        // Line comments end at the first line terminator, so their content never
-        // contains `\n` — gate the scan on `is_block` (value unchanged, scan skipped
-        // for every `//` comment).
-        multiline: is_block && content.contains('\n'),
+        multiline,
         span: Span::new(
             (token_start + base_offset) as u32,
             (token_end + base_offset) as u32,
         ),
         emit_character_field: false,
         bump_pattern_columns: false,
+        // Set later by the parser: a `(` glued to this comment makes it a cast's.
+        owned_by_node: false,
     };
     (comment, has_line_terminator)
 }
@@ -804,13 +818,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Like `try_binding_name`, but also accepts the `this` keyword as the
     /// TypeScript `this` parameter (`function f(this: T)`, `(this: T) => U`).
     pub(super) fn try_param_name(&self) -> Option<IdentName> {
-        self.try_binding_name().or_else(|| {
-            if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::This)) {
-                Some(self.current_raw_ident_name())
-            } else {
-                None
-            }
-        })
+        self.try_binding_name().or_else(|| self.this_as_name())
+    }
+
+    /// The `this` keyword used as a name channel — the TypeScript `this`
+    /// parameter (`function f(this: T)`) and the subject of a `this` type
+    /// predicate (`this is T`, `asserts this`). `None` when the current token is
+    /// not `this`; its raw text is verbatim (`this` is never escaped).
+    pub(super) fn this_as_name(&self) -> Option<IdentName> {
+        if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::This)) {
+            Some(self.current_raw_ident_name())
+        } else {
+            None
+        }
     }
 
     /// Name channel for the current token as the `IdentifierName` half of a
@@ -1104,10 +1124,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// the binding parser, matching acorn's rejection of both readings. The
     /// one-past-peek sibling is `peek_followed_by_same_line_binding_word`.
     pub(super) fn peek_is_same_line_binding_word(&mut self) -> bool {
-        matches!(
-            self.peek_kind(),
-            TokenKind::Identifier | TokenKind::Keyword(_)
-        ) && !self.peek_preceded_by_line_terminator()
+        self.peek_is_identifier_or_keyword()
+            && !self.peek_preceded_by_line_terminator()
             && !matches!(self.peek_value(), "in" | "instanceof" | "as" | "satisfies")
     }
 
@@ -1197,6 +1215,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn current_is_identifier_or_keyword(&self) -> bool {
         matches!(
             self.current.kind,
+            TokenKind::Identifier | TokenKind::Keyword(_)
+        )
+    }
+
+    /// Peek sibling of `current_is_identifier_or_keyword`: whether the next token
+    /// is an identifier or any keyword (acorn/tsc `tokenIsIdentifierOrKeyword`).
+    pub(super) fn peek_is_identifier_or_keyword(&mut self) -> bool {
+        matches!(
+            self.peek_kind(),
             TokenKind::Identifier | TokenKind::Keyword(_)
         )
     }
@@ -1448,6 +1475,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         matches!(self.peek_kind(), TokenKind::Identifier) && self.peek_value() == keyword
     }
 
+    /// Eat a leading `asserts` type-predicate keyword, committing only when an
+    /// identifier or keyword follows it. Mirrors tsc's `parseNonArrayType`
+    /// dispatch (`parser.ts`): `asserts` is a type-predicate prefix iff
+    /// `nextTokenIsIdentifierOrKeyword` — otherwise (punctuation/literal: `{`,
+    /// `[`, `<`, `.`, `|`, `&`, `;`, …) it stays an ordinary type name
+    /// (`: asserts`, `: asserts[]`, `: asserts<T>`, `: asserts.Foo`), left
+    /// unconsumed for the caller to parse as a regular type. When a *reserved*
+    /// keyword follows (`asserts extends …`), the prefix commits and the caller
+    /// then rejects it as a missing parameter name — matching tsc, which parses
+    /// the keyword as the asserted identifier and errors.
+    pub(super) fn eat_type_predicate_asserts(&mut self) -> bool {
+        matches!(self.current_kind(), TokenKind::Identifier)
+            && self.current_value() == "asserts"
+            && self.peek_is_identifier_or_keyword()
+            && self.try_advance()
+    }
+
     /// Check if a semicolon can be inserted at the current position (ASI).
     ///
     /// Returns true if:
@@ -1649,9 +1693,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse a string literal into a Literal node.
     ///
-    /// Expects the current token to be a String token.
+    /// Most callers first confirm a `String` token, but the module `from`/source
+    /// paths (`export * from …`, `export { … } from …`) reach here directly on
+    /// arbitrary input, so a non-`String` token is returned as a clean parse error
+    /// rather than panicking (debug) or mis-extracting a "string" from the wrong
+    /// token (release, where a bare `debug_assert!` would be elided). Surfaced by
+    /// the `fuzz` gate (`tsv_debug fuzz`).
     pub(super) fn parse_string_literal(&mut self) -> Result<Literal<'arena>, ParseError> {
-        debug_assert!(matches!(self.current_kind(), TokenKind::String));
+        if !matches!(self.current_kind(), TokenKind::String) {
+            return Err(self.error_expected("string literal"));
+        }
 
         let (start, end) = self.current_pos();
         let cooked = self.extract_string_cooked();
@@ -1680,5 +1731,19 @@ pub fn parse_typescript_with_goal<'arena>(
     arena: &'arena Bump,
 ) -> Result<Program<'arena>, ParseError> {
     let mut parser = Parser::new_with_goal(source, goal, arena)?;
+    parser.parse()
+}
+
+/// [`parse_typescript`] with grouping parens preserved as `ParenthesizedExpression`
+/// nodes (acorn's `preserveParens: true`), against a fresh interner. Standalone
+/// analog of [`crate::parse_with_interner_preserve_parens`] — the binding audit
+/// (`tsv_debug binding_audit`) reparses formatted output this way so the paren
+/// structure a glued comment binds to is visible in the wire JSON.
+pub fn parse_typescript_preserve_parens<'arena>(
+    source: &str,
+    arena: &'arena Bump,
+) -> Result<Program<'arena>, ParseError> {
+    let mut parser = Parser::new_with_goal(source, Goal::Module, arena)?;
+    parser.preserve_parens = true;
     parser.parse()
 }

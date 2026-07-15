@@ -7,10 +7,11 @@
 
 use smallvec::SmallVec;
 
-use super::super::Printer;
+use super::super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
+use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
     /// Open a non-last argument gap that may carry comments and emit its head into
@@ -39,6 +40,44 @@ impl<'a> Printer<'a> {
         pc.emit_trailing_comments_around_comma(parts, self);
         pc
     }
+}
+
+/// Emit an empty argument list into `parts`: the comments in the gap before the
+/// `(` (`fn<string> /* c */()`), then the parens themselves — closed (`()`) or
+/// enclosing their dangling comments (`fn(/* c */)`, and the broken form a line
+/// comment forces).
+///
+/// `search_from` is where to look for the `(` (the position after the type
+/// arguments, or after the callee when there are none) and `paren_close` the
+/// position past the `)`. `prefix` is the open delimiter — `"("`, or `"?.("` for
+/// an optional call — and `empty_pair` its closed form, used only when no `(` is
+/// found at all (unreachable for valid code).
+///
+/// Shared by the plain call/`new` path and the member-chain path so the empty-args
+/// shape lives in one place: these two drifted apart once already, and the
+/// inline-comment emission that drift preserved let a `//` comment swallow the `)`.
+pub(super) fn push_empty_args(
+    printer: &Printer<'_>,
+    parts: &mut DocBuf,
+    search_from: u32,
+    paren_close: u32,
+    prefix: &'static str,
+    empty_pair: &'static str,
+) {
+    let d = printer.d();
+    let Some(paren_pos) = printer.find_char_outside_comments(search_from, paren_close, b'(') else {
+        parts.push(d.text(empty_pair));
+        return;
+    };
+    if let Some(pre) = printer.build_comments_between_filtered_opt(
+        search_from,
+        paren_pos,
+        CommentSpacing::Leading,
+        CommentFilter::All,
+    ) {
+        parts.push(pre);
+    }
+    parts.push(printer.build_empty_parens_inline_with_comments_doc(paren_pos, paren_close, prefix));
 }
 
 //
@@ -137,6 +176,64 @@ pub(crate) fn is_comment_after_comma(comment: &internal::Comment, comma_pos: usi
     (comment.span.start as usize) > comma_pos
 }
 
+/// Build inline block comments AFTER the comma as leading on the next arg.
+///
+/// For `fn(a, /** @type {T} */ b)`, the comment is after the comma and should
+/// be emitted as `/** @type {T} */ ` before `b`, not as trailing on `a`. Shared
+/// by the call, `new`, and chain expand-first paths so a block comment leading the
+/// second arg is preserved inline rather than dropped.
+pub(super) fn build_after_comma_leading_comments(
+    printer: &Printer<'_>,
+    prev_arg_end: u32,
+    arg_start: u32,
+) -> Option<DocId> {
+    let d = printer.d();
+    let comma_pos = find_comma_pos(printer.source, prev_arg_end, arg_start)?;
+    let mut parts = DocBuf::new();
+    for comment in comments_to_emit_in_range(printer.comments, prev_arg_end, arg_start) {
+        if is_comment_after_comma(comment, comma_pos)
+            && comment.is_block
+            && is_comment_inline_with_next(printer, comment.span.end, arg_start)
+        {
+            parts.push(printer.build_comment_doc(comment));
+            parts.push(d.text(" "));
+        }
+    }
+    if parts.is_empty() {
+        None
+    } else {
+        Some(d.concat(&parts))
+    }
+}
+
+/// Build inline block comments BEFORE the comma as trailing on the current arg.
+///
+/// For `fn(a /* comment */, b)`, the comment is before the comma and should
+/// be emitted as ` /* comment */` after `a`.
+pub(super) fn build_before_comma_trailing_comments(
+    printer: &Printer<'_>,
+    arg_end: u32,
+    next_arg_start: u32,
+) -> Option<DocId> {
+    let d = printer.d();
+    let comma_pos = find_comma_pos(printer.source, arg_end, next_arg_start)?;
+    let mut parts = DocBuf::new();
+    for comment in comments_to_emit_in_range(printer.comments, arg_end, next_arg_start) {
+        if is_comment_before_comma(comment, comma_pos)
+            && comment.is_block
+            && printer.is_same_line(arg_end, comment.span.start)
+        {
+            parts.push(d.text(" "));
+            parts.push(printer.build_comment_doc(comment));
+        }
+    }
+    if parts.is_empty() {
+        None
+    } else {
+        Some(d.concat(&parts))
+    }
+}
+
 /// Check if a comment is an inline block comment before the comma
 ///
 /// Returns true if the comment is:
@@ -196,7 +293,7 @@ pub(crate) fn has_inter_argument_comments_slice(
 
     arguments
         .windows(2)
-        .any(|pair| printer.has_comments_between(pair[0].span().end, pair[1].span().start))
+        .any(|pair| printer.has_comments_to_emit_between(pair[0].span().end, pair[1].span().start))
 }
 
 /// Check if the gap between two source positions contains only whitespace and parens,
@@ -264,7 +361,7 @@ pub(crate) fn should_force_expansion_for_comments(
         return true;
     }
     // Check if any block comment is truly standalone (not inline with the next code)
-    for comment in comments_in_range(printer.comments, start, next_code_pos) {
+    for comment in comments_to_emit_in_range(printer.comments, start, next_code_pos) {
         if comment.is_block
             && !printer.is_same_line(start, comment.span.start)
             && !is_comment_inline_with_next(printer, comment.span.end, next_code_pos)
@@ -290,7 +387,7 @@ pub(super) fn any_comment_forces_expansion(
 
     // Check leading comments before first arg
     let first_arg_start = call.arguments[0].span().start;
-    if printer.has_comments_between(paren_open, first_arg_start)
+    if printer.has_comments_to_emit_between(paren_open, first_arg_start)
         && should_force_expansion_for_comments(printer, paren_open, first_arg_start)
     {
         return true;
@@ -305,7 +402,7 @@ pub(super) fn any_comment_forces_expansion(
             call.span.end
         };
 
-        if !printer.has_comments_between(arg_end, next_boundary) {
+        if !printer.has_comments_to_emit_between(arg_end, next_boundary) {
             continue;
         }
 
@@ -343,24 +440,27 @@ pub(super) fn last_arg_has_comments(
     };
     let last_start = last.span().start;
 
-    // Leading: comments before last arg
+    // Leading: comments before last arg. Counts owned comments — this is a pure layout
+    // gate (it only disables the expand-last hug), and a bundler annotation leading the
+    // last argument is on the page just like any other leading comment, so prettier's
+    // `shouldExpandLastArg` refuses the hug for it too.
     if arguments.len() >= 2 {
         // Multi-arg: check after comma
         let prev_end = arguments[arguments.len() - 2].span().end;
         if let Some(cp) = find_comma_pos(printer.source, prev_end, last_start)
-            && printer.has_comments_between((cp + 1) as u32, last_start)
+            && printer.has_comments_on_page_between((cp + 1) as u32, last_start)
         {
             return true;
         }
     } else {
         // Single-arg: check after opening paren
-        if printer.has_comments_between(paren_open + 1, last_start) {
+        if printer.has_comments_on_page_between(paren_open + 1, last_start) {
             return true;
         }
     }
 
     // Trailing: comments after last arg, before closing paren
-    printer.has_comments_between(last.span().end, call_end)
+    printer.has_comments_to_emit_between(last.span().end, call_end)
 }
 
 /// Check if the first arg has any comments (leading or trailing).
@@ -372,6 +472,11 @@ pub(super) fn last_arg_has_comments(
 ///
 /// Used to prevent expand-first-arg layout when the first arg has comments,
 /// since prettier's shouldExpandFirstArg returns false in that case.
+///
+/// **on page**, like its twin [`last_arg_has_comments`]: this only disables the
+/// expand-first hug — a pure layout gate — and a bundler annotation leading the first
+/// argument is on the page just like any other leading comment, so prettier's
+/// `shouldExpandFirstArg` refuses the hug for it too.
 pub(super) fn first_arg_has_any_comments(
     arguments: &[internal::Expression<'_>],
     printer: &Printer<'_>,
@@ -383,7 +488,7 @@ pub(super) fn first_arg_has_any_comments(
     let first = &arguments[0];
 
     // Leading: comments between paren and first arg
-    if printer.has_comments_between(paren_open, first.span().start) {
+    if printer.has_comments_on_page_between(paren_open, first.span().start) {
         return true;
     }
 
@@ -392,7 +497,7 @@ pub(super) fn first_arg_has_any_comments(
         let first_end = first.span().end;
         let next_start = arguments[1].span().start;
         if let Some(cp) = find_comma_pos(printer.source, first_end, next_start) {
-            return printer.has_comments_between(first_end, cp as u32);
+            return printer.has_comments_on_page_between(first_end, cp as u32);
         }
     }
 
@@ -436,7 +541,7 @@ pub(crate) fn emit_first_arg_leading_comments(
     paren_open: u32,
     first_arg_start: u32,
 ) {
-    if !printer.has_comments_between(paren_open, first_arg_start) {
+    if !printer.has_comments_to_emit_between(paren_open, first_arg_start) {
         return;
     }
     let d = printer.d();
@@ -464,7 +569,7 @@ pub(crate) fn has_trailing_comments_slice(
     printer: &Printer<'_>,
 ) -> bool {
     has_trailing_comments_slice_impl(arguments, call_span_end, |start, end| {
-        printer.has_comments_between(start, end)
+        printer.has_comments_to_emit_between(start, end)
     })
 }
 

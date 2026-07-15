@@ -7,7 +7,7 @@
 //   type / type-argument list) can control breaking
 
 use super::super::CommentVec;
-use super::super::comments_in_range;
+use super::super::comments_to_emit_in_range;
 use super::Printer;
 use super::helpers::{immediate_union_paren, unwrap_parenthesized};
 use crate::ast::internal::{
@@ -48,7 +48,7 @@ impl<'a> Printer<'a> {
         // when false, `[prev_end, member_start]` is provably empty,
         // so skip the collect/filter machinery.
         let all_comments: CommentVec<'_> = if comments_present {
-            comments_in_range(self.comments, prev_end, member_start).collect()
+            comments_to_emit_in_range(self.comments, prev_end, member_start).collect()
         } else {
             CommentVec::new()
         };
@@ -65,18 +65,27 @@ impl<'a> Printer<'a> {
             self.first_member_leading_comments(all_comments, delimiter_pull_pos)
         };
 
-        let has_blank = if !leading_comments.is_empty() {
-            self.has_blank_line_between(prev_end, leading_comments[0].span.start)
+        // Step the scan past the previous member's trailing comment(s) so a multi-line
+        // block's interior newlines aren't read as an authored blank line
+        // (`a: 1; /*⏎…⏎*/⏎b` has no blank line between the members).
+        let check_pos = if !leading_comments.is_empty() {
+            leading_comments[0].span.start
         } else {
-            self.has_blank_line_between(prev_end, member_start)
+            member_start
         };
+        let has_blank =
+            self.has_blank_line_between(self.blank_scan_start(prev_end, check_pos), check_pos);
 
         let mut docs = DocBuf::with_capacity(3);
         if has_blank && !is_first {
             docs.push(d.literalline());
         }
         docs.push(d.hardline());
-        docs.extend(self.build_leading_comments_with_blank_lines(&leading_comments, member_start));
+        docs.extend(self.build_leading_comments_with_blank_lines(
+            &leading_comments,
+            member_start,
+            false,
+        ));
         docs
     }
 
@@ -92,7 +101,8 @@ impl<'a> Printer<'a> {
     ) -> DocBuf {
         let d = self.d();
         let mut docs = DocBuf::new();
-        for comment in comments_in_range(self.comments, brace_start + 1, first_member_start) {
+        for comment in comments_to_emit_in_range(self.comments, brace_start + 1, first_member_start)
+        {
             docs.push(self.build_comment_doc(comment));
             docs.push(d.text(" "));
         }
@@ -257,7 +267,9 @@ impl<'a> Printer<'a> {
             // no previous member to relocate onto, so it is kept inside the parens
             // leading the inner union. A line comment must end its line, so it forces
             // the paren group to break.
-            for comment in comments_in_range(self.comments, p.span.start + 1, union.span.start) {
+            for comment in
+                comments_to_emit_in_range(self.comments, p.span.start + 1, union.span.start)
+            {
                 if comment.is_block {
                     indented.push(self.build_comment_doc(comment));
                     indented.push(d.text(" "));
@@ -275,7 +287,8 @@ impl<'a> Printer<'a> {
             // forces the paren group to break. The inner union has its own group,
             // but the line comment's `break_parent` (below) propagates, expanding it
             // to one member per line.
-            for comment in comments_in_range(self.comments, union.span.end, p.span.end - 1) {
+            for comment in comments_to_emit_in_range(self.comments, union.span.end, p.span.end - 1)
+            {
                 if comment.is_block {
                     indented.push(d.text(" "));
                     indented.push(self.build_comment_doc(comment));
@@ -399,7 +412,7 @@ impl<'a> Printer<'a> {
                     .get(i + 1)
                     .map_or(t.span.end, |next| next.span().start);
                 let trailing: CommentVec<'_> = if comments_present {
-                    comments_in_range(self.comments, member_content_end, upper_bound)
+                    comments_to_emit_in_range(self.comments, member_content_end, upper_bound)
                         .filter(|c| self.is_same_line(member_content_end, c.span.start))
                         .collect()
                 } else {
@@ -485,7 +498,7 @@ impl<'a> Printer<'a> {
             .get(i + 1)
             .map_or(t.span.end, |next| next.span().start);
         let trailing: CommentVec<'_> = if comments_present {
-            comments_in_range(self.comments, member_content_end, upper_bound).collect()
+            comments_to_emit_in_range(self.comments, member_content_end, upper_bound).collect()
         } else {
             CommentVec::new()
         };
@@ -532,7 +545,8 @@ impl<'a> Printer<'a> {
             self.source[obj.span.start as usize..m.span().start as usize].contains('\n')
         });
         let has_line_or_multiline_block = comments_present
-            && comments_in_range(self.comments, obj.span.start, obj.span.end)
+            && self
+                .comments_on_page_between(obj.span.start, obj.span.end)
                 .any(|c| !c.is_block || c.multiline);
         source_is_multiline
             || first_member_on_new_line
@@ -561,9 +575,24 @@ impl<'a> Printer<'a> {
         closing: &'static str,
     ) -> DocId {
         let d = self.d();
+        // Empty object type: keep the braces delimiter-tight (`{}` not `{ }`) and
+        // preserve any interior comment. The members-only alignment path returns an
+        // empty doc for zero members, so the `d.line()` boundary below would render
+        // as a spurious space and the comment would be dropped — mirror the plain
+        // type-literal empty path (`build_empty_type_literal_inline_with_comments_doc`),
+        // threading this path's (possibly prefixed) `opening`/`closing`.
+        if obj.members.is_empty() {
+            return self.build_empty_bracketed_with_comments_doc(
+                obj.span.start,
+                obj.span.end,
+                opening,
+                closing,
+                d.line(),
+            );
+        }
         // Zero-comment whole-construct gate: one existence check over the literal's
         // span; every comment sub-query below is bounded within it.
-        let comments_present = self.has_comments_between(obj.span.start, obj.span.end);
+        let comments_present = self.has_comments_to_emit_between(obj.span.start, obj.span.end);
         let force_multiline = self.type_literal_force_multiline(obj, comments_present);
         let members_doc = self.build_type_literal_members_only_doc_for_alignment(
             obj,
@@ -626,7 +655,7 @@ impl<'a> Printer<'a> {
         // Zero-comment whole-construct gate: one existence check over the literal's
         // span skips every per-member comment query below on the comment-free
         // common case — each sub-range lies within [span.start, span.end].
-        let comments_present = self.has_comments_between(t.span.start, t.span.end);
+        let comments_present = self.has_comments_to_emit_between(t.span.start, t.span.end);
         let force_multiline = self.type_literal_force_multiline(t, comments_present);
 
         if t.members.is_empty() {
@@ -686,7 +715,7 @@ impl<'a> Printer<'a> {
                     .get(i + 1)
                     .map_or(t.span.end, |next| next.span().start);
                 let trailing: CommentVec<'_> = if comments_present {
-                    comments_in_range(self.comments, member_content_end, upper_bound)
+                    comments_to_emit_in_range(self.comments, member_content_end, upper_bound)
                         .filter(|c| self.is_same_line(member_content_end, c.span.start))
                         .collect()
                 } else {
@@ -763,18 +792,19 @@ impl<'a> Printer<'a> {
                 let inner = self.build_type_doc_for_type_arg(p.type_annotation);
                 let inner_start = p.type_annotation.span().start;
                 let inner_end = p.type_annotation.span().end;
-                let has_leading = self.has_comments_between(p.span.start + 1, inner_start);
-                let has_trailing = self.has_comments_between(inner_end, p.span.end - 1);
+                let has_leading = self.has_comments_to_emit_between(p.span.start + 1, inner_start);
+                let has_trailing = self.has_comments_to_emit_between(inner_end, p.span.end - 1);
                 if !has_leading && !has_trailing {
                     return inner;
                 }
                 let leading: CommentVec<'_> = if has_leading {
-                    comments_in_range(self.comments, p.span.start + 1, inner_start).collect()
+                    comments_to_emit_in_range(self.comments, p.span.start + 1, inner_start)
+                        .collect()
                 } else {
                     smallvec![]
                 };
                 let trailing: CommentVec<'_> = if has_trailing {
-                    comments_in_range(self.comments, inner_end, p.span.end - 1).collect()
+                    comments_to_emit_in_range(self.comments, inner_end, p.span.end - 1).collect()
                 } else {
                     smallvec![]
                 };

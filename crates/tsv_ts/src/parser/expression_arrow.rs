@@ -23,11 +23,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// enforcement point, shared by the paren, single-param, generic, and async
     /// arrow builders. A same-line block comment (`(a) /* c */ =>`) carries no line
     /// terminator and stays valid.
-    fn expect_arrow(&mut self) -> Result<(), ParseError> {
+    /// Consume the arrow's `=>` and return the byte offset of its `=` (the arrow
+    /// token start), so builders can record it on the node instead of the printer
+    /// re-scanning source for it.
+    fn expect_arrow(&mut self) -> Result<u32, ParseError> {
         if self.check(&TokenKind::Arrow) && self.had_line_terminator {
             return Err(self.error_msg("Line terminator not permitted before '=>'"));
         }
-        self.expect(&TokenKind::Arrow)
+        // Full-document coordinate (`current_pos` adds `base_offset`), matching the
+        // AST spans the printer indexes with — NOT the raw `self.current.start`, which
+        // is slice-relative under Svelte embedding. Same reason `params_start` does this.
+        let arrow_token = self.current_pos().0 as u32;
+        self.expect(&TokenKind::Arrow)?;
+        Ok(arrow_token)
     }
 
     /// Check if current position starts an arrow function
@@ -82,13 +90,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Params + body in the arrow's own `[~Await, ~Yield]` context (an arrow is
         // never async/generator itself; the return type between them is await-free,
         // and `yield` in an arrow inside a generator is a plain identifier).
-        let (params, return_type, body) = self.with_fn_context(false, false, |p| {
+        let (params, return_type, body, arrow_token) = self.with_fn_context(false, false, |p| {
             let params = p.parse_parameter_list_no_decorators()?.into_bump_slice();
             // Return type annotation: <T>(): type => ... or type predicate
             let return_type = p.parse_optional_return_type()?;
-            p.expect_arrow()?; // consume '=>' (no LineTerminator before it)
+            let arrow_token = p.expect_arrow()?; // consume '=>' (no LineTerminator before it)
             let body = p.parse_arrow_body()?;
-            Ok((params, return_type, body))
+            Ok((params, return_type, body, arrow_token))
         })?;
         let end = self.prev_token_end() as u32;
 
@@ -100,6 +108,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 return_type,
                 r#async: false,
                 params_start: Some(params_start as u32),
+                arrow_token,
                 span: Span::new(start as u32, end),
             },
         ))
@@ -143,13 +152,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Params + body in the arrow's own `[~Await, ~Yield]` context (an arrow is
         // never async/generator itself).
-        let (params, return_type, body) = self.with_fn_context(false, false, |p| {
+        let (params, return_type, body, arrow_token) = self.with_fn_context(false, false, |p| {
             let params = p.parse_parameter_list_no_decorators()?.into_bump_slice();
             // Return type annotation: (): type => ... or type predicate
             let return_type = p.parse_optional_return_type()?;
-            p.expect_arrow()?; // consume '=>' (no LineTerminator before it)
+            let arrow_token = p.expect_arrow()?; // consume '=>' (no LineTerminator before it)
             let body = p.parse_arrow_body()?;
-            Ok((params, return_type, body))
+            Ok((params, return_type, body, arrow_token))
         })?;
         let end = self.prev_token_end() as u32;
 
@@ -161,6 +170,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 return_type,
                 r#async: false, // Non-async arrow function; async ones are parsed via parse_async_arrow_function
                 params_start: Some(params_start as u32),
+                arrow_token,
                 span: Span::new(start as u32, end),
             },
         ))
@@ -188,7 +198,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         )));
         let params = params.into_bump_slice();
 
-        self.expect_arrow()?; // consume '=>' (no LineTerminator before it)
+        let arrow_token = self.expect_arrow()?; // consume '=>' (no LineTerminator before it)
 
         // Non-async single-param arrow body is `[~Await]`.
         let body = self.with_fn_context(false, false, Self::parse_arrow_body)?;
@@ -202,6 +212,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 return_type: None, // Single-param without parens can't have return type
                 r#async: false,
                 params_start: None, // No parens for single-param arrows
+                arrow_token,
                 span: Span::new(start as u32, end),
             },
         ))
@@ -247,7 +258,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Check for return type annotation or type predicate
         let return_type = self.parse_optional_return_type()?;
 
-        self.expect_arrow()?; // consume '=>' (no LineTerminator before it)
+        let arrow_token = self.expect_arrow()?; // consume '=>' (no LineTerminator before it)
 
         // Async arrow body is `[+Await]`.
         let body = self.with_fn_context(true, false, Self::parse_arrow_body)?;
@@ -261,6 +272,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 return_type,
                 r#async: true,
                 params_start,
+                arrow_token,
                 span: Span::new(start as u32, end),
             },
         ))

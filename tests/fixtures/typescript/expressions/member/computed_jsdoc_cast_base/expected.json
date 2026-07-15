@@ -1,0 +1,570 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 573,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A JSDoc cast base whose parens hang across lines: the optional computed lookup",
+			"start": 10,
+			"end": 91,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " still hugs the `)`. Prettier never breaks before a computed `[` (member.js",
+			"start": 93,
+			"end": 170,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `shouldInline` includes `node.computed`); the brackets break instead.",
+			"start": 172,
+			"end": 244,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {Record<string, Function | Function[]>} ",
+			"start": 256,
+			"end": 308,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 11
+				},
+				"end": {
+					"line": 5,
+					"column": 63
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {string} ",
+			"start": 353,
+			"end": 374,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 5
+				},
+				"end": {
+					"line": 7,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Same rule for a non-optional lookup.",
+			"start": 386,
+			"end": 425,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {Record<string, Function | Function[]>} ",
+			"start": 437,
+			"end": 489,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 11
+				},
+				"end": {
+					"line": 10,
+					"column": 63
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {string} ",
+			"start": 532,
+			"end": 553,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 3
+				},
+				"end": {
+					"line": 12,
+					"column": 24
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 572,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 563,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 13,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 246,
+					"end": 383,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 35
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 252,
+							"end": 382,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 7
+								},
+								"end": {
+									"line": 7,
+									"column": 34
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 252,
+								"end": 253,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 7
+									},
+									"end": {
+										"line": 5,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ChainExpression",
+								"start": 309,
+								"end": 382,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 64
+									},
+									"end": {
+										"line": 7,
+										"column": 34
+									}
+								},
+								"expression": {
+									"type": "MemberExpression",
+									"start": 309,
+									"end": 382,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 64
+										},
+										"end": {
+											"line": 7,
+											"column": 34
+										}
+									},
+									"object": {
+										"type": "MemberExpression",
+										"start": 313,
+										"end": 347,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 2
+											},
+											"end": {
+												"line": 6,
+												"column": 36
+											}
+										},
+										"object": {
+											"type": "MemberExpression",
+											"start": 313,
+											"end": 338,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 2
+												},
+												"end": {
+													"line": 6,
+													"column": 27
+												}
+											},
+											"object": {
+												"type": "Identifier",
+												"start": 313,
+												"end": 329,
+												"loc": {
+													"start": {
+														"line": 6,
+														"column": 2
+													},
+													"end": {
+														"line": 6,
+														"column": 18
+													}
+												},
+												"name": "componentContext"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 330,
+												"end": 338,
+												"loc": {
+													"start": {
+														"line": 6,
+														"column": 19
+													},
+													"end": {
+														"line": 6,
+														"column": 27
+													}
+												},
+												"name": "instance"
+											},
+											"computed": false,
+											"optional": false
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 339,
+											"end": 347,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 28
+												},
+												"end": {
+													"line": 6,
+													"column": 36
+												}
+											},
+											"name": "$$events"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 376,
+										"end": 380,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 28
+											},
+											"end": {
+												"line": 7,
+												"column": 32
+											}
+										},
+										"name": "type",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": "* @type {string} ",
+												"start": 353,
+												"end": 374
+											}
+										]
+									},
+									"computed": true,
+									"optional": true
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {Record<string, Function | Function[]>} ",
+										"start": 256,
+										"end": 308
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A JSDoc cast base whose parens hang across lines: the optional computed lookup",
+							"start": 10,
+							"end": 91
+						},
+						{
+							"type": "Line",
+							"value": " still hugs the `)`. Prettier never breaks before a computed `[` (member.js",
+							"start": 93,
+							"end": 170
+						},
+						{
+							"type": "Line",
+							"value": " `shouldInline` includes `node.computed`); the brackets break instead.",
+							"start": 172,
+							"end": 244
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 427,
+					"end": 562,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 33
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 433,
+							"end": 561,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 7
+								},
+								"end": {
+									"line": 12,
+									"column": 32
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 433,
+								"end": 434,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 7
+									},
+									"end": {
+										"line": 10,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "MemberExpression",
+								"start": 490,
+								"end": 561,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 64
+									},
+									"end": {
+										"line": 12,
+										"column": 32
+									}
+								},
+								"object": {
+									"type": "MemberExpression",
+									"start": 494,
+									"end": 528,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 2
+										},
+										"end": {
+											"line": 11,
+											"column": 36
+										}
+									},
+									"object": {
+										"type": "MemberExpression",
+										"start": 494,
+										"end": 519,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 2
+											},
+											"end": {
+												"line": 11,
+												"column": 27
+											}
+										},
+										"object": {
+											"type": "Identifier",
+											"start": 494,
+											"end": 510,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 2
+												},
+												"end": {
+													"line": 11,
+													"column": 18
+												}
+											},
+											"name": "componentContext"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 511,
+											"end": 519,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 19
+												},
+												"end": {
+													"line": 11,
+													"column": 27
+												}
+											},
+											"name": "instance"
+										},
+										"computed": false,
+										"optional": false
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 520,
+										"end": 528,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 28
+											},
+											"end": {
+												"line": 11,
+												"column": 36
+											}
+										},
+										"name": "$$events"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 555,
+									"end": 559,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 26
+										},
+										"end": {
+											"line": 12,
+											"column": 30
+										}
+									},
+									"name": "type",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": "* @type {string} ",
+											"start": 532,
+											"end": 553
+										}
+									]
+								},
+								"computed": true,
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {Record<string, Function | Function[]>} ",
+										"start": 437,
+										"end": 489
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Same rule for a non-optional lookup.",
+							"start": 386,
+							"end": 425
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

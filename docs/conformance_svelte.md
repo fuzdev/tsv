@@ -43,6 +43,7 @@ catalog entry.
 - Attribute namespaces `[ns|attr]` — Not supported — [namespace](../tests/fixtures/css/selectors/attribute/namespace_svelte_divergence/)
 - No-namespace `|element` — Not supported — [no_namespace](../tests/fixtures/css/selectors/namespace/no_namespace_svelte_divergence/)
 - Forgiving :is()/:where() — Strict parsing (should be forgiving); tsv drops both syntactically invalid items (`.`, `[`) and contextually invalid ones (known syntax in the wrong place — e.g. an `An+B`/`of S` term, valid only in `:nth-*()`, so `:is(2n of)` → empty), while Svelte fails the whole parse — [forgiving_is_where](../tests/fixtures/css/selectors/forgiving_is_where_svelte_divergence/)
+- Forgiving :is()/:where() dropped-item newline — the formatter side of the row above: a dropped invalid item spanning a newline (`:is(.a > .⏎> .b)`) has its preserved verbatim text's whitespace runs (including the newline) collapsed to single spaces, matching prettier (which collapses whitespace inside a selector) — the same rule tsv applies to every other selector-argument position. Parser behavior is unchanged from the row above (the item is still dropped from the AST) — [forgiving_is_where_newline](../tests/fixtures/css/selectors/forgiving_is_where_newline_svelte_divergence/)
 - Empty-after-comment declarations — Rejected (`css_empty_declaration`) — [comment_empty_value](../tests/fixtures/css/tokens/comments/comment_empty_value_svelte_divergence/)
 - `;` inside a function value (`prop: fn(a; b)`) — Rejected (`css_empty_declaration`); the inner `;` is truncated as a declaration terminator, but per CSS Syntax 3 a `;` inside a `fn(…)` simple block is block content — tsv (and prettier) keep the declaration whole — [function_semicolon](../tests/fixtures/css/values/function_semicolon_svelte_divergence/)
 - `;` inside a simple block or `var()` fallback (`(x;y)`, `[x;y]`, `var(--d, ;)`) — Rejected (`css_empty_declaration`); the same class as the function case, extended to `()` / `[]` simple blocks and the `var()` fallback — all balanced units per CSS Syntax 3, so an inner `;` is content — tsv (and prettier) keep the declaration whole — [balanced_semicolon](../tests/fixtures/css/values/balanced_semicolon_svelte_divergence/)
@@ -194,17 +195,42 @@ format everything well-formed. So a "correction" below is tsv matching **tsc/spe
 
 Svelte ❌ / Prettier ✅ / tsv ✅ in every case below:
 
-- `using` declarations (ES2024) — [basic](../tests/fixtures/typescript/typescript_specific/using/basic_svelte_divergence/)
-- `await using` declarations — [await](../tests/fixtures/typescript/typescript_specific/using/await_svelte_divergence/)
+- `using` declarations (Explicit Resource Management — a finished/Stage 4 proposal, not ES2024; see [checklist_typescript.md](./checklist_typescript.md#explicit-resource-management)) — [basic](../tests/fixtures/typescript/typescript_specific/using/basic_svelte_divergence/)
+- `await using` declarations — [await](../tests/fixtures/typescript/typescript_specific/using/await_svelte_divergence/); with a comment inside the keyword (`await /* c */ using`), which tsv preserves where prettier relocates it past `using` — [await_keyword_comment](../tests/fixtures/typescript/typescript_specific/using/await_keyword_comment_svelte_prettier_divergence/)
 - `const` type params in classes — [const_type_param_class](../tests/fixtures/typescript/typescript_specific/generics/const_type_param_class_svelte_divergence/)
+- `const` type params in interfaces, incl. `const` before variance (`<const in T>`) — [const_type_param_interface](../tests/fixtures/typescript/typescript_specific/generics/const_type_param_interface_svelte_divergence/). acorn rejects the `const` token (tsc defers it to the TS1277 checker error); the mis-ordered `<in const T>` is instead a *grammar* error tsv rejects like acorn, pinned by the regular fixture [type_param_modifier_order](../tests/fixtures/typescript/typescript_specific/generics/type_param_modifier_order/)
 - Import type options — [dynamic_attributes](../tests/fixtures/typescript/modules/imports/dynamic_attributes_svelte_divergence/)
-- ES2024 v-flag regex — [unicode_sets_advanced](../tests/fixtures/typescript/expressions/literals/regex/unicode_sets_advanced_svelte_divergence/)
+- An **invalid** v-flag regex (`/[a-z--[aeiou]]/v` — a range is not a `ClassSetOperand`, so V8 throws too): tsv accepts it by deferring the `IsValidRegularExpressionLiteral` early error, since regex bodies are opaque. Svelte is *correct* to reject; this is not a `v`-flag gap — [unicode_sets_advanced](../tests/fixtures/typescript/expressions/literals/regex/unicode_sets_advanced_svelte_divergence/)
 - `export default class implements I {}` (anonymous default class, implements-first heritage) — [export_default_implements](../tests/fixtures/typescript/declarations/class/export_default_implements_svelte_divergence/)
+- A cast as the left operand of `**` (`x as number ** 2`) — see below; the rejection itself is not pinnable
 - Async generic arrow params — see fixtures below
 
-**`using` keyword-name comments**: Both acorn and tsv reject comments between `using` and the binding name (`using /* c */ x = fn()`), and between `await` and `using` (`await /* c */ using x = fn()`). Per the ECMAScript spec, comments behave like white space and are discarded between any two tokens (§12.4), so these should be valid. However, since `using` is a contextual keyword requiring lookahead disambiguation, both parsers check the next token before comment processing. tsv matches acorn's behavior here. If acorn adds support, tsv should follow.
+**`using` keyword-name comments**: tsv **accepts** a comment between `using` and the binding name (`using /* c */ x = fn()`) and round-trips it, which is correct — per ecma262 §sec-comments a comment "behave[s] like white space and [is] discarded", so any two tokens may be separated by one. A comment *containing a line terminator* is the exception the same clause names: it counts as a `LineTerminator`, which the `[no LineTerminator here]` in `await [no LT] using` and `using [no LT] BindingIdentifier` then demotes — so `await /* c⏎ */ using x = fn()` correctly fails to read as a declaration. acorn's verdict is not comparable here: it rejects `using` / `await using` outright (see the list above), so it never reaches the comment question.
+
+**Cast as the left operand of `**`**: acorn-typescript rejects `x as number ** 2` / `x satisfies number ** 2` (`Unexpected token` at the `**`). tsc accepts both — it parses the cast as the `**` left operand, and its "unary expression is not allowed in the left-hand side of an exponentiation expression" grammar error (TS17006) fires only for a *prefix-unary* operand (`-2 ** 3`), not for a cast. Prettier agrees, printing `(x as number) ** 2`, and tsv matches. **Upstream candidate**: acorn-typescript exponentiation after `as`/`satisfies`.
+
+The rejection is the one case here that **cannot be pinned**. The `expected_svelte.json` = `{"error": "failed to parse"}` sentinel every fixture above uses attaches to `input.*`, and an `input.*` must be a formatting fixed point (F1) — `x as number ** 2` is not one, since both formatters normalize it to `(x as number) ** 2`. The source form can therefore only live in an `unformatted_*` variant, and the validator runs the canonical parser over `input.*` and `input_invalid_*` only, never over variants. So [as_satisfies_exponentiation](../tests/fixtures/typescript/expressions/as_satisfies_exponentiation/) is a *regular* fixture: it pins the parse shape and the paren insertion (both operand sides — a cast on the right needs parens too, since `as` otherwise binds looser and takes the whole exponentiation), and its `unformatted_no_parens` variant carries the source form. That variant formats at all only because prettier-plugin-svelte re-parses `<script>` content with prettier's own TypeScript parser rather than with Svelte's — Svelte's parser sees the fixture's parenthesized `input.svelte` and is happy.
 
 **Async generic arrow params**: acorn-typescript drops all function parameters from `async` arrow functions that have type parameters (`async <T,>(x: T) => x` → `params: []`). Non-async generic arrows are unaffected. This is semantic corruption — tools consuming the AST would see zero-argument functions. **Upstream candidate**: acorn-typescript async arrow parsing.
+
+**Import-phase proposals (forward-looking, ungated).** tsv accepts the TC39
+import-phase syntax — `import defer * as ns from '…'` / `import source x from '…'`
+and the dynamic `import.defer(…)` / `import.source(…)` — and emits a `phase` field
+(`'defer'` / `'source'`) on the `ImportDeclaration` / `ImportExpression` wire node
+(declared in `crates/tsv_wasm/types/tsv_ast.d.ts`). Unlike every case above, this one
+is **un-fixturable** — and not because the canonical parsers reject it. A canonical
+rejection on its own is pinnable, via the `expected_svelte.json` = `{"error": "failed
+to parse"}` sentinel that every fixture above uses; what those fixtures still have, and
+import-phase does not, is a *second* oracle. **prettier** is no oracle here — it drops
+the `defer` keyword (silent content loss) and rejects `import source`, so there is no
+format claim to pin. With `expected_ours.json` self-generated and no formatter to check
+it against, the fixture would assert only that tsv agrees with tsv. The syntax is also
+not yet in the finished ECMAScript standard. The emitted `phase`
+shape mirrors the TC39 proposals' AST; because there is no oracle, it is a deliberate
+extension rather than a drop-in guarantee, and **if acorn-typescript later implements
+import-phase with a different shape, tsv should re-align to it**. Emitted from
+`crates/tsv_ts/src/ast/convert/write/statements.rs` (declaration) and
+`crates/tsv_ts/src/ast/convert/write/expressions.rs` (expression).
 
 Its one accept-side consequence is a *reverse* divergence — tsv **over-rejects** here. A parameter decorator is invalid on an arrow in every form (tsc + prettier + acorn all reject `(@dec a) => a`, `<T>(@dec a) => a`, `async (@dec a) => a` — the drop-in rejections pinned by the `input_invalid_*` cases in [decorators/parameter_arrow](../tests/fixtures/typescript/typescript_specific/decorators/parameter_arrow/)). But in the async-generic form acorn *accepts* `async <T>(@dec a) => a`, only because the param-drop bug above silently discards the parameter and its decorator. tsc still rejects the decorator, so tsv rejects too — matching every other arrow form and diverging from acorn's lossy accept (a `tsv_rejects.txt` fixture).
 
@@ -381,8 +407,8 @@ ternary onto an unparenthesized arrow above the `parseExprOps` arrow guard.
 
 #### Import-phase proposals
 
-The Stage-3 **source-phase imports** and **import defer** proposals add a phase to
-both static and dynamic imports:
+The **source-phase imports** and **import defer** proposals — not yet standard — add a
+phase to both static and dynamic imports:
 
 - `import source x from 'mod'` / `import.source('mod')` — phase `'source'`
 - `import defer * as ns from 'mod'` / `import.defer('mod')` — phase `'defer'`
@@ -484,16 +510,20 @@ All corrections exist because of upstream bugs. If fixed upstream, tsv would rem
 **acorn-typescript** — fix in acorn-typescript, then Svelte updates its dependency:
 
 - Async generic arrow params — params dropped when `async` + type params
-- `using` / `await using` — ES2024 declarations not recognized
+- `using` / `await using` — Explicit Resource Management declarations not recognized
 - `const` type params — `const` modifier on class type params
 - Import type options — `import()` type assertion options
 - Anonymous class-expression `id` — omitted for implements-first heritage
 - `export default class implements I {}` — anonymous default class with implements-first heritage rejected (`implements` read as a reserved-word name)
 - Type assertion vs. generic arrow — `<T>` before any arrow (even a parenthesized one) reads as type parameters; the parenthesized-arrow abort check is dead code
 
-**acorn** — fix in acorn core:
-
-- ES2024 v-flag regex — Unicode sets `v` flag not supported
+(No **acorn core** candidates. The `v`-flag regex entry that used to sit here was withdrawn: acorn
+supports the `v` flag and its set operations, and correctly rejects the one construct
+[unicode_sets_advanced](../tests/fixtures/typescript/expressions/literals/regex/unicode_sets_advanced_svelte_divergence/)
+exercises — `/[a-z--[aeiou]]/v` is invalid ECMAScript, which V8 throws on too. That fixture is not
+an upstream bug at all; it is tsv deferring the `IsValidRegularExpressionLiteral` early error
+because regex bodies are opaque, so it does not meet this section's bar and will become an
+`input_invalid_*` fixture when the diagnostics layer lands.)
 
 **Svelte CSS parser** — fix directly in Svelte:
 

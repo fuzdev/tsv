@@ -11,6 +11,12 @@ description = "Language-agnostic foundation primitives for tsv"
 # no `DocArena` side-set field, no render-loop hook. `tsv_debug` forwards this
 # feature (off by default there too) to drive `swallow_audit`. See src/doc/swallow.rs.
 swallow_check = []
+# Opt-in print-once comment ledger (diagnostic): every comment a document parses must
+# be emitted exactly once. Off by default, same reasoning as `swallow_check` — no
+# registration in the format entry points, no record hook in the printers' comment
+# seams. `tsv_ts` / `tsv_css` / `tsv_svelte` / `tsv_debug` each forward it. See
+# src/comment_ledger.rs.
+comment_check = []
 # Shared wire-JSON writer substrate (`json_writer`), pulled in transitively by
 # each language crate's `convert` feature. Off in the format-only
 # @fuzdev/tsv_format_wasm build, so `serde_json` never enters that graph.

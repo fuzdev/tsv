@@ -64,16 +64,19 @@ impl<'a> Printer<'a> {
             match self.unwrap_redundant_parens(annotation.type_annotation) {
                 TSType::Union(u) => {
                     let type_doc = self.build_union_type_doc(u);
-                    // Extract comments between `:` and the union type (e.g., `: /* c */ A | B`)
-                    let comments_doc = self.build_comments_between(
-                        colon_end,
-                        type_start,
-                        CommentSpacing::Trailing,
-                    );
-                    d.concat(&[
-                        d.text(":"),
-                        hang_after_operator(d, d.concat(&[comments_doc, type_doc])),
-                    ])
+                    // Comments between `:` and the union type (e.g., `: /* c */ A | B`);
+                    // omit the empty child on the comment-free common path. Byte-identical.
+                    let hung = if self.has_comments_to_emit_between(colon_end, type_start) {
+                        let comments_doc = self.build_comments_between(
+                            colon_end,
+                            type_start,
+                            CommentSpacing::Trailing,
+                        );
+                        d.concat(&[comments_doc, type_doc])
+                    } else {
+                        type_doc
+                    };
+                    d.concat(&[d.text(":"), hang_after_operator(d, hung)])
                 }
                 TSType::Intersection(i) => {
                     // Build intersection with proper indentation for type annotation context:
@@ -85,6 +88,7 @@ impl<'a> Printer<'a> {
                     colon_end,
                     type_start,
                     annotation.type_annotation,
+                    self.has_comments_to_emit_between(colon_end, type_start),
                 ),
             }
         }
@@ -97,15 +101,29 @@ impl<'a> Printer<'a> {
     /// gap stay inline (`: /* c */ Type`). Takes the caller's already-computed
     /// `colon_end` / `type_start` so neither re-derives them, and the raw `ty` (not an
     /// unwrapped form) so redundant parens like `: (string)` are preserved.
+    ///
+    /// `gap_has_comments` is the caller's answer for the `:`→type gap, so a caller that
+    /// already knows the whole annotation is comment-free spends no search here at all.
     fn build_simple_type_annotation_doc(
         &self,
         colon_end: u32,
         type_start: u32,
         ty: &TSType<'_>,
+        gap_has_comments: bool,
     ) -> DocId {
         let d = self.d();
         let mut parts: DocBuf = smallvec![d.text(": ")];
-        parts.push(self.build_comments_between(colon_end, type_start, CommentSpacing::Trailing));
+        // Skip the `empty()` comment child on the comment-free `: Type` gap — type
+        // annotations are one of the most frequent TS constructs, so a wasted child here
+        // (walked by render + every fits pass) is ubiquitous. Byte-identical: the gap is
+        // comment-free, so the comment doc would be `empty()`.
+        if gap_has_comments {
+            parts.push(self.build_comments_between(
+                colon_end,
+                type_start,
+                CommentSpacing::Trailing,
+            ));
+        }
         parts.push(self.build_type_doc(ty));
         d.concat(&parts)
     }
@@ -156,11 +174,24 @@ impl<'a> Printer<'a> {
         always_wrap: bool,
     ) -> DocId {
         let d = self.d();
-        // First check for line comments between `:` and the type.
-        // If there are comments, fall back to build_type_annotation_doc which handles them properly.
         let colon_end = annotation.span.start + 1; // After the `:`
         let type_start = annotation.type_annotation.span().start;
-        if self.has_line_comments_between(colon_end, type_start) {
+
+        // One window search over the whole annotation gates every comment query below.
+        // Each of them — the `:`→type gap, the type-name→type-args gap, and the member
+        // gaps `union_return_hugs` inspects — is bounded inside `annotation.span`
+        // (`: Type`), and a comment only counts when it lies fully inside the queried
+        // range. So a comment-free annotation provably has none in any of them: the
+        // per-gap searches are skipped and the `empty()` children they would feed into
+        // the concats below are never pushed. Byte-identical, and the false path is the
+        // overwhelmingly common one — annotations are among the most frequent TS
+        // constructs, and comments inside one are rare.
+        let has_comments =
+            self.has_comments_to_emit_between(annotation.span.start, annotation.span.end);
+
+        // First check for line comments between `:` and the type.
+        // If there are comments, fall back to build_type_annotation_doc which handles them properly.
+        if has_comments && self.has_line_comments_between(colon_end, type_start) {
             return self.build_type_annotation_doc(annotation);
         }
 
@@ -169,26 +200,27 @@ impl<'a> Printer<'a> {
             && let Some(type_args) = &r.type_arguments
             && (always_wrap || type_args_should_wrap_for_return_type(type_args))
         {
-            // Extract comments between `:` and the type (e.g., `: /* c */ Promise<string>`)
-            let comments_doc =
-                self.build_comments_between(colon_end, type_start, CommentSpacing::Trailing);
+            let mut parts: DocBuf = smallvec![d.text(": ")];
+            // Comments between `:` and the type (e.g., `: /* c */ Promise<string>`)
+            if has_comments
+                && let Some(comments_doc) =
+                    self.build_inline_comments_between_doc_trailing_space_opt(colon_end, type_start)
+            {
+                parts.push(comments_doc);
+            }
+            parts.push(self.build_entity_name_doc(&r.type_name));
             // Preserve comments between type name and type args: `Promise/* c */ <string>`
-            let name_end = r.type_name.span().end;
-            let ta_start = type_args.span.start;
-            let name_ta_comments = self
-                .build_name_to_type_params_comments_opt(
-                    name_end,
-                    ta_start,
+            if has_comments
+                && let Some(name_ta_comments) = self.build_name_to_type_params_comments_opt(
+                    r.type_name.span().end,
+                    type_args.span.start,
                     CommentSpacing::Trailing,
                 )
-                .unwrap_or_else(|| d.empty());
-            return d.concat(&[
-                d.text(": "),
-                comments_doc,
-                self.build_entity_name_doc(&r.type_name),
-                name_ta_comments,
-                self.build_type_arguments_doc_wrapping(type_args),
-            ]);
+            {
+                parts.push(name_ta_comments);
+            }
+            parts.push(self.build_type_arguments_doc_wrapping(type_args));
+            return d.concat(&parts);
         }
 
         // Strip redundant comment-free parens around a union / intersection so a
@@ -202,9 +234,16 @@ impl<'a> Printer<'a> {
         if let TSType::Union(u) = value_type {
             let type_doc = self.build_union_type_doc(u);
 
-            // Extract comments between `:` and the union type (e.g., `: /* c */ A | B`)
-            let comments_doc =
-                self.build_comments_between(colon_end, value_type_start, CommentSpacing::Trailing);
+            // Comments between `:` and the union type (e.g., `: /* c */ A | B`). `None`
+            // on the comment-free path, so the concats below carry no empty child.
+            let comments_doc = if has_comments {
+                self.build_inline_comments_between_doc_trailing_space_opt(
+                    colon_end,
+                    value_type_start,
+                )
+            } else {
+                None
+            };
 
             // A brace-hugging union return (`{ … } | null` / `| void`) hugs `:`
             // block-style, like the type-alias RHS — the object owns its own expansion
@@ -216,7 +255,10 @@ impl<'a> Printer<'a> {
             // `should_hug_union_type` branch below), and a member/gap comment
             // disqualifies the hug.
             if self.union_return_hugs(value_type, u, colon_end, value_type_start) {
-                return d.concat(&[d.text(": "), comments_doc, type_doc]);
+                return match comments_doc {
+                    Some(c) => d.concat(&[d.text(": "), c, type_doc]),
+                    None => d.concat(&[d.text(": "), type_doc]),
+                };
             }
 
             if should_hug_union_type(u) {
@@ -229,15 +271,23 @@ impl<'a> Printer<'a> {
                 // directly, which correctly handles nested hardlines (returns true).
                 // State 0: `: Promise<…> | null` (inline, no break after colon)
                 // State 1: `:\n  Promise<…> | null` (break after colon, for long names)
-                let flat_state = d.concat(&[d.text(": "), comments_doc, type_doc]);
-                let break_state = d.concat(&[
-                    d.text(":"),
-                    d.indent_line(d.concat(&[comments_doc, type_doc])),
-                ]);
-                return d.conditional_group(&[flat_state, break_state]);
+                return match comments_doc {
+                    Some(c) => d.conditional_group(&[
+                        d.concat(&[d.text(": "), c, type_doc]),
+                        d.concat(&[d.text(":"), d.indent_line(d.concat(&[c, type_doc]))]),
+                    ]),
+                    None => d.conditional_group(&[
+                        d.concat(&[d.text(": "), type_doc]),
+                        d.concat(&[d.text(":"), d.indent_line(type_doc)]),
+                    ]),
+                };
             }
 
-            let union_group = hang_after_operator(d, d.concat(&[comments_doc, type_doc]));
+            let hung = match comments_doc {
+                Some(c) => d.concat(&[c, type_doc]),
+                None => type_doc,
+            };
+            let union_group = hang_after_operator(d, hung);
             return d.concat(&[d.text(":"), union_group]);
         }
 
@@ -251,7 +301,14 @@ impl<'a> Printer<'a> {
         // directly instead of delegating to `build_type_annotation_doc`, which would
         // re-derive what we already know here: no line comments (proven false above),
         // and `unwrap_redundant_parens` + the Union/Intersection match (ruled out above).
-        self.build_simple_type_annotation_doc(colon_end, type_start, annotation.type_annotation)
+        // A comment-free annotation also already answers the gap query, so it costs no
+        // search of its own.
+        self.build_simple_type_annotation_doc(
+            colon_end,
+            type_start,
+            annotation.type_annotation,
+            has_comments && self.has_comments_to_emit_between(colon_end, type_start),
+        )
     }
 
     /// Build intersection type annotation with proper indentation.
@@ -287,13 +344,14 @@ impl<'a> Printer<'a> {
         // Extract comments between `:` and the type (e.g., `: & /* c */ A`)
         if intersection.types.len() == 1 {
             let first_type_start = intersection.types[0].span().start;
-            let comments_doc =
-                self.build_comments_between(colon_end, first_type_start, CommentSpacing::Trailing);
-            return d.concat(&[
-                d.text(": "),
-                comments_doc,
-                self.build_type_doc_with_wrapping_type_args(&intersection.types[0]),
-            ]);
+            let mut parts: DocBuf = smallvec![d.text(": ")];
+            if let Some(comments_doc) = self
+                .build_inline_comments_between_doc_trailing_space_opt(colon_end, first_type_start)
+            {
+                parts.push(comments_doc);
+            }
+            parts.push(self.build_type_doc_with_wrapping_type_args(&intersection.types[0]));
+            return d.concat(&parts);
         }
 
         // Multi-member: `: ` + any colon→first-member comment, then delegate the whole
@@ -306,15 +364,14 @@ impl<'a> Printer<'a> {
         // block comment INSIDE the intersection (`: & /* c */ A`, where the span starts at
         // the leading `&`) is emitted by the bare printer, so bounding at `types[0]` here
         // would double-emit it.
-        let comments_doc = self.build_comments_between(
+        let mut parts: DocBuf = smallvec![d.text(": ")];
+        if let Some(comments_doc) = self.build_inline_comments_between_doc_trailing_space_opt(
             colon_end,
             intersection.span.start,
-            CommentSpacing::Trailing,
-        );
-        d.concat(&[
-            d.text(": "),
-            comments_doc,
-            self.intersection_hanging_with_indent(intersection),
-        ])
+        ) {
+            parts.push(comments_doc);
+        }
+        parts.push(self.intersection_hanging_with_indent(intersection));
+        d.concat(&parts)
     }
 }

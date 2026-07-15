@@ -3,7 +3,7 @@
 //! Contains the Expression enum and all expression types including
 //! operators, literals, function expressions, and TypeScript type assertions.
 
-use tsv_lang::Span;
+use tsv_lang::{Comment, Span};
 
 use super::{
     ArrayPattern, AssignmentPattern, BlockStatement, ClassExpression, Identifier, Literal,
@@ -202,7 +202,15 @@ impl<'arena> Expression<'arena> {
 #[derive(Debug, Clone)]
 pub struct JsdocCast<'arena> {
     pub inner: &'arena Expression<'arena>,
+    /// The `(`…`)` of the cast — the comment is **not** included, so enclosing nodes
+    /// keep taking their paren-inclusive bounds from here (matching acorn's spans).
     pub span: Span,
+    /// The `@type`/`@satisfies` comment glued to `span.start`. The cast owns it
+    /// (`Comment::owned_by_node`), so the generic comment machinery skips it and this
+    /// node is the only thing that prints it — which is what keeps a paren synthesized
+    /// around an enclosing expression from landing between the comment and the `(` and
+    /// silently re-binding the cast.
+    pub comment: Comment,
 }
 
 /// Preserved grouping parentheses: `(expr)`.
@@ -584,6 +592,11 @@ pub struct ArrowFunctionExpression<'arena> {
     /// Position of opening paren for params, if parenthesized.
     /// `Some(pos)` for `(x) => x` or `() => x`, `None` for `x => x`
     pub params_start: Option<u32>,
+    /// Byte offset of the `=` in the arrow's `=>` token, captured by the parser
+    /// when it consumes the arrow (like `params_start`, a print-time position fact,
+    /// not emitted to the wire). Lets the printer split comments around `=>` without
+    /// re-scanning source for it.
+    pub arrow_token: u32,
     pub span: Span,
 }
 

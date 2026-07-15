@@ -77,7 +77,7 @@ impl<'a> Printer<'a> {
     /// Shared by the rule and at-rule block loops.
     pub(super) fn write_format_ignore_declaration(&mut self, decl: &internal::CssDeclaration<'_>) {
         self.write_indent();
-        self.write(decl.span.extract(self.source));
+        self.write_verbatim_span(decl.span);
         self.write_declaration_end(decl);
     }
 
@@ -185,7 +185,11 @@ impl<'a> Printer<'a> {
         // declaration slice so the source-extracting paths never re-scan for it.
         let colon_pos = (decl.colon_offset - decl.span.start) as usize;
         let property_normalized = value_normalization::lowercase_property_name(
-            value_normalization::extract_property_name(decl_source, colon_pos),
+            value_normalization::extract_property_name(
+                decl_source,
+                colon_pos,
+                decl.has_block_comment,
+            ),
         );
         self.write(&property_normalized);
 
@@ -357,7 +361,9 @@ impl<'a> Printer<'a> {
     fn print_decl_default(&mut self, decl: &internal::CssDeclaration<'_>, property: &str) {
         // Property with comment: `color /* comment */` → ` : `
         // Property without comment: `color` → `: `
-        if property.contains("/*") {
+        // The parser-recorded `has_block_comment` is false iff the declaration holds no
+        // `/* … */` anywhere, so the property text provably has none — skip the scan.
+        if decl.has_block_comment && property.contains("/*") {
             self.write(" : ");
         } else {
             self.write(": ");

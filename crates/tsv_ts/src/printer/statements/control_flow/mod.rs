@@ -16,14 +16,32 @@ mod try_jump;
 
 use smallvec::SmallVec;
 
-use crate::ast::internal::{Expression, UnaryOperator};
+use crate::ast::internal::{Expression, Statement, UnaryOperator};
 use crate::printer::{CommentVec, Printer};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
-use tsv_lang::{Comment, comments_in_range};
+use tsv_lang::{Comment, comments_to_emit_in_range};
 
 impl<'a> Printer<'a> {
+    /// Build a control-flow *body* whose empty block form collapses (`do {} while (cond)`,
+    /// C-style `for (…) {}`). The generic `build_statement_doc` dispatch EXPANDS a
+    /// statement-position empty block to `{\n}`, so a collapse-context body must build a
+    /// `BlockStatement` directly via the collapse path; a non-block body keeps the generic
+    /// dispatch (a non-empty block is identical either way — `expand_empty` only affects the
+    /// empty case). The `while` handler and `catch` inline their own block builds (extra
+    /// close-paren handling / an always-block body), so they don't route through here.
+    fn build_collapsing_body_doc(&self, body: &Statement<'_>) -> DocId {
+        if let Statement::BlockStatement(block) = body {
+            self.build_block_statement_doc(block)
+        } else {
+            // Non-block body: its container is the control-flow statement
+            // itself, never Program/BlockStatement, so a bare string statement
+            // here is never directive-prologue eligible.
+            self.build_statement_doc(body, false)
+        }
+    }
+
     /// Partition comments between two positions into inline vs own-line.
     ///
     /// Returns `(inline_with_prev, own_line, inline_with_next)` where:
@@ -42,7 +60,7 @@ impl<'a> Printer<'a> {
         let mut own_line = SmallVec::new();
         let mut inline_next = SmallVec::new();
 
-        for comment in comments_in_range(self.comments, prev_end, next_start) {
+        for comment in comments_to_emit_in_range(self.comments, prev_end, next_start) {
             let same_line_as_prev = self.is_same_line(prev_end, comment.span.start);
             let same_line_as_next = self.is_same_line(comment.span.end, next_start);
 
@@ -60,14 +78,59 @@ impl<'a> Printer<'a> {
 
     /// Build comments between a keyword and its `(`, preserving position.
     ///
-    /// Returns a doc for comments between `keyword_end` and `open_paren` if any exist.
-    /// Example: `if/* c */(a)` → `if /* c */ (a)` (comment stays between keyword and paren)
+    /// Returns the full keyword→`(` transition (leading space included) for comments
+    /// between `keyword_end` and `open_paren`, or `None` when there are none. A block
+    /// comment glues with a trailing space (`if /* c */ ` → `if /* c */ (a)`); a line
+    /// comment trails the keyword and breaks so the `(` drops to the next line and
+    /// can't be swallowed (`if // c` + hardline → `if // c⏎(a)`). The caller pushes a
+    /// bare `(` after this (no leading space) — see [`Self::build_keyword_paren_comments`]
+    /// call sites. Prettier relocates the comment instead (into the parens for
+    /// `if`/`while`/`switch`, past the header for `for`); tsv preserves the authored
+    /// position uniformly.
     fn build_keyword_paren_comments(
         &self,
         keyword_end: u32,
         open_paren: Option<u32>,
     ) -> Option<DocId> {
-        open_paren.and_then(|op| self.build_inline_comments_between_doc_opt(keyword_end, op))
+        let op = open_paren?;
+        if !self.has_comments_to_emit_between(keyword_end, op) {
+            return None;
+        }
+        let d = self.d();
+        let mut parts = DocBuf::new();
+        for comment in comments_to_emit_in_range(self.comments, keyword_end, op) {
+            parts.push(d.text(" "));
+            parts.push(self.build_comment_doc(comment));
+            // Block: glue with a trailing space so the `(` follows directly. Line: a
+            // hardline drops the `(` to the next line so the `//` can't swallow it.
+            if comment.is_block {
+                parts.push(d.text(" "));
+            } else {
+                parts.push(d.hardline());
+            }
+        }
+        Some(d.concat(&parts))
+    }
+
+    /// Push a control-flow head opener — `keyword`, any `keyword`→`(` comment
+    /// (`keyword_comments`, which already carries its own trailing space/break), then
+    /// `(`. With no comment it emits a plain `keyword (`. Shared by `if`/`while`/
+    /// `switch`/`catch` and the plain-`for` header so the `keyword`→`(` line-comment
+    /// break is uniform (`if // c⏎(a)`) rather than swallowing the `(`.
+    fn push_keyword_open_paren(
+        &self,
+        parts: &mut DocBuf,
+        keyword: &'static str,
+        kc: Option<DocId>,
+    ) {
+        let d = self.d();
+        parts.push(d.text(keyword));
+        if let Some(kc) = kc {
+            parts.push(kc);
+            parts.push(d.text("("));
+        } else {
+            parts.push(d.text(" ("));
+        }
     }
 
     /// Build docs for comments between statement parts (e.g., between `}` and `else`).
@@ -130,7 +193,7 @@ impl<'a> Printer<'a> {
     ) {
         let d = self.d();
         parts.push(d.text(")"));
-        if self.has_comments_between(paren_end, empty_start) {
+        if self.has_comments_to_emit_between(paren_end, empty_start) {
             let has_line = self.has_line_comments_between(paren_end, empty_start);
             let comment_doc =
                 self.build_inline_comments_between_doc_no_leading_space(paren_end, empty_start);
@@ -164,7 +227,7 @@ impl<'a> Printer<'a> {
         body_start: u32,
     ) {
         let d = self.d();
-        if self.has_comments_between(paren_end, body_start) {
+        if self.has_comments_to_emit_between(paren_end, body_start) {
             let (mut inline_prev, own_line, inline_next) =
                 self.partition_comments_by_line(paren_end, body_start);
 
@@ -217,7 +280,7 @@ impl<'a> Printer<'a> {
         body_doc: DocId,
     ) -> DocId {
         let d = self.d();
-        if self.has_comments_between(paren_end, body_start) {
+        if self.has_comments_to_emit_between(paren_end, body_start) {
             let has_line = self.has_line_comments_between(paren_end, body_start);
             let comment_doc =
                 self.build_inline_comments_between_doc_no_leading_space(paren_end, body_start);
@@ -287,7 +350,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         if self.condition_should_inline_negation(test) {
             let no_comments = match (open_paren, close_paren) {
-                (Some(open), Some(close)) => !self.has_comments_between(open + 1, close),
+                (Some(open), Some(close)) => !self.has_comments_to_emit_between(open + 1, close),
                 _ => true,
             };
             if no_comments {
@@ -371,8 +434,8 @@ impl<'a> Printer<'a> {
         let test_end = test_expr.span().end;
 
         // Check for comments before and after the condition
-        let has_leading = self.has_comments_between(open_paren_pos + 1, test_start);
-        let has_trailing = self.has_comments_between(test_end, close_paren_pos);
+        let has_leading = self.has_comments_to_emit_between(open_paren_pos + 1, test_start);
+        let has_trailing = self.has_comments_to_emit_between(test_end, close_paren_pos);
 
         if !has_leading && !has_trailing {
             // No comments - use the standard condition group
@@ -388,7 +451,7 @@ impl<'a> Printer<'a> {
         // - "inline with open paren" = comment STARTS on same line as open paren
         // - "own line" = comment does NOT start on same line as open paren
         let leading_comments: CommentVec<'_> = if has_leading {
-            comments_in_range(self.comments, open_paren_pos + 1, test_start).collect()
+            comments_to_emit_in_range(self.comments, open_paren_pos + 1, test_start).collect()
         } else {
             SmallVec::new()
         };

@@ -70,9 +70,13 @@ impl<'a> Printer<'a> {
     /// If no comma is found before `upper`, the check starts at `prev_end`.
     /// Callers must pass `prev_end <= upper`.
     pub(crate) fn has_blank_line_after_comma(&self, prev_end: u32, upper: u32) -> bool {
-        let check_start = self
+        let after_comma = self
             .find_comma_in_range(prev_end, upper)
             .map_or(prev_end, |c| c + 1);
+        // The scan counts raw newlines, so it must not span a comment's bytes — including
+        // one this caller does not emit (an owned annotation leading the next element).
+        // See `blank_scan_start`.
+        let check_start = self.blank_scan_start(after_comma, upper);
         let check_end = super::calls::skip_stripped_open_paren(self.source, check_start, upper);
         self.has_blank_line_between(check_start, check_end)
     }
@@ -93,18 +97,46 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// **in source**: where a blank-line scan running *up to* `node_start` must **stop** —
+    /// at the first comment physically in `[prev_end, node_start)`, else at `node_start`.
+    ///
+    /// `has_blank_line_between*` is a raw newline count over a byte range: it cannot tell
+    /// a comment's own newlines from an author's blank line. So the scan must never span a
+    /// comment's bytes — and "a comment" here means **every** comment in the gap, not just
+    /// the ones this caller emits. An owned comment is printed by the node its token
+    /// begins, but its bytes are still in the file; a scan that skipped it would read a
+    /// multi-line annotation as a blank line the author never wrote.
+    pub(in crate::printer) fn blank_scan_end(&self, prev_end: u32, node_start: u32) -> u32 {
+        self.comments_in_source_between(prev_end, node_start)
+            .next()
+            .map_or(node_start, |c| c.span.start)
+    }
+
+    /// **in source**: where a blank-line scan running *up to* `end` must **start** — past
+    /// the last comment physically in `[start, end)`, else at `start`.
+    ///
+    /// The mirror of [`Self::blank_scan_end`], for the callers that measure the gap
+    /// *after* a comment run rather than before it (array element boundaries, the
+    /// inter-argument gap). Same rule, same reason: the scan must not span comment bytes.
+    /// Clamped to `[start, end]`.
+    pub(in crate::printer) fn blank_scan_start(&self, start: u32, end: u32) -> u32 {
+        self.comments_in_source_between(start, end)
+            .map(|c| c.span.end)
+            .max()
+            .map_or(start, |e| e.clamp(start, end))
+    }
+
     /// Find the end position including any trailing same-line comments
     ///
     /// Used to correctly detect blank lines - need to check from after trailing
     /// comments, not just after the statement.
     pub(in crate::printer) fn find_end_with_trailing_comments(&self, after_pos: u32) -> u32 {
-        let first_idx = tsv_lang::find_first_comment_from(self.comments, after_pos);
         let mut end = after_pos;
         // Track the "current line" reference — follows multi-line block comments
         // to their closing */ line (same logic as build_trailing_same_line_comment_docs)
         let mut line_ref = after_pos;
 
-        for comment in &self.comments[first_idx..] {
+        for comment in tsv_lang::comments_in_source_after(self.comments, after_pos) {
             if self.is_same_line(line_ref, comment.span.start) {
                 end = comment.span.end;
                 // Follow multi-line block comments to their closing line

@@ -42,7 +42,7 @@ use helpers::type_needs_parens_for_indexed_access_object;
 use helpers::type_needs_parens_for_optional_element;
 use helpers::type_needs_parens_for_prefix_operator;
 use smallvec::smallvec;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -239,28 +239,23 @@ impl<'a> Printer<'a> {
                     return d.concat(&parts);
                 }
                 let operand_doc = self.build_type_doc(o.type_annotation);
-                let comments_doc = self.build_comments_between(
+                // `None` on the comment-free `keyof T` / `readonly T[]` — no empty child.
+                let comments_doc = self.build_inline_comments_between_doc_trailing_space_opt(
                     keyword_end,
                     operand_start,
-                    CommentSpacing::Trailing,
                 );
-                if needs_parens {
-                    d.concat(&[
-                        d.text(o.operator.as_str()),
-                        d.text(" "),
-                        comments_doc,
-                        d.text("("),
-                        operand_doc,
-                        d.text(")"),
-                    ])
-                } else {
-                    d.concat(&[
-                        d.text(o.operator.as_str()),
-                        d.text(" "),
-                        comments_doc,
-                        operand_doc,
-                    ])
+                let mut parts: DocBuf = smallvec![d.text(o.operator.as_str()), d.text(" ")];
+                if let Some(comments) = comments_doc {
+                    parts.push(comments);
                 }
+                if needs_parens {
+                    parts.push(d.text("("));
+                    parts.push(operand_doc);
+                    parts.push(d.text(")"));
+                } else {
+                    parts.push(operand_doc);
+                }
+                d.concat(&parts)
             }
             TSType::Import(i) => self.build_import_type_doc(i),
             TSType::TypeQuery(q) => {
@@ -294,11 +289,11 @@ impl<'a> Printer<'a> {
                     return d.concat(&parts);
                 }
                 let mut parts: DocBuf = smallvec![d.text("typeof ")];
-                parts.push(self.build_comments_between(
-                    typeof_end,
-                    expr_start,
-                    CommentSpacing::Trailing,
-                ));
+                if let Some(comments) = self
+                    .build_inline_comments_between_doc_trailing_space_opt(typeof_end, expr_start)
+                {
+                    parts.push(comments);
+                }
                 parts.push(self.build_type_query_expr_name_doc(&q.expr_name));
                 if let Some(type_args) = &q.type_arguments {
                     // Preserve comments: `typeof fn/* c */ <string>`
@@ -405,7 +400,7 @@ impl<'a> Printer<'a> {
                 // Comments between label/`?` and `:` (e.g., `[b /* c */: T]`); a line
                 // comment breaks so it can't swallow the `:`.
                 if let Some(after_colon) = after_colon
-                    && self.has_comments_between(after_modifier, after_colon - 1)
+                    && self.has_comments_to_emit_between(after_modifier, after_colon - 1)
                 {
                     parts.push(
                         self.build_leading_comments_break_for_line(after_modifier, after_colon - 1),
@@ -492,7 +487,7 @@ impl<'a> Printer<'a> {
         &self,
         p: &TSParenthesizedType<'_>,
     ) -> CommentVec<'_> {
-        comments_in_range(
+        comments_to_emit_in_range(
             self.comments,
             p.span.start + 1,
             p.type_annotation.span().start,
@@ -582,7 +577,7 @@ impl<'a> Printer<'a> {
             self.build_paren_leading_value_doc(open_paren_end, arg_start, literal_doc);
 
         // Trailing comments between the specifier and `)`.
-        let has_trailing = self.has_comments_between(arg_end, paren_close);
+        let has_trailing = self.has_comments_to_emit_between(arg_end, paren_close);
         let has_trailing_line = self.has_line_comments_between(arg_end, paren_close);
 
         let mut inner = smallvec![arg_doc];
@@ -618,8 +613,8 @@ impl<'a> Printer<'a> {
     ) -> (bool, bool) {
         let inner = p.type_annotation.span();
         (
-            self.has_comments_between(p.span.start, inner.start),
-            self.has_comments_between(inner.end, p.span.end),
+            self.has_comments_to_emit_between(p.span.start, inner.start),
+            self.has_comments_to_emit_between(inner.end, p.span.end),
         )
     }
 
@@ -666,7 +661,7 @@ impl<'a> Printer<'a> {
 
         // Leading comments: between `(` and inner type
         if has_leading {
-            for comment in comments_in_range(self.comments, paren_open, inner_start) {
+            for comment in comments_to_emit_in_range(self.comments, paren_open, inner_start) {
                 if comment.is_block {
                     parts.push(self.build_comment_doc(comment));
                     parts.push(d.text(" "));
@@ -686,7 +681,7 @@ impl<'a> Printer<'a> {
 
         // Trailing comments: between inner type and `)`
         if has_trailing {
-            for comment in comments_in_range(self.comments, inner_end, paren_close) {
+            for comment in comments_to_emit_in_range(self.comments, inner_end, paren_close) {
                 if comment.is_block {
                     parts.push(d.text(" "));
                     parts.push(self.build_comment_doc(comment));

@@ -5,7 +5,8 @@ Comprehensive reference for CSS language features supported by tsv's parser and 
 ## Coverage
 
 Effectively all CSS features from stable W3C specifications are supported.
-Early-draft features that tsv does not yet parse are listed under [Future Work](#future-work).
+Early-draft features are covered under [Future Work](#future-work) — nearly all of them
+already parse via generic handling; only two constructs are rejected outright.
 
 **Scope & goals.** The north star is full **CSS-spec compliance**; the near-term,
 enforced goal is **matching Svelte's `parseCss`** (the AST canonical). SCSS/Sass,
@@ -17,9 +18,19 @@ intended end state. See ./conformance_svelte.md (§CSS Parser Scope & Error Mode
 
 **Spec References**:
 
-- CSS specs: `../../csswg-drafts/` (137 modules)
+- CSS specs: `../../csswg-drafts/`
 - Machine-readable data: `../../webref/ed/css/`
-- CSS Snapshot 2025: `../../csswg-drafts/css-2025/`
+- CSS Snapshot: `../../csswg-drafts/css-2026/` (the latest; prior years are siblings)
+
+Sections below name the spec module but not its maturity level. Maturity moves, and a
+hand-copied label rots silently — the CSS Working Group's [current
+work](https://www.w3.org/Style/CSS/current-work) page is the live source, and each
+module's `Overview.bs` carries its own `Status:` / `Work Status:`.
+
+`css-properties-values-api` (the `@property` spec) is the one module cited below that
+lives outside `csswg-drafts` — it belongs to the CSS Houdini Task Force
+([w3c/css-houdini-drafts](https://github.com/w3c/css-houdini-drafts)). The webref data
+covers it.
 
 ---
 
@@ -27,7 +38,7 @@ intended end state. See ./conformance_svelte.md (§CSS Parser Scope & Error Mode
 
 ## CSS Syntax Level 3
 
-Foundation for all CSS parsing. Spec: `css-syntax-3` (REC)
+Foundation for all CSS parsing. Spec: `css-syntax-3`
 
 ### Tokenization
 
@@ -51,7 +62,10 @@ Foundation for all CSS parsing. Spec: `css-syntax-3` (REC)
 - CSS comments (`/* comment */`)
 - Multi-line comments
 - Comments in selectors
-- Comments in `:nth-*()` args (An+B gaps, around `of`, after the `of` list; a comment inside the An+B text freezes it verbatim)
+- Comments in `:nth-*()` args — before or after the An+B term, around `of`, and after the
+  `of` list. A trailing comment inside the parens freezes the An+B text verbatim (`2n+1`
+  keeps its authored spacing instead of normalizing to `2n + 1`). A comment *splitting* the
+  An+B term (`:nth-child(2n /* c */ + 1)`) is not supported — see [Future Work](#not-parsed)
 - Comments in `::slotted()` / `::part()` / unknown-pseudo args (leading/trailing gaps preserved; the interior positions — between `::part()` names, or `::slotted()` compound-internal — are rejected by parseCss but preserved + normalized by tsv, a `_svelte_prettier_divergence`)
 - Comments in `:dir()` / `:lang()` / `::highlight()` identifier args (leading/trailing gaps preserved + normalized; parseCss accepts → a `_prettier_divergence`)
 - Comments in declarations
@@ -74,7 +88,7 @@ Foundation for all CSS parsing. Spec: `css-syntax-3` (REC)
 
 ## CSS Selectors Level 4
 
-Spec: `selectors-4` (CR - core features in REC via CSS2.1)
+Spec: `selectors-4` (core features are REC via CSS2.1)
 
 ### Basic Selectors
 
@@ -127,6 +141,7 @@ Spec: `selectors-4` (CR - core features in REC via CSS2.1)
 - `:nth-last-child(An+B)`
 - `:nth-of-type(An+B)`
 - `:nth-last-of-type(An+B)`
+- `:nth-col(An+B)`, `:nth-last-col(An+B)` - Level 4, table columns
 - `:nth-child(An+B of selector)` - Level 4
 
 ### Logical Pseudo-Classes
@@ -196,7 +211,7 @@ Parsed via generic pseudo-class handling.
 
 ### Pseudo-Elements (Shadow DOM)
 
-Spec: CSS Scoping Level 1
+Spec: `css-shadow-1` (CSS Shadow Module Level 1 — the module formerly named CSS Scoping Level 1, which also absorbed CSS Shadow Parts; `css-scoping-1` is now a redirect)
 
 - `::slotted(selector)`
 - `::part(name)`
@@ -216,7 +231,7 @@ Parsed via generic pseudo-element handling.
 
 ## CSS Values and Units
 
-Specs: `css-values-3` (REC), `css-values-4` (CR)
+Specs: `css-values-3`, `css-values-4`
 
 ### Numbers and Dimensions
 
@@ -234,18 +249,18 @@ Specs: `css-values-3` (REC), `css-values-4` (CR)
 
 - `em`, `rem`, `ex`, `ch`
 - `cap`, `ic`, `lh`, `rlh` (Level 4)
+- Root-relative: `rex`, `rch`, `rcap`, `ric` (Level 4)
 
 ### Viewport Units
 
-- `vw`, `vh`, `vmin`, `vmax`
-- Small viewport: `svw`, `svh`, `svmin`, `svmax` (Level 4)
-- Large viewport: `lvw`, `lvh`, `lvmin`, `lvmax` (Level 4)
-- Dynamic viewport: `dvw`, `dvh`, `dvmin`, `dvmax` (Level 4)
-- Logical viewport: `vi`, `vb` (Level 4)
+- `vw`, `vh`, `vmin`, `vmax`, and the logical `vi`, `vb` (Level 4)
+- Small viewport: `svw`, `svh`, `svi`, `svb`, `svmin`, `svmax` (Level 4)
+- Large viewport: `lvw`, `lvh`, `lvi`, `lvb`, `lvmin`, `lvmax` (Level 4)
+- Dynamic viewport: `dvw`, `dvh`, `dvi`, `dvb`, `dvmin`, `dvmax` (Level 4)
 
 ### Container Query Units
 
-Spec: `css-contain-3` (CR)
+Spec: `css-conditional-5` (container queries and their units moved here; `css-contain-3` is now a placeholder)
 
 - `cqw`, `cqh`, `cqi`, `cqb`, `cqmin`, `cqmax`
 
@@ -254,7 +269,8 @@ Spec: `css-contain-3` (CR)
 - Angles: `deg`, `rad`, `turn`, `grad`
 - Time: `s`, `ms`
 - Frequency: `hz`, `khz`
-- Resolution: `dpi`, `dppx`, `dpcm`
+- Resolution: `dpi`, `dppx`, `dpcm`, `x` (the `dppx` alias)
+- Flex/grid fraction: `fr`
 - Ratio: `16/9`, `4/3`
 
 ### Math Functions
@@ -298,7 +314,7 @@ Spec: `css-contain-3` (CR)
 
 ## CSS Custom Properties
 
-Spec: `css-variables-1` (CR)
+Spec: `css-variables-1`
 
 - Custom property declaration (`--name: value`)
 - Empty custom property (`--name:;`) — value grammar is `<declaration-value>?`;
@@ -320,7 +336,7 @@ Spec: `css-variables-1` (CR)
 
 ## CSS Colors
 
-Specs: `css-color-3` (REC), `css-color-4` (CR), `css-color-5` (WD - widely shipped)
+Specs: `css-color-3`, `css-color-4`, `css-color-5` (Level 5 is widely shipped)
 
 ### Named Colors
 
@@ -364,9 +380,18 @@ Specs: `css-color-3` (REC), `css-color-4` (CR), `css-color-5` (WD - widely shipp
 
 ## CSS At-Rules
 
-> **Note**: Condition at-rules (`@media`, `@supports`, `@container`) use partial structured parsing - outer structure (connectors, modifiers) is parsed while inner conditions remain as strings. Full structured parsing (range syntax, media features) may be added for tooling use cases (linting, type checking).
+> **Note**: At-rule preludes are parsed at three levels. **Structured**: `@supports` and
+> `@container` (conditions, for line-width wrapping — with a raw fallback when the prelude
+> isn't a valid condition), `@import` (url/string + `layer()`/`supports()`/media, falling back
+> to raw when it doesn't lead with a url/string), and `@scope` (forgiving selector lists).
+> **Raw text**: `@media` — kept verbatim to preserve comments, with the printer locating
+> `and`/`or` boundaries at print time for wrapping. **Raw text** likewise for everything else
+> (`@keyframes`, `@layer`, `@page`, …), since they have no `property: value` / media-query
+> grammar; `@namespace` is the exception that takes a normalizing path. In every case the
+> public AST stays source-verbatim. Full structured parsing (range syntax, media features) may
+> be added for tooling use cases (linting, type checking).
 
-### Core At-Rules (REC)
+### Core At-Rules
 
 - `@charset`
 - `@import` (basic)
@@ -377,34 +402,34 @@ Specs: `css-color-3` (REC), `css-color-4` (CR), `css-color-5` (WD - widely shipp
 - `@font-face`
 - `@keyframes`
 
-### Conditional Rules (CR)
+### Conditional Rules
 
 - `@media` with boolean logic (`and`, `or`, `not`)
 - `@media` range syntax (`width >= 768px`)
 - `@supports` (feature queries)
 - `@supports selector()`
 
-### Cascade Layers (CR)
+### Cascade Layers
 
 - `@layer`
 - `@import` with `layer()` condition
 - `@import` with `supports()` condition
 
-### Container Queries (CR)
+### Container Queries
 
-Spec: `css-contain-3`
+Spec: `css-conditional-5` (which also adds `@when` / `@else`)
 
 - `@container`
 - `@container` with logical operators
 
-### Custom Properties API (CR)
+### Custom Properties API
 
-Spec: `css-properties-values-api-1`
+Spec: `css-properties-values-api`
 
 - `@property` at-rule
 - `syntax`, `inherits`, `initial-value` descriptors
 
-### Anchor Positioning (CR)
+### Anchor Positioning
 
 Spec: `css-anchor-position-1` (Chromium shipped)
 
@@ -425,15 +450,17 @@ Spec: `css-anchor-position-1` (Chromium shipped)
 
 Parsed via generic at-rule handling.
 
-- `@when` (Conditional Rules Level 5)
+- `@when`, `@else` (Conditional Rules Level 5)
 - `@view-transition`
-- Vendor-prefixed at-rules (`@-webkit-*`, `@-moz-*`)
+- Vendor-prefixed at-rules (`@-webkit-*`, `@-moz-*`) — except the `@keyframes` family
+  (`@-webkit-keyframes`, `@-moz-keyframes`, `@-o-keyframes`, `@-ms-keyframes`), which
+  gets the same structured keyframe-selector block parsing as bare `@keyframes`
 
 ---
 
 ## CSS Nesting
 
-Spec: `css-nesting-1` (CR - widely shipped)
+Spec: `css-nesting-1` (widely shipped)
 
 - Nesting selector `&`
 - `&` with combinators (`& > .child`)
@@ -452,7 +479,7 @@ Spec: `css-nesting-1` (CR - widely shipped)
 
 ### Gradients
 
-Spec: `css-backgrounds-3` (CR)
+Spec: `css-images-3`
 
 - `linear-gradient()`
 - `radial-gradient()`
@@ -461,7 +488,7 @@ Spec: `css-backgrounds-3` (CR)
 
 ### Images
 
-Specs: `css-images-3` (CR), `css-images-4`
+Specs: `css-images-3`, `css-images-4`
 
 - `conic-gradient()`, `repeating-conic-gradient()`
 - `image-set()`
@@ -469,7 +496,7 @@ Specs: `css-images-3` (CR), `css-images-4`
 
 ### 2D Transforms
 
-Spec: `css-transforms-1` (CR)
+Spec: `css-transforms-1`
 
 - `translate()`, `translateX()`, `translateY()`
 - `scale()`, `scaleX()`, `scaleY()`
@@ -479,7 +506,7 @@ Spec: `css-transforms-1` (CR)
 
 ### 3D Transforms
 
-Spec: `css-transforms-1` (CR)
+Spec: `css-transforms-2`
 
 - `translate3d()`, `translateZ()`
 - `scale3d()`, `scaleZ()`
@@ -489,13 +516,13 @@ Spec: `css-transforms-1` (CR)
 
 ### Individual Transform Properties
 
-Spec: `css-transforms-2` (CR)
+Spec: `css-transforms-2`
 
 - `translate`, `scale`, `rotate` properties
 
 ### Filter Effects
 
-Spec: `filter-effects-1` (CR)
+Spec: `filter-effects-1`
 
 - `blur()`, `brightness()`, `contrast()`
 - `drop-shadow()`, `grayscale()`, `hue-rotate()`
@@ -503,23 +530,28 @@ Spec: `filter-effects-1` (CR)
 
 ### Shapes
 
-Spec: `css-shapes-1` (CR)
+Spec: `css-shapes-1`
 
 - `circle()`, `ellipse()`, `polygon()`, `inset()`
 - `path()` (SVG path syntax)
 
 ### Grid Functions
 
-Spec: `css-grid-1` (CR)
+Spec: `css-grid-1`
 
 - `minmax()`
 - `repeat()`
 - `fit-content()`
 - Named grid lines (`[name]`)
+- Multi-row string values on `grid` / `grid-template*` are **source-position-dependent** —
+  the one place CSS formatting reads the author's line breaks. Consecutive string values
+  written on different source lines wrap one-per-line; the same values written inline stay
+  inline (`grid-template-areas: 'a a' 'b b'`). Matches prettier
+  (`comma-separated-value-group.js`)
 
 ### Easing Functions
 
-Spec: `css-easing-1` (CR)
+Spec: `css-easing-1`
 
 - `linear` keyword
 - `ease`, `ease-in`, `ease-out`, `ease-in-out` keywords
@@ -530,14 +562,14 @@ Spec: `css-easing-1` (CR)
 
 ### Scroll-Driven Animations
 
-Spec: `scroll-animations-1` (WD - Chromium shipped)
+Spec: `scroll-animations-1` (Chromium shipped)
 
 - `scroll()` function
 - `view()` function
 
 ### Environment Variables
 
-Spec: `css-env-1` (WD - widely supported)
+Spec: `css-env-1` (widely supported)
 
 - `env()` function
 - Safe area insets
@@ -568,98 +600,50 @@ Features that parse correctly through generic handling.
 
 # Future Work
 
-Early-draft features tsv does not yet parse. All specs are Editor's Drafts (ED) with "Exploring" or "Revising" work status.
+## Not Parsed
 
-## CSS Mixins Level 1
+The constructs tsv rejects outright:
 
-Spec: `css-mixins-1` (ED - Exploring)
+- Reference combinator (`/ref/`, `selectors-5`) for IDREF-based relationships — no parse support
+- A comment splitting an An+B term (`:nth-child(2n /* c */ + 1)`) — rejected, matching
+  `parseCss`. Per css-syntax-3 §4 comments are removed at tokenization and produce no token,
+  so the spec accepts this (prettier does too); the An+B microsyntax reads frozen source text
+  and so can't see through the comment. The surrounding positions are supported — see
+  [Comments](#comments)
 
-Chrome has announced intent to implement.
+## Parsed Generically, Not Modeled
 
-- `@function` at-rule
-- Dashed-function syntax (`--custom-fn()`)
-- `@return` inside functions
-- `@mixin`, `@apply` (planned)
+Everything below **parses today** — the generic at-rule, pseudo-class/element, and
+declaration-value paths accept it, format it, and round-trip it. What it lacks is
+*structural* modeling, which is the same footing as `@view-transition`,
+`contrast-color()`, and the [Modern Pseudo-Classes](#modern-pseudo-classes-level-4)
+already listed under Supported.
 
-## CSS Grid Level 3 - Masonry
+For the value-level entries that is the intended end state rather than a gap:
+a declaration value is a balanced token scan and
+[property value validation is out of scope](#out-of-scope), so a new function needs
+no per-function grammar. The list exists because these specs are still unstable —
+if a construct ever earns dedicated modeling (a real AST shape, not just acceptance),
+the spec settling is the gate.
 
-Spec: `css-grid-3` (ED - Revising)
+| Spec | Constructs |
+| --- | --- |
+| CSS Mixins 1 (`css-mixins-1`) | `@function` (with its `result:` descriptor, parameters, and `returns` type), dashed-function calls (`--custom-fn()`), `@mixin`, `@apply`, `@contents` |
+| CSS Grid 3 (`css-grid-3`) | `display: grid-lanes` / `inline-grid-lanes`, `flow-tolerance` — ordinary value keywords and a generic declaration. (This is the module formerly specced as `grid-template-*: masonry`; the CSSWG renamed the model to *grid lanes*, and the `masonry-*` anchors survive only as `oldids`.) |
+| CSS Selectors 5 (`selectors-5`) | `:local-link(n)`, `:state(identifier)`, `:heading`, `:heading(level)` |
+| CSS Conditional Rules 5 (`css-conditional-5`) | `@when`, `@else` |
+| CSS Easing 2 (`css-easing-2`) | `linear()` with control points |
+| CSS Values 5 (`css-values-5`) | `attr()` with type casting/fallbacks, `calc-size()`, `progress()`, `random()`, `first-valid()`, `if()`, `toggle()`, `sibling-count()`, `sibling-index()` |
+| CSS Color 6 (`css-color-6`) | `color-layers()`, `contrast-color()` |
+| CSS View Transitions 2 (`css-view-transitions-2`) | Cross-document transitions — no new syntax over the Level 1 `@view-transition` |
+| CSS Conditional Values 1 (`css-conditional-values-1`) | `true` / `false` values, comparison operators in values, boolean logic in values |
+| CSS Forms 1 (`css-forms-1`) | `appearance: base`, `::picker()`, `::field-text`, `::clear-icon` |
 
-Firefox has an experimental implementation.
-
-- `grid-template-*: masonry`
-
-## CSS Selectors Level 5
-
-Spec: `selectors-5` (ED - Exploring)
-
-- `:local-link(n)` functional form
-- `:state(identifier)` for custom element states
-- `:heading` pseudo-class (matches all heading elements)
-- `:heading(level)` functional form (matches specific heading levels)
-- Reference combinator (`/ref/`) for IDREF-based relationships
-
-## CSS Conditional Rules Level 5
-
-Spec: `css-conditional-5` (ED - Exploring)
-
-- `@when` generalized conditional rule
-- `@else` chained conditional rule
-
-## CSS Easing Functions Level 2
-
-Spec: `css-easing-2` (ED - Revising)
-
-- `linear()` function with control points
-
-## CSS Values and Units Level 5
-
-Spec: `css-values-5` (ED - Exploring)
-
-New functions for advanced value manipulation:
-
-- `attr()` enhanced with type casting and fallbacks
-- `calc-size()` for intrinsic size calculations
-- `progress()` for progress interpolation
-- `random()` for random values
-- `first-valid()` for fallback chains
-- `if()` for conditional values
-- `toggle()` for cycling values
-- `sibling-count()`, `sibling-index()` for sibling-based values
-
-## CSS Color Level 6
-
-Spec: `css-color-6` (ED - Exploring)
-
-Note: `contrast-color()` already works via generic function parsing.
-
-- `color-layers()`
-
-## CSS View Transitions Level 2
-
-Spec: `css-view-transitions-2` (ED - Exploring)
-
-Note: `@view-transition` already works via generic at-rule parsing.
-
-- Cross-document transitions
-
-## CSS Conditional Values
-
-Spec: `css-conditional-values-1` (UD - Exploring)
-
-Very early stage - "Unofficial Draft" status.
-
-- `true` and `false` CSS values
-- Comparison operators in values
-- Boolean logic in values
-
-## CSS Forms Level 1
-
-Spec: `css-forms-1` (ED - Exploring)
-
-- `appearance: base`
-- `::picker()` pseudo-element
-- `::field-text`, `::clear-icon`
+An unknown pseudo-class/element argument is not held opaque — `parse_unknown_args` first
+tries the content as a complex selector list and only falls back to a paren-balanced raw
+skip. So `:state(foo)`'s `foo` lands as a `TypeSelector` and `:heading(1)`'s `1` as an
+`Nth`. That is not a divergence: `parseCss` produces the identical shape, and matching it
+is the enforced goal.
 
 ---
 
@@ -668,7 +652,10 @@ Spec: `css-forms-1` (ED - Exploring)
 These are outside the parser/formatter's responsibility:
 
 - Preprocessor languages (Sass/SCSS, Less, Stylus) and PostCSS plugin syntax
-- CSS Modules (`:global`, `composes`) and YAML front-matter
+- CSS Modules (stylesheet-mode `:global`, `composes`) and YAML front-matter. This is the
+  **CSS Modules** `:global`, not Svelte's — Svelte's `:global(…)` selector and `:global`
+  block are supported and get structured selector-list parsing (the same grammar as
+  `:not()`); see [checklist_svelte.md](./checklist_svelte.md)
 - IE / legacy-browser hacks (`*zoom`, `_width`, `+color`, `color: red\9`)
 - CSS-in-JS patterns (styled-components, emotion)
 - Houdini APIs (CSS Paint API, Layout API, Properties API runtime)
@@ -685,9 +672,19 @@ Parse output matches Svelte's `parseCss` and formatting matches Prettier, except
 
 ## Intentional Differences (Spec-Compliant Improvements)
 
-Places where tsv is more correct than Svelte's parser:
+Places where tsv is more correct than Svelte's parser. The authoritative catalog —
+each entry with its reasoning and fixture — is [conformance_svelte.md §CSS
+Corrections](conformance_svelte.md#css-corrections); the classes are:
 
-- `:nth-child(An+B of selector)` - full complex selector list parsing
-- Attribute namespace syntax (`[svg|href]`, `[*|attr]`, `[|attr]`)
-- Pseudo-element arguments (`::slotted()`, `::part()`) - internal parsing with Svelte-compatible public output
-- No-namespace selector syntax (`|div`, `|*`) - Svelte doesn't support
+- An+B microsyntax — `of S` nesting, spec-valid negative forms (`-3`, `-2n`, `-n-3`),
+  and leading-`-n` forms that `parseCss` rejects or mis-parses
+- Comments as inter-token trivia — at combinator boundaries, glued inside a compound,
+  between `::part()` names, and in `:nth-*()` argument positions
+- Consecutive combinators (`> > .a`) — preserved rather than collapsed to the last
+- Namespaces — attribute namespaces (`[svg|href]`, `[*|attr]`, `[|attr]`) and
+  no-namespace selectors (`|div`, `|*`), neither of which Svelte supports
+- Forgiving `:is()` / `:where()` — invalid items dropped, not a whole-parse failure
+- `;` inside a balanced construct — a function value, a simple block, a `var()`
+  fallback, or an `@supports` `<general-enclosed>` — is content, not a terminator
+- Pseudo-element arguments (`::slotted()`, `::part()`) — internal parsing with
+  Svelte-compatible public output

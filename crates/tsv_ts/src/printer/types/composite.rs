@@ -8,7 +8,7 @@
 // - Type queries: `typeof x`
 // - Entity names: `A.B.C`
 
-use super::super::comments_in_range;
+use super::super::comments_to_emit_in_range;
 use super::helpers::{
     should_hug_union_type, type_needs_parens_for_array_element,
     type_needs_parens_for_conditional_check, type_needs_parens_for_conditional_extends,
@@ -44,9 +44,21 @@ impl<'a> Printer<'a> {
         let true_type_end = c.true_type.span().end;
         let false_type_start = c.false_type.span().start;
 
-        // Find ? and : token positions for comment categorization
-        let question_pos = self.find_char_outside_comments(extends_type_end, true_type_start, b'?');
-        let colon_pos = self.find_char_outside_comments(true_type_end, false_type_start, b':');
+        // Find ? and : token positions for comment categorization. These positions only
+        // bound the comment scans below, so a conditional type with no comment anywhere in
+        // the extends→false-branch span skips both position scans — `None` collapses to the
+        // same empty comment docs a comment-free `Some` would (the arm builder emits nothing
+        // for `None`, and every `needs_breaking` term that consults them scans a comment-free
+        // sub-range either way). Paren-leading-line-comment terms below stay independent.
+        let (question_pos, colon_pos) =
+            if self.has_comments_to_emit_between(extends_type_end, false_type_start) {
+                (
+                    self.find_char_outside_comments(extends_type_end, true_type_start, b'?'),
+                    self.find_char_outside_comments(true_type_end, false_type_start, b':'),
+                )
+            } else {
+                (None, None)
+            };
 
         // Check for comments that force breaking layout.
         // Line comments anywhere in the conditional force breaking (they end the line).
@@ -72,9 +84,9 @@ impl<'a> Printer<'a> {
         );
         let has_breaking_comments_around_question = self
             .has_line_comments_between(extends_type_end, true_type_start)
-            || self.has_multiline_block_comments_between(extends_type_end, true_type_start)
+            || self.has_multiline_block_comments_on_page_between(extends_type_end, true_type_start)
             || question_pos.is_some_and(|q| {
-                tsv_lang::has_comments_in_range(self.comments, extends_type_end, q)
+                tsv_lang::has_comments_to_emit_in_range(self.comments, extends_type_end, q)
             })
             // A single-line block comment in the `?`→branch gap (own-line or trailing)
             // collapses inline (`? /* c */ B`) — the branch loop pulls the comment to
@@ -85,7 +97,7 @@ impl<'a> Printer<'a> {
         let colon_end = colon_pos.map_or(true_type_end, |c| c + 1);
         let has_breaking_comments_after_colon = self
             .has_line_comments_between(colon_end, false_type_start)
-            || self.has_multiline_block_comments_between(colon_end, false_type_start)
+            || self.has_multiline_block_comments_on_page_between(colon_end, false_type_start)
             || false_paren_has_leading_line_comment;
         // Trailing line comments on true_type also force breaking (they end the line)
         let has_trailing_line_comment_on_true =
@@ -365,6 +377,37 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Emit the comments in a conditional-type branch gap — between `?` and the
+    /// true branch, or between `:` and the false branch — into `parts`, returning
+    /// whether the branch type must itself drop to its own indented line.
+    ///
+    /// The first comment trails the operator (` // c`); a line comment ends its
+    /// line, so each subsequent comment drops to its own indented line rather than
+    /// merging onto the operator's line (`// c1 // c2` would reparse as a single
+    /// comment — a boundary loss). A single-line block stays inline (in-place
+    /// collapse). A line comment or a multiline block forces the branch onto its
+    /// own line (`needs_indent`). The `?`- and `:`-branch loops share this so they
+    /// can't drift.
+    fn push_conditional_branch_gap_comments(&self, parts: &mut DocBuf, from: u32, to: u32) -> bool {
+        let d = self.d();
+        let mut needs_indent = false;
+        let mut prev_was_line_comment = false;
+        for comment in comments_to_emit_in_range(self.comments, from, to) {
+            if prev_was_line_comment {
+                parts.push(d.hardline());
+                parts.push(d.text(INDENT));
+            } else {
+                parts.push(d.text(" "));
+            }
+            parts.push(self.build_comment_doc(comment));
+            if !comment.is_block || comment.multiline {
+                needs_indent = true;
+            }
+            prev_was_line_comment = !comment.is_block;
+        }
+        needs_indent
+    }
+
     /// Build conditional type doc when comments force a breaking layout.
     /// This handles: line comments, multiline block comments, and comments
     /// before `?` or `:` operators.
@@ -443,7 +486,7 @@ impl<'a> Printer<'a> {
         // (before the hardline that ends extends_type's line). Also includes
         // relocated leading line comments from inside true_type's parens.
         let mut trailing_on_extends_parts: DocBuf = DocBuf::new();
-        for comment in comments_in_range(self.comments, extends_type_end, before_q_end) {
+        for comment in comments_to_emit_in_range(self.comments, extends_type_end, before_q_end) {
             trailing_on_extends_parts.push(self.build_trailing_comment_doc(comment));
         }
         for comment in &true_paren_leading_line_comments {
@@ -456,17 +499,9 @@ impl<'a> Printer<'a> {
         q_parts.push(d.hardline());
         q_parts.push(d.text("?"));
 
-        // Comments AFTER the `?` token — emit between `?` and the true branch. A line
-        // comment or a multiline block drops the branch onto its own (indented) line;
-        // a single-line block stays inline on the `?` arm (in-place collapse).
-        let mut needs_indent_before_true = false;
-        for comment in comments_in_range(self.comments, after_q_start, true_type_start) {
-            q_parts.push(d.text(" "));
-            q_parts.push(self.build_comment_doc(comment));
-            if !comment.is_block || comment.multiline {
-                needs_indent_before_true = true;
-            }
-        }
+        // Comments AFTER the `?` token — emit between `?` and the true branch.
+        let needs_indent_before_true =
+            self.push_conditional_branch_gap_comments(&mut q_parts, after_q_start, true_type_start);
         q_parts.push(self.build_conditional_branch_tail_doc(
             c.true_type,
             true_type_doc,
@@ -477,7 +512,7 @@ impl<'a> Printer<'a> {
         // Also includes relocated leading line comments from inside false_type's parens.
         let colon = self.find_char_outside_comments(true_type_end, false_type_start, b':');
         if let Some(c_pos) = colon {
-            for comment in comments_in_range(self.comments, true_type_end, c_pos) {
+            for comment in comments_to_emit_in_range(self.comments, true_type_end, c_pos) {
                 q_parts.push(self.build_trailing_comment_doc(comment));
             }
         }
@@ -491,22 +526,8 @@ impl<'a> Printer<'a> {
 
         // Comments after : only (between : and false_type)
         let colon_end = colon.map_or(true_type_end, |c| c + 1);
-        let mut needs_indent_before_false = false;
-        let mut prev_was_line_comment = false;
-        for comment in comments_in_range(self.comments, colon_end, false_type_start) {
-            if prev_was_line_comment {
-                // Line comments end the line, so subsequent comments need a new line
-                q_parts.push(d.hardline());
-                q_parts.push(d.text(INDENT));
-            } else {
-                q_parts.push(d.text(" "));
-            }
-            q_parts.push(self.build_comment_doc(comment));
-            if !comment.is_block || comment.multiline {
-                needs_indent_before_false = true;
-            }
-            prev_was_line_comment = !comment.is_block;
-        }
+        let needs_indent_before_false =
+            self.push_conditional_branch_gap_comments(&mut q_parts, colon_end, false_type_start);
         q_parts.push(self.build_conditional_branch_tail_doc(
             c.false_type,
             false_type_doc,
@@ -562,9 +583,9 @@ impl<'a> Printer<'a> {
         )
         .map_or(param_name_start, |p| p as u32);
         let leading_comments: CommentVec<'_> =
-            comments_in_range(self.comments, content_start, bracket_pos).collect();
+            comments_to_emit_in_range(self.comments, content_start, bracket_pos).collect();
         let bracket_inner_comments: CommentVec<'_> =
-            comments_in_range(self.comments, bracket_pos + 1, param_name_start).collect();
+            comments_to_emit_in_range(self.comments, bracket_pos + 1, param_name_start).collect();
 
         // Leading comments (before `[`): the node-adjacent (LAST) comment stays
         // inline iff it's a block comment with no newline after it; every earlier
@@ -716,7 +737,7 @@ impl<'a> Printer<'a> {
             // Comments between `]` (or `?`/`+?`/`-?`) and value type
             // Start from bracket_close to avoid double-counting pre-bracket comments
             let comments_before_value: CommentVec<'_> =
-                comments_in_range(self.comments, bracket_close, type_start).collect();
+                comments_to_emit_in_range(self.comments, bracket_close, type_start).collect();
 
             body_parts.push(d.text(":"));
 
@@ -777,7 +798,7 @@ impl<'a> Printer<'a> {
             // end-of-line *after* the `;` (`V; // c`) instead of swallowing it —
             // the `;` is emitted separately by the multiline/one-line branch below.
             let body_end = m.span.end.saturating_sub(1); // before `}`
-            for comment in comments_in_range(self.comments, type_end, body_end) {
+            for comment in comments_to_emit_in_range(self.comments, type_end, body_end) {
                 body_parts.push(self.build_trailing_comment_doc(comment));
             }
         } else {
@@ -785,7 +806,7 @@ impl<'a> Printer<'a> {
             // optional modifier) still trail the member the same way — dropping
             // through without collecting them would lose content.
             let body_end = m.span.end.saturating_sub(1); // before `}`
-            for comment in comments_in_range(self.comments, bracket_close, body_end) {
+            for comment in comments_to_emit_in_range(self.comments, bracket_close, body_end) {
                 body_parts.push(self.build_trailing_comment_doc(comment));
             }
         }
@@ -850,7 +871,7 @@ impl<'a> Printer<'a> {
         // comment there the expansion checks are provably false and the list is
         // plain elements joined by `,` + line (renders identically — the skipped
         // pushes are empty comment docs and the empty after-comma buffer).
-        if !self.has_comments_between(t.span.start, t.span.end) {
+        if !self.has_comments_to_emit_between(t.span.start, t.span.end) {
             let mut parts = DocBuf::new();
             for (i, elem) in t.element_types.iter().enumerate() {
                 if i > 0 {

@@ -11,31 +11,56 @@ mod splitting;
 pub(crate) use colors::format_color_from_source;
 pub(crate) use numbers::normalize_dimension_from_source;
 pub(crate) use splitting::{
-    extract_function_args, normalize_css_whitespace, split_args_by_comma,
+    collapse_whitespace_runs, extract_function_args, normalize_css_whitespace, split_args_by_comma,
     split_by_space_preserving_parens,
 };
 
 use std::borrow::Cow;
 
+use crate::color::is_hex_color_body;
 use numbers::{canonical_unit, is_known_css_unit, normalize_css_number};
 use tsv_lang::printing::format_string_literal;
 
 /// Normalize CSS numbers and string quotes within a raw prelude string,
 /// mirroring prettier's `adjustNumbers(adjustStrings(...))` for at-rule preludes
-/// it parses as values (`@media`/`@supports`). `/* */` comments and `#`-prefixed
-/// tokens (hex colors) are copied verbatim. A number is normalized only when it
-/// isn't part of an identifier (`min-width` is untouched) and its trailing unit
-/// is a known CSS unit or empty (so `1abc` is left alone); unit casing is
-/// preserved. Quoted strings get prettier's quote normalization (prefer single,
-/// swapping only to minimize escaping) — `@container`, which isn't value-parsed,
-/// never reaches this function so its prelude stays raw.
-pub(crate) fn normalize_value_text(input: &str) -> String {
+/// it parses as values (`@media`/`@supports`/`@import`). `/* */` comments are
+/// copied verbatim. A number is normalized only when it isn't part of an
+/// identifier (`min-width` is untouched) and its trailing unit is a known CSS
+/// unit or empty (so `1abc` is left alone); unit casing is preserved. Quoted
+/// strings get prettier's quote normalization (prefer single, swapping only to
+/// minimize escaping) — `@container`, which isn't value-parsed, never reaches
+/// this function so its prelude stays raw.
+///
+/// `#`-prefixed tokens: when `lowercase_hex` is set (only `@supports`, whose
+/// condition parts are real declarations), a hex **color** — `#` + exactly 3, 4,
+/// 6, or 8 ASCII hex digits — is lowercased (`#FFF` → `#fff`), matching prettier.
+/// Any other `#`-token — an off-length run (`#ABCDE`), a non-hex token, or one
+/// inside a `selector(...)` group (a case-sensitive ID selector) — is copied
+/// verbatim, as is every `#`-token under `@media`/`@import` (`lowercase_hex` off),
+/// where prettier preserves case.
+///
+/// An unquoted `url(...)` is a `<url-token>` — opaque per CSS Syntax 3 §4.3.6, so
+/// its whole content is copied verbatim regardless of `lowercase_hex` (a path like
+/// `url(sprite1.50.png)` is never number/unit-normalized). A quoted `url("…")` is a
+/// function with a `<string>` arg and takes normal quote normalization.
+pub(crate) fn normalize_value_text(input: &str, lowercase_hex: bool) -> String {
     let bytes = input.as_bytes();
     let mut out = String::with_capacity(input.len());
     let mut i = 0;
+    // `url(...)`/`selector(...)` context tracking, consulted only for `#`-tokens:
+    // `preserve_from` is `Some(depth)` while inside the outermost such group, so a
+    // `#`-token there is preserved rather than lowercased as a hex color.
+    let mut paren_depth = 0usize;
+    let mut preserve_from: Option<usize> = None;
+    // Whether the identifier just emitted was `url`/`selector`, so a `(` that
+    // immediately follows opens a preserve group (a CSS function token requires the
+    // `(` to abut the name — any char between, incl. whitespace, breaks it).
+    let mut prev_ident_preserve_fn = false;
 
     while i < bytes.len() {
         let b = bytes[i];
+        let after_preserve_ident = prev_ident_preserve_fn;
+        prev_ident_preserve_fn = false;
 
         // Normalize quoted-string quotes (handling backslash escapes). A properly
         // closed string runs through prettier's quote chooser; an unterminated run
@@ -66,14 +91,11 @@ pub(crate) fn normalize_value_text(input: &str) -> String {
             continue;
         }
 
-        // Copy block comments verbatim.
+        // Copy block comments verbatim (shares `skip_block_comment` with the
+        // media-feature scanner below — one definition of a comment's extent).
         if b == b'/' && bytes.get(i + 1) == Some(&b'*') {
             let start = i;
-            i += 2;
-            while i < bytes.len() && !(bytes[i] == b'*' && bytes.get(i + 1) == Some(&b'/')) {
-                i += 1;
-            }
-            i = (i + 2).min(bytes.len());
+            i = skip_block_comment(input, i);
             out.push_str(&input[start..i]);
             continue;
         }
@@ -94,15 +116,39 @@ pub(crate) fn normalize_value_text(input: &str) -> String {
                     break;
                 }
             }
-            out.push_str(&input[start..i]);
+            let ident = &input[start..i];
+            out.push_str(ident);
+
+            // An unquoted `url(...)` is a `<url-token>` — opaque per CSS Syntax 3
+            // §4.3.6, so its content (a path, maybe with number/unit-looking runs like
+            // `sprite1.50.png`) is copied verbatim, never number/unit-normalized. A
+            // quoted `url("…")` is instead a function with a `<string>` arg; it flows
+            // through the normal string branch (quote normalization), so leave it.
+            if ident.eq_ignore_ascii_case("url")
+                && bytes.get(i) == Some(&b'(')
+                && !url_arg_is_quoted(input, i)
+            {
+                out.push_str(consume_paren_group(input, &mut i));
+                continue;
+            }
+
+            // A `selector(...)` that immediately follows opens a hex-preserve group:
+            // an ID selector's `#` is case-sensitive (numbers inside stay on the normal
+            // path — the documented `selector()` over-normalization).
+            prev_ident_preserve_fn = ident.eq_ignore_ascii_case("selector");
             continue;
         }
 
-        // Copy `#`-prefixed tokens (hex colors) verbatim so exponent-looking
-        // hex like `#1e2` isn't mangled.
+        // A `#`-prefixed token. A hex color (`#` + 3/4/6/8 hex digits) in an
+        // `@supports` value lowercases (matching prettier); everything else — an
+        // off-length run, a non-hex token, exponent-looking hex under
+        // `@media`/`@import`, or a `#` inside a `selector(...)` group (a case-sensitive
+        // ID) — is copied verbatim (so `#1e2` isn't mangled and IDs survive). An
+        // unquoted `url(...)` never reaches here (opaque, consumed above).
         if b == b'#' {
             let start = i;
             i += 1;
+            let body_start = i;
             while let Some(c) = input[i..].chars().next() {
                 if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
                     i += c.len_utf8();
@@ -110,7 +156,15 @@ pub(crate) fn normalize_value_text(input: &str) -> String {
                     break;
                 }
             }
-            out.push_str(&input[start..i]);
+            let body = &input[body_start..i];
+            if lowercase_hex && preserve_from.is_none() && is_hex_color_body(body) {
+                out.push('#');
+                for c in body.chars() {
+                    out.push(c.to_ascii_lowercase());
+                }
+            } else {
+                out.push_str(&input[start..i]);
+            }
             continue;
         }
 
@@ -138,11 +192,64 @@ pub(crate) fn normalize_value_text(input: &str) -> String {
             continue;
         }
 
+        // Track `selector(...)` nesting for the `#`-token rule above (an unquoted
+        // `url(...)` is consumed opaquely in the ident branch and never reaches here).
+        // A `(` right after a `selector` ident opens the outermost hex-preserve group;
+        // its matching `)` closes it.
+        match ch {
+            '(' => {
+                paren_depth += 1;
+                if after_preserve_ident && preserve_from.is_none() {
+                    preserve_from = Some(paren_depth);
+                }
+            }
+            ')' => {
+                if preserve_from == Some(paren_depth) {
+                    preserve_from = None;
+                }
+                paren_depth = paren_depth.saturating_sub(1);
+            }
+            _ => {}
+        }
         out.push(ch);
         i += ch.len_utf8();
     }
 
     out
+}
+
+/// Whether the `url(` opening at `open` (the `(` byte index) is immediately
+/// followed — after optional whitespace — by a quote, i.e. `url("…")`/`url('…')` (a
+/// function with a `<string>` arg) rather than an unquoted `<url-token>`.
+fn url_arg_is_quoted(s: &str, open: usize) -> bool {
+    let bytes = s.as_bytes();
+    let mut j = open + 1;
+    while j < bytes.len() && bytes[j].is_ascii_whitespace() {
+        j += 1;
+    }
+    matches!(bytes.get(j), Some(b'"') | Some(b'\''))
+}
+
+/// Consume the balanced parenthesized group starting at the `(` at `*i`, advancing
+/// `*i` past the matching `)` (or to end of input if unbalanced), and return the
+/// consumed slice — used to copy an opaque `url(<url-token>)` verbatim.
+fn consume_paren_group<'s>(s: &'s str, i: &mut usize) -> &'s str {
+    let bytes = s.as_bytes();
+    let start = *i;
+    let mut depth = 0usize;
+    while *i < s.len() {
+        let b = bytes[*i];
+        *i += 1;
+        if b == b'(' {
+            depth += 1;
+        } else if b == b')' {
+            depth -= 1;
+            if depth == 0 {
+                break;
+            }
+        }
+    }
+    &s[start..*i]
 }
 
 /// Can `ch` begin a CSS identifier? (letter, `_`, `$`, `@`, or non-ASCII)
@@ -409,6 +516,10 @@ pub(crate) fn format_string_value(content: &str, quote: char) -> String {
 ///   (the parser's `CssDeclaration::colon_offset`, minus the declaration span start —
 ///   no re-scan; a property comment may itself hold a `:` that a naive scan would
 ///   mis-match, which the parser-recorded colon already skips)
+/// * `has_block_comment` - The parser-recorded `CssDeclaration::has_block_comment`. False
+///   proves the declaration holds no `/* … */` at all, so the comment path is skipped
+///   without scanning the property text (the free O(1) negative gate
+///   `has_value_comments_in_decl` uses).
 ///
 /// # Returns
 /// * Normalized property name (e.g., `color /* test */`)
@@ -422,14 +533,14 @@ pub(crate) fn format_string_value(content: &str, quote: char) -> String {
 /// ```ignore
 /// // colon_pos = the parser's recorded colon offset within decl_source
 /// let source = "color/* comment */:red;";
-/// assert_eq!(extract_property_name(source, 18), "color /* comment */");
+/// assert_eq!(extract_property_name(source, 18, true), "color /* comment */");
 ///
 /// // Every gap comment is preserved, joined single-spaced.
 /// let source = "color/* a *//* b */:red;";
-/// assert_eq!(extract_property_name(source, 19), "color /* a */ /* b */");
+/// assert_eq!(extract_property_name(source, 19, true), "color /* a */ /* b */");
 ///
 /// let source = "margin: 10px;";
-/// assert_eq!(extract_property_name(source, 6), "margin");
+/// assert_eq!(extract_property_name(source, 6, false), "margin");
 /// ```
 ///
 /// # Svelte Quirk
@@ -441,11 +552,19 @@ pub(crate) fn format_string_value(content: &str, quote: char) -> String {
 /// - Input: `color/* comment */:red;`
 /// - Output: `color /* comment */` (normalized spacing)
 /// - Prettier: `color/* comment */` (no space before comment)
-pub(crate) fn extract_property_name(decl_source: &str, colon_pos: usize) -> Cow<'_, str> {
+pub(crate) fn extract_property_name(
+    decl_source: &str,
+    colon_pos: usize,
+    has_block_comment: bool,
+) -> Cow<'_, str> {
     let property_part = &decl_source[..colon_pos];
 
-    // Check if property contains a comment
-    if let Some(comment_start) = property_part.find("/*") {
+    // `has_block_comment` is recorded at parse time and is false iff the declaration
+    // carries no `/* … */` anywhere — so the property→colon gap holds none either and the
+    // substring scan below is provably fruitless. A literal `/*` cannot occur in a
+    // property name except as a comment start (an escaped one is written `\2f\2a`), so
+    // the gate can only skip work, never change the branch taken.
+    if has_block_comment && let Some(comment_start) = property_part.find("/*") {
         let before_comment = property_part[..comment_start].trim();
 
         // Collect EVERY comment in the property→colon gap, not just the first: a
@@ -622,6 +741,14 @@ pub(crate) fn extract_value_with_comments(decl_source: &str, colon_pos: usize) -
 mod tests {
     use super::*;
 
+    /// Stands in for the parser-recorded `CssDeclaration::has_block_comment` — true iff
+    /// the declaration carries a `/* … */` anywhere. These test inputs hold no string or
+    /// `url()` that could disguise a literal `/*`, so the substring check agrees with
+    /// what the parser would record.
+    fn has_block_comment(src: &str) -> bool {
+        src.contains("/*")
+    }
+
     #[test]
     fn test_extract_property_name_borrows_common_case() {
         // The overwhelmingly-common case: a bare property name with no comment and
@@ -636,22 +763,26 @@ mod tests {
             "--custom-prop: var(--x)",
             "grid-template-columns: 1fr 2fr",
         ] {
-            let got = extract_property_name(src, colon(src));
+            let got = extract_property_name(src, colon(src), has_block_comment(src));
             assert!(
                 matches!(got, Cow::Borrowed(_)),
                 "bare property in {src:?} must borrow, got owned {got:?}"
             );
         }
         assert_eq!(
-            extract_property_name("margin: 10px", colon("margin: 10px")),
+            extract_property_name("margin: 10px", colon("margin: 10px"), false),
             "margin"
         );
         assert_eq!(
-            extract_property_name("color:red", colon("color:red")),
+            extract_property_name("color:red", colon("color:red"), false),
             "color"
         );
         assert_eq!(
-            extract_property_name("--custom-prop: var(--x)", colon("--custom-prop: var(--x)")),
+            extract_property_name(
+                "--custom-prop: var(--x)",
+                colon("--custom-prop: var(--x)"),
+                false
+            ),
             "--custom-prop"
         );
     }
@@ -661,7 +792,7 @@ mod tests {
         // Insignificant whitespace around the property name is trimmed; the result
         // is still a borrowed sub-slice (trim returns a sub-slice, no alloc).
         let src = "color : red";
-        let got = extract_property_name(src, src.find(':').unwrap());
+        let got = extract_property_name(src, src.find(':').unwrap(), has_block_comment(src));
         assert_eq!(got, "color");
         assert!(matches!(got, Cow::Borrowed(_)));
     }
@@ -671,7 +802,7 @@ mod tests {
         // A comment in the property name reconstructs an owned, space-normalized form.
         // The comment holds no `:`, so the real colon is the first `:`.
         let src = "color/* comment */:red";
-        let got = extract_property_name(src, src.find(':').unwrap());
+        let got = extract_property_name(src, src.find(':').unwrap(), has_block_comment(src));
         assert_eq!(got, "color /* comment */");
         assert!(matches!(got, Cow::Owned(_)));
     }
@@ -681,13 +812,13 @@ mod tests {
         // A property name ending in a hex escape consumes one trailing whitespace as
         // the escape's terminator — that space is preserved, so the result owns.
         let src = "\\41 : red";
-        let got = extract_property_name(src, src.find(':').unwrap());
+        let got = extract_property_name(src, src.find(':').unwrap(), has_block_comment(src));
         assert_eq!(got, "\\41 ");
         assert!(matches!(got, Cow::Owned(_)));
 
         // A non-escape trailing space is trimmed (borrowed).
         let src = "color : red";
-        let got = extract_property_name(src, src.find(':').unwrap());
+        let got = extract_property_name(src, src.find(':').unwrap(), has_block_comment(src));
         assert_eq!(got, "color");
         assert!(matches!(got, Cow::Borrowed(_)));
     }
@@ -769,5 +900,61 @@ mod tests {
         ));
         // A comment in the expression is preserved; the name still lowercases.
         assert_eq!(f("(MIN-WIDTH: /* c */ 1px)"), "(min-width: /* c */ 1px)");
+    }
+
+    #[test]
+    fn test_normalize_value_text_hex() {
+        // `@supports` (lowercase_hex = true): a hex color of a valid length lowercases.
+        let sup = |s: &str| normalize_value_text(s, true);
+        assert_eq!(sup("(background: #FFF)"), "(background: #fff)"); // 3-digit
+        assert_eq!(sup("(a: #ABCD)"), "(a: #abcd)"); // 4-digit RGBA
+        assert_eq!(sup("(a: #AABBCC)"), "(a: #aabbcc)"); // 6-digit
+        assert_eq!(sup("(a: #AABBCCDD)"), "(a: #aabbccdd)"); // 8-digit RRGGBBAA
+        assert_eq!(sup("(a: #1E2)"), "(a: #1e2)"); // exponent-looking but a valid 3-hex color
+        // Off-length or non-hex `#`-tokens keep their case (not colors).
+        assert_eq!(sup("(a: #ABCDE)"), "(a: #ABCDE)"); // 5 digits
+        assert_eq!(sup("(a: #ABCDEFA)"), "(a: #ABCDEFA)"); // 7 digits
+        assert_eq!(sup("(a: #GG)"), "(a: #GG)"); // non-hex
+        // Inside `url(...)`/`selector(...)`, a `#` is a URL fragment / ID selector →
+        // preserved even though it is a valid hex-color shape. Function-name case is
+        // irrelevant to the detection (CSS function tokens are case-insensitive).
+        assert_eq!(sup("(background: url(#ABC))"), "(background: url(#ABC))");
+        assert_eq!(sup("selector(#ABC)"), "selector(#ABC)");
+        assert_eq!(sup("URL(#ABC)"), "URL(#ABC)");
+        // A hex color OUTSIDE the preserve group still lowercases; the group's is kept.
+        assert_eq!(sup("url(#ABC) #FFF"), "url(#ABC) #fff");
+        // A non-opaque function (var/color-mix) is a value context → hex lowercases.
+        assert_eq!(sup("var(--x, #ABC)"), "var(--x, #abc)");
+        // Number normalization is unaffected by the new hex flag.
+        assert_eq!(sup("(margin: .5px)"), "(margin: 0.5px)");
+
+        // An unquoted `url(...)` is an opaque `<url-token>`: number/unit-looking
+        // content is copied verbatim, never normalized.
+        assert_eq!(
+            sup("(background: url(sprite1.50.png))"),
+            "(background: url(sprite1.50.png))"
+        );
+        assert_eq!(sup("(width: url(A.5PX))"), "(width: url(A.5PX))");
+        assert_eq!(sup("url()"), "url()"); // empty url-token
+        // A quoted `url("…")` is a `<string>` arg: quotes normalize, content preserved.
+        assert_eq!(
+            normalize_value_text("(background: url(\"v2.00.png\"))", true),
+            "(background: url('v2.00.png'))"
+        );
+        // url opacity is unconditional (independent of `lowercase_hex`).
+        assert_eq!(
+            normalize_value_text("(a: url(x1.50))", false),
+            "(a: url(x1.50))"
+        );
+
+        // `@media`/`@import` (lowercase_hex = false): every `#`-token is preserved.
+        assert_eq!(
+            normalize_value_text("(min-width: #FFF)", false),
+            "(min-width: #FFF)"
+        );
+        assert_eq!(
+            normalize_value_text("(margin: .5px)", false),
+            "(margin: 0.5px)"
+        );
     }
 }

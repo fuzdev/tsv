@@ -12,6 +12,8 @@ use super::render_config::RenderConfig;
 #[cfg(feature = "swallow_check")]
 use super::swallow::SwallowTracker;
 use super::types::{CachedWidth, DocContext, GroupId, LineKind, Mode, TextResolver, resolve_text};
+#[cfg(feature = "comment_check")]
+use crate::comment_ledger;
 
 /// The mode each id-bearing group resolved to, as a total map over the closed
 /// [`GroupId`] enum. Backed by a fixed inline array indexed by `id as usize`, so
@@ -203,7 +205,13 @@ fn render_line_break(
     }
 }
 
-/// Flush pending line suffix content.
+/// Flush pending line suffix content, in the order it was queued.
+///
+/// Prettier flushes by re-pushing the buffer onto its command *stack*
+/// (`commands.push(line, ...lineSuffix.reverse())`, `printer.js`) — the `reverse()`
+/// there exists only to cancel the stack's LIFO pop, so the net emission order is
+/// FIFO. This renderer drives the suffixes directly, so it must iterate forward:
+/// reversing here would emit two suffixes queued on one line back-to-front.
 #[allow(clippy::too_many_arguments)]
 fn flush_line_suffix<R: TextResolver + ?Sized>(
     arena: &DocArena,
@@ -218,7 +226,7 @@ fn flush_line_suffix<R: TextResolver + ?Sized>(
     if line_suffix.is_empty() {
         return;
     }
-    for suffix_cmd in std::mem::take(line_suffix).into_iter().rev() {
+    for suffix_cmd in std::mem::take(line_suffix) {
         render_single_doc_inner(
             arena,
             suffix_cmd.doc,
@@ -507,9 +515,10 @@ trait RenderPolicy {
     /// real command stack at top level, nothing in the single-doc sub-render.
     fn with_context_fill_rest<'a>(&self, commands: &'a [ArenaCommand]) -> &'a [ArenaCommand];
 
-    // Opt-in swallow diagnostic hooks (`swallow_check` feature): live only on
-    // the top-level policy — the sub-renders never carried the check. See
-    // `crate::doc::swallow`.
+    // Opt-in swallow diagnostic hooks (`swallow_check` feature). Both policies carry
+    // them: a swallow is a property of the physical output line, and the sub-renders
+    // append to the same line as the main loop, so every renderer drives the one
+    // shared state machine. See `crate::doc::swallow`.
     #[cfg(feature = "swallow_check")]
     fn swallow_enabled(&self) -> bool;
     #[cfg(feature = "swallow_check")]
@@ -580,6 +589,10 @@ impl RenderPolicy for TopLevelPolicy {
 /// pending-command lookahead through `WithContext`.
 struct SingleDocPolicy {
     tracking_suffix: bool,
+    /// Joins the enclosing render's swallow state machine — see
+    /// [`SwallowTracker::join_render`].
+    #[cfg(feature = "swallow_check")]
+    swallow: SwallowTracker,
 }
 
 impl RenderPolicy for SingleDocPolicy {
@@ -603,19 +616,28 @@ impl RenderPolicy for SingleDocPolicy {
         &[]
     }
 
+    // A sub-render appends to the same physical output line as the main loop, so it
+    // drives the same state machine rather than opting out. Without this the
+    // line-suffix flush was a blind spot: two trailing `//` comments flushed at one
+    // line break land back-to-back (`x; // c1 // c2`) and the first swallows the
+    // second.
     #[cfg(feature = "swallow_check")]
     #[inline]
     fn swallow_enabled(&self) -> bool {
-        false
+        self.swallow.enabled()
     }
 
     #[cfg(feature = "swallow_check")]
     #[inline]
-    fn swallow_on_text(&mut self, _is_line_comment: bool, _text: &str, _output: &str) {}
+    fn swallow_on_text(&mut self, is_line_comment: bool, text: &str, output: &str) {
+        self.swallow.on_text(is_line_comment, text, output);
+    }
 
     #[cfg(feature = "swallow_check")]
     #[inline]
-    fn swallow_on_newline(&mut self, _emitted: bool) {}
+    fn swallow_on_newline(&mut self, emitted: bool) {
+        self.swallow.on_newline(emitted);
+    }
 }
 
 /// Command-stack-based rendering with look-ahead — the top-level renderer
@@ -640,7 +662,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
     let mut policy = TopLevelPolicy {
         group_mode_map: GroupModeMap::default(),
         #[cfg(feature = "swallow_check")]
-        swallow: SwallowTracker::new(),
+        swallow: SwallowTracker::begin_render(),
     };
     // Borrow the arena-pooled work buffers for the duration of this top-level
     // render: their spill capacity warms once per arena instead of
@@ -729,7 +751,20 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
     let children_vec: &[DocId] = &children_outer;
     let pool: &str = &pool_outer;
 
+    // The print-once comment ledger's render-side hook (`comment_check` feature). Every
+    // command popped here is a node the renderer *emits* — a conditional-group candidate
+    // that loses, or a `fits()` lookahead, never reaches this loop — so recording the tag
+    // here is the emit itself. Gated on the arena actually carrying tags, so a
+    // comment-free document pays nothing. See `crate::comment_ledger`.
+    #[cfg(feature = "comment_check")]
+    let ledger_on = comment_ledger::comment_check_enabled() && arena.has_comment_docs();
+
     loop {
+        #[cfg(feature = "comment_check")]
+        if ledger_on && let Some((span, key)) = arena.comment_doc_tag(cmd.doc) {
+            comment_ledger::record_emitted_keyed(key, span);
+        }
+
         match &nodes[cmd.doc.index()] {
             DocNode::Text(t) => {
                 #[cfg(feature = "swallow_check")]
@@ -958,29 +993,6 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
                 continue;
             }
 
-            DocNode::IsolatedGroup { contents } => {
-                let contents = *contents;
-
-                if !policy.tracking_suffix() {
-                    // Suffix-flush render: pass through in the current mode.
-                    cmd = cmd.with_doc(contents);
-                    continue;
-                }
-
-                let fits = arena_fits_with_lookahead(
-                    arena,
-                    contents,
-                    Mode::Flat,
-                    commands,
-                    remaining_width(*pos, render, embed),
-                    embed,
-                    resolver,
-                );
-                let chosen_mode = if fits { Mode::Flat } else { Mode::Break };
-                cmd = cmd.with_mode(chosen_mode, contents);
-                continue;
-            }
-
             DocNode::IfBreak {
                 break_doc,
                 flat_doc,
@@ -1188,6 +1200,8 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
 ) {
     let mut policy = SingleDocPolicy {
         tracking_suffix: suffix_buffer.is_some(),
+        #[cfg(feature = "swallow_check")]
+        swallow: SwallowTracker::join_render(),
     };
     let mut dummy_suffix: LineSuffixBuf = SmallVec::new();
     let line_suffix = suffix_buffer.unwrap_or(&mut dummy_suffix);
@@ -1250,4 +1264,176 @@ fn indent_str_width(indent: &str) -> usize {
         .chars()
         .map(|ch| if ch == '\t' { TAB_WIDTH } else { 1 })
         .sum()
+}
+
+#[cfg(test)]
+mod column_arithmetic_tests {
+    //! Equivalence/contract tests for this module's corpus-blind numeric facts —
+    //! the column-advance and indent-width helpers that feed every `fits` verdict.
+    //!
+    //! **No corpus can grade these.** A column error only changes the *output*
+    //! once a fits verdict lands exactly on the print width, so an arithmetic slip
+    //! on a rare byte (a tab, a control char) or a rare position leaves every
+    //! formatted file byte-identical — it sails through the fixtures and any size
+    //! of format/wire diff (verified for the sibling `pooled_text_width`: a
+    //! one-column tab error was invisible to an 11,696-file diff and caught only by
+    //! its equivalence test). These are the only gates with power over their facts.
+    //! Mutation testing (`cargo mutants -p tsv_lang --file '**/arena_render.rs'`)
+    //! flagged each arm below as an unasserted survivor; corruption-verify any
+    //! change here by breaking the arm and watching exactly one assertion fail.
+    use super::RenderConfig;
+    use super::{
+        effective_suffix_width, indent_str_width, indent_width, line_start_column,
+        update_pos_for_text,
+    };
+    use crate::EmbedContext;
+    use crate::config::TAB_WIDTH;
+    use crate::printing::visual_width;
+
+    // --- update_pos_for_text / update_pos_for_text_unicode column advance ---
+
+    /// Run `update_pos_for_text` (the ASCII fast path, which delegates the whole
+    /// slice to `update_pos_for_text_unicode` on the first non-ASCII byte) and
+    /// return the resulting column.
+    fn advanced(pos: usize, s: &str) -> usize {
+        let mut p = pos;
+        update_pos_for_text(&mut p, s);
+        p
+    }
+
+    /// The column after rendering `s` starting at column `pos`, spelled out
+    /// independently of the fast path: a newline restarts the column at the width
+    /// of the text after the last one; otherwise the width simply adds. This is
+    /// the shape `update_pos_for_text_unicode` implements, kept as a *separate*
+    /// copy here so a mutation to the source arithmetic desyncs the two and fires.
+    fn reference(pos: usize, s: &str) -> usize {
+        match s.rfind('\n') {
+            Some(nl) => visual_width(&s[nl + 1..], TAB_WIDTH),
+            None => pos + visual_width(s, TAB_WIDTH),
+        }
+    }
+
+    fn assert_advance_agrees(pos: usize, s: &str) {
+        assert_eq!(
+            advanced(pos, s),
+            reference(pos, s),
+            "update_pos_for_text disagrees with the reference at pos {pos} on {s:?}"
+        );
+    }
+
+    #[test]
+    fn advance_agrees_on_exhaustive_short_strings() {
+        // Every string of length 0-2 over an alphabet spanning each arm of the
+        // byte walk (newline reset, tab expansion, plain ASCII, control/DEL — all
+        // 0x00..=0x7f) and the non-ASCII hand-off (2-/3-/4-byte, combining mark,
+        // ZWJ), at several starting columns so the `pos + w` accumulation and the
+        // newline-reset-to-0 are both graded.
+        let alphabet = [
+            "a", "Z", "0", " ", "\t", "\n", "\x01", "\x7f", "é", "中", "🎉", "\u{0301}", "\u{200d}",
+        ];
+        for pos in [0usize, 1, 7, 42] {
+            assert_advance_agrees(pos, "");
+            for a in alphabet {
+                assert_advance_agrees(pos, a);
+                for b in alphabet {
+                    assert_advance_agrees(pos, &format!("{a}{b}"));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn advance_agrees_on_realistic_and_boundary_inputs() {
+        // Cases that pin specific arms: tab expansion, the newline reset (both
+        // pure-ASCII, handled by the fast path, and non-ASCII, routed whole to
+        // `_unicode` so its `rfind('\n') + 1` slice + tail measure are graded),
+        // and a combining cluster crossing an ASCII boundary.
+        for pos in [0usize, 5] {
+            for s in [
+                "identifier",
+                "a\tb\tc",
+                "line one\ntail",
+                "\tindented\ttail",
+                // Non-ASCII → the whole slice goes through `_unicode`; a newline
+                // after the multibyte char grades its restart slice.
+                "é\ntail",
+                "中\tafter",
+                "prefix\n中tail",
+                "e\u{0301}x",
+                "1\u{fe0f}\u{20e3}",
+            ] {
+                assert_advance_agrees(pos, s);
+            }
+        }
+    }
+
+    // --- indent column math: indent_str_width / indent_width / line_start_column ---
+
+    fn cfg(indent: &'static str) -> RenderConfig {
+        RenderConfig {
+            print_width: 100,
+            indent,
+        }
+    }
+
+    #[test]
+    fn indent_str_width_counts_tabs_as_tab_width() {
+        // Each '\t' is TAB_WIDTH columns, every other char is 1.
+        assert_eq!(indent_str_width(""), 0);
+        assert_eq!(indent_str_width("\t"), TAB_WIDTH);
+        assert_eq!(indent_str_width("\t\t"), 2 * TAB_WIDTH);
+        assert_eq!(indent_str_width("  "), 2);
+        assert_eq!(indent_str_width("    "), 4);
+        // Mixed: the tab/non-tab split must not collapse to a constant.
+        assert_eq!(indent_str_width(" \t "), 1 + TAB_WIDTH + 1);
+    }
+
+    #[test]
+    fn indent_width_is_level_times_indent_str_width() {
+        let tab = cfg("\t");
+        let spaces = cfg("  ");
+        assert_eq!(indent_width(0, &tab), 0);
+        assert_eq!(indent_width(3, &tab), 3 * TAB_WIDTH);
+        assert_eq!(indent_width(4, &spaces), 4 * 2);
+    }
+
+    #[test]
+    fn line_start_column_adds_indent_and_embed_offset() {
+        let tab = cfg("\t");
+        // base_indent_offset 0: purely the indent width.
+        let embed0 = EmbedContext::default();
+        assert_eq!(line_start_column(0, &tab, &embed0), 0);
+        assert_eq!(line_start_column(2, &tab, &embed0), 2 * TAB_WIDTH);
+        // base_indent_offset > 0 contributes base * TAB_WIDTH, ADDED (not
+        // multiplied) to the indent width. Level 0 isolates the additive term
+        // (a `+`→`*` flip reads 0 here instead of the offset); level 2 grades the
+        // sum of two non-zero terms.
+        let embed = EmbedContext {
+            base_indent_offset: 3,
+            ..EmbedContext::default()
+        };
+        assert_eq!(line_start_column(0, &tab, &embed), 3 * TAB_WIDTH);
+        assert_eq!(
+            line_start_column(2, &tab, &embed),
+            2 * TAB_WIDTH + 3 * TAB_WIDTH
+        );
+    }
+
+    // --- effective_suffix_width boundary ---
+
+    #[test]
+    fn effective_suffix_width_gates_on_first_line_offset() {
+        let embed = EmbedContext {
+            first_line_offset: 5,
+            suffix_width: 3,
+            ..EmbedContext::default()
+        };
+        // pos >= first_line_offset → the reserved suffix; the boundary is
+        // inclusive (pos == offset already reserves).
+        assert_eq!(effective_suffix_width(5, &embed), 3);
+        assert_eq!(effective_suffix_width(6, &embed), 3);
+        // pos < first_line_offset → nothing reserved yet.
+        assert_eq!(effective_suffix_width(4, &embed), 0);
+        assert_eq!(effective_suffix_width(0, &embed), 0);
+    }
 }

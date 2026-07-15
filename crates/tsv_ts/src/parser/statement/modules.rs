@@ -167,7 +167,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 Ok(self.export_named(start, decl, ExportKind::Value))
             }
             // export async function foo() {}
+            //
+            // `async` is only a declaration keyword here when `function` follows — there
+            // is no `export async` arrow form. Without this check a stray `export async
+            // foo()` would reach `parse_function_or_overload` on a non-`function` token,
+            // violating its precondition. `peek_kind` skips comments, matching the
+            // statement-position dispatch in `statement/mod.rs`.
             TokenKind::Keyword(KeywordKind::Async) => {
+                if self.peek_kind() != TokenKind::Keyword(KeywordKind::Function) {
+                    return Err(self.error_expected_after("'function'", "export async"));
+                }
                 let decl = self.parse_async_function_declaration()?;
                 Ok(self.export_named(start, decl, ExportKind::Value))
             }
@@ -851,7 +860,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         ));
         self.advance()?;
 
-        // Stage-3 import-phase proposals: `import source <binding> from …` and
+        // The import-phase proposals: `import source <binding> from …` and
         // `import defer * as ns from …`. `source`/`defer` are contextual — a phase
         // keyword only in the phase-specific shape, otherwise an ordinary default
         // binding (`import defer from …` imports a default named `defer`). acorn

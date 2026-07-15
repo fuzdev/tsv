@@ -6,13 +6,40 @@
 // heritage clauses (`extends` / `implements`).
 
 use super::layout::hang_after_operator;
-use super::{CommentFilter, CommentSpacing, CommentVec, Printer};
+use super::{CommentSpacing, CommentVec, LeadingGlue, Printer};
 use crate::ast::internal;
 use smallvec::{SmallVec, smallvec};
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::{TriviaProfile, find_char, find_char_skipping_comments};
+
+/// How one heritage inter-item gap splits between the preceding item's doc and the
+/// join separator. The gap holds a comma, any comments, and the break to the next
+/// item; which of those the item's doc already emitted decides what the separator
+/// must add, so the two are read off one value instead of re-derived.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HeritageGap {
+    /// The whole gap is baked into the preceding item's doc. A line comment in the
+    /// gap forces the break, so the gap emitter owns the comma, the comments, *and*
+    /// the break (it must, to let a block glued to the next item hug it). The
+    /// separator emits nothing.
+    ///
+    /// Why the *preceding* item, when a block-only gap instead leads the **next** one
+    /// (the leading branch in `build_heritage_clause_doc`)? Because this gap's split —
+    /// which comments trail the comma vs lead the next item — is one derivation, and
+    /// `push_inter_item_line_comment_gap` makes it once. Handing the leading half to
+    /// the next item's doc would force *it* to re-derive where the previous item's tail
+    /// stopped, and two derivations of one boundary drift apart (the `bug121` class; a
+    /// block-only gap escapes this only because both sides call
+    /// `is_stranded_after_comma_block` with identical arguments).
+    Baked,
+    /// The comma is baked — a **stranded** after-comma block trails it on its line
+    /// (`A, /* c */⏎B`) — but the break is the separator's.
+    CommaBaked,
+    /// Nothing is baked; the separator emits comma + break.
+    Open,
+}
 
 /// A heritage-clause keyword (`extends` / `implements`). Carried as an enum
 /// rather than `&str` so the keyword text and its spaced form are total — no
@@ -59,7 +86,7 @@ impl<'a> Printer<'a> {
     ) {
         let keyword = kind_text.trim_end();
         if let Some(kw_pos) = self.find_keyword_in_range(*cursor, bound, keyword) {
-            if self.has_comments_between(*cursor, kw_pos) {
+            if self.has_comments_to_emit_between(*cursor, kw_pos) {
                 parts.push(self.build_trailing_comments_break_for_line(*cursor, kw_pos));
             }
             *cursor = kw_pos + keyword.len() as u32;
@@ -76,7 +103,7 @@ impl<'a> Printer<'a> {
         cursor: u32,
         name_start: u32,
     ) {
-        if self.has_comments_between(cursor, name_start) {
+        if self.has_comments_to_emit_between(cursor, name_start) {
             parts.push(self.build_trailing_comments_break_for_line(cursor, name_start));
         }
     }
@@ -165,7 +192,7 @@ impl<'a> Printer<'a> {
         if self.has_line_comments_between(after, pos) {
             parts.push(self.build_continuation_indent(after, pos, marker_doc));
         } else {
-            if self.has_comments_between(after, pos) {
+            if self.has_comments_to_emit_between(after, pos) {
                 parts.push(self.build_inline_comments_between_doc(after, pos));
             }
             parts.push(marker_doc);
@@ -243,7 +270,7 @@ impl<'a> Printer<'a> {
     ///
     /// `marker_end` is the offset just past the key (and any `?`/`!`); `colon_pos`
     /// is the type annotation's `:` (its span start). Callers gate on
-    /// `has_comments_between` first, so the common (no-comment) path never reaches
+    /// `has_comments_to_emit_between` first, so the common (no-comment) path never reaches
     /// the `has_line_comments_between` probe here.
     ///
     /// Shared by the before-`:` sites: index/property signatures, class properties,
@@ -300,7 +327,7 @@ impl<'a> Printer<'a> {
     /// just `: T`. `marker_end` is the offset past the name and any `!`/`?`; `wrap`
     /// selects the width-aware annotation builder (generics / wrapping type args).
     ///
-    /// Gates on `has_comments_between` once, so the common no-comment path is a single
+    /// Gates on `has_comments_to_emit_between` once, so the common no-comment path is a single
     /// binary search. Shared by every before-`:` site whose block form keeps the space
     /// before `:`: index-signature keys, class properties, variable bindings, and
     /// function parameters/identifiers. (Property signatures handle the gap inline:
@@ -318,7 +345,7 @@ impl<'a> Printer<'a> {
         } else {
             self.build_type_annotation_doc(type_ann)
         };
-        if !self.has_comments_between(marker_end, colon_pos) {
+        if !self.has_comments_to_emit_between(marker_end, colon_pos) {
             return type_doc;
         }
         if let Some(doc) =
@@ -331,6 +358,147 @@ impl<'a> Printer<'a> {
             d.text(" "),
             type_doc,
         ])
+    }
+
+    /// A whole multi-word header: the keyword (see
+    /// [`build_keyword_words_doc`](Self::build_keyword_words_doc)) plus the
+    /// keyword→`continuation` gap. The shape every caller wants that has no other use
+    /// for the keyword's end — bounding the word search by `continuation_start` also
+    /// keeps a word from ever matching inside the continuation.
+    pub(crate) fn build_keyword_header_doc(
+        &self,
+        words: &[&'static str],
+        start: u32,
+        continuation_start: u32,
+        continuation: DocId,
+    ) -> DocId {
+        let d = self.d();
+        let (keyword_doc, keyword_end) =
+            self.build_keyword_words_doc(words, start, continuation_start);
+        d.concat(&[
+            keyword_doc,
+            self.build_keyword_to_name_continuation(keyword_end, continuation_start, continuation),
+        ])
+    }
+
+    /// Build a **multi-word keyword** (`export default`, `await using`, `declare
+    /// const`, `export as namespace`), preserving a comment authored in one of its
+    /// interior gaps.
+    ///
+    /// Returns the keyword's doc (no trailing space) and the source offset just past
+    /// its final word — the caller's own keyword→value gap starts there.
+    ///
+    /// A keyword spanning two or more words has a gap *between* them that is a real
+    /// source position an author can write a comment in. Deriving the keyword's extent
+    /// by measuring its text (`span.start + "export default".len()`) never locates that
+    /// gap, so nothing scans it and the comment is silently dropped. Locating each word
+    /// instead makes every interior gap emittable, through the same emitter the
+    /// keyword→name gap uses: a block comment stays inline, a line comment indents the
+    /// continuation.
+    ///
+    /// `words` must occur in order within `source[start..search_end]`; each is matched
+    /// whole-word and comment-aware, so a word appearing inside an interior comment
+    /// (`export /* default */ default 1`) never matches.
+    ///
+    /// A word may be a punctuator (`=`). Note what makes that safe: the whole-word test
+    /// rejects a match flanked by *identifier* bytes, and a punctuator has none — so it
+    /// does **not** rule out matching the `=` inside `=>` or `==`. Only `start` and
+    /// `search_end` do: every caller bounds the search at the token before the
+    /// continuation, and no operator can occur in that gap. A caller that widens those
+    /// bounds must re-check that itself.
+    pub(crate) fn build_keyword_words_doc(
+        &self,
+        words: &[&'static str],
+        start: u32,
+        search_end: u32,
+    ) -> (DocId, u32) {
+        let d = self.d();
+        debug_assert!(!words.is_empty(), "a keyword has at least one word");
+
+        // A one-word keyword has no interior gap, so there is nothing to locate: it
+        // begins at `start` and its end is arithmetic. This is the hot path — the
+        // single-word kinds (`const`/`let`/`var`/`using`) run through here for **every**
+        // declaration in every file, and the gap printer they feed is already the
+        // hottest of them (see the internal perf notes on `build_keyword_to_name_continuation`).
+        // Only a genuinely multi-word keyword pays for a scan.
+        if let [word] = words {
+            // That shortcut rests on an invariant nothing else enforces: a single-word
+            // caller's `start` IS the keyword. Locating it would cost the hot path a
+            // scan to prove what every caller already knows, so assert it in debug
+            // instead — a caller passing a wider span (one that leads with `export `,
+            // say) would otherwise silently mis-place `keyword_end` and drop the gap's
+            // comment, which is the very bug this function exists to prevent.
+            debug_assert!(
+                self.source
+                    .as_bytes()
+                    .get(start as usize..)
+                    .is_some_and(|rest| rest.starts_with(word.as_bytes())),
+                "single-word keyword `{word}` must begin at `start` ({start})"
+            );
+            return (d.text(word), start + word.len() as u32);
+        }
+
+        let mut starts: SmallVec<[u32; 4]> = SmallVec::new();
+        let mut cursor = start;
+        for word in words {
+            let Some(pos) = self.find_keyword_in_range(cursor, search_end, word) else {
+                // The source doesn't hold the shape the caller named — only reachable
+                // through a synthetic span or a `search_end` that precedes the words.
+                // Assert it in debug: this arm's measured end is the very arithmetic
+                // this function exists to replace (it assumes one space per gap), so a
+                // caller that lands here silently drops the comment it came for. Prod
+                // still degrades gracefully rather than panicking — a formatter must
+                // not crash on input it parsed.
+                debug_assert!(
+                    false,
+                    "keyword word `{word}` not found in source[{cursor}..{search_end}] \
+                     — caller passed a synthetic span or a bad search_end"
+                );
+                let mut parts: DocBuf = DocBuf::new();
+                for (i, w) in words.iter().enumerate() {
+                    if i > 0 {
+                        parts.push(d.text(" "));
+                    }
+                    parts.push(d.text(w));
+                }
+                let width: u32 = words.iter().map(|w| w.len() as u32).sum();
+                let measured = start + width + words.len() as u32 - 1;
+                return (d.concat(&parts), measured);
+            };
+            starts.push(pos);
+            cursor = pos + word.len() as u32;
+        }
+        let keyword_end = cursor;
+
+        // Left-to-right and FLAT: every gap emits its comments where the author wrote
+        // them, but none of them indents on its own — the whole tail is wrapped once,
+        // below. Indenting per gap would compound, and the staircase it builds is not
+        // just deep, it is wrong: the caller emits the keyword→value gap at the header's
+        // own level, so a two-broken-gap keyword would leave its last word sitting a
+        // level *below* the value that follows it.
+        let mut tail: DocBuf = DocBuf::new();
+        let mut any_line = false;
+        for i in 0..words.len() - 1 {
+            let gap_start = starts[i] + words[i].len() as u32;
+            let (gap_doc, has_line) = self.build_keyword_gap_doc(gap_start, starts[i + 1]);
+            any_line |= has_line;
+            tail.push(gap_doc);
+            tail.push(d.text(words[i + 1]));
+        }
+        let tail_doc = d.concat(&tail);
+        // One level for the whole header — the same thing the single-gap rule says: a
+        // broken gap reads as one statement continuation, never as N nested ones. With
+        // no line comment there is no break to indent, so the wrapper is skipped and a
+        // comment-free keyword stays byte-identical to `words.join(" ")`.
+        let doc = d.concat(&[
+            d.text(words[0]),
+            if any_line {
+                d.indent(tail_doc)
+            } else {
+                tail_doc
+            },
+        ]);
+        (doc, keyword_end)
     }
 
     /// Build a declaration header's keyword→name gap comment followed by the rest
@@ -371,23 +539,40 @@ impl<'a> Printer<'a> {
         continuation: DocId,
     ) -> DocId {
         let d = self.d();
-        let has_line = self.has_line_comments_between(keyword_end, name_start);
+        let (gap_doc, has_line) = self.build_keyword_gap_doc(keyword_end, name_start);
+        let body = d.concat(&[gap_doc, continuation]);
+        if has_line { d.indent(body) } else { body }
+    }
+
+    /// One header gap — the comments authored in it plus the separator that follows —
+    /// with **no** `indent` applied. Also reports whether a *line* comment ended the
+    /// line, which is the caller's cue that a break happened.
+    ///
+    /// Split out from [`build_keyword_to_name_continuation`](Self::build_keyword_to_name_continuation)
+    /// so a caller with *several* gaps can emit each one and then decide **once** what
+    /// to indent. Indenting per gap compounds: two broken gaps would put the keyword's
+    /// last word two levels deep, below the value that follows it at one.
+    #[inline]
+    fn build_keyword_gap_doc(&self, start: u32, end: u32) -> (DocId, bool) {
+        let d = self.d();
+        // One search settles the gap. With no comment there is nothing to emit but the
+        // separator — no empty child, and neither of the per-shape searches below runs.
+        // Every declaration in every file passes through here, so this is the hottest of
+        // the gap printers.
+        if !self.has_comments_to_emit_between(start, end) {
+            return (d.text(" "), false);
+        }
+        let has_line = self.has_line_comments_between(start, end);
         let comment_doc = if has_line {
-            self.build_name_to_type_params_comments(
-                keyword_end,
-                name_start,
-                CommentSpacing::Leading,
-            )
-        } else if let Some(c) = self.build_inline_comments_between_doc_opt(keyword_end, name_start)
-        {
+            self.build_name_to_type_params_comments(start, end, CommentSpacing::Leading)
+        } else if let Some(c) = self.build_inline_comments_between_doc_opt(start, end) {
             c
         } else {
             d.empty()
         };
         // After a line comment the hardline provides separation; otherwise a space.
         let space_after = if has_line { d.empty() } else { d.text(" ") };
-        let body = d.concat(&[comment_doc, space_after, continuation]);
-        if has_line { d.indent(body) } else { body }
+        (d.concat(&[comment_doc, space_after]), has_line)
     }
 
     /// Build a Doc for comments between a keyword and the following name/token.
@@ -400,6 +585,11 @@ impl<'a> Printer<'a> {
     /// `enum // c\nname`, etc. — any keyword-to-name/code gap.
     pub(crate) fn build_keyword_to_name_comments(&self, start: u32, end: u32) -> DocId {
         let d = self.d();
+        // A comment-free gap is just the leading space — emitting it as a bare text
+        // saves both the empty child and the concat node that would wrap it.
+        if !self.has_comments_to_emit_between(start, end) {
+            return d.text(" ");
+        }
         if self.has_line_comments_between(start, end) {
             self.build_name_to_type_params_comments(start, end, CommentSpacing::Trailing)
         } else {
@@ -428,16 +618,12 @@ impl<'a> Printer<'a> {
         block_spacing: CommentSpacing,
     ) -> DocId {
         let d = self.d();
-        let first_idx = tsv_lang::find_first_comment_from(self.comments, start);
         let mut parts = DocBuf::new();
         // After a line comment's hardline the next comment starts a fresh (indented)
         // line, so it must not get a leading space — otherwise a 2nd+ own-line comment
         // renders as `\t // c` (stray leading space).
         let mut at_line_start = false;
-        for comment in self.comments[first_idx..]
-            .iter()
-            .take_while(|c| c.span.end <= end)
-        {
+        for comment in comments_to_emit_in_range(self.comments, start, end) {
             if comment.is_block {
                 // Block comment: use caller-specified spacing
                 match block_spacing {
@@ -471,17 +657,37 @@ impl<'a> Printer<'a> {
     }
 
     /// Like `build_name_to_type_params_comments`, but returns `None` when there
-    /// are no comments in the range (avoids the separate `has_comments_between` check).
+    /// are no comments in the range (avoids the separate `has_comments_to_emit_between` check).
     pub(crate) fn build_name_to_type_params_comments_opt(
         &self,
         start: u32,
         end: u32,
         block_spacing: CommentSpacing,
     ) -> Option<DocId> {
-        if self.has_comments_between(start, end) {
+        if self.has_comments_to_emit_between(start, end) {
             Some(self.build_name_to_type_params_comments(start, end, block_spacing))
         } else {
             None
+        }
+    }
+
+    /// Append the name→type-params/parens gap comments to `parts`, appending nothing
+    /// when the gap is comment-free.
+    ///
+    /// That is the overwhelmingly common case on a gap every function, method, class and
+    /// interface member emits, and pushing the builder's `empty()` unconditionally would
+    /// leave a child slot for the renderer and every `fits` pass to walk.
+    pub(crate) fn push_name_to_type_params_comments(
+        &self,
+        parts: &mut DocBuf,
+        start: u32,
+        end: u32,
+        block_spacing: CommentSpacing,
+    ) {
+        if let Some(comments) =
+            self.build_name_to_type_params_comments_opt(start, end, block_spacing)
+        {
+            parts.push(comments);
         }
     }
 
@@ -503,7 +709,7 @@ impl<'a> Printer<'a> {
         let mut inline_parts = DocBuf::new();
         let mut indent_parts = DocBuf::new();
         let mut saw_line_comment = false;
-        for comment in comments_in_range(self.comments, start, end) {
+        for comment in comments_to_emit_in_range(self.comments, start, end) {
             if saw_line_comment {
                 indent_parts.push(d.hardline());
                 indent_parts.push(self.build_comment_doc(comment));
@@ -518,7 +724,37 @@ impl<'a> Printer<'a> {
         (inline_parts, indent_parts)
     }
 
+    /// Join heritage item docs, emitting per gap only what that gap's item doc did
+    /// not already write (see [`HeritageGap`]) — so the separator and the item doc
+    /// can't disagree about who owns the comma or the break. `break_doc` is the
+    /// separator's break: a `hardline` where a line comment forces one, a `line`
+    /// for the width-based clause. With every gap `Open` this is exactly
+    /// `d.join(item_docs, "," + break_doc)`.
+    fn join_heritage_items(
+        &self,
+        item_docs: &[DocId],
+        gaps: &[HeritageGap],
+        break_doc: DocId,
+    ) -> DocId {
+        let d = self.d();
+        let comma_break = d.concat(&[d.text(","), break_doc]);
+        let mut joined: DocBuf = smallvec![item_docs[0]];
+        for (idx, &item_doc) in item_docs.iter().enumerate().skip(1) {
+            match gaps[idx - 1] {
+                // The gap emitter already wrote the comma, the comments, and the break.
+                HeritageGap::Baked => {}
+                HeritageGap::CommaBaked => joined.push(break_doc),
+                HeritageGap::Open => joined.push(comma_break),
+            }
+            joined.push(item_doc);
+        }
+        d.concat(&joined)
+    }
+
     /// Build a heritage clause doc: `keyword` + indented, comma-separated heritage items.
+    ///
+    /// See [`HeritageGap`] for how each inter-item gap splits between the preceding
+    /// item's doc and the join separator.
     ///
     /// Handles line comments between items (SAFETY): when a line comment appears after
     /// a heritage item, the comma is placed before the comment to prevent the comment
@@ -544,26 +780,27 @@ impl<'a> Printer<'a> {
             .collect();
         let has_any_item_line_comments = has_trailing_line_comment.iter().any(|&v| v);
 
-        // A gap's comma is *baked into the preceding item's doc* (rather than emitted
-        // by the join separator) when that item has a trailing line comment, or — in
-        // group mode — a **stranded** after-comma block that must stay on the comma's
-        // line (`A, /* c */⏎ B`). The join then uses a bare break for such items and a
-        // comma-break for the rest. Inline (non-group) heritage keeps every after-comma
-        // block leading the next item, so nothing is baked there (the `", "` join owns
-        // the comma). Mirrors the declarator/for-init stranded rule; prettier relocates
-        // the block before the comma.
-        let comma_baked: SmallVec<[bool; 8]> = has_trailing_line_comment
+        // How each gap's pieces split between the preceding item's doc and the join
+        // separator. Inline (non-group) heritage keeps every after-comma block leading
+        // the next item, so nothing is baked there (the `", "` join owns the comma).
+        // Mirrors the declarator/for-init stranded rule; prettier relocates the block
+        // before the comma.
+        let gaps: SmallVec<[HeritageGap; 8]> = has_trailing_line_comment
             .iter()
             .enumerate()
             .map(|(i, &has_line)| {
-                has_line
-                    || (group_mode && {
-                        let next_start = items[i + 1].span.start;
-                        let comma_pos =
-                            self.comma_between(heritage_item_end(&items[i]), next_start);
-                        comments_in_range(self.comments, comma_pos, next_start)
-                            .any(|c| self.is_stranded_after_comma_block(c, comma_pos, next_start))
-                    })
+                if has_line {
+                    HeritageGap::Baked
+                } else if group_mode && {
+                    let next_start = items[i + 1].span.start;
+                    let comma_pos = self.comma_between(heritage_item_end(&items[i]), next_start);
+                    self.comments_on_page_between(comma_pos, next_start)
+                        .any(|c| self.is_stranded_after_comma_block(c, comma_pos, next_start))
+                } {
+                    HeritageGap::CommaBaked
+                } else {
+                    HeritageGap::Open
+                }
             })
             .collect();
 
@@ -581,23 +818,27 @@ impl<'a> Printer<'a> {
                 // item (trailing its comma) in group mode, so skip it here. When the
                 // previous gap has a line comment, its after-comma comments were baked
                 // into that item's doc, so skip the lead there entirely.
-                if i > 0 && !has_trailing_line_comment[i - 1] {
+                if i > 0 && gaps[i - 1] != HeritageGap::Baked {
                     let prev_end = heritage_item_end(&items[i - 1]);
                     let comma_pos = self.comma_between(prev_end, heritage.span.start);
-                    for comment in comments_in_range(self.comments, comma_pos, heritage.span.start)
-                    {
-                        if group_mode
-                            && self.is_stranded_after_comma_block(
-                                comment,
-                                comma_pos,
-                                heritage.span.start,
-                            )
-                        {
-                            continue;
-                        }
-                        h_parts.push(self.build_comment_doc(comment));
-                        h_parts.push(d.text(" "));
-                    }
+                    let leading: CommentVec<'_> =
+                        comments_to_emit_in_range(self.comments, comma_pos, heritage.span.start)
+                            .filter(|c| {
+                                !(group_mode
+                                    && self.is_stranded_after_comma_block(
+                                        c,
+                                        comma_pos,
+                                        heritage.span.start,
+                                    ))
+                            })
+                            .collect();
+                    self.push_leading_comment_run(
+                        &mut h_parts,
+                        leading.iter().copied(),
+                        heritage.span.start,
+                        LeadingGlue::Adjacent,
+                        d.empty(),
+                    );
                 }
 
                 h_parts.push(self.build_entity_name_doc(&heritage.expression));
@@ -617,35 +858,34 @@ impl<'a> Printer<'a> {
                 if let Some(next) = items.get(i + 1) {
                     let item_end = heritage_item_end(heritage);
 
-                    if has_trailing_line_comment[i] {
+                    if gaps[i] == HeritageGap::Baked {
                         // Line comment(s) in the gap: before-comma blocks trail this
                         // item, then the comma, then the first line comment trails it
                         // (on the comma's line) or drops below — the same rule as the
                         // declarator/for-init gaps, so route through the shared helper.
-                        // e.g. `I /* c1 */,\n// c2\nJ` or `I, // c1\n// c2\nJ`. The comma
-                        // is baked into this item's doc (the join uses a bare hardline
-                        // after it, via `comma_baked`); the run sits inside the clause's
+                        // e.g. `I /* c1 */,\n// c2\nJ` or `I, // c1\n// c2\nJ`. The whole
+                        // gap is baked into this item's doc, break included (the join adds
+                        // nothing — `HeritageGap::Baked`); the run sits inside the clause's
                         // `d.indent()`, so continuation indent is empty.
-                        let comments: CommentVec<'_> =
-                            comments_in_range(self.comments, item_end, next.span.start).collect();
                         let comma_pos = self.comma_between(item_end, next.span.start);
-                        self.push_inter_declarator_line_comment_gap(
+                        self.push_inter_item_line_comment_gap(
                             &mut h_parts,
-                            &comments,
+                            item_end,
                             comma_pos,
+                            next.span.start,
                             d.empty(),
                         );
                     } else {
                         // Before-comma block(s) trail this item; a **hugging** after-comma
                         // block leads the NEXT item (its leading branch above). A
                         // **stranded** after-comma block stays on the comma's line: when
-                        // this gap is baked (`comma_baked[i]`, group mode only) the comma
-                        // is emitted here with the stranded block trailing it, and the
-                        // join uses a bare break. Otherwise the comma comes from the join
-                        // separator. Preserves the author's side of the comma.
+                        // this gap's comma is baked (`HeritageGap::CommaBaked`, group mode
+                        // only) the comma is emitted here with the stranded block trailing
+                        // it, and the join uses a bare break. Otherwise the comma comes
+                        // from the join separator. Preserves the author's side of the comma.
                         let comma_pos = self.comma_between(item_end, next.span.start);
                         self.push_before_comma_blocks(&mut h_parts, item_end, comma_pos);
-                        if comma_baked[i] {
+                        if gaps[i] == HeritageGap::CommaBaked {
                             h_parts.push(d.text(","));
                             self.push_stranded_after_comma_blocks(
                                 &mut h_parts,
@@ -659,18 +899,13 @@ impl<'a> Printer<'a> {
             })
             .collect();
 
-        // Optional comments between keyword and first item: `extends /* c */ Item`
-        let kw_comments = keyword_start
-            .and_then(|kw_start| {
-                let kw_end = kw_start + keyword.as_str().len() as u32;
-                self.build_comments_between_filtered_opt(
-                    kw_end,
-                    items[0].span.start,
-                    CommentSpacing::Trailing,
-                    CommentFilter::All,
-                )
-            })
-            .unwrap_or_else(|| d.empty());
+        // Optional comments between keyword and first item: `extends /* c */ Item`.
+        // Kept as an `Option` so the comment-free heritage clause — every plain
+        // `class X extends Y` / `interface I extends J` — pushes no empty child.
+        let kw_comments = keyword_start.and_then(|kw_start| {
+            let kw_end = kw_start + keyword.as_str().len() as u32;
+            self.build_inline_comments_between_doc_trailing_space_opt(kw_end, items[0].span.start)
+        });
 
         // A line comment or multiline block between the keyword and the first item
         // hangs the items on the next line — mirroring the as/satisfies + type-param
@@ -681,7 +916,15 @@ impl<'a> Printer<'a> {
         if let Some(kw_start) = keyword_start {
             let kw_end = kw_start + keyword.as_str().len() as u32;
             if self.comments_force_own_line_between(kw_end, items[0].span.start) {
-                let value_doc = d.join(item_docs, ", ");
+                // Items carrying their own line comments must join with the
+                // gap-aware separators — mirroring the group-mode line-comment join
+                // below. A plain `", "` join would let a per-item line comment swallow
+                // the next item (`// c1, B` — non-reparseable content loss).
+                let value_doc = if has_any_item_line_comments {
+                    self.join_heritage_items(&item_docs, &gaps, d.hardline())
+                } else {
+                    d.join(item_docs, ", ")
+                };
                 let mut parts = smallvec![d.text(keyword.as_str())];
                 self.append_keyword_value_line_comments(
                     &mut parts,
@@ -695,48 +938,29 @@ impl<'a> Printer<'a> {
 
         if group_mode {
             if has_any_item_line_comments {
-                // Line comments force hardline breaks. Items whose gap baked its comma
-                // (a line comment, or a stranded block) get just a hardline; others get
-                // comma + hardline from the separator.
-                let comma_hardline = d.concat(&[d.text(","), d.hardline()]);
-                let hardline = d.hardline();
-                let mut joined_parts: DocBuf = smallvec![item_docs[0]];
-                for (idx, &item_doc) in item_docs.iter().enumerate().skip(1) {
-                    joined_parts.push(if comma_baked[idx - 1] {
-                        hardline
-                    } else {
-                        comma_hardline
-                    });
-                    joined_parts.push(item_doc);
-                }
-                let types_joined = d.concat(&joined_parts);
-                let inner = d.indent(d.concat(&[d.hardline(), kw_comments, types_joined]));
+                // Line comments force hardline breaks.
+                let types_joined = self.join_heritage_items(&item_docs, &gaps, d.hardline());
+                let inner = d.indent(match kw_comments {
+                    Some(c) => d.concat(&[d.hardline(), c, types_joined]),
+                    None => d.concat(&[d.hardline(), types_joined]),
+                });
                 d.concat(&[d.text(keyword.as_str()), inner])
             } else {
-                // Width-based breaks. An item whose gap baked its comma (a stranded
-                // after-comma block trailing it) gets a bare `line`; others get the
-                // `comma_line` separator. With no baked commas this is exactly
-                // `join_doc(item_docs, comma_line)`.
-                let comma_line = d.concat(&[d.text(","), d.line()]);
-                let line = d.line();
-                let mut joined_parts: DocBuf = smallvec![item_docs[0]];
-                for (idx, &item_doc) in item_docs.iter().enumerate().skip(1) {
-                    joined_parts.push(if comma_baked[idx - 1] {
-                        line
-                    } else {
-                        comma_line
-                    });
-                    joined_parts.push(item_doc);
-                }
-                let types_joined = d.concat(&joined_parts);
-                d.concat(&[
-                    d.text(keyword.as_str()),
-                    hang_after_operator(d, d.concat(&[kw_comments, types_joined])),
-                ])
+                // Width-based breaks. No gap is `Baked` here — that needs a line
+                // comment, which this branch excludes.
+                let types_joined = self.join_heritage_items(&item_docs, &gaps, d.line());
+                let hung = match kw_comments {
+                    Some(c) => d.concat(&[c, types_joined]),
+                    None => types_joined,
+                };
+                d.concat(&[d.text(keyword.as_str()), hang_after_operator(d, hung)])
             }
         } else {
             let keyword_space = keyword.with_space();
-            d.concat(&[d.text(keyword_space), kw_comments, d.join(item_docs, ", ")])
+            match kw_comments {
+                Some(c) => d.concat(&[d.text(keyword_space), c, d.join(item_docs, ", ")]),
+                None => d.concat(&[d.text(keyword_space), d.join(item_docs, ", ")]),
+            }
         }
     }
 
@@ -751,7 +975,7 @@ impl<'a> Printer<'a> {
         type_params_end: u32,
         paren_pos: u32,
     ) {
-        for comment in comments_in_range(self.comments, type_params_end, paren_pos) {
+        for comment in comments_to_emit_in_range(self.comments, type_params_end, paren_pos) {
             parts.push(self.build_trailing_comment_doc(comment));
         }
     }
@@ -789,7 +1013,9 @@ impl<'a> Printer<'a> {
         // Comments before the `*` lead it, at the author's position. A generator
         // always has a real `*`; if (defensively) none is found, treat the whole
         // gap as "before" so no comment is ever dropped.
-        for comment in comments_in_range(self.comments, search_start, star.unwrap_or(key_start)) {
+        for comment in
+            comments_to_emit_in_range(self.comments, search_start, star.unwrap_or(key_start))
+        {
             parts.push(self.build_comment_doc(comment));
             parts.push(d.text(" "));
         }
@@ -798,7 +1024,7 @@ impl<'a> Printer<'a> {
         // computed key, whose in-bracket comments the bracket builder owns).
         if let Some(star) = star {
             let name_bound = self.computed_key_name_bound(star + 1, key_start, computed);
-            for comment in comments_in_range(self.comments, star + 1, name_bound) {
+            for comment in comments_to_emit_in_range(self.comments, star + 1, name_bound) {
                 parts.push(self.build_comment_doc(comment));
                 parts.push(d.text(" "));
             }
@@ -829,7 +1055,7 @@ impl<'a> Printer<'a> {
         let mut value_block: DocBuf = smallvec![d.hardline()];
         let mut on_own_line = false;
         let comments: CommentVec<'_> =
-            comments_in_range(self.comments, keyword_end, value_start).collect();
+            comments_to_emit_in_range(self.comments, keyword_end, value_start).collect();
         for (i, comment) in comments.iter().enumerate() {
             let same_line = !on_own_line && self.is_same_line(keyword_end, comment.span.start);
             if same_line {

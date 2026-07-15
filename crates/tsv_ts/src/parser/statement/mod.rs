@@ -109,7 +109,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         }
                         return self.parse_expression_statement();
                     }
-                    // Check for `await using` declaration (ES2024 Explicit Resource Management);
+                    // Check for `await using` declaration (Explicit Resource Management);
                     // both gaps carry [no LineTerminator here] — a break before `using` or
                     // before the binding makes this an `await using` expression statement,
                     // as does a word-shaped binary operator (`await using in b`)
@@ -178,7 +178,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             },
             TokenKind::Identifier => {
                 // Check for contextual keyword 'using' followed by a binding word
-                // (ES2024 Explicit Resource Management); `using [no LineTerminator
+                // (Explicit Resource Management); `using [no LineTerminator
                 // here] BindingIdentifier` — a break makes `using` an identifier
                 // statement, and an expression-continuation word (`in`/`instanceof`/
                 // `as`/`satisfies`) keeps the expression reading

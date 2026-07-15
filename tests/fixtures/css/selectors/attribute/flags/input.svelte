@@ -21,4 +21,12 @@
 	[title*='example' s] {
 		font-weight: bold;
 	}
+
+	/* Dash-match operator with flag */
+	[lang|='en' i] {
+		font-style: italic;
+	}
+	[lang|='en' s] {
+		font-style: normal;
+	}
 </style>

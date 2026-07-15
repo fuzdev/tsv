@@ -11,7 +11,7 @@ use tsv_lang::Span;
 ///
 /// Comments are stored in a separate Vec, sorted by span.start.
 /// This matches the TS/Svelte pattern and enables efficient range queries
-/// using `comments_in_range()` from tsv_lang.
+/// using `comments_to_emit_in_range()` from tsv_lang.
 #[derive(Debug, Clone)]
 pub struct CssStyleSheet<'arena> {
     /// CSS nodes (rules, at-rules) - no longer includes Comment variant
@@ -23,7 +23,7 @@ pub struct CssStyleSheet<'arena> {
     /// - Top-level comments (between rules)
     /// - Value comments (inside property values like `font-size: /* comment */ 12px;`)
     ///
-    /// Use `tsv_lang::comments_in_range()` for efficient range lookups.
+    /// Use `tsv_lang::comments_to_emit_in_range()` for efficient range lookups.
     pub comments: Vec<Comment>,
 }
 
@@ -655,7 +655,7 @@ pub enum PreludeValue<'arena> {
 /// Bundling the list with its paren span makes the printer-only span **structurally**
 /// present whenever the list is (no separate `Option<Span>` to keep in lockstep): the
 /// paren bounds the gaps where a comment inside the parens but outside the list sits
-/// (`@scope (/* c */ .a)`), which the printer re-emits via `comments_in_range` — the
+/// (`@scope (/* c */ .a)`), which the printer re-emits via `comments_to_emit_in_range` — the
 /// same wrapping `:is()` args use. Wire-ignored (the prelude is extracted from the
 /// `Selectors` `span`, comments stripped).
 #[derive(Debug, Clone)]

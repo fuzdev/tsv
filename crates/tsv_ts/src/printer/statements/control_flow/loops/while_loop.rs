@@ -37,11 +37,8 @@ impl<'a> Printer<'a> {
             // Block body: while (cond) { ... }
             // Uses append_close_paren_with_comments for consistency with if/for-in/for-of:
             // block comments stay inline, line comments become trailing.
-            let mut parts = smallvec![d.text("while")];
-            if let Some(kc) = &keyword_comments {
-                parts.push(*kc);
-            }
-            parts.push(d.text(" ("));
+            let mut parts: DocBuf = DocBuf::new();
+            self.push_keyword_open_paren(&mut parts, "while", keyword_comments);
             parts.push(condition_group);
             let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
             self.append_close_paren_with_comments(&mut parts, paren_end, block.span.start);
@@ -52,11 +49,8 @@ impl<'a> Printer<'a> {
             let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
             let empty_start = stmt.body.span().start;
 
-            let mut empty_parts = smallvec![d.text("while")];
-            if let Some(kc) = &keyword_comments {
-                empty_parts.push(*kc);
-            }
-            empty_parts.push(d.text(" ("));
+            let mut empty_parts: DocBuf = DocBuf::new();
+            self.push_keyword_open_paren(&mut empty_parts, "while", keyword_comments);
             empty_parts.push(condition_group);
             self.append_close_paren_empty_stmt_with_comments(
                 &mut empty_parts,
@@ -71,13 +65,10 @@ impl<'a> Printer<'a> {
             // - When broken: line becomes newline + indent -> `while (cond)\n\ta;`
             let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
             let body_start = stmt.body.span().start;
-            let body_doc = self.build_statement_doc(stmt.body);
+            let body_doc = self.build_statement_doc(stmt.body, false);
 
-            let mut head_parts: DocBuf = smallvec![d.text("while")];
-            if let Some(kc) = &keyword_comments {
-                head_parts.push(*kc);
-            }
-            head_parts.push(d.text(" ("));
+            let mut head_parts: DocBuf = DocBuf::new();
+            self.push_keyword_open_paren(&mut head_parts, "while", keyword_comments);
             head_parts.push(condition_group);
             self.build_adjust_clause_with_comments(&head_parts, paren_end, body_start, body_doc)
         }
@@ -98,14 +89,16 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let is_block = matches!(stmt.body, Statement::BlockStatement(_));
 
+        // A loop body collapses its empty block form (`do {} while (cond)`).
+        let body_doc = self.build_collapsing_body_doc(stmt.body);
+
         // Check for comments between `do` keyword and body
         let do_end = stmt.span.start + "do".len() as u32;
         let body_start = stmt.body.span().start;
-        let mut parts = if self.has_comments_between(do_end, body_start) {
+        let mut parts = if self.has_comments_to_emit_between(do_end, body_start) {
             let has_line = self.has_line_comments_between(do_end, body_start);
             let comment_doc =
                 self.build_inline_comments_between_doc_no_leading_space(do_end, body_start);
-            let body_doc = self.build_statement_doc(stmt.body);
             let mut p = smallvec![d.text("do")];
             if has_line && !is_block {
                 // Line comment with non-block body: indent comment + body
@@ -127,9 +120,9 @@ impl<'a> Printer<'a> {
         } else if matches!(stmt.body, Statement::EmptyStatement(_)) {
             // Prettier's `adjustClause` returns `";"` directly for an empty body
             // → `do;`, not `do ;`.
-            smallvec![d.text("do"), self.build_statement_doc(stmt.body)]
+            smallvec![d.text("do"), body_doc]
         } else {
-            smallvec![d.text("do "), self.build_statement_doc(stmt.body)]
+            smallvec![d.text("do "), body_doc]
         };
 
         // Find the while keyword position for comment handling
@@ -140,7 +133,7 @@ impl<'a> Printer<'a> {
 
         // Check for comments between } and while, determine if while stays on same line
         let while_on_same_line = if let Some(while_start) = while_pos
-            && self.has_comments_between(body_end, while_start)
+            && self.has_comments_to_emit_between(body_end, while_start)
         {
             let (inline_prev, own_line, inline_next) =
                 self.partition_comments_by_line(body_end, while_start);
@@ -182,15 +175,17 @@ impl<'a> Printer<'a> {
         }
         if let Some(kc) = keyword_comments {
             parts.push(kc);
+            parts.push(d.text("("));
+        } else {
+            parts.push(d.text(" ("));
         }
-        parts.push(d.text(" ("));
 
         // Check for comments in the condition and use preserve_inline if present
         // Use preserve_inline for do-while to intentionally differ from Prettier
         // Prettier moves comments after `while (` to outside the parens - we keep them in place
         if let (Some(open), Some(close)) = (open_paren, close_paren)
-            && (self.has_comments_between(open + 1, stmt.test.span().start)
-                || self.has_comments_between(stmt.test.span().end, close))
+            && (self.has_comments_to_emit_between(open + 1, stmt.test.span().start)
+                || self.has_comments_to_emit_between(stmt.test.span().end, close))
         {
             parts.push(self.build_condition_group_preserve_inline(&stmt.test, open, close));
         } else {

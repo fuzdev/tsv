@@ -350,10 +350,24 @@ impl<'a> Lexer<'a> {
                         break;
                     }
                 }
-                // Any other byte: decode the char (ASCII or not) and continue while it
-                // is an IdentifierPart. The ASCII fast path above already consumed the
-                // no-escape ASCII run, so the common case is one decode of the terminator;
-                // the escape path (decoded is `Some`) also re-consumes ASCII parts here.
+                // ASCII byte (the overwhelmingly common case): after the fast path this
+                // is almost always the terminator, so settle it from the byte LUT alone —
+                // no char decode, no cross-crate Unicode `is_id_continue` dispatch. The
+                // LUT equals `is_id_continue` on ASCII (the same equivalence the fast path
+                // above relies on), so this stays exact. The escape path (decoded is
+                // `Some`) re-consumes ASCII identifier parts through here too.
+                Some(b) if b < 0x80 => {
+                    if is_ascii_id_continue(b) {
+                        if let Some(d) = &mut decoded {
+                            d.push(b as char);
+                        }
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
+                // Non-ASCII lead byte: decode the full char and continue while it is an
+                // IdentifierPart.
                 Some(_) => match self.cur_char() {
                     Some(ch) if is_id_continue(ch) => {
                         if let Some(d) = &mut decoded {
@@ -457,15 +471,16 @@ impl<'a> Lexer<'a> {
 
         // Decimal point and fractional part
         if self.cur_byte() == Some(b'.') {
-            // Peek ahead: if next char is a digit or if this is trailing decimal (5.)
-            let rest = &self.source[self.position + 1..];
-            let next_char = rest.chars().next();
-            if next_char.is_some_and(|c| c.is_ascii_digit()) {
+            // Peek ahead: the common `3.14` case only needs the next byte — an ASCII
+            // digit is single-byte, so the byte test equals decoding the char, with no
+            // subslice/decode. The rarer trailing-dot-exponent (`1.e1`) path below still
+            // reads the `&str` tail.
+            if self.byte_ahead(1).is_some_and(|b| b.is_ascii_digit()) {
                 // Normal decimal: 3.14
                 is_integer = false;
                 self.advance(); // consume '.'
                 self.scan_digits(|c| c.is_ascii_digit())?;
-            } else if is_exponent_start(rest) {
+            } else if is_exponent_start(&self.source[self.position + 1..]) {
                 // Trailing-dot exponent: `1.e1` is a single numeric literal (= 1e1).
                 // Consume the '.'; the exponent block below consumes `e1`.
                 // Without this, `1.e1` would lex as `1.` followed by member access `.e1`.
@@ -597,7 +612,17 @@ impl<'a> Lexer<'a> {
         // an infix keyword. A DecimalDigit can only follow a complete number after
         // an out-of-range radix digit (`0b12`) or a BigInt suffix (`5n3`), both of
         // which the parser already rejects as adjacent number tokens.
-        if self.cur_char().is_some_and(is_id_start) {
+        // Byte-gate the IdentifierStart check: the byte after a number is almost
+        // always an ASCII terminator (`;`, `)`, whitespace, an operator), settled from
+        // the LUT with no char decode + no cross-crate `is_id_start` dispatch. The LUT
+        // equals `is_id_start` on ASCII (the same tested invariant the identifier fast
+        // paths rely on); only a non-ASCII lead byte decodes the full char.
+        let id_start_follows = match self.cur_byte() {
+            Some(b) if b < 0x80 => is_ascii_id_start(b),
+            Some(_) => self.cur_char().is_some_and(is_id_start),
+            None => false,
+        };
+        if id_start_follows {
             return Err(lex_err("Identifier directly after number", self.position));
         }
 
@@ -1253,8 +1278,17 @@ impl<'a> Lexer<'a> {
         let mut in_class = false; // Inside character class [...]
         let mut escaped = false; // Previous char was \
 
-        // Read pattern until unescaped / outside character class
-        // TODO: Validate pattern syntax (e.g., reject invalid escape sequences like \c without letter)
+        // Read pattern until unescaped / outside character class.
+        //
+        // The pattern body is deliberately NOT validated here, and this loose scan is
+        // exactly what the spec asks a lexer for: the `RegularExpressionBody` productions
+        // exist so "the input element scanner [can] find the end of the regular expression
+        // literal", and the body/flags "are subsequently parsed again using the more
+        // stringent ECMAScript Regular Expression grammar" (ecma262
+        // sec-literals-regular-expression-literals). That second parse failing is an
+        // *early error* — `IsValidRegularExpressionLiteral` — not a grammar error, so it
+        // belongs to the diagnostics layer with the other deferred early errors, and the
+        // formatter (which only ever re-emits the body verbatim) never needs it.
         loop {
             match self.cur_byte() {
                 None => {
@@ -1317,10 +1351,16 @@ impl<'a> Lexer<'a> {
 
         self.advance(); // Consume closing /
 
-        // Read flags (IdentifierPartChar = ID_Continue, plus $ for ECMAScript)
-        // TODO: Validate flags are only valid regex flags (d, g, i, m, s, u, v, y)
-        // TODO: Reject duplicate flags (e.g., /test/gg)
-        // TODO: Support Unicode escape sequences in flags (e.g., /test/\u0067 for 'g')
+        // Read flags. This IS the whole spec production — `RegularExpressionFlags ::
+        // [empty] | RegularExpressionFlags IdentifierPartChar`, and `IdentifierPartChar ::
+        // UnicodeIDContinue | $`. Note what that excludes: there is no backslash, so an
+        // escaped flag is not a flags production at all and correctly fails here, as it
+        // does in acorn — there is nothing to "support".
+        //
+        // Which flags are *legal* (`d`/`g`/`i`/`m`/`s`/`u`/`v`/`y`, each at most once) is
+        // not this loop's business: that is the first two steps of the early error
+        // `IsValidRegularExpressionLiteral`, deferred to the diagnostics layer along with
+        // the pattern parse (see the body scan above). So `/a/qqq` and `/a/gg` lex fine.
         // The flags text is recovered from the span by the parser, not sliced here;
         // this loop only advances `self.position` to the token end.
         while let Some(b) = self.cur_byte() {
@@ -1437,5 +1477,30 @@ impl<'a> Lexer<'a> {
             end: self.position as u32,
         };
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // The byte-cursor fast path and the identifier-scan terminator arm both decide
+    // ASCII identifier bytes from the `[bool; 256]` LUTs instead of decoding a char
+    // and calling the Unicode predicates. That is only sound if the LUTs agree with
+    // `is_id_start`/`is_id_continue` on every ASCII byte.
+    #[test]
+    fn ascii_id_luts_match_unicode_predicates() {
+        for b in 0u8..0x80 {
+            assert_eq!(
+                is_ascii_id_start(b),
+                is_id_start(b as char),
+                "id_start mismatch at byte {b:#x}"
+            );
+            assert_eq!(
+                is_ascii_id_continue(b),
+                is_id_continue(b as char),
+                "id_continue mismatch at byte {b:#x}"
+            );
+        }
     }
 }

@@ -4,7 +4,7 @@ use crate::ast::internal::{self, Statement};
 use crate::printer::{CommentVec, Printer};
 use smallvec::smallvec;
 use tsv_lang::Span;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -15,7 +15,7 @@ impl<'a> Printer<'a> {
     /// Used for `try /* c */ {`, `catch (e) /* c */ {`, `catch /* c */ {`, `finally /* c */ {`.
     fn append_keyword_to_body_comments(&self, parts: &mut DocBuf, token_end: u32, body_start: u32) {
         let d = self.d();
-        if self.has_comments_between(token_end, body_start) {
+        if self.has_comments_to_emit_between(token_end, body_start) {
             let has_line = self.has_line_comments_between(token_end, body_start);
             parts.push(self.build_inline_comments_between_doc(token_end, body_start));
             if has_line {
@@ -41,7 +41,7 @@ impl<'a> Printer<'a> {
         keyword: &'static str,
     ) {
         let d = self.d();
-        if self.has_comments_between(gap_start, keyword_pos) {
+        if self.has_comments_to_emit_between(gap_start, keyword_pos) {
             let has_line = self.has_line_comments_between(gap_start, keyword_pos);
             parts.push(self.build_inline_comments_between_doc(gap_start, keyword_pos));
             parts.push(if has_line { d.hardline() } else { d.text(" ") });
@@ -83,13 +83,15 @@ impl<'a> Printer<'a> {
                     self.build_keyword_paren_comments(catch_keyword_end, open_paren);
                 if let Some(kc) = keyword_comments {
                     parts.push(kc);
+                    parts.push(d.text("("));
+                } else {
+                    parts.push(d.text(" ("));
                 }
 
                 // Check for comments in catch parameter
-                parts.push(d.text(" ("));
                 if let (Some(open), Some(close)) = (open_paren, close_paren)
-                    && (self.has_comments_between(open + 1, param.span().start)
-                        || self.has_comments_between(param.span().end, close))
+                    && (self.has_comments_to_emit_between(open + 1, param.span().start)
+                        || self.has_comments_to_emit_between(param.span().end, close))
                 {
                     parts.push(self.build_condition_group_with_comments(param, open, close));
                 } else {
@@ -113,8 +115,15 @@ impl<'a> Printer<'a> {
                     handler.body.span.start,
                 );
             }
-            // Catch block stays inline: `catch (e) {}`
-            parts.push(self.build_block_statement_doc(&handler.body));
+            // Catch block stays inline (`catch (e) {}`) UNLESS a `finally`
+            // follows, in which case it expands empty like `try`/`finally` do
+            // (Prettier's `block.js`: `parent.type === "CatchClause" &&
+            // !parentParent.finalizer` is the only case that stays collapsed).
+            if stmt.finalizer.is_some() {
+                parts.push(self.build_block_statement_expand_empty_doc(&handler.body));
+            } else {
+                parts.push(self.build_block_statement_doc(&handler.body));
+            }
         }
         if let Some(finalizer) = &stmt.finalizer {
             // Check for comments before finally (after catch block or try block)
@@ -226,7 +235,7 @@ impl<'a> Printer<'a> {
 
         // Build the `: body` tail (including any colon→body comments).
         let mut tail_parts: DocBuf = smallvec![];
-        if self.has_comments_between(colon_end, body_start) {
+        if self.has_comments_to_emit_between(colon_end, body_start) {
             let has_line_comment = self.has_line_comments_between(colon_end, body_start);
             tail_parts.push(d.text(":"));
             tail_parts.push(self.build_inline_comments_between_doc(colon_end, body_start));
@@ -235,7 +244,7 @@ impl<'a> Printer<'a> {
             } else {
                 d.text(" ")
             });
-            tail_parts.push(self.build_statement_doc(stmt.body));
+            tail_parts.push(self.build_statement_doc(stmt.body, false));
         } else {
             // No space before empty statement: `label:;` not `label: ;`
             let separator = if matches!(stmt.body, Statement::EmptyStatement(_)) {
@@ -244,7 +253,7 @@ impl<'a> Printer<'a> {
                 ": "
             };
             tail_parts.push(d.text(separator));
-            tail_parts.push(self.build_statement_doc(stmt.body));
+            tail_parts.push(self.build_statement_doc(stmt.body, false));
         }
         let tail = d.concat(&tail_parts);
 
@@ -254,8 +263,11 @@ impl<'a> Printer<'a> {
         // inline would let the `//` swallow the `:` + body); an own-line block follows
         // the same rule rather than reflowing inline. A purely **same-line** block
         // stays inline before `:` (`label /* c */: body`), matching prettier.
+        // **to emit**: this set is printed below, and `relocate` is derived from it — so the
+        // two agree by construction. Nothing can be owned here anyway: an owned comment binds
+        // to the token that follows it, and `:` begins no node.
         let gap_comments: CommentVec<'_> =
-            comments_in_range(self.comments, label_end, colon_pos as u32).collect();
+            comments_to_emit_in_range(self.comments, label_end, colon_pos as u32).collect();
         let relocate = gap_comments.iter().any(|c| self.is_own_line_comment(c));
 
         let mut parts: DocBuf = smallvec![];

@@ -6,12 +6,12 @@
 // - Building argument lists split into head/last patterns
 
 use super::super::{
-    ArrowChainContext, CommentFilter, CommentSpacing, Printer, has_newline_before_position,
+    ArrowChainContext, CommentSpacing, Printer, has_newline_before_position,
     is_curried_arrow_chain, is_multiline_template_expression,
 };
 use super::arg_comments::{
     emit_first_arg_leading_comments, find_comma_pos, has_blank_line_between_args,
-    is_inline_block_after_comma, is_inline_block_before_comma,
+    is_inline_block_after_comma, is_inline_block_before_comma, push_empty_args,
 };
 use super::arg_predicates::{
     arrow_body_is_call_through_non_null, is_block_function, is_short_second_arg_for_expand_first,
@@ -19,7 +19,7 @@ use super::arg_predicates::{
 use crate::ast::internal;
 use crate::printer::expressions::functions::has_leftmost_object_expression;
 use smallvec::smallvec;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 
@@ -27,7 +27,8 @@ use tsv_lang::doc::arena::{DocArena, DocId};
 ///
 /// Used when we want the signature to stay on one line (e.g., `(x) =>`).
 /// Does NOT include the ` =>` - caller adds that.
-/// Only handles untyped arrows (no type params, no return type, no param types).
+/// Handles arrows with no type parameters and no return type; param-level type
+/// annotations are fine (emitted via `build_function_parameter_doc`).
 pub(crate) fn build_arrow_inline_signature(
     printer: &Printer<'_>,
     arrow: &internal::ArrowFunctionExpression<'_>,
@@ -38,17 +39,10 @@ pub(crate) fn build_arrow_inline_signature(
         sig_parts.push(d.text("async "));
     }
     if arrow.params.is_empty() {
-        if let Some(open) = arrow.params_start
-            && let Some(close_after) = printer.find_closing_paren(open, arrow.body.span().start)
-            && let Some(comment_doc) = printer
-                .build_inline_comments_between_doc_no_leading_space_opt(open + 1, close_after - 1)
-        {
-            sig_parts.push(d.text("("));
-            sig_parts.push(comment_doc);
-            sig_parts.push(d.text(")"));
-        } else {
-            sig_parts.push(d.text("()"));
-        }
+        sig_parts.push(
+            printer
+                .build_empty_params_with_comments_doc(arrow.params_start, arrow.body.span().start),
+        );
     } else {
         sig_parts.push(d.text("("));
         sig_parts.push(
@@ -74,11 +68,17 @@ pub(crate) fn build_arrow_sig_doc(
     printer: &Printer<'_>,
     arrow: &internal::ArrowFunctionExpression<'_>,
 ) -> DocId {
-    if arrow_has_type_annotations(arrow) {
+    let sig = if arrow_has_return_or_type_params(arrow) {
         printer.d().group(printer.build_arrow_signature_doc(arrow))
     } else {
         build_arrow_inline_signature(printer, arrow)
-    }
+    };
+    // Every call-argument state that reassembles an arrow from signature + body starts
+    // here, and none of them route the arrow through `build_expression_doc` — so this is
+    // the only place its owned leading comment can be claimed. An owned comment nothing
+    // prints is a *dropped* comment (`f(/** @param {any} n */ (n) => g(n))`), so the
+    // claim must live on the same seam the reassembly does. See `comments/owned.rs`.
+    printer.prepend_owned_leading_comment_at(arrow.span.start, sig)
 }
 
 /// Prepend any comments between arrow `=>` and body expression to `body_doc`.
@@ -93,7 +93,7 @@ pub(crate) fn prepend_arrow_body_comments(
     body_start: u32,
     body_doc: DocId,
 ) -> DocId {
-    let arrow_end = printer.find_arrow_token_for(arrow) + "=>".len() as u32;
+    let arrow_end = arrow.arrow_token + "=>".len() as u32;
 
     // Prepend inline comments between `=>` and body. Glued: a single-line block
     // hugged to `=>` stays with the body across a source newline, matching the main
@@ -226,12 +226,13 @@ pub(super) fn classify_chain_arg(arg: &internal::Expression<'_>) -> ChainArgKind
         | internal::Expression::ArrayExpression(_)
         | internal::Expression::FunctionExpression(_)
         | internal::Expression::ClassExpression(_) => ChainArgKind::HugsNaturally,
-        // TS type wrappers: classify based on the inner expression
-        // e.g., `{...} as any` hugs, `longExpr as T` soft-wraps
+        // TS cast wrappers: classify based on the inner expression
+        // e.g., `{...} as any` hugs, `longExpr as T` soft-wraps. Mirrors prettier's
+        // couldExpandArg, which looks through `as`/`satisfies`/`<T>` but NOT a
+        // non-null assertion, so `{...}!` / `[...]!` soft-wraps rather than hugging.
         internal::Expression::TSAsExpression(e) => classify_chain_arg(e.expression),
         internal::Expression::TSSatisfiesExpression(e) => classify_chain_arg(e.expression),
         internal::Expression::TSTypeAssertion(e) => classify_chain_arg(e.expression),
-        internal::Expression::TSNonNullExpression(e) => classify_chain_arg(e.expression),
         // Arrow functions: prettier's couldExpandArg keys on the body type and
         // looks through the return-type annotation, so arrows are classified by
         // their body regardless of any return type.
@@ -242,35 +243,17 @@ pub(super) fn classify_chain_arg(arg: &internal::Expression<'_>) -> ChainArgKind
     }
 }
 
-/// Check if an arrow function has any type annotations (return type, type params, or param types).
+/// Check if an arrow function has a return type or type parameters.
 ///
-/// Used to determine formatting behavior - arrows with type annotations often need
-/// different breaking strategies than untyped arrows.
-pub(crate) fn arrow_has_type_annotations(arrow: &internal::ArrowFunctionExpression<'_>) -> bool {
-    arrow.return_type.is_some()
-        || arrow.type_parameters.is_some()
-        || arrow.params.iter().any(param_has_type_annotation)
-}
-
-/// Check if a function parameter has a type annotation.
-///
-/// Handles all parameter patterns: Identifier, ArrayPattern, ObjectPattern, AssignmentPattern.
-fn param_has_type_annotation(param: &internal::Expression<'_>) -> bool {
-    match param {
-        internal::Expression::Identifier(id) => id.type_annotation().is_some(),
-        internal::Expression::ArrayPattern(arr) => arr.type_annotation.is_some(),
-        internal::Expression::ObjectPattern(obj) => obj.type_annotation.is_some(),
-        internal::Expression::AssignmentPattern(assign) => {
-            // Assignment patterns wrap another pattern/identifier
-            match assign.left {
-                internal::Expression::Identifier(id) => id.type_annotation().is_some(),
-                internal::Expression::ArrayPattern(arr) => arr.type_annotation.is_some(),
-                internal::Expression::ObjectPattern(obj) => obj.type_annotation.is_some(),
-                _ => false,
-            }
-        }
-        _ => false,
-    }
+/// These are the parts `build_arrow_inline_signature` can't render, so an arrow
+/// carrying either needs the full grouped signature. A param-level type annotation
+/// does NOT need it — the inline signature emits param types too (via
+/// `build_function_parameter_doc`), so a params-only-typed arrow renders identically
+/// either way.
+pub(crate) fn arrow_has_return_or_type_params(
+    arrow: &internal::ArrowFunctionExpression<'_>,
+) -> bool {
+    arrow.return_type.is_some() || arrow.type_parameters.is_some()
 }
 
 /// Classify how an arrow function body should be formatted in chain context.
@@ -456,8 +439,8 @@ pub(crate) fn build_args_split_last(
     has_comments: bool,
 ) -> (DocBuf, DocId, DocId) {
     let d = printer.d();
-    // Build all args (using build_huggable_expression_doc for proper parens on assignments
-    // and isolated_group wrapping for templates).
+    // Build all args (using build_arg_expression_doc for argument-context parens on
+    // assignments, and the indented binary/conditional layouts).
     //
     // A curried arrow-chain argument (`fn(x, (a) => (b) => …)`) routes through the
     // progressive call-arg chain layout: set the context so the outermost chain
@@ -471,10 +454,10 @@ pub(crate) fn build_args_split_last(
             if is_curried_arrow_chain(arg) {
                 printer
                     .build_with_arrow_chain_context(ArrowChainContext::CallArgOrBinaryish, || {
-                        printer.build_huggable_expression_doc(arg)
+                        printer.build_arg_expression_doc(arg)
                     })
             } else {
-                printer.build_huggable_expression_doc(arg)
+                printer.build_arg_expression_doc(arg)
             }
         })
         .collect();
@@ -509,7 +492,8 @@ pub(crate) fn build_args_split_last(
 
             // Add inline block comments around comma
             if let Some(cpos) = comma_pos {
-                for comment in comments_in_range(printer.comments, arg_end, next_arg_start) {
+                for comment in comments_to_emit_in_range(printer.comments, arg_end, next_arg_start)
+                {
                     if is_inline_block_before_comma(comment, cpos, printer.line_breaks, arg_end) {
                         head_parts.push(d.text(" "));
                         head_parts.push(printer.build_comment_doc(comment));
@@ -520,7 +504,8 @@ pub(crate) fn build_args_split_last(
             head_parts.push(d.text(", "));
 
             if let Some(cpos) = comma_pos {
-                for comment in comments_in_range(printer.comments, arg_end, next_arg_start) {
+                for comment in comments_to_emit_in_range(printer.comments, arg_end, next_arg_start)
+                {
                     if is_inline_block_after_comma(comment, cpos, printer.line_breaks, arg_end) {
                         head_parts.push(printer.build_comment_doc(comment));
                         head_parts.push(d.text(" "));
@@ -554,7 +539,8 @@ pub(crate) fn build_args_split_last(
 
             // Only add inline block comments that are BEFORE the comma
             if let Some(cpos) = comma_pos {
-                for comment in comments_in_range(printer.comments, arg_end, next_arg_start) {
+                for comment in comments_to_emit_in_range(printer.comments, arg_end, next_arg_start)
+                {
                     if is_inline_block_before_comma(comment, cpos, printer.line_breaks, arg_end) {
                         all_args_parts.push(d.text(" "));
                         all_args_parts.push(printer.build_comment_doc(comment));
@@ -789,7 +775,7 @@ pub(crate) fn build_args_joined_with_comments(
             let arg_end = arg.span().end;
             let next_arg_start = arguments[i + 1].span().start;
 
-            if printer.has_comments_between(arg_end, next_arg_start) {
+            if printer.has_comments_to_emit_between(arg_end, next_arg_start) {
                 let pc = printer.open_inter_arg_gap(&mut parts, arg_end, next_arg_start);
                 // A line comment runs to EOL → hard-break; otherwise honor the caller's style.
                 parts.push(if pc.has_trailing_line() || use_hardline {
@@ -828,21 +814,29 @@ pub(super) fn should_expand_first_arg(
         return false;
     }
 
-    // Prettier's couldExpandArg returns true for objects/arrays with hasComment(node),
-    // which includes leading comments. This makes !couldExpandArg(secondArg) = false,
-    // blocking shouldExpandFirstArg. Without this check, the expand-first path also
-    // drops the leading comment (SAFETY).
+    // Prettier's couldExpandArg returns true for a bare object/array with a leading
+    // comment (`hasComment(node)`), so `!couldExpandArg(secondArg)` is false and it
+    // breaks all args. tsv matches by blocking expand-first here. A cast-wrapped
+    // collection (`/* c */ {} as T`) is deliberately NOT blocked — prettier's comment
+    // attaches to the cast, `couldExpandArg` stays false, and it expand-firsts; the
+    // expand-first path carries the inter-arg leading comment via
+    // `build_after_comma_leading_comments`.
+    //
+    // **on page** (both probes): prettier's `couldExpandArg` asks `hasComment(node)`, a
+    // pure layout question — an owned annotation is on the page and blocks the hug just
+    // like any other comment. Kept in lockstep with the twin guard in
+    // `chain_args::should_expand_first_arg_for_chain`.
     if matches!(
         &args[1],
         internal::Expression::ObjectExpression(_) | internal::Expression::ArrayExpression(_)
-    ) && printer.has_comments_between(args[0].span().end, args[1].span().start)
+    ) && printer.has_comments_on_page_between(args[0].span().end, args[1].span().start)
     {
         return false;
     }
 
     // Second arg must be short/simple
     is_short_second_arg_for_expand_first(&args[1], |start, end| {
-        printer.has_comments_between(start, end)
+        printer.has_comments_on_page_between(start, end)
     })
 }
 
@@ -885,34 +879,9 @@ pub(super) fn build_empty_args_doc(
     after_type_args: u32,
     paren_close: u32,
 ) -> DocId {
-    let d = printer.d();
     let mut parts: DocBuf = smallvec![callee];
-    if let Some(paren_pos) = printer.find_char_outside_comments(after_type_args, paren_close, b'(')
-    {
-        let pre_paren_comments = printer.build_comments_between_filtered_opt(
-            after_type_args,
-            paren_pos,
-            CommentSpacing::Leading,
-            CommentFilter::All,
-        );
-        let inside_paren_comments = printer
-            .build_inline_comments_between_doc_no_leading_space_opt(paren_pos + 1, paren_close);
-        if let Some(pre) = pre_paren_comments {
-            parts.push(pre);
-        }
-        match inside_paren_comments {
-            Some(inner) => {
-                parts.push(d.text("("));
-                parts.push(inner);
-                parts.push(d.text(")"));
-            }
-            None => parts.push(d.text("()")),
-        }
-    } else {
-        // Fallback: no `(` found (shouldn't happen for valid code)
-        parts.push(d.text("()"));
-    }
-    d.concat(&parts)
+    push_empty_args(printer, &mut parts, after_type_args, paren_close, "(", "()");
+    printer.d().concat(&parts)
 }
 
 /// Single multiline-template argument on the same line as `(` — hug it,
@@ -965,12 +934,16 @@ pub(super) fn build_args_with_blank_lines(
         if i > 0 {
             let prev_end = args[i - 1].span().end;
             let curr_start = arg.span().start;
-            if !printer.has_comments_between(prev_end, curr_start)
+            // Nothing to emit in the gap, but a comment can still physically *be* there —
+            // an owned annotation leading this argument. The blank-line scan counts raw
+            // newlines, so it must stop at the comment: `[prev_end, comment_start)` excludes
+            // the annotation's own newlines yet keeps an authored blank line *before* it.
+            if !printer.has_comments_to_emit_between(prev_end, curr_start)
                 && has_blank_line_between_args(
                     printer.source,
                     printer.line_breaks,
                     prev_end,
-                    curr_start,
+                    printer.blank_scan_end(prev_end, curr_start),
                 )
             {
                 arg_parts.push(d.literalline());
@@ -988,7 +961,7 @@ pub(super) fn build_args_with_blank_lines(
             let arg_end = arg.span().end;
             let next_start = args[i + 1].span().start;
 
-            if printer.has_comments_between(arg_end, next_start) {
+            if printer.has_comments_to_emit_between(arg_end, next_start) {
                 let pc = printer.open_inter_arg_gap(&mut arg_parts, arg_end, next_start);
 
                 let next_has_blank = pc.has_blank_line_in_gap(printer.source, printer.line_breaks);
@@ -1001,12 +974,13 @@ pub(super) fn build_args_with_blank_lines(
             } else {
                 arg_parts.push(d.text(","));
                 // Skip hardline if next arg has blank line
-                // (handled at top of next iteration)
+                // (handled at top of next iteration — same physical scan window, so the
+                // two agree even when an owned annotation sits in the gap).
                 let next_has_blank = has_blank_line_between_args(
                     printer.source,
                     printer.line_breaks,
                     arg_end,
-                    next_start,
+                    printer.blank_scan_end(arg_end, next_start),
                 );
                 if !next_has_blank {
                     arg_parts.push(d.hardline());

@@ -38,15 +38,15 @@ mod program;
 mod statements;
 mod types;
 
-use analysis::needs_isolation_for_hugging;
 // Layout predicates re-exported from the crate root for embedders (tsv_svelte's
 // {@const} assignment layout reuses Prettier's break-after-operator rules).
 pub use analysis::conditional_should_break_after_op;
 pub(crate) use analysis::{
     PatternContext, build_entity_name_doc, has_multiline_content, has_newline_before_position,
-    is_brace_block_multiline, is_module_path_fluid_call, is_multiline_string_literal,
-    is_multiline_template_expression, is_pure_property_chain, is_string_literal,
-    object_pattern_should_expand, template_literal_has_newlines,
+    is_brace_block_multiline, is_effectively_empty_body, is_module_path_fluid_call,
+    is_multiline_string_literal, is_multiline_template_expression, is_pure_property_chain,
+    is_string_literal, next_printed_stmt_start, object_pattern_should_expand,
+    template_literal_has_newlines,
 };
 pub(crate) use comments::{
     CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue,
@@ -57,7 +57,7 @@ pub(crate) use expressions::assignment::{
     is_curried_arrow_chain, is_curried_arrow_with_return_type, is_literal_member_chain,
     is_poorly_breakable_chain, is_regex_root_chain, is_self_expanding_value,
     is_simple_self_expanding, is_simple_value, is_single_call_on_member_chain,
-    is_type_assertion_call,
+    is_type_assertion_call, jsdoc_cast_comment_is_own_line,
 };
 pub(crate) use needs_parens::{ParenContext, is_in_binary, needs_parens};
 pub(crate) use types::{should_hug_union_type, unwrap_parenthesized};
@@ -69,12 +69,13 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use tsv_lang::{
     EmbedContext, OutputBuffer, SharedInterner, Span, SymbolResolver, SymbolToU32, TAB_WIDTH,
-    comments_in_range,
+    comments_to_emit_in_range,
     doc::{
         self,
         arena::{DocArena, DocId},
     },
-    has_comments_in_range, has_line_comments_in_range, is_format_ignore_directive, printing,
+    has_comments_to_emit_in_range, has_line_comments_in_range, is_format_ignore_directive,
+    printing,
     source_scan::{TriviaProfile, skip_trivia},
 };
 
@@ -214,6 +215,16 @@ pub struct Printer<'a> {
     /// Keyed by span (unique per source position); nested expand-last calls
     /// save/restore, so only the node currently being reused ever matches.
     pub(crate) arrow_body_inject: Cell<Option<(u32, DocId)>>,
+    /// Whether the member chain currently being built has any comment anywhere in its
+    /// span. Set once per `build_chain_doc` (save/restore, so a nested chain in a call
+    /// arg / base restores the parent's value on exit — re-entrancy-safe like
+    /// [`Self::chain_arg_share`]). The chain print path reads it to skip per-member
+    /// comment classification when the whole chain is comment-free (the common case).
+    /// Safe by construction: the flag only *enables* a skip whose soundness is
+    /// span-containment (a member's comment gap ⊆ the chain span), so a stale value can
+    /// only cause more work, never a dropped comment. Defaults `true` (do the full
+    /// classify) so any member print reached without a preceding set is fail-safe.
+    pub(crate) chain_has_comments: Cell<bool>,
 }
 
 impl<'a> Printer<'a> {
@@ -251,6 +262,7 @@ impl<'a> Printer<'a> {
             chain_arg_share: RefCell::new(HashMap::new()),
             chain_arg_share_active: Cell::new(false),
             arrow_body_inject: Cell::new(None),
+            chain_has_comments: Cell::new(true),
         }
     }
 
@@ -427,20 +439,6 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Build expression doc with IsolatedGroup wrapping for huggable expressions.
-    ///
-    /// Wraps templates and arrow-with-template-body in `isolated_group` to prevent
-    /// internal breaks from forcing parent calls/arrays to break (enables hugging).
-    pub(crate) fn build_huggable_expression_doc(&self, expr: &internal::Expression<'_>) -> DocId {
-        let d = self.d();
-        let base_doc = self.build_arg_expression_doc(expr);
-        if needs_isolation_for_hugging(expr) {
-            d.isolated_group(base_doc)
-        } else {
-            base_doc
-        }
-    }
-
     /// Whether `build_arg_expression_doc` may share its result via `chain_arg_share`.
     /// True only while a member chain is building (`chain_arg_share_active`) AND the two
     /// flags that make the flat vs expanded chain-group builds diverge are clear — see
@@ -608,11 +606,56 @@ impl<'a> Printer<'a> {
         usize::midpoint(start_pos, end_pos) as u32
     }
 
-    /// Check if there are comments between two positions (read-only check)
+    /// **to emit**: whether *this* caller has a comment to print in `[start, end)`.
     ///
-    /// Uses binary search: O(log n)
-    pub(crate) fn has_comments_between(&self, start: u32, end: u32) -> bool {
-        has_comments_in_range(self.comments, start, end)
+    /// Skips a comment a node owns and prints itself
+    /// ([`tsv_lang::Comment::owned_by_node`]). See `tsv_lang::comment` for the three
+    /// axes — a *layout* gate wants [`Self::has_comments_on_page_between`] and a source
+    /// cursor wants [`Self::comments_in_source_between`].
+    pub(crate) fn has_comments_to_emit_between(&self, start: u32, end: u32) -> bool {
+        has_comments_to_emit_in_range(self.comments, start, end)
+    }
+
+    /// **on page**: whether any comment occupies the page in `[start, end)` — an owned
+    /// comment **counted**.
+    ///
+    /// The existence check for a *layout* gate (break / expand / hug / paren /
+    /// fast-path). An owned comment is printed by its own node rather than by this gap,
+    /// but it is still in the output and still occupies width, so a layout decision must
+    /// see it. Using [`Self::has_comments_to_emit_between`] here makes the comment
+    /// silently vanish from a decision it is visibly part of.
+    pub(crate) fn has_comments_on_page_between(&self, start: u32, end: u32) -> bool {
+        tsv_lang::has_comments_on_page_in_range(self.comments, start, end)
+    }
+
+    /// **on page**: every comment occupying the page in `[start, end)` — an owned comment
+    /// **counted**.
+    ///
+    /// The iterator form of [`Self::has_comments_on_page_between`], for a layout gate whose
+    /// rule is per-comment (`.any(|c| …)`). Same membership as
+    /// [`Self::comments_in_source_between`] — on-page and in-source both count an owned
+    /// comment, only *to emit* skips it — but the name says which question is being asked.
+    pub(crate) fn comments_on_page_between(
+        &self,
+        start: u32,
+        end: u32,
+    ) -> impl Iterator<Item = &'a internal::Comment> {
+        tsv_lang::comments_on_page_in_range(self.comments, start, end)
+    }
+
+    /// **in source**: every comment physically inside `[start, end)` — an owned comment
+    /// **counted**.
+    ///
+    /// For a cursor stepping over comment *bytes*: a blank-line scan, an offset, a
+    /// `prev_end`. The bytes are in the file regardless of who prints them, so a scan
+    /// that skipped an owned comment would read its own newlines as an author's blank
+    /// line — and emit a blank line that was never written.
+    pub(crate) fn comments_in_source_between(
+        &self,
+        start: u32,
+        end: u32,
+    ) -> impl Iterator<Item = &'a internal::Comment> {
+        tsv_lang::comments_in_source_range(self.comments, start, end)
     }
 
     /// Position to start scanning from when looking for comments that trail the
@@ -624,7 +667,7 @@ impl<'a> Printer<'a> {
     /// from the argument's own end.
     pub(crate) fn last_arg_comment_scan_start(&self, arg: &internal::Expression<'_>) -> u32 {
         if let internal::Expression::SpreadElement(spread) = arg
-            && self.has_comments_between(spread.argument.span().end, spread.span.end)
+            && self.has_comments_on_page_between(spread.argument.span().end, spread.span.end)
         {
             spread.argument.span().end
         } else {
@@ -668,8 +711,12 @@ impl<'a> Printer<'a> {
     /// Multiline block comments (containing newlines) force break-after-operator
     /// layout in assignments and property values.
     /// Prettier ref: `hasLeadingOwnLineComment` in assignment.js `chooseLayout`
-    pub(crate) fn has_multiline_block_comments_between(&self, start: u32, end: u32) -> bool {
-        tsv_lang::has_multiline_block_comments_in_range(self.comments, start, end)
+    pub(crate) fn has_multiline_block_comments_on_page_between(
+        &self,
+        start: u32,
+        end: u32,
+    ) -> bool {
+        tsv_lang::has_multiline_block_comments_on_page_in_range(self.comments, start, end)
     }
 
     /// Whether comments in the range force the following value onto its own line.
@@ -693,7 +740,7 @@ impl<'a> Printer<'a> {
     /// guard; use that variant only at the two carve-out sites where prettier
     /// *keeps* that break (binary/logical operands, `export default`).
     pub(crate) fn comments_force_own_line_between(&self, start: u32, end: u32) -> bool {
-        self.any_comment_with_next(start, end, |c, next| {
+        self.any_comment_on_page_with_next(start, end, |c, next| {
             !c.is_block || (c.multiline && self.has_newline_between(c.span.end, next))
         })
     }
@@ -712,7 +759,7 @@ impl<'a> Printer<'a> {
     /// own-line single-line block inline; that is the gate for every other
     /// keyword→value gap.
     pub(crate) fn comment_forces_following_own_line(&self, start: u32, end: u32) -> bool {
-        self.any_comment_with_next(start, end, |c, next| {
+        self.any_comment_on_page_with_next(start, end, |c, next| {
             !c.is_block || self.has_newline_between(c.span.end, next)
         })
     }
@@ -723,7 +770,7 @@ impl<'a> Printer<'a> {
     /// where prettier breaks on the blank even though the own-line comment alone
     /// does not.
     pub(crate) fn comment_followed_by_blank(&self, start: u32, end: u32) -> bool {
-        self.any_comment_with_next(start, end, |c, next| {
+        self.any_comment_on_page_with_next(start, end, |c, next| {
             self.has_blank_line_between(c.span.end, next)
         })
     }
@@ -732,14 +779,19 @@ impl<'a> Printer<'a> {
     /// if `pred(comment, next_start)` holds for any — where `next_start` is the
     /// following comment's start, or `end` for the last. The shared primitive behind
     /// the gap predicates above (each keys a per-comment rule on the gap to whatever
-    /// follows it). `peekable` over `comments_in_range`, so no allocation.
-    fn any_comment_with_next(
+    /// follows it). `peekable`, so no allocation.
+    ///
+    /// **on page**: every caller is a layout gate (prettier's `hasLeadingOwnLineComment`
+    /// and friends — does the comment hang the value / force the break?). An owned
+    /// annotation is on the page and hangs the value exactly as any other own-line comment
+    /// does, so the scan is physical.
+    fn any_comment_on_page_with_next(
         &self,
         start: u32,
         end: u32,
         pred: impl Fn(&internal::Comment, u32) -> bool,
     ) -> bool {
-        let mut comments = comments_in_range(self.comments, start, end).peekable();
+        let mut comments = tsv_lang::comments_in_source_range(self.comments, start, end).peekable();
         while let Some(c) = comments.next() {
             let next = comments.peek().map_or(end, |n| n.span.start);
             if pred(c, next) {
@@ -809,7 +861,9 @@ impl<'a> Printer<'a> {
     {
         let open_bracket = span.start;
 
-        for comment in comments_in_range(self.comments, open_bracket + 1, span.end - 1) {
+        for comment in
+            tsv_lang::comments_in_source_range(self.comments, open_bracket + 1, span.end - 1)
+        {
             if !comment.is_block || comment.multiline {
                 continue;
             }
@@ -920,52 +974,6 @@ impl<'a> Printer<'a> {
         .map(|i| (i + keyword.len()) as u32)
     }
 
-    /// Find the `=>` token position for an arrow function.
-    ///
-    /// Computes the signature end from the arrow's structure and scans for `=>`.
-    /// Returns the position of `=` in `=>`, or the body start as fallback.
-    pub(crate) fn find_arrow_token_for(
-        &self,
-        arrow: &internal::ArrowFunctionExpression<'_>,
-    ) -> u32 {
-        let body_start = arrow.body.span().start;
-        let sig_end = if let Some(rt) = &arrow.return_type {
-            rt.span.end
-        } else if let Some(ps) = arrow.params_start {
-            self.find_closing_paren(ps, body_start)
-                .unwrap_or(body_start)
-        } else {
-            arrow
-                .params
-                .last()
-                .map_or(arrow.span.start, |p| p.span().end)
-        };
-        self.find_arrow_token(sig_end, body_start)
-            .unwrap_or(body_start)
-    }
-
-    /// Find the `=>` token between a start position and end boundary.
-    ///
-    /// Scans the source to find `=>`. Returns the position OF the `=` character
-    /// (the start of the arrow token). Skips over comments and strings.
-    pub(crate) fn find_arrow_token(&self, start: u32, end: u32) -> Option<u32> {
-        let source = self.source.as_bytes();
-        let end = (end as usize).min(source.len());
-        let mut i = start as usize;
-
-        while i + 1 < end {
-            if let Some(past) = skip_trivia(source, i, end, TriviaProfile::JS) {
-                i = past;
-                continue;
-            }
-            if source[i] == b'=' && source[i + 1] == b'>' {
-                return Some(i as u32);
-            }
-            i += 1;
-        }
-        None
-    }
-
     /// Find a keyword between a start position and end boundary.
     ///
     /// Returns the position of the first character of the keyword if found.
@@ -1041,8 +1049,12 @@ impl<'a> Printer<'a> {
 
     /// Check if any comment in the range is a format-ignore directive.
     /// Used to emit the next node as raw source text instead of formatting.
+    ///
+    /// Axis-free: ownership binds only a *bundler annotation* (`@__NAME__`) or a JSDoc cast,
+    /// and neither is a format-ignore directive — no owned comment can ever match this
+    /// predicate, so skipping and counting give the same answer.
     fn has_format_ignore_in_range(&self, start: u32, end: u32) -> bool {
-        comments_in_range(self.comments, start, end)
+        comments_to_emit_in_range(self.comments, start, end)
             .any(|c| is_format_ignore_directive(c.content(self.source)))
     }
 
@@ -1070,6 +1082,11 @@ impl<'a> Printer<'a> {
             start,
             end: start + trimmed.len() as u32,
         };
+        // The comments inside a format-ignored node ride out in the raw slice, never
+        // reaching `build_comment_doc` — tell the ledger so they don't read as dropped.
+        #[cfg(feature = "comment_check")]
+        tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
+
         self.d().source_span(span, self.source)
     }
 

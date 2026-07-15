@@ -167,6 +167,29 @@ impl<'a> Printer<'a> {
         self.buffer.write(s);
     }
 
+    /// Write `span` of the source **verbatim** to the buffer.
+    ///
+    /// The format-ignore seam for a whole `<script>` / `<style>` section: the island's
+    /// comments (which `Root.comments` holds) ride out inside the raw slice and never
+    /// reach an emitter, so the ledger is told the range is covered. The doc-side
+    /// verbatim seams use [`Self::verbatim_source_doc`].
+    pub(crate) fn write_verbatim_span(&mut self, span: Span) {
+        #[cfg(feature = "comment_check")]
+        tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
+
+        self.write(span.extract(self.source));
+    }
+
+    /// A doc emitting `span` of the source **verbatim** — the doc-side twin of
+    /// [`Self::write_verbatim_span`] (a format-ignored template node, a format-ignore
+    /// range).
+    pub(crate) fn verbatim_source_doc(&self, span: Span) -> DocId {
+        #[cfg(feature = "comment_check")]
+        tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
+
+        self.d().source_span(span, self.source)
+    }
+
     /// Get the source code
     pub(crate) fn source(&self) -> &str {
         self.source
@@ -279,6 +302,12 @@ pub(crate) fn format_svelte_in(
     source: &str,
     arena: &DocArena,
 ) -> String {
+    // The print-once comment ledger's expectation for this document (diagnostic; see
+    // `tsv_lang::comment_ledger`). `Root.comments` is the `<script>` + template-expression
+    // comments; the `<style>` island registers its own through `tsv_css`.
+    #[cfg(feature = "comment_check")]
+    tsv_lang::comment_ledger::register_parsed(source, &root.comments);
+
     let mut printer = Printer::new(arena, source, Rc::clone(&root.interner), &root.comments);
     printer.print_root(root);
     printer.into_string()
@@ -477,7 +506,7 @@ impl<'a> Printer<'a> {
                 }
                 self.print_section_comments(comments, &root.fragment, script.span.start);
                 if self.has_format_ignore_before(&root.fragment, script.span.start) {
-                    self.write(script.span.extract(self.source));
+                    self.write_verbatim_span(script.span);
                     self.write("\n");
                 } else {
                     self.print_script(script);
@@ -511,7 +540,7 @@ impl<'a> Printer<'a> {
             }
             self.print_section_comments(&style_comments, &root.fragment, style.span.start);
             if ignore_style {
-                self.write(style.span.extract(self.source));
+                self.write_verbatim_span(style.span);
                 self.write("\n");
             } else {
                 self.print_style(style);
@@ -641,10 +670,7 @@ impl<'a> Printer<'a> {
                 // comment — emit the slice as a span, no allocation.
                 let raw_start = nodes[i].span().end;
                 let raw_end = nodes[range_end].span().end;
-                out.push(
-                    self.d()
-                        .source_span(Span::new(raw_start, raw_end), self.source),
-                );
+                out.push(self.verbatim_source_doc(Span::new(raw_start, raw_end)));
                 // The whitespace after the end comment is trimmed by the next segment's
                 // boundary, so re-emit it as the separator before that segment.
                 if let Some(sep) = self.range_trailing_separator(nodes, range_end) {

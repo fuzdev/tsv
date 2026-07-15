@@ -13,7 +13,7 @@
 //
 // - prettier/src/language-js/print/assignment.js
 
-use crate::ast::internal::{self, Expression};
+use crate::ast::internal::{self, Expression, JsdocCast};
 use crate::printer::ArrowChainContext;
 use crate::printer::Printer;
 use crate::printer::conditional_should_break_after_op;
@@ -54,6 +54,41 @@ pub enum AssignmentLayout {
     Fluid,
 }
 
+/// Whether the author gave a JSDoc cast's comment a line of its own — a newline on
+/// **both** sides of it, as in `const a =⏎\t/** @type {A} */⏎\t(expr)`.
+///
+/// Both sides is the rule prettier applies, and only that shape hangs. A newline on
+/// one side alone collapses to a space:
+///
+/// ```js
+/// const a = /** @type {A} */⏎  (expr);  // →  const a = /** @type {A} */ (expr);
+/// const a =⏎  /** @type {A} */ (expr);  // →  const a = /** @type {A} */ (expr);
+/// ```
+///
+/// The single source of truth for both consequences of that shape: the hang itself
+/// (`choose_layout` below, and the declarator's own predicates in
+/// `statements/variable.rs`) and the hardline the cast prints between the comment and
+/// its `(` (`build_jsdoc_cast_doc`). They must agree — a hang without the hardline
+/// leaves the `(` stranded, and a hardline without the hang un-indents it.
+pub fn jsdoc_cast_comment_is_own_line(cast: &JsdocCast<'_>, source: &str) -> bool {
+    let bytes = source.as_bytes();
+    // Only whitespace between the start of the line and the comment.
+    let mut i = cast.comment.span.start as usize;
+    let newline_before = loop {
+        if i == 0 {
+            break true;
+        }
+        i -= 1;
+        match bytes[i] {
+            b'\n' => break true,
+            b' ' | b'\t' | b'\r' => {}
+            _ => break false,
+        }
+    };
+    newline_before
+        && !tsv_lang::printing::is_same_line(source, cast.comment.span.end, cast.span.start)
+}
+
 /// Choose the layout strategy for an assignment
 ///
 /// Follows prettier's `chooseLayout` logic in assignment.js
@@ -61,9 +96,16 @@ pub enum AssignmentLayout {
 /// `is_short_key`: True for property keys shorter than `tabWidth + MIN_OVERLAP_FOR_BREAK`.
 /// Short keys don't benefit from breaking after the colon. For non-property assignments
 /// (e.g., `x = value`), pass `false`.
+///
+/// `can_break_left`: Whether the printed left-hand side contains a break point
+/// (prettier's `canBreakLeftDoc`). It gates the `never-break-after-operator` cases: an
+/// unbreakable RHS may only stay welded to the operator when the LHS has nowhere to
+/// break either — otherwise the assignment falls through to `fluid` and breaks after the
+/// operator, rather than letting the LHS break inside the assignment target.
 pub fn choose_layout(
     right_expr: &Expression<'_>,
     is_short_key: bool,
+    can_break_left: bool,
     source: &str,
     print_width: usize,
     comments: &[Comment],
@@ -127,18 +169,23 @@ pub fn choose_layout(
 
     // Short property keys → never break after operator
     // (wrapping object properties with very short keys usually doesn't add much value)
-    if is_short_key {
+    if is_short_key && !can_break_left {
         return AssignmentLayout::NeverBreakAfterOperator;
     }
 
     // Check if RHS is a poorly breakable chain (should break after operator)
-    // Note: is_short_key is false here due to early return above
     if should_break_after_operator(right_expr, source, print_width, comments) {
         return AssignmentLayout::BreakAfterOperator;
     }
 
-    // Simple values that shouldn't break → never break after operator
-    if is_simple_value(right_expr) {
+    // Simple values that shouldn't break → never break after operator.
+    //
+    // Only when the LHS can't break either (prettier's `!canBreakLeftDoc`, assignment.js
+    // chooseLayout:181-191). When it CAN — `params['key'] = \`template\`;`, whose computed
+    // lookup is a breakable group — welding the unbreakable RHS to the operator would
+    // force the overflow into the assignment *target*, splitting `params[⏎ 'key'⏎] =`.
+    // Prettier instead falls through to `fluid` and breaks after the `=`.
+    if is_simple_value(right_expr) && !can_break_left {
         return AssignmentLayout::NeverBreakAfterOperator;
     }
 
@@ -688,7 +735,7 @@ fn call_arg_has_comments(call: &internal::CallExpression<'_>, comments: &[Commen
     // Check for any comments in the argument region (between callee end and closing paren)
     let args_region_start = call.callee.span().end;
     let args_region_end = call.span.end;
-    tsv_lang::has_comments_in_range(comments, args_region_start, args_region_end)
+    tsv_lang::has_comments_on_page_in_range(comments, args_region_start, args_region_end)
 }
 
 /// Check if expression is a type assertion (`as` or `satisfies`) wrapping a call with long arguments.
@@ -861,6 +908,7 @@ impl<'a> Printer<'a> {
         let mut layout = choose_layout(
             right_expr,
             is_short_key,
+            d.can_break(left_doc),
             self.source,
             PRINT_WIDTH,
             self.comments,
@@ -881,6 +929,15 @@ impl<'a> Printer<'a> {
         if layout != AssignmentLayout::BreakAfterOperator
             && let Some(comments_doc) = rhs_comments
             && d.will_break(comments_doc)
+        {
+            layout = AssignmentLayout::BreakAfterOperator;
+        }
+        // A comment the RHS *owns* (a JSDoc cast, a bundler annotation) is glued to its
+        // first token and travels inside its doc, so it is never in `rhs_comments` — the
+        // gap emits nothing for it. It is still on the page and still hangs the value, so
+        // ask the node. See `owned_leading_comment_hangs_value`.
+        if layout != AssignmentLayout::BreakAfterOperator
+            && self.owned_leading_comment_hangs_value(right_expr)
         {
             layout = AssignmentLayout::BreakAfterOperator;
         }
@@ -921,10 +978,23 @@ impl<'a> Printer<'a> {
         // doc should not contain forced breaks (hardlines/breakParent). If it does,
         // our static AST analysis missed a break-emitting node — the chain actually
         // has internal break points and may need a different layout.
+        //
+        // A comment the RHS *owns* is exempt: it prints inside the RHS's doc, so the doc
+        // force-breaks for a reason that is not a chain break point at all. "Poorly
+        // breakable" is a claim about the *chain*, and the layout already hangs the value
+        // for such a comment (`owned_leading_comment_hangs_value`). Without the exemption an
+        // owned multi-line annotation on a trivial call (`a = /**⏎ * @__PURE__⏎ */ fn();`)
+        // trips the assert on every debug build.
         debug_assert!(
             {
                 let core_expr = unwrap_expression(right_expr);
-                !is_poorly_breakable_chain(core_expr, self.source, PRINT_WIDTH, self.comments)
+                self.owned_leading_comment_hangs_value(right_expr)
+                    || !is_poorly_breakable_chain(
+                        core_expr,
+                        self.source,
+                        PRINT_WIDTH,
+                        self.comments,
+                    )
                     || !d.will_break(right_doc)
             },
             "is_poorly_breakable_chain classified expression as poorly breakable but the \
@@ -1019,7 +1089,7 @@ impl<'a> Printer<'a> {
                     .options
                     .as_ref()
                     .map_or_else(|| import.source.span().end, |opts| opts.span().end);
-                self.has_comments_between(last_arg_end, paren_close)
+                self.has_comments_to_emit_between(last_arg_end, paren_close)
             }
             Expression::AwaitExpression(await_expr) => {
                 self.has_import_with_trailing_comments(await_expr.argument)

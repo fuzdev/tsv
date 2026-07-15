@@ -30,10 +30,13 @@ mod template_literal;
 use self::operators::OperatorBuf;
 use crate::ast::internal::{BinaryExpression, Expression, TSType};
 use crate::printer::comments::{CommentFilter, CommentSpacing};
-use crate::printer::{ParenContext, PatternContext, Printer, chain, class_expr_has_decorators};
+use crate::printer::{
+    ParenContext, PatternContext, Printer, chain, class_expr_has_decorators,
+    jsdoc_cast_comment_is_own_line,
+};
 use smallvec::smallvec;
 use tsv_lang::Span;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -77,7 +80,17 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for an expression (for use in object/array contexts and statements)
+    ///
+    /// Every expression funnels through here, which is what lets the owned-comment seam
+    /// be a single line: a comment bound to `expr`'s first token is prepended *inside*
+    /// the doc, so a paren any parent synthesizes around it lands outside the pair. See
+    /// `comments/owned.rs`.
     pub(crate) fn build_expression_doc(&self, expr: &Expression<'_>) -> DocId {
+        let doc = self.build_expression_doc_dispatch(expr);
+        self.prepend_owned_leading_comment(expr, doc)
+    }
+
+    fn build_expression_doc_dispatch(&self, expr: &Expression<'_>) -> DocId {
         let d = self.d();
 
         // Take and clear is_expression_statement so it doesn't leak to sub-expressions.
@@ -211,12 +224,20 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for a JSDoc type cast: `/** @type {T} */ (inner)`.
     ///
-    /// The leading `@type`/`@satisfies` comment for this cast level lives in the
-    /// gap before the `(` and is emitted by the *caller* (statement / RHS / arg
-    /// leading-comment path, keyed on `cast.span.start` = the `(`). This method
-    /// emits the parens plus any comments between this `(` and the inner — which
-    /// is how a **nested** cast's own `@type` comment lands (`/** @type {A} */
-    /// (/** @type {B} */ (expr))`). The inner is built bare: the cast's own
+    /// The cast **owns** its leading `@type`/`@satisfies` comment (the parser sets
+    /// `Comment::owned_by_node`, so every gap emitter and layout predicate skips it)
+    /// and prints it here, glued to its own `(`. That gluing is the correctness
+    /// property: the comment and the `(` together *are* the cast, so a paren the
+    /// printer synthesizes around an *enclosing* expression — `??` clarity parens
+    /// under a ternary, a member/call base, a `new` callee, a `**` operand — lands
+    /// **outside** the pair instead of between them. Printed from the enclosing gap
+    /// instead (prettier's model, and its bug), that paren separates the two and the
+    /// cast silently re-binds to the wider expression on reparse. See
+    /// `docs/conformance_prettier.md` §JSDoc / paren semantics.
+    ///
+    /// A **nested** cast's comment lands the same way — the inner `JsdocCast` prints
+    /// its own (`/** @type {A} */ (/** @type {B} */ (expr))`) — so the interior gap
+    /// below carries only ordinary comments. The inner is built bare: the cast's own
     /// parens provide grouping, so `needs_parens` must not double-wrap it.
     ///
     /// Layout follows prettier-plugin-svelte's `ParenthesizedExpression`: an
@@ -230,12 +251,25 @@ impl<'a> Printer<'a> {
         let inner_start = cast.inner.span().start;
         let inner_doc = self.build_expression_doc(cast.inner);
 
+        // The owned comment, glued to the `(`. A comment the author gave a line of its
+        // own keeps it (the same predicate drives the enclosing assignment to hang, so
+        // the `(` lands indented under it); any other authored newline between the two
+        // collapses to a space, matching prettier.
+        let comment_doc = self.build_comment_doc(&cast.comment);
+        let comment_gap = if jsdoc_cast_comment_is_own_line(cast, self.source) {
+            d.hardline()
+        } else {
+            d.text(" ")
+        };
+        let lead = d.concat(&[comment_doc, comment_gap]);
+        let with_lead = |paren_doc: DocId| d.concat(&[lead, paren_doc]);
+
         // A line comment in the gap before the inner must force a hardline layout —
         // otherwise `(// c <inner>)` runs the inner and the `)` into the comment
         // (silent content loss). Mirrors `build_expression_doc_keep_paren_comments`.
         if self.has_line_comments_between(open + 1, inner_start) {
             let mut parts: DocBuf = smallvec![d.hardline()];
-            for comment in comments_in_range(self.comments, open + 1, inner_start) {
+            for comment in comments_to_emit_in_range(self.comments, open + 1, inner_start) {
                 parts.push(self.build_comment_doc(comment));
                 // A line comment runs to end-of-line, so it must break; a block
                 // comment hugs the next token inline (`/** @type {B} */ (x)`).
@@ -246,17 +280,17 @@ impl<'a> Printer<'a> {
                 });
             }
             parts.push(inner_doc);
-            return d.concat(&[
+            return with_lead(d.concat(&[
                 d.text("("),
                 d.indent(d.concat(&parts)),
                 d.hardline(),
                 d.text(")"),
-            ]);
+            ]));
         }
 
-        // Comments between this cast's `(` and the inner expression (a nested
-        // cast's own `@type` comment, when `inner` is itself a JsdocCast) — all
-        // block comments here, so they hug inline.
+        // Ordinary comments between this cast's `(` and the inner expression — all
+        // block comments here, so they hug inline. A nested cast's own `@type` comment
+        // is NOT among them: that cast owns it and prints it itself.
         let interior = self.build_comments_between(open + 1, inner_start, CommentSpacing::Trailing);
         let body = d.concat(&[interior, inner_doc]);
 
@@ -265,14 +299,14 @@ impl<'a> Printer<'a> {
             cast.inner,
             Expression::ObjectExpression(_) | Expression::ArrayExpression(_)
         ) {
-            d.concat(&[d.text("("), body, d.text(")")])
+            with_lead(d.concat(&[d.text("("), body, d.text(")")]))
         } else {
-            d.group(d.concat(&[
+            with_lead(d.group(d.concat(&[
                 d.text("("),
                 d.indent(d.concat(&[d.softline(), body])),
                 d.softline(),
                 d.text(")"),
-            ]))
+            ])))
         }
     }
 
@@ -557,8 +591,11 @@ impl<'a> Printer<'a> {
         let type_start = type_annotation.span().start;
         let keyword_pos = self.find_keyword_in_range(expr_end, type_start, keyword);
 
-        // Comments between expression and keyword → place before the keyword
-        if let Some(kw_pos) = keyword_pos {
+        // Comments between expression and keyword → place before the keyword. Skip the
+        // `empty()` child on the comment-free `expr as` gap (ubiquitous). Byte-identical.
+        if let Some(kw_pos) = keyword_pos
+            && self.has_comments_to_emit_between(expr_end, kw_pos)
+        {
             parts.push(self.build_inline_comments_between_doc(expr_end, kw_pos));
         }
 
@@ -611,7 +648,14 @@ impl<'a> Printer<'a> {
         // (uniform for every cast type, including `as const`).
         if let Some(kw_pos) = keyword_pos {
             let kw_end = kw_pos + keyword.len() as u32;
-            parts.push(self.build_comments_between(kw_end, type_start, CommentSpacing::Trailing));
+            // Skip the `empty()` child on the comment-free `as Type` gap. Byte-identical.
+            if self.has_comments_to_emit_between(kw_end, type_start) {
+                parts.push(self.build_comments_between(
+                    kw_end,
+                    type_start,
+                    CommentSpacing::Trailing,
+                ));
+            }
             parts.push(self.build_type_doc_with_wrapping_type_args(type_annotation));
         } else {
             parts.push(self.build_type_doc_with_wrapping_type_args(type_annotation));
@@ -641,7 +685,9 @@ impl<'a> Printer<'a> {
         type_start: u32,
     ) -> Option<DocId> {
         let keyword_len = keyword.len() as u32;
-        if keyword_pos.is_some_and(|pos| self.has_comments_between(pos + keyword_len, type_start)) {
+        if keyword_pos
+            .is_some_and(|pos| self.has_comments_to_emit_between(pos + keyword_len, type_start))
+        {
             return None;
         }
         let hanging = self.build_union_hanging_indent_doc(type_annotation)?;
@@ -665,7 +711,9 @@ impl<'a> Printer<'a> {
         type_start: u32,
     ) -> Option<DocId> {
         let keyword_len = keyword.len() as u32;
-        if keyword_pos.is_some_and(|pos| self.has_comments_between(pos + keyword_len, type_start)) {
+        if keyword_pos
+            .is_some_and(|pos| self.has_comments_to_emit_between(pos + keyword_len, type_start))
+        {
             return None;
         }
         let TSType::Intersection(i) = type_annotation else {
@@ -743,7 +791,7 @@ impl<'a> Printer<'a> {
                 parts.push(lead);
             }
             parts.push(inner_doc);
-            if self.has_comments_between(argument_end, non_null_expr.span.end) {
+            if self.has_comments_to_emit_between(argument_end, non_null_expr.span.end) {
                 self.append_trailing_paren_comments(
                     &mut parts,
                     argument_end,
@@ -752,9 +800,10 @@ impl<'a> Printer<'a> {
             }
             parts.push(d.text(")!"));
             d.concat(&parts)
-        } else if self
-            .has_comments_between(non_null_expr.expression.span().end, non_null_expr.span.end)
-        {
+        } else if self.has_comments_to_emit_between(
+            non_null_expr.expression.span().end,
+            non_null_expr.span.end,
+        ) {
             // A comment between the operand and `!` (`p?.q /* c */!`, or from stripped
             // grouping parens `(x /* c */)!`) trails the operand — preserve it rather
             // than dropping it. The redundant grouping parens are stripped per tsv's
@@ -851,7 +900,7 @@ impl<'a> Printer<'a> {
         // If there are comments within the binary expression, use the comment-aware
         // implementation from operators.rs which preserves comments and their line breaks.
         // This handles cases like: fn(a && // comment\n    b)
-        if self.has_comments_between(binary.span.start, binary.span.end) {
+        if self.has_comments_to_emit_between(binary.span.start, binary.span.end) {
             // Use the parts version (no group wrapper) since our caller controls grouping
             return self.build_binary_chain_parts_with_continuation_indent(binary);
         }

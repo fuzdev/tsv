@@ -10,7 +10,7 @@ use crate::printer::{CommentVec, ParenContext, Printer};
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::TAB_WIDTH;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing::visual_width;
@@ -42,7 +42,7 @@ impl<'a> Printer<'a> {
         // lies within the template span, so no comment anywhere in the window means
         // every per-interpolation collect is empty. Templates are comment-sparse.
         let template_has_comments =
-            self.has_comments_between(template.span.start, template.span.end);
+            self.has_comments_to_emit_between(template.span.start, template.span.end);
 
         let mut previous_quasi_indent_size: usize = 0;
 
@@ -80,9 +80,13 @@ impl<'a> Printer<'a> {
                 let (leading_comments, trailing_comments): (CommentVec<'_>, CommentVec<'_>) =
                     if template_has_comments {
                         (
-                            comments_in_range(self.comments, quasi.span.end, expr.span().start)
-                                .collect(),
-                            comments_in_range(
+                            comments_to_emit_in_range(
+                                self.comments,
+                                quasi.span.end,
+                                expr.span().start,
+                            )
+                            .collect(),
+                            comments_to_emit_in_range(
                                 self.comments,
                                 expr.span().end,
                                 next_quasi.span.start,
@@ -125,12 +129,12 @@ impl<'a> Printer<'a> {
                 // `next_quasi.span.start` at the closing `}`, so the range is the
                 // interpolation interior — the equivalent of prettier's
                 // `hasNewlineInRange(locEnd(quasi[i]), locStart(quasi[i + 1]))`.
-                // `will_break_deep` stands in for prettier's re-render at
+                // `will_break` stands in for prettier's re-render at
                 // `printWidth: Infinity`: a doc breaks at infinite width iff it
                 // carries a hardline / forced break, i.e. renders with a newline.
                 let interpolation_has_newline = self
                     .has_newline_between(quasi.span.end, next_quasi.span.start)
-                    || d.will_break_deep(full_expr_doc);
+                    || d.will_break(full_expr_doc);
 
                 let inner = if interpolation_has_newline {
                     // Qualifying types and trailing line comments use softline
@@ -434,7 +438,7 @@ impl<'a> Printer<'a> {
             .map_or_else(|| tagged.tag.span().end, |ta| ta.span.end);
         let comment_end = tagged.quasi.span.start;
         let gap_comments: CommentVec<'_> =
-            comments_in_range(self.comments, comment_start, comment_end).collect();
+            comments_to_emit_in_range(self.comments, comment_start, comment_end).collect();
         if !gap_comments.is_empty() {
             let mut prev_end = comment_start;
             let mut ends_with_hardline = false;

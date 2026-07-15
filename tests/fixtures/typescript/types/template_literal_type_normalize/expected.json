@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 379,
+	"end": 477,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -89,24 +89,40 @@
 					"column": 32
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " Adjacent interpolations — the empty quasi between them (cooked/raw '')",
+			"start": 371,
+			"end": 444,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 74
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 378,
+		"end": 476,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 369,
+			"end": 467,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 16,
+					"line": 19,
 					"column": 9
 				}
 			},
@@ -1140,6 +1156,201 @@
 							"value": " Nested template literal type",
 							"start": 299,
 							"end": 330
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 446,
+					"end": 466,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 21
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 451,
+						"end": 452,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 6
+							},
+							"end": {
+								"line": 18,
+								"column": 7
+							}
+						},
+						"name": "F"
+					},
+					"typeAnnotation": {
+						"type": "TSLiteralType",
+						"start": 455,
+						"end": 465,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 10
+							},
+							"end": {
+								"line": 18,
+								"column": 20
+							}
+						},
+						"literal": {
+							"type": "TemplateLiteral",
+							"start": 455,
+							"end": 465,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 10
+								},
+								"end": {
+									"line": 18,
+									"column": 20
+								}
+							},
+							"expressions": [
+								{
+									"type": "TSTypeReference",
+									"start": 458,
+									"end": 459,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 13
+										},
+										"end": {
+											"line": 18,
+											"column": 14
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 458,
+										"end": 459,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 13
+											},
+											"end": {
+												"line": 18,
+												"column": 14
+											}
+										},
+										"name": "A"
+									}
+								},
+								{
+									"type": "TSTypeReference",
+									"start": 462,
+									"end": 463,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 17
+										},
+										"end": {
+											"line": 18,
+											"column": 18
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 462,
+										"end": 463,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 17
+											},
+											"end": {
+												"line": 18,
+												"column": 18
+											}
+										},
+										"name": "B"
+									}
+								}
+							],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 456,
+									"end": 456,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 11
+										},
+										"end": {
+											"line": 18,
+											"column": 11
+										}
+									},
+									"value": {
+										"raw": "",
+										"cooked": ""
+									},
+									"tail": false
+								},
+								{
+									"type": "TemplateElement",
+									"start": 460,
+									"end": 460,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 15
+										},
+										"end": {
+											"line": 18,
+											"column": 15
+										}
+									},
+									"value": {
+										"raw": "",
+										"cooked": ""
+									},
+									"tail": false
+								},
+								{
+									"type": "TemplateElement",
+									"start": 464,
+									"end": 464,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 19
+										},
+										"end": {
+											"line": 18,
+											"column": 19
+										}
+									},
+									"value": {
+										"raw": "",
+										"cooked": ""
+									},
+									"tail": true
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Adjacent interpolations — the empty quasi between them (cooked/raw '')",
+							"start": 371,
+							"end": 444
 						}
 					]
 				}

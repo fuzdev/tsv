@@ -1,0 +1,5 @@
+<script>
+	try {
+		expr;
+	}
+</script>

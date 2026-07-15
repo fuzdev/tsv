@@ -15,7 +15,7 @@ use crate::printer::{CommentVec, Printer};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::TAB_WIDTH;
-use tsv_lang::comments_in_range;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing::visual_width;
@@ -30,8 +30,14 @@ impl<'a> Printer<'a> {
         obj: &internal::ObjectExpression<'_>,
     ) -> DocId {
         let d = self.d();
-        // Check for comments inside the object
-        let has_comments = self.has_comments_between(obj.span.start, obj.span.end);
+        // Check for comments inside the object.
+        //
+        // **on page**: this is the object-wide fast gate, and it short-circuits the
+        // *layout* work too — a `false` here routes every property to the plain
+        // `key: value` form. An owned annotation on a value is on the page and hangs the
+        // value onto a continuation line exactly as any other own-line comment does, so
+        // the gate has to see it. (`build_object_doc_expanded` carries the twin gate.)
+        let has_comments = self.has_comments_on_page_between(obj.span.start, obj.span.end);
 
         // Check if object contains line comments or block comments on their own line (force multiline)
         let has_line_comments = self.has_line_comments_between(obj.span.start, obj.span.end);
@@ -106,7 +112,7 @@ impl<'a> Printer<'a> {
                 // Skip line comments that are on same line as previous property (those are trailing)
                 // Block comments after comma on same line are leading
                 let comments: CommentVec<'_> =
-                    comments_in_range(self.comments, search_start, prop_start)
+                    comments_to_emit_in_range(self.comments, search_start, prop_start)
                         .filter(|c| {
                             // Brace-line comments pulled onto the `{` line above are emitted
                             // as the prefix, not here (only relevant for the first property).
@@ -225,7 +231,7 @@ impl<'a> Printer<'a> {
             // Handle trailing comments before closing brace
             let closing_brace_pos = obj.span.end - 1;
             let trailing_comments: CommentVec<'_> =
-                comments_in_range(self.comments, prev_end, closing_brace_pos)
+                comments_to_emit_in_range(self.comments, prev_end, closing_brace_pos)
                     .filter(|c| !self.is_same_line(prev_end, c.span.start))
                     .collect();
 
@@ -362,8 +368,9 @@ impl<'a> Printer<'a> {
         }
 
         // Object-wide comment-presence flag (one binary search); gates the per-property
-        // key→value comment queries in build_property_doc.
-        let has_comments = self.has_comments_between(obj.span.start, obj.span.end);
+        // key→value comment queries in build_property_doc. **on page**, in lockstep with
+        // the twin gate in `build_object_doc` — it short-circuits layout work too.
+        let has_comments = self.has_comments_on_page_between(obj.span.start, obj.span.end);
 
         let mut parts: DocBuf = DocBuf::new();
         for (i, prop) in obj.properties.iter().enumerate() {
@@ -459,12 +466,14 @@ impl<'a> Printer<'a> {
                 // Comments between key and params: get [x] /* c */() {}
                 // Line comments get a hardline to prevent absorbing parens as comment text
                 let params_start = func.params_start;
-                let comments = self.build_name_to_type_params_comments(
+                match self.build_name_to_type_params_comments_opt(
                     key_region_end,
                     params_start,
                     CommentSpacing::Leading,
-                );
-                d.concat(&[key_doc, comments, func_doc])
+                ) {
+                    Some(comments) => d.concat(&[key_doc, comments, func_doc]),
+                    None => d.concat(&[key_doc, func_doc]),
+                }
             } else {
                 key_doc
             }
@@ -499,11 +508,12 @@ impl<'a> Printer<'a> {
                     .type_parameters
                     .as_ref()
                     .map_or(func.params_start, |tp| tp.span.start);
-                parts.push(self.build_name_to_type_params_comments(
+                self.push_name_to_type_params_comments(
+                    &mut parts,
                     key_region_end,
                     comment_search_end,
                     CommentSpacing::for_type_params(func.type_parameters.is_some()),
-                ));
+                );
 
                 parts.push(func_doc);
                 d.concat(&parts)
@@ -578,16 +588,34 @@ impl<'a> Printer<'a> {
 
             // Comments between key region and colon (e.g., {key /* comment */: value})
             let pre_colon_comments: CommentVec<'_> =
-                comments_in_range(self.comments, key_region_end, colon_pos).collect();
+                comments_to_emit_in_range(self.comments, key_region_end, colon_pos).collect();
             // Comments between colon and value (e.g., {key: /* comment */ value})
             let post_colon_comments: CommentVec<'_> =
-                comments_in_range(self.comments, colon_pos + 1, value_start).collect();
+                comments_to_emit_in_range(self.comments, colon_pos + 1, value_start).collect();
 
             // Check if value needs parens (e.g., assignment expressions)
             let needs_parens =
                 self.needs_parens(&prop.value, super::ParenContext::ObjectPropertyValue);
 
-            if pre_colon_comments.is_empty() && post_colon_comments.is_empty() {
+            // A post-colon comment forces break-after-operator when it's a line
+            // comment (extends to end of line), a multiline block (its own newlines
+            // break the group), or the source put the value on a later line than the
+            // comment (an own-line leading comment); a single-line block glued to the
+            // value (`: /* c */ v`) stays inline.
+            // Prettier ref: hasLeadingOwnLineComment → break-after-operator in chooseLayout
+            //
+            // **on page**, not `post_colon_comments` (which is emit-keyed): hanging the
+            // value is a LAYOUT decision, so an owned annotation hangs it exactly as any
+            // other own-line comment does — even though this gap emits nothing for it (the
+            // value's own node prints it, and the `comments_doc` below is empty).
+            let has_own_line_comment_post_colon = self
+                .comments_in_source_between(colon_pos + 1, value_start)
+                .any(|c| !c.is_block || c.multiline || !self.is_same_line(c.span.end, value_start));
+
+            if pre_colon_comments.is_empty()
+                && post_colon_comments.is_empty()
+                && !has_own_line_comment_post_colon
+            {
                 if needs_parens {
                     // Build manually with parens
                     let value_doc = d.concat(&[
@@ -602,16 +630,6 @@ impl<'a> Printer<'a> {
                     self.build_assignment_layout(key_doc, ":", &prop.value, is_short_key, None)
                 }
             } else {
-                // A post-colon comment forces break-after-operator when it's a line
-                // comment (extends to end of line), a multiline block (its own newlines
-                // break the group), or the source put the value on a later line than the
-                // comment (an own-line leading comment); a single-line block glued to the
-                // value (`: /* c */ v`) stays inline.
-                // Prettier ref: hasLeadingOwnLineComment → break-after-operator in chooseLayout
-                let has_own_line_comment_post_colon = post_colon_comments.iter().any(|c| {
-                    !c.is_block || c.multiline || !self.is_same_line(c.span.end, value_start)
-                });
-
                 if has_own_line_comment_post_colon {
                     // Line comment or multiline block comment after colon: BreakAfterOperator
                     // Structure: group([group(key + pre_colon), ":", group(indent([line, rhs]))])
@@ -894,12 +912,12 @@ impl<'a> Printer<'a> {
         // Byte-identical to the pre-divergence behavior.
         if !bracket_line && !after_key_line {
             let mut parts: DocBuf = smallvec![d.text("[")];
-            for comment in comments_in_range(self.comments, bracket_start + 1, key_start) {
+            for comment in comments_to_emit_in_range(self.comments, bracket_start + 1, key_start) {
                 parts.push(self.build_comment_doc(comment));
                 parts.push(d.text(" "));
             }
             parts.push(key_doc);
-            for comment in comments_in_range(self.comments, key_end, bracket_end) {
+            for comment in comments_to_emit_in_range(self.comments, key_end, bracket_end) {
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
             }
@@ -919,7 +937,7 @@ impl<'a> Printer<'a> {
         // bracket-break helper owns the `[`→key line-comment prefix and the break shell.
         let mut body_parts: DocBuf = smallvec![key_doc];
         let mut prev = key_end;
-        for comment in comments_in_range(self.comments, key_end, bracket_end) {
+        for comment in comments_to_emit_in_range(self.comments, key_end, bracket_end) {
             if self.is_same_line(prev, comment.span.start) {
                 body_parts.push(d.text(" "));
             } else {

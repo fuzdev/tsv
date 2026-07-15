@@ -2,6 +2,9 @@
 //
 // Handles: new Foo(), new Foo(arg1, arg2), new Foo<T>()
 
+use super::arg_comments::{
+    build_after_comma_leading_comments, first_arg_has_any_comments, last_arg_has_comments,
+};
 use super::arg_wrapping::{
     append_type_args_with_gap_comments, build_args_with_blank_lines, build_empty_args_doc,
     should_expand_first_arg, try_hug_multiline_template_arg, wrap_call_with_soft_breaks,
@@ -10,7 +13,7 @@ use crate::ast::internal;
 use crate::printer::calls::arg_predicates::{
     arrow_body_is_call_through_non_null, arrow_has_trailing_param_comments,
     is_array_or_object_unwrapped, is_concise_numeric_array, is_function_composition_args,
-    is_ternary_arrow_body, preceding_args_allow_expand_last,
+    is_ternary_arrow_body,
 };
 use crate::printer::calls::{
     PartitionedComments, build_args_joined_with_comments, build_args_split_last,
@@ -108,7 +111,13 @@ impl<'a> Printer<'a> {
         // which scans a sub-range within it. The callee and type-argument gap
         // comments live before `paren_open` and are handled unconditionally above.
         // Canonical reference: build_params_doc_with_comments.
-        let new_has_comments = self.has_comments_between(paren_open, new_expr.span.end);
+        //
+        // **on page**: this is the master gate for the whole `new` cascade — including
+        // the layout predicates (`first_arg_has_any_comments`, the huggable-argument
+        // refusal). Skipping an owned annotation here would short-circuit them all and
+        // silently hug an argument prettier expands. Its analogs (`call_has_comments`)
+        // in `calls/mod.rs`, `call_formatting.rs` and `chain_args.rs` count too.
+        let new_has_comments = self.has_comments_on_page_between(paren_open, new_expr.span.end);
 
         // Single huggable argument: object literal or function
         // These stay on the same line as the opening paren: `new Cls({...})` not `new Cls(\n{...})`
@@ -154,19 +163,23 @@ impl<'a> Printer<'a> {
                     } else {
                         None
                     };
-                    let has_leading_comment = if let Some(leading) = glued {
+                    if let Some(leading) = glued {
                         arrow_doc = d.concat(&[leading, arrow_doc]);
-                        true
-                    } else {
-                        false
-                    };
+                    }
+                    // **on page**: a leading comment forces the wrapped (expanded) state,
+                    // owned or not — an owned comment rides inside `arrow_doc` (so it's
+                    // not in `glued`) but still defeats the hug, exactly as prettier
+                    // expands a block-arrow arg whose leading comment precedes it. A
+                    // to-emit gate here would go blind to it and wrongly hug.
+                    let has_leading_comment = new_has_comments
+                        && self.has_comments_on_page_between(paren_open, arg_start);
 
                     // If the arrow has trailing param comments or leading comments,
                     // force wrapped state
-                    let arrow_token = self.find_arrow_token_for(arrow);
+                    let arrow_token = arrow.arrow_token;
                     let has_trailing_param_comments = new_has_comments
                         && arrow_has_trailing_param_comments(arrow, arrow_token, |start, end| {
-                            self.has_comments_between(start, end)
+                            self.has_comments_to_emit_between(start, end)
                         });
 
                     if has_trailing_param_comments || has_leading_comment {
@@ -360,16 +373,36 @@ impl<'a> Printer<'a> {
         }
 
         // "Expand first arg" pattern: callback first, short/empty container last
-        // e.g., new Proxy((x) => { ... }, {}) - callback hugs, empty obj stays inline
-        if should_expand_first_arg(self, new_expr.arguments) {
+        // e.g., new Proxy((x) => { ... }, {}) - callback hugs, empty obj stays inline.
+        // Block for comments the inline tail can't carry (matching the plain-call path):
+        // a line comment anywhere in the args, or any comment on the first arg — those
+        // break all args instead (a before-comma trailing block, a leading first-arg
+        // comment). An after-comma inline block leading the second arg is carried below.
+        if should_expand_first_arg(self, new_expr.arguments)
+            && !(new_has_comments
+                && has_trailing_line_comments_slice(new_expr.arguments, new_expr.span.end, self))
+            && !(new_has_comments
+                && first_arg_has_any_comments(new_expr.arguments, self, paren_open))
+        {
             let first_arg_doc = self.build_expression_doc(&new_expr.arguments[0]);
             let second_arg_doc = self.build_expression_doc(&new_expr.arguments[1]);
+
+            // Carry an inline block comment leading the second arg after the comma
+            // (`}, /* c */ arg`) so it isn't dropped — matching prettier's expand-first.
+            let comma_and_leading = match build_after_comma_leading_comments(
+                self,
+                new_expr.arguments[0].span().end,
+                new_expr.arguments[1].span().start,
+            ) {
+                Some(leading) => d.concat(&[d.text(", "), leading]),
+                None => d.text(", "),
+            };
 
             return d.concat(&[
                 callee_with_types,
                 d.text("("),
                 first_arg_doc,
-                d.text(", "),
+                comma_and_leading,
                 second_arg_doc,
                 d.text(")"),
             ]);
@@ -445,7 +478,7 @@ impl<'a> Printer<'a> {
             && new_expr.arguments.last().is_some_and(|last_arg| {
                 let arg_end = last_arg.span().end;
                 let paren_close = new_expr.span.end;
-                self.has_comments_between(arg_end, paren_close)
+                self.has_comments_to_emit_between(arg_end, paren_close)
                     && !self.has_line_comments_between(arg_end, paren_close)
             });
 
@@ -559,9 +592,14 @@ impl<'a> Printer<'a> {
 
             if new_expr.arguments.len() >= 2
                 && (last_is_function || last_is_expandable_collection)
-                && preceding_args_allow_expand_last(new_expr.arguments, self.line_breaks)
                 && !(new_has_comments
                     && has_inter_argument_comments_slice(new_expr.arguments, self))
+                // On-page: a leading comment on the last argument defeats the expand-last
+                // hug (prettier's `shouldExpandLastArg`), owned or not — an owned comment
+                // rides inside the argument's doc, so this must count it (on page), not just
+                // the emit-keyed ones, or it hugs blind. Mirrors the call/chain paths.
+                && !(new_has_comments
+                    && last_arg_has_comments(new_expr.arguments, self, new_expr.span.end, paren_open))
             {
                 // Expand-last arrow with a call body: build the body ONCE and inject it so
                 // the whole-arrow arg doc reuses it (the break-body state below reuses it
@@ -684,7 +722,7 @@ impl<'a> Printer<'a> {
         // These need explicit handling that the simple join_doc path doesn't provide
         let has_leading_comments = new_has_comments
             && !new_expr.arguments.is_empty()
-            && self.has_comments_between(paren_open, new_expr.arguments[0].span().start);
+            && self.has_comments_to_emit_between(paren_open, new_expr.arguments[0].span().start);
         let has_inter_arg_comments =
             new_has_comments && has_inter_argument_comments_slice(new_expr.arguments, self);
 

@@ -228,7 +228,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Currently extracted from: {@debug} tags (intentional divergence from prettier)
         // Future: could extend to other template tags if needed
         comments.append(&mut self.expression_comments);
-        // Sort by position for consistent lookup via comments_in_range()
+        // Sort by position for consistent lookup via comments_to_emit_in_range()
         comments.sort_by_key(|c| c.span.start);
         // TODO: Consider extracting CSS comments if needed for public AST
 
