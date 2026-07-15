@@ -26,6 +26,7 @@ use super::expressions::literals::format_directive;
 use super::is_string_literal;
 use super::needs_parens::leftmost_no_lookahead;
 use crate::ast::internal::{self, Expression, Statement};
+use crate::printer::analysis::has_newline_after_position;
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
@@ -356,18 +357,27 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
 
-        // Extract inline comments between keyword and argument
-        // Uses line-comment-safe spacing to prevent `return // comment expr`
         let keyword_end = keyword_start + keyword.len() as u32;
-        let inline_comments = self.build_rhs_comments_opt(keyword_end, arg.span().start);
 
         // Trailing comments from stripped grouping parens: `return (x /* c */)` → `return x /* c */;`
         let argument_end = arg.span().end;
         let has_trailing_comments = self.has_comments_to_emit_between(argument_end, span_end);
 
+        // A comment that must break takes the parenthesized form, which is what makes the
+        // break legal; there the comment keeps the line the author gave it.
         if self.argument_has_own_line_comment(keyword_start, arg) {
-            return self.build_comment_paren_doc(keyword, arg, inline_comments);
+            let own_line_comments = self.build_rhs_comments_opt(keyword_end, arg.span().start);
+            return self.build_comment_paren_doc(keyword, arg, own_line_comments);
         }
+
+        // Every remaining comment is glued to the keyword with the value after it on some
+        // line, so the value is pulled up onto the comment's line (`return /* c */⏎(v)` →
+        // `return /* c */ v`) rather than keeping the author's break: a break between
+        // `return`/`throw` and its argument is ASI, not layout — these are restricted
+        // productions. (The bare `keyword /* c */⏎value` cannot reach here at all: ASI
+        // splits it at parse, so there would be no argument.) The parenthesized branches
+        // below may still break, because they emit the parens that survive it.
+        let inline_comments = self.build_rhs_comments_glued_opt(keyword_end, arg.span().start);
 
         // Assignment expressions need parentheses for clarity: return (a = b);
         // Comments go BEFORE the parens: return /* comment */ (a = b);
@@ -482,9 +492,10 @@ impl<'a> Printer<'a> {
     ///
     /// Matches Prettier's `returnArgumentHasLeadingComment` (function.js:290-318).
     fn argument_has_own_line_comment(&self, keyword_start: u32, arg: &Expression<'_>) -> bool {
-        // Check for own-line comments before the argument itself
-        // (e.g., `return // comment\n expr`)
-        if self.has_leading_own_line_comment_in_range(keyword_start, arg.span().start) {
+        // Own-line comment before the argument itself (`return (\n// c\nexpr)`). No node
+        // precedes this gap — the keyword is not an expression — so any comment in it leads
+        // the argument.
+        if self.has_leading_own_line_comment_in_range(None, keyword_start, arg.span().start) {
             return true;
         }
 
@@ -502,12 +513,12 @@ impl<'a> Printer<'a> {
         match expr {
             Expression::CallExpression(call) => self.chain_has_own_line_comment(call.callee),
             Expression::MemberExpression(member) => {
-                // Check for leading own-line comments between object and property.
-                // Must NOT be on the same line as the object — trailing comments
-                // like `foo() // comment` don't trigger paren wrapping.
+                // Leading own-line comment between object and property. The object precedes
+                // the gap, so a comment on its line trails it (`foo() // c`) and leaves the
+                // chain bare.
                 let obj_end = member.object.span().end;
                 let prop_start = member.property.span().start;
-                if self.has_leading_own_line_comment_in_range(obj_end, prop_start) {
+                if self.has_leading_own_line_comment_in_range(Some(obj_end), obj_end, prop_start) {
                     return true;
                 }
                 self.chain_has_own_line_comment(member.object)
@@ -522,15 +533,34 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Check if there are any leading own-line comments in a range.
+    /// Whether a comment in `start..end` *leads* the node at `end` and is followed by a
+    /// newline — Prettier's `hasLeadingOwnLineComment` (`utils/index.js`). Two terms, and
+    /// both are load-bearing:
     ///
-    /// "Leading own-line" means the comment is NOT on the same line as `start`
-    /// (i.e., it's on its own line, not trailing the previous expression).
-    /// This matches Prettier's `hasLeadingOwnLineComment` which checks for
-    /// comments with a newline after them that are leading on a node.
-    fn has_leading_own_line_comment_in_range(&self, start: u32, end: u32) -> bool {
-        self.comments_in_source_between(start, end)
-            .any(|c| !self.is_same_line(start, c.span.start))
+    /// - **Leads.** A comment sharing `prev_node_end`'s line *trails* that node rather than
+    ///   leading the next one (Prettier attaches it as a trailing comment), so it never
+    ///   counts: `return foo() // c` + `.bar` keeps the chain bare. Pass `None` where no
+    ///   node precedes the gap — after a `return`/`throw` keyword the comment always leads
+    ///   the argument, so nothing can be trailing there.
+    /// - **Followed by a newline.** This is what makes a break unavoidable: the node cannot
+    ///   share the comment's line, so the caller must emit the form that survives one.
+    ///   A block comment with code after it on the same line (`return /* c */ (x)`) fails
+    ///   this term and stays inline.
+    ///
+    /// For `return`/`throw` the second term is an ASI guard, not cosmetics. Both are
+    /// restricted productions (`return [no LineTerminator here] Expression`), so putting the
+    /// argument on a later line without parens *changes the program*: `return` silently
+    /// becomes `return;` plus an unreachable statement, and `throw` becomes a syntax error.
+    fn has_leading_own_line_comment_in_range(
+        &self,
+        prev_node_end: Option<u32>,
+        start: u32,
+        end: u32,
+    ) -> bool {
+        self.comments_in_source_between(start, end).any(|c| {
+            let leads = prev_node_end.is_none_or(|prev| !self.is_same_line(prev, c.span.start));
+            leads && has_newline_after_position(self.source, c.span.end)
+        })
     }
 
     /// Build unconditional paren-wrapped doc for return/throw with own-line comments.
