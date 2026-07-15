@@ -42,7 +42,7 @@ pre-alpha - v0.1 is for feedback only not production use; tsv v0.2 is closer but
 
 ## About
 
-tsv is derived from:
+tsv derives its tools from:
 
 - HTML/CSS/JS
 - TypeScript
