@@ -96,18 +96,25 @@ pub fn is_simple_type_arg(ty: &TSType<'_>) -> bool {
         || matches!(unwrapped, TSType::TypeReference(r) if r.type_arguments.is_none())
 }
 
-/// Prettier's `shouldHugUnionType` criterion for a single type argument: a union with
-/// exactly one brace-delimited member and only void-like siblings (`{…} | null`,
-/// `null | {…}`, `{…} | void`), per [`should_hug_union_type`]. Such a union inlines
-/// atomically — the object member carries its own group and breaks block-style inside
-/// the hugged `<…>`, so the `<…>` itself never needs a break point. Parenthesized
-/// wrappers are unwrapped first. The single source of truth shared by the
-/// call/`new`/instantiation type-argument builder and the type-position builder so the
-/// two agree by construction. Prettier ref: `shouldHugType` → `shouldHugUnionType`.
-pub fn is_hugging_union_type_arg(ty: &TSType<'_>) -> bool {
-    matches!(unwrap_parenthesized(ty), TSType::Union(u)
-        if should_hug_union_type(u)
-            && u.types.iter().any(|t| matches!(t, TSType::TypeLiteral(_) | TSType::Mapped(_))))
+/// Whether any union member is **brace-delimited** (`TypeLiteral`/`Mapped`) — the extra
+/// narrowing a *type-argument* hug requires on top of [`union_hug_shape`]: the object
+/// member carries its own group and breaks block-style inside the hugged `<…>`, so the
+/// `<…>` itself never needs a break point.
+///
+/// **Deliberately stricter than** prettier's `isObjectLikeType`, which also accepts a bare
+/// `TSTypeReference`: excluding it is the sanctioned `return_type_generic_union` print-width
+/// family (a `Promise<…> | null` argument keeps its break point). Don't widen it to match
+/// prettier.
+///
+/// Sole caller is
+/// [`Printer::type_arg_union_prints_hugged`](super::super::Printer::type_arg_union_prints_hugged)
+/// — this is one *clause* of that gate, never the gate. It is safe to ask bare (unlike
+/// [`union_hug_shape`], it makes no claim to answer "does this hug?").
+pub(super) fn union_has_brace_member(union: &TSUnionType<'_>) -> bool {
+    union
+        .types
+        .iter()
+        .any(|t| matches!(t, TSType::TypeLiteral(_) | TSType::Mapped(_)))
 }
 
 /// Find the `TSParenthesizedType` that directly wraps `ts_type`'s underlying type,
@@ -142,15 +149,27 @@ pub fn is_huggable_type(ts_type: &TSType<'_>) -> bool {
     matches!(ts_type, TSType::TypeLiteral(_) | TSType::Mapped(_))
 }
 
-/// Check if a union type should be "hugged" — formatted as `A | B | C` inline
-/// even when it breaks, rather than using the multi-line `| A\n| B\n| C` format.
+/// The **syntactic shape** a hugging union must have — exactly one object-like
+/// member (`TSTypeLiteral` or `TSTypeReference`) with only void siblings (`void`,
+/// `null`), e.g. `{ name: string; value: number } | null`.
 ///
-/// Matches Prettier's `shouldHugUnionType`: hugs when there's exactly one
-/// object-like type (TSTypeLiteral or TSTypeReference) and all other members
-/// are void types (void, null).
+/// ⚠️ **Necessary, never sufficient — do not use this as a layout gate.** This is
+/// Prettier's `shouldHugUnionType` (`utilities/union-type-print.js`) **minus its
+/// first clause**, `types.some((n) => hasComment(n))`. That clause needs the
+/// comment table, which a free function has no access to; it lives in
+/// [`Printer::union_prints_hugged`](super::super::Printer::union_prints_hugged),
+/// which pairs this shape with the comment checks and is the single source of
+/// truth for *whether the hug actually happens*.
 ///
-/// Example: `{ name: string; value: number } | null` stays hugged.
-pub fn should_hug_union_type(union: &TSUnionType<'_>) -> bool {
+/// A layout gate that asks this predicate alone re-derives the hug with a subset
+/// of the rule, so it answers "hug" for a union the printer then expands: the
+/// keyword keeps its operand glued while the members explode below it
+/// (`type A = Foo<| {…} /* c */⏎| null>`). That is a bug class, not a hypothetical
+/// — five gates asked it bare. Every caller must pair it with `union_prints_hugged`
+/// (see [`Self::union_return_hugs`](super::super::Printer::union_return_hugs) and
+/// [`Printer::type_arg_union_prints_hugged`](super::super::Printer::type_arg_union_prints_hugged)
+/// for the two shapes that do).
+pub(super) fn union_hug_shape(union: &TSUnionType<'_>) -> bool {
     // Find exactly one object-like type
     let mut object_idx = None;
     for (i, t) in union.types.iter().enumerate() {

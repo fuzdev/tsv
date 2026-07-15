@@ -8,8 +8,9 @@
 use super::super::comments_to_emit_in_range;
 use super::helpers::{
     find_separator_position, intersection_has_expanding_first_type,
-    intersection_has_huggable_last_type, is_huggable_type, is_hugging_union_type_arg,
-    should_hug_union_type, type_needs_parens_in_union_or_intersection, unwrap_parenthesized,
+    intersection_has_huggable_last_type, is_huggable_type,
+    type_needs_parens_in_union_or_intersection, union_has_brace_member, union_hug_shape,
+    unwrap_parenthesized,
 };
 use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{TSIntersectionType, TSParenthesizedType, TSType, TSUnionType};
@@ -400,7 +401,7 @@ impl<'a> Printer<'a> {
         let TSType::Union(union) = ty else {
             return None;
         };
-        // `union_prints_hugged`, not the bare syntactic `should_hug_union_type`: this
+        // `union_prints_hugged`, not the bare syntactic `union_hug_shape`: this
         // must agree with the layout `build_union_type_doc` will actually take. A comment
         // can make it decline the hug and expand, and then the keyword has to break like
         // any other non-hugging union — asking the syntactic form alone keeps `as ` glued
@@ -680,8 +681,8 @@ impl<'a> Printer<'a> {
     /// (`build_type_annotation_doc_with_wrapping`), so the two arms can't drift (the
     /// drift is exactly what let the hug miss those contexts before).
     ///
-    /// Requires a brace member with only void siblings (`is_hugging_union_type_arg` —
-    /// a `TypeLiteral`/`Mapped`; excludes the `Promise<…> | null` `TSTypeReference`
+    /// Requires the brace-member shape (`union_has_brace_member` — a
+    /// `TypeLiteral`/`Mapped`; excludes the `Promise<…> | null` `TSTypeReference`
     /// print-width family). A comment prettier's `shouldHugUnionType` would bail on —
     /// between two members, or in the operator→union gap `[gap_start, gap_end]` —
     /// disqualifies the hug; an *inside-object* comment (`{ /* c */ … }`) does not.
@@ -689,22 +690,33 @@ impl<'a> Printer<'a> {
     pub(crate) fn union_return_hugs(
         &self,
         value_type: &TSType<'_>,
-        union: &TSUnionType<'_>,
         gap_start: u32,
         gap_end: u32,
     ) -> bool {
-        // Two questions, each asked of the one predicate that owns it. The **brace**
-        // narrowing is this site's own (`is_hugging_union_type_arg` — a
-        // `Promise<…> | null` `TSTypeReference` member is excluded, the sanctioned
-        // `return_type_generic_union` print-width family), and so is the `:`→union gap.
-        // But whether the union HUGS AT ALL belongs to [`Self::union_prints_hugged`] and
-        // is not re-derived here: this gate used to spell out its own subset of that
-        // predicate's comment checks and missed the leading `|`→first-member line
+        // The `:`→union gap is this site's own question; the hug itself is not
+        // re-derived here but delegated (via `type_arg_union_prints_hugged`) to
+        // [`Self::union_prints_hugged`]. This gate used to spell out its own subset of
+        // that predicate's comment checks and missed the leading `|`→first-member line
         // comment, so a comment that made the printer decline the hug still read as
         // "hug" here and kept `: ` glued while the members exploded below it.
-        is_hugging_union_type_arg(value_type)
-            && self.union_prints_hugged(union)
+        self.type_arg_union_prints_hugged(value_type)
             && !self.has_comments_to_emit_between(gap_start, gap_end)
+    }
+
+    /// Whether a **type argument** actually prints hugged — [`Self::union_prints_hugged`]
+    /// (which owns the whole hug question, shape *and* comments) narrowed by
+    /// [`union_has_brace_member`] (the type-argument-only extra clause).
+    ///
+    /// The single gate every type-argument position asks, so none of them has to
+    /// remember that a shape predicate is only half the question. Asking a bare shape
+    /// instead inlines the argument atomically while the printer expands its members,
+    /// gluing the `<` to a dangling `|` (`Foo<| {…} /* c */⏎| null>`) — which is exactly
+    /// what `type_arguments.rs` and `type_params.rs` both did.
+    pub(crate) fn type_arg_union_prints_hugged(&self, ty: &TSType<'_>) -> bool {
+        // `union_prints_hugged` subsumes `union_hug_shape`, so the shape is not re-tested
+        // here — the brace clause is the only thing this position adds.
+        matches!(unwrap_parenthesized(ty), TSType::Union(u)
+            if self.union_prints_hugged(u) && union_has_brace_member(u))
     }
 
     /// Whether [`Self::build_union_type_doc`] will actually take its **hug** path —
@@ -713,7 +725,7 @@ impl<'a> Printer<'a> {
     /// The single source of truth for that question, because two places must agree on
     /// it: the union printer (which lays the members out) and the type-alias RHS
     /// (`build_type_alias_doc`, which decides whether to break after `=`). Asking the
-    /// bare syntactic [`should_hug_union_type`] at the alias while the printer declines
+    /// bare syntactic [`union_hug_shape`] at the alias while the printer declines
     /// the hug for a comment splits them — the alias keeps `= ` while the union expands,
     /// yielding `type A = | // c⏎{ a: 1 }⏎| null` where a non-hugging union of the same
     /// shape correctly breaks after the `=`.
@@ -743,7 +755,7 @@ impl<'a> Printer<'a> {
     /// pairwise scan would report "no comments" for an owned one, hugging a union whose
     /// members the printer expands.
     pub(crate) fn union_prints_hugged(&self, union: &TSUnionType<'_>) -> bool {
-        if !should_hug_union_type(union) {
+        if !union_hug_shape(union) {
             return false;
         }
         // Zero-comment fast path — an **on-page** question, since it short-circuits the
@@ -781,24 +793,6 @@ impl<'a> Printer<'a> {
             .any(|pair| self.has_comments_to_emit_between(pair[0].span().end, pair[1].span().start))
     }
 
-    /// Check if a union type has line comments between any consecutive members.
-    ///
-    /// Used by callers (e.g., mapped types) to decide whether the union needs
-    /// extra indentation wrapping, and internally to force multiline formatting.
-    pub(crate) fn union_has_line_comments_between_members(&self, union: &TSUnionType<'_>) -> bool {
-        // Zero-comment window gate (as in `union_has_comments_between_members`): every
-        // pairwise range lies within the union span, so no comment inside the union
-        // means every pairwise scan below is provably false — skip them on the common
-        // comment-free `A | B | C`.
-        if !self.has_comments_to_emit_between(union.span.start, union.span.end) {
-            return false;
-        }
-        union
-            .types
-            .windows(2)
-            .any(|pair| self.has_line_comments_between(pair[0].span().end, pair[1].span().start))
-    }
-
     /// True when an **own-line comment** sits between two consecutive members —
     /// a line comment (which can never be inline), or a block comment with a
     /// newline before it (`| 'x'⏎/* c */⏎| 'y'`), on either side of the `|`.
@@ -807,9 +801,8 @@ impl<'a> Printer<'a> {
     /// (`union-type.js`), forcing the whole union group to break
     /// one-member-per-line. A *same-line* block comment (`a /* c */ | b`) does
     /// not count — it stays inline, matching `union_intersection_parens_comment`.
-    /// Subsumes the between-members case of `union_has_line_comments_between_members`
-    /// (a line comment is always own-line here) and additionally catches own-line
-    /// *block* comments, which the default (groupable) path would otherwise keep flat.
+    /// Catches own-line *block* comments too, which the default (groupable) path would
+    /// otherwise keep flat.
     fn union_has_own_line_member_comment(&self, union: &TSUnionType<'_>) -> bool {
         // Zero-comment window gate (see `union_has_comments_between_members`): every
         // pairwise range lies within the union span, so no comment inside the union
