@@ -339,7 +339,6 @@ pub enum DocNode {
     LineSuffix(DocId),                          // End-of-line content
     LineSuffixBoundary,                         // Flush pending suffixes
     BreakParent,                                // Force parent group to break
-    IsolatedGroup { contents },                 // Prevent hardline propagation
 }
 ```
 

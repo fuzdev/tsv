@@ -573,11 +573,9 @@ fn build_long_chain_doc<'a, P: ChainPrinter>(
     let on_line: DocBuf = groups.iter().map(|g| print_group(g, printer)).collect();
 
     // Check if any group except the last will break.
-    // Use will_break_deep to see through IsolatedGroup wrappers — chain break
-    // detection is a doc analysis concern, not a rendering isolation concern.
     let any_non_last_breaks = on_line[..on_line.len() - 1]
         .iter()
-        .any(|&doc| d.will_break_deep(doc));
+        .any(|&doc| d.will_break(doc));
 
     // Check if this chain ends with member access (not a call)
     let chain_ends_with_member = ends_with_member(rest_groups, first_groups);

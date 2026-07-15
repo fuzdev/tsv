@@ -9,8 +9,7 @@ use super::super::comments_to_emit_in_range;
 use super::helpers::{
     find_separator_position, intersection_has_expanding_first_type,
     intersection_has_huggable_last_type, is_huggable_type, is_hugging_union_type_arg,
-    should_hug_union_type, type_needs_parens_in_union_or_intersection, type_never_needs_parens,
-    unwrap_parenthesized,
+    should_hug_union_type, type_needs_parens_in_union_or_intersection, unwrap_parenthesized,
 };
 use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{TSIntersectionType, TSParenthesizedType, TSType, TSUnionType};
@@ -22,12 +21,15 @@ use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
 /// Member-parens predicate for a union/intersection with `member_count` members.
-/// A single-member union/intersection collapses to its member (Prettier
-/// postprocess), so the lone member needs no precedence parens of its own;
-/// 2+ members use the normal `|`/`&` precedence rule.
+///
+/// A single-member union/intersection collapses to its member (Prettier drops
+/// single-element union/intersection nodes in postprocess), so the lone member prints
+/// in the union's own position and needs no precedence parens of its own — any required
+/// parens come from the union's parent context, applied one level up. 2+ members use the
+/// normal `|`/`&` precedence rule.
 fn union_member_parens(member_count: usize) -> fn(&TSType<'_>) -> bool {
     if member_count == 1 {
-        type_never_needs_parens
+        |_| false
     } else {
         type_needs_parens_in_union_or_intersection
     }
@@ -275,8 +277,8 @@ impl<'a> Printer<'a> {
         // `if_break("| ")` + offset once a nested comment forces the union multiline.
         // Placed after the hug/line-comment paths so a leading line comment (which the
         // block-only comment helper can't carry) still routes there. A block comment
-        // between the dropped `|` and the member is preserved. `member_parens` here is
-        // `type_never_needs_parens`, so any required parens come from the parent one
+        // between the dropped `|` and the member is preserved. `member_parens` is the
+        // single-member predicate here, so any required parens come from the parent one
         // level up.
         if union.types.len() == 1 {
             let member = &union.types[0];

@@ -156,9 +156,6 @@ pub enum DocNode {
 
     /// Force parent group to break
     BreakParent,
-
-    /// A group that prevents hardline propagation to parent groups
-    IsolatedGroup { contents: DocId },
 }
 
 // `DocNode` must stay free of drop glue: dynamically-built text lives in the
@@ -1289,11 +1286,6 @@ impl DocArena {
         self.interned_singleton(&self.break_parent_node, || DocNode::BreakParent)
     }
 
-    /// Create an isolated group that prevents hardline propagation.
-    pub fn isolated_group(&self, doc: DocId) -> DocId {
-        self.alloc(DocNode::IsolatedGroup { contents: doc })
-    }
-
     //
     // Convenience builders
     //
@@ -1450,53 +1442,12 @@ impl DocArena {
                 .iter()
                 .any(|&kid| Self::will_break_memo(kid, nodes, children, cache)),
             DocNode::WithContext { doc, .. } => Self::will_break_memo(*doc, nodes, children, cache),
-            DocNode::IsolatedGroup { .. } => false,
             DocNode::LineSuffix(_) => false,
             DocNode::LineSuffixBoundary => false,
             DocNode::BreakParent => true,
         };
         cache[id.index()] = Some(result);
         result
-    }
-
-    /// Like `will_break`, but also traverses into `IsolatedGroup`.
-    ///
-    /// Use this for doc analysis (e.g., chain expansion decisions) where
-    /// rendering isolation is irrelevant — we need to know if the content
-    /// actually contains forced breaks regardless of group isolation.
-    pub fn will_break_deep(&self, id: DocId) -> bool {
-        let nodes = self.nodes.borrow();
-        self.will_break_deep_inner(id, &nodes)
-    }
-
-    fn will_break_deep_inner(&self, id: DocId, nodes: &[DocNode]) -> bool {
-        match &nodes[id.index()] {
-            DocNode::IsolatedGroup { contents, .. } => self.will_break_deep_inner(*contents, nodes),
-            DocNode::Text(_) => false,
-            DocNode::MultilineText { .. } => true,
-            DocNode::Line(kind) => matches!(kind, LineKind::Hard | LineKind::Literal),
-            DocNode::Indent(inner) | DocNode::Dedent(inner) => {
-                self.will_break_deep_inner(*inner, nodes)
-            }
-            DocNode::Align { contents, .. } => self.will_break_deep_inner(*contents, nodes),
-            DocNode::IndentIfBreak { contents, .. } => self.will_break_deep_inner(*contents, nodes),
-            DocNode::Group {
-                contents,
-                should_break,
-                ..
-            } => *should_break || self.will_break_deep_inner(*contents, nodes),
-            DocNode::IfBreak { .. } => false,
-            DocNode::Concat(range) | DocNode::Fill(range) => {
-                let children = self.children.borrow();
-                let kids = range.resolve(&children);
-                kids.iter()
-                    .any(|&kid| self.will_break_deep_inner(kid, nodes))
-            }
-            DocNode::WithContext { doc, .. } => self.will_break_deep_inner(*doc, nodes),
-            DocNode::LineSuffix(_) => false,
-            DocNode::LineSuffixBoundary => false,
-            DocNode::BreakParent => true,
-        }
     }
 
     /// Check if a doc has forced breaks (hardlines only, no should_break groups).
@@ -1526,7 +1477,6 @@ impl DocArena {
                     .any(|&kid| self.has_forced_break_inner(kid, nodes))
             }
             DocNode::WithContext { doc, .. } => self.has_forced_break_inner(*doc, nodes),
-            DocNode::IsolatedGroup { .. } => false,
             DocNode::LineSuffix(_) => false,
             DocNode::LineSuffixBoundary => false,
             DocNode::BreakParent => true,
@@ -1580,7 +1530,6 @@ impl DocArena {
                 kids.iter().any(|&kid| self.can_break_inner(kid, nodes))
             }
             DocNode::WithContext { doc, .. } => self.can_break_inner(*doc, nodes),
-            DocNode::IsolatedGroup { contents, .. } => self.can_break_inner(*contents, nodes),
             DocNode::LineSuffix(inner) => self.can_break_inner(*inner, nodes),
             DocNode::MultilineText { .. } => true,
             DocNode::Text(_) | DocNode::LineSuffixBoundary => false,
@@ -1606,7 +1555,6 @@ impl DocArena {
                 id: Option<GroupId>,
                 should_break: bool,
             },
-            IsolatedGroup(DocId),
             IfBreakFlat(DocId),
             IndentIfBreakContents(DocId),
             Concat(DocBuf),
@@ -1642,7 +1590,6 @@ impl DocArena {
                     id: *group_id,
                     should_break: *should_break,
                 },
-                DocNode::IsolatedGroup { contents } => Info::IsolatedGroup(*contents),
                 DocNode::IfBreak { flat_doc, .. } => Info::IfBreakFlat(*flat_doc),
                 DocNode::IndentIfBreak { contents, .. } => Info::IndentIfBreakContents(*contents),
                 DocNode::Concat(range) => {
@@ -1711,10 +1658,6 @@ impl DocArena {
                         should_break,
                     })
                 }
-            }
-            Info::IsolatedGroup(contents) => {
-                let new_contents = self.remove_lines(contents);
-                self.isolated_group(new_contents)
             }
             Info::IfBreakFlat(flat_doc) => self.remove_lines(flat_doc),
             Info::IndentIfBreakContents(contents) => self.remove_lines(contents),

@@ -7,7 +7,6 @@
 // - Comment preservation
 
 use crate::ast::internal::{self, Expression, LiteralValue};
-use crate::printer::calls::skip_stripped_open_paren;
 use crate::printer::{CommentVec, Printer, has_multiline_content};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::doc::DocBuf;
@@ -69,61 +68,49 @@ impl<'a> Printer<'a> {
             .unwrap_or(arr.span.end - 1)
     }
 
-    /// Check for a blank line at an array boundary, walking back across any
-    /// intervening hole commas (elision-aware version of
-    /// `has_blank_line_after_comma`).
+    /// Blank-line rule for the gap after array slot `i` — prettier's
+    /// `node && isLineAfterElementEmpty(node)` (`print/array.js`, `printArrayElements`).
     ///
-    /// `i` is the destination iter index; `upper` is the position of the next
-    /// real token (typically the next element's start, or its first own-line
-    /// leading comment).
-    fn has_blank_line_at_array_boundary(
+    /// Both terms are load-bearing for elisions:
+    ///
+    /// - A **hole carries no blank line after it** (prettier's `node &&`): it has no node
+    ///   to anchor the scan on, and its own line break is structure, not authorship.
+    /// - The scan stops at **slot `i + 1`**, not at the next real element. A hole is empty
+    ///   — its slot is the point just before the comma that terminates it — so when slot
+    ///   `i + 1` is a hole the next real element lies past that comma, and a scan running
+    ///   that far reads the hole's own line break as an author's blank line.
+    ///
+    /// `upper_override` bounds the scan instead, for the expanding printer: it stops at
+    /// slot `i + 1`'s first own-line leading comment, where a blank line belongs before
+    /// the comment rather than before the element.
+    ///
+    /// The hole guard runs first, so the scan always anchors on a real element's end —
+    /// which also keeps a nested element's commas (`[[1, 2], , x]`) behind it.
+    fn has_blank_line_after_slot(
         &self,
         arr: &internal::ArrayExpression<'_>,
         i: usize,
-        upper: u32,
+        upper_override: Option<u32>,
     ) -> bool {
-        let check_start = self.blank_scan_start_before(arr, i, upper);
-        let check_end = skip_stripped_open_paren(self.source, check_start, upper);
-        self.has_blank_line_between(check_start, check_end)
-    }
-
-    /// Compute the scan start for a blank-line check between array element
-    /// boundaries — the position immediately before `upper` after stepping past
-    /// every comma and every comment in (`scan_from`, `upper`).
-    ///
-    /// `scan_from` is the end of the last real element before index `i` (or
-    /// just inside `[`). `i` may be `arr.elements.len()` for end-of-iter checks
-    /// where the "next" boundary is the closing bracket.
-    ///
-    /// Why both: elision commas live between consecutive holes; line and
-    /// multi-line block comments contribute newlines that `has_blank_line_between`
-    /// would otherwise count as a blank line. Returning the position past all of
-    /// them leaves a pure-whitespace gap to `upper` that the binary-search
-    /// blank-line check can interpret correctly.
-    ///
-    /// Result is clamped to `<= upper`.
-    fn blank_scan_start_before(
-        &self,
-        arr: &internal::ArrayExpression<'_>,
-        i: usize,
-        upper: u32,
-    ) -> u32 {
-        let scan_from = arr.elements[..i]
-            .iter()
-            .rev()
-            .find_map(|e| e.as_ref().map(|e| e.span().end))
-            .unwrap_or(arr.span.start + 1);
-        let mut pos = self
-            .find_last_comma_before(scan_from, upper)
-            .map_or(scan_from, |c| c + 1);
-        // Every comment physically in the gap, not just the ones this gap emits: an owned
-        // annotation's bytes are still there, and stepping over them is the whole point.
-        for c in self.comments_in_source_between(pos, upper) {
-            if c.span.end > pos {
-                pos = c.span.end;
+        let Some(elem) = arr.elements[i].as_ref() else {
+            return false;
+        };
+        let elem_end = elem.span().end;
+        let upper = upper_override.unwrap_or_else(|| {
+            // The next real element's start, or the closing `]` — slot `i + 1`'s own
+            // boundary unless a hole sits in front of it.
+            let next_real = self.next_element_boundary(arr, i);
+            if matches!(arr.elements.get(i + 1), Some(None)) {
+                // A hole terminates at its own comma: the second past this element, the
+                // first being this element's own separator.
+                self.find_comma_in_range(elem_end, next_real)
+                    .and_then(|comma| self.find_comma_in_range(comma + 1, next_real))
+                    .unwrap_or(next_real)
+            } else {
+                next_real
             }
-        }
-        pos.min(upper)
+        });
+        self.has_blank_line_after_comma(elem_end, upper)
     }
 
     /// Format a block comment for inline use (with appropriate spacing)
@@ -151,61 +138,111 @@ impl<'a> Printer<'a> {
         doc
     }
 
-    /// Build expression doc for array element, wrapping certain expressions in isolated_group
+    /// The last real element before slot `i` — its end position and its index.
     ///
-    /// This prevents internal breaks from propagating to parent groups,
-    /// enabling arrays to stay hugged (matching Prettier behavior).
-    fn build_array_element_doc(&self, expr: &Expression<'_>) -> DocId {
-        self.build_huggable_expression_doc(expr)
+    /// A hole has no span, so this is the only anchor a source scan across earlier slots can
+    /// start from. When every earlier slot is a hole the anchor is just inside `[`, paired
+    /// with index 0 so a comma count from it still measures whole slots.
+    fn prev_real_element_end(&self, arr: &internal::ArrayExpression<'_>, i: usize) -> (u32, usize) {
+        arr.elements[..i]
+            .iter()
+            .enumerate()
+            .rev()
+            .find_map(|(idx, e)| e.as_ref().map(|e| (e.span().end, idx)))
+            .unwrap_or((arr.span.start + 1, 0))
     }
 
-    /// Calculate the end position of an element (or fallback for elisions)
-    fn element_end_position(
+    /// Does this **block** comment trail the element before it, rather than lead the one after?
+    /// The separator decides, and is the whole rule: before the comma the comment trails
+    /// (`[A /* c */, B]`); past it, it leads the next element (`[A, /* c */ B]`).
+    ///
+    /// A newline after the comment does **not** carry it across the comma. Prettier classifies
+    /// on newlines alone (`endOfLine`, `main/comments/attach.js` — a comma is not a node) and so
+    /// rewrites `[A, /* c */⏎B]` to `[A /* c */, B]`, flipping the binding from `B` to `A`; tsv
+    /// preserves the authored position. The comma is what carries the association, and unlike a
+    /// `//` — which runs to end-of-line, so trailing it past the comma is the only rendering
+    /// that exists (the sanctioned pure-separator trail) — a block comment renders fine either
+    /// side, making the move unforced. See conformance_prettier.md §Comment relocation.
+    ///
+    /// `comma_pos` is the separator after `prev_end`. An own-line comment (a newline *before*
+    /// it) forces the expanding path, so it never reaches here.
+    fn block_comment_trails_prev_element(
         &self,
-        elem: Option<&Expression<'_>>,
-        arr: &internal::ArrayExpression<'_>,
-    ) -> u32 {
-        elem.map_or(arr.span.start + 1, |e| e.span().end)
+        prev_end: u32,
+        comment: &tsv_lang::Comment,
+        comma_pos: Option<u32>,
+    ) -> bool {
+        self.is_same_line(prev_end, comment.span.start)
+            && comma_pos.is_none_or(|pos| comment.span.start < pos)
     }
 
     /// Emit block comments in `[search_start, elem_start)` as inline-leading
     /// (`/*c*/ elem`). Used by both the first-element and subsequent-element
     /// paths in the non-expanding array printers.
+    ///
+    /// `prev` is the preceding real element's end and its separator comma — `None` for the
+    /// first element, which has nothing before it. A comment that trails that element
+    /// ([`Self::block_comment_trails_prev_element`]) is emitted *there*, so it must not also
+    /// be emitted here.
     fn add_inline_leading_block_comments(
         &self,
         search_start: u32,
         elem_start: u32,
+        prev: Option<(u32, Option<u32>)>,
         parts: &mut DocBuf,
     ) {
         for comment in comments_to_emit_in_range(self.comments, search_start, elem_start) {
-            if comment.is_block {
-                parts.push(self.format_inline_block_comment(comment, true));
+            if !comment.is_block {
+                continue;
             }
+            if let Some((prev_end, comma_pos)) = prev
+                && self.block_comment_trails_prev_element(prev_end, comment, comma_pos)
+            {
+                continue;
+            }
+            parts.push(self.format_inline_block_comment(comment, true));
         }
     }
 
-    /// Compute the search start for leading comments on the array element at
-    /// `i`. For the first element, that's just inside `[`; for later elements,
-    /// just past the comma after the previous element.
-    fn leading_comment_search_start_for(
+    /// The leading-comment scan for the array element at `i`: where to start searching, plus
+    /// the `prev` pair [`Self::add_inline_leading_block_comments`] takes — the preceding real
+    /// element's end and its separator comma (`None` at `i == 0`, which has nothing before it).
+    ///
+    /// One walk answers both, because they are two points on the same comma run: the search
+    /// starts just past the comma that terminates slot `i - 1`, and slot `i - 1`'s own
+    /// separator is the *first* comma the walk steps over.
+    ///
+    /// A hole has no span to anchor on, so when holes sit before `i` the terminating comma is
+    /// located by **counting** from the last real element: its own separator is the first comma
+    /// past the anchor, and each hole after it adds one more. Anchoring on the array's first
+    /// comma instead would start the search before earlier elements and re-collect their
+    /// comments.
+    fn leading_comment_scan_for(
         &self,
         arr: &internal::ArrayExpression<'_>,
         i: usize,
-    ) -> u32 {
+    ) -> (u32, Option<(u32, Option<u32>)>) {
         if i == 0 {
-            arr.span.start + 1
-        } else {
-            let prev_end = self.element_end_position(arr.elements[i - 1].as_ref(), arr);
-            self.leading_comment_search_start(prev_end, false)
+            return (arr.span.start + 1, None);
         }
+        let (anchor, r) = self.prev_real_element_end(arr, i);
+        let upper = arr.elements[i]
+            .as_ref()
+            .map_or(arr.span.end - 1, |e| e.span().start);
+        let mut pos = anchor;
+        let mut first_comma = None;
+        for _ in 0..(i - r) {
+            let Some(comma) = self.find_comma_in_range(pos, upper) else {
+                break;
+            };
+            first_comma.get_or_insert(comma);
+            pos = comma + 1;
+        }
+        (pos, Some((anchor, first_comma)))
     }
 
-    /// Add trailing block comments for an array element
-    ///
-    /// Only adds comments that are:
-    /// - On the same line as the element
-    /// - Block comments (not line comments)
-    /// - Before the comma (not after - those are leading on next element)
+    /// Add trailing block comments for an array element — the ones
+    /// [`Self::block_comment_trails_prev_element`] binds to it.
     fn add_trailing_array_comments(
         &self,
         arr: &internal::ArrayExpression<'_>,
@@ -214,23 +251,25 @@ impl<'a> Printer<'a> {
         parts: &mut DocBuf,
     ) {
         let next_boundary = self.next_element_boundary(arr, current_index);
-        let comma_pos = self.find_comma_after(elem_end);
+        // Bounded at `next_boundary`: this element's separator, if it has one, lies before the
+        // next element. Past the last element there is none — and every candidate comment is
+        // in range, so `None` tie-breaks them all the same way a comma beyond the array would.
+        let comma_pos = self.find_comma_in_range(elem_end, next_boundary);
 
         for comment in comments_to_emit_in_range(self.comments, elem_end, next_boundary) {
-            if comment.is_block && self.is_same_line(elem_end, comment.span.start) {
-                // Only add if before comma (or no comma found - shouldn't happen in valid arrays with more elements)
-                if comma_pos.is_none_or(|pos| comment.span.start < pos) {
-                    parts.push(self.format_inline_block_comment(comment, false));
-                }
+            if comment.is_block
+                && self.block_comment_trails_prev_element(elem_end, comment, comma_pos)
+            {
+                parts.push(self.format_inline_block_comment(comment, false));
             }
         }
     }
 
-    /// Build a Doc for an array with proper wrapping behavior
-    pub(in crate::printer) fn build_array_doc_with_wrapping(
-        &self,
-        arr: &internal::ArrayExpression<'_>,
-    ) -> DocId {
+    /// Build a Doc for an array expression, wrapping on width.
+    ///
+    /// The single entry point for every array position — top-level and nested alike — so
+    /// multiline content triggers the same expansion everywhere.
+    pub(in crate::printer) fn build_array_doc(&self, arr: &internal::ArrayExpression<'_>) -> DocId {
         if arr.elements.is_empty() {
             return self.build_empty_brackets_inline_with_comments_doc(arr.span);
         }
@@ -332,15 +371,16 @@ impl<'a> Printer<'a> {
                 // no comment can lie in this element's leading/trailing gap, so skip
                 // the inline block-comment collection (and its comma scan).
                 if has_comments {
-                    let search_start = self.leading_comment_search_start_for(arr, i);
+                    let (search_start, prev) = self.leading_comment_scan_for(arr, i);
                     self.add_inline_leading_block_comments(
                         search_start,
                         expr.span().start,
+                        prev,
                         &mut parts,
                     );
                 }
 
-                parts.push(self.build_expression_doc(expr));
+                parts.push(self.build_arg_expression_doc(expr));
 
                 if has_comments {
                     // Trailing block comments (before comma only)
@@ -380,9 +420,6 @@ impl<'a> Printer<'a> {
         let mut should_break = self.should_break_nested_array(arr);
 
         for (i, elem) in arr.elements.iter().enumerate() {
-            // Calculate elem_end for blank line checking (even for elisions)
-            let elem_end = self.element_end_position(elem.as_ref(), arr);
-
             // Handle comments and element (skip comment collection for elisions)
             if let Some(expr) = elem {
                 // Zero-comment fast gate: with no comments anywhere in the array, no
@@ -390,28 +427,26 @@ impl<'a> Printer<'a> {
                 // inline block-comment collection (and its comma scan). The blank-line
                 // detection below is comment-independent and stays outside the gate.
                 if has_comments {
-                    let search_start = self.leading_comment_search_start_for(arr, i);
+                    let (search_start, prev) = self.leading_comment_scan_for(arr, i);
                     self.add_inline_leading_block_comments(
                         search_start,
                         expr.span().start,
+                        prev,
                         &mut parts,
                     );
                 }
 
-                // Add element (templates wrapped in isolated_group)
-                parts.push(self.build_array_element_doc(expr));
+                parts.push(self.build_arg_expression_doc(expr));
 
                 if has_comments {
                     // Trailing block comments (before comma only)
-                    self.add_trailing_array_comments(arr, elem_end, i, &mut parts);
+                    self.add_trailing_array_comments(arr, expr.span().end, i, &mut parts);
                 }
             }
 
             let is_last = i == arr.elements.len() - 1;
             if !is_last {
-                // Check for blank line after this element (using same boundary logic as comments).
-                let next_start = self.next_element_boundary(arr, i);
-                let has_blank_after = self.has_blank_line_after_comma(elem_end, next_start);
+                let has_blank_after = self.has_blank_line_after_slot(arr, i, None);
 
                 // Separator comma between elements
                 parts.push(d.text(","));
@@ -539,14 +574,11 @@ impl<'a> Printer<'a> {
             if i > 0 {
                 parts.push(d.text(","));
 
-                // Check for blank line before this element (preserved when wrapped).
-                // Use literalline() for the blank line (no trailing whitespace) then
-                // hardline() for the indented content line — matches the non-forced path.
-                let prev_end = arr.elements[i - 1]
-                    .as_ref()
-                    .map_or(arr.span.start + 1, |e| e.span().end);
-                let curr_start = elem.as_ref().map_or(arr.span.end - 1, |e| e.span().start);
-                if self.has_blank_line_after_comma(prev_end, curr_start) {
+                // Check for blank line before this element (preserved when wrapped) — the
+                // gap after the previous slot. Use literalline() for the blank line (no
+                // trailing whitespace) then hardline() for the indented content line —
+                // matches the non-forced path.
+                if self.has_blank_line_after_slot(arr, i - 1, None) {
                     parts.push(d.literalline());
                 }
 
@@ -554,7 +586,7 @@ impl<'a> Printer<'a> {
             }
 
             if let Some(expr) = elem {
-                parts.push(self.build_array_element_doc(expr));
+                parts.push(self.build_arg_expression_doc(expr));
             }
         }
 
@@ -571,22 +603,15 @@ impl<'a> Printer<'a> {
             }
         }
 
-        if trailing_comments.is_empty() {
-            // No trailing comma after the last element under `trailingComma: 'none'`.
-            let inner = d.concat(&[d.hardline(), d.concat(&parts)]);
-            let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.hardline());
-            d.concat(&[d.text("["), indented_content, closing_line, d.text("]")])
-        } else {
-            // No trailing comma after the last element under `trailingComma: 'none'`,
-            // then comments on own lines.
-            for comment in &trailing_comments {
-                parts.push(d.hardline());
-                parts.push(self.build_comment_doc(comment));
-            }
-            let inner = d.concat(&[d.hardline(), d.concat(&parts)]);
-            let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.hardline());
-            d.concat(&[d.text("["), indented_content, closing_line, d.text("]")])
+        // No trailing comma after the last element under `trailingComma: 'none'`, then any
+        // own-line comments.
+        for comment in &trailing_comments {
+            parts.push(d.hardline());
+            parts.push(self.build_comment_doc(comment));
         }
+        let inner = d.concat(&[d.hardline(), d.concat(&parts)]);
+        let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.hardline());
+        d.concat(&[d.text("["), indented_content, closing_line, d.text("]")])
     }
 
     /// Build a Doc for an array with comments that force expansion.
@@ -667,7 +692,14 @@ impl<'a> Printer<'a> {
                             return false;
                         }
                         if i > 0 && self.is_same_line(last_real_emit_end, c.span.start) {
-                            c.is_block && prev_comma_pos.is_some_and(|pos| c.span.start > pos)
+                            // The complement of the trailing filter below — same predicate,
+                            // so each same-line block comment lands on exactly one side.
+                            c.is_block
+                                && !self.block_comment_trails_prev_element(
+                                    last_real_emit_end,
+                                    c,
+                                    prev_comma_pos,
+                                )
                         } else {
                             true
                         }
@@ -677,13 +709,14 @@ impl<'a> Printer<'a> {
                 smallvec![]
             };
 
-            // Blank-line check before this element / its leading comments
-            // (walks back across intervening hole commas).
+            // Blank-line check before this element / its leading comments — the gap after
+            // the previous slot. A leading comment bounds the scan (the blank line belongs
+            // before the comment); otherwise `has_blank_line_after_slot` finds this slot's
+            // own boundary, which for a hole is its comma rather than this `elem_start`
+            // (the next real element, past it).
             if i > 0 {
-                let blank_check_end = leading_comments
-                    .first()
-                    .map_or(elem_start, |c| c.span.start);
-                if self.has_blank_line_at_array_boundary(arr, i, blank_check_end) {
+                let blank_check_end = leading_comments.first().map(|c| c.span.start);
+                if self.has_blank_line_after_slot(arr, i - 1, blank_check_end) {
                     parts.push(d.literalline());
                     parts.push(d.hardline());
                 }
@@ -726,7 +759,7 @@ impl<'a> Printer<'a> {
             }
 
             if let Some(e) = elem {
-                parts.push(self.build_array_element_doc(e));
+                parts.push(self.build_arg_expression_doc(e));
             }
 
             // Same-line trailing comments (real elements only).
@@ -736,8 +769,10 @@ impl<'a> Printer<'a> {
                     .filter(|c| self.is_same_line(elem_end, c.span.start))
                     .filter(|c| {
                         if c.is_block {
-                            comma_pos.is_none_or(|pos| c.span.start < pos)
+                            self.block_comment_trails_prev_element(elem_end, c, comma_pos)
                         } else {
+                            // A same-line line comment always trails: nothing can follow it
+                            // on its line.
                             true
                         }
                     })
@@ -801,13 +836,18 @@ impl<'a> Printer<'a> {
             // Suppress trailing hardline if the next iter has a blank line before it
             // (the blank check at start of that iter will emit it).
             let next_has_blank_before = if i + 1 < arr.elements.len() {
+                // Must ask exactly what iter `i + 1`'s own blank check will ask, or the
+                // hardline is emitted twice or not at all. Same slot — and the same bound,
+                // which means only looking for a leading comment when slot `i + 1` is real:
+                // a hole collects none (its comments belong to the next real element, past
+                // it), so a search running that far would bound the scan on a comment iter
+                // `i + 1` never sees.
                 // **in source**: bounds a raw blank-line scan (see `blank_scan_end`).
-                let first_leading_comment = self
-                    .comments_in_source_between(elem_end, next_boundary)
-                    .find(|c| !self.is_same_line(elem_end, c.span.start));
-                let blank_check_boundary =
-                    first_leading_comment.map_or(next_boundary, |c| c.span.start);
-                self.has_blank_line_at_array_boundary(arr, i + 1, blank_check_boundary)
+                let first_leading_comment = arr.elements[i + 1].as_ref().and_then(|_| {
+                    self.comments_in_source_between(elem_end, next_boundary)
+                        .find(|c| !self.is_same_line(elem_end, c.span.start))
+                });
+                self.has_blank_line_after_slot(arr, i, first_leading_comment.map(|c| c.span.start))
             } else {
                 false
             };
@@ -859,15 +899,6 @@ impl<'a> Printer<'a> {
         ])
     }
 
-    /// Build a Doc for an array expression (for nested contexts)
-    ///
-    /// Delegates to `build_array_doc_with_wrapping` to ensure multiline content
-    /// triggers proper expansion even in nested contexts.
-    pub(in crate::printer) fn build_array_doc(&self, arr: &internal::ArrayExpression<'_>) -> DocId {
-        // Use the same wrapping logic as top-level arrays to handle multiline content
-        self.build_array_doc_with_wrapping(arr)
-    }
-
     /// Build a Doc for an array expression with forced expansion (hardlines).
     ///
     /// Used by chain arg formatting when we need the array to expand internally
@@ -886,7 +917,7 @@ impl<'a> Printer<'a> {
         for (i, elem) in arr.elements.iter().enumerate() {
             // Elements are Option<Expression> where None = hole/elision
             if let Some(expr) = elem {
-                parts.push(self.build_array_element_doc(expr));
+                parts.push(self.build_arg_expression_doc(expr));
             }
             // Holes are represented by just a comma (no element content)
 
