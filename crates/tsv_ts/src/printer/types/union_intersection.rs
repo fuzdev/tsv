@@ -223,9 +223,7 @@ impl<'a> Printer<'a> {
         // nested *inside* a member (e.g. `{ /* c */ a: 1 }`) attaches to a child
         // node, not the member, so it must not block the hug — the member's own
         // doc renders it.
-        if (!has_comments || !self.union_has_comments_between_members(union))
-            && should_hug_union_type(union)
-        {
+        if self.union_prints_hugged(union) {
             let mut parts = DocBuf::new();
             // Extract leading block comments before the first type
             // (e.g., `| /* c */ A` — comment between leading `|` and first member)
@@ -330,16 +328,26 @@ impl<'a> Printer<'a> {
                 parts.push(d.if_break(d.text("| "), d.empty()));
 
                 // Extract leading block comments before the first type
-                // (e.g., `| /* c */ A | B` — comment between leading `|` and first member)
+                // (e.g., `| /* c */ A | B` — comment between leading `|` and first member).
+                //
+                // `indent` for the same reason as the line-comment path's run: when this
+                // run ends in a break — an own-line multi-line block, or its soft `line`
+                // breaking as the union expands — it is the run that places the member's
+                // own first line, which then belongs at the per-member offset rather than
+                // flush under the `|`. Unconditional because `indent` binds only the
+                // breaks inside it, so a run that hugs its member is unaffected.
                 if has_comments {
-                    parts.push(
+                    parts.push(d.indent(
                         self.build_member_leading_block_comments(union.span.start, type_start),
-                    );
+                    ));
                 }
             }
 
             // Apply Prettier's per-member `align(2, …)` offset (rendered as one
-            // whole tab) — see `build_union_member_offset_doc`.
+            // whole tab) — see `build_union_member_offset_doc`. The first member's
+            // leading run takes that offset separately, above: the run is indented, never
+            // this call's result, so the object-literal and default-paren members that
+            // supply their own indent keep declining it.
             parts.push(self.build_union_member_offset_doc(t, member_parens));
 
             // Add trailing block comments after this type (before the next `|` separator)
@@ -392,7 +400,12 @@ impl<'a> Printer<'a> {
         let TSType::Union(union) = ty else {
             return None;
         };
-        if should_hug_union_type(union) {
+        // `union_prints_hugged`, not the bare syntactic `should_hug_union_type`: this
+        // must agree with the layout `build_union_type_doc` will actually take. A comment
+        // can make it decline the hug and expand, and then the keyword has to break like
+        // any other non-hugging union — asking the syntactic form alone keeps `as ` glued
+        // while the members explode below it.
+        if self.union_prints_hugged(union) {
             return None;
         }
         // The union members form their own group (`build_union_type_doc`), nested
@@ -439,6 +452,27 @@ impl<'a> Printer<'a> {
         for (i, t) in union.types.iter().enumerate() {
             let type_start = t.span().start;
             let type_end = t.span().end;
+
+            // The **first** member's leading-comment run, built here rather than at the
+            // `| ` prefix below so the arm that emits it decides whether it takes the
+            // per-member offset — the paren-union arm declines it, the general arm takes
+            // it. Both block and line comments are emitted from here; a line comment
+            // requires multiline and places the member on the next line (`| // c⏎  A`).
+            //
+            // ⚠️ Empty for every later member, and the arm chain below consumes it by
+            // move — an arm that neither extends nor inspects it is a **dropped comment**
+            // (`comments:audit` is the corpus-wide guard). The relocated-paren arm can't
+            // coexist with a non-empty run: its `relocated_paren_leading` is empty unless
+            // `i > 0`.
+            //
+            // `None` for `skip_delim`: the union's leading `|` is not run through
+            // `delimiter_line_comment_prefix`, unlike the bracket/angle/paren lists, so
+            // no comment was pulled onto a delimiter line to exclude here.
+            let first_leading = if i == 0 {
+                self.build_leading_comments_multiline(union.span.start, type_start, None)
+            } else {
+                DocBuf::new()
+            };
 
             // For non-first members, detect leading line comments inside the
             // parens of a TSParenthesizedType wrapper. Prettier relocates these
@@ -538,27 +572,10 @@ impl<'a> Printer<'a> {
                     parts.push(d.text("| "));
                 }
             } else {
-                // First type: always has `| ` prefix when multiline
+                // First type: always has `| ` prefix when multiline. Its leading run was
+                // built above and is emitted by the arm chain below.
                 parts.push(d.text("| "));
-
-                // Extract leading comments before the first type. Both block and
-                // line comments are emitted here — line comments require multiline
-                // and place the type on the next line (e.g., `| // c\n   A`).
-                parts.extend(self.build_leading_comments_multiline(union.span.start, type_start));
             }
-
-            // The per-member offset shifts a member's *internal* break lines past
-            // the `| ` prefix; it must only apply when the member's first line is
-            // glued to `| `. The first member is dropped onto its own line by a
-            // leading own-line comment — either before it (`| // c\n a`) or inside
-            // its stripped parens (`(// c\n a)`) — where the offset would wrongly
-            // indent the member's own first line. Non-first members keep their
-            // leading line comments before the pipe, so they stay glued.
-            let member_on_own_line = i == 0
-                && (self
-                    .comments_on_page_between(union.span.start, type_start)
-                    .any(|c| !self.comment_hugs_next(c, type_start))
-                    || matches!(t, TSType::Parenthesized(p) if self.paren_has_leading_line_comment(p)));
 
             // Add the type with the same per-member offset as the main path
             // (`build_union_member_offset_doc`). When we relocated leading line
@@ -569,6 +586,9 @@ impl<'a> Printer<'a> {
             if !relocated_paren_leading.is_empty()
                 && let TSType::Parenthesized(p) = t
             {
+                // Unreachable with a held run — this arm needs `i > 0`, the run needs
+                // `i == 0` (see its declaration), so there is nothing here to emit.
+                debug_assert!(first_leading.is_empty());
                 let inner = p.type_annotation;
                 if let TSType::Union(union) = inner {
                     // `build_parenthesized_union_doc` lays out `(`/`)` on their own
@@ -600,21 +620,38 @@ impl<'a> Printer<'a> {
                 // to `build_parenthesized_union_doc` so it is not dropped. Take the
                 // per-member offset like any other paren-union member (matching the
                 // `is_paren_union_member` arm of `build_union_member_offset_doc`).
+                parts.extend(first_leading);
                 parts.push(d.indent(self.build_parenthesized_union_doc(
                     inner_union,
                     Some(p),
                     true,
                 )));
-            } else if member_on_own_line {
-                // Dropped onto its own line by a leading comment — emit without the
-                // offset (it would indent the member's own first line). Objects
-                // still self-indent via `build_union_member_object_literal_doc`.
-                if let TSType::TypeLiteral(obj) = t {
-                    parts.push(self.build_union_member_object_literal_doc(obj));
-                } else {
-                    parts.push(self.build_type_doc_maybe_parens(t, member_parens));
-                }
             } else {
+                // The leading run takes the member's per-member offset. Whenever the run
+                // ends in a break it is the run — not the `| ` prefix — that places the
+                // member's own first line, so an unindented run would strand that line
+                // one level shallower than the member's internal breaks. Prettier has the
+                // same shape: `align(2, print())`, whose `print()` carries the leading
+                // comments.
+                //
+                // The wrapper is applied whenever there IS a run, never keyed on whether
+                // the run breaks: `indent` binds only the line breaks *inside* it, so a
+                // run whose comments all hug the member is pure text and the wrapper is
+                // inert. "Does this run drop the member onto its own line?" is a question
+                // the doc structure already answers — asking it again with a predicate
+                // would be a second gate that can drift from this one.
+                //
+                // Indent the RUN, never `build_union_member_offset_doc`'s result: that
+                // function owns the opt-outs (an object literal and a default-paren
+                // member supply their own indent and decline the offset), so wrapping
+                // its result would double-indent exactly those two — the member's body
+                // two columns past prettier, its closing delimiter out of line with its
+                // opener. Sound because `indent` is a per-line property, so
+                // `indent(concat([run, member]))` and `concat([indent(run), member])`
+                // agree wherever the member does take the offset.
+                if !first_leading.is_empty() {
+                    parts.push(d.indent(d.concat(&first_leading)));
+                }
                 parts.push(self.build_union_member_offset_doc(t, member_parens));
             }
 
@@ -656,12 +693,80 @@ impl<'a> Printer<'a> {
         gap_start: u32,
         gap_end: u32,
     ) -> bool {
+        // Two questions, each asked of the one predicate that owns it. The **brace**
+        // narrowing is this site's own (`is_hugging_union_type_arg` — a
+        // `Promise<…> | null` `TSTypeReference` member is excluded, the sanctioned
+        // `return_type_generic_union` print-width family), and so is the `:`→union gap.
+        // But whether the union HUGS AT ALL belongs to [`Self::union_prints_hugged`] and
+        // is not re-derived here: this gate used to spell out its own subset of that
+        // predicate's comment checks and missed the leading `|`→first-member line
+        // comment, so a comment that made the printer decline the hug still read as
+        // "hug" here and kept `: ` glued while the members exploded below it.
         is_hugging_union_type_arg(value_type)
-            && !self.union_has_comments_between_members(union)
+            && self.union_prints_hugged(union)
             && !self.has_comments_to_emit_between(gap_start, gap_end)
     }
 
-    pub(crate) fn union_has_comments_between_members(&self, union: &TSUnionType<'_>) -> bool {
+    /// Whether [`Self::build_union_type_doc`] will actually take its **hug** path —
+    /// the inline `{ … } | null` form where the object member owns its own expansion.
+    ///
+    /// The single source of truth for that question, because two places must agree on
+    /// it: the union printer (which lays the members out) and the type-alias RHS
+    /// (`build_type_alias_doc`, which decides whether to break after `=`). Asking the
+    /// bare syntactic [`should_hug_union_type`] at the alias while the printer declines
+    /// the hug for a comment splits them — the alias keeps `= ` while the union expands,
+    /// yielding `type A = | // c⏎{ a: 1 }⏎| null` where a non-hugging union of the same
+    /// shape correctly breaks after the `=`.
+    ///
+    /// Beyond the syntactic shape, a comment prettier's `shouldHugUnionType` would bail
+    /// on disqualifies the hug:
+    ///
+    /// - **between two members** — prettier's `types.some((t) => hasComment(t))`, which
+    ///   in the detached model lives in the inter-member gap;
+    /// - a **line** comment in the leading `|`→first-member gap — the hug emits that gap
+    ///   block-only, so a line comment there would be silently DROPPED, and it could not
+    ///   be inlined regardless (a `//` runs to end-of-line and would swallow the member).
+    ///   `union_has_comments_between_members` cannot answer this: the gap is *before* the
+    ///   first member, not *between* two. A **block** there stays hugged and inline
+    ///   (`/* c */ { a: 1 } | null`), matching prettier.
+    ///
+    /// A comment nested *inside* a member (`{ /* c */ a: 1 }`) attaches to a child node,
+    /// not the member, so it never blocks the hug — the member's own doc renders it.
+    ///
+    /// **Axis.** This is a layout gate, so it asks the **on-page** question — an owned
+    /// comment occupies the page and must block the hug like any other. The delegates it
+    /// guards read the **to-emit** axis, which is sound here only because ownership is
+    /// set exclusively in expression position (`parser/expression.rs`): no comment in a
+    /// *type*'s gaps is ever owned, so within a union the two axes coincide. Should
+    /// ownership ever reach type position, `union_has_comments_between_members` becomes
+    /// the weak link — the on-page fast path would fall through and the emit-keyed
+    /// pairwise scan would report "no comments" for an owned one, hugging a union whose
+    /// members the printer expands.
+    pub(crate) fn union_prints_hugged(&self, union: &TSUnionType<'_>) -> bool {
+        if !should_hug_union_type(union) {
+            return false;
+        }
+        // Zero-comment fast path — an **on-page** question, since it short-circuits the
+        // comment gates below.
+        if !self.has_comments_on_page_between(union.span.start, union.span.end) {
+            return true;
+        }
+        !self.union_has_comments_between_members(union)
+            && !union.types.first().is_some_and(|first| {
+                self.has_line_comments_between(union.span.start, first.span().start)
+            })
+    }
+
+    /// Whether any comment sits in a gap *between* two consecutive members — the
+    /// detached-model spelling of prettier's `types.some((t) => hasComment(t))`
+    /// (`shouldHugType`'s bail).
+    ///
+    /// Private, and deliberately so: it answers one clause of "does this union hug",
+    /// never that question itself. [`Self::union_prints_hugged`] owns the whole answer,
+    /// and is the only caller — a layout gate that reaches past it to this clause is
+    /// re-deriving the layout with a subset of the rule, which is exactly how the
+    /// leading-`|` line comment was missed.
+    fn union_has_comments_between_members(&self, union: &TSUnionType<'_>) -> bool {
         // Zero-comment window gate: one binary search over the whole union span before
         // the N-1 pairwise between-member searches. Each pairwise range lies within
         // `[union.span.start, union.span.end]`, so with no comment inside the union

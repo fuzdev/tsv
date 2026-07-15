@@ -1,7 +1,7 @@
 // Type declaration printing (type aliases, interfaces, enums, namespaces, declare functions)
 // plus shared entity-name helpers
 
-use super::{Printer, build_entity_name_doc, is_effectively_empty_body, should_hug_union_type};
+use super::{Printer, build_entity_name_doc, is_effectively_empty_body};
 use crate::ast::internal::{self, TSType};
 use crate::printer::layout::hang_after_operator;
 use crate::printer::{CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue};
@@ -301,7 +301,11 @@ impl<'a> Printer<'a> {
             // breaking from this context's group.
             if let TSType::Union(u) = value_type {
                 let type_doc = self.build_union_type_doc(u);
-                if should_hug_union_type(u) {
+                // `union_prints_hugged`, not the bare syntactic `should_hug_union_type`:
+                // this must agree with the layout `build_union_type_doc` just chose. A
+                // comment can make it decline the hug and expand, and then the `=` has
+                // to break like any other non-hugging union.
+                if self.union_prints_hugged(u) {
                     // Hugged unions (e.g., `{ ... } | null`): the object type handles its own
                     // expansion, so keep `= {` together like other internally-breaking types
                     parts.push(d.text(" "));
@@ -737,11 +741,7 @@ impl<'a> Printer<'a> {
             parts.push(d.hardline());
 
             // Print leading comments with blank line preservation
-            parts.extend(self.build_leading_comments_with_blank_lines(
-                &leading_comments,
-                member_start,
-                false,
-            ));
+            parts.extend(self.build_leading_comments_before(&leading_comments, member_start));
 
             // A preceding format-ignore directive keeps the member's source verbatim.
             // The member span includes its trailing `;`.
