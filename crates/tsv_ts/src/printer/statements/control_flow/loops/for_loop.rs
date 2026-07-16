@@ -1502,6 +1502,17 @@ impl<'a> Printer<'a> {
         match left {
             internal::ForInOfLeft::VariableDeclaration(decl) => {
                 let Some(declarator) = decl.declarations.first() else {
+                    // A for-in/of head always binds something (`for (const of x)` is a
+                    // parse error), so there is no declarator to bound a gap search at
+                    // and nothing to print but the kind. `as_str()` is the joined text —
+                    // the very thing `words()` exists to avoid, since it emits `await
+                    // using`'s interior gap as a fixed space and would drop a comment
+                    // authored there. Safe only because this arm is unreachable; assert
+                    // that rather than let a future caller reach it silently.
+                    debug_assert!(
+                        false,
+                        "a for-in/of variable declaration always has a declarator"
+                    );
                     return d.concat(&[d.text(decl.kind.as_str()), d.text(" ")]);
                 };
                 // The keyword→binding gap carries a comment (`for (const /* c */ x of y)`)

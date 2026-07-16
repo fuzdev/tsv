@@ -1,7 +1,7 @@
 // Type-argument instantiation (`<T, U>`) rendering
 
 use super::Printer;
-use super::helpers::{is_hugging_union_type_arg, is_simple_type_arg, unwrap_parenthesized};
+use super::helpers::{is_huggable_type, is_simple_type_arg, unwrap_parenthesized};
 use crate::ast::internal::{self, TSType};
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
@@ -30,11 +30,13 @@ impl<'a> Printer<'a> {
     /// arguments, the assignment `=`) rather than inside it; any brace-delimited member
     /// carries its own group and still breaks block-style within the hugged `<…>`.
     ///
-    /// Assumes `args.params.len() == 1`; the caller gates on its own single-arg inline
-    /// predicate (`is_simple_type_arg`, `is_hugging_union_type_arg`, a huggable object,
-    /// or always-inline). Own-line and line comments are routed to the multiline path
-    /// before this runs, so only inline block comments remain to preserve here. Shared by
-    /// the type-position builder and the call/`new`/instantiation builder.
+    /// Assumes `args.params.len() == 1` **and** that the caller has gated on the argument
+    /// actually hugging — [`Self::type_arg_hugs`] for both builders here, and its split
+    /// spelling in `type_params.rs` (whose object case routes through
+    /// `try_build_hugging_curly_type_doc`, a documented divergence). Own-line and line
+    /// comments are routed to the multiline path before this runs, so only inline block
+    /// comments remain to preserve here. Shared by the type-position builder and the
+    /// call/`new`/instantiation builder.
     /// `has_comments` is the caller's whole-`<…>` window answer: `false` proves both
     /// gaps below are comment-free, so neither is searched.
     pub(in crate::printer) fn build_single_type_arg_inline(
@@ -56,6 +58,30 @@ impl<'a> Printer<'a> {
         }
         parts.push(d.text(">"));
         d.concat(&parts)
+    }
+
+    /// Whether a **single type argument** hugs — i.e. whether `<T>` inlines atomically.
+    /// Prettier's `shouldHugType` (`print/type-annotation.js`), and the whole answer, so no
+    /// type-argument site re-derives it from parts. Three clauses:
+    ///
+    /// 1. a **simple** type ([`is_simple_type_arg`]) — atomic, never benefits from breaking;
+    /// 2. an **object** type ([`is_huggable_type`] — `TypeLiteral`/`Mapped`), which carries
+    ///    its own group and breaks block-style *inside* the hugged `<…>`;
+    /// 3. a **hugged union** ([`Self::type_arg_union_prints_hugged`] — `{ … } | null`), whose
+    ///    object member likewise owns the expansion.
+    ///
+    /// For TypeScript this *is* prettier's `shouldInline` at `len == 1`: its remaining
+    /// disjunct, `NullableTypeAnnotation`, is Flow-only, and its `isParameterInTestCall` /
+    /// `isArrowFunctionVariable` clauses gate call-site `<…>`, not a type-position one.
+    ///
+    /// ⚠️ A non-hugging argument (an intersection, a function type, a conditional) must
+    /// **not** inline: `build_single_type_arg_inline` emits no group and no softlines, so an
+    /// inlined `<…>` has no break point and an overflowing head breaks *around* the brackets
+    /// (the enclosing operand, or the assignment `=`) instead of inside them.
+    pub(in crate::printer) fn type_arg_hugs(&self, ty: &TSType<'_>) -> bool {
+        is_simple_type_arg(ty)
+            || is_huggable_type(unwrap_parenthesized(ty))
+            || self.type_arg_union_prints_hugged(ty)
     }
 
     /// Comments that force the `<...>` list to the multiline layout: line
@@ -96,8 +122,22 @@ impl<'a> Printer<'a> {
 
     /// Build doc for type arguments: `<T, U>`.
     ///
-    /// Single arg: always inline. Multi-arg: group-based breaking via shared helper.
-    /// Use `build_type_arguments_doc_wrapping` for single-arg hugging (e.g., `Array<{...}>`).
+    /// One builder for every type-argument position — there is no "wrapping" variant, because
+    /// there is nothing for one to do differently. A single **hugging** argument inlines
+    /// atomically ([`Self::type_arg_hugs`]); everything else — a non-hugging single argument
+    /// and every multi-argument list alike — gets the group, so the `<…>` breaks at print
+    /// width independently of its parent:
+    ///
+    /// ```text
+    /// Array<{        Promise<
+    ///     prop: T;       A & B & C
+    /// }>             >
+    /// ```
+    ///
+    /// Inlining a hugging argument matters beyond layout taste: the group/softlines it avoids
+    /// would create Break-mode Line nodes in `fits()` rest_commands, causing upstream groups
+    /// (like arrays in Fluid assignment layout) to incorrectly appear to "fit" — Line in Break
+    /// mode returns true from `fits()`, short-circuiting the width check.
     pub(crate) fn build_type_arguments_doc(
         &self,
         args: &internal::TSTypeParameterInstantiation<'_>,
@@ -107,84 +147,34 @@ impl<'a> Printer<'a> {
             return d.text("<>");
         }
 
-        // One window search over the `<…>`, threaded into everything below it.
+        // One window search over the `<…>`, threaded into everything below it. **On-page**:
+        // this is the builder's zero-comment fast gate, so it short-circuits the layout gates
+        // below (`type_arguments_force_expansion` above all) — an emit-keyed answer would make
+        // every one of them blind to an owned comment. Sound today either way (ownership is
+        // set only in expression position, and a `<…>` window holds types), but the question
+        // asked here is "does a comment occupy the page", so that is the axis it asks.
         let has_comments = self.has_comments_on_page_between(args.span.start, args.span.end);
 
         if self.type_arguments_force_expansion(args, has_comments) {
             return self.build_type_arguments_doc_with_line_comments(args);
         }
 
-        // Single type argument: inline (matches Prettier's shouldInline for len==1)
-        if args.params.len() == 1 {
+        // A single argument inlines only when it hugs; a non-hugging one (an intersection, a
+        // function type, a conditional) falls through to the group below, which is what gives
+        // the `<…>` a break point of its own.
+        if args.params.len() == 1 && self.type_arg_hugs(&args.params[0]) {
             return self.build_single_type_arg_inline(args, has_comments);
         }
 
-        // Multiple type arguments: use group so they can break at print width.
         // Matches Prettier's group([<, indent([softline, join([",", line], args)]), softline, >])
-        self.build_type_arguments_doc_multi_arg(args, has_comments)
-    }
-
-    /// Build doc for type arguments with width-based wrapping support.
-    ///
-    /// Inline: `<T, U, V>`
-    /// Wrapped: `<\n\tT,\n\tU,\n\tV\n>`
-    ///
-    /// Special case: single TypeLiteral argument hugs the opening `<`:
-    /// `Array<{prop: string}>` stays hugged, and when broken:
-    /// ```text
-    /// Array<{
-    ///     prop: string;
-    /// }>
-    /// ```
-    ///
-    /// Use this when type arguments should break independently of parent context,
-    /// such as in property type annotations.
-    pub(crate) fn build_type_arguments_doc_wrapping(
-        &self,
-        args: &internal::TSTypeParameterInstantiation<'_>,
-    ) -> DocId {
-        let d = self.d();
-        if args.params.is_empty() {
-            return d.text("<>");
-        }
-
-        // One window search over the `<…>`, threaded into everything below it.
-        let has_comments = self.has_comments_to_emit_between(args.span.start, args.span.end);
-
-        if self.type_arguments_force_expansion(args, has_comments) {
-            return self.build_type_arguments_doc_with_line_comments(args);
-        }
-
-        // Single type argument inlining, matching Prettier's `shouldInline` logic.
-        // Three categories are inlined (no group/softlines):
-        //
-        // 1. Simple types (`is_simple_type_arg`): keywords, literals, `this`, and a
-        //    bare TypeReference without type args. Atomic — never need breaking.
-        // 2. Object types: TypeLiteral and Mapped types handle their own breaking.
-        // 3. Hugged unions: unions with a brace-delimited member like `{...} | null`.
-        //
-        // Without inlining, the group/softlines create Break-mode Line nodes in
-        // `fits()` rest_commands, causing upstream groups (like arrays in Fluid
-        // assignment layout) to incorrectly appear to "fit" — Line in Break mode
-        // returns true from `fits()`, short-circuiting the width check.
-        if args.params.len() == 1 {
-            let unwrapped = unwrap_parenthesized(&args.params[0]);
-            let is_huggable = is_simple_type_arg(&args.params[0])
-                || matches!(unwrapped, TSType::TypeLiteral(_) | TSType::Mapped(_))
-                || is_hugging_union_type_arg(&args.params[0]);
-            if is_huggable {
-                return self.build_single_type_arg_inline(args, has_comments);
-            }
-        }
-
         self.build_type_arguments_doc_multi_arg(args, has_comments)
     }
 
     /// Build multi-arg type arguments with group-based breaking.
     ///
     /// Matches Prettier's `group([<, indent([softline, join([",", line], args)]), softline, >])`.
-    /// Used by both `build_type_arguments_doc` and `build_type_arguments_doc_wrapping`
-    /// for 2+ type arguments (and non-huggable single args in the wrapping variant).
+    /// Used by `build_type_arguments_doc` for 2+ type arguments and for a non-hugging
+    /// single argument.
     /// `has_comments` is the caller's whole-`<…>` window answer. When `false` the whole
     /// per-argument comment apparatus is dead: every gap is provably comment-free, so
     /// neither the leading/trailing searches nor the `find_list_comma` byte scan that

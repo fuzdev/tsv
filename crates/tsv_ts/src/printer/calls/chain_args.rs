@@ -24,6 +24,7 @@ use super::arg_wrapping::{
     wrap_huggable_arg,
 };
 use crate::ast::internal::{self, Expression};
+use crate::printer::expressions::functions::arrow_signature_has_breaking_comments;
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
@@ -783,6 +784,11 @@ fn build_chain_args_single(
         // hug must refuse it too — a to-emit gate would hug blind.
         && !(has_any_comment_text
             && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
+        // A comment LEADING the arg isn't the only shape that defeats the hug: one INSIDE
+        // the signature forces a break the one-line hug can't honor. Same predicate as the
+        // non-chain path — see `arrow_signature_has_breaking_comments`.
+        && !(has_any_comment_text
+            && arrow_signature_has_breaking_comments(printer, arrow))
     {
         // Render the arrow with flat params (prettier's expandLastArg
         // `removeLines`) so the force-broken state breaks the body, not the
@@ -926,7 +932,17 @@ fn build_chain_args_single(
     // Leading comments prevent hugging — prettier's shouldExpandLastArg
     // returns false when hasComment(lastArg, Leading), so the default
     // expansion path is used instead of expand-last hugging.
-    let kind = if has_leading_comment_on_page {
+    //
+    // A comment that FORCES a break inside an arrow's signature does the same, and for the
+    // same reason: hugging would strand the break mid-signature. This is the last of the
+    // three places that must agree on when a hug is legal (the expand-last gate above, and
+    // `call_formatting.rs`'s non-chain arm) — all asking the one predicate, because the
+    // hug that mangled `arr.map(…)` while `fn(…)` stayed correct was precisely two of them
+    // disagreeing. See `arrow_signature_has_breaking_comments`.
+    let signature_forces_break = has_any_comment_text
+        && matches!(arg, Expression::ArrowFunctionExpression(arrow)
+            if arrow_signature_has_breaking_comments(printer, arrow));
+    let kind = if has_leading_comment_on_page || signature_forces_break {
         ChainArgKind::NeedsSoftWrap
     } else {
         classify_chain_arg(arg)

@@ -14,6 +14,18 @@ stays inline (`A | B`) when it fits.
 Per Comment Position Philosophy: the comment is inside the parenthesized member,
 so tsv associates it with that member rather than hoisting it out.
 
+`FirstIntersection` is the same shape with a **paren-intersection** member whose
+trailing object supplies its own aligned layout (`(// c\n A & { … })`). It is a
+separate case because that layout is built from the *already-unwrapped* inner type,
+so the paren's own `(`→inner gap is invisible to it and the comment has to be
+threaded in explicitly — without that it is silently **dropped**, which no
+prettier comparison catches (the two forms differ anyway) and only the print-once
+comment ledger reports. Its comment hugs the `(` rather than taking its own line
+below it, matching the other default-paren member shapes (function, constructor,
+conditional, plain intersection); the paren-union `First` above is the one that
+puts `(` and the comment on separate lines, because its layout gives `(` its own
+line whenever the group breaks.
+
 This mirrors the trailing-comment sibling
 [union_intersection_retained_paren_line_comment](../union_intersection_retained_paren_line_comment_prettier_divergence/),
 which likewise keeps a line comment inside the retained parens for the first

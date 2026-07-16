@@ -138,6 +138,26 @@ pub(super) struct TagClass {
     pub(super) is_declaration: bool,
 }
 
+/// The source window an attribute list's comment gaps live in.
+///
+/// A named struct rather than loose `u32`s for the same reason [`TagClass`] is one: the two
+/// offsets are positional and silently swappable at the call site.
+#[derive(Clone, Copy)]
+pub(super) struct AttrGaps {
+    /// Where the gap before the first attribute starts — the tag name's end.
+    pub(super) first_range_start: u32,
+    /// The `>` closing the opening tag; bounds the gap after the last attribute.
+    pub(super) open_tag_end: u32,
+    /// A region inside the window that the caller prints itself, whose comments the scan
+    /// must therefore skip. `<svelte:element this={…}>` keeps its `this` out of the
+    /// attribute list and synthesizes the attribute, so the braces land in one of the gaps
+    /// probed here while the tag's own doc is what prints them; without the skip a comment
+    /// in there is emitted twice, once by each. Ownership does not cover this on its own: a
+    /// *glued block* comment is `owned_by_node` and already skipped on the `to emit` axis,
+    /// but a line comment never is (`owned ⇒ is_block`).
+    pub(super) claimed: Option<Span>,
+}
+
 /// Analysis context for element formatting decisions
 ///
 /// Computed once per element from its [`ElementParts`], used to determine layout and build
@@ -387,7 +407,12 @@ impl<'a> Printer<'a> {
     /// The `>` is **attr-keyed**: the trailing dedented softline hugs it to the last attribute
     /// when the attributes fit and drops it to its own line when they wrap. When `force_break`
     /// is true (e.g. an attribute value with embedded newlines) the attributes always wrap.
-    fn build_opening_tag(&self, name: DocId, attr_docs: &[DocId], force_break: bool) -> DocId {
+    pub(super) fn build_opening_tag(
+        &self,
+        name: DocId,
+        attr_docs: &[DocId],
+        force_break: bool,
+    ) -> DocId {
         let d = self.d();
         if attr_docs.is_empty() {
             d.concat(&[d.text("<"), name])
@@ -837,35 +862,60 @@ impl<'a> Printer<'a> {
         // buffer stays on the stack (`DocBuf`'s inline capacity); attribute-dense
         // elements spill to the heap as before.
         let mut docs: DocBuf = DocBuf::with_capacity(attrs.len() * 2);
-        self.push_attrs_with_comments(&mut docs, attrs, separator, name_end, open_tag_end, is_html);
+        self.push_attrs_with_comments(
+            &mut docs,
+            attrs,
+            separator,
+            AttrGaps {
+                first_range_start: name_end,
+                open_tag_end,
+                // A regular element's attributes are all in `attrs` — nothing here is
+                // printed by a synthesized attribute of the caller's own.
+                claimed: None,
+            },
+            is_html,
+        );
         docs
     }
 
     /// Push attribute docs with interleaved JS comment handling.
     ///
     /// Shared between regular element and special element attr doc builders.
-    /// Handles comments between attributes (using `first_range_start` for the gap
-    /// before the first attr) and trailing comments after the last attribute
-    /// (bounded by `open_tag_end`).
+    /// Handles comments between attributes and trailing comments after the last one, over
+    /// the window described by [`AttrGaps`].
     pub(super) fn push_attrs_with_comments(
         &self,
         docs: &mut DocBuf,
         attrs: &[internal::AttributeNode<'_>],
         separator: DocId,
-        first_range_start: u32,
-        open_tag_end: u32,
+        gaps: AttrGaps,
         is_html: bool,
     ) {
         let d = self.d();
+        let AttrGaps {
+            first_range_start,
+            open_tag_end,
+            claimed,
+        } = gaps;
+        // The gap probes below all go through these, so the claimed region is skipped once
+        // here rather than at each of the four sites.
+        let gap_comments = |start: u32, end: u32| {
+            comments_to_emit_in_range(self.comments, start, end).filter(move |c| {
+                !claimed.is_some_and(|r| r.start <= c.span.start && c.span.end <= r.end)
+            })
+        };
+        let has_gap_comments = |start: u32, end: u32| gap_comments(start, end).next().is_some();
 
         // Every gap this fn probes — each attribute's leading range and the trailing range
         // after the last one — lies inside `[first_range_start, open_tag_end]`. A comment
-        // lands in `has_comments_to_emit_in_range` only when it sits fully inside the queried range,
-        // so a comment-free open tag means every one of those gaps is comment-free: each
-        // would take the bare-separator branch below and the trailing block would emit
-        // nothing. Answer that with one probe instead of one per attribute plus one.
-        if !tsv_lang::has_comments_to_emit_in_range(self.comments, first_range_start, open_tag_end)
-        {
+        // lands in a probe only when it sits fully inside the queried range, so a
+        // comment-free open tag means every one of those gaps is comment-free: each would
+        // take the bare-separator branch below and the trailing block would emit nothing.
+        // Answer that with one probe instead of one per attribute plus one. (Whole-window
+        // and per-gap probes share `gap_comments`, so the claim is honored identically by
+        // both — a claim that shortcut only the per-gap probes would re-open the
+        // double-print through this fast path.)
+        if !has_gap_comments(first_range_start, open_tag_end) {
             for attr in attrs {
                 docs.push(separator);
                 docs.push(self.build_attribute_node_doc(attr, is_html));
@@ -882,12 +932,12 @@ impl<'a> Printer<'a> {
             };
             let range_end = attr.span().start;
 
-            if !tsv_lang::has_comments_to_emit_in_range(self.comments, range_start, range_end) {
+            if !has_gap_comments(range_start, range_end) {
                 docs.push(separator);
             } else {
                 let last_is_own_line = self.push_attr_comment_docs(
                     docs,
-                    comments_to_emit_in_range(self.comments, range_start, range_end),
+                    gap_comments(range_start, range_end),
                     range_start,
                 );
                 // Separator before the next attribute
@@ -904,10 +954,10 @@ impl<'a> Printer<'a> {
         // Check for trailing comments after last attribute
         if let Some(last_attr) = attrs.last() {
             let range_start = last_attr.span().end;
-            if tsv_lang::has_comments_to_emit_in_range(self.comments, range_start, open_tag_end) {
+            if has_gap_comments(range_start, open_tag_end) {
                 self.push_attr_comment_docs(
                     docs,
-                    comments_to_emit_in_range(self.comments, range_start, open_tag_end),
+                    gap_comments(range_start, open_tag_end),
                     range_start,
                 );
             }

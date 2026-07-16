@@ -19,3 +19,5 @@
 <div transition:fn={expr}></div>
 <div animate:fn={expr}></div>
 <Comp let:v={expr}></Comp>
+<svelte:element this={tag}></svelte:element>
+<svelte:component this={Comp}></svelte:component>

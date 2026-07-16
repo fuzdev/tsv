@@ -49,7 +49,7 @@ pub use swallow::{SwallowReport, set_swallow_check, swallow_check_enabled, take_
 
 // Arena render
 pub use arena_render::{
-    arena_print_doc, arena_print_doc_at_column, arena_print_doc_flat_resolved,
+    arena_measure_doc_flat_resolved, arena_print_doc, arena_print_doc_at_column,
     arena_print_doc_with_indent, arena_print_doc_with_indent_resolved,
     arena_print_doc_with_indent_resolved_into,
     arena_print_doc_with_indent_resolved_preserve_whitespace,
@@ -123,6 +123,7 @@ mod arena_tests {
         let render = RenderConfig {
             print_width,
             indent: "  ",
+            ..RenderConfig::default()
         };
         render_test(arena, doc, &render, 0)
     }
@@ -132,6 +133,7 @@ mod arena_tests {
         let render = RenderConfig {
             print_width,
             indent: "\t",
+            ..RenderConfig::default()
         };
         render_test(arena, doc, &render, 0)
     }
@@ -485,11 +487,50 @@ mod arena_tests {
 
     #[test]
     fn test_arena_multiline_text_remove_lines() {
-        // Flattening drops the internal hardlines (→ empty) and joins the lines
-        // with no separator — matches `remove_lines` over the per-line concat.
+        // `remove_lines` must NOT touch a `MultilineText`: its `\n`s are hard lines, and
+        // prettier's `removeLinesFn` gates on `!doc.hard` precisely so content that must
+        // break still breaks.
         let a = DocArena::new();
         let flat = a.remove_lines(a.multiline_text("/*a\n b\n c*/"));
-        assert_eq!(render_default(&a, flat), "/*a b c*/");
+        assert_eq!(render_default(&a, flat), "/*a\n b\n c*/");
+    }
+
+    /// The glue this guards against, in the shape that shows it.
+    ///
+    /// The old behavior joined the lines with no separator, and the case above CANNOT see
+    /// that: every line of `/*a\n b\n c*/` already starts with a space, so dropping the
+    /// newlines still rendered `/*a b c*/` — which reads fine. Only a body whose lines
+    /// would FUSE reveals it, so pin one.
+    #[test]
+    fn test_arena_multiline_text_remove_lines_does_not_glue_words() {
+        let a = DocArena::new();
+        let flat = a.remove_lines(a.multiline_text("/*text1\ntext2*/"));
+        assert_eq!(
+            render_default(&a, flat),
+            "/*text1\ntext2*/",
+            "flattening must not fuse `text1` and `text2` into `text1text2`"
+        );
+    }
+
+    /// A hard line survives; a soft/normal one does not. The whole contract in one case.
+    #[test]
+    fn test_arena_remove_lines_keeps_hard_drops_soft_and_normal() {
+        let a = DocArena::new();
+        // Normal → space, soft → nothing: the flattening `remove_lines` really does do.
+        let soft_and_normal = a.concat(&[
+            a.text("a"),
+            a.line(),
+            a.text("b"),
+            a.softline(),
+            a.text("c"),
+        ]);
+        assert_eq!(render_default(&a, a.remove_lines(soft_and_normal)), "a bc");
+
+        // Hard and literal → untouched, because removing one deletes a required newline.
+        let hard = a.concat(&[a.text("a"), a.hardline(), a.text("b")]);
+        assert_eq!(render_default(&a, a.remove_lines(hard)), "a\nb");
+        let literal = a.concat(&[a.text("a"), a.literalline(), a.text("b")]);
+        assert_eq!(render_default(&a, a.remove_lines(literal)), "a\nb");
     }
 
     #[test]
@@ -545,6 +586,7 @@ mod arena_tests {
         let render = RenderConfig {
             print_width: 12,
             indent: "\t",
+            ..RenderConfig::default()
         };
         assert_eq!(
             render_test(&a, doc, &render, 0),
@@ -678,6 +720,7 @@ mod arena_tests {
         let render = RenderConfig {
             print_width: 100,
             indent: "\t",
+            ..RenderConfig::default()
         };
         let embed = EmbedContext {
             base_indent_offset: 1,

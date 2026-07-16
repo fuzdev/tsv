@@ -84,6 +84,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // whole literal to its follow-token.
             b'0'..=b'9' | b'-' => scan_for_closing_angle_bracket(bytes, pos),
 
+            // A leading `|`/`&` on the first union/intersection member
+            // (`f<| A | B>()`, `f<& A & B>()`) — the form prettier itself emits
+            // whenever such a type argument breaks across lines. Neither byte can
+            // start an expression, so a `<` followed by one is never a comparison;
+            // the closing-`>` + follow-token scan still runs, as in every other arm,
+            // so an unterminated `<` stays unclaimed.
+            b'|' | b'&' => scan_for_closing_angle_bracket(bytes, pos),
+
             // Not a recognized type argument start
             _ => false,
         }

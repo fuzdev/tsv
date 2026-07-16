@@ -279,8 +279,23 @@ impl<'a> Printer<'a> {
 
     /// Build a DocId for a TS expression without comments.
     ///
-    /// Used for contexts like @const patterns or this={expr} where no comments
-    /// are expected between the expression and its container.
+    /// Only for an expression whose span cannot *contain* a comment — a non-computed
+    /// object-pattern key (a bare identifier or literal), whose surrounding gaps are the
+    /// caller's to emit. Anything with an interior takes [`Self::build_ts_expression_doc`]:
+    /// passing an empty comment list means every comment inside the expression is silently
+    /// dropped, with no gate anywhere downstream to notice. That is not hypothetical — it is
+    /// exactly how `<svelte:element this={…}>` dropped every comment in its expression.
+    ///
+    /// TODO: retire this, or explain why the one remaining caller needs it. The case for
+    /// retiring: it is a footgun whose whole behavior is "drop the comments", and its own
+    /// sibling six lines away in `build_pattern_key_doc` (the *computed* key) deliberately
+    /// uses the comment-aware builder, with a comment explaining that the `[`→key gap
+    /// emitter skips owned comments so the key's doc must claim them. The non-computed
+    /// branch is the same shape and does the opposite. The case for caution: nobody has
+    /// explained what prints `{ /* c */ k: v }`'s comment today. It *is* printed exactly
+    /// once (the ledger agrees), yet the comment is glued to `k` — hence `owned_by_node` —
+    /// so `build_pattern_leading_comments` should skip it and this builder cannot emit it.
+    /// One of those three facts is wrong; find out which before touching it.
     pub(crate) fn build_ts_expression_doc_no_comments(&self, expr: &Expression<'_>) -> DocId {
         let inputs = tsv_ts::PrinterInputs {
             comments: &[],

@@ -1,7 +1,7 @@
 // Type declaration printing (type aliases, interfaces, enums, namespaces, declare functions)
 // plus shared entity-name helpers
 
-use super::{Printer, build_entity_name_doc, is_effectively_empty_body, should_hug_union_type};
+use super::{Printer, build_entity_name_doc, is_effectively_empty_body};
 use crate::ast::internal::{self, TSType};
 use crate::printer::layout::hang_after_operator;
 use crate::printer::{CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue};
@@ -187,18 +187,24 @@ impl<'a> Printer<'a> {
     /// between `=` and the value. `lead_space` controls the leading space before
     /// `=` (true for the inline `... =` form, false when the caller has already
     /// emitted a hardline, e.g. after an own-line pre-`=` comment).
-    /// A prefix type operator (`keyof` / `typeof`) whose keyword→operand gap holds
-    /// a comment that forces the operand onto its own line — a **line** comment or an
-    /// **own-line multiline** block comment. Such a value hangs the operand, so the
-    /// type-alias RHS keeps the operator on the `=` line (the operand hangs via the
-    /// operator's own layout) instead of breaking after `=` — consistent with the
-    /// conditional / internal-breaking arms. A **single-line** block comment (any
-    /// position) or a **glued** multiline block comment collapses inline, so this
-    /// returns false; the comment-free `=` layout then keeps the (short) value on the
-    /// `=` line, and a long *comment-free* operator still breaks after `=` (the
-    /// hanging-indent arm). Mirrors the printer-side gate
-    /// (`comments_force_own_line_between`) so the two stay in lockstep.
-    fn type_operator_comment_forces_operand_own_line(&self, ty: &TSType<'_>) -> bool {
+    /// A value whose own comment layout already breaks it internally, so the type-alias RHS
+    /// keeps the value's head on the `=` line and lets the value hang its own tail — instead
+    /// of *also* breaking after `=`, which would indent the whole thing a second level for
+    /// nothing. The comment-driven sibling of the `conditional` / `type_has_internal_breaking`
+    /// arms. Two shapes qualify:
+    ///
+    /// - a prefix type operator (`keyof` / `typeof`) whose keyword→operand gap holds a comment
+    ///   that hangs the operand — the operator stays on `=`, the operand hangs beneath it;
+    /// - a template-literal type with an expanding interpolation — the backtick stays on `=`,
+    ///   the `${…}` expands beneath it (matching prettier).
+    ///
+    /// A **single-line** block comment (any position) or a **glued** multiline block collapses
+    /// inline, so this returns false; the comment-free `=` layout then keeps the (short) value
+    /// on the `=` line, and a long *comment-free* value still breaks after `=` (the
+    /// hanging-indent arm). Each arm asks the same predicate the value's own printer asks
+    /// (`comments_force_own_line_between` / `template_literal_type_breaks_for_comment`), so the `=` can't
+    /// disagree with the value about whether the value breaks.
+    fn value_owns_its_comment_break(&self, ty: &TSType<'_>) -> bool {
         match ty {
             TSType::TypeOperator(o) => {
                 let kw_end = o.span.start + o.operator.as_str().len() as u32;
@@ -207,6 +213,9 @@ impl<'a> Printer<'a> {
             TSType::TypeQuery(q) => {
                 let kw_end = q.span.start + "typeof".len() as u32;
                 self.comments_force_own_line_between(kw_end, q.expr_name.span().start)
+            }
+            TSType::Literal(internal::TSLiteralType::TemplateLiteral(t)) => {
+                self.template_literal_type_breaks_for_comment(t)
             }
             _ => false,
         }
@@ -301,7 +310,11 @@ impl<'a> Printer<'a> {
             // breaking from this context's group.
             if let TSType::Union(u) = value_type {
                 let type_doc = self.build_union_type_doc(u);
-                if should_hug_union_type(u) {
+                // `union_prints_hugged`, not the bare syntactic `should_hug_union_type`:
+                // this must agree with the layout `build_union_type_doc` just chose. A
+                // comment can make it decline the hug and expand, and then the `=` has
+                // to break like any other non-hugging union.
+                if self.union_prints_hugged(u) {
                     // Hugged unions (e.g., `{ ... } | null`): the object type handles its own
                     // expansion, so keep `= {` together like other internally-breaking types
                     parts.push(d.text(" "));
@@ -328,7 +341,7 @@ impl<'a> Printer<'a> {
             } else if type_has_internal_breaking(value_type) {
                 // Types with internal breaking (braces, brackets, parens, angle brackets) stay hugged
                 // Use wrapping version so TypeReference type args break internally when too long
-                let type_doc = self.build_type_doc_with_wrapping_type_args(value_type);
+                let type_doc = self.build_type_doc(value_type);
                 parts.push(d.text(" "));
                 parts.push(type_doc);
             } else if has_complex_params {
@@ -362,7 +375,7 @@ impl<'a> Printer<'a> {
                 // A comment-free value that doesn't `will_break` hangs (long case).
                 let type_doc = self.build_type_doc(value_type);
                 let value_span = value_type.span();
-                let hug = self.type_operator_comment_forces_operand_own_line(value_type)
+                let hug = self.value_owns_its_comment_break(value_type)
                     || (d.will_break(type_doc)
                         && tsv_lang::has_comments_to_emit_in_range(
                             self.comments,
@@ -737,11 +750,7 @@ impl<'a> Printer<'a> {
             parts.push(d.hardline());
 
             // Print leading comments with blank line preservation
-            parts.extend(self.build_leading_comments_with_blank_lines(
-                &leading_comments,
-                member_start,
-                false,
-            ));
+            parts.extend(self.build_leading_comments_before(&leading_comments, member_start));
 
             // A preceding format-ignore directive keeps the member's source verbatim.
             // The member span includes its trailing `;`.
@@ -1159,13 +1168,29 @@ impl<'a> Printer<'a> {
                     ),
                 );
             }
-            match &decl.id {
-                internal::TSModuleName::Identifier(id) => {
-                    parts.push(self.identifier_name_doc(id));
+            let name_doc = match &decl.id {
+                internal::TSModuleName::Identifier(id) => self.identifier_name_doc(id),
+                internal::TSModuleName::Literal(lit) => self.build_literal_doc(lit),
+            };
+            // A dotted namespace (`namespace Outer.Inner {}`) pairs this name with the
+            // nested one, and both gaps around that `.` are positions an author can
+            // comment in — so the shared dotted-pair printer emits the name, the dot and
+            // the gaps together (it needs the left doc, hence holding it until here).
+            // Pushing name + `d.text(".")` scans neither gap and drops what's in it.
+            match &decl.body {
+                Some(internal::TSModuleDeclarationBody::TSModuleDeclaration(nested)) => {
+                    let name_end = match &decl.id {
+                        internal::TSModuleName::Identifier(id) => id.span.end,
+                        internal::TSModuleName::Literal(lit) => lit.span.end,
+                    };
+                    parts.push(self.build_dotted_pair_doc(
+                        name_doc,
+                        self.build_module_declaration_doc_inner(nested, false),
+                        name_end,
+                        nested.span.start,
+                    ));
                 }
-                internal::TSModuleName::Literal(lit) => {
-                    parts.push(self.build_literal_doc(lit));
-                }
+                _ => parts.push(name_doc),
             }
         }
 
@@ -1229,11 +1254,11 @@ impl<'a> Printer<'a> {
                     parts.push(d.text("}"));
                 }
             }
-            Some(internal::TSModuleDeclarationBody::TSModuleDeclaration(nested)) => {
-                // Nested namespace: `namespace Outer.Inner { }`
-                // Print as `Outer.Inner` (dot-separated)
-                parts.push(d.text("."));
-                parts.push(self.build_module_declaration_doc_inner(nested, false));
+            Some(internal::TSModuleDeclarationBody::TSModuleDeclaration(_)) => {
+                // A dotted namespace (`namespace Outer.Inner {}`) is emitted with the
+                // name above — the `.` and both its gaps belong to that pair, and only
+                // that path holds the left doc the shared printer needs. A `global`
+                // namespace can't be dotted, so the name path always ran.
             }
             None => {
                 // Shorthand ambient module: `declare module 'name';`

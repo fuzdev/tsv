@@ -4,7 +4,7 @@
 // - Dynamic import: `import('module')`, `import('module', options)`
 // - Meta properties: `import.meta`, `new.target`
 
-use super::super::{CommentSpacing, Printer};
+use super::super::Printer;
 use super::arg_comments::{
     PartitionedComments, has_blank_line_between_args, should_force_expansion_for_comments,
 };
@@ -14,34 +14,83 @@ use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 
-/// The opening token of a (possibly phased) dynamic import: `import(`,
-/// `import.source(`, or `import.defer(`.
-fn import_open(phase: internal::ImportPhase) -> &'static str {
+/// The phase keyword of a phased dynamic import (`source` / `defer`), or `None` for a
+/// plain `import(`.
+fn import_phase_word(phase: internal::ImportPhase) -> Option<&'static str> {
     match phase {
-        internal::ImportPhase::None => "import(",
-        internal::ImportPhase::Source => "import.source(",
-        internal::ImportPhase::Defer => "import.defer(",
+        internal::ImportPhase::None => None,
+        internal::ImportPhase::Source => Some("source"),
+        internal::ImportPhase::Defer => Some("defer"),
     }
+}
+
+/// The whole opening of a (possibly phased) dynamic import — `import`, the phase
+/// (`.source` / `.defer`) when there is one, and the `(` — plus the offset where the
+/// caller's leading-comment scan must begin.
+///
+/// A phased import is a dotted pair (`import` `.` `source`), so both gaps around its dot
+/// are positions an author can comment in; the shared printer emits them. Baking the
+/// pair into one fixed text (`"import.source("`) scans neither and drops what's there.
+///
+/// The returned offset is the **head's end** — just past `import`, or past the phase
+/// word — deliberately *before* the `(` rather than after it. The caller scans from
+/// there to the first argument, so that one range covers both the head→`(` gap and the
+/// `(`→argument gap, and every comment in the opening reaches the caller's emitter
+/// exactly as before. `span.start + import_open(phase).len()` could not: it assumes the
+/// opening is contiguous, so a comment inside it shifts the real `(` past that offset
+/// and the scan starts mid-comment, missing it. That was the drop.
+fn build_import_open_doc(
+    printer: &Printer<'_>,
+    import_expr: &internal::ImportExpression<'_>,
+) -> (DocId, u32) {
+    let d = printer.d();
+    let start = import_expr.span.start;
+    let import_end = start + "import".len() as u32;
+    // Bounds every scan below: the first argument is the next real token, and no `(` or
+    // phase word of this import's own lies past it.
+    let source_start = import_expr.source.span().start;
+
+    // The head (`import`, plus `.source` / `.defer`) and where it ends in source.
+    let (head, head_end) = match import_phase_word(import_expr.phase) {
+        None => (d.text("import"), import_end),
+        Some(word) => match printer.find_keyword_in_range(import_end, source_start, word) {
+            Some(word_start) => (
+                printer.build_dotted_pair_doc(
+                    d.text("import"),
+                    d.text(word),
+                    import_end,
+                    word_start,
+                ),
+                word_start + word.len() as u32,
+            ),
+            None => {
+                // Only reachable on a synthetic span: the parser set the phase by
+                // reading this very word out of the source.
+                debug_assert!(
+                    false,
+                    "phased import has no `{word}` in source[{import_end}..{source_start}]"
+                );
+                (d.text("import"), import_end)
+            }
+        },
+    };
+
+    (d.concat(&[head, d.text("(")]), head_end)
 }
 
 /// Wrap import args in a breakable group: `<open>` + softline-indented `inner` +
 /// softline + `)`. Stays inline when it fits, breaks each side onto its own line
 /// otherwise. The shared shell for every block-comment / no-line-comment layout.
-fn wrap_import_group(d: &DocArena, open: &'static str, inner: DocId) -> DocId {
-    d.group(d.concat(&[
-        d.text(open),
-        d.indent_softline(inner),
-        d.softline(),
-        d.text(")"),
-    ]))
+fn wrap_import_group(d: &DocArena, open: DocId, inner: DocId) -> DocId {
+    d.group(d.concat(&[open, d.indent_softline(inner), d.softline(), d.text(")")]))
 }
 
 /// Wrap import args in a forced-multiline layout: `<open>` + hardline-indented
 /// `inner` + hardline + `)`. Used whenever a line comment (which runs to EOL) or an
 /// own-line comment forces the parens open.
-fn wrap_import_hardline(d: &DocArena, open: &'static str, inner: DocId) -> DocId {
+fn wrap_import_hardline(d: &DocArena, open: DocId, inner: DocId) -> DocId {
     d.concat(&[
-        d.text(open),
+        open,
         d.indent(d.concat(&[d.hardline(), inner])),
         d.hardline(),
         d.text(")"),
@@ -59,14 +108,12 @@ pub(super) fn build_import_expression_doc(
 ) -> DocId {
     let d = printer.d();
 
-    // Opening token: `import(`, `import.source(`, or `import.defer(` (import-phase
-    // proposals). Threaded into every wrapper and used to bound the leading-comment scan.
-    let open = import_open(import_expr.phase);
-
-    // Preserve comments between the `(` and the source expression, e.g.
-    // import(/* @vite-ignore */ expr) — they would otherwise be lost. Own-line
+    // The opening — `import`, any phase (`.source` / `.defer`), and the `(` — built once
+    // and threaded into every wrapper. It also reports where the leading-comment scan
+    // starts: the head's end, so the scan spans the `(` and catches a comment on either
+    // side of it (`import /* c */ ('m')`, `import(/* @vite-ignore */ m)`). Own-line
     // comments force the parens to break; `leading_forces_break` drives that below.
-    let open_paren_end = import_expr.span.start + open.len() as u32;
+    let (open, leading_scan_start) = build_import_open_doc(printer, import_expr);
     let source_start = import_expr.source.span().start;
 
     // Parenthesize an `in` argument inside a for-header init (`for (a = import(m,
@@ -77,7 +124,7 @@ pub(super) fn build_import_expression_doc(
         printer.build_expression_doc(import_expr.source),
     );
     let (source_doc, leading_forces_break) =
-        printer.build_paren_leading_value_doc(open_paren_end, source_start, raw_source_doc);
+        printer.build_paren_leading_value_doc(leading_scan_start, source_start, raw_source_doc);
 
     let source_end = import_expr.source.span().end;
     let paren_close = import_expr.span.end;
@@ -219,17 +266,11 @@ pub(super) fn build_import_expression_doc(
         // State 0: all flat — import('source', {with: {type: 'json'}})
         // State 1: expand-last — import('source', {\n\twith: ...\n})
         // State 2: expand-all — import(\n\t'source',\n\t{...}\n)
-        let state_flat = d.concat(&[
-            d.text(open),
-            source_doc,
-            d.text(", "),
-            options_doc,
-            d.text(")"),
-        ]);
+        let state_flat = d.concat(&[open, source_doc, d.text(", "), options_doc, d.text(")")]);
 
         let expanded_options = d.group_break(options_doc);
         let state_expand_last = d.concat(&[
-            d.text(open),
+            open,
             source_doc,
             d.text(", "),
             expanded_options,
@@ -238,7 +279,7 @@ pub(super) fn build_import_expression_doc(
 
         let arg_parts = d.join_doc([source_doc, options_doc], d.comma_line());
         let state_expand_all = d.concat(&[
-            d.text(open),
+            open,
             d.indent_softline(arg_parts),
             d.softline(),
             d.text(")"),
@@ -254,68 +295,18 @@ pub(super) fn build_import_expression_doc(
 
 /// Build a Doc for a meta property: `import.meta`, `new.target`
 ///
-/// Both gaps around the `.` are real source positions an author can comment in
-/// (`new /* c */.target`, `new./* c */ target`), so each is located and emitted.
-/// Concatenating the three pieces scans neither gap and drops whatever is in it — the
-/// same class as a comment inside a multi-word keyword (see `build_keyword_words_doc`
-/// in `printer/comments/declarations.rs`), and the reason that class's usual detector
-/// (a `d.text` literal with an *interior* space) is only a proxy: here the pieces are
-/// joined by `"."`, which has no space to find.
-///
-/// Each side stays where it was authored, which is also what prettier prints: the
-/// comment hugs the `.` and keeps its space on the identifier's side. A *line* comment
-/// before the `.` ends its line, so `.property` continues one level down
-/// (`new // c⏎\t.target`) — the shape a member access already takes.
+/// A meta property is a dotted pair of names, so it delegates to the shared
+/// [`Printer::build_dotted_pair_doc`] — which emits both gaps around the `.`, the
+/// positions an author can comment in (`new /* c */.target`, `new./* c */ target`).
+/// A qualified name (`ns.Type`) is the same shape and shares that printer.
 pub(super) fn build_meta_property_doc(
     printer: &Printer<'_>,
     meta: &internal::MetaProperty<'_>,
 ) -> DocId {
-    let d = printer.d();
-    let meta_doc = printer.identifier_name_doc(&meta.meta);
-    let prop_doc = printer.identifier_name_doc(&meta.property);
-    let gap_start = meta.meta.span.end;
-    let gap_end = meta.property.span.start;
-
-    // `new.target` / `import.meta` with both gaps empty — every ordinary occurrence.
-    if !printer.has_comments_to_emit_between(gap_start, gap_end) {
-        return d.concat(&[meta_doc, d.text("."), prop_doc]);
-    }
-
-    let Some(dot) = printer.find_char_outside_comments(gap_start, gap_end, b'.') else {
-        debug_assert!(
-            false,
-            "a meta property always spells a `.` between its two names"
-        );
-        return d.concat(&[meta_doc, d.text("."), prop_doc]);
-    };
-
-    // `.`→property: a block comment keeps its space on the property's side
-    // (`./* c */ target`); a line comment ends the line, so the property drops a level.
-    let after_dot = if !printer.has_comments_to_emit_between(dot + 1, gap_end) {
-        prop_doc
-    } else if printer.has_line_comments_between(dot + 1, gap_end) {
-        printer.build_continuation_indent(dot + 1, gap_end, prop_doc)
-    } else {
-        d.concat(&[
-            printer.build_comments_between(dot + 1, gap_end, CommentSpacing::Trailing),
-            prop_doc,
-        ])
-    };
-    let tail = d.concat(&[d.text("."), after_dot]);
-
-    // meta→`.`: a line comment takes the whole `.property` onto the next line with it.
-    if printer.has_line_comments_between(gap_start, dot) {
-        return d.concat(&[
-            meta_doc,
-            printer.build_continuation_indent(gap_start, dot, tail),
-        ]);
-    }
-    if printer.has_comments_to_emit_between(gap_start, dot) {
-        return d.concat(&[
-            meta_doc,
-            printer.build_comments_between(gap_start, dot, CommentSpacing::Leading),
-            tail,
-        ]);
-    }
-    d.concat(&[meta_doc, tail])
+    printer.build_dotted_pair_doc(
+        printer.identifier_name_doc(&meta.meta),
+        printer.identifier_name_doc(&meta.property),
+        meta.meta.span.end,
+        meta.property.span.start,
+    )
 }

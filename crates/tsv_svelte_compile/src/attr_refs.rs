@@ -46,7 +46,7 @@
 
 use tsv_svelte::ast::internal::{
     AttributeNode, AttributeValue, Element, ElementKind, Fragment, FragmentNode, SpecialElement,
-    SpecialElementKind, StyleDirectiveValue,
+    SpecialElementKind, SpecialThis, StyleDirectiveValue,
 };
 use tsv_ts::ast::internal::Expression;
 
@@ -554,8 +554,10 @@ pub(crate) fn special_element_reference_expression<'a, 'arena>(
     se: &'a SpecialElement<'arena>,
 ) -> Option<&'a Expression<'arena>> {
     match &se.kind {
-        SpecialElementKind::SvelteElement { tag } => Some(tag),
-        SpecialElementKind::SvelteComponent { expression } => Some(expression),
+        SpecialElementKind::SvelteElement {
+            tag: SpecialThis::Braced(tag),
+        } => Some(&tag.expression),
+        SpecialElementKind::SvelteComponent { expression } => Some(&expression.expression),
         _ => None,
     }
 }
