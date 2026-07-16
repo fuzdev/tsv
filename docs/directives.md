@@ -2,7 +2,8 @@
 
 tsv honors in-source comments that suppress formatting for a piece of code. The
 directives are recognized in every language tsv formats — TypeScript (`<script>`
-and `.ts` / `.svelte.ts`), CSS (`<style>` and `.css`), and Svelte templates.
+and the JS/TS family: `.ts` / `.svelte.ts` / `.mts` / `.cts` / `.js` / `.mjs` /
+`.cjs`), CSS (`<style>` and `.css`), and Svelte templates.
 
 Like everything else in tsv, the directives are **not configurable**: they are
 always active and cannot be turned off.
