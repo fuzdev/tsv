@@ -5,6 +5,13 @@
 		bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbLong
 	];
 
+	// A glued pair whose second block is multiline stays glued.
+	const e = [
+		/* c1 */ /* c2
+		 */ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaLong,
+		bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbLong
+	];
+
 	// A glued pair between array elements stays glued.
 	const b = [
 		aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaLong,
