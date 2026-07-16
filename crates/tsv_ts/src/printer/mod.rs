@@ -119,6 +119,12 @@ pub struct Printer<'a> {
     pub(crate) source: &'a str,
     /// Comments from the program (for printing leading/trailing comments)
     pub(crate) comments: &'a [internal::Comment],
+    /// Whether any comment in this document is owned by a node (`owned_by_node`).
+    /// Document-level presence flag (from `PrinterInputs`), computed once per document
+    /// — never here, per that field's doc (the `.svelte` per-`{expr}` trap). Gates the
+    /// owned-leading-comment path so a document with no owned comment (~all of them)
+    /// skips its per-expression byte gate entirely.
+    pub(crate) has_owned_comments: bool,
     /// Precomputed line break positions for O(log n) line boundary lookups
     pub(crate) line_breaks: &'a [u32],
     /// Extra indent depth for declaration contexts (0 normally, 1+ in multi-declarator)
@@ -248,6 +254,7 @@ impl<'a> Printer<'a> {
             interner: Rc::clone(&inputs.interner),
             source: inputs.source,
             comments: inputs.comments,
+            has_owned_comments: inputs.has_owned_comments,
             line_breaks: inputs.line_breaks,
             declaration_indent_depth: Cell::new(0),
             is_expression_statement: Cell::new(false),
