@@ -2,8 +2,8 @@
 	"version": 7,
 	"runtime": "node",
 	"corpus_kind": "conformance",
-	"timestamp": "2026-07-08T20:05:31.963Z",
-	"git_commit": "a04d667b",
+	"timestamp": "2026-07-16T00:24:26.030Z",
+	"git_commit": "eca5466f",
 	"machine": {
 		"cpu_model": "AMD Ryzen 5 PRO 7530U with Radeon Graphics",
 		"os": "linux",
@@ -11,7 +11,7 @@
 		"runtime_version": "24.14.1"
 	},
 	"corpus": {
-		"svelte": 4535,
+		"svelte": 4539,
 		"typescript": 44224,
 		"css": 22641
 	},
@@ -93,16 +93,16 @@
 		},
 		{
 			"path": "../svelte/packages/svelte/tests",
-			"files": 4451,
+			"files": 4455,
 			"by_language": {
-				"svelte": 4133,
+				"svelte": 4137,
 				"typescript": 137,
 				"css": 181
 			},
 			"repo": {
 				"url": "https://github.com/sveltejs/svelte",
 				"slug": "sveltejs/svelte",
-				"commit": "8fb7ceeba5dd1d3b7fc3f587f4e2138bf1b978ed",
+				"commit": "b4d1583ae20f3869a88a731d9a265c546c099f66",
 				"subpath": "packages/svelte/tests"
 			}
 		},
@@ -144,76 +144,76 @@
 		"acorn_ts": "1.0.11",
 		"prettier": "3.9.0",
 		"prettier_svelte": "4.1.1",
-		"oxc_parser": "0.139.0",
-		"oxfmt": "0.57.0",
-		"biome": "2.5.2"
+		"oxc_parser": "0.140.0",
+		"oxfmt": "0.59.0",
+		"biome": "2.5.4"
 	},
 	"binary_sizes": [
 		{
 			"label": "tsv (ffi)",
-			"bytes": 3348832,
+			"bytes": 3407520,
 			"kind": "native",
-			"gzip_bytes": 1444707
+			"gzip_bytes": 1473224
 		},
 		{
 			"label": "tsv format (ffi)",
-			"bytes": 3085648,
+			"bytes": 3143024,
 			"kind": "native",
-			"gzip_bytes": 1337366
+			"gzip_bytes": 1366105
 		},
 		{
 			"label": "tsv parse (ffi)",
-			"bytes": 1568432,
+			"bytes": 1602672,
 			"kind": "native",
-			"gzip_bytes": 691800
+			"gzip_bytes": 704951
 		},
 		{
 			"label": "tsv (napi)",
-			"bytes": 3486816,
+			"bytes": 3540848,
 			"kind": "native",
-			"gzip_bytes": 1491293
+			"gzip_bytes": 1517414
 		},
 		{
 			"label": "tsv_format_wasm",
-			"bytes": 2214519,
+			"bytes": 2261296,
 			"kind": "wasm",
-			"gzip_bytes": 763363
+			"gzip_bytes": 794602
 		},
 		{
 			"label": "tsv_parse_wasm",
-			"bytes": 1036989,
+			"bytes": 1057603,
 			"kind": "wasm",
-			"gzip_bytes": 381243
+			"gzip_bytes": 389582
 		},
 		{
 			"label": "tsv_wasm",
-			"bytes": 2445504,
+			"bytes": 2491362,
 			"kind": "wasm",
-			"gzip_bytes": 842708
+			"gzip_bytes": 875347
 		},
 		{
 			"label": "biome (wasm)",
-			"bytes": 37540009,
+			"bytes": 38584187,
 			"kind": "wasm",
-			"gzip_bytes": 9006428
+			"gzip_bytes": 9281487
 		},
 		{
 			"label": "oxc-parser (napi)",
-			"bytes": 2428632,
+			"bytes": 2354904,
 			"kind": "native",
-			"gzip_bytes": 977389
+			"gzip_bytes": 954754
 		},
 		{
 			"label": "oxfmt (napi)",
-			"bytes": 9061136,
+			"bytes": 8917776,
 			"kind": "native",
-			"gzip_bytes": 3631974
+			"gzip_bytes": 3586269
 		},
 		{
 			"label": "oxc-parser (wasm)",
-			"bytes": 1616596,
+			"bytes": 1531455,
 			"kind": "wasm",
-			"gzip_bytes": 501431
+			"gzip_bytes": 495227
 		}
 	],
 	"entries": [
@@ -232,9 +232,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 4535,
-			"files_total": 4535,
-			"files_iterated": 4532,
+			"files_processed": 4539,
+			"files_total": 4539,
+			"files_iterated": 4539,
 			"runtime": "node"
 		},
 		{
@@ -252,9 +252,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 4532,
-			"files_total": 4535,
-			"files_iterated": 4532,
+			"files_processed": 4539,
+			"files_total": 4539,
+			"files_iterated": 4539,
 			"runtime": "node"
 		},
 		{
@@ -272,9 +272,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 4532,
-			"files_total": 4535,
-			"files_iterated": 4532,
+			"files_processed": 4539,
+			"files_total": 4539,
+			"files_iterated": 4539,
 			"runtime": "node"
 		},
 		{
@@ -292,9 +292,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 4532,
-			"files_total": 4535,
-			"files_iterated": 4532,
+			"files_processed": 4539,
+			"files_total": 4539,
+			"files_iterated": 4539,
 			"runtime": "node"
 		},
 		{
@@ -312,9 +312,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 4532,
-			"files_total": 4535,
-			"files_iterated": 4532,
+			"files_processed": 4539,
+			"files_total": 4539,
+			"files_iterated": 4539,
 			"runtime": "node"
 		},
 		{
@@ -332,9 +332,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 4532,
-			"files_total": 4535,
-			"files_iterated": 4532,
+			"files_processed": 4539,
+			"files_total": 4539,
+			"files_iterated": 4539,
 			"runtime": "node"
 		},
 		{
@@ -352,9 +352,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 4532,
-			"files_total": 4535,
-			"files_iterated": 4532,
+			"files_processed": 4539,
+			"files_total": 4539,
+			"files_iterated": 4539,
 			"runtime": "node"
 		},
 		{
@@ -392,7 +392,7 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 44026,
+			"files_processed": 44023,
 			"files_total": 44224,
 			"files_iterated": 43619,
 			"runtime": "node"
@@ -412,7 +412,7 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 44026,
+			"files_processed": 44023,
 			"files_total": 44224,
 			"files_iterated": 43619,
 			"runtime": "node"
@@ -432,7 +432,7 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 44026,
+			"files_processed": 44023,
 			"files_total": 44224,
 			"files_iterated": 43619,
 			"runtime": "node"
@@ -452,7 +452,7 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 44026,
+			"files_processed": 44023,
 			"files_total": 44224,
 			"files_iterated": 43619,
 			"runtime": "node"
@@ -472,7 +472,7 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 44026,
+			"files_processed": 44023,
 			"files_total": 44224,
 			"files_iterated": 43619,
 			"runtime": "node"
@@ -492,7 +492,7 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 44026,
+			"files_processed": 44023,
 			"files_total": 44224,
 			"files_iterated": 43619,
 			"runtime": "node"
@@ -554,7 +554,7 @@
 			"sample_size": null,
 			"files_processed": 22402,
 			"files_total": 22641,
-			"files_iterated": 22379,
+			"files_iterated": 22388,
 			"runtime": "node"
 		},
 		{
@@ -572,9 +572,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 22448,
+			"files_processed": 22457,
 			"files_total": 22641,
-			"files_iterated": 22379,
+			"files_iterated": 22388,
 			"runtime": "node"
 		},
 		{
@@ -592,9 +592,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 22448,
+			"files_processed": 22457,
 			"files_total": 22641,
-			"files_iterated": 22379,
+			"files_iterated": 22388,
 			"runtime": "node"
 		},
 		{
@@ -612,9 +612,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 22448,
+			"files_processed": 22457,
 			"files_total": 22641,
-			"files_iterated": 22379,
+			"files_iterated": 22388,
 			"runtime": "node"
 		},
 		{
@@ -632,9 +632,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 22448,
+			"files_processed": 22457,
 			"files_total": 22641,
-			"files_iterated": 22379,
+			"files_iterated": 22388,
 			"runtime": "node"
 		}
 	],
