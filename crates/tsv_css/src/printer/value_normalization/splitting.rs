@@ -3,7 +3,7 @@
 
 use std::borrow::Cow;
 
-use crate::whitespace::is_css_whitespace;
+use crate::whitespace::{is_ascii_trim_ws, is_css_whitespace};
 
 /// Normalize CSS whitespace in extracted source text
 ///
@@ -167,11 +167,15 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> Cow<'_, str> {
     }
 
     // The char-loop above already suppresses leading/trailing whitespace in the
-    // common case, so `trim()` is usually a no-op; return the owned buffer as-is
+    // common case, so this trim is usually a no-op; return the owned buffer as-is
     // rather than cloning it. Only the rare edge cases that preserve verbatim
-    // boundary whitespace (e.g. an unterminated string/comment) pay the copy —
-    // byte-identical to `result.trim().to_string()` either way.
-    let trimmed = result.trim();
+    // boundary whitespace (e.g. an unterminated string/comment) pay the copy. The
+    // trim is ASCII-only (`is_ascii_trim_ws`), matching the char-loop's ASCII-only
+    // whitespace handling above: a boundary non-ASCII space (NBSP, em space) is
+    // value content — the char-loop pushes it verbatim, and stripping it here would
+    // silently drop it (deleting a string element whose leading/trailing space the
+    // value parser deliberately kept).
+    let trimmed = result.trim_matches(is_ascii_trim_ws);
     if trimmed.len() == result.len() {
         Cow::Owned(result)
     } else {
