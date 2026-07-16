@@ -13,6 +13,7 @@ pub(crate) mod scan;
 pub mod strings;
 
 use crate::ast::internal::CssValue;
+use crate::whitespace::is_ascii_trim_ws;
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
@@ -96,8 +97,13 @@ fn locate_value(value_str: &str) -> Option<(&str, usize)> {
         return Some((value_str, 0));
     }
 
-    let after_leading = value_str.trim_start();
-    let trimmed = after_leading.trim_end();
+    // ASCII-only trim: a boundary non-ASCII space (NBSP U+00A0, em space U+2003, …)
+    // is CSS value *content*, not a separator (CSS whitespace is ASCII-only), so it
+    // stays with the value — a single `content: <NBSP>'z'` keeps the space instead of
+    // dropping it. Byte-identical to `str::trim*` on real stylesheet input, which has
+    // no boundary whitespace at all. See `whitespace::is_ascii_trim_ws`.
+    let after_leading = value_str.trim_start_matches(is_ascii_trim_ws);
+    let trimmed = after_leading.trim_end_matches(is_ascii_trim_ws);
     if trimmed.is_empty() {
         return None;
     }
@@ -281,16 +287,21 @@ mod value_span_tests {
         }
     }
 
-    /// A non-ASCII boundary byte cannot settle the question (a lead byte says
-    /// nothing about its char's `White_Space`), so it must fall through to the
-    /// trimming path — where NBSP, which `char::is_whitespace` accepts, is
-    /// trimmed, and a letter is not.
+    /// A non-ASCII boundary byte cannot settle the fast-path question (a lead byte
+    /// says nothing about its char), so it falls through to the trimming path — where
+    /// the trim is ASCII-only. A boundary non-ASCII space (NBSP U+00A0) is CSS value
+    /// *content*, not whitespace, so it is **kept**: `content: <NBSP>'z'` preserves the
+    /// space rather than dropping it (former content loss). An ASCII space next to it
+    /// still comes off, and a letter is untouched.
     #[test]
-    fn non_ascii_boundaries_take_the_trimming_path() {
+    fn non_ascii_boundary_space_is_kept_as_content() {
+        // NBSP at both ends is content — the span covers the whole run.
         assert_eq!(
             value_span("\u{a0}red\u{a0}", 0, 7),
-            Span { start: 2, end: 5 }
+            Span { start: 0, end: 7 }
         );
+        // ASCII space (trimmed) then NBSP (kept): only the ASCII byte comes off.
+        assert_eq!(value_span(" \u{a0}red", 0, 6), Span { start: 1, end: 6 });
         assert_eq!(value_span("é", 0, 2), Span { start: 0, end: 2 });
     }
 }
