@@ -120,8 +120,22 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Structure-based check using shared helper
-        self.any_value_needs_own_line(values)
+        // Structure-based check using shared helper.
+        self.any_value_needs_own_line(values) || self.comma_list_comment_forces_own_line(decl)
+    }
+
+    /// Whether a comment forces this declaration's comma list to break one-per-line.
+    ///
+    /// True for a comment at the list's **top level** (prettier force-breaks such a
+    /// list). Keyed on the comment — not the space-separated `List` the value parser
+    /// builds only when a space follows the comment — so a glued (`x,/* c */y`) and a
+    /// spaced (`x, /* c */ y`) authoring reach the same fixed point in one pass; see
+    /// `comma_value_has_top_level_comment`. The single predicate `should_use_multiline`
+    /// (break after the colon) and `print_decl_multiline` (one element per line) both
+    /// consult, so the two decisions cannot disagree — a split would reintroduce the
+    /// glued-vs-spaced 2-cycle. Gated on the O(1) `has_block_comment`.
+    fn comma_list_comment_forces_own_line(&self, decl: &internal::CssDeclaration<'_>) -> bool {
+        decl.has_block_comment && self.comma_value_has_top_level_comment(decl.value.span())
     }
 
     /// Print a declaration whose comment-free value is a comma- or space-separated
@@ -217,9 +231,13 @@ impl<'a> Printer<'a> {
 
     /// Print declaration with multiline formatting (structure-based)
     fn print_decl_multiline(&mut self, decl: &internal::CssDeclaration<'_>) {
+        // A top-level comment forces one-per-line even when no space-separated `List`
+        // element is present (the glued-comment authoring) — the same predicate
+        // `should_use_multiline` used to route here, so the two agree.
+        let force_own_line = self.comma_list_comment_forces_own_line(decl);
         self.write(":\n");
         self.indent_level += 1;
-        self.print_css_value_multiline(&decl.value);
+        self.print_css_value_multiline(&decl.value, force_own_line);
         self.indent_level -= 1;
         self.write_declaration_end(decl);
     }
@@ -441,14 +459,14 @@ impl<'a> Printer<'a> {
     ///
     /// Exception: Properties with space-separated items (like box-shadow, text-shadow)
     /// or wrappable functions (like gradients) use true one-per-line formatting.
-    fn print_css_value_multiline(&mut self, value: &CssValue<'_>) {
+    fn print_css_value_multiline(&mut self, value: &CssValue<'_>, force_own_line: bool) {
         let CssValue::CommaSeparated { values, .. } = value else {
             // Fallback to regular formatting
             self.print_nested_value(value);
             return;
         };
 
-        if self.any_value_needs_own_line(values) {
+        if force_own_line || self.any_value_needs_own_line(values) {
             // True one-per-line for shadow-like properties and wrappable functions
             for (i, val) in values.iter().enumerate() {
                 self.write_indent();
