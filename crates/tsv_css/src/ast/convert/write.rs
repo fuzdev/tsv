@@ -201,7 +201,7 @@ fn write_declaration(w: &mut JsonWriter, decl: &internal::CssDeclaration<'_>, ct
         .map_or(decl.span.end, |e| e.max(decl.span.end));
     let end = scan_to_terminator(ctx.source, content_end as usize);
     let decl_source = &ctx.source[decl.span.start as usize..end];
-    let colon = (decl.colon_offset - decl.span.start) as usize;
+    let colon = decl.colon_pos();
     let (property_source, value): (&str, Cow<'_, str>) = if decl.has_block_comment {
         // Rare: a block comment sits somewhere in the declaration — apply the
         // Svelte property/value split quirk and strip comments from the value.
