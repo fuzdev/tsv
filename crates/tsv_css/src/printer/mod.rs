@@ -161,10 +161,7 @@ impl<'a> Printer<'a> {
             return false;
         }
         let decl_source = decl.span.extract(self.source);
-        // The parser recorded the `property : value` colon; rebase it to the
-        // declaration slice instead of re-scanning (see `CssDeclaration::colon_offset`).
-        let colon_pos = (decl.colon_offset - decl.span.start) as usize;
-        let value_part = &decl_source[colon_pos + 1..];
+        let value_part = &decl_source[decl.colon_pos() + 1..];
         // Fast path: no `/*` at all → no block comment possible.
         if !value_part.contains("/*") {
             return false;
