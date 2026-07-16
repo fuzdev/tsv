@@ -125,6 +125,12 @@ pub struct Printer<'a> {
     /// owned-leading-comment path so a document with no owned comment (~all of them)
     /// skips its per-expression byte gate entirely.
     pub(crate) has_owned_comments: bool,
+    /// Whether any comment in this document is a `format-ignore` directive.
+    /// Document-level presence flag (from `PrinterInputs`), computed once per document —
+    /// never here (the `.svelte` per-`{expr}` trap). Gates `has_format_ignore_in_range` so
+    /// a document with no format-ignore directive (~all of them) skips the per-node range
+    /// scan + directive-string match entirely.
+    pub(crate) has_format_ignore: bool,
     /// Precomputed line break positions for O(log n) line boundary lookups
     pub(crate) line_breaks: &'a [u32],
     /// Extra indent depth for declaration contexts (0 normally, 1+ in multi-declarator)
@@ -255,6 +261,7 @@ impl<'a> Printer<'a> {
             source: inputs.source,
             comments: inputs.comments,
             has_owned_comments: inputs.has_owned_comments,
+            has_format_ignore: inputs.has_format_ignore,
             line_breaks: inputs.line_breaks,
             declaration_indent_depth: Cell::new(0),
             is_expression_statement: Cell::new(false),
@@ -1083,6 +1090,11 @@ impl<'a> Printer<'a> {
     /// and neither is a format-ignore directive — no owned comment can ever match this
     /// predicate, so skipping and counting give the same answer.
     fn has_format_ignore_in_range(&self, start: u32, end: u32) -> bool {
+        // Document-level short-circuit: no format-ignore directive anywhere in the
+        // document ⇒ none in any sub-range, so skip the range scan + directive match.
+        if !self.has_format_ignore {
+            return false;
+        }
         comments_to_emit_in_range(self.comments, start, end)
             .any(|c| is_format_ignore_directive(c.content(self.source)))
     }

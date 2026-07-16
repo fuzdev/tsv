@@ -821,6 +821,9 @@ impl<'a> Printer<'a> {
     ///
     /// Handles multiple consecutive comments by preserving their line structure:
     /// - `a && // comment1\n// comment2\nb` keeps each comment on its own line
+    // Seven distinct pieces of per-operand state (the buffer, two offsets, the operand, and
+    // three layout flags); bundling them into a struct would only obscure the single call site.
+    #[allow(clippy::too_many_arguments)]
     fn append_post_operator_parts(
         &self,
         parts: &mut DocBuf,
