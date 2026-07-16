@@ -16,3 +16,20 @@
 pub(crate) fn is_css_whitespace(c: char) -> bool {
     c.is_ascii_whitespace()
 }
+
+/// The whitespace a CSS value-**boundary** trim strips: the ASCII whitespace set
+/// **plus** U+000B (vertical tab) — i.e. exactly what `str::trim` removes *within
+/// ASCII*. It differs from [`is_css_whitespace`] only on VT (which `str::trim`
+/// eats), so replacing a `str::trim*` with this predicate is byte-identical for
+/// ASCII input — the point is what it *excludes*: a non-ASCII "whitespace" char
+/// (NBSP U+00A0, em space U+2003, NEL, …) is CSS value **content**, not a
+/// separator, so it is never trimmed. Trimming one would silently drop content
+/// and, for a quoted-string element, desync the leaf's text from its span (the
+/// string printer then extracts a span that no longer begins with a quote and
+/// emits nothing — deleting the whole element). Every value-boundary trim — in the
+/// value parser (`ValueParser`) and the printer's `normalize_css_whitespace` — uses
+/// this in place of `str::trim*`.
+#[inline]
+pub(crate) fn is_ascii_trim_ws(c: char) -> bool {
+    c.is_ascii() && c.is_whitespace()
+}

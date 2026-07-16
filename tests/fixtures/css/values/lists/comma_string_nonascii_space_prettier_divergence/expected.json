@@ -1,0 +1,94 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 421,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 11,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 11,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "a",
+											"start": 9,
+											"end": 11
+										}
+									],
+									"start": 9,
+									"end": 11
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 12,
+					"end": 412,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 89,
+							"end": 119,
+							"property": "grid-template-areas",
+							"value": "'x',  'y'"
+						},
+						{
+							"type": "Declaration",
+							"start": 187,
+							"end": 211,
+							"property": "font-family",
+							"value": "'f0',  'f1'"
+						},
+						{
+							"type": "Declaration",
+							"start": 283,
+							"end": 315,
+							"property": "grid-template-columns",
+							"value": "'a' , 'b'"
+						},
+						{
+							"type": "Declaration",
+							"start": 387,
+							"end": 408,
+							"property": "font-family",
+							"value": "'a'  'b'"
+						}
+					]
+				},
+				"start": 9,
+				"end": 412
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 413,
+			"styles": "\n\t.a {\n\t\t/* Comma list, string element led by a non-breaking space (U+00A0). */\n\t\tgrid-template-areas: 'x',  'y';\n\t\t/* Comma list, string element led by an em space (U+2003). */\n\t\tfont-family: 'f0',  'f1';\n\t\t/* Comma list, string element trailed by a non-breaking space. */\n\t\tgrid-template-columns: 'a' , 'b';\n\t\t/* Space list, string element trailed by a non-breaking space. */\n\t\tfont-family: 'a'  'b';\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 422,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
