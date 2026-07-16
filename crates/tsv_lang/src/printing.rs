@@ -17,8 +17,17 @@ use unicode_width::UnicodeWidthChar;
 /// output equals the verbatim source literal — no allocation needed).
 #[inline]
 pub fn optimal_string_quote(raw_content: &str) -> char {
-    let single_count = raw_content.matches('\'').count();
-    let double_count = raw_content.matches('"').count();
+    // One fused byte pass counting both quote kinds. Both quotes are ASCII and
+    // UTF-8 continuation bytes are >= 0x80, so a byte compare cannot match
+    // inside a multi-byte sequence. String contents are typically short, where
+    // a per-pattern searcher setup dominates a plain counting loop; the
+    // branchless sums auto-vectorize for long contents.
+    let mut single_count = 0usize;
+    let mut double_count = 0usize;
+    for &b in raw_content.as_bytes() {
+        single_count += usize::from(b == b'\'');
+        double_count += usize::from(b == b'"');
+    }
     // Double quotes only when they're strictly rarer (fewer escapes); otherwise
     // single — which also covers the tie, the hardcoded single-quote tie-breaker.
     if double_count < single_count {
@@ -822,6 +831,40 @@ mod tests {
     fn test_no_quotes_uses_preferred() {
         let result = format_string_literal("hello", '"');
         assert_eq!(result, "'hello'");
+    }
+
+    #[test]
+    fn optimal_string_quote_matches_searcher_reference_exhaustively() {
+        // No corpus can grade a counting bug here: a miscount only changes
+        // output when it flips the quote choice, so this exhaustive equivalence
+        // check against the two-searcher shape is the load-bearing gate for the
+        // fused byte count.
+        fn reference(raw_content: &str) -> char {
+            let single_count = raw_content.matches('\'').count();
+            let double_count = raw_content.matches('"').count();
+            if double_count < single_count {
+                '"'
+            } else {
+                '\''
+            }
+        }
+        // Alphabet covers each arm: both quote kinds, plain ASCII, a control
+        // char, a two-byte and a three-byte UTF-8 sequence (continuation bytes
+        // must never read as a quote byte), and a backslash.
+        const ALPHABET: [char; 7] = ['\'', '"', 'a', '\n', 'é', '✓', '\\'];
+        let mut cases = vec![String::new()];
+        for c1 in ALPHABET {
+            cases.push(c1.to_string());
+            for c2 in ALPHABET {
+                cases.push(format!("{c1}{c2}"));
+                for c3 in ALPHABET {
+                    cases.push(format!("{c1}{c2}{c3}"));
+                }
+            }
+        }
+        for s in &cases {
+            assert_eq!(optimal_string_quote(s), reference(s), "content {s:?}");
+        }
     }
 
     #[test]
