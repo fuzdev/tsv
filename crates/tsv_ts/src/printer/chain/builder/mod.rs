@@ -534,9 +534,19 @@ fn build_multiarg_short_chain_doc<'a, P: ChainPrinter>(
     state_last_standard_parts.extend(rest_standard_expanded);
     let state_last_standard = d.concat(&state_last_standard_parts);
 
-    // State: First call's args expanded, rest groups flexible
+    // State: First call's args expanded, rest groups flexible.
+    // Wrap the expanded first group in group_break so it renders in Break mode when this
+    // state is selected: the conditional_group renders a chosen non-last state in Flat mode
+    // (arena_render.rs), and without the wrapper the expanded call args' hardlines make
+    // newlines while the mode stays Flat, so a nested arrow signature's fits() measures its
+    // body line() as a space and wrongly breaks the param list — the head/prefix analog of
+    // the arrow-sig protection the sibling expanded states already apply
+    // (build_member_ending_chain_doc / build_breaking_object_chain_doc). Selection is
+    // unchanged: fits() early-returns at the first hardline either way (same remaining<0
+    // gate), so only state_first_expanded's render mode flips Flat→Break. state_all_expanded
+    // is the Break-mode last fallback, so it keeps the raw doc.
     let first_expanded_doc = build_first_groups_expanded_doc(first_groups, printer);
-    let mut state_first_expanded_parts: DocBuf = smallvec![first_expanded_doc];
+    let mut state_first_expanded_parts: DocBuf = smallvec![d.group_break(first_expanded_doc)];
     state_first_expanded_parts.extend(rest_docs.iter().copied());
     let state_first_expanded = d.concat(&state_first_expanded_parts);
 
