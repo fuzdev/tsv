@@ -7,7 +7,9 @@ use futures_util::StreamExt;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use tsv_cli::json_utils::to_json_with_tabs;
-use tsv_svelte_compile::{CompileError, CompileOptions, canonicalize_js, compile};
+use tsv_svelte_compile::{
+    CompileError, CompileOptions, canonicalize_js, census, census_detected_buckets, compile,
+};
 
 /// Run the Svelte compile-parity pipeline over corpora of `.svelte` files.
 ///
@@ -31,12 +33,33 @@ use tsv_svelte_compile::{CompileError, CompileOptions, canonicalize_js, compile}
 /// Exit codes: 0 = clean (mismatch = 0, error = 0), 1 = a mismatch (a bug),
 /// 2 = a harness error. Sidecar-dependent — kept out of `deno task check`; point
 /// it at real repos and the Svelte test suites on demand.
+///
+/// # `--census` (the sole-blocker refusal census)
+///
+/// tsv's `compile()` bails at the **first** unsupported construct, so the refusal
+/// sub-buckets above are first-refusal-only and overstate any one class's parity
+/// yield. `--census` re-prices them: over the same oracle-accepted, tsv-refused
+/// files, it unions each file's real first-refusal with
+/// [`census`](tsv_svelte_compile::census)'s independently-detected blocker set,
+/// then reports — per class — its **sole-blocker** count (files it is the *only*
+/// blocker of, so unlocking it yields exactly that many new parity files) and its
+/// **co-blocker** count. A mandatory **exposure** line counts candidates whose
+/// first-refusal is a class the census cannot detect independently
+/// ([`census_detected_buckets`](tsv_svelte_compile::census_detected_buckets)) —
+/// those files may hide an undetected co-blocker, so their sole counts could be
+/// over-promised. Diagnostic only: it exits 0 unless a harness error occurs (2).
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "compile_corpus_compare")]
 pub struct CompileCorpusCompareCommand {
     /// list the discovered in-scope `.svelte` files without comparing
     #[argh(switch)]
     list: bool,
+
+    /// re-price the refusal buckets: per class, sole-blocker vs co-blocker counts
+    /// over the oracle-accepted, tsv-refused files (diagnostic; see the command
+    /// docs)
+    #[argh(switch)]
+    census: bool,
 
     /// emit a machine-readable JSON report
     #[argh(switch)]
@@ -129,7 +152,37 @@ impl CompileCorpusCompareCommand {
         }
 
         let rt = super::create_runtime();
-        rt.block_on(self.run_async(groups, items))
+        if self.census {
+            rt.block_on(self.run_census_async(items))
+        } else {
+            rt.block_on(self.run_async(groups, items))
+        }
+    }
+
+    async fn run_census_async(self, items: Vec<(usize, PathBuf)>) -> Result<(), CliError> {
+        let total = items.len();
+        let mut stream = super::spawn_work_stream(
+            items,
+            super::ResultOrder::Completion,
+            |(_group, path)| async move { classify_census_file(path).await },
+        );
+        let mut outcomes = Vec::with_capacity(total);
+        while let Some(joined) = stream.next().await {
+            outcomes.push(super::task_result(joined, "compile-census")?);
+        }
+
+        let report = CensusReport::build(&outcomes);
+        if self.json {
+            report.print_json()?;
+        } else {
+            report.print_human();
+        }
+        // Diagnostic only — a harness error is the sole non-zero exit.
+        if report.errors > 0 {
+            Err(CliError::Errored)
+        } else {
+            Ok(())
+        }
     }
 
     async fn run_async(
@@ -694,9 +747,354 @@ fn print_reasons(title: &str, reasons: &[ReasonCount], limit: usize) {
     }
 }
 
+// ---- Census (--census) ------------------------------------------------------
+
+/// One file's census outcome.
+enum CensusOutcome {
+    /// Not a parity candidate — the oracle rejected it, or tsv reached parity.
+    /// Out of scope for the census (it only re-prices refused files).
+    Skipped,
+    /// An oracle-accepted, tsv-refused file: the real first-refusal bucket key and
+    /// the union of it with the census's independently-detected blocker keys.
+    Candidate {
+        first_key: String,
+        union: Vec<String>,
+        /// Whether the census's own findings **for this file** reproduced the real
+        /// first-refusal. This is a per-file fact, distinct from global
+        /// class-detectability: a dual-position class (`Rune`/`DerivedBindingRead`/
+        /// `TopLevelAwait`) is globally "detected" (the census reaches its SCRIPT
+        /// variant) yet may go unconfirmed on a file whose first-refusal is the
+        /// TEMPLATE variant the census never reaches. Exposure keys on this, not on
+        /// the global set.
+        first_confirmed: bool,
+    },
+    /// A harness failure: `(kind, detail)`.
+    Error(&'static str, String),
+}
+
+/// Read and classify one file for the census (oracle-first, like [`classify`]).
+async fn classify_census_file(path: PathBuf) -> CensusOutcome {
+    match std::fs::read_to_string(&path) {
+        Ok(source) => classify_census(&source).await,
+        Err(e) => CensusOutcome::Error("read", e.to_string()),
+    }
+}
+
+/// The per-file census pipeline. Only oracle-accepted **and** tsv-refused files
+/// are candidates (the parity-yield population); everything else is skipped.
+async fn classify_census(source: &str) -> CensusOutcome {
+    // Oracle side. A coded rejection is out of census scope (never a parity
+    // candidate); an uncoded ToolError / other DenoError is a harness failure.
+    match deno::svelte_compile(source, SvelteGenerate::Server, false).await {
+        Ok(_) => {}
+        Err(DenoError::ToolError { message }) => {
+            return match oracle_reject_code(&message) {
+                Some(_) => CensusOutcome::Skipped,
+                None => CensusOutcome::Error("oracle-tool", first_line(&message)),
+            };
+        }
+        Err(e) => return CensusOutcome::Error("oracle-sidecar", e.to_string()),
+    }
+
+    // tsv side. Only a refusal is a candidate; parity is out of scope, and the
+    // bug/parse outcomes are harness errors (as in `classify`).
+    let first = match compile(source, &CompileOptions::default()) {
+        Ok(_) => return CensusOutcome::Skipped,
+        Err(CompileError::Unsupported(reason)) => reason,
+        Err(CompileError::Parse(e)) => return CensusOutcome::Error("tsv-parse", e.to_string()),
+        Err(CompileError::CorruptOutput(e)) => {
+            return CensusOutcome::Error("tsv-corrupt-output", e.to_string());
+        }
+        Err(CompileError::TypeErasureLeak(span)) => {
+            return CensusOutcome::Error("tsv-type-erasure-leak", format!("at {span:?}"));
+        }
+    };
+
+    // Census pass. It parsed once already inside `compile()`, so a parse error is
+    // impossible here — surface it loudly if it somehow occurs.
+    let detected = match census(source, &CompileOptions::default()) {
+        Ok(d) => d,
+        Err(e) => return CensusOutcome::Error("census", e.to_string()),
+    };
+    let first_key = first.bucket_key().into_owned();
+    // Did the census's OWN findings reproduce this file's real first-refusal? This
+    // is what exposure keys on — a global "is this class ever detectable" check
+    // wrongly clears a dual-position class whose template variant the census never
+    // reaches (its script variant shares the bucket key).
+    let first_confirmed = detected
+        .iter()
+        .any(|reason| reason.bucket_key().as_ref() == first_key.as_str());
+    let mut union = vec![first_key.clone()];
+    for reason in &detected {
+        let key = reason.bucket_key().into_owned();
+        if !union.contains(&key) {
+            union.push(key);
+        }
+    }
+    CensusOutcome::Candidate {
+        first_key,
+        union,
+        first_confirmed,
+    }
+}
+
+/// One class's sole/co counts.
+#[derive(Default, serde::Serialize)]
+struct BlockerCount {
+    bucket: String,
+    /// Files where this class is the ONLY blocker — unlocking it yields exactly
+    /// this many new parity files.
+    sole: usize,
+    /// Files where this class blocks alongside at least one other.
+    co: usize,
+    /// Whether the census detects this class independently. When `false` the class
+    /// only ever enters a file's blocker set as the real first-refusal, so its
+    /// `sole` count is an **upper bound** (an undetected co-blocker could lower it).
+    detected: bool,
+}
+
+/// A first-refusal class the census did not reproduce on some candidate, and how
+/// many candidates it went unconfirmed on — the exposure detail.
+#[derive(serde::Serialize)]
+struct DisclaimedCount {
+    bucket: String,
+    count: usize,
+}
+
+/// The aggregated census report.
+struct CensusReport {
+    candidates: usize,
+    errors: usize,
+    blockers: Vec<BlockerCount>,
+    /// Candidates whose real first-refusal the census did **not** itself reproduce
+    /// (a per-file fact) — their sole counts could be over-promised.
+    exposure: usize,
+    disclaimed: Vec<DisclaimedCount>,
+    error_entries: Vec<(String, String)>,
+}
+
+impl CensusReport {
+    fn build(outcomes: &[CensusOutcome]) -> Self {
+        let detected: std::collections::HashSet<String> = census_detected_buckets()
+            .into_iter()
+            .map(std::borrow::Cow::into_owned)
+            .collect();
+
+        let mut sole: BTreeMap<String, usize> = BTreeMap::new();
+        let mut co: BTreeMap<String, usize> = BTreeMap::new();
+        let mut disclaimed: BTreeMap<String, usize> = BTreeMap::new();
+        let mut candidates = 0;
+        let mut errors = 0;
+        let mut exposure = 0;
+        let mut error_entries = Vec::new();
+
+        for outcome in outcomes {
+            match outcome {
+                CensusOutcome::Skipped => {}
+                CensusOutcome::Error(kind, detail) => {
+                    errors += 1;
+                    if error_entries.len() < ERROR_CAP {
+                        error_entries.push(((*kind).to_string(), detail.clone()));
+                    }
+                }
+                CensusOutcome::Candidate {
+                    first_key,
+                    union,
+                    first_confirmed,
+                } => {
+                    candidates += 1;
+                    if union.len() == 1 {
+                        *sole.entry(union[0].clone()).or_default() += 1;
+                    } else {
+                        for key in union {
+                            *co.entry(key.clone()).or_default() += 1;
+                        }
+                    }
+                    // Exposure is PER-FILE: the census did not itself reproduce this
+                    // file's real first-refusal, so it may hide an undetected
+                    // co-blocker (and, for a dual-position class, the first-refusal
+                    // itself is a position the census never reached). A global
+                    // class-detectability check would wrongly clear those.
+                    if !first_confirmed {
+                        exposure += 1;
+                        *disclaimed.entry(first_key.clone()).or_default() += 1;
+                    }
+                }
+            }
+        }
+
+        // Merge sole + co into one per-bucket row, sorted sole-desc then co-desc.
+        let mut keys: std::collections::HashSet<String> = std::collections::HashSet::new();
+        keys.extend(sole.keys().cloned());
+        keys.extend(co.keys().cloned());
+        let mut blockers: Vec<BlockerCount> = keys
+            .into_iter()
+            .map(|bucket| BlockerCount {
+                sole: sole.get(&bucket).copied().unwrap_or(0),
+                co: co.get(&bucket).copied().unwrap_or(0),
+                detected: detected.contains(&bucket),
+                bucket,
+            })
+            .collect();
+        blockers.sort_by(|a, b| {
+            b.sole
+                .cmp(&a.sole)
+                .then_with(|| b.co.cmp(&a.co))
+                .then_with(|| a.bucket.cmp(&b.bucket))
+        });
+
+        let mut disclaimed: Vec<DisclaimedCount> = disclaimed
+            .into_iter()
+            .map(|(bucket, count)| DisclaimedCount { bucket, count })
+            .collect();
+        disclaimed.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.bucket.cmp(&b.bucket)));
+
+        CensusReport {
+            candidates,
+            errors,
+            blockers,
+            exposure,
+            disclaimed,
+            error_entries,
+        }
+    }
+
+    fn print_human(&self) {
+        println!(
+            "compile_corpus_compare --census — {} oracle-accepted, tsv-refused candidate(s)\n",
+            self.candidates
+        );
+        println!(
+            "Per refusal class (sole = unlocking it yields exactly that many new parity files):"
+        );
+        println!("  {:>6}  {:>6}  refusal class", "SOLE", "CO");
+        for b in &self.blockers {
+            // A `*` marks a class the census cannot detect independently — its
+            // sole count is an upper bound (see the exposure line below).
+            let mark = if b.detected { "" } else { " *" };
+            println!("  {:>6}  {:>6}  {}{}", b.sole, b.co, b.bucket, mark);
+        }
+        println!(
+            "  (* = census cannot detect this class independently; its SOLE count is an upper bound)"
+        );
+
+        // The mandatory exposure line — per-file: how many candidates the census
+        // could not confirm the first-refusal of (so an undetected co-blocker, or
+        // an unreached dual-position first-refusal, may hide there).
+        println!(
+            "\nEXPOSURE: {} of {} candidate(s) — the census did not itself reproduce that file's \
+             real first-refusal",
+            self.exposure, self.candidates
+        );
+        println!(
+            "  (an undetected co-blocker, or a dual-position first-refusal in a position the \
+             census never reaches, may hide there)"
+        );
+        if !self.disclaimed.is_empty() {
+            println!("  Unconfirmed first-refusal classes (count):");
+            for d in &self.disclaimed {
+                println!("    {:>6}  {}", d.count, d.bucket);
+            }
+        }
+        println!(
+            "\nDetected-sole counts RANK parity yield (order-of-magnitude); they are NOT literal \
+             '+N parity' promises — an EARLY detected class can hide a LATE disclaimed co-blocker \
+             the census never sees, so EXPOSURE is a lower bound on the over-promise population."
+        );
+        println!(
+            "Disclaimed classes (`*`) are the static-evaluator/overlay family, the emitter \
+             refusals that read live per-emission state (styled-component attributes, \
+             bind:/event/value attributes, block placement, component invocations), and the \
+             pipeline-inline comment-family refusals. See the tsv_svelte_compile::census module docs."
+        );
+
+        if self.errors > 0 {
+            println!("\nErrors ({}):", self.errors);
+            for (kind, detail) in &self.error_entries {
+                let detail = if detail.is_empty() {
+                    String::new()
+                } else {
+                    format!(" — {}", truncate(&detail.replace('\n', " "), 160))
+                };
+                println!("  [{kind}]{detail}");
+            }
+            if self.errors > self.error_entries.len() {
+                println!(
+                    "  … (+{} more errors)",
+                    self.errors - self.error_entries.len()
+                );
+            }
+        }
+    }
+
+    fn print_json(&self) -> Result<(), CliError> {
+        #[derive(serde::Serialize)]
+        struct JsonReport<'a> {
+            candidates: usize,
+            errors: usize,
+            exposure: usize,
+            blockers: &'a [BlockerCount],
+            disclaimed: &'a [DisclaimedCount],
+        }
+        let report = JsonReport {
+            candidates: self.candidates,
+            errors: self.errors,
+            exposure: self.exposure,
+            blockers: &self.blockers,
+            disclaimed: &self.disclaimed,
+        };
+        match to_json_with_tabs(&report) {
+            Ok(json) => {
+                println!("{json}");
+                Ok(())
+            }
+            Err(e) => {
+                eprintln!("Error serializing census report: {e}");
+                Err(CliError::Errored)
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn census_exposure_is_per_file_not_global() {
+        // The per-file exposure fix: a candidate is exposed iff the census did not
+        // itself reproduce that file's real first-refusal (`first_confirmed`),
+        // regardless of whether that class is globally detectable. This models a
+        // dual-position class whose bucket key IS in `census_detected_buckets()`
+        // (so a global check would clear it) yet went unconfirmed on this file.
+        let dual = "rune {name}".to_string(); // globally detected (script variant)
+        assert!(
+            census_detected_buckets().iter().any(|b| b.as_ref() == dual),
+            "precondition: the class is globally detectable"
+        );
+        let outcomes = vec![
+            // First-refusal reproduced by the census → confirmed, NOT exposed.
+            CensusOutcome::Candidate {
+                first_key: dual.clone(),
+                union: vec![dual.clone()],
+                first_confirmed: true,
+            },
+            // Same class as first-refusal, but the census did not reproduce it on
+            // this file (template variant) → exposed, despite being globally
+            // detectable. A global-set check would wrongly clear it.
+            CensusOutcome::Candidate {
+                first_key: dual.clone(),
+                union: vec![dual.clone(), "non-class css selector".to_string()],
+                first_confirmed: false,
+            },
+        ];
+        let report = CensusReport::build(&outcomes);
+        assert_eq!(report.candidates, 2);
+        assert_eq!(report.exposure, 1, "only the unconfirmed file is exposed");
+        assert_eq!(report.disclaimed.len(), 1);
+        assert_eq!(report.disclaimed[0].bucket, dual);
+        assert_eq!(report.disclaimed[0].count, 1);
+    }
 
     #[test]
     fn oracle_reject_code_requires_svelte_code() {

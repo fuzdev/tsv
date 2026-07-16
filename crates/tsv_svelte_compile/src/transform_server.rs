@@ -256,7 +256,7 @@ pub(crate) fn compile_server<'arena>(
     // CSS scoping analysis (no minting): which class names are scoped, and
     // where the hash class splices into the style text.
     let scope = match root.css {
-        Some(style) => Some(analyze_style(style, source)?),
+        Some(style) => Some(analyze_style(style, source, None)?),
         None => None,
     };
 

@@ -691,7 +691,7 @@ fn normalize_whitespace(list: &mut Vec<CleanNode<'_>>, parent_name: Option<&str>
     list.retain(|_| !*keep.next().unwrap_or(&false));
 }
 
-fn fragment_node_kind(node: &FragmentNode<'_>) -> &'static str {
+pub(crate) fn fragment_node_kind(node: &FragmentNode<'_>) -> &'static str {
     match node {
         FragmentNode::Element(_) => "element",
         FragmentNode::SpecialElement(_) => "special element",

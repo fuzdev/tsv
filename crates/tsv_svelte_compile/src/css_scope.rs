@@ -29,26 +29,41 @@ pub(crate) struct ScopeInfo {
 /// Analyze a `<style>` for the minimal supported shape: top-level rules whose
 /// selectors are single simple class selectors. Anything else is refused — the
 /// real matcher/pruner machinery is a later milestone.
-pub(crate) fn analyze_style(style: &Style<'_>, source: &str) -> Result<ScopeInfo, CompileError> {
+///
+/// `sink` is the [`census`](crate::census) collect seam: when `None` the four
+/// unsupported shapes **bail on the first** (the compile path), byte-identical to
+/// having no parameter; when `Some`, each pushes its [`Refusal`] and the walk
+/// continues, so a stylesheet's whole refusal set is collected in one pass. In
+/// collect mode the returned [`ScopeInfo`] is partial and unused — only the sink
+/// matters.
+pub(crate) fn analyze_style(
+    style: &Style<'_>,
+    source: &str,
+    mut sink: Option<&mut Vec<Refusal>>,
+) -> Result<ScopeInfo, CompileError> {
     let mut info = ScopeInfo {
         class_names: BTreeSet::new(),
         insertions: Vec::new(),
     };
     for node in style.css_stylesheet.nodes {
         let CssNode::Rule(rule) = node else {
-            return Err(unsupported(Refusal::CssAtRule));
+            refuse(&mut sink, Refusal::CssAtRule)?;
+            continue;
         };
         for child in rule.declarations {
             if matches!(child, CssBlockChild::Rule(_) | CssBlockChild::Atrule(_)) {
-                return Err(unsupported(Refusal::CssNestedRule));
+                refuse(&mut sink, Refusal::CssNestedRule)?;
+                break;
             }
         }
         for complex in rule.selector.selectors {
             let [relative] = complex.children else {
-                return Err(unsupported(Refusal::CssCombinatorSelector));
+                refuse(&mut sink, Refusal::CssCombinatorSelector)?;
+                continue;
             };
             let [SimpleSelector::Class { span }] = relative.selectors else {
-                return Err(unsupported(Refusal::CssNonClassSelector));
+                refuse(&mut sink, Refusal::CssNonClassSelector)?;
+                continue;
             };
             // Span text includes the leading `.`.
             let name = &span.extract(source)[1..];
@@ -58,6 +73,20 @@ pub(crate) fn analyze_style(style: &Style<'_>, source: &str) -> Result<ScopeInfo
     }
     info.insertions.sort_unstable();
     Ok(info)
+}
+
+/// Record `reason`: in bail mode (`sink` is `None`) return it as an `Err` — the
+/// `?` at the call site propagates it exactly as the original `return Err(…)`
+/// did, so the compile path stays byte-identical; in collect mode push it and
+/// return `Ok(())` so the caller continues to the next node/selector.
+fn refuse(sink: &mut Option<&mut Vec<Refusal>>, reason: Refusal) -> Result<(), CompileError> {
+    match sink {
+        Some(collected) => {
+            collected.push(reason);
+            Ok(())
+        }
+        None => Err(unsupported(reason)),
+    }
 }
 
 /// The scoped CSS: the author's style text verbatim (whitespace preserved) with

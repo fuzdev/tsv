@@ -20,9 +20,12 @@ mod attr_refs;
 mod attribute;
 mod blocks;
 mod build;
+mod census;
 mod css_scope;
 mod element;
 mod erase;
+
+pub use census::{census, census_detected_buckets};
 
 /// The forward half of an erased TypeScript region's comment-refusal window (see
 /// `erase`). Exported so the `erase_comment_census` diagnostic sizes the rule the
