@@ -10,7 +10,7 @@ use tsv_lang::ParseError;
 /// excluded. Single source for the threshold shared by `is_identifier_start` and
 /// the continuation guard in `read_identifier`.
 #[inline]
-fn is_non_ascii_identifier_codepoint(ch: char) -> bool {
+pub(crate) fn is_non_ascii_identifier_codepoint(ch: char) -> bool {
     ch as u32 >= 0xA0
 }
 
