@@ -11,7 +11,8 @@
  *
  * Freshness inputs (newest mtime wins): every `*.rs` and `Cargo.toml` under
  * the crates that feed the WASM bundle (the run-side guard's `CORE_CRATES` +
- * `tsv_wasm` — imported, so the two sides can't drift; the dev-tooling crates
+ * `WASM_CRATES` — `tsv_wasm` plus the `tsv_ignore`/`tsv_discover` IgnoreStack
+ * crates; imported, so the two sides can't drift; the dev-tooling crates
  * are deliberately out, else every `tsv_debug` fixture-workflow edit would
  * force a pointless wasm rebuild), the workspace `Cargo.toml` + `Cargo.lock`
  * (dependency bumps), and
@@ -40,13 +41,14 @@ import {
 	CORE_CRATES,
 	newest_source_mtime,
 	type SourceMtime,
+	WASM_CRATES,
 } from '../benches/js/lib/check_artifact_freshness.ts';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
 const newest_source = async (): Promise<SourceMtime> => {
 	// Copy — newest_source_mtime memoizes its result object; don't mutate the cache.
-	const newest = { ...(await newest_source_mtime([...CORE_CRATES, 'tsv_wasm'])) };
+	const newest = { ...(await newest_source_mtime([...CORE_CRATES, ...WASM_CRATES])) };
 	const consider = async (path: string, label: string): Promise<void> => {
 		try {
 			const st = await stat(path);

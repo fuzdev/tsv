@@ -107,7 +107,11 @@ import {
 	generate_binary_size_report,
 } from './lib/binary_sizes.ts';
 import { type Language, LANGUAGES, type SourceFile } from './lib/types.ts';
-import { check_artifact_freshness, wasm_artifact_path } from './lib/check_artifact_freshness.ts';
+import {
+	check_artifact_freshness,
+	WASM_CRATES,
+	wasm_artifact_path,
+} from './lib/check_artifact_freshness.ts';
 import { check_node_modules } from './lib/check_node_modules.ts';
 import { get_library_path } from './lib/ffi.ts';
 import { get_napi_library_path } from './lib/napi.ts';
@@ -487,7 +491,7 @@ await check_artifact_freshness([
 	{
 		label: `WASM (all/${wasm_target})`,
 		path: wasm_artifact_path('all'),
-		binding_crates: ['tsv_wasm'],
+		binding_crates: WASM_CRATES,
 		rebuild: `deno task build:wasm:all:${wasm_target}`,
 	},
 ]);

@@ -39,26 +39,40 @@ import { fileURLToPath } from 'node:url';
 import { current_runtime } from './runtime.ts';
 
 /**
- * Crates whose source compiles into every tsv artifact (the shared core).
- * `tsv_arena` feeds all three bindings' per-thread reuse; `tsv_ignore` +
- * `tsv_discover` ship in the WASM bundle (the `IgnoreStack` export) — an edit
- * to any of them must trip staleness like a language-crate edit does.
- * Exported (with `newest_source_mtime`) for `scripts/run_if_stale.ts`, the
- * build-side sibling — the two sides must agree on what "the sources" are.
- * Deliberately excludes the dev-tooling crates (`tsv_debug`, `tsv_cli`): they
- * don't feed the measured artifacts, and including them would force wasm
- * rebuilds on every fixture-workflow edit.
+ * Crates whose source compiles into EVERY measured tsv artifact (the shared
+ * core): the language crates plus `tsv_arena` (all three bindings' per-thread
+ * reuse). Applied as the freshness floor for every check.
+ *
+ * `tsv_ignore` + `tsv_discover` are deliberately NOT here — they feed only the
+ * WASM bundle (the `IgnoreStack` export), not `tsv_ffi` / `tsv_napi`, so they
+ * live in `WASM_CRATES`. Sharing them would false-stale the native checks: a
+ * `tsv_discover` edit never rebuilds the FFI (it's not in its dependency
+ * graph), so the guard could never clear on a rebuild.
+ *
+ * Exported (with `WASM_CRATES` + `newest_source_mtime`) for
+ * `scripts/run_if_stale.ts`, the build-side sibling — the two sides must agree
+ * on what "the sources" are. Deliberately excludes the dev-tooling crates
+ * (`tsv_debug`, `tsv_cli`): they don't feed the measured artifacts, and
+ * including them would force wasm rebuilds on every fixture-workflow edit.
  */
 export const CORE_CRATES = [
 	'tsv_lang',
 	'tsv_arena',
 	'tsv_html',
-	'tsv_ignore',
-	'tsv_discover',
 	'tsv_ts',
 	'tsv_css',
 	'tsv_svelte',
 ];
+
+/**
+ * Crates that feed the WASM bundle beyond `CORE_CRATES`: the binding crate
+ * itself plus `tsv_ignore` + `tsv_discover` (the `IgnoreStack` export, which
+ * only the WASM artifact links among the measured bindings — `tsv_ffi` /
+ * `tsv_napi` link neither). Used as the WASM check's `binding_crates` AND by
+ * `scripts/run_if_stale.ts`, imported by both so the run-side guard and the
+ * build-side skip can't drift on what feeds the bundle.
+ */
+export const WASM_CRATES = ['tsv_wasm', 'tsv_ignore', 'tsv_discover'];
 
 /** Absolute path to the workspace `crates/` directory. */
 const CRATES_DIR = fileURLToPath(new URL('../../../crates', import.meta.url));
