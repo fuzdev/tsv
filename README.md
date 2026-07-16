@@ -12,8 +12,7 @@ and a drop-in replacement for [Svelte](https://svelte.dev/)'s parser +
 [acorn-typescript](https://github.com/sveltejs/acorn-typescript).
 
 Compared to Oxc, Biome, and SWC, tsv is a set of focused tools, not a generic language platform,
-so the focus is web standards and there's no support for JSX/SCSS/etc,
-beyond Svelte as the only JS framework.
+so the focus is Web standards + Svelte and there's no support for JSX/SCSS/etc.
 The extensibility story is currently limited to using its Rust crates as libraries (or forking);
 bridging to JS or WASM plugins is an open question (leaning against).
 
@@ -25,7 +24,7 @@ tsv prioritizes, in order:
 4. extensibility (valued but deprioritized)
 
 See the [benchmarks](https://tsv.fuz.dev/docs/benchmarks) for stats.
-Compared to Oxc and Biome, tsv (v0.2, not yet published) is significantly faster,
+Compared to Oxc and Biome, tsv (v0.2, not yet published) is faster,
 smaller, and uses less memory to parse and format its supported languages.
 
 This is an early release, and reports and feedback are appreciated -

@@ -80,10 +80,13 @@ enum FastScan<'arena> {
 
 /// ASCII bytes that `str::trim` (via `char::is_whitespace`) strips: the CSS
 /// whitespace set plus U+000B (vertical tab), which `char::is_whitespace`
-/// includes and `is_css_whitespace` does not. Used only to check — from a value
-/// range's boundary bytes — whether it is already trimmed, so the fast path can
-/// skip a redundant `str::trim`; any non-ASCII boundary byte conservatively takes
-/// the trimming path instead.
+/// includes and `is_css_whitespace` does not. A conservative superset of what the
+/// boundary trims themselves strip (CSS whitespace only, via
+/// [`crate::escapes::trim_start_css`] / [`crate::escapes::trim_end_preserving_escape`],
+/// which exclude U+000B). Used only to check — from a value range's boundary bytes —
+/// whether it is already trimmed, so the fast path can skip a redundant trim; any
+/// non-ASCII boundary byte conservatively takes the trimming path instead (where a
+/// non-ASCII space is preserved, not dropped).
 const fn is_trim_boundary_ws(b: u8) -> bool {
     matches!(b, b'\t' | b'\n' | 0x0B | 0x0C | b'\r' | b' ')
 }
@@ -180,18 +183,22 @@ impl<'a> ValueParser<'a> {
     /// `ValueCursor` split is comment-*blind*, and the two deliberately disagree on
     /// a comment between value tokens, so the single-string fast pass hands such a
     /// value off unchanged. A whitespace or non-ASCII boundary byte (rare, since the
-    /// range is trimmed) also takes the two-pass path, which trims first; the value
-    /// it produces is identical either way.
+    /// range is trimmed) also takes the two-pass path, which trims first —
+    /// CSS-whitespace-only (`trim_start_css` / `trim_end_preserving_escape`), so an
+    /// ASCII-whitespace boundary comes off (identical to what the fast path would
+    /// produce) while a non-ASCII space (NBSP, em space) is kept as leaf content,
+    /// never dropped.
     pub fn parse<'arena>(&self, arena: &'arena Bump) -> CssValue<'arena> {
         let text = self.text();
         let bytes = text.as_bytes();
 
         // Fast path: confirm `text` is already trimmed straight from its boundary
-        // bytes (ASCII and non-whitespace ends ⇒ `str::trim` is a no-op) and skip
-        // the redundant `str::trim` the two-pass path runs. A whitespace boundary
+        // bytes (ASCII and non-whitespace ends ⇒ the ASCII trim is a no-op) and skip
+        // the redundant trim the two-pass path runs. An ASCII-whitespace boundary
         // (`text` is trimmed in practice, so this is rare) or a non-ASCII boundary
-        // byte (possibly a Unicode space like NBSP that `str::trim` strips) falls
-        // through to the trimming path below, which yields the same value.
+        // byte falls through to the trimming path below: an ASCII-whitespace end is
+        // trimmed there (same value), while a non-ASCII space (NBSP, em space) is
+        // kept — it is CSS value content, not whitespace.
         if let (Some(&first), Some(&last)) = (bytes.first(), bytes.last())
             && first < 0x80
             && last < 0x80
@@ -355,8 +362,11 @@ impl<'a> ValueParser<'a> {
         let seg = &text[seg_start..seg_end];
         // Match `split_top_level`'s asymmetric trimming exactly: leading whitespace is
         // skipped ASCII-only (like `ValueCursor::skip_whitespace`), trailing is trimmed
-        // Unicode-wide (like `trimmed_end`'s `str::trim_end`). A leading non-ASCII space
-        // (e.g. NBSP) therefore stays part of the element, as it does in the old path.
+        // CSS-whitespace-only and escape-aware (like `trimmed_end`'s
+        // `trim_end_preserving_escape`). A non-ASCII space (e.g. NBSP) on either end
+        // therefore stays part of the element — it is CSS value content, not a
+        // separator — rather than being dropped (which, for a string element, would
+        // delete the whole element).
         let after_lead = seg.trim_start_matches(|c: char| c.is_ascii_whitespace());
         let core = crate::escapes::trim_end_preserving_escape(after_lead);
         if core.is_empty() {
@@ -469,7 +479,12 @@ impl<'a> ValueParser<'a> {
     /// Parse single value (leaf node), trimming first.
     ///
     /// Used by the two-pass fallback, where the range may carry surrounding
-    /// whitespace; the fast path calls `build_leaf` directly.
+    /// whitespace; the fast path calls `build_leaf` directly. The trim is
+    /// CSS-whitespace-only and escape-aware (`trim_start_css` /
+    /// `trim_end_preserving_escape`): a non-ASCII space (NBSP, em space) at either end
+    /// is leaf content and stays, so the text handed to `build_leaf` still matches
+    /// `span` (trimming it would desync the two and drop a string element — see the
+    /// helper).
     fn parse_single<'arena>(&self, arena: &'arena Bump) -> CssValue<'arena> {
         let text = self.text();
         self.build_leaf(

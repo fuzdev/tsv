@@ -221,8 +221,13 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> Cow<'_, str> {
     // common case, so the trim is usually a no-op; return the owned buffer as-is
     // rather than cloning it. Only the rare edge cases that preserve verbatim
     // boundary whitespace (e.g. an unterminated string/comment) pay the copy —
-    // byte-identical either way. The trailing trim spares an escape's payload
-    // (`50px\ `), which the loop copied verbatim as content.
+    // byte-identical either way. The trim is CSS-whitespace-only and escape-aware,
+    // matching the char-loop's ASCII-only whitespace handling above: a boundary
+    // non-ASCII space (NBSP, em space) is value content — the char-loop pushes it
+    // verbatim, and stripping it here would silently drop it (deleting a string
+    // element whose leading/trailing space the value parser deliberately kept). The
+    // trailing trim also spares an escape's payload (`50px\ `), which the loop copied
+    // verbatim as content.
     let trimmed =
         crate::escapes::trim_end_preserving_escape(crate::escapes::trim_start_css(&result));
     if trimmed.len() == result.len() {
