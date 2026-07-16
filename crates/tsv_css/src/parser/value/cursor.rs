@@ -163,13 +163,15 @@ impl<'a> ValueCursor<'a> {
                 (c, c.len_utf8())
             };
 
-            // An escaped paren (`\(` / `\)`) is a content code point (css-syntax §4.3.7), not a
-            // nesting delimiter, so it must not change `paren_depth` — otherwise an escaped `)`
-            // inside `url()` mis-drops the depth and exposes a false top-level separator. Skip
-            // both (parens are ASCII, one byte each). Kept identical in the twin
-            // `fast_scan` / `classify_separators` trackers.
-            if ch == '\\' && matches!(bytes.get(i + 1), Some(b'(' | b')')) {
-                i += 2;
+            // An escape is OPAQUE: step over it whole (`crate::escapes::escape_len`), so
+            // nothing inside it — an escaped paren, comma, or space, or a hex escape's
+            // whitespace terminator — reads as nesting or as a delimiter. Kept identical in
+            // the twin `fast_scan` / `classify_separators` trackers (see `fast_scan` for the
+            // full rationale).
+            if ch == '\\'
+                && let Some(len) = crate::escapes::escape_len(self.source, i)
+            {
+                i += len;
                 continue;
             }
 

@@ -1,0 +1,108 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 151,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 142,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 17,
+							"end": 30,
+							"property": "width",
+							"value": "50px\\"
+						},
+						{
+							"type": "Declaration",
+							"start": 34,
+							"end": 58,
+							"property": "height",
+							"value": "var(--a, 50px\\ )"
+						},
+						{
+							"type": "Declaration",
+							"start": 62,
+							"end": 81,
+							"property": "margin",
+							"value": "calc(1px\\ )"
+						},
+						{
+							"type": "Declaration",
+							"start": 85,
+							"end": 96,
+							"property": "color",
+							"value": "a\\ b"
+						},
+						{
+							"type": "Declaration",
+							"start": 100,
+							"end": 123,
+							"property": "padding",
+							"value": "var(--b, x\\,y)"
+						},
+						{
+							"type": "Declaration",
+							"start": 127,
+							"end": 138,
+							"property": "inset",
+							"value": "a\\+b"
+						}
+					]
+				},
+				"start": 9,
+				"end": 142
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 143,
+			"styles": "\n\tdiv {\n\t\twidth: 50px\\ ;\n\t\theight: var(--a, 50px\\ );\n\t\tmargin: calc(1px\\ );\n\t\tcolor: a\\ b;\n\t\tpadding: var(--b, x\\,y);\n\t\tinset: a\\+b;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 152,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -42,7 +42,7 @@ impl<'a> Printer<'a> {
             start_index += 1; // Skip this comment when processing declarations
         }
 
-        self.write(" {\n");
+        self.write_block_open();
 
         // Format declarations and comments with indentation, via the shared
         // block-body routine (also used by at-rule blocks). `start_index` skips
