@@ -49,6 +49,19 @@ pub struct PrinterInputs<'a> {
     pub comments: &'a [ast::Comment],
     /// Precomputed newline offsets for O(log n) line/column lookup.
     pub line_breaks: &'a [u32],
+    /// Whether any comment in this document is owned by a node (`owned_by_node`).
+    /// A document-level presence flag that short-circuits the owned-leading-comment
+    /// path (`prepend_owned_leading_comment` & siblings), which otherwise runs a byte
+    /// gate once per expression node — the highest-frequency comment path — to conclude
+    /// "no owned comment" for the ~all documents that have none.
+    ///
+    /// **Compute this once per document, from the parsed comment list** (e.g.
+    /// `comments.iter().any(|c| c.owned_by_node)`), and pass it in. It must NOT be
+    /// derived inside `Printer::with_context` or `tsv_svelte`'s `ts_inputs()`: the latter
+    /// is called per template `{expr}`, so an `any()` scan there is O(islands × comments)
+    /// and regresses `.svelte`. `owned_by_node` is set at parse time (including for
+    /// Svelte-embedded TS, parsed eagerly), so the flag is stable before any printing.
+    pub has_owned_comments: bool,
 }
 
 /// Build an *output* printer — pre-sizes the output buffer to the source
@@ -184,6 +197,7 @@ pub fn format_in(program: &Program<'_>, source: &str, arena: &DocArena) -> Strin
         interner: Rc::clone(&program.interner),
         comments: &program.comments,
         line_breaks: &line_breaks,
+        has_owned_comments: program.comments.iter().any(|c| c.owned_by_node),
     };
     let mut printer = make_printer(arena, &inputs, EmbedContext::default());
     printer.print_program(program);
@@ -571,6 +585,7 @@ pub fn build_program_doc(
         interner: Rc::clone(&program.interner),
         comments: &program.comments,
         line_breaks,
+        has_owned_comments: program.comments.iter().any(|c| c.owned_by_node),
     };
     let printer = make_doc_printer(arena, &inputs, embed);
     printer.build_program_doc(program)

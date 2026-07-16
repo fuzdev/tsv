@@ -56,12 +56,33 @@ impl<'a> Printer<'a> {
     /// the node's doc at every one of the ~29 sites where a *parent* decides to wrap that
     /// doc in parens, present or future. Nothing else prints an owned comment.
     pub(crate) fn prepend_owned_leading_comment(&self, expr: &Expression<'_>, doc: DocId) -> DocId {
+        // Document-level short-circuit: no comment in this document is owned, so nothing
+        // here can prepend one. Skips even the byte gate below for the ~all documents with
+        // no owned comment. (Every `JsdocCast` comment is owned, so a cast implies the flag.)
+        if !self.has_owned_comments {
+            return doc;
+        }
+        let start = expr.span().start;
+        // Cheap byte gate next: this runs once per expression node (the highest-frequency
+        // comment path), and almost every expression is mid-line — preceded by `(`/`,`/space,
+        // not a block comment's `*/` — so the gate bails in a few instructions before the
+        // JsdocCast match and the 13-arm left-spine walk. Byte-identical: when no glued block
+        // comment ends here, `owned_leading_comment_at` would find nothing and every arm below
+        // returns `doc` unchanged, so the early return is the same result reached sooner.
+        if source_scan::block_comment_end_before(
+            self.source.as_bytes(),
+            start as usize,
+            source_scan::CommentGlue::SameLine,
+        )
+        .is_none()
+        {
+            return doc;
+        }
         // A JSDoc cast holds its own copy of its comment and prints it against its own
         // `(` — see `build_jsdoc_cast_doc`. Claiming it here would print it twice.
         if matches!(expr, Expression::JsdocCast(_)) {
             return doc;
         }
-        let start = expr.span().start;
         // A node whose left-spine child starts here is not the innermost — that child is
         // (or something below it). Let the recursion reach it.
         if left_spine_child(expr).is_some_and(|c| c.span().start == start) {
@@ -78,6 +99,11 @@ impl<'a> Printer<'a> {
     /// seam above never runs for them and the comment would be *dropped*. An arrow is
     /// always its own left edge, so there is no innermost-node check to make.
     pub(crate) fn prepend_owned_leading_comment_at(&self, start: u32, doc: DocId) -> DocId {
+        // Document-level short-circuit (also covers the arrow-reassembly callers, which
+        // reach here without going through `prepend_owned_leading_comment`).
+        if !self.has_owned_comments {
+            return doc;
+        }
         let Some(comment) = self.owned_leading_comment_at(start) else {
             return doc;
         };
@@ -99,6 +125,11 @@ impl<'a> Printer<'a> {
     /// block, or a block the author left on its own line. A single-line block glued to the
     /// value (`= /* c */ v`) stays inline.
     pub(crate) fn owned_leading_comment_hangs_value(&self, expr: &Expression<'_>) -> bool {
+        // Document-level short-circuit: no owned comment anywhere ⇒ none hangs the value
+        // (and no `JsdocCast` exists, since a cast's comment is always owned).
+        if !self.has_owned_comments {
+            return false;
+        }
         // A JSDoc cast keeps its own rule, and must: it prints a hardline between the
         // comment and its `(` on exactly the shape `jsdoc_cast_comment_is_own_line`
         // describes, and a hang without that hardline strands the `(` (see that
@@ -128,6 +159,11 @@ impl<'a> Printer<'a> {
     /// whichever node on the spine ends up printing the comment, they all start where `expr`
     /// does, so the position is the same.
     pub(crate) fn owned_leading_comment_start(&self, expr: &Expression<'_>) -> Option<u32> {
+        // Document-level short-circuit: no owned comment anywhere ⇒ no owned start
+        // (and no `JsdocCast` exists, since a cast's comment is always owned).
+        if !self.has_owned_comments {
+            return None;
+        }
         // A JSDoc cast carries its own copy and always prints it (`build_jsdoc_cast_doc`), so
         // it is the one node that answers from the node rather than the glued-comment lookup.
         // It must: `JsdocCast::span` covers the `(`…`)` only — the comment sits *outside* it —

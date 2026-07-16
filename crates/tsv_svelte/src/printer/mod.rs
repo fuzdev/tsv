@@ -66,6 +66,12 @@ pub(crate) struct Printer<'a> {
     interner: SharedInterner,
     /// Comments from scripts and template expressions
     comments: &'a [Comment],
+    /// Whether any of `comments` is owned by a node (`owned_by_node`). Computed once
+    /// per document at construction and handed to `tsv_ts` via `ts_inputs()`, so the
+    /// embedded owned-comment path short-circuits per `{expr}` without an O(comments)
+    /// rescan there. `owned_by_node` is set during the eager parse of embedded TS, so
+    /// it is already final before printing.
+    has_owned_comments: bool,
     /// Precomputed line break positions (byte offsets of '\n' in source)
     line_breaks: Vec<u32>,
     /// Whether a wrapped block-tag head may dangle its `}` (and, later, expand its
@@ -126,6 +132,7 @@ impl<'a> Printer<'a> {
             source,
             interner,
             comments,
+            has_owned_comments: comments.iter().any(|c| c.owned_by_node),
             line_breaks,
             block_dangle_allowed: Cell::new(true),
             root_inline_run_block_starts: RefCell::new(HashSet::new()),
@@ -205,6 +212,9 @@ impl<'a> Printer<'a> {
             interner: Rc::clone(&self.interner),
             comments: self.comments,
             line_breaks: &self.line_breaks,
+            // The document-level owned-comment flag, computed once at construction
+            // (never here — this is called per `{expr}`; see the field's doc).
+            has_owned_comments: self.has_owned_comments,
         }
     }
 
