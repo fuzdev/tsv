@@ -313,6 +313,13 @@ mod value_span_tests {
         }
     }
 
+    /// An ASCII space adjacent to a kept non-ASCII space still comes off — only the
+    /// ASCII byte is trimmed, the NBSP stays as content.
+    #[test]
+    fn ascii_space_trims_beside_a_kept_nbsp() {
+        assert_eq!(value_span(" \u{a0}red", 0, 6), Span { start: 1, end: 6 });
+    }
+
     /// The trailing whitespace a `\` escape owns is content: trimming it strands
     /// the backslash onto whatever follows (`50px\ ;` → `50px\;`, the `;` now
     /// escaped) and the declaration no longer parses. Padding past the escaped

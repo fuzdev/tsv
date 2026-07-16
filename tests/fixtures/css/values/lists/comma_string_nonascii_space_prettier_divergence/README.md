@@ -6,9 +6,10 @@ glued to a non-ASCII whitespace** — a non-breaking space (U+00A0) or an em spa
 `grid-template-columns: 'a'<NBSP>, 'b'` (trailing).
 
 CSS whitespace is ASCII-only (CSS Syntax 3 §"whitespace" is `\t \n \f \r` and
-space), so a non-ASCII space is **not** a separator — it is a name code point, i.e.
-value content. tsv keeps the element as **one opaque token, inline**, preserving the
-character:
+space), so a non-ASCII space is **not** a separator — it is value content (tsv treats
+it as an identifier code point, ≥ U+00A0, following Svelte's `parseCss` — broader than
+the CSS Syntax ident set, which excludes these look-alike whitespace chars). tsv keeps
+the element as **one opaque token, inline**, preserving the character:
 
 ```
 grid-template-areas: 'x', <NBSP>'y';
