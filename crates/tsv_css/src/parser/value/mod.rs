@@ -13,7 +13,7 @@ pub(crate) mod scan;
 pub mod strings;
 
 use crate::ast::internal::CssValue;
-use crate::whitespace::is_ascii_trim_ws;
+use crate::escapes::{trim_end_preserving_escape, trim_start_css};
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
@@ -71,25 +71,33 @@ pub fn parse_value_from_source<'arena>(
     parser::ValueParser::new(trimmed, absolute_span).parse(arena)
 }
 
-/// A value's text with its surrounding whitespace removed, and how many bytes of
-/// that whitespace preceded it. `None` when the value is entirely whitespace.
+/// A value's text with its surrounding **CSS** whitespace removed, and how many
+/// bytes of that whitespace preceded it. `None` when the value is entirely
+/// whitespace.
 ///
 /// The span a declaration hands over is, in practice, already trimmed — real
 /// stylesheets do not put a whitespace byte at either end of a value — so the
-/// common case answers from two byte comparisons and never walks the text. That
-/// matters because `str::trim*` is Unicode-aware: it decodes a `char` and tests
-/// `White_Space` at each end, and the offsets a naive shape recovers cost a
-/// second and third walk to learn what the first already knew.
+/// common case answers from two byte comparisons and never walks the text.
 ///
-/// ⚠️ Only an **ASCII non-whitespace** byte at each end settles it. A non-ASCII
-/// byte cannot (a multi-byte char's leading byte says nothing about whether that
-/// char is `White_Space`), and an ASCII whitespace byte means there is something
-/// to trim; both fall through to the trimming path. The test is
-/// `char::is_whitespace`, **not** `u8::is_ascii_whitespace` — the two disagree on
-/// the **vertical tab**, and `trim` uses the former.
+/// The trim is [`trim_start_css`] / [`trim_end_preserving_escape`], **not**
+/// `str::trim`: CSS whitespace is the five ASCII characters of §4.2, so NBSP and
+/// U+3000 are value *content* (`str::trim` would eat them), and the trailing
+/// whitespace a `\` escape owns is content too — `50px\ ;` must keep its escaped
+/// space or the backslash strands onto the `;` and the output stops parsing.
+/// `trimmed` becomes the `ValueParser`'s source and its length is what the leaf
+/// spans are derived from, so cutting an escape's payload here is what does it.
+///
+/// The fast path's guard is therefore exactly `u8::is_ascii_whitespace` — the
+/// same set the trim acts on, so the two arms cannot disagree. A boundary byte
+/// that is not ASCII whitespace settles the question outright, **including a
+/// non-ASCII one**: no byte of a multi-byte char is ASCII whitespace, and the
+/// trim would not have touched that char anyway. ⚠️ The set is
+/// `u8::is_ascii_whitespace`, **not** `char::is_whitespace` (which would eat NBSP)
+/// and not the lexer's `is_ascii_css_whitespace` (which adds the **vertical tab**
+/// to match `parseCss`); the vertical tab is content to this trim.
 fn locate_value(value_str: &str) -> Option<(&str, usize)> {
     let bytes = value_str.as_bytes();
-    let settled = |b: u8| b.is_ascii() && !char::from(b).is_whitespace();
+    let settled = |b: u8| !b.is_ascii_whitespace();
     if let (Some(&first), Some(&last)) = (bytes.first(), bytes.last())
         && settled(first)
         && settled(last)
@@ -97,13 +105,8 @@ fn locate_value(value_str: &str) -> Option<(&str, usize)> {
         return Some((value_str, 0));
     }
 
-    // ASCII-only trim: a boundary non-ASCII space (NBSP U+00A0, em space U+2003, …)
-    // is CSS value *content*, not a separator (CSS whitespace is ASCII-only), so it
-    // stays with the value — a single `content: <NBSP>'z'` keeps the space instead of
-    // dropping it. Byte-identical to `str::trim*` on real stylesheet input, which has
-    // no boundary whitespace at all. See `whitespace::is_ascii_trim_ws`.
-    let after_leading = value_str.trim_start_matches(is_ascii_trim_ws);
-    let trimmed = after_leading.trim_end_matches(is_ascii_trim_ws);
+    let after_leading = trim_start_css(value_str);
+    let trimmed = trim_end_preserving_escape(after_leading);
     if trimmed.is_empty() {
         return None;
     }
@@ -263,17 +266,14 @@ mod value_span_tests {
         assert_eq!(value_span("red", 0, 3), Span { start: 0, end: 3 });
         assert_eq!(value_span("a red b", 2, 5), Span { start: 2, end: 5 });
 
-        // Whitespace at either end must come off the span identically.
+        // CSS whitespace at either end must come off the span identically.
         for (source, span, want) in [
             (" red", (0, 4), (1, 4)),
             ("red ", (0, 4), (0, 3)),
             ("  red  ", (0, 7), (2, 5)),
             ("\tred\t", (0, 5), (1, 4)),
             ("\nred\n", (0, 5), (1, 4)),
-            // The vertical tab is `White_Space` (so `trim` eats it) but NOT
-            // `u8::is_ascii_whitespace` — asking the `char` is what keeps the
-            // fast path's guard equivalent to the trim it stands in for.
-            ("\x0bred\x0b", (0, 5), (1, 4)),
+            ("\rred\r", (0, 5), (1, 4)),
             ("\x0cred\x0c", (0, 5), (1, 4)),
         ] {
             assert_eq!(
@@ -287,21 +287,48 @@ mod value_span_tests {
         }
     }
 
-    /// A non-ASCII boundary byte cannot settle the fast-path question (a lead byte
-    /// says nothing about its char), so it falls through to the trimming path — where
-    /// the trim is ASCII-only. A boundary non-ASCII space (NBSP U+00A0) is CSS value
-    /// *content*, not whitespace, so it is **kept**: `content: <NBSP>'z'` preserves the
-    /// space rather than dropping it (former content loss). An ASCII space next to it
-    /// still comes off, and a letter is untouched.
+    /// Only the five ASCII characters of §4.2 are whitespace to CSS. Everything
+    /// else at a boundary is value **content** and keeps its span — which is also
+    /// what lets the fast path settle a non-ASCII byte outright.
+    ///
+    /// The vertical tab is the sharp edge: `char::is_whitespace` accepts it (so
+    /// `str::trim` would eat it) and so does the *lexer*'s `is_ascii_css_whitespace`
+    /// (which matches `parseCss`), but this trim is §4.2 and must not.
     #[test]
-    fn non_ascii_boundary_space_is_kept_as_content() {
-        // NBSP at both ends is content — the span covers the whole run.
-        assert_eq!(
-            value_span("\u{a0}red\u{a0}", 0, 7),
-            Span { start: 0, end: 7 }
-        );
-        // ASCII space (trimmed) then NBSP (kept): only the ASCII byte comes off.
+    fn non_css_whitespace_is_content() {
+        for (source, span) in [
+            ("\u{a0}red\u{a0}", (0, 7)),     // NBSP
+            ("\u{3000}red\u{3000}", (0, 9)), // ideographic space
+            ("\x0bred\x0b", (0, 5)),         // vertical tab
+            ("é", (0, 2)),
+        ] {
+            assert_eq!(
+                value_span(source, span.0, span.1),
+                Span {
+                    start: span.0,
+                    end: span.1
+                },
+                "value span for {source:?}"
+            );
+        }
+    }
+
+    /// An ASCII space adjacent to a kept non-ASCII space still comes off — only the
+    /// ASCII byte is trimmed, the NBSP stays as content.
+    #[test]
+    fn ascii_space_trims_beside_a_kept_nbsp() {
         assert_eq!(value_span(" \u{a0}red", 0, 6), Span { start: 1, end: 6 });
-        assert_eq!(value_span("é", 0, 2), Span { start: 0, end: 2 });
+    }
+
+    /// The trailing whitespace a `\` escape owns is content: trimming it strands
+    /// the backslash onto whatever follows (`50px\ ;` → `50px\;`, the `;` now
+    /// escaped) and the declaration no longer parses. Padding past the escaped
+    /// character is ordinary whitespace and still goes.
+    #[test]
+    fn an_escapes_payload_stays_in_the_span() {
+        assert_eq!(value_span(r"50px\ ", 0, 6), Span { start: 0, end: 6 });
+        assert_eq!(value_span(r"50px\   ", 0, 8), Span { start: 0, end: 6 });
+        // An even backslash run is a completed `\\` — the space is just padding.
+        assert_eq!(value_span(r"50px\\ ", 0, 7), Span { start: 0, end: 6 });
     }
 }

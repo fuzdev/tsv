@@ -280,7 +280,13 @@ pub(super) fn parse_raw_prelude_content<'arena>(
         }
     }
 
-    let content = parser.alloc_str_in(prelude.trim());
+    // Escape-aware: `@layer a\ ;` ends in an escape whose payload IS that space (§4.3.4 /
+    // §4.3.7). Trimming it strands the backslash onto the `;` (or the block's `{`), which
+    // it then escapes — output that no longer parses. The CSS-only trim also leaves an
+    // NBSP alone: it is prelude content, not padding.
+    let content = parser.alloc_str_in(crate::escapes::trim_end_preserving_escape(
+        crate::escapes::trim_start_css(&prelude),
+    ));
     let prelude_end = parser.span_pos(parser.current_start);
     let span = Span {
         start: prelude_start,

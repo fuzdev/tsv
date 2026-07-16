@@ -200,9 +200,12 @@ pub(super) fn reconsume_prelude_as_raw<'arena>(
 
     // Verbatim prelude text runs from its first token to the boundary token; outer
     // whitespace is trimmed so the public AST (from `span`) and printer `content` agree.
+    // Escape-aware, and CSS-whitespace-only: a prelude can end in an escape whose payload
+    // is that whitespace (`@layer a\ ;`), and an NBSP is prelude content, not padding.
     let raw = &parser.source()[prelude_start_raw..parser.current_start];
-    let content = raw.trim();
-    let content_start_raw = prelude_start_raw + (raw.len() - raw.trim_start().len());
+    let lead = crate::escapes::trim_start_css(raw);
+    let content = crate::escapes::trim_end_preserving_escape(lead);
+    let content_start_raw = prelude_start_raw + (raw.len() - lead.len());
     let content_end_raw = content_start_raw + content.len();
 
     Ok(PreludeValue::Raw {

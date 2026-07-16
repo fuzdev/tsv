@@ -460,8 +460,8 @@ impl<'a> Printer<'a> {
     /// (type / class / id / pseudo-without-args) extracted verbatim from source so
     /// escapes are preserved.
     ///
-    /// A CSS hex escape consumes one following whitespace as its terminator, which
-    /// the lexer captures into the selector's span (`.\1F600 ` before `{`). When
+    /// A CSS **hex** escape consumes one following whitespace as its *terminator*,
+    /// which the lexer captures into the selector's span (`.\1F600 ` before `{`). When
     /// this is the last simple selector in its compound, whatever follows is a
     /// structural separator (a combinator's space, `,`, `)`, or the block `{`) that
     /// terminates the escape on its own, so the captured terminator is dropped to
@@ -469,10 +469,19 @@ impl<'a> Printer<'a> {
     /// compound, or the first of `:\41 :\42`) is kept — it separates the escape from
     /// the next simple selector. This single leaf rule replaces the old
     /// buffer-popping `pop_selector_terminator`.
+    ///
+    /// A **literal** escape's whitespace is the opposite case and must NOT be trimmed:
+    /// in `.a\ ` the space is the escape's *payload* (the class is named `a `), not a
+    /// terminator, so dropping it strands the backslash — which then escapes the
+    /// separator that follows, silently **merging a descendant combinator into the
+    /// compound** (`.a\␣␣.b` would print as `.a\␣.b`, which re-parses as one compound,
+    /// losing the `Combinator`). `trim_end_preserving_escape` draws exactly that line:
+    /// a whitespace preceded by an odd-length backslash run is a payload and stays;
+    /// anything else (a hex terminator, ordinary padding) still goes.
     fn span_leaf_doc(&self, span: Span, is_last_in_compound: bool) -> DocId {
         let raw = span.extract(self.source);
         let text = if is_last_in_compound {
-            raw.trim_end()
+            crate::escapes::trim_end_preserving_escape(raw)
         } else {
             raw
         };
@@ -638,13 +647,19 @@ impl<'a> Printer<'a> {
                 // selector-argument position gets, and what prettier does inside a
                 // selector.
                 //
+                // The OUTER trim is escape-aware for the same reason the collapse inside
+                // is: `:is(.a > . > .b\ )` ends in an escape whose payload is that space,
+                // and trimming it strands the backslash onto the `)` that closes the
+                // pseudo — output tsv's own parser then rejects.
+                //
                 // The parser registers whatever comments it read before the parse error,
                 // and they ride out inside this slice — see `tsv_lang::comment_ledger`.
                 #[cfg(feature = "comment_check")]
                 tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
-                d.text_pooled(&value_normalization::collapse_whitespace_runs(
-                    span.extract(self.source).trim(),
-                ))
+                let raw = span.extract(self.source);
+                let item =
+                    crate::escapes::trim_end_preserving_escape(crate::escapes::trim_start_css(raw));
+                d.text_pooled(&value_normalization::collapse_whitespace_runs(item))
             }
         }
     }
@@ -666,8 +681,12 @@ impl<'a> Printer<'a> {
                 d.concat(&[d.text_pooled(&name), self.build_pseudo_args_doc(args)])
             }
             None => {
-                // No args: the whole span is the name; drop its escape terminator
-                // when it ends the compound.
+                // No args: the whole span is the name. Drop a hex escape's whitespace
+                // TERMINATOR when it ends the compound (the separator that follows
+                // re-terminates it), but never a literal escape's PAYLOAD — the exact
+                // rule `span_leaf_doc` applies to type/class/id leaves, on the pseudo
+                // path. `:hover\ ` is a pseudo named `hover `; stranding its backslash
+                // would escape the `,` or `{` that follows and destroy the selector list.
                 //
                 // The span also covers an *unreadable* argument list (`:state(/* c */ "x")`,
                 // whose args the parser skipped to `)` after registering the gap comment) —
@@ -677,7 +696,7 @@ impl<'a> Printer<'a> {
                 tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
                 let name = self.pseudo_name_text(span, false);
                 let text = if is_last_in_compound {
-                    name.trim_end()
+                    crate::escapes::trim_end_preserving_escape(&name)
                 } else {
                     &name
                 };

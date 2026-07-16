@@ -243,7 +243,7 @@ impl<'a> Printer<'a> {
         }
 
         if let Some(block) = &atrule.block {
-            self.write(" {\n");
+            self.write_block_open();
             // Format the block's children via the shared block-body routine (also
             // used by rule bodies). At-rule blocks have no pre-`{` comments — the
             // prelude owns that region — so `start_index` is 0. A nested rule flows

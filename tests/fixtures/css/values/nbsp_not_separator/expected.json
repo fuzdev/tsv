@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 209,
+		"end": 570,
 		"attributes": [],
 		"children": [
 			{
@@ -38,7 +38,7 @@
 				"block": {
 					"type": "Block",
 					"start": 11,
-					"end": 200,
+					"end": 370,
 					"children": [
 						{
 							"type": "Declaration",
@@ -53,23 +53,105 @@
 							"end": 196,
 							"property": "transition",
 							"value": "u v 1s"
+						},
+						{
+							"type": "Declaration",
+							"start": 329,
+							"end": 338,
+							"property": "width",
+							"value": "u"
+						},
+						{
+							"type": "Declaration",
+							"start": 342,
+							"end": 366,
+							"property": "transform",
+							"value": "translate(u )"
 						}
 					]
 				},
 				"start": 9,
-				"end": 200
+				"end": 370
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 534,
+					"end": 542,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 534,
+							"end": 537,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "u ",
+											"start": 534,
+											"end": 537
+										}
+									],
+									"start": 534,
+									"end": 537
+								}
+							]
+						},
+						{
+							"type": "ComplexSelector",
+							"start": 540,
+							"end": 542,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "v",
+											"start": 540,
+											"end": 542
+										}
+									],
+									"start": 540,
+									"end": 542
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 543,
+					"end": 561,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 547,
+							"end": 557,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 534,
+				"end": 561
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 201,
-			"styles": "\n\ta {\n\t\t/* U+00A0 (no-break space) is not CSS whitespace: it stays inside the value\n\t\t   token, while a real ASCII space still splits the list */\n\t\tanimation-name: u v;\n\t\ttransition: u v 1s;\n\t}\n",
+			"end": 562,
+			"styles": "\n\ta {\n\t\t/* U+00A0 (no-break space) is not CSS whitespace: it stays inside the value\n\t\t   token, while a real ASCII space still splits the list */\n\t\tanimation-name: u v;\n\t\ttransition: u v 1s;\n\t\t/* …and at the END of a value or a function argument, where a Unicode trim\n\t\t   would silently eat it and rewrite the token */\n\t\twidth: u ;\n\t\ttransform: translate(u );\n\t}\n\n\t/* the same in a selector: a trailing NBSP is part of the class name, so eating it\n\t   would silently rename the class (and here, glue it to the list comma) */\n\t.u ,\n\t.v {\n\t\tcolor: red;\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 210,
+	"end": 571,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

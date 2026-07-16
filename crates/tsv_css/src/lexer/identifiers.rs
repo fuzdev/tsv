@@ -219,7 +219,22 @@ pub(crate) fn decode_unicode_escape(
         return Err(lex_err("Invalid unicode escape sequence", start));
     }
 
-    // Skip optional whitespace after unicode escape
+    // Skip the hex escape's optional whitespace terminator.
+    //
+    // **Unicode-wide, deliberately** — and NOT `whitespace::is_css_whitespace`. The oracle
+    // for the LEXER is Svelte's `parseCss`, whose `read_identifier` matches the terminator
+    // with `/\\[0-9a-fA-F]{1,6}(\r\n|\s)?/` (`1-parse/read/style.js`), and JS `\s` is the
+    // Unicode `White_Space` set — so a VT (U+000B) or NBSP after a hex escape terminates it
+    // there. `char::is_whitespace` is exactly that set; ASCII-only would leave the VT and
+    // NBSP inside the identifier, moving the **token boundary** and re-parsing
+    // `.a\41<VT>b` as `aA` + descendant + `b` (and over-rejecting `[a=b\41<VT>c]`).
+    //
+    // This is a different rule from `escapes::escape_len`, and deliberately so: that one is
+    // a *printer-side value scanner* whose job is "how far does this escape reach when I
+    // rewrite a value", answering to css-syntax-3; this one is *tokenization*, answering to
+    // `parseCss`, and its boundaries become wire spans the AST oracle compares. The rest of
+    // this lexer is Unicode-wide for the same reason (`skip_whitespace`, `consume_url_token`),
+    // as is the wire writer's `raw_selector_name`.
     if let Some(ch) = source[*pos..].chars().next()
         && ch.is_whitespace()
     {

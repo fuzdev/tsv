@@ -553,8 +553,17 @@ fn url_token_end(source: &str, bytes: &[u8], value_start: usize, open: usize) ->
     if matches!(source[i..].chars().next(), Some('"' | '\'')) {
         return None;
     }
-    // Opaque to the matching unescaped `)`, or end-of-source (an unterminated url-token is
-    // taken as-is — the lexer does not model bad-url recovery either).
+    // Opaque to the matching unescaped `)`.
+    //
+    // An **unterminated** url-token declines to the reference walk. The lexer takes it
+    // as-is (it models no bad-url recovery), so the token runs to end-of-source and can
+    // therefore *end in whitespace* — and `value_end`'s trailing-whitespace trim assumes
+    // the value's last token does not, which is why the trim is exact everywhere else.
+    // Reachable only on malformed CSS (`url(x\)` — the `\)` escapes the closing paren, so
+    // nothing ever closes the url), where the parse fails regardless; declining costs
+    // nothing and keeps the byte scan and the walk agreeing fact-for-fact. The other way a
+    // last token can end in whitespace — an escape's payload or a hex escape's terminator —
+    // is already declined by the main loop's `\` arm, which this helper is what hides.
     let len = bytes.len();
     let mut j = open + 1;
     loop {
@@ -562,7 +571,7 @@ fn url_token_end(source: &str, bytes: &[u8], value_start: usize, open: usize) ->
             j += 1;
         }
         if j >= len {
-            break;
+            return None; // unterminated
         }
         if bytes[j] == b')' {
             j += 1;

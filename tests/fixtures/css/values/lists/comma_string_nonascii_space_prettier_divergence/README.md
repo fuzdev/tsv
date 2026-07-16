@@ -6,9 +6,10 @@ glued to a non-ASCII whitespace** — a non-breaking space (U+00A0) or an em spa
 `grid-template-columns: 'a'<NBSP>, 'b'` (trailing).
 
 CSS whitespace is ASCII-only (CSS Syntax 3 §"whitespace" is `\t \n \f \r` and
-space), so a non-ASCII space is **not** a separator — it is a name code point, i.e.
-value content. tsv keeps the element as **one opaque token, inline**, preserving the
-character:
+space), so a non-ASCII space is **not** a separator — it is value content (tsv treats
+it as an identifier code point, ≥ U+00A0, following Svelte's `parseCss` — broader than
+the CSS Syntax ident set, which excludes these look-alike whitespace chars). tsv keeps
+the element as **one opaque token, inline**, preserving the character:
 
 ```
 grid-template-areas: 'x', <NBSP>'y';
@@ -37,9 +38,9 @@ a **string** element that was outright deletion: the trim left the string's span
 covering the space while narrowing its text, so the string printer extracted a span
 that no longer began with a quote and emitted nothing — the whole element vanished
 (`'x',;`, then `'x';` on a second pass — non-idempotent). An ident element lost just
-the space. The fix trims only ASCII whitespace (`is_ascii_trim_ws`, matching CSS's
-own definition) everywhere a value boundary is trimmed, so the non-ASCII space
-survives as content.
+the space. The fix trims only CSS whitespace (`trim_start_css` /
+`trim_end_preserving_escape`, matching CSS Syntax 3 §4.2's ASCII-only definition)
+everywhere a value boundary is trimmed, so the non-ASCII space survives as content.
 
 `input.svelte` is tsv's inline form; `output_prettier.svelte` is prettier's split
 form.

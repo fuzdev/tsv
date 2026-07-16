@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 1232,
+		"end": 1859,
 		"attributes": [],
 		"children": [
 			{
@@ -875,18 +875,130 @@
 				},
 				"start": 1162,
 				"end": 1223
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 1538,
+					"end": 1557,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 1538,
+							"end": 1557,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "is",
+											"args": {
+												"type": "SelectorList",
+												"start": 1542,
+												"end": 1556,
+												"children": []
+											},
+											"start": 1538,
+											"end": 1557
+										}
+									],
+									"start": 1538,
+									"end": 1557
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 1558,
+					"end": 1577,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 1562,
+							"end": 1573,
+							"property": "color",
+							"value": "teal"
+						}
+					]
+				},
+				"start": 1538,
+				"end": 1577
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 1809,
+					"end": 1829,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 1809,
+							"end": 1829,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "x",
+											"start": 1809,
+											"end": 1811
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "is",
+											"args": {
+												"type": "SelectorList",
+												"start": 1815,
+												"end": 1828,
+												"children": []
+											},
+											"start": 1811,
+											"end": 1829
+										}
+									],
+									"start": 1809,
+									"end": 1829
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 1830,
+					"end": 1850,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 1834,
+							"end": 1846,
+							"property": "color",
+							"value": "olive"
+						}
+					]
+				},
+				"start": 1809,
+				"end": 1850
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 1224,
-			"styles": "\n\t/* :is() with syntax error - invalid selector skipped */\n\tdiv:is(.a, ., .b) {\n\t\tcolor: red;\n\t}\n\n\t/* :where() with syntax error - invalid selector skipped */\n\tspan:where(.class1, [, .class2) {\n\t\tcolor: blue;\n\t}\n\n\t/* :is() with pseudo-element - kept in AST (valid syntax) */\n\tp:is(.class3, ::before, .class4) {\n\t\tmargin: 10px;\n\t}\n\n\t/* :where() with pseudo-elements only - all kept (valid syntax) */\n\th1:where(::before, ::after) {\n\t\tpadding: 5px;\n\t}\n\n\t/* :is() with mixed valid/invalid/pseudo-element - syntax errors skipped, rest kept */\n\tarticle:is(.a, ., ::marker, .b:hover, [attr, .c) {\n\t\tbackground: gray;\n\t}\n\n\t/* :where() with unknown pseudo-class - kept (syntactically valid) */\n\tsection:where(.class5, .class6:unknown-pseudo, .class7) {\n\t\tborder: 1px solid black;\n\t}\n\n\t/* :is() with An+B in an invalid context - `of` is valid only in :nth-*(), so the\n\t   whole arg is a contextually-invalid selector and the forgiving list is empty */\n\tul:is(2n of) {\n\t\tlist-style: none;\n\t}\n\n\t/* :where() with a contextually-invalid An+B among valid classes - only the An+B is\n\t   skipped; the valid siblings are kept (the text is preserved verbatim on format) */\n\tol:where(.class8, 2n of, .class9) {\n\t\tlist-style: decimal;\n\t}\n",
+			"end": 1851,
+			"styles": "\n\t/* :is() with syntax error - invalid selector skipped */\n\tdiv:is(.a, ., .b) {\n\t\tcolor: red;\n\t}\n\n\t/* :where() with syntax error - invalid selector skipped */\n\tspan:where(.class1, [, .class2) {\n\t\tcolor: blue;\n\t}\n\n\t/* :is() with pseudo-element - kept in AST (valid syntax) */\n\tp:is(.class3, ::before, .class4) {\n\t\tmargin: 10px;\n\t}\n\n\t/* :where() with pseudo-elements only - all kept (valid syntax) */\n\th1:where(::before, ::after) {\n\t\tpadding: 5px;\n\t}\n\n\t/* :is() with mixed valid/invalid/pseudo-element - syntax errors skipped, rest kept */\n\tarticle:is(.a, ., ::marker, .b:hover, [attr, .c) {\n\t\tbackground: gray;\n\t}\n\n\t/* :where() with unknown pseudo-class - kept (syntactically valid) */\n\tsection:where(.class5, .class6:unknown-pseudo, .class7) {\n\t\tborder: 1px solid black;\n\t}\n\n\t/* :is() with An+B in an invalid context - `of` is valid only in :nth-*(), so the\n\t   whole arg is a contextually-invalid selector and the forgiving list is empty */\n\tul:is(2n of) {\n\t\tlist-style: none;\n\t}\n\n\t/* :where() with a contextually-invalid An+B among valid classes - only the An+B is\n\t   skipped; the valid siblings are kept (the text is preserved verbatim on format) */\n\tol:where(.class8, 2n of, .class9) {\n\t\tlist-style: decimal;\n\t}\n\t/* a dropped forgiving item is kept verbatim except for a whitespace COLLAPSE, which\n\t   must not reach inside an escape: `\\<TAB>` is a valid escape whose escaped code\n\t   point IS that tab (css-syntax-3 §4.3.4/§4.3.7), so the class is named `b<TAB>c`.\n\t   Collapsing it to a space silently renames the class */\n\t:is(.a > . > .b\\\tc) {\n\t\tcolor: teal;\n\t}\n\t/* the item's OUTER trim is escape-aware too: `.b\\ ` ends in an escape whose payload\n\t   is that space, and trimming it strands the backslash onto the `)` that closes the\n\t   pseudo — output tsv's own parser would then reject */\n\t.x:is(.a > . > .b\\ ) {\n\t\tcolor: olive;\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 1233,
+	"end": 1860,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

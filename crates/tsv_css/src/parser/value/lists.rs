@@ -76,12 +76,14 @@ pub fn classify_separators(s: &str) -> ValueSeparator {
             continue;
         }
 
-        // An escaped paren (`\(` / `\)`) is a content code point (css-syntax §4.3.7), not a
-        // nesting delimiter, so it must not change `in_parens` — otherwise an escaped `)`
-        // inside `url()` mis-drops the depth and exposes a false top-level separator. Skip
-        // both bytes. Kept identical in the twin `fast_scan` / `ValueCursor` trackers.
-        if b == b'\\' && matches!(bytes.get(i + 1), Some(b'(' | b')')) {
-            i += 2;
+        // An escape is OPAQUE: step over it whole (`crate::escapes::escape_len`), so nothing
+        // inside it — an escaped paren, comma, or space, or a hex escape's whitespace
+        // terminator — reads as nesting or as a separator. Kept identical in the twin
+        // `fast_scan` / `ValueCursor` trackers (see `fast_scan` for the full rationale).
+        if b == b'\\'
+            && let Some(len) = crate::escapes::escape_len(s, i)
+        {
+            i += len;
             continue;
         }
 
