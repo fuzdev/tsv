@@ -6,7 +6,7 @@
 
 **Corpus kind:** conformance — fixtures-only corpus (disjoint from perf; Svelte set minus svelte/compiler-rejected files), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)
 
-**Date:** 2026-07-16T00:24:26.030Z — tsv 0.1.0 (eca5466f)
+**Date:** 2026-07-16T11:52:16.141Z — tsv 0.1.0 (135b7b93)
 
 **Corpus:** 4539 Svelte (1.1 MB), 44224 TypeScript (63.3 MB), 22641 CSS (7.7 MB) — 71404 files, 72.0 MB total
 
@@ -34,7 +34,7 @@
 | --- | ---: | ---: | ---: | ---: |
 | tsv_format_wasm | 2.3 MB | 794.6 KB | 0.9x | 0.9x |
 | tsv_parse_wasm | 1.1 MB | 389.6 KB | 0.4x | 0.4x |
-| tsv_wasm | 2.5 MB | 875.3 KB | — | — |
+| tsv_wasm | 2.5 MB | 875.4 KB | — | — |
 | biome (wasm) | 38.6 MB | 9.3 MB | 15.5x | 10.6x |
 | oxc-parser (wasm) | 1.5 MB | 495.2 KB | 0.6x | 0.6x |
 | tsv (ffi) | 3.4 MB | 1.5 MB | 1.0x | 1.0x |

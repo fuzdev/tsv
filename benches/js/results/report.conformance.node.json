@@ -2,8 +2,8 @@
 	"version": 7,
 	"runtime": "node",
 	"corpus_kind": "conformance",
-	"timestamp": "2026-07-16T00:24:26.030Z",
-	"git_commit": "eca5466f",
+	"timestamp": "2026-07-16T11:52:16.141Z",
+	"git_commit": "135b7b93",
 	"machine": {
 		"cpu_model": "AMD Ryzen 5 PRO 7530U with Radeon Graphics",
 		"os": "linux",
@@ -175,9 +175,9 @@
 		},
 		{
 			"label": "tsv_format_wasm",
-			"bytes": 2261296,
+			"bytes": 2261397,
 			"kind": "wasm",
-			"gzip_bytes": 794602
+			"gzip_bytes": 794650
 		},
 		{
 			"label": "tsv_parse_wasm",
@@ -187,9 +187,9 @@
 		},
 		{
 			"label": "tsv_wasm",
-			"bytes": 2491362,
+			"bytes": 2491464,
 			"kind": "wasm",
-			"gzip_bytes": 875347
+			"gzip_bytes": 875399
 		},
 		{
 			"label": "biome (wasm)",
