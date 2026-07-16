@@ -29,4 +29,21 @@
 		a,
 		b
 	);
+
+	// Line comment, own-line block, then a multiline block glued to the first arg —
+	// all on consecutive lines (no blank before the glued block).
+	fn(
+		// comment 1
+		/* comment 2 */
+		/* comment 3
+		 */ a
+	);
+
+	// A glued block run before the first arg stays glued (not split), even with a
+	// multiline block glued to the arg.
+	fn(
+		// comment 1
+		/* comment 2 */ /* comment 3
+		 */ a
+	);
 </script>
