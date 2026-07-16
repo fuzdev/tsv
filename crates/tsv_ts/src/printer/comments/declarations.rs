@@ -1152,9 +1152,11 @@ impl<'a> Printer<'a> {
             } else {
                 on_own_line = true;
                 value_block.push(self.build_comment_doc(comment));
-                // Preserve an author blank line before the next comment / the value.
-                let next = comments.get(i + 1).map_or(value_start, |c| c.span.start);
-                self.push_blank_preserving_hardline(&mut value_block, comment.span.end, next);
+                self.push_leading_run_separator(
+                    &mut value_block,
+                    comment,
+                    comments.get(i + 1).map_or(value_start, |c| c.span.start),
+                );
             }
         }
         value_block.push(value_doc);
