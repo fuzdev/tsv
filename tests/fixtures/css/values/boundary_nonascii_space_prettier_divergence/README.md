@@ -7,9 +7,10 @@ single-value sibling of the comma/space-list case
 ([comma_string_nonascii_space](../lists/comma_string_nonascii_space_prettier_divergence/)).
 
 CSS whitespace is ASCII-only (CSS Syntax 3 §"whitespace" is `\t \n \f \r` and space),
-and every non-ASCII code point at U+00A0 and above is a **name** code point, i.e. value
-content — never a separator. tsv keeps the value as **one opaque token, inline**,
-preserving the character:
+so a non-ASCII space is never a separator — it is value content (tsv treats every code
+point ≥ U+00A0 as an identifier code point, following Svelte's `parseCss`, broader than
+the CSS Syntax ident set, which excludes these look-alike whitespace chars). tsv keeps
+the value as **one opaque token, inline**, preserving the character:
 
 ```
 content: <NBSP>'z';
@@ -34,9 +35,10 @@ This pins a former **content loss** — a boundary non-ASCII space was silently 
 (`content: <NBSP>'z'` → `content: 'z'`). Two sites dropped it, both now fixed:
 
 - **The value-boundary trim** (`value/mod.rs::locate_value`) used the Unicode-aware
-  `str::trim*`, which strips a boundary non-ASCII space. It now trims ASCII-only
-  (`whitespace::is_ascii_trim_ws`), matching CSS's own whitespace definition — so a
-  **trailing** space survives (it is inside the declaration value's extent).
+  `str::trim*`, which strips a boundary non-ASCII space. It now trims CSS whitespace only
+  (the escape-aware `escapes::trim_start_css` / `trim_end_preserving_escape`), matching CSS
+  Syntax 3 §4.2's ASCII-only whitespace definition — so a **trailing** space survives (it is
+  inside the declaration value's extent).
 - **The lexer's whitespace scan** treated every `char::is_whitespace()` code point as CSS
   whitespace, so a **leading** space after the `:` was skipped as part of the
   colon→value gap before the value even began. It now excludes the non-ASCII identifier
