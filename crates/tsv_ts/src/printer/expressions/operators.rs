@@ -821,6 +821,10 @@ impl<'a> Printer<'a> {
     ///
     /// Handles multiple consecutive comments by preserving their line structure:
     /// - `a && // comment1\n// comment2\nb` keeps each comment on its own line
+    // the operand plus the four layout flags are all load-bearing here
+    // TODO: fold op_end/operand/allow_breaks/lead_with_space/chain_has_comments into a
+    // small `PostOperatorCtx` struct to retire the allow (byte-identical output)
+    #[allow(clippy::too_many_arguments)]
     fn append_post_operator_parts(
         &self,
         parts: &mut DocBuf,
