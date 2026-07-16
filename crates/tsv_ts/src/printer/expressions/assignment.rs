@@ -979,16 +979,29 @@ impl<'a> Printer<'a> {
         // our static AST analysis missed a break-emitting node — the chain actually
         // has internal break points and may need a different layout.
         //
-        // A comment the RHS *owns* is exempt: it prints inside the RHS's doc, so the doc
-        // force-breaks for a reason that is not a chain break point at all. "Poorly
-        // breakable" is a claim about the *chain*, and the layout already hangs the value
-        // for such a comment (`owned_leading_comment_hangs_value`). Without the exemption an
-        // owned multi-line annotation on a trivial call (`a = /**⏎ * @__PURE__⏎ */ fn();`)
-        // trips the assert on every debug build.
+        // Two exemptions, both cases where the doc force-breaks for a reason that is NOT a
+        // chain break point the static analysis missed:
+        //
+        // - A comment the RHS *owns* prints inside the RHS's doc (a JSDoc cast, a bundler
+        //   annotation), so an owned multi-line annotation on a trivial call
+        //   (`a = /**⏎ * @__PURE__⏎ */ fn();`) force-breaks the doc without being a chain
+        //   break. The layout already hangs the value for it (`owned_leading_comment_hangs_value`).
+        // - An *interior line comment* in the chain (`a = foo // c⏎.bar!`) forces the break
+        //   at the comment — a `//` must end its line — and the layout override above already
+        //   handled it (`has_line_comments_in_*_chain` → NeverBreakAfterOperator, keeping the
+        //   chain on the operator line rather than double-breaking after the operator). The
+        //   break is the comment's, not a mis-classified chain break point, so "poorly
+        //   breakable" is still a sound claim about the chain itself. (The VariableDeclarator
+        //   path prints through its own layout and never reaches this assert; the assignment-
+        //   expression / object-property / pattern / class-field callers do.) The exemption is
+        //   `has_line_comments_in_chain` directly — the member/call-chain layout predicates both
+        //   reduce to it (the member one only adds an `is_member_only_chain` guard), so naming
+        //   the underlying check is exact and avoids a redundant disjunct.
         debug_assert!(
             {
                 let core_expr = unwrap_expression(right_expr);
                 self.owned_leading_comment_hangs_value(right_expr)
+                    || self.has_line_comments_in_chain(right_expr)
                     || !is_poorly_breakable_chain(
                         core_expr,
                         self.source,
