@@ -267,9 +267,12 @@ See ./crates/tsv_wasm/CLAUDE.md §TS type maintenance for the per-field checklis
 
 Compare formatting against Prettier, and parse output against the canonical
 parsers, on real codebases. The gates, corpus tools, and harvests enforce
-**pinned expected counts** on full runs (exact for pinned-checkout suites,
-minimums for the live corpus + committed fixtures; the Rust-side
-test262/fixtures/swallow gates carry their own) — see
+**pinned expected counts** on full runs. The format `corpus:compare:format --all`
+counts are enforced over the **reproducible subset** (the version-pinned
+framework + prettier checkouts), so they hold on any `pins:audit`-aligned machine;
+the live dev repos are a non-gating WARN (SAFETY still gates every file). Parse
+`compared` counts + committed fixtures stay live-growth minimums; the Rust-side
+test262/fixtures/swallow gates carry their own — see
 `benches/js/lib/gate_counts.ts` and ./benches/js/CLAUDE.md §Pinned gate counts:
 
 ```bash
