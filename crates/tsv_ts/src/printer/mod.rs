@@ -60,7 +60,7 @@ pub(crate) use expressions::assignment::{
     is_type_assertion_call, jsdoc_cast_comment_is_own_line,
 };
 pub(crate) use needs_parens::{ParenContext, is_in_binary, needs_parens};
-pub(crate) use types::{should_hug_union_type, unwrap_parenthesized};
+pub(crate) use types::unwrap_parenthesized;
 
 use crate::PrinterInputs;
 use crate::ast::internal;
@@ -369,7 +369,7 @@ impl<'a> Printer<'a> {
             inner: &*interner,
             source: self.source,
         };
-        doc::arena_print_doc_flat_resolved(self.arena, d, &self.embed, &resolver)
+        doc::arena_measure_doc_flat_resolved(self.arena, d, &self.embed, &resolver)
     }
 
     /// Get the formatted output
@@ -740,9 +740,31 @@ impl<'a> Printer<'a> {
     /// guard; use that variant only at the two carve-out sites where prettier
     /// *keeps* that break (binary/logical operands, `export default`).
     pub(crate) fn comments_force_own_line_between(&self, start: u32, end: u32) -> bool {
-        self.any_comment_on_page_with_next(start, end, |c, next| {
-            !c.is_block || (c.multiline && self.has_newline_between(c.span.end, next))
-        })
+        self.any_comment_on_page_with_next(start, end, |c, next| self.comment_hangs_next(c, next))
+    }
+
+    /// Whether this one comment hangs what follows it onto its own line, where `next` is
+    /// the start of the following comment, or the gap's end for the last.
+    ///
+    /// The single statement of the rule: a **line** comment (runs to end-of-line, so
+    /// inlining would swallow what follows) or a **multiline** block the author wrote on
+    /// its own line (a newline after it — inlining would reflow the author's break).
+    /// Everything else collapses inline. The hang counterpart of
+    /// [`Self::comment_hugs_next`], and keyed like it on what follows the comment.
+    ///
+    /// One question, one predicate: both the gate
+    /// ([`Self::comments_force_own_line_between`]) and the emitter that gate selects
+    /// ([`Self::build_trailing_comments_hang_next`]) ask it, so they cannot answer
+    /// differently. ⚠️ Do not re-derive it at a call site. Keying an emitter on
+    /// `is_block` alone reads as plausible code but silently collapses the own-line
+    /// multiline case the gate had just flagged as hanging — and then a layout keyed on
+    /// the authored newline is decided by a newline that very collapse destroys, so the
+    /// format stops being idempotent on its own output.
+    ///
+    /// Contrast [`Self::comment_forces_own_line`], the operator-glue rule, which keys on
+    /// the newline *before* a comment and hangs an own-line **single-line** block too.
+    pub(crate) fn comment_hangs_next(&self, c: &internal::Comment, next: u32) -> bool {
+        !c.is_block || (c.multiline && self.has_newline_between(c.span.end, next))
     }
 
     /// Whether a comment in `(start, end)` forces the *following* value onto its own

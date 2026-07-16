@@ -16,9 +16,7 @@ mod type_declarations;
 mod variable;
 
 // Re-export for submodules to use `super::Printer` instead of `super::super::Printer`
-pub(super) use super::{
-    Printer, build_entity_name_doc, is_effectively_empty_body, should_hug_union_type,
-};
+pub(super) use super::{Printer, build_entity_name_doc, is_effectively_empty_body};
 
 use super::ParenContext;
 use super::class_expr_has_decorators;
@@ -294,9 +292,7 @@ impl<'a> Printer<'a> {
         // `split_separator_gap_comments`.
         let expr_end = stmt.expression.span().end;
         let semicolon_pos = stmt.span.end.saturating_sub(1);
-        let after = self.split_separator_gap_comments(&mut parts, expr_end, semicolon_pos, true);
-        parts.push(d.text(";"));
-        parts.extend(after);
+        self.push_semicolon_with_gap_comments(&mut parts, expr_end, semicolon_pos, true);
         d.concat(&parts)
     }
 
@@ -359,9 +355,7 @@ impl<'a> Printer<'a> {
         let keyword_end = span.start + keyword.len() as u32;
         let semicolon_pos = span.end.saturating_sub(1);
         let mut parts: DocBuf = smallvec![d.text(keyword)];
-        let after = self.split_separator_gap_comments(&mut parts, keyword_end, semicolon_pos, true);
-        parts.push(d.text(";"));
-        parts.extend(after);
+        self.push_semicolon_with_gap_comments(&mut parts, keyword_end, semicolon_pos, true);
         d.concat(&parts)
     }
 

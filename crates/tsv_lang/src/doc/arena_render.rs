@@ -9,6 +9,8 @@ use super::arena::{ArenaCommand, CmdStack, DocArena, DocId, DocNode, LineSuffixB
 use super::arena_fits::arena_fits_with_lookahead;
 use super::arena_render_fill::render_fill_iterative;
 use super::render_config::RenderConfig;
+#[cfg(feature = "comment_check")]
+use super::render_config::RenderPurpose;
 #[cfg(feature = "swallow_check")]
 use super::swallow::SwallowTracker;
 use super::types::{CachedWidth, DocContext, GroupId, LineKind, Mode, TextResolver, resolve_text};
@@ -278,12 +280,15 @@ pub fn arena_print_doc(arena: &DocArena, doc: DocId, embed: &EmbedContext) -> St
     arena_print_doc_at_column(arena, doc, embed, 0)
 }
 
-/// Render with effectively infinite print width — every group flattens.
+/// **Measure** a doc's flat-layout width: render at effectively infinite print width, so
+/// every group flattens. The renderer still uses [`crate::TAB_WIDTH`] / [`crate::INDENT`].
 ///
-/// Used by callers that need to measure a doc's flat-layout width
-/// (e.g., template literal type sizing). The renderer still uses
-/// [`crate::TAB_WIDTH`] / [`crate::INDENT`].
-pub fn arena_print_doc_flat_resolved<R: TextResolver + ?Sized>(
+/// ⚠️ The result is for measuring, **never** for output — it renders with
+/// [`RenderPurpose::Measure`], so a comment reached in `doc` is deliberately *not* recorded
+/// as emitted. Writing this string into the document would make every comment it covers read
+/// as DROPPED to the ledger (and, if the real render also runs, DOUBLE-PRINTED). Use a
+/// `arena_print_doc_*` entry to produce output.
+pub fn arena_measure_doc_flat_resolved<R: TextResolver + ?Sized>(
     arena: &DocArena,
     doc: DocId,
     embed: &EmbedContext,
@@ -291,6 +296,10 @@ pub fn arena_print_doc_flat_resolved<R: TextResolver + ?Sized>(
 ) -> String {
     let render = RenderConfig {
         print_width: usize::MAX / 2,
+        // Measured and discarded, never written to the document — so reaching a comment's
+        // node here is not that comment being emitted. See `RenderPurpose`.
+        #[cfg(feature = "comment_check")]
+        purpose: RenderPurpose::Measure,
         ..RenderConfig::default()
     };
     let mut output = String::with_capacity(arena.estimated_output_capacity());
@@ -757,7 +766,9 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
     // here is the emit itself. Gated on the arena actually carrying tags, so a
     // comment-free document pays nothing. See `crate::comment_ledger`.
     #[cfg(feature = "comment_check")]
-    let ledger_on = comment_ledger::comment_check_enabled() && arena.has_comment_docs();
+    let ledger_on = comment_ledger::comment_check_enabled()
+        && arena.has_comment_docs()
+        && render.purpose.records_comment_emits();
 
     loop {
         #[cfg(feature = "comment_check")]
@@ -1373,6 +1384,7 @@ mod column_arithmetic_tests {
         RenderConfig {
             print_width: 100,
             indent,
+            ..RenderConfig::default()
         }
     }
 

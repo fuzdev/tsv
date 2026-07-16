@@ -392,34 +392,56 @@ impl<'a> Printer<'a> {
         self.build_comments_between(start, end, CommentSpacing::Leading)
     }
 
-    /// Build a Doc for trailing comments where a line comment must force the
-    /// following content onto a new line.
+    /// Build a Doc for trailing comments where a comment that forces the following
+    /// content onto its own line gets a hardline after it, and every other comment
+    /// collapses inline (a space, as `build_comments_between(_, _, Trailing)` does).
     ///
-    /// Like `build_comments_between(_, _, Trailing)` for block comments, but
-    /// for line comments emits a hardline after the comment instead of a space.
-    /// Use when the comment precedes content that must not be swallowed by the
-    /// line comment (e.g., `=> // leading\nT`, `: // leading\nT`).
-    pub(crate) fn build_trailing_comments_break_for_line(&self, start: u32, end: u32) -> DocId {
+    /// The separator is [`Printer::comment_hangs_next`] — the same per-comment
+    /// rule as the gate that selects this builder
+    /// ([`Printer::comments_force_own_line_between`]), so a gate and its emitter can't
+    /// answer differently. Two shapes hang: a **line** comment (a `//` would swallow
+    /// the following content) and an **own-line multiline** block (inlining it would
+    /// reflow the author's break). A single-line block in any position, and a glued
+    /// multiline block, collapse.
+    ///
+    /// Use across a gap whose following token must not be swallowed or reflowed — the
+    /// type-construct delimiter/keyword gaps (`=> // leading\nT`, `: // leading\nT`,
+    /// an indexed access's `[`→index, a template-literal type's `${`→type).
+    pub(crate) fn build_trailing_comments_hang_next(&self, start: u32, end: u32) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
-        for comment in comments_to_emit_in_range(self.comments, start, end) {
+        let mut comments = comments_to_emit_in_range(self.comments, start, end).peekable();
+        while let Some(comment) = comments.next() {
             parts.push(self.build_comment_doc(comment));
-            if comment.is_block {
-                parts.push(d.text(" "));
-            } else {
+            let next = comments.peek().map_or(end, |n| n.span.start);
+            if self.comment_hangs_next(comment, next) {
                 parts.push(d.hardline());
+            } else {
+                parts.push(d.text(" "));
             }
         }
         // `concat` short-circuits the no-comments-in-range case to `empty()`.
         d.concat(&parts)
     }
 
-    /// Leading-spacing counterpart of `build_trailing_comments_break_for_line`: a
+    /// Leading-spacing counterpart of [`Self::build_trailing_comments_hang_next`]: a
     /// leading space before each comment, and a line comment forces the *following*
     /// content onto a new line (`hardline`) so it can't be swallowed. A block comment
     /// glues to the following token (` /* c */X`), matching the inline `Leading` form.
     /// Use where the comment leads the next token across a gap that would otherwise
-    /// glue it (e.g. an indexed-access object→`[` gap, `A // c⏎[K]`).
+    /// glue it (a mapped type's key-name→`in` gap, `[K // c⏎in B]`; a computed member's
+    /// object→`[` gap, `obj // c⏎[idx]`).
+    ///
+    /// Deliberately **line-only**, unlike its trailing counterpart: this builder is called
+    /// unconditionally rather than behind
+    /// [`Printer::comments_force_own_line_between`], so there is no gate for it to
+    /// contradict, and an own-line multiline block collapsing here is idempotent.
+    ///
+    /// Note the *type*-level indexed-access object→`[` gap can hold **only** a single-line
+    /// block: a type's index suffix may not follow a line break, so a line comment or a
+    /// multiline block there means the source never parsed as an indexed access at all
+    /// (`type X = A // c⏎[K];` is `type X = A;` plus an `ArrayExpression` statement). The
+    /// hardline branch is live only at the gaps above, all of which permit the break.
     pub(crate) fn build_leading_comments_break_for_line(&self, start: u32, end: u32) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
@@ -550,8 +572,23 @@ impl<'a> Printer<'a> {
     /// [`build_rhs_comments_opt`](Self::build_rhs_comments_opt),
     /// [`build_rhs_comments_glued_opt`](Self::build_rhs_comments_glued_opt), the
     /// arrow-body run, the member-leading sites (interface / intersection members),
-    /// and the comma-separated inter-item gaps (declarators, for-init, heritage,
-    /// switch cases).
+    /// the comma-separated inter-item gaps (declarators, for-init, heritage,
+    /// switch cases), the forced-multiline lists via
+    /// [`build_leading_comments_multiline`](Self::build_leading_comments_multiline)
+    /// (tuples, type params/args, function-type params, the union's first member, the
+    /// bracket-break shell, the broken `<T>` cast), the array literal / array pattern
+    /// element runs, the body/member runs via
+    /// [`build_leading_comments_before`](Self::build_leading_comments_before) (class,
+    /// interface and enum members, statement lists, type literals, expanded object
+    /// patterns), and — for all but its last comment —
+    /// [`build_orphaned_comment_run`](Self::build_orphaned_comment_run).
+    ///
+    /// Three loops still emit a leading run themselves, because their surrounding
+    /// separator policy genuinely differs — the import/export specifier list, the
+    /// for-clause leading gap, and the union's inter-member run (which brackets the
+    /// `| ` separator and preserves blanks in different positions). Each calls
+    /// [`comment_hugs_next`](Self::comment_hugs_next) rather than re-deriving the rule,
+    /// so what differs there is the loop, never the decision.
     pub(crate) fn push_leading_comment_run<'c>(
         &self,
         parts: &mut DocBuf,

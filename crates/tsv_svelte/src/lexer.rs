@@ -1,7 +1,7 @@
 use std::fmt;
 use std::str::Chars;
 // Shared lexer-error constructor: used by the unterminated/unexpected sites in `next_token`.
-use tsv_lang::{ParseError, lex_err};
+use tsv_lang::{ParseError, lex_err, source_scan};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenKind {
@@ -132,6 +132,18 @@ impl<'a> Lexer<'a> {
                 break;
             }
         }
+    }
+
+    /// Move the cursor to byte offset `pos`, which must be a char boundary at or after the
+    /// current position. Lets a scan delegate a span to a byte-level helper
+    /// (`tsv_lang::source_scan`) and resume lexing just past it, instead of re-walking the
+    /// span char by char through `advance`.
+    #[inline]
+    fn seek_to(&mut self, pos: usize) {
+        debug_assert!(pos >= self.position && self.source.is_char_boundary(pos));
+        self.chars = self.source[pos..].chars();
+        self.current = self.chars.next();
+        self.position = pos;
     }
 
     /// Byte offset of the first non-whitespace char at or after the cursor, without
@@ -271,71 +283,49 @@ impl<'a> Lexer<'a> {
                 Ok(self.make_token(TokenKind::Equals, start))
             }
             Some(quote @ '\'' | quote @ '"') => {
-                // String literal for attribute values
-                // Handle escape sequences AND embedded expression tags like {expr}
-                // Inside {}, quotes are part of JS strings, not attribute delimiters
+                // Quoted attribute value. Only two things matter here: the closing quote,
+                // and any `{expr}` tag — whose interior is JS, where the attribute's quote
+                // character is just an ordinary byte (`title="{a['\"']}"`).
                 //
-                // NOTE: Similar brace/string tracking logic exists in parse_attribute_value()
-                // (attribute.rs). The lexer tokenizes the whole string; the parser later
-                // extracts Text and ExpressionTag parts from it. Both need to track JS
-                // string contexts to handle quotes correctly.
+                // The expression is skipped WHOLE via the shared trivia-aware brace
+                // matcher rather than re-lexed here. It already knows every construct in
+                // which a `}` or a quote is not code — nested braces, strings (escape
+                // aware), template literals including `${…}` interpolation, comments, and
+                // regex literals — so no delimiter buried in one can be mistaken for the
+                // end of the expression or of the attribute. Hand-tracking a subset of
+                // those is the "comment-aware delimiter scan" bug class (see
+                // `tsv_debug scan_audit`): this scan used to track braces and strings but
+                // not comments or regex, so `title="{/* ` */ b}"` and `title="{f(/"/)}"`
+                // desynced it and it ran to EOF — an over-rejection of Svelte-valid input.
+                //
+                // `parse_attribute_value` (attribute.rs) re-walks the same value to split
+                // it into Text and ExpressionTag parts, and reaches the same answer the
+                // same way (via `parse_expression_tag_at`); this is the tokenizing half.
                 self.advance(); // consume opening quote
 
-                let mut brace_depth = 0;
-                let mut in_js_string = false;
-                let mut js_string_char = '\0';
-
                 while let Some(ch) = self.current {
-                    if in_js_string {
-                        // Inside a JS string within {expr}
-                        if ch == '\\' {
-                            // Escape sequence in JS string
-                            self.advance();
-                            if self.current.is_some() {
-                                self.advance();
-                            }
-                        } else if ch == js_string_char {
-                            // End of JS string
-                            in_js_string = false;
-                            self.advance();
-                        } else {
-                            self.advance();
-                        }
-                    } else if brace_depth > 0 {
-                        // Inside an expression tag {expr}
-                        if ch == '\'' || ch == '"' || ch == '`' {
-                            // Start of JS string
-                            in_js_string = true;
-                            js_string_char = ch;
-                            self.advance();
-                        } else if ch == '{' {
-                            brace_depth += 1;
-                            self.advance();
-                        } else if ch == '}' {
-                            brace_depth -= 1;
-                            self.advance();
-                        } else {
-                            self.advance();
-                        }
-                    } else {
-                        // Outside expression tags — attribute-value text. HTML/Svelte
-                        // attribute values have NO backslash escapes (unlike a JS string
-                        // inside `{expr}`, handled above), so `\` is a literal char:
-                        // `a="{x}\"` closes at the `"` with value `{x}\`, matching
-                        // Svelte's parser. Treating `\` as an escape here read `\"` as an
-                        // escaped quote and ran past the close → "Unterminated string
-                        // literal" (an over-rejection of valid Svelte; the `fuzz` gate).
-                        if ch == quote {
-                            self.advance(); // consume closing quote
-                            return Ok(self.make_token(TokenKind::String, start));
-                        } else if ch == '{' {
-                            // Start of expression tag
-                            brace_depth = 1;
-                            self.advance();
-                        } else {
-                            self.advance();
-                        }
+                    if ch == quote {
+                        self.advance(); // consume closing quote
+                        return Ok(self.make_token(TokenKind::String, start));
                     }
+                    if ch == '{' {
+                        let Some(close) = source_scan::scan_to_matching_brace(
+                            self.source.as_bytes(),
+                            self.position + 1,
+                            self.source.len(),
+                        ) else {
+                            break; // unterminated `{` — the value can't close
+                        };
+                        self.seek_to(close + '}'.len_utf8());
+                        continue;
+                    }
+                    // Attribute-value text. HTML/Svelte attribute values have NO backslash
+                    // escapes (unlike a JS string inside `{expr}`, skipped above), so `\`
+                    // is a literal char: `a="{x}\"` closes at the `"` with value `{x}\`,
+                    // matching Svelte's parser. Treating `\` as an escape here read `\"` as
+                    // an escaped quote and ran past the close → "Unterminated string
+                    // literal" (an over-rejection of valid Svelte; the `fuzz` gate).
+                    self.advance();
                 }
                 // Unterminated string
                 Err(lex_err("Unterminated string literal in template", start))

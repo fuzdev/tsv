@@ -1,0 +1,311 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 478,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An own-line multiline block comment in an indexed access's `[`→index gap hangs",
+			"start": 20,
+			"end": 101,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the index on its own line, the comment kept inside the brackets where the author",
+			"start": 103,
+			"end": 186,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " wrote it — inlining it would reflow the author's break. A GLUED multiline block",
+			"start": 188,
+			"end": 270,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " collapses inline instead (keyword_value_glued_multiline_block_comment), as does a",
+			"start": 272,
+			"end": 356,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " single-line block in any position (indexed_access_own_line_block_comment).",
+			"start": 358,
+			"end": 435,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c\nd ",
+			"start": 450,
+			"end": 461,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 4
+				},
+				"end": {
+					"line": 9,
+					"column": 6
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 477,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 468,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 437,
+					"end": 467,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 5
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 442,
+						"end": 443,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 6
+							},
+							"end": {
+								"line": 7,
+								"column": 7
+							}
+						},
+						"name": "X"
+					},
+					"typeAnnotation": {
+						"type": "TSIndexedAccessType",
+						"start": 448,
+						"end": 466,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 2
+							},
+							"end": {
+								"line": 10,
+								"column": 4
+							}
+						},
+						"objectType": {
+							"type": "TSTypeReference",
+							"start": 448,
+							"end": 449,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 2
+								},
+								"end": {
+									"line": 8,
+									"column": 3
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 448,
+								"end": 449,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 3
+									}
+								},
+								"name": "A"
+							}
+						},
+						"indexType": {
+							"type": "TSTypeReference",
+							"start": 464,
+							"end": 465,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 2
+								},
+								"end": {
+									"line": 10,
+									"column": 3
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 464,
+								"end": 465,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 3
+									}
+								},
+								"name": "K"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c\nd ",
+									"start": 450,
+									"end": 461
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An own-line multiline block comment in an indexed access's `[`→index gap hangs",
+							"start": 20,
+							"end": 101
+						},
+						{
+							"type": "Line",
+							"value": " the index on its own line, the comment kept inside the brackets where the author",
+							"start": 103,
+							"end": 186
+						},
+						{
+							"type": "Line",
+							"value": " wrote it — inlining it would reflow the author's break. A GLUED multiline block",
+							"start": 188,
+							"end": 270
+						},
+						{
+							"type": "Line",
+							"value": " collapses inline instead (keyword_value_glued_multiline_block_comment), as does a",
+							"start": 272,
+							"end": 356
+						},
+						{
+							"type": "Line",
+							"value": " single-line block in any position (indexed_access_own_line_block_comment).",
+							"start": 358,
+							"end": 435
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

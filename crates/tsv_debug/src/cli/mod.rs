@@ -3,6 +3,8 @@ pub mod commands;
 use argh::FromArgs;
 #[cfg(feature = "comment_check")]
 use commands::comment_audit::CommentAuditCommand;
+#[cfg(feature = "comment_check")]
+use commands::gap_audit::GapAuditCommand;
 #[cfg(feature = "swallow_check")]
 use commands::swallow_audit::SwallowAuditCommand;
 use commands::{
@@ -71,6 +73,10 @@ pub enum Subcommand {
     // `comments:audit` deno task passes it.
     #[cfg(feature = "comment_check")]
     CommentAudit(CommentAuditCommand),
+    // Same `comment_check` gate as `CommentAudit` — it drives the same ledger; the
+    // `gaps:audit` deno task passes the feature.
+    #[cfg(feature = "comment_check")]
+    GapAudit(GapAuditCommand),
     Compare(CompareCommand),
     ConformanceAudit(ConformanceAuditCommand),
     AstDiff(AstDiffCommand),
@@ -118,6 +124,8 @@ impl TopLevel {
             Subcommand::BuildFanoutAudit(c) => c.run(),
             #[cfg(feature = "comment_check")]
             Subcommand::CommentAudit(c) => c.run(),
+            #[cfg(feature = "comment_check")]
+            Subcommand::GapAudit(c) => c.run(),
             Subcommand::Compare(c) => c.run(),
             Subcommand::ConformanceAudit(c) => c.run(),
             Subcommand::AstDiff(c) => c.run(),

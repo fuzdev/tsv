@@ -516,13 +516,18 @@ pub(crate) fn build_entity_name_doc(
     printer: &Printer<'_>,
     name: &internal::TSEntityName<'_>,
 ) -> DocId {
-    let d = printer.d();
     match name {
         internal::TSEntityName::Identifier(id) => printer.identifier_name_doc(id),
-        internal::TSEntityName::QualifiedName(qn) => d.concat(&[
+        // A qualified name is a dotted pair, so both gaps around the `.` are positions an
+        // author can comment in (`ns /* c */.Type`, `ns./* c */ Type`). The shared printer
+        // emits them; concatenating the three pieces scans neither and drops what's there.
+        // One printer serves every qualified name, so this reaches type references,
+        // interface heritage, and import-equals module references alike.
+        internal::TSEntityName::QualifiedName(qn) => printer.build_dotted_pair_doc(
             build_entity_name_doc(printer, &qn.left),
-            d.text("."),
             printer.identifier_name_doc(&qn.right),
-        ]),
+            qn.left.span().end,
+            qn.right.span.start,
+        ),
     }
 }

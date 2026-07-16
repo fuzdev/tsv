@@ -4,7 +4,7 @@
 // - Type parameter declarations: `<T, U extends V = W>`
 // - Type parameter instantiation (type arguments): `<T, U>`
 
-use super::helpers::{is_hugging_union_type_arg, is_simple_type_arg};
+use super::helpers::is_simple_type_arg;
 use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{self, TSType, TSTypeParameter, TSTypeParameterDeclaration};
 use crate::printer::layout::fluid_after_operator;
@@ -100,7 +100,7 @@ impl<'a> Printer<'a> {
             // Leading comments (after previous comma or `<`); for the first param,
             // exclude comments already pulled onto the `<` line.
             let skip_delim = if i == 0 { angle_pull_pos } else { None };
-            inner_parts.extend(self.build_leading_comments_multiline_opt(
+            inner_parts.extend(self.build_leading_comments_multiline(
                 prev_end,
                 param_start,
                 skip_delim,
@@ -555,10 +555,10 @@ impl<'a> Printer<'a> {
         // A single *simple* or *hugged-union* type argument inlines atomically: no
         // group, no softlines. Simple = keyword, literal, `this`, or a bare type
         // reference (`is_simple_type_arg`); hugged union = `{…} | null` / `null | {…}`
-        // (`is_hugging_union_type_arg`), whose object member carries its own group and
+        // (`union_type_arg_hug_shape`), whose object member carries its own group and
         // breaks block-style inside the hugged `<…>` rather than breaking the `<…>` onto
         // its own lines. Matches Prettier's `shouldInline`/`shouldHugType` and tsv's own
-        // type-position builder (`build_type_arguments_doc_wrapping`), via the shared
+        // type-position builder (`build_type_arguments_doc`), via the shared
         // predicates. Without it the fall-through group below gives the argument a
         // softline break point, so an overflowing call head (`callee<Ref>(`) breaks the
         // `<Ref>` instead of the arguments (and, as an assignment RHS, keeps the RHS on
@@ -567,7 +567,8 @@ impl<'a> Printer<'a> {
         // remain — the shared `build_single_type_arg_inline` preserves them. (The single
         // brace-delimited object/mapped type is handled by the curly-hug case above.)
         if inst.params.len() == 1
-            && (is_simple_type_arg(&inst.params[0]) || is_hugging_union_type_arg(&inst.params[0]))
+            && (is_simple_type_arg(&inst.params[0])
+                || self.type_arg_union_prints_hugged(&inst.params[0]))
         {
             return self.build_single_type_arg_inline(inst, has_comments);
         }
@@ -684,7 +685,9 @@ impl<'a> Printer<'a> {
             );
             if has_line && !has_trailing {
                 let leading =
-                    self.build_leading_comments_multiline(inst.span.start + 1, param_start);
+                    // `None`: this hug path emits no delimiter-line prefix, so nothing
+                    // was pulled onto the `<` line to exclude here.
+                    self.build_leading_comments_multiline(inst.span.start + 1, param_start, None);
                 if !leading.is_empty() {
                     let param_doc = if type_position {
                         self.build_type_arg_doc(param, is_multi)
@@ -719,7 +722,7 @@ impl<'a> Printer<'a> {
             // drop comments pulled onto the `<` line (emitted as the angle-line
             // prefix below).
             let skip_delim = if i == 0 { delimiter_pull_pos } else { None };
-            inner_parts.extend(self.build_leading_comments_multiline_opt(
+            inner_parts.extend(self.build_leading_comments_multiline(
                 prev_end,
                 param_start,
                 skip_delim,
@@ -765,7 +768,7 @@ impl<'a> Printer<'a> {
     /// The object/mapped type carries its own width-aware group, so an inline
     /// `<{ ... }>` that overflows breaks block-style (members on their own lines)
     /// rather than spilling an inner union/intersection — matching the type-reference
-    /// type-argument path (`build_type_arguments_doc_wrapping`).
+    /// type-argument path (`build_type_arguments_doc`).
     fn try_build_hugging_curly_type_doc(&self, ty: &TSType<'_>) -> Option<DocId> {
         match ty {
             // Object type literal: { a: number; b: string } or { /* comment */ }

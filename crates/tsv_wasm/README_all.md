@@ -11,7 +11,7 @@ Source of truth, full docs, and conformance notes: [github.com/fuzdev/tsv](https
 ## CLI
 
 ```bash
-npx @fuzdev/tsv_wasm format src        # format .ts/.svelte/.css in place, recursively
+npx @fuzdev/tsv_wasm format src        # format .ts/.mts/.cts/.js/.mjs/.cjs/.svelte/.css in place, recursively
 npx @fuzdev/tsv_wasm format --check .  # CI: exit 1 if anything would change
 npx @fuzdev/tsv_wasm format --list .   # list the in-scope files, format nothing
 npx @fuzdev/tsv_wasm parse file.svelte # JSON AST to stdout (--pretty to indent)

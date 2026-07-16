@@ -3,32 +3,26 @@
 	type A=(// leading
 	a)|b;
 
-	// case B: later union member with leading line comment
-	type B=a|(// leading
-	b);
-
-	// case D: multiple leading line comments
-	type D=(// c1
+	// case B: multiple leading line comments
+	type B=(// c1
 	// c2
 	a)|b;
 
-	// case E: leading line + trailing block
-	type E=(// leading
+	// case C: leading line + trailing block
+	type C=(// leading
 	a/* t */)|b;
 
-	// case F: paren retained (intersection in union)
-	type F=a|(// leading
-	b&c);
+	// case D: object-literal first member - the comment run takes the offset, and
+	// the object's own lines sit at its own indent (closing `}` aligns with `{`)
+	type D=(// leading
+	{
+	a:1;b:2
+	})|b;
 
-	// case G: conditional extends
-	type G=a extends(// comment
-	b)?c:d;
-
-	// case M1: 3-member union, leading on middle
-	type M1=a|(// leading
-	b)|c;
-
-	// case M2: 3-member union, leading on last
-	type M2=a|b|(// leading
-	c);
+	// case E: default-paren first member - same as D, the paren layout supplies
+	// the member's own indent
+	type E=|// leading
+	(a&{
+	a:1;b:2
+	})|b;
 </script>

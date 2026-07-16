@@ -306,11 +306,7 @@ impl<'a> Printer<'a> {
             }
 
             // Process comments before this member (with blank line preservation)
-            member_parts.extend(self.build_leading_comments_with_blank_lines(
-                &comments,
-                member_start,
-                false,
-            ));
+            member_parts.extend(self.build_leading_comments_before(&comments, member_start));
 
             // A preceding format-ignore directive keeps the member's source verbatim.
             // The member span includes its trailing `;`.
@@ -554,9 +550,7 @@ impl<'a> Printer<'a> {
             .map(|v| v.span().end)
             .or_else(|| prop.type_annotation.as_ref().map(|ta| ta.span.end))
             .unwrap_or(after_modifier);
-        let after = self.split_separator_gap_comments(&mut parts, content_end, prop.span.end, true);
-        parts.push(d.text(";"));
-        parts.extend(after);
+        self.push_semicolon_with_gap_comments(&mut parts, content_end, prop.span.end, true);
 
         d.concat(&parts)
     }
@@ -786,10 +780,7 @@ impl<'a> Printer<'a> {
                 |rt| rt.span.end,
             );
             let semicolon_pos = method.span.end.saturating_sub(1);
-            let after =
-                self.split_separator_gap_comments(&mut parts, content_end, semicolon_pos, true);
-            parts.push(d.text(";"));
-            parts.extend(after);
+            self.push_semicolon_with_gap_comments(&mut parts, content_end, semicolon_pos, true);
         } else {
             self.append_body_with_sig_comments(&mut parts, sig_end, &method.value.body);
         }

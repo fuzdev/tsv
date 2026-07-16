@@ -138,9 +138,7 @@ impl<'a> Printer<'a> {
                 self.is_expression_statement.set(was_expr_stmt);
                 self.build_member_doc(member)
             }
-            Expression::ConditionalExpression(cond) => {
-                self.build_conditional_doc_with_wrapping(cond)
-            }
+            Expression::ConditionalExpression(cond) => self.build_conditional_doc(cond),
             Expression::ArrowFunctionExpression(arrow) => self.build_arrow_doc(arrow),
             Expression::FunctionExpression(func) => {
                 self.maybe_wrap_expr_stmt_paren(func.span, self.build_function_doc(func))
@@ -409,7 +407,7 @@ impl<'a> Printer<'a> {
         let type_end = type_assert.type_annotation.span().end;
         let expr_start = type_assert.expression.span().start;
         let close_angle = self.find_assertion_close_angle(type_end, expr_start);
-        let type_doc = self.build_type_doc_with_wrapping_type_args(type_assert.type_annotation);
+        let type_doc = self.build_type_doc(type_assert.type_annotation);
 
         // Comments in the cast stay where the author wrote them. Block comments hug
         // inline (`</* c */ T>`, `<T /* c */>`, `<T>/* c */ expr`); a `//` runs to
@@ -541,10 +539,17 @@ impl<'a> Printer<'a> {
         let angle_end = open_pos + 1; // after `<`
         let (angle_prefix, angle_pull_pos) =
             self.delimiter_line_comment_prefix(open_pos, type_start);
-        let leading =
-            self.build_leading_comments_multiline_opt(angle_end, type_start, angle_pull_pos);
+        let leading = self.build_leading_comments_multiline(angle_end, type_start, angle_pull_pos);
         let trailing = self.build_trailing_comments_multiline(type_end, close_angle);
-        d.concat(&[
+        // `group_break`, not a bare concat: this is the already-broken form, and saying
+        // so contains the leading run's soft `line` (prettier's `printLeadingComment`)
+        // here rather than letting it escape to the enclosing assignment group — which
+        // would measure it against that group and wrongly pull the type up onto the
+        // comment's line. Prettier gives the cast no per-element group, so the `line`
+        // rides the broken group and breaks. The sibling angle/paren lists
+        // (type params, type args, function-type params) are already grouped by their
+        // own callers, which is why they land on the break without this.
+        d.group_break(d.concat(&[
             d.text("<"),
             d.concat(&angle_prefix),
             d.indent(d.concat(&[
@@ -555,7 +560,7 @@ impl<'a> Printer<'a> {
             ])),
             d.hardline(),
             d.text(">"),
-        ])
+        ]))
     }
 
     /// Build a Doc for a TypeScript binary cast expression — `expr as Type` or
@@ -613,7 +618,7 @@ impl<'a> Printer<'a> {
             if self.comments_force_own_line_between(kw_end, type_start) {
                 parts.push(d.text(" "));
                 parts.push(d.text(keyword));
-                let type_doc = self.build_type_doc_with_wrapping_type_args(type_annotation);
+                let type_doc = self.build_type_doc(type_annotation);
                 self.append_keyword_value_line_comments(&mut parts, kw_end, type_start, type_doc);
                 return d.concat(&parts);
             }
@@ -656,9 +661,9 @@ impl<'a> Printer<'a> {
                     CommentSpacing::Trailing,
                 ));
             }
-            parts.push(self.build_type_doc_with_wrapping_type_args(type_annotation));
+            parts.push(self.build_type_doc(type_annotation));
         } else {
-            parts.push(self.build_type_doc_with_wrapping_type_args(type_annotation));
+            parts.push(self.build_type_doc(type_annotation));
         }
 
         d.concat(&parts)
@@ -684,6 +689,16 @@ impl<'a> Printer<'a> {
         type_annotation: &TSType<'_>,
         type_start: u32,
     ) -> Option<DocId> {
+        // The discriminant first: it is free, and the overwhelmingly common cast
+        // (`x as Foo`) is not a union — it paid a binary search only to learn that.
+        // Deliberately a guard here rather than moving the gap search below
+        // `build_union_hanging_indent_doc`: that function BUILDS the union doc before
+        // it can return, so a reorder would build-then-discard on a commented gap.
+        // This mirrors its own first check exactly (a bare match on the type, no paren
+        // unwrapping), so it only ever retires work the callee would redo.
+        if !matches!(type_annotation, TSType::Union(_)) {
+            return None;
+        }
         let keyword_len = keyword.len() as u32;
         if keyword_pos
             .is_some_and(|pos| self.has_comments_to_emit_between(pos + keyword_len, type_start))
@@ -710,15 +725,18 @@ impl<'a> Printer<'a> {
         type_annotation: &TSType<'_>,
         type_start: u32,
     ) -> Option<DocId> {
+        // Discriminant before the gap search: it is free, and both checks only ever
+        // `return None`, so the order is unobservable. The overwhelmingly common cast
+        // (`x as Foo`) is not an intersection, and paid a binary search to learn it.
+        let TSType::Intersection(i) = type_annotation else {
+            return None;
+        };
         let keyword_len = keyword.len() as u32;
         if keyword_pos
             .is_some_and(|pos| self.has_comments_to_emit_between(pos + keyword_len, type_start))
         {
             return None;
         }
-        let TSType::Intersection(i) = type_annotation else {
-            return None;
-        };
         let d = self.d();
         let body = self.intersection_hanging_with_indent(i);
         Some(d.concat(&[d.text(" "), d.text(keyword), d.text(" "), body]))

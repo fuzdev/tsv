@@ -29,7 +29,7 @@ mod type_params;
 mod union_intersection;
 
 // Re-export public items from helpers
-pub use helpers::{should_hug_union_type, unwrap_parenthesized};
+pub use helpers::unwrap_parenthesized;
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`
 pub(super) use super::{CommentFilter, CommentSpacing, Printer};
@@ -52,25 +52,12 @@ impl<'a> Printer<'a> {
     // Main Type Doc Builders
     //
 
-    /// Build a Doc for a TypeScript type expression
-    pub(in crate::printer) fn build_type_doc(&self, ts_type: &TSType<'_>) -> DocId {
-        self.build_type_doc_inner(ts_type, false)
-    }
-
-    /// Build a Doc for a TypeScript type expression with wrapping type arguments.
+    /// Build a Doc for a TypeScript type expression.
     ///
-    /// Used in type alias RHS where TypeReference type arguments should break
-    /// internally (e.g., `Promise<LongType | null>` breaks inside `<>`).
-    pub(in crate::printer) fn build_type_doc_with_wrapping_type_args(
-        &self,
-        ts_type: &TSType<'_>,
-    ) -> DocId {
-        self.build_type_doc_inner(ts_type, true)
-    }
-
-    /// Inner implementation for type doc building.
-    /// When `wrap_type_args` is true, TypeReference uses wrapping type arguments.
-    pub(super) fn build_type_doc_inner(&self, ts_type: &TSType<'_>, wrap_type_args: bool) -> DocId {
+    /// A `TypeReference`'s own type arguments always break internally when too wide
+    /// (`Promise<LongType | null>` breaks inside the `<>`) — `build_type_arguments_doc` is the
+    /// single builder for every type-argument position, so no caller has to opt into that.
+    pub(in crate::printer) fn build_type_doc(&self, ts_type: &TSType<'_>) -> DocId {
         let d = self.d();
         match ts_type {
             TSType::Keyword(kw) => d.text(kw.kind.as_str()),
@@ -89,11 +76,7 @@ impl<'a> Printer<'a> {
                     ) {
                         parts.push(doc);
                     }
-                    if wrap_type_args {
-                        parts.push(self.build_type_arguments_doc_wrapping(type_args));
-                    } else {
-                        parts.push(self.build_type_arguments_doc(type_args));
-                    }
+                    parts.push(self.build_type_arguments_doc(type_args));
                 }
                 d.concat(&parts)
             }
@@ -334,7 +317,7 @@ impl<'a> Printer<'a> {
                 // indexed_access_own_line_block_comment.
                 let index_comments = bracket_open.map(|bp| {
                     if self.comments_force_own_line_between(bp + 1, index_type_start) {
-                        self.build_trailing_comments_break_for_line(bp + 1, index_type_start)
+                        self.build_trailing_comments_hang_next(bp + 1, index_type_start)
                     } else {
                         self.build_comments_between(
                             bp + 1,
@@ -364,8 +347,7 @@ impl<'a> Printer<'a> {
                 let dots_end = r.span.start + "...".len() as u32;
                 let type_start = r.type_annotation.span().start;
                 // Break a line comment so it can't swallow the rest-element type.
-                let comments_doc =
-                    self.build_trailing_comments_break_for_line(dots_end, type_start);
+                let comments_doc = self.build_trailing_comments_hang_next(dots_end, type_start);
                 d.concat(&[
                     d.text("..."),
                     comments_doc,
@@ -410,9 +392,7 @@ impl<'a> Printer<'a> {
                 // can't swallow the type.
                 let comments_doc = after_colon.map_or_else(
                     || d.empty(),
-                    |after_colon| {
-                        self.build_trailing_comments_break_for_line(after_colon, type_start)
-                    },
+                    |after_colon| self.build_trailing_comments_hang_next(after_colon, type_start),
                 );
                 // A long union/intersection element hangs after `:` (redundant parens
                 // stripped first); everything else stays inline after `: `.
@@ -461,8 +441,7 @@ impl<'a> Printer<'a> {
                     return d.concat(&parts);
                 }
                 // A block comment glued to the name stays inline (`infer /* c */ R`).
-                let comments_doc =
-                    self.build_trailing_comments_break_for_line(infer_end, name_start);
+                let comments_doc = self.build_trailing_comments_hang_next(infer_end, name_start);
                 d.concat(&[d.text("infer "), comments_doc, type_param_doc])
             }
             TSType::ThisType(_) => d.text("this"),
@@ -518,8 +497,7 @@ impl<'a> Printer<'a> {
             let dot_area_start = paren_close + 1;
             let qualifier_start = qualifier.span().start;
             parts.push(d.text("."));
-            parts
-                .push(self.build_trailing_comments_break_for_line(dot_area_start, qualifier_start));
+            parts.push(self.build_trailing_comments_hang_next(dot_area_start, qualifier_start));
             parts.push(self.build_entity_name_doc(qualifier));
         }
         if let Some(type_args) = &i.type_arguments {

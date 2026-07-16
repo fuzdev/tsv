@@ -47,8 +47,10 @@ crates (the open-convention stance):
 
 - `SAFETY_NET_DIRS` / `HEURISTIC_DIRS` / `FORMATTABLE_EXTENSIONS` — the three
   name/extension-set constants.
-- `is_formattable(name)` — `.ts`/`.svelte`/`.css` extension check (matches
-  `Path::extension`; a bare `.ts` dotfile is a stem, not formattable).
+- `is_formattable(name)` — extension check over the JS/TS family
+  (`.ts`/`.mts`/`.cts`/`.js`/`.mjs`/`.cjs`, all parsed as TypeScript), `.svelte`,
+  and `.css` (matches `Path::extension`; a bare `.ts` dotfile is a stem, not
+  formattable). `.jsx`/`.tsx` are absent — JSX is out of scope.
 - `is_safety_net(name)` — whether a directory name is an always-pruned safety net.
   A **complete, context-free** decision (safety nets prune in every mode, no
   override), so a caller walking its own tree can short-circuit before building an

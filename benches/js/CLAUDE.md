@@ -774,9 +774,11 @@ they pass the guard for free.
 tasks (`build:wasm:deno`, `build:wasm:parse:deno`, `build:wasm:all:deno`,
 `build:wasm:all:nodejs`) ride `scripts/run_if_stale.ts`, which skips wasm-pack
 when the bundle's `.wasm` is already newer than every source that feeds it
-(the guard's `CORE_CRATES` + `tsv_wasm` — imported, so the two sides can't
-drift; dev-tooling crates deliberately excluded so `tsv_debug` edits don't
-force wasm rebuilds — plus the workspace `Cargo.toml` + `Cargo.lock`, and
+(the guard's `CORE_CRATES` + `WASM_CRATES` — `tsv_wasm` plus the
+`tsv_ignore`/`tsv_discover` IgnoreStack crates the bundle links but the FFI /
+N-API don't; imported, so the two sides can't drift; dev-tooling crates
+deliberately excluded so `tsv_debug` edits don't force wasm rebuilds — plus the
+workspace `Cargo.toml` + `Cargo.lock`, and
 `deno.json` — so editing a build task's flags re-triggers
 it). Rationale: wasm-pack re-runs wasm-opt (~8–27s per bundle) even when cargo
 is a fully-cached no-op, so a source-unchanged `deno task bench` used to pay
