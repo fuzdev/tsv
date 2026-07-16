@@ -272,16 +272,34 @@ export function group_by_language(files: SourceFile[]): Record<Language, SourceF
 /**
  * Which concern an entry serves — the axis the views select on.
  *
- * - `real` — application/library/framework source: what the perf numbers
- *   should reflect.
- * - `prettier_fixture` — Prettier's and prettier-plugin-svelte's test suites:
- *   deliberately tricky edge cases the formatting-conformance gates need but
- *   that skew throughput toward hard cases.
+ * - `real` — the author's LIVE dev repos (zzz, the fuz ecosystem, gro, the
+ *   personal sites): real application/library source the perf numbers reflect.
+ *   These are working trees that churn with ordinary work and are NOT version-
+ *   pinned, so the format gate's count pins are NOT enforced over them (see
+ *   `reproducible` / `REPRODUCIBLE_TIERS`).
+ * - `framework` — version-pinned upstream framework source (kit, svelte,
+ *   svelte.dev subpaths), tracked by `GATE_CHECKOUT_COMMITS` + verified by
+ *   `deno task pins:audit`. Also real code (in the perf view), but reproducible:
+ *   the format count pins ARE measured over it, so they hold on any aligned
+ *   checkout.
+ * - `prettier_fixture` — Prettier's and prettier-plugin-svelte's test suites
+ *   (pinned checkouts): deliberately tricky edge cases the formatting-conformance
+ *   gates need but that skew throughput toward hard cases. Reproducible.
  * - `suite` — parse-conformance suites (Svelte compiler tests, wpt-css
  *   harvest, test262 graded positives): per-tool parse coverage measurement
  *   only, never timed as "typical code".
  */
-export type CorpusTier = 'real' | 'prettier_fixture' | 'suite';
+export type CorpusTier = 'real' | 'framework' | 'prettier_fixture' | 'suite';
+
+/**
+ * The tiers whose files are version-pinned and reproducible — the format gate's
+ * count pins (match/unknown/partial) are enforced over exactly these, so a
+ * `pins:audit`-aligned machine measures the same numbers. The live `real` tier is
+ * demoted to a non-gating WARN (its divergences are reported but don't fail the
+ * gate); SAFETY still gates over every tier. Kept in lockstep with
+ * `GATE_CHECKOUT_COMMITS` (the `pins:audit`-tracked checkouts).
+ */
+export const REPRODUCIBLE_TIERS: readonly CorpusTier[] = ['framework', 'prettier_fixture'];
 
 /** A named subset of `CORPUS_ENTRIES` — see the module doc for what each view is for. */
 export type CorpusView = 'perf' | 'gates' | 'conformance';
@@ -415,11 +433,14 @@ const CORPUS_ENTRIES: CorpusEntry[] = [
 	// External projects (monorepo subpaths). Each entry is a reviewed package
 	// `src/` tree — never a whole monorepo — so test fixtures, build output, and
 	// scaffolding stay out (the perf prune only catches `fixtures`/`test/samples`).
-	{ path: '../kit/packages/kit/src', tier: 'real' },
-	{ path: '../svelte/packages/svelte/src', tier: 'real' },
-	{ path: '../svelte.dev/apps/svelte.dev/src', tier: 'real' },
-	{ path: '../svelte.dev/packages/repl/src', tier: 'real' },
-	{ path: '../svelte.dev/packages/site-kit/src', tier: 'real' },
+	// Tier `framework` (not `real`): these are version-pinned checkouts tracked by
+	// GATE_CHECKOUT_COMMITS, so the format count pins ARE enforced over them — real
+	// code in the perf view, reproducible in the gate. See REPRODUCIBLE_TIERS.
+	{ path: '../kit/packages/kit/src', tier: 'framework' },
+	{ path: '../svelte/packages/svelte/src', tier: 'framework' },
+	{ path: '../svelte.dev/apps/svelte.dev/src', tier: 'framework' },
+	{ path: '../svelte.dev/packages/repl/src', tier: 'framework' },
+	{ path: '../svelte.dev/packages/site-kit/src', tier: 'framework' },
 	// prettier-plugin-svelte test cases (.html treated as Svelte, skip non-default options)
 	{
 		path: '../prettier-plugin-svelte/test',
@@ -453,9 +474,15 @@ const CORPUS_ENTRIES: CorpusEntry[] = [
 ];
 
 const TIERS_BY_VIEW: Record<CorpusView, CorpusTier[]> = {
-	perf: ['real'],
-	gates: ['real', 'prettier_fixture'],
-	// deliberately NO `real`: the conformance coverage surface and the perf corpus
+	// `framework` is real code too — perf measures it alongside the live `real`
+	// repos (same composition as before the framework/real split).
+	perf: ['real', 'framework'],
+	// `gates` loads BOTH the live `real` repos and the reproducible `framework` +
+	// `prettier_fixture` tiers — same file set as before. The reproducibility split
+	// is enforced downstream (the count pins gate on REPRODUCIBLE_TIERS only, the
+	// live `real` repos become a non-gating WARN), not by dropping them from the view.
+	gates: ['real', 'framework', 'prettier_fixture'],
+	// deliberately NO `real`/`framework`: the conformance coverage surface and the perf corpus
 	// are mutually exclusive sets. perf is the "every in-scope tool must fully
 	// process it" corpus (bench.ts hard-fails an unlisted failure); conformance is
 	// the hard-cases-only surface where sub-100% coverage is the measurement.
@@ -678,6 +705,10 @@ export class DevReposLoader {
 		for (const entry of present) {
 			const entry_path = entry_source(entry);
 			const resolved_path = resolve(entry_path);
+			// Reproducible = a version-pinned, pins:audit-tracked tier. Tags each
+			// file so the format gate can enforce its count pins over this subset
+			// only (live `real` repos → non-gating WARN; SAFETY still gates all).
+			const reproducible = REPRODUCIBLE_TIERS.includes(entry.tier);
 
 			let count = 0;
 			const by_language: Record<Language, number> = { svelte: 0, typescript: 0, css: 0 };
@@ -685,6 +716,7 @@ export class DevReposLoader {
 				for await (const file of load_file_list(resolved_path)) {
 					count++;
 					by_language[file.language]++;
+					file.reproducible = reproducible;
 					yield file;
 				}
 			} else {
@@ -712,6 +744,7 @@ export class DevReposLoader {
 				) {
 					count++;
 					by_language[file.language]++;
+					file.reproducible = reproducible;
 					yield file;
 				}
 			}
