@@ -58,9 +58,15 @@ pub const SAFETY_NET_DIRS: [&str; 6] = ["node_modules", ".git", ".sl", ".hg", ".
 pub const HEURISTIC_DIRS: [&str; 3] = ["dist", "build", "target"];
 
 /// The file extensions tsv formats — the discovery filter behind
-/// [`is_formattable`]. Compound forms like `.svelte.ts` are covered by the `ts`
-/// entry (`Path::extension` yields the final component).
-pub const FORMATTABLE_EXTENSIONS: [&str; 3] = ["ts", "svelte", "css"];
+/// [`is_formattable`]. The whole JS/TS family (`ts`/`mts`/`cts`/`js`/`mjs`/`cjs`)
+/// parses as TypeScript, a syntactic superset of JavaScript — the same dispatch
+/// an explicitly named file gets from `ParserType::from_extension`, so a walk and
+/// a named path agree on every extension. JSX/TSX is out of tsv's scope, so `jsx`
+/// and `tsx` are deliberately absent; JSX inside a `.js` file is a parse error
+/// rather than a silent skip. Compound forms like `.svelte.ts` are covered by the
+/// `ts` entry (`Path::extension` yields the final component).
+pub const FORMATTABLE_EXTENSIONS: [&str; 8] =
+    ["ts", "mts", "cts", "js", "mjs", "cjs", "svelte", "css"];
 
 /// The discovery verdict for one child **directory**: descend into it, prune it
 /// (skip its whole subtree), or prune it **and** surface a diagnostic.
@@ -79,9 +85,9 @@ pub enum DirVerdict {
 }
 
 /// Whether a file name has a [formattable extension](FORMATTABLE_EXTENSIONS)
-/// (`.ts`, `.svelte`, `.css` — compound forms like `.svelte.ts` are covered by the
-/// `.ts` match). Matches `Path::extension`, so a bare dotfile like `.ts` is a stem
-/// with no extension and is **not** formattable.
+/// (the JS/TS family, `.svelte`, `.css` — compound forms like `.svelte.ts` are
+/// covered by the `.ts` match). Matches `Path::extension`, so a bare dotfile like
+/// `.ts` is a stem with no extension and is **not** formattable.
 pub fn is_formattable(name: &str) -> bool {
     Path::new(name)
         .extension()
@@ -359,9 +365,16 @@ mod tests {
     #[test]
     fn is_formattable_matches_supported_extensions() {
         assert!(is_formattable("a.ts"));
+        assert!(is_formattable("a.mts"));
+        assert!(is_formattable("a.cts"));
+        assert!(is_formattable("a.js")); // the TypeScript parser covers the JS family
+        assert!(is_formattable("a.mjs"));
+        assert!(is_formattable("a.cjs"));
         assert!(is_formattable("a.svelte"));
         assert!(is_formattable("a.css"));
         assert!(is_formattable("a.svelte.ts")); // .ts wins
+        assert!(!is_formattable("a.jsx")); // JSX/TSX is out of scope
+        assert!(!is_formattable("a.tsx"));
         assert!(!is_formattable("a.txt"));
         assert!(!is_formattable("a")); // no extension
         assert!(!is_formattable(".ts")); // bare dotfile: a stem, no extension
