@@ -601,9 +601,22 @@ impl<'a> Printer<'a> {
         let mut comments = comments.peekable();
         while let Some(comment) = comments.next() {
             parts.push(self.build_comment_doc(comment));
-            // The next thing after this comment is the following comment, or the
-            // terminal (value/member/item/body) for the last one.
-            let next = comments.peek().map_or(terminal_pos, |c| c.span.start);
+            // The next thing after this comment — the following comment, or the
+            // terminal (value/member/item/body) for the last one. Anchored on the
+            // PHYSICAL next comment, not just the emitted one: an owned comment (glued
+            // to the value, so printed by the value's node and skipped by the emit
+            // iterator) still occupies the gap here, and both the glue test and the
+            // blank-line scan below are physical questions. Anchoring past it would
+            // unglue a run the author wrote glued (`/* a */ /* b⏎*/ v` → `/* a */` on
+            // its own line) and, worse, read the owned comment's own newline as an
+            // author blank line — inserting one on the next pass (non-idempotent).
+            // Owned comments are always the glued suffix of a leading run, so this
+            // only ever differs at the last emitted comment; bounding `blank_scan_end`
+            // at the emit-next keeps it from over-reaching a caller's filtered set.
+            let next = self.blank_scan_end(
+                comment.span.end,
+                comments.peek().map_or(terminal_pos, |c| c.span.start),
+            );
             let hugs = match glue {
                 LeadingGlue::Adjacent => self.comment_hugs_next(comment, next),
                 // A glued (not own-line) single-line block hugs across a source

@@ -26,4 +26,11 @@
 		/* c2 */
 		/* c3 */
 		3;
+
+	// a glued run whose later member is multiline stays glued (the run is not split)
+	const d =
+
+
+		/* d1 */ /* d2
+*/ 4;
 </script>

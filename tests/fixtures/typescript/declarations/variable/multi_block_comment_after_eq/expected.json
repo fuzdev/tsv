@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 334,
+	"end": 455,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -169,24 +169,72 @@
 					"column": 10
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " a glued run whose later member is multiline stays glued (the run is not split)",
+			"start": 326,
+			"end": 407,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " d1 ",
+			"start": 421,
+			"end": 429,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 2
+				},
+				"end": {
+					"line": 24,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " d2\n ",
+			"start": 430,
+			"end": 441,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 11
+				},
+				"end": {
+					"line": 25,
+					"column": 5
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 333,
+		"end": 454,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 324,
+			"end": 445,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 21,
+					"line": 26,
 					"column": 9
 				}
 			},
@@ -458,6 +506,94 @@
 							"value": " three block comments, all stay after =",
 							"start": 233,
 							"end": 274
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 409,
+					"end": 444,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 8
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 415,
+							"end": 443,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 7
+								},
+								"end": {
+									"line": 25,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 415,
+								"end": 416,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 7
+									},
+									"end": {
+										"line": 23,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 442,
+								"end": 443,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 6
+									},
+									"end": {
+										"line": 25,
+										"column": 7
+									}
+								},
+								"value": 4,
+								"raw": "4",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " d1 ",
+										"start": 421,
+										"end": 429
+									},
+									{
+										"type": "Block",
+										"value": " d2\n ",
+										"start": 430,
+										"end": 441
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a glued run whose later member is multiline stays glued (the run is not split)",
+							"start": 326,
+							"end": 407
 						}
 					]
 				}

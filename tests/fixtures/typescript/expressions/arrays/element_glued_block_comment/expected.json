@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 1010,
+	"end": 1214,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -60,9 +60,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " A glued pair between array elements stays glued.",
+			"value": " A glued pair whose second block is multiline stays glued.",
 			"start": 220,
-			"end": 271,
+			"end": 280,
 			"loc": {
 				"start": {
 					"line": 8,
@@ -70,6 +70,54 @@
 				},
 				"end": {
 					"line": 8,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 296,
+			"end": 304,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 2
+				},
+				"end": {
+					"line": 10,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2\n ",
+			"start": 305,
+			"end": 316,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 11
+				},
+				"end": {
+					"line": 11,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A glued pair between array elements stays glued.",
+			"start": 424,
+			"end": 475,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
 					"column": 52
 				}
 			}
@@ -77,15 +125,15 @@
 		{
 			"type": "Block",
 			"value": " c1 ",
-			"start": 339,
-			"end": 347,
+			"start": 543,
+			"end": 551,
 			"loc": {
 				"start": {
-					"line": 11,
+					"line": 18,
 					"column": 2
 				},
 				"end": {
-					"line": 11,
+					"line": 18,
 					"column": 10
 				}
 			}
@@ -93,15 +141,15 @@
 		{
 			"type": "Block",
 			"value": " c2 ",
-			"start": 348,
-			"end": 356,
+			"start": 552,
+			"end": 560,
 			"loc": {
 				"start": {
-					"line": 11,
+					"line": 18,
 					"column": 11
 				},
 				"end": {
-					"line": 11,
+					"line": 18,
 					"column": 19
 				}
 			}
@@ -109,15 +157,15 @@
 		{
 			"type": "Line",
 			"value": " A glued pair after a line comment stays glued.",
-			"start": 412,
-			"end": 461,
+			"start": 616,
+			"end": 665,
 			"loc": {
 				"start": {
-					"line": 14,
+					"line": 21,
 					"column": 1
 				},
 				"end": {
-					"line": 14,
+					"line": 21,
 					"column": 50
 				}
 			}
@@ -125,15 +173,15 @@
 		{
 			"type": "Line",
 			"value": " line",
-			"start": 529,
-			"end": 536,
+			"start": 733,
+			"end": 740,
 			"loc": {
 				"start": {
-					"line": 17,
+					"line": 24,
 					"column": 2
 				},
 				"end": {
-					"line": 17,
+					"line": 24,
 					"column": 9
 				}
 			}
@@ -141,15 +189,15 @@
 		{
 			"type": "Block",
 			"value": " c1 ",
-			"start": 539,
-			"end": 547,
+			"start": 743,
+			"end": 751,
 			"loc": {
 				"start": {
-					"line": 18,
+					"line": 25,
 					"column": 2
 				},
 				"end": {
-					"line": 18,
+					"line": 25,
 					"column": 10
 				}
 			}
@@ -157,15 +205,15 @@
 		{
 			"type": "Block",
 			"value": " c2 ",
-			"start": 548,
-			"end": 556,
+			"start": 752,
+			"end": 760,
 			"loc": {
 				"start": {
-					"line": 18,
+					"line": 25,
 					"column": 11
 				},
 				"end": {
-					"line": 18,
+					"line": 25,
 					"column": 19
 				}
 			}
@@ -173,15 +221,15 @@
 		{
 			"type": "Line",
 			"value": " Blocks the author put on their own lines keep them.",
-			"start": 614,
-			"end": 668,
+			"start": 818,
+			"end": 872,
 			"loc": {
 				"start": {
-					"line": 22,
+					"line": 29,
 					"column": 1
 				},
 				"end": {
-					"line": 22,
+					"line": 29,
 					"column": 55
 				}
 			}
@@ -189,15 +237,15 @@
 		{
 			"type": "Block",
 			"value": " c1 ",
-			"start": 736,
-			"end": 744,
+			"start": 940,
+			"end": 948,
 			"loc": {
 				"start": {
-					"line": 25,
+					"line": 32,
 					"column": 2
 				},
 				"end": {
-					"line": 25,
+					"line": 32,
 					"column": 10
 				}
 			}
@@ -205,15 +253,15 @@
 		{
 			"type": "Block",
 			"value": " c2 ",
-			"start": 747,
-			"end": 755,
+			"start": 951,
+			"end": 959,
 			"loc": {
 				"start": {
-					"line": 26,
+					"line": 33,
 					"column": 2
 				},
 				"end": {
-					"line": 26,
+					"line": 33,
 					"column": 10
 				}
 			}
@@ -221,15 +269,15 @@
 		{
 			"type": "Line",
 			"value": " An array pattern takes the pattern printer.",
-			"start": 813,
-			"end": 859,
+			"start": 1017,
+			"end": 1063,
 			"loc": {
 				"start": {
-					"line": 30,
+					"line": 37,
 					"column": 1
 				},
 				"end": {
-					"line": 30,
+					"line": 37,
 					"column": 47
 				}
 			}
@@ -237,15 +285,15 @@
 		{
 			"type": "Block",
 			"value": " c1 ",
-			"start": 871,
-			"end": 879,
+			"start": 1075,
+			"end": 1083,
 			"loc": {
 				"start": {
-					"line": 32,
+					"line": 39,
 					"column": 2
 				},
 				"end": {
-					"line": 32,
+					"line": 39,
 					"column": 10
 				}
 			}
@@ -253,15 +301,15 @@
 		{
 			"type": "Block",
 			"value": " c2 ",
-			"start": 880,
-			"end": 888,
+			"start": 1084,
+			"end": 1092,
 			"loc": {
 				"start": {
-					"line": 32,
+					"line": 39,
 					"column": 11
 				},
 				"end": {
-					"line": 32,
+					"line": 39,
 					"column": 19
 				}
 			}
@@ -270,19 +318,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 1009,
+		"end": 1213,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 1000,
+			"end": 1204,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 35,
+					"line": 42,
 					"column": 9
 				}
 			},
@@ -409,37 +457,37 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 273,
-					"end": 409,
+					"start": 282,
+					"end": 421,
 					"loc": {
 						"start": {
 							"line": 9,
 							"column": 1
 						},
 						"end": {
-							"line": 12,
+							"line": 13,
 							"column": 3
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 279,
-							"end": 408,
+							"start": 288,
+							"end": 420,
 							"loc": {
 								"start": {
 									"line": 9,
 									"column": 7
 								},
 								"end": {
-									"line": 12,
+									"line": 13,
 									"column": 2
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 279,
-								"end": 280,
+								"start": 288,
+								"end": 289,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -450,34 +498,154 @@
 										"column": 8
 									}
 								},
-								"name": "b"
+								"name": "e"
 							},
 							"init": {
 								"type": "ArrayExpression",
-								"start": 283,
-								"end": 408,
+								"start": 292,
+								"end": 420,
 								"loc": {
 									"start": {
 										"line": 9,
 										"column": 11
 									},
 									"end": {
-										"line": 12,
+										"line": 13,
 										"column": 2
 									}
 								},
 								"elements": [
 									{
 										"type": "Identifier",
-										"start": 287,
-										"end": 335,
+										"start": 317,
+										"end": 365,
 										"loc": {
 											"start": {
-												"line": 10,
+												"line": 11,
+												"column": 6
+											},
+											"end": {
+												"line": 11,
+												"column": 54
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaLong",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c1 ",
+												"start": 296,
+												"end": 304
+											},
+											{
+												"type": "Block",
+												"value": " c2\n ",
+												"start": 305,
+												"end": 316
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 369,
+										"end": 417,
+										"loc": {
+											"start": {
+												"line": 12,
 												"column": 2
 											},
 											"end": {
-												"line": 10,
+												"line": 12,
+												"column": 50
+											}
+										},
+										"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbLong"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A glued pair whose second block is multiline stays glued.",
+							"start": 220,
+							"end": 280
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 477,
+					"end": 613,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 483,
+							"end": 612,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 7
+								},
+								"end": {
+									"line": 19,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 483,
+								"end": 484,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 7
+									},
+									"end": {
+										"line": 16,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 487,
+								"end": 612,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 11
+									},
+									"end": {
+										"line": 19,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 491,
+										"end": 539,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 2
+											},
+											"end": {
+												"line": 17,
 												"column": 50
 											}
 										},
@@ -485,15 +653,15 @@
 									},
 									{
 										"type": "Identifier",
-										"start": 357,
-										"end": 405,
+										"start": 561,
+										"end": 609,
 										"loc": {
 											"start": {
-												"line": 11,
+												"line": 18,
 												"column": 20
 											},
 											"end": {
-												"line": 11,
+												"line": 18,
 												"column": 68
 											}
 										},
@@ -502,14 +670,14 @@
 											{
 												"type": "Block",
 												"value": " c1 ",
-												"start": 339,
-												"end": 347
+												"start": 543,
+												"end": 551
 											},
 											{
 												"type": "Block",
 												"value": " c2 ",
-												"start": 348,
-												"end": 356
+												"start": 552,
+												"end": 560
 											}
 										]
 									}
@@ -522,51 +690,51 @@
 						{
 							"type": "Line",
 							"value": " A glued pair between array elements stays glued.",
-							"start": 220,
-							"end": 271
+							"start": 424,
+							"end": 475
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 463,
-					"end": 611,
+					"start": 667,
+					"end": 815,
 					"loc": {
 						"start": {
-							"line": 15,
+							"line": 22,
 							"column": 1
 						},
 						"end": {
-							"line": 20,
+							"line": 27,
 							"column": 3
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 469,
-							"end": 610,
+							"start": 673,
+							"end": 814,
 							"loc": {
 								"start": {
-									"line": 15,
+									"line": 22,
 									"column": 7
 								},
 								"end": {
-									"line": 20,
+									"line": 27,
 									"column": 2
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 469,
-								"end": 470,
+								"start": 673,
+								"end": 674,
 								"loc": {
 									"start": {
-										"line": 15,
+										"line": 22,
 										"column": 7
 									},
 									"end": {
-										"line": 15,
+										"line": 22,
 										"column": 8
 									}
 								},
@@ -574,30 +742,30 @@
 							},
 							"init": {
 								"type": "ArrayExpression",
-								"start": 473,
-								"end": 610,
+								"start": 677,
+								"end": 814,
 								"loc": {
 									"start": {
-										"line": 15,
+										"line": 22,
 										"column": 11
 									},
 									"end": {
-										"line": 20,
+										"line": 27,
 										"column": 2
 									}
 								},
 								"elements": [
 									{
 										"type": "Identifier",
-										"start": 477,
-										"end": 525,
+										"start": 681,
+										"end": 729,
 										"loc": {
 											"start": {
-												"line": 16,
+												"line": 23,
 												"column": 2
 											},
 											"end": {
-												"line": 16,
+												"line": 23,
 												"column": 50
 											}
 										},
@@ -605,15 +773,15 @@
 									},
 									{
 										"type": "Identifier",
-										"start": 559,
-										"end": 607,
+										"start": 763,
+										"end": 811,
 										"loc": {
 											"start": {
-												"line": 19,
+												"line": 26,
 												"column": 2
 											},
 											"end": {
-												"line": 19,
+												"line": 26,
 												"column": 50
 											}
 										},
@@ -622,20 +790,20 @@
 											{
 												"type": "Line",
 												"value": " line",
-												"start": 529,
-												"end": 536
+												"start": 733,
+												"end": 740
 											},
 											{
 												"type": "Block",
 												"value": " c1 ",
-												"start": 539,
-												"end": 547
+												"start": 743,
+												"end": 751
 											},
 											{
 												"type": "Block",
 												"value": " c2 ",
-												"start": 548,
-												"end": 556
+												"start": 752,
+												"end": 760
 											}
 										]
 									}
@@ -648,51 +816,51 @@
 						{
 							"type": "Line",
 							"value": " A glued pair after a line comment stays glued.",
-							"start": 412,
-							"end": 461
+							"start": 616,
+							"end": 665
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 670,
-					"end": 810,
+					"start": 874,
+					"end": 1014,
 					"loc": {
 						"start": {
-							"line": 23,
+							"line": 30,
 							"column": 1
 						},
 						"end": {
-							"line": 28,
+							"line": 35,
 							"column": 3
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 676,
-							"end": 809,
+							"start": 880,
+							"end": 1013,
 							"loc": {
 								"start": {
-									"line": 23,
+									"line": 30,
 									"column": 7
 								},
 								"end": {
-									"line": 28,
+									"line": 35,
 									"column": 2
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 676,
-								"end": 677,
+								"start": 880,
+								"end": 881,
 								"loc": {
 									"start": {
-										"line": 23,
+										"line": 30,
 										"column": 7
 									},
 									"end": {
-										"line": 23,
+										"line": 30,
 										"column": 8
 									}
 								},
@@ -700,30 +868,30 @@
 							},
 							"init": {
 								"type": "ArrayExpression",
-								"start": 680,
-								"end": 809,
+								"start": 884,
+								"end": 1013,
 								"loc": {
 									"start": {
-										"line": 23,
+										"line": 30,
 										"column": 11
 									},
 									"end": {
-										"line": 28,
+										"line": 35,
 										"column": 2
 									}
 								},
 								"elements": [
 									{
 										"type": "Identifier",
-										"start": 684,
-										"end": 732,
+										"start": 888,
+										"end": 936,
 										"loc": {
 											"start": {
-												"line": 24,
+												"line": 31,
 												"column": 2
 											},
 											"end": {
-												"line": 24,
+												"line": 31,
 												"column": 50
 											}
 										},
@@ -731,15 +899,15 @@
 									},
 									{
 										"type": "Identifier",
-										"start": 758,
-										"end": 806,
+										"start": 962,
+										"end": 1010,
 										"loc": {
 											"start": {
-												"line": 27,
+												"line": 34,
 												"column": 2
 											},
 											"end": {
-												"line": 27,
+												"line": 34,
 												"column": 50
 											}
 										},
@@ -748,14 +916,14 @@
 											{
 												"type": "Block",
 												"value": " c1 ",
-												"start": 736,
-												"end": 744
+												"start": 940,
+												"end": 948
 											},
 											{
 												"type": "Block",
 												"value": " c2 ",
-												"start": 747,
-												"end": 755
+												"start": 951,
+												"end": 959
 											}
 										]
 									}
@@ -768,66 +936,66 @@
 						{
 							"type": "Line",
 							"value": " Blocks the author put on their own lines keep them.",
-							"start": 614,
-							"end": 668
+							"start": 818,
+							"end": 872
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 861,
-					"end": 999,
+					"start": 1065,
+					"end": 1203,
 					"loc": {
 						"start": {
-							"line": 31,
+							"line": 38,
 							"column": 1
 						},
 						"end": {
-							"line": 34,
+							"line": 41,
 							"column": 9
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 867,
-							"end": 998,
+							"start": 1071,
+							"end": 1202,
 							"loc": {
 								"start": {
-									"line": 31,
+									"line": 38,
 									"column": 7
 								},
 								"end": {
-									"line": 34,
+									"line": 41,
 									"column": 8
 								}
 							},
 							"id": {
 								"type": "ArrayPattern",
-								"start": 867,
-								"end": 992,
+								"start": 1071,
+								"end": 1196,
 								"loc": {
 									"start": {
-										"line": 31,
+										"line": 38,
 										"column": 7
 									},
 									"end": {
-										"line": 34,
+										"line": 41,
 										"column": 2
 									}
 								},
 								"elements": [
 									{
 										"type": "Identifier",
-										"start": 889,
-										"end": 937,
+										"start": 1093,
+										"end": 1141,
 										"loc": {
 											"start": {
-												"line": 32,
+												"line": 39,
 												"column": 20
 											},
 											"end": {
-												"line": 32,
+												"line": 39,
 												"column": 68
 											}
 										},
@@ -836,28 +1004,28 @@
 											{
 												"type": "Block",
 												"value": " c1 ",
-												"start": 871,
-												"end": 879
+												"start": 1075,
+												"end": 1083
 											},
 											{
 												"type": "Block",
 												"value": " c2 ",
-												"start": 880,
-												"end": 888
+												"start": 1084,
+												"end": 1092
 											}
 										]
 									},
 									{
 										"type": "Identifier",
-										"start": 941,
-										"end": 989,
+										"start": 1145,
+										"end": 1193,
 										"loc": {
 											"start": {
-												"line": 33,
+												"line": 40,
 												"column": 2
 											},
 											"end": {
-												"line": 33,
+												"line": 40,
 												"column": 50
 											}
 										},
@@ -867,15 +1035,15 @@
 							},
 							"init": {
 								"type": "Identifier",
-								"start": 995,
-								"end": 998,
+								"start": 1199,
+								"end": 1202,
 								"loc": {
 									"start": {
-										"line": 34,
+										"line": 41,
 										"column": 5
 									},
 									"end": {
-										"line": 34,
+										"line": 41,
 										"column": 8
 									}
 								},
@@ -888,8 +1056,8 @@
 						{
 							"type": "Line",
 							"value": " An array pattern takes the pattern printer.",
-							"start": 813,
-							"end": 859
+							"start": 1017,
+							"end": 1063
 						}
 					]
 				}
