@@ -839,7 +839,8 @@ Things the published numbers measure that aren't quite what they look like:
   different amounts of code, conflating config with engine speed. (oxfmt's own
   width default is already 100 — pinned anyway so a default change can't
   silently skew the rows. The options provably reach oxfmt's bundled-prettier
-  fallback for css/svelte too.)
+  Svelte fallback too — its native engine handles JS/TS and CSS; see
+  §Implementations.)
   `prettier` is the reference; `oxfmt` also targets prettier conformance, so
   `prettier` vs `oxfmt` is the closest to a same-output, same-work race. `tsv`
   tracks prettier closely but _intentionally diverges_ in documented cases (the
@@ -929,10 +930,10 @@ Things the published numbers measure that aren't quite what they look like:
   are discarded uniformly for all impls; the FFI/WASM/async boundaries block
   dead-code elimination, so no impl's work is optimized away.
 - **`tsv_wasm` is measured on the full build.** The WASM bench loads
-  `pkg/all/deno` (the default both-features artifact, ~2.6 MB — what
+  `pkg/all/deno` (the default both-features artifact, ~2.5 MB — what
   `@fuzdev/tsv_wasm` ships) for _both_ parse and format, while subset
   consumers ship the smaller `@fuzdev/tsv_format_wasm` (~2.3 MB, no convert
-  layer) or `@fuzdev/tsv_parse_wasm` (~1.2 MB, no printers). The Binary
+  layer) or `@fuzdev/tsv_parse_wasm` (~1.1 MB, no printers). The Binary
   Sizes table lists all three; the throughput rows reflect the full build.
   The native `tsv` row is the same story: the perf row loads the full
   `libtsv_ffi`, while the Binary Sizes table also lists `tsv format (ffi)`
@@ -1088,9 +1089,9 @@ project root). Every entry carries a tier — `real`, `prettier_fixture`, or
   `deno task bench:harvest:svelte-rejects` (`diagnostics/svelte_reject_harvest.ts`),
   loaded by `DevReposLoader` only when `view === 'conformance'`. Coverage then
   measures fidelity on *valid* Svelte: svelte/compiler → 100% (it's the oracle),
-  tsv → ~99.8% (residual = 8 tracked over-rejections — drop-in gaps to fix, not
-  sanctions: 7 are the svelte-fixtures gate's `KNOWN_GAPS`, and 1 is a prettier
-  `tests/format/html` Angular file outside that gate's scope).
+  tsv → 100% (every previously tracked over-rejection is fixed — the
+  svelte-fixtures gate's `KNOWN_GAPS` is empty; a new drop-in gap would read as
+  sub-100% coverage here and get tracked there).
   **Svelte only** — svelte/compiler is the parser tsv is a strict drop-in *for*;
   `acorn-typescript` **trails** modern TS/JS (its rejects include valid code tsv
   correctly parses) and `parseCss` is lenient, so neither is a validity oracle and
