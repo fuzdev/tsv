@@ -336,6 +336,7 @@ fn collect<'arena>(
     let mut has_effects = false;
     let mut dropped_regions = Vec::new();
     let mut bindable = Vec::new();
+    let mut props_id = None;
     for stmt in erased_body {
         if matches!(
             stmt,
@@ -367,6 +368,7 @@ fn collect<'arena>(
             uses_slots,
             &mut dropped_regions,
             &mut bindable,
+            &mut props_id,
         ) {
             push_unsupported(found, err);
         }

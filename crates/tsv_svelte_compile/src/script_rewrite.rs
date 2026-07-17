@@ -425,6 +425,27 @@ fn analyze_declarator<'arena>(
             }
             Ok(())
         }
+        Some(RuneInit::PropsId) => {
+            // `const id = $props.id()` binds a plain identifier only (the oracle's
+            // `props_id_invalid_placement` rejects a destructure). The binding
+            // evaluates through the `$props.id()` call — the evaluator maps that
+            // keypath to a STRING sentinel, so a `{id}` read never folds (matching
+            // the oracle's `$.escape(id)`).
+            let name = identifier_binding_name(&declarator.id, source)
+                .ok_or_else(|| unsupported(Refusal::PropsIdBindingPattern))?;
+            bindings.insert(
+                name,
+                Binding {
+                    kind: BindingKind::Normal,
+                    initial: declarator
+                        .init
+                        .as_ref()
+                        .map_or(Initial::None, Initial::Expr),
+                    updated: false,
+                },
+            );
+            Ok(())
+        }
         Some(RuneInit::State(arg)) => {
             let name = identifier_binding_name(&declarator.id, source)
                 .ok_or_else(|| unsupported(Refusal::DestructuringState))?;
@@ -433,6 +454,24 @@ fn analyze_declarator<'arena>(
                 Binding {
                     kind: BindingKind::Normal,
                     initial: arg.map_or(Initial::Undefined, Initial::Expr),
+                    updated: false,
+                },
+            );
+            Ok(())
+        }
+        Some(RuneInit::StateSnapshot(arg)) => {
+            // `const s = $state.snapshot(x)` unwraps to `const s = x`; the binding
+            // evaluates through `x` exactly as `x` itself would. A destructured
+            // target refuses — the oracle lowers `const {a} = $state.snapshot(x)`
+            // into a temp-destructure (`const tmp = x, a = tmp.a`), a shape this
+            // transform does not reproduce (a safe over-refusal).
+            let name = identifier_binding_name(&declarator.id, source)
+                .ok_or_else(|| unsupported(Refusal::DestructuringStateSnapshot))?;
+            bindings.insert(
+                name,
+                Binding {
+                    kind: BindingKind::Normal,
+                    initial: Initial::Expr(arg),
                     updated: false,
                 },
             );
@@ -552,6 +591,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
     uses_slots: bool,
     dropped_regions: &mut Vec<Span>,
     bindable: &mut Vec<BindableEntry>,
+    props_id: &mut Option<String>,
 ) -> Result<Option<Statement<'arena>>, CompileError> {
     // A top-level `$:` label is a legacy reactive statement — invalid in
     // runes mode (the oracle rejects it with legacy_reactive_statement_invalid),
@@ -627,6 +667,23 @@ pub(crate) fn rewrite_script_statement<'arena>(
             .as_ref()
             .and_then(|init| classify_rune_init(init, source));
 
+        // `$props.id()` — skip the declarator entirely: the transform hoists
+        // `const <name> = $.props_id($$renderer)` to the top of the component body
+        // (the oracle's `component_block.body.unshift`, for hydration). At most one
+        // per component (`props_duplicate`), and a plain-identifier target only
+        // (`props_id_invalid_placement` rejects a destructure). The whole declarator
+        // is a dropped region, so a comment inside refuses.
+        if matches!(rune, Some(RuneInit::PropsId)) {
+            if props_id.is_some() {
+                return Err(unsupported(Refusal::DuplicatePropsId));
+            }
+            let name = identifier_binding_name(&declarator.id, source)
+                .ok_or_else(|| unsupported(Refusal::PropsIdBindingPattern))?;
+            *props_id = Some(name);
+            dropped_regions.push(declarator.span);
+            continue;
+        }
+
         // Guard the binding pattern (a rune or derived read can hide in a
         // pattern default) — except for state/derived declarators, whose id is
         // an enforced plain identifier and is a *declaration* of the (possibly
@@ -644,6 +701,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
             let init_span = init.span();
             match rune {
                 Some(RuneInit::State(Some(arg)))
+                | Some(RuneInit::StateSnapshot(arg))
                 | Some(RuneInit::Derived(arg))
                 | Some(RuneInit::DerivedBy(arg)) => {
                     let arg_span = arg.span();
@@ -655,6 +713,9 @@ pub(crate) fn rewrite_script_statement<'arena>(
         }
 
         let mut new_id = declarator.id.clone();
+        // `RuneInit::PropsId` is skipped via `continue` above, so the arm below is
+        // genuinely dead — it documents that invariant rather than a live branch.
+        #[allow(clippy::unreachable)]
         let new_init = match rune {
             Some(RuneInit::Props) => {
                 *uses_props = true;
@@ -681,6 +742,9 @@ pub(crate) fn rewrite_script_statement<'arena>(
                 let props_ident = b.ident_at("$$props", init_span);
                 Some(Expression::Identifier(props_ident))
             }
+            // Handled above by `continue` — the declarator is skipped, never
+            // rebuilt, so this arm is unreachable. Kept for match exhaustiveness.
+            Some(RuneInit::PropsId) => unreachable!("$props.id() is skipped above"),
             Some(RuneInit::State(arg)) => match arg {
                 Some(arg) => {
                     walk_expression_guarded(arg, &mut ctx)?;
@@ -695,6 +759,11 @@ pub(crate) fn rewrite_script_statement<'arena>(
                     Some(b.void_zero())
                 }
             },
+            // `$state.snapshot(x)` unwraps to `x` (like `$state`), guarding `x`.
+            Some(RuneInit::StateSnapshot(arg)) => {
+                walk_expression_guarded(arg, &mut ctx)?;
+                Some(arg.clone())
+            }
             Some(RuneInit::Derived(expr)) => {
                 walk_expression_guarded(expr, &mut ctx)?;
                 // The oracle wraps the value with `b.thunk`, which is
@@ -730,6 +799,11 @@ pub(crate) fn rewrite_script_statement<'arena>(
             definite: declarator.definite,
             span: declarator.span,
         });
+    }
+    // Every declarator was a skipped `$props.id()` — drop the whole statement
+    // (its `id` binding lives on as the hoisted `const id = $.props_id($$renderer)`).
+    if declarations.is_empty() {
+        return Ok(None);
     }
     Ok(Some(Statement::VariableDeclaration(VariableDeclaration {
         kind: decl.kind,

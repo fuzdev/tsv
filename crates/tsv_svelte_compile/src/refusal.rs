@@ -178,12 +178,27 @@ pub enum Refusal {
     /// Destructuring a `$state(…)` declarator.
     #[error("destructuring a $state declarator")]
     DestructuringState,
+    /// Destructuring a `$state.snapshot(…)` declarator. The oracle lowers
+    /// `const {a} = $state.snapshot(x)` into a temp-destructure
+    /// (`const tmp = x, a = tmp.a`), a shape this transform does not reproduce (a
+    /// safe over-refusal); a plain-identifier target unwraps to the argument.
+    #[error("destructuring a $state.snapshot declarator")]
+    DestructuringStateSnapshot,
     /// Destructuring a `$derived(…)` declarator.
     #[error("destructuring a $derived declarator")]
     DestructuringDerived,
     /// Destructuring a `$derived.by(…)` declarator.
     #[error("destructuring a $derived.by declarator")]
     DestructuringDerivedBy,
+    /// A `$props.id()` in a position other than a plain-identifier declarator init
+    /// (a destructure, or a nested/non-declarator use). The oracle's
+    /// `props_id_invalid_placement` restricts it to a top-level variable
+    /// declarator with an identifier target.
+    #[error("$props.id() outside a plain top-level variable declaration")]
+    PropsIdBindingPattern,
+    /// A second `$props.id()` in the component (the oracle's `props_duplicate`).
+    #[error("$props.id() used more than once")]
+    DuplicatePropsId,
 
     // ── Runes ──────────────────────────────────────────────────────────────
     /// A non-sanctioned rune call (or a rune in a non-sanctioned position).
@@ -267,6 +282,12 @@ pub enum Refusal {
     /// Comments in a script with a non-destructured `$props()`.
     #[error("comments in a script with a non-destructured $props() (injected $$slots/$$events)")]
     CommentsWithNonDestructuredProps,
+    /// Comments in a script with a `$props.id()` declarator. The hoisted
+    /// `const <name> = $.props_id($$renderer)` is a synthetic first statement whose
+    /// leading comment window would sweep the carried script comments — a safe
+    /// over-refusal, like [`Self::CommentsWithSlots`].
+    #[error("comments in a script with a $props.id() declarator")]
+    CommentsWithPropsId,
     /// Comments in a script with a `$bindable()` prop default. The bindable
     /// rewrite mints an appendix `void 0` and rewrites the `$bindable(...)` call
     /// syntax inside the destructure pattern, so a carried comment's window would
@@ -775,8 +796,15 @@ impl Refusal {
                 "$props() binding pattern (not an identifier or object pattern — the oracle rejects it)",
             ),
             Self::DestructuringState => Cow::Borrowed("destructuring a $state declarator"),
+            Self::DestructuringStateSnapshot => {
+                Cow::Borrowed("destructuring a $state.snapshot declarator")
+            }
             Self::DestructuringDerived => Cow::Borrowed("destructuring a $derived declarator"),
             Self::DestructuringDerivedBy => Cow::Borrowed("destructuring a $derived.by declarator"),
+            Self::PropsIdBindingPattern => {
+                Cow::Borrowed("$props.id() outside a plain top-level variable declaration")
+            }
+            Self::DuplicatePropsId => Cow::Borrowed("$props.id() used more than once"),
             Self::TopLevelAwait => {
                 Cow::Borrowed("top-level await (async component output not implemented)")
             }
@@ -816,6 +844,9 @@ impl Refusal {
             Self::CommentsWithNonDestructuredProps => Cow::Borrowed(
                 "comments in a script with a non-destructured $props() (injected $$slots/$$events)",
             ),
+            Self::CommentsWithPropsId => {
+                Cow::Borrowed("comments in a script with a $props.id() declarator")
+            }
             Self::CommentsWithBindable => {
                 Cow::Borrowed("comments in a script with a $bindable() prop default")
             }

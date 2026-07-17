@@ -516,6 +516,10 @@ pub(crate) fn compile_server<'arena>(
     // order). A non-empty set forces the `$$renderer.component(…)` wrapper and
     // appends the trailing `$.bind_props($$props, { … })` (below).
     let mut bindable: Vec<BindableEntry> = Vec::new();
+    // The `$props.id()` local, if the script declares one (`const id =
+    // $props.id()`). The declarator is skipped in the loop and hoisted to the top
+    // of the component body below. At most one (`props_duplicate`).
+    let mut props_id: Option<String> = None;
     // `component` is the whole-component analysis, computed up front by `analyze`
     // (the script rewrite needs its `uses_slots`) but left UNRESOLVED: its error
     // must NOT win over the script-loop refusals below, so it is `?`-unwrapped
@@ -556,6 +560,7 @@ pub(crate) fn compile_server<'arena>(
             uses_slots,
             &mut dropped_regions,
             &mut bindable,
+            &mut props_id,
         )?;
         let Some(rewritten) = rewritten else {
             continue;
@@ -591,6 +596,13 @@ pub(crate) fn compile_server<'arena>(
     // program — a placement this transform doesn't reconcile yet.
     if has_comments && !user_imports.is_empty() {
         return Err(unsupported(Refusal::CommentsAlongsideImports));
+    }
+    // The hoisted `const <name> = $.props_id($$renderer)` is a synthetic
+    // (appendix-span) first statement, so its leading comment window would sweep
+    // every carried script comment — the same hazard the `$$slots` sanitize decl
+    // has. Refuse the combination (a safe over-refusal).
+    if props_id.is_some() && has_comments {
+        return Err(unsupported(Refusal::CommentsWithPropsId));
     }
     // The oracle wraps the whole body in `$$renderer.component(($$renderer) => …)`
     // whenever its `needs_context` analysis fires (a `new` expression or a
@@ -730,6 +742,23 @@ pub(crate) fn compile_server<'arena>(
         out.push_statement(&mut env.b, arena, stmt);
     }
     let body = out.finish(&mut env.b, arena);
+
+    // A `$props.id()` declarator hoists `const <name> = $.props_id($$renderer)` to
+    // the FIRST statement of the component body (the oracle's
+    // `component_block.body.unshift`, placed for hydration). Prepended here — after
+    // `out.finish`, before the `needs_context` wrapper — so it lands INSIDE the
+    // wrapper when there is one, and before the `$$slots` sanitize decl (which is
+    // prepended OUTSIDE the wrapper below). It references `$$renderer` (always in
+    // scope), never `$$props`, so it forces no parameter.
+    let body = if let Some(name) = &props_id {
+        let decl = build_props_id_decl(&mut env.b, arena, name);
+        let mut with_id: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
+        with_id.push(decl);
+        with_id.extend_from_slice(body);
+        with_id.into_bump_slice()
+    } else {
+        body
+    };
 
     // The template's erased regions get the script's comment rule (a comment in
     // an erased region's window refuses — the oracle's surviving-comment
@@ -1001,6 +1030,22 @@ fn build_bindable_object<'arena>(
         spread_trailing_comma: false,
         span: Span::new(obrace, cbrace),
     })
+}
+
+/// `const <name> = $.props_id($$renderer);` — the oracle's hoisted `$props.id()`
+/// binding, prepended as the component body's first statement.
+fn build_props_id_decl<'arena>(
+    b: &mut Builder<'arena>,
+    arena: &'arena bumpalo::Bump,
+    name: &str,
+) -> Statement<'arena> {
+    // Mint the id before the init so the declaration span runs forward, the same
+    // invariant `build_sanitize_slots_decl` relies on.
+    let id = Expression::Identifier(b.ident(name));
+    let renderer_ident = b.ident("$$renderer");
+    let renderer_arg = arena.alloc(Expression::Identifier(renderer_ident));
+    let init = b.member_call("$", "props_id", std::slice::from_ref(renderer_arg));
+    declaration_stmt(b, VariableDeclarationKind::Const, id, init)
 }
 
 /// `const $$slots = $.sanitize_slots($$props);` — the oracle's `uses_slots`

@@ -791,8 +791,16 @@ fn expression_kind(expr: &Expression<'_>) -> &'static str {
 pub(crate) enum RuneInit<'arena> {
     /// `$props()` (argument-less, direct call).
     Props,
+    /// `$props.id()` (argument-less member call) — the declarator is skipped and a
+    /// server-hoisted `const <name> = $.props_id($$renderer)` takes its place.
+    PropsId,
     /// `$state(arg?)` / `$state.raw(arg?)` — the server drops the wrapper.
     State(Option<&'arena Expression<'arena>>),
+    /// `$state.snapshot(x)` (exactly one argument) — the server unwraps it to `x`
+    /// in a declarator init, exactly like `$state`/`$derived` unwrap their
+    /// argument. Distinct from [`Self::State`] so a snapshot binding never joins
+    /// the `state_names` set (it is a plain `const`, not a reactive `$state`).
+    StateSnapshot(&'arena Expression<'arena>),
     /// `$derived(expr)` — becomes `$.derived(() => expr)`.
     Derived(&'arena Expression<'arena>),
     /// `$derived.by(fn)` — becomes `$.derived(fn)`.
@@ -808,11 +816,34 @@ pub(crate) fn classify_rune_init<'arena>(
     let Expression::CallExpression(call) = init else {
         return None;
     };
+    // An optional-chained rune init — `$state?.(x)`, `$state.snapshot?.(obj)`,
+    // `$state?.snapshot(obj)` — is a `ChainExpression` in ESTree, which the
+    // oracle's `get_rune` does NOT see through: it visits the declarator
+    // normally, so the declarator-unwrap never applies. The placement-restricted
+    // runes ($state/$state.raw/$props/$props.id/$derived/$derived.by) then error
+    // (their placement validators require a bare-call parent); $state.snapshot
+    // (valid anywhere) instead has its `CallExpression` visitor emit
+    // `$.snapshot(x)`. tsv models `?.` as a flag, not a `ChainExpression` node, so
+    // without this guard it would classify the optional form as the rune and
+    // unwrap it — a MISMATCH for $state.snapshot (`x` vs the oracle's
+    // `$.snapshot(x)`) and an over-acceptance for the rest. Refuse to classify any
+    // optional-chained init; the guard walk then refuses the stray `$`-rooted call
+    // (a safe over-refusal). The template snapshot path (`snapshot_call_arg`)
+    // recognizes the optional form separately and correctly emits `$.snapshot(x)`,
+    // matching the oracle there.
+    if call.optional || matches!(call.callee, Expression::MemberExpression(m) if m.optional) {
+        return None;
+    }
     let keypath = callee_keypath(call.callee, source)?;
     let arg = call.arguments.first();
     match keypath.as_str() {
         "$props" if call.arguments.is_empty() => Some(RuneInit::Props),
+        "$props.id" if call.arguments.is_empty() => Some(RuneInit::PropsId),
         "$state" | "$state.raw" if call.arguments.len() <= 1 => Some(RuneInit::State(arg)),
+        // `$state.snapshot` is valid only with exactly one argument (the oracle's
+        // `rune_invalid_arguments_length`); a wrong arity falls through to `None`
+        // so the guard walk refuses the stray `$state`-rooted call.
+        "$state.snapshot" if call.arguments.len() == 1 => arg.map(RuneInit::StateSnapshot),
         "$derived" if call.arguments.len() == 1 => arg.map(RuneInit::Derived),
         "$derived.by" if call.arguments.len() == 1 => arg.map(RuneInit::DerivedBy),
         _ => None,
@@ -895,7 +926,7 @@ pub(crate) fn is_inspect_call<'arena>(
 
 /// The plain (non-computed) identifier keypath of a callee: `$state`,
 /// `$state.raw` — one identifier or one member level.
-fn callee_keypath(callee: &Expression<'_>, source: &str) -> Option<String> {
+pub(crate) fn callee_keypath(callee: &Expression<'_>, source: &str) -> Option<String> {
     fn plain_name<'s>(
         id: &tsv_ts::ast::internal::Identifier<'_>,
         source: &'s str,

@@ -16,7 +16,11 @@ use tsv_svelte::ast::internal::{
     ElementKind, ExpressionTag, Fragment, FragmentNode, HtmlTag, IfBlock, KeyBlock, RenderTag,
     SnippetBlock, SpecialElement, SpecialElementKind, SpecialThis, StyleDirectiveValue,
 };
-use tsv_ts::ast::internal::{Expression, ExpressionStatement, Statement};
+use tsv_ts::ast::internal::{
+    ArrayExpression, BinaryExpression, CallExpression, ConditionalExpression, Expression,
+    ExpressionStatement, MemberExpression, NewExpression, ParenthesizedExpression,
+    SequenceExpression, SpreadElement, Statement, TemplateLiteral, UnaryExpression,
+};
 
 use crate::analyze::{NameSet, ScopeEntry, evaluate, stringify_value};
 use crate::attr_refs::{TemplateItem, each_template_item, fragment_any};
@@ -828,14 +832,36 @@ fn emit_expression_tag<'arena>(
     Ok(())
 }
 
-/// Prepare a borrowed value expression for a synthetic call argument slot:
-/// a bare read of a derived binding becomes `d()`; anything else is guarded
-/// (stray runes, non-bare derived reads, and template mutations refuse) and
-/// passed through borrowed.
+/// Prepare a borrowed value expression for a synthetic call argument slot — the
+/// emitter's **item-6 template-value walk**, the single home every template value
+/// position routes through ([`emit_expression_tag`], [`wrap_single`], the
+/// attribute/spread/component-prop borrow points). It:
+///
+/// - rewrites a bare read of a derived binding to `d()`;
+/// - rewrites every `$state.snapshot(x)` sub-node it descends into
+///   `$.snapshot(<processed x>)`, processing the argument as a value in turn (a
+///   bare derived arg → `d()`, a nested snapshot → `$.snapshot(...)`); and
+/// - guards everything else (stray runes, non-bare derived reads, template
+///   mutations, top-level await refuse) and passes it through borrowed.
+///
+/// A `$state.snapshot` in a position this walk does not descend is left for the
+/// guard, which refuses it — a safe over-refusal the next slice can widen (that
+/// same slice extends this walk to rewrite nested `d` → `d()` reads).
 pub(crate) fn wrap_value_expr<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     expr: &'arena Expression<'arena>,
 ) -> Result<&'arena [Expression<'arena>], CompileError> {
+    Ok(std::slice::from_ref(rewrite_template_value(env, expr)?))
+}
+
+/// The recursive core of [`wrap_value_expr`]: rewrite one value expression,
+/// returning the borrowed input unchanged when nothing needs rewriting (after
+/// guarding it).
+fn rewrite_template_value<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    expr: &'arena Expression<'arena>,
+) -> Result<&'arena Expression<'arena>, CompileError> {
+    // A bare read of a derived binding becomes `d()`.
     if let Expression::Identifier(id) = expr
         && id.escaped_name.is_none()
     {
@@ -843,20 +869,258 @@ pub(crate) fn wrap_value_expr<'arena>(
         let name = &env.source[start..start + id.name_len as usize];
         if env.derived_names.contains(name) {
             let call = env.b.call_expr(expr, &[]);
-            let call_alloc = env.b.arena.alloc(call);
-            return Ok(std::slice::from_ref(call_alloc));
+            return Ok(env.b.arena.alloc(call));
         }
     }
+    // A `$state.snapshot(x)` call → `$.snapshot(<processed x>)`.
+    if let Some(arg) = snapshot_call_arg(env.source, expr) {
+        let processed = rewrite_template_value(env, arg)?;
+        let call = env
+            .b
+            .member_call("$", "snapshot", std::slice::from_ref(processed));
+        return Ok(env.b.arena.alloc(call));
+    }
+    // No snapshot in this subtree: guard it whole and pass through borrowed — the
+    // unchanged pre-item-6 path, so every snapshot-free template expression keeps
+    // its exact behavior (and does no extra allocation).
+    if !contains_snapshot(env.source, expr) {
+        guard_template_value(env, expr)?;
+        return Ok(expr);
+    }
+    // A snapshot sits nested inside a wrapper — rebuild along the path.
+    rebuild_with_snapshots(env, expr)
+}
+
+/// Guard a snapshot-free template value expression (the pre-item-6 behavior):
+/// stray runes, non-bare derived reads, and top-level await refuse, and a
+/// mutation refuses via [`Refusal::MutationInTemplateExpr`] (a mutation would
+/// postdate the binding analysis the fold already consulted).
+fn guard_template_value<'arena>(
+    env: &EmitEnv<'arena, '_>,
+    expr: &'arena Expression<'arena>,
+) -> Result<(), CompileError> {
     let mut updated = NameSet::default();
     let mut nested = NameSet::default();
     let mut ctx = WalkCtx::new(env.source, &mut updated, &mut nested, &env.derived_names);
     walk_expression_guarded(expr, &mut ctx)?;
     if !updated.is_empty() {
-        // A mutation here would postdate the binding analysis the fold already
-        // consulted — refuse rather than fold stale.
         return Err(unsupported(Refusal::MutationInTemplateExpr));
     }
-    Ok(std::slice::from_ref(expr))
+    Ok(())
+}
+
+/// If `expr` is a `$state.snapshot(x)` call (the `$state.snapshot` keypath with
+/// exactly one argument), the argument `x`. Shares [`crate::analyze::callee_keypath`]
+/// with the declarator classifier, so template and script recognize it identically.
+fn snapshot_call_arg<'arena>(
+    source: &str,
+    expr: &'arena Expression<'arena>,
+) -> Option<&'arena Expression<'arena>> {
+    let Expression::CallExpression(call) = expr else {
+        return None;
+    };
+    if call.arguments.len() != 1
+        || crate::analyze::callee_keypath(call.callee, source).as_deref() != Some("$state.snapshot")
+    {
+        return None;
+    }
+    call.arguments.first()
+}
+
+/// Whether `expr` contains a `$state.snapshot(...)` call anywhere this walk
+/// descends. A false negative is safe — the snapshot then reaches the rune guard,
+/// which refuses it (a safe over-refusal). Descends exactly the wrapper node kinds
+/// [`rebuild_with_snapshots`] rebuilds.
+fn contains_snapshot(source: &str, expr: &Expression<'_>) -> bool {
+    if snapshot_call_arg(source, expr).is_some() {
+        return true;
+    }
+    match expr {
+        Expression::CallExpression(c) => {
+            contains_snapshot(source, c.callee)
+                || c.arguments.iter().any(|a| contains_snapshot(source, a))
+        }
+        Expression::NewExpression(n) => {
+            contains_snapshot(source, n.callee)
+                || n.arguments.iter().any(|a| contains_snapshot(source, a))
+        }
+        Expression::BinaryExpression(b) => {
+            contains_snapshot(source, b.left) || contains_snapshot(source, b.right)
+        }
+        Expression::MemberExpression(m) => {
+            contains_snapshot(source, m.object)
+                || (m.computed && contains_snapshot(source, m.property))
+        }
+        Expression::ConditionalExpression(c) => {
+            contains_snapshot(source, c.test)
+                || contains_snapshot(source, c.consequent)
+                || contains_snapshot(source, c.alternate)
+        }
+        Expression::UnaryExpression(u) => contains_snapshot(source, u.argument),
+        Expression::ParenthesizedExpression(p) => contains_snapshot(source, p.expression),
+        Expression::SequenceExpression(s) => {
+            s.expressions.iter().any(|e| contains_snapshot(source, e))
+        }
+        Expression::SpreadElement(s) => contains_snapshot(source, s.argument),
+        Expression::ArrayExpression(a) => a
+            .elements
+            .iter()
+            .any(|e| e.as_ref().is_some_and(|e| contains_snapshot(source, e))),
+        Expression::TemplateLiteral(t) => {
+            t.expressions.iter().any(|e| contains_snapshot(source, e))
+        }
+        _ => false,
+    }
+}
+
+/// Rebuild a value expression that contains a nested `$state.snapshot(...)`,
+/// recursing [`rewrite_template_value`] on every value-position child (a
+/// snapshot-free child re-enters the guarded fast path). A node kind this match
+/// does not cover falls through to the guard, which refuses the snapshot it
+/// carries — a safe over-refusal.
+fn rebuild_with_snapshots<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    expr: &'arena Expression<'arena>,
+) -> Result<&'arena Expression<'arena>, CompileError> {
+    let rebuilt = match expr {
+        // A `$`-rooted (non-snapshot) callee refuses via the recursive guard on the
+        // callee itself, so no explicit rune check is needed here.
+        Expression::CallExpression(call) => {
+            let callee = rewrite_template_value(env, call.callee)?;
+            let arguments = rewrite_value_slice(env, call.arguments)?;
+            Expression::CallExpression(CallExpression {
+                callee,
+                type_arguments: None,
+                arguments,
+                ..call.clone()
+            })
+        }
+        Expression::NewExpression(new) => {
+            let callee = rewrite_template_value(env, new.callee)?;
+            let arguments = rewrite_value_slice(env, new.arguments)?;
+            Expression::NewExpression(NewExpression {
+                callee,
+                type_arguments: None,
+                arguments,
+                span: new.span,
+            })
+        }
+        Expression::BinaryExpression(b) => {
+            let left = rewrite_template_value(env, b.left)?;
+            let right = rewrite_template_value(env, b.right)?;
+            Expression::BinaryExpression(BinaryExpression {
+                left,
+                right,
+                ..b.clone()
+            })
+        }
+        Expression::MemberExpression(m) => {
+            let object = rewrite_template_value(env, m.object)?;
+            // A non-computed property is a NAME, never a value read — leave it.
+            let property = if m.computed {
+                rewrite_template_value(env, m.property)?
+            } else {
+                m.property
+            };
+            Expression::MemberExpression(MemberExpression {
+                object,
+                property,
+                ..m.clone()
+            })
+        }
+        Expression::ConditionalExpression(c) => {
+            let test = rewrite_template_value(env, c.test)?;
+            let consequent = rewrite_template_value(env, c.consequent)?;
+            let alternate = rewrite_template_value(env, c.alternate)?;
+            Expression::ConditionalExpression(ConditionalExpression {
+                test,
+                consequent,
+                alternate,
+                span: c.span,
+            })
+        }
+        Expression::UnaryExpression(u) => {
+            let argument = rewrite_template_value(env, u.argument)?;
+            Expression::UnaryExpression(UnaryExpression {
+                argument,
+                ..u.clone()
+            })
+        }
+        Expression::ParenthesizedExpression(p) => {
+            let expression = rewrite_template_value(env, p.expression)?;
+            Expression::ParenthesizedExpression(ParenthesizedExpression {
+                expression,
+                span: p.span,
+            })
+        }
+        Expression::SequenceExpression(s) => {
+            let expressions = rewrite_value_slice(env, s.expressions)?;
+            Expression::SequenceExpression(SequenceExpression {
+                expressions,
+                span: s.span,
+            })
+        }
+        Expression::SpreadElement(s) => {
+            let argument = rewrite_template_value(env, s.argument)?;
+            Expression::SpreadElement(SpreadElement {
+                argument,
+                span: s.span,
+            })
+        }
+        Expression::ArrayExpression(a) => {
+            let elements = rewrite_opt_slice(env, a.elements)?;
+            Expression::ArrayExpression(ArrayExpression {
+                elements,
+                ..a.clone()
+            })
+        }
+        Expression::TemplateLiteral(t) => {
+            let expressions = rewrite_value_slice(env, t.expressions)?;
+            Expression::TemplateLiteral(TemplateLiteral {
+                expressions,
+                ..t.clone()
+            })
+        }
+        _ => {
+            guard_template_value(env, expr)?;
+            return Ok(expr);
+        }
+    };
+    Ok(env.b.arena.alloc(rebuilt))
+}
+
+/// Rewrite each expression of a slice (call arguments, sequence, template
+/// expressions), returning a fresh arena slice (shallow clones — pointers, never
+/// subtrees).
+fn rewrite_value_slice<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    exprs: &'arena [Expression<'arena>],
+) -> Result<&'arena [Expression<'arena>], CompileError> {
+    let arena = env.b.arena;
+    let mut out: BumpVec<'arena, Expression<'arena>> =
+        BumpVec::with_capacity_in(exprs.len(), arena);
+    for expr in exprs {
+        out.push(rewrite_template_value(env, expr)?.clone());
+    }
+    Ok(out.into_bump_slice())
+}
+
+/// Rewrite each present element of an array-element slice (`[a, , b]` holes stay
+/// `None`), returning a fresh arena slice.
+fn rewrite_opt_slice<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    elements: &'arena [Option<Expression<'arena>>],
+) -> Result<&'arena [Option<Expression<'arena>>], CompileError> {
+    let arena = env.b.arena;
+    let mut out: BumpVec<'arena, Option<Expression<'arena>>> =
+        BumpVec::with_capacity_in(elements.len(), arena);
+    for element in elements {
+        match element {
+            Some(expr) => out.push(Some(rewrite_template_value(env, expr)?.clone())),
+            None => out.push(None),
+        }
+    }
+    Ok(out.into_bump_slice())
 }
 
 /// Parents whose whitespace-only children are removed entirely instead of
