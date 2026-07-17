@@ -399,19 +399,48 @@ impl<'a> Printer<'a> {
                 // A comment-free value that doesn't `will_break` hangs (long case).
                 let type_doc = self.build_type_doc(value_type);
                 let value_span = value_type.span();
+                let value_has_comments = tsv_lang::has_comments_to_emit_in_range(
+                    self.comments,
+                    value_span.start,
+                    value_span.end,
+                );
                 let hug = self.value_owns_its_comment_break(value_type)
                     || (d.will_break(type_doc)
-                        && tsv_lang::has_comments_to_emit_in_range(
-                            self.comments,
-                            value_span.start,
-                            value_span.end,
-                        )
+                        && value_has_comments
                         && !self.comments_force_own_line_between(value_span.start, value_span.end));
                 if hug {
                     parts.push(d.text(" "));
                     parts.push(type_doc);
-                } else {
+                } else if value_has_comments
+                    || matches!(
+                        value_type,
+                        TSType::Literal(internal::TSLiteralType::TemplateLiteral(_))
+                    )
+                {
+                    // Break after `=` with a hanging indent, for two kinds:
+                    //   - a non-hugging comment-bearing value, preserving comment
+                    //     placement (e.g. a `[`→index own-line comment hangs the index —
+                    //     indexed_access_line_comment); and
+                    //   - a template-literal type, whose `${…}` printer force-breaks: on
+                    //     the `fluid` path the value would hug `= \`prefix_${` and break
+                    //     the interpolation instead of breaking after `=` first (tsv's
+                    //     template layout is already a deliberate divergence — see
+                    //     template_literal_type_long; `is_simple_type_arg` excludes them
+                    //     from atomic inlining for the same reason).
                     parts.push(hang_after_operator(d, type_doc));
+                } else {
+                    // The comment-free remainder is prettier's `fluid` default
+                    // (`chooseLayout`'s fallthrough): the value hugs the `=` line and
+                    // breaks INSIDE its own delimiter when it can, and the marker's `line`
+                    // keeps the LHS `<…>` inline instead of breaking the type-param list.
+                    // A postfix wrapper (`(cond)[]`, `(cond)[K]`), a prefix operator
+                    // (`keyof`/`readonly`/`typeof`) over a breakable operand, and an atomic
+                    // reference all route here; an unbreakable value (a bare reference, a
+                    // string-literal type) makes `fluid` and break-after-`=` render
+                    // identically. `shouldBreakAfterOperator` has no case for these kinds,
+                    // so prettier falls through to `fluid` — see
+                    // `prettier/src/language-js/print/assignment.js`.
+                    parts.push(fluid_after_operator(d, type_doc, GroupId::Assignment));
                 }
             }
         }
