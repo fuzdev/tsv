@@ -686,12 +686,22 @@ fn walk_fragment_node(node: &FragmentNode<'_>, nc: &mut Nc<'_>) {
         // references are reachable only through a dropped `{:catch}` (matched
         // explicitly so a new variant fails compilation here).
         FragmentNode::SpecialElement(se) => {
-            let ssr_inert = matches!(
-                se.kind,
+            // Exhaustive `match` (not `matches!`) so a new `SpecialElementKind`
+            // variant fails compilation here rather than silently defaulting to
+            // the refused-at-emission set.
+            let ssr_inert = match &se.kind {
                 SpecialElementKind::SvelteWindow
-                    | SpecialElementKind::SvelteBody
-                    | SpecialElementKind::SvelteDocument
-            );
+                | SpecialElementKind::SvelteBody
+                | SpecialElementKind::SvelteDocument => true,
+                SpecialElementKind::SvelteHead
+                | SpecialElementKind::SvelteElement { .. }
+                | SpecialElementKind::SvelteComponent { .. }
+                | SpecialElementKind::SvelteSelf
+                | SpecialElementKind::SlotElement
+                | SpecialElementKind::SvelteFragment
+                | SpecialElementKind::SvelteBoundary
+                | SpecialElementKind::TitleElement => false,
+            };
             if nc.in_dropped_catch || ssr_inert {
                 walk_special_element(se, nc);
             }
@@ -785,7 +795,7 @@ fn walk_element(element: &Element<'_>, nc: &mut Nc<'_>) {
     // and the no-op drop family (`use:`/`transition:`/`animate:`/`{@attach}`) on a
     // regular element — dropped from the tag but still walked, so a prop-rooted
     // access inside a `use:` argument still fires the wrapper. Element spreads and
-    // the still-refused directives are not visited (their emission refusal fires).
+    // the refused legacy directives are not visited (their emission refusal fires).
     // A bare directive *name* never triggers `needs_context`, so the name walk is
     // the snippet analysis's alone. Inside a dropped `{:catch}` the emitter never
     // walks the fragment, so those emission refusals never fire — there a

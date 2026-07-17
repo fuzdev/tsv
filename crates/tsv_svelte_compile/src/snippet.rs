@@ -354,7 +354,7 @@ impl<'s> Collector<'s> {
         // *names* (a use/transition/animate action reference) ride the companion
         // name walk. Inside a dropped `{:catch}` the emitter never walks the
         // fragment, so the emission refusals that let the default traversal skip
-        // element spreads / the still-refused directives never fire — there every
+        // element spreads / the refused legacy directives never fire — there every
         // attribute reference must be counted, `style:` shorthand names included.
         if self.in_dropped_catch {
             self.dropped_attribute_refs(element.attributes);

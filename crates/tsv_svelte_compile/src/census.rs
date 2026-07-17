@@ -418,10 +418,15 @@ fn import_local_names(body: &[Statement<'_>], source: &str) -> NameSet {
 /// never refuses it there; walking every child fragment can therefore
 /// over-detect in that doubly-rare position — a special element AND only in a
 /// `{:catch}` — accepted as a diagnostic imprecision. Likewise a window/body/
-/// document at an INVALID position — nested, or a duplicate — compiles-refuses
-/// (`SpecialElementInvalidPlacement`/`DuplicateSpecialElement`) but is not
-/// re-detected here; such input is oracle-rejected, so it is never a parity
-/// candidate.)
+/// document that compiles-refuses only for an INVALID-INPUT reason — nested or
+/// duplicate placement (`SpecialElementInvalidPlacement`/`DuplicateSpecialElement`),
+/// children (`SpecialElementChildren`), an illegal/non-event attribute or spread
+/// (`SpecialElementIllegalAttribute`), an out-of-whitelist bind
+/// (`Refusal::BindDirective`), or a legacy `on:`/`let:` directive
+/// (`NonPlainAttribute`) — is not re-detected here; all of that is oracle-rejected
+/// input, so it is never a parity candidate. The same acknowledged imprecision as
+/// the placement/duplicate cases: the census reports SUPPORTED-shape co-blockers,
+/// not the reasons oracle-invalid input would fail.)
 fn collect_template_nodes(fragment: &Fragment<'_>, found: &mut Vec<Refusal>) {
     for node in fragment.nodes {
         let refused = match node {

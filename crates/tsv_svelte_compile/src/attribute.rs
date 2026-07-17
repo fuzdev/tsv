@@ -1209,6 +1209,52 @@ fn emitted_bind_target<'arena>(
     Ok(wrap_value_expr(env, expr)?[0].clone())
 }
 
+/// Validate the TARGET of a `bind:` on an SSR-inert special element
+/// (`<svelte:window>`/`<svelte:body>`/`<svelte:document>`) — **validation only**
+/// (the bind is dropped from SSR output, no `$.attr` is emitted; the bind NAME is
+/// already whitelisted by the caller). Reproduces the SAME reassignable-lvalue rule
+/// regular elements enforce, reusing the shared primitives so the two never drift:
+///
+/// - `bind:this` accepts any `Identifier`/member-chain lvalue or a `{get, set}`
+///   pair, no `$state` gate — exactly [`resolve_bind_directive`]'s `this` branch.
+/// - every other (whitelisted-name) bind requires a `$state`-rooted
+///   `Identifier`/member lvalue — the SAFE gate [`emitted_bind_target`] applies,
+///   over-refusing a prop / plain reassignable `let` / each binding (which the
+///   oracle accepts) exactly as the regular path does. A non-lvalue (call / literal
+///   / logical) and a plain (non-`$state`) `const` or undefined identifier never
+///   reach `state_names`, so both refuse — matching the oracle's own
+///   `bind_invalid_expression` / `constant_binding` / `bind_invalid_value`.
+///
+/// One residual over-acceptance stays open, PRE-EXISTING and SHARED with the
+/// regular-element / `<input>` bind path: `state_names` records a `$state` /
+/// `$state.raw` root without tracking whether it was declared `const` or `let`, so
+/// `const c = $state(0)` + `bind:innerWidth={c}` (and a `const` `bind:this` target,
+/// which takes any lvalue with no `$state` gate) compiles here where the oracle
+/// rejects it (`constant_binding`). Closing it needs reassignability tracking on the
+/// binding table — a dedicated shared-primitive slice covering [`emitted_bind_target`]
+/// and [`resolve_bind_directive`]'s `this` branch at once, not this inert path alone.
+///
+/// A failure refuses with the collapsing `Refusal::BindDirective { name }` bucket.
+pub(crate) fn validate_inert_bind_target<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    directive: &'arena BindDirective<'arena>,
+) -> Result<(), CompileError> {
+    let bind_name = directive.name_span.extract(env.source).to_string();
+    // Erase a TypeScript wrapper (`bind:this={x as T}`) first, exactly as the
+    // regular fork does before gating the target's shape.
+    let expr = env.erase(&directive.expression)?;
+    if bind_name == "this" {
+        if bind_target_root(expr, env.source).is_some() || is_get_set_pair(expr) {
+            return Ok(());
+        }
+        return refuse_bind(&bind_name);
+    }
+    match bind_target_root(expr, env.source) {
+        Some(name) if env.state_names.contains(&name) => Ok(()),
+        _ => refuse_bind(&bind_name),
+    }
+}
+
 /// Build and push `$.attr(name, value[, true])` for a synthesized bind attribute.
 /// The synthetic call interleaves minted (appendix) and borrowed (host) argument
 /// spans; with carried script comments their windows would sweep — refuse,

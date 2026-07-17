@@ -331,7 +331,9 @@ fn emit_plain_attributes<'arena>(
             AttributeNode::BindDirective(directive) => {
                 emit_bind_directive(env, directive, element, name, out)?;
             }
-            // A legacy `on:` directive and `let:` are not emitted yet — refuse.
+            // A legacy `on:` directive and `let:` deliberately refuse — a runes-only
+            // fence (the oracle compiles `on:` in runes mode, but it's deprecated
+            // Svelte-4 syntax; migrate to `onclick={fn}` / the runes event attribute).
             // (`class:`/`style:`/`bind:` alongside one of these still refuses here,
             // via the sibling.)
             AttributeNode::OnDirective(_) | AttributeNode::LetDirective(_) => {
@@ -499,9 +501,11 @@ fn elide_call_args<'arena>(
 /// non-spread element.
 ///
 /// Refuses the deferred/divergent shapes: a `<select>` (the `$$renderer.select`
-/// trap), a load-error element (which gets `onload`/`onerror` capture markup), and a
-/// legacy `on:` / `let:` directive (still not emitted). A `bind:`/`class:`/`style:`
-/// validity gate can also refuse (an invalid bind target, a bad `style:` modifier).
+/// trap) and a load-error element (which gets `onload`/`onerror` capture markup) —
+/// plus, a deliberate runes-only fence rather than a deferral, a legacy `on:` / `let:`
+/// directive (deprecated Svelte-4 syntax; migrate to `onclick` / the runes event
+/// attribute). A `bind:`/`class:`/`style:` validity gate can also refuse (an invalid
+/// bind target, a bad `style:` modifier).
 fn emit_spread_attributes<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     element: &'arena Element<'arena>,
@@ -528,8 +532,8 @@ fn emit_spread_attributes<'arena>(
     // Collect the `class:`/`style:` directives (source order) for the 3rd/4th
     // arguments, guard-and-drop the no-op drop family (SSR runs no client lifecycle,
     // but a misplaced rune / top-level `await` inside the expression still refuses),
-    // and refuse the still-unemitted `on:`/`let:`. Plain attributes / spreads /
-    // `bind:` are handled inside the object builder.
+    // and deliberately refuse `on:`/`let:` (the runes-only fence). Plain attributes /
+    // spreads / `bind:` are handled inside the object builder.
     let mut class_directives: Vec<&'arena ClassDirective<'arena>> = Vec::new();
     let mut style_directives: Vec<&'arena StyleDirective<'arena>> = Vec::new();
     for attr_node in element.attributes {
@@ -557,8 +561,10 @@ fn emit_spread_attributes<'arena>(
                 }
             }
             AttributeNode::AttachTag(attach) => guard_dropped(env, &attach.expression)?,
-            // A legacy `on:` directive and `let:` are not emitted yet — refuse,
-            // matching the non-spread path (the oracle drops them, but tsv declines).
+            // A legacy `on:` directive and `let:` deliberately refuse — a runes-only
+            // fence matching the non-spread path (the oracle drops them in SSR, but
+            // tsv declines: deprecated syntax, migrate to `onclick` / the runes event
+            // attribute).
             AttributeNode::OnDirective(_) | AttributeNode::LetDirective(_) => {
                 return Err(unsupported(Refusal::NonPlainAttribute));
             }

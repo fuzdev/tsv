@@ -12,15 +12,14 @@ use std::collections::HashMap;
 
 use bumpalo::collections::Vec as BumpVec;
 use tsv_svelte::ast::internal::{
-    AwaitBlock, ConstTag, EachBlock, Element, ElementKind, ExpressionTag, Fragment, FragmentNode,
-    HtmlTag, IfBlock, KeyBlock, RenderTag, SnippetBlock, SpecialElement, SpecialElementKind,
+    Attribute, AttributeNode, AttributeValue, AwaitBlock, ConstTag, EachBlock, Element,
+    ElementKind, ExpressionTag, Fragment, FragmentNode, HtmlTag, IfBlock, KeyBlock, RenderTag,
+    SnippetBlock, SpecialElement, SpecialElementKind, StyleDirectiveValue,
 };
 use tsv_ts::ast::internal::{Expression, ExpressionStatement, Statement};
 
 use crate::analyze::{NameSet, ScopeEntry, evaluate, stringify_value};
-use crate::attr_refs::{
-    TemplateItem, each_reference_bearing_attribute_expression, each_template_item, fragment_any,
-};
+use crate::attr_refs::{TemplateItem, each_template_item, fragment_any};
 use crate::blocks::{
     emit_await_block, emit_const_tag, emit_each_block, emit_if_block, emit_key_block,
     emit_svelte_head,
@@ -265,49 +264,56 @@ pub(crate) fn emit_fragment<'arena>(
     let mut seen_inert: Vec<&'static str> = Vec::new();
     for node in nodes {
         match node {
-            FragmentNode::SpecialElement(se)
-                if matches!(se.kind, SpecialElementKind::SvelteHead) =>
-            {
-                head_nodes.push(se);
-            }
-            // The SSR-inert special elements: `<svelte:window>`/`<svelte:body>`/
-            // `<svelte:document>` compile to NOTHING (their events/binds are
-            // client-only, so the oracle emits no template output for them) and are
-            // parser-guaranteed childless. Emit nothing, but still guard-and-drop
-            // each attribute expression so a stray rune / top-level `await` refuses,
-            // exactly as a dropped event handler on a regular element does. Two
-            // invalid-input shapes the oracle rejects at analysis (tsv's parser is
-            // permissive about both, so the guard lives here): a NESTED one (legal
-            // only at the component root — `svelte_meta_invalid_placement`) and a
-            // DUPLICATE of the same kind (`svelte_meta_duplicate`).
-            FragmentNode::SpecialElement(se)
-                if matches!(
-                    se.kind,
-                    SpecialElementKind::SvelteWindow
-                        | SpecialElementKind::SvelteBody
-                        | SpecialElementKind::SvelteDocument
-                ) =>
-            {
-                let tag = se.kind.tag_name();
-                if !ctx.is_component_root {
-                    return Err(unsupported(Refusal::SpecialElementInvalidPlacement {
-                        name: tag.to_string(),
+            // Every special-element kind is dispatched here (exhaustive `match` on
+            // `se.kind`, so a new `SpecialElementKind` variant fails compilation
+            // rather than silently falling through to a refusal or a drop).
+            FragmentNode::SpecialElement(se) => match &se.kind {
+                SpecialElementKind::SvelteHead => head_nodes.push(se),
+                // The SSR-inert special elements: `<svelte:window>`/`<svelte:body>`/
+                // `<svelte:document>` compile to NOTHING (their events/binds are
+                // client-only, so the oracle emits no template output for them).
+                // They are still validated: the oracle runs its phase-2 analysis
+                // over placement, children, and every attribute — tsv's parser is
+                // permissive where the oracle rejects, so those checks live in
+                // `guard_inert_special_element` (children, illegal attributes,
+                // invalid binds, legacy directives) plus the placement/duplicate
+                // guards here. A NESTED one (legal only at the component root —
+                // `svelte_meta_invalid_placement`) and a DUPLICATE of the same kind
+                // (`svelte_meta_duplicate`) refuse.
+                kind @ (SpecialElementKind::SvelteWindow
+                | SpecialElementKind::SvelteBody
+                | SpecialElementKind::SvelteDocument) => {
+                    let tag = se.kind.tag_name();
+                    if !ctx.is_component_root {
+                        return Err(unsupported(Refusal::SpecialElementInvalidPlacement {
+                            name: tag.to_string(),
+                        }));
+                    }
+                    if seen_inert.contains(&tag) {
+                        return Err(unsupported(Refusal::DuplicateSpecialElement {
+                            name: tag.to_string(),
+                        }));
+                    }
+                    seen_inert.push(tag);
+                    guard_inert_special_element(env, se, kind, tag)?;
+                }
+                // Every other special element refuses (`<svelte:element>`,
+                // `<svelte:component>`, `<svelte:self>`, `<slot>`,
+                // `<svelte:fragment>`, `<svelte:boundary>`, `<title>`) — not emitted
+                // yet. The bucket key matches `fragment_node_kind`'s "special
+                // element".
+                SpecialElementKind::SvelteElement { .. }
+                | SpecialElementKind::SvelteComponent { .. }
+                | SpecialElementKind::SvelteSelf
+                | SpecialElementKind::SlotElement
+                | SpecialElementKind::SvelteFragment
+                | SpecialElementKind::SvelteBoundary
+                | SpecialElementKind::TitleElement => {
+                    return Err(unsupported(Refusal::TemplateNode {
+                        kind: "special element",
                     }));
                 }
-                if seen_inert.contains(&tag) {
-                    return Err(unsupported(Refusal::DuplicateSpecialElement {
-                        name: tag.to_string(),
-                    }));
-                }
-                seen_inert.push(tag);
-                let mut attr_exprs: Vec<&'arena Expression<'arena>> = Vec::new();
-                each_reference_bearing_attribute_expression(se.attributes, &mut |e| {
-                    attr_exprs.push(e);
-                });
-                for expr in attr_exprs {
-                    guard_dropped(env, expr)?;
-                }
-            }
+            },
             FragmentNode::Text(text) => {
                 list.push(CleanNode::Text(text.data(source).into_owned()));
             }
@@ -440,6 +446,169 @@ pub(crate) fn emit_fragment<'arena>(
         }
     }
     Ok(())
+}
+
+/// Validate and guard-drop the attributes of an SSR-inert special element
+/// (`<svelte:window>`/`<svelte:body>`/`<svelte:document>`). The element emits
+/// NOTHING, but the oracle still runs its full phase-2 analysis over it, so every
+/// shape the oracle rejects at analysis must refuse here (tsv's parser is
+/// permissive where the oracle is strict). Mirrors the oracle's
+/// `SvelteWindow`/`SvelteBody`/`SvelteDocument` visitors + `disallow_children` +
+/// `BindDirective`:
+///
+/// - **children** (`disallow_children`): these cannot have children
+///   (`svelte_meta_invalid_content`). tsv's parser *does* parse children into the
+///   fragment, so a non-empty fragment refuses.
+/// - **illegal attribute** (`illegal_element_attribute` /
+///   `svelte_body_illegal_attribute`): only a **modern event attribute**
+///   (`on*={expr}`, a single-expression value) is legal; a spread and every other
+///   plain attribute refuse.
+/// - **invalid bind** (`BindDirective` + `binding_properties`): a `bind:` is valid
+///   iff its name is in the per-kind whitelist ([`inert_bind_is_valid`]) **and** its
+///   target is a reassignable lvalue (`attribute::validate_inert_bind_target` — the
+///   same `$state`-rooted fork regular elements use); otherwise refuse.
+/// - **legacy directives**: a legacy `on:` event directive and `let:` are
+///   runes-only-fence refusals (`NonPlainAttribute`), matching the regular-element
+///   path — even though the oracle happens to accept `on:` here, tsv declines it (a
+///   safe over-refusal).
+/// - the **no-op drop family** (`class:`/`style:`/`use:`/`transition:`/`in:`/`out:`/
+///   `animate:`/`{@attach}`): oracle-accepted, so guard-and-drop each expression
+///   (SSR runs no client lifecycle, but a stray rune / top-level `await` refuses).
+fn guard_inert_special_element<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    se: &'arena SpecialElement<'arena>,
+    kind: &SpecialElementKind<'arena>,
+    tag: &'static str,
+) -> Result<(), CompileError> {
+    if !se.fragment.nodes.is_empty() {
+        return Err(unsupported(Refusal::SpecialElementChildren {
+            name: tag.to_string(),
+        }));
+    }
+    // Exhaustive over `AttributeNode` so a new variant fails compilation here
+    // rather than silently being dropped (or refused).
+    for attr in se.attributes {
+        match attr {
+            AttributeNode::Attribute(a) => {
+                if is_event_attribute(a, env.source) {
+                    // A modern event handler drops from SSR output, but its
+                    // expression is still guarded (a misplaced rune / top-level
+                    // `await` is an oracle analysis-phase error).
+                    if let Some([AttributeValue::ExpressionTag(t)]) = a.value {
+                        guard_dropped(env, &t.expression)?;
+                    }
+                } else {
+                    return Err(unsupported(Refusal::SpecialElementIllegalAttribute {
+                        name: tag.to_string(),
+                    }));
+                }
+            }
+            AttributeNode::SpreadAttribute(_) => {
+                return Err(unsupported(Refusal::SpecialElementIllegalAttribute {
+                    name: tag.to_string(),
+                }));
+            }
+            AttributeNode::BindDirective(d) => {
+                let name = d.name_span.extract(env.source).to_string();
+                // (1) the bind NAME must be in the per-kind whitelist, and (2) its
+                // TARGET must be a reassignable lvalue — the SAME two-part rule
+                // regular elements enforce (`attribute::validate_inert_bind_target`
+                // reuses the shared `$state`-rooted lvalue fork), so a non-lvalue /
+                // const / undefined / plain-`let` / prop target refuses just as the
+                // oracle rejects it (`bind_invalid_expression` / `constant_binding` /
+                // `bind_invalid_value`).
+                if !inert_bind_is_valid(kind, &name) {
+                    return Err(unsupported(Refusal::BindDirective { name }));
+                }
+                crate::attribute::validate_inert_bind_target(env, d)?;
+                // The bind is dropped from SSR output but still guarded (a stray rune
+                // / top-level `await`); its reassignment is collected in
+                // `needs_context` so a later read of a `$state` target stays dynamic
+                // (an unreassigned `$state` read otherwise folds to its init value).
+                guard_dropped(env, &d.expression)?;
+            }
+            // Legacy `on:` event directive and `let:` — runes-only fence: refuse,
+            // matching the regular-element path (`element.rs`).
+            AttributeNode::OnDirective(_) | AttributeNode::LetDirective(_) => {
+                return Err(unsupported(Refusal::NonPlainAttribute));
+            }
+            // The no-op drop family: guard-and-drop each expression, like a regular
+            // element (the oracle accepts them on these elements and drops them).
+            AttributeNode::ClassDirective(d) => guard_dropped(env, &d.expression)?,
+            AttributeNode::UseDirective(d) => {
+                if let Some(e) = &d.expression {
+                    guard_dropped(env, e)?;
+                }
+            }
+            AttributeNode::TransitionDirective(d) => {
+                if let Some(e) = &d.expression {
+                    guard_dropped(env, e)?;
+                }
+            }
+            AttributeNode::AnimateDirective(d) => {
+                if let Some(e) = &d.expression {
+                    guard_dropped(env, e)?;
+                }
+            }
+            AttributeNode::AttachTag(t) => guard_dropped(env, &t.expression)?,
+            AttributeNode::StyleDirective(d) => match &d.value {
+                StyleDirectiveValue::ExpressionTag(t) => guard_dropped(env, &t.expression)?,
+                StyleDirectiveValue::Parts(parts) => {
+                    for v in *parts {
+                        if let AttributeValue::ExpressionTag(t) = v {
+                            guard_dropped(env, &t.expression)?;
+                        }
+                    }
+                }
+                StyleDirectiveValue::True => {}
+            },
+        }
+    }
+    Ok(())
+}
+
+/// The oracle's `is_event_attribute` (`utils/ast.js`): a plain attribute whose
+/// value is a single expression (`{expr}`) and whose RAW authored name starts with
+/// `on`. tsv always wraps an attribute value in an array, so the oracle's
+/// `is_expression_attribute` is exactly the single-`ExpressionTag` case here.
+fn is_event_attribute(attr: &Attribute<'_>, source: &str) -> bool {
+    attr.name_span.extract(source).starts_with("on")
+        && matches!(attr.value, Some([AttributeValue::ExpressionTag(_)]))
+}
+
+/// Whether the `bind:<name>` NAME is valid on an SSR-inert special element — a
+/// faithful SUBSET of the oracle's `binding_properties` rule (`BindDirective` +
+/// `bindings.js`): `this`/`focused` are unrestricted, otherwise the name must be
+/// in the element's `valid_elements` list. Deliberately over-refuses the extra
+/// names the oracle also accepts on `<svelte:body>` (the dimension family —
+/// `clientWidth`/`offsetWidth`/…) as a safe "not yet", never an over-acceptance.
+/// The bind's TARGET (its lvalue/reassignability) is validated separately by
+/// `attribute::validate_inert_bind_target`, which the caller runs next.
+fn inert_bind_is_valid(kind: &SpecialElementKind<'_>, name: &str) -> bool {
+    if name == "this" || name == "focused" {
+        return true;
+    }
+    match kind {
+        SpecialElementKind::SvelteWindow => matches!(
+            name,
+            "innerWidth"
+                | "innerHeight"
+                | "outerWidth"
+                | "outerHeight"
+                | "scrollX"
+                | "scrollY"
+                | "online"
+                | "devicePixelRatio"
+        ),
+        SpecialElementKind::SvelteDocument => matches!(
+            name,
+            "activeElement" | "fullscreenElement" | "pointerLockElement" | "visibilityState"
+        ),
+        // `<svelte:body>` has no element-specific window/document binding; only the
+        // unrestricted `this`/`focused` above. (The caller only passes an inert
+        // kind, so the other arms are unreachable.)
+        _ => false,
+    }
 }
 
 /// Recursively test whether a fragment contains any control-flow block or

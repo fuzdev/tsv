@@ -603,6 +603,27 @@ pub enum Refusal {
         /// The special-element tag (`svelte:window`, …).
         name: String,
     },
+    /// Children on an SSR-inert special element (`<svelte:window>`/`<svelte:body>`/
+    /// `<svelte:document>`). The oracle rejects them (`svelte_meta_invalid_content`:
+    /// these elements cannot have children); tsv's parser parses them into the
+    /// element's fragment, so the compiler refuses rather than emit nothing for
+    /// oracle-rejected input.
+    #[error("<{name}> cannot have children (the oracle rejects it)")]
+    SpecialElementChildren {
+        /// The special-element tag (`svelte:window`, …).
+        name: String,
+    },
+    /// An illegal attribute on an SSR-inert special element
+    /// (`<svelte:window>`/`<svelte:body>`/`<svelte:document>`): a spread, or a plain
+    /// attribute that is not a modern event attribute (`on*={expr}`). The oracle
+    /// rejects it (`illegal_element_attribute` / `svelte_body_illegal_attribute`);
+    /// tsv's parser accepts it, so the compiler refuses rather than emit nothing for
+    /// oracle-rejected input.
+    #[error("invalid attribute on <{name}> (the oracle rejects it)")]
+    SpecialElementIllegalAttribute {
+        /// The special-element tag (`svelte:window`, …).
+        name: String,
+    },
 
     // ── CSS scoping ────────────────────────────────────────────────────────
     /// An at-rule in `<style>`.
@@ -885,6 +906,12 @@ impl Refusal {
             }
             Self::DuplicateSpecialElement { .. } => {
                 Cow::Borrowed("duplicate <{name}> element (the oracle rejects it)")
+            }
+            Self::SpecialElementChildren { .. } => {
+                Cow::Borrowed("<{name}> cannot have children (the oracle rejects it)")
+            }
+            Self::SpecialElementIllegalAttribute { .. } => {
+                Cow::Borrowed("invalid attribute on <{name}> (the oracle rejects it)")
             }
             Self::CssAtRule => Cow::Borrowed("css at-rule in <style>"),
             Self::CssNestedRule => Cow::Borrowed("nested css rule in <style>"),

@@ -51,8 +51,8 @@ project-wide conventions.
     statements (invalid in runes mode — a nested `$` label or a plain label is
     ordinary JS and clones through), `svelte/internal*` imports and
     `beforeUpdate`/`afterUpdate` imports from `svelte` (the oracle's runes-mode
-    import rules), `{@debug}`, the still-refused attribute directives
-    (a legacy `on:` directive and `let:`) — an element `{...spread}` (alone, or
+    import rules), `{@debug}`, the deliberately-refused legacy attribute directives
+    (a legacy `on:` directive and `let:` — a runes-only fence, not a gap) — an element `{...spread}` (alone, or
     co-present with `class:` / `style:` / `bind:` / the no-op drop family) is
     **emitted** as the fused
     `$.attributes(object, css_hash, classes, styles, flags)` call
@@ -220,7 +220,7 @@ project-wide conventions.
     on a regular element, dropped-but-analyzed like an event handler; its
     `each_emitted_directive_name` companion surfaces the drop-family directive
     *names* plus a `style:` shorthand name an expression traversal can't reach; the
-    still-refused positions — legacy `on:`/`let:` — are
+    refused positions — legacy `on:`/`let:` — are
     skipped, the refusal keeping their references out of output), and
     `each_reference_bearing_attribute_expression` (+ the directive-name and
     special-element entry points), the **dropped-fragment** view, which includes
