@@ -5,10 +5,15 @@
 //! (`phases/2-analyze/css/css-prune.js`) rides on `element.metadata.path` — the
 //! ancestor-node chain. This module builds that chain.
 //!
-//! One top-down walk over `root.fragment` produces a [`CensusElement`] per
-//! **regular** HTML element (components are excluded, matching the oracle's
-//! element list, which only pushes `RegularElement`/`SvelteElement`). Each census
-//! element carries its [`path`](CensusElement::path): the ancestor chain snapshot
+//! One top-down walk over `root.fragment` produces a [`CensusElement`] per scoping
+//! candidate — a **regular** HTML element or a **`<svelte:element>`** (components are
+//! excluded, matching the oracle's element list, which pushes exactly
+//! `RegularElement`/`SvelteElement`). A `<svelte:element>` is both a leaf (a type
+//! selector matches it unconditionally, its runtime tag being unknown) and an owner
+//! of its children (an ancestor element for descendant/child combinators). Each
+//! census element carries its [`node`](CensusElement::node) — a [`CensusNode`]
+//! projecting either element type onto one leaf test — and its
+//! [`path`](CensusElement::path): the ancestor chain snapshot
 //! (references, never clones), from which [`get_ancestor_elements`] and
 //! [`get_possible_element_siblings`] recover the ancestor/sibling context the
 //! combinator matcher needs — direct ports of the oracle's `get_ancestor_elements`
@@ -16,9 +21,9 @@
 //!
 //! # What the walk descends into
 //!
-//! Every fragment that reaches SSR output: element/component subtrees, `{#if}`
-//! branches, `{#each}` body + fallback, `{#await}` pending + then, `{#key}`,
-//! `{#snippet}` bodies, and `<svelte:head>` content. It deliberately **excludes
+//! Every fragment that reaches SSR output: element/component/`<svelte:element>`
+//! subtrees, `{#if}` branches, `{#each}` body + fallback, `{#await}` pending + then,
+//! `{#key}`, `{#snippet}` bodies, and `<svelte:head>` content. It deliberately **excludes
 //! `{:catch}`** — tsv drops that branch from output (the oracle's SSR `$.await`
 //! has no catch arm either), so a catch element is never emitted and never an
 //! `element_scope` candidate. Keeping the census leaf set equal to the emitted set
@@ -44,12 +49,65 @@ use tsv_svelte::ast::internal::{
     SpecialElementKind,
 };
 
-/// One regular HTML element plus the ancestor chain that gives it upward
-/// navigability (the oracle's `element.metadata.path`).
+/// One scoping candidate plus the ancestor chain that gives it upward navigability
+/// (the oracle's `element.metadata.path`).
 pub(crate) struct CensusElement<'a> {
-    pub(crate) node: &'a Element<'a>,
+    pub(crate) node: CensusNode<'a>,
     /// Ancestor frames, outermost (root) first, innermost (direct parent) last.
     pub(crate) path: Vec<PathFrame<'a>>,
+}
+
+/// A CSS scoping candidate — the oracle's element list holds `RegularElement` and
+/// `SvelteElement`, so the census does too. Both project onto one leaf test (span,
+/// attributes, type name); a `<svelte:element>` differs only in that a type selector
+/// matches it **unconditionally** (its runtime tag is unknown, `css-prune.js:637-647`)
+/// and, as a possible sibling, it only PROBABLY exists (its tag may resolve to
+/// nothing). `Copy` — both variants are a single reference.
+#[derive(Clone, Copy)]
+pub(crate) enum CensusNode<'a> {
+    /// A regular HTML element. A type selector matches it by tag name.
+    Regular(&'a Element<'a>),
+    /// A `<svelte:element>` (dynamic tag).
+    Dynamic(&'a SpecialElement<'a>),
+}
+
+impl<'a> CensusNode<'a> {
+    /// The element's full span — the CSS-scope lookup key
+    /// ([`CssScoping`](crate::css_scope) is span-keyed).
+    pub(crate) fn span(self) -> Span {
+        match self {
+            CensusNode::Regular(e) => e.span,
+            CensusNode::Dynamic(s) => s.span,
+        }
+    }
+
+    /// The element's attributes — the id/class/attribute selectors route through
+    /// `attribute_matches`, which iterates this list.
+    pub(crate) fn attributes(self) -> &'a [AttributeNode<'a>] {
+        match self {
+            CensusNode::Regular(e) => e.attributes,
+            CensusNode::Dynamic(s) => s.attributes,
+        }
+    }
+
+    /// The tag-name span: a regular element's real tag (for a type-selector compare),
+    /// or a `<svelte:element>`'s literal `svelte:element`. A type selector bypasses
+    /// the name for a dynamic node (see [`is_dynamic`](Self::is_dynamic)); this name
+    /// feeds only the `[open]`-on-`<details>`/`<dialog>` whitelist and the non-ASCII
+    /// guard, both of which behave correctly on the literal (never `details`/`dialog`,
+    /// always ASCII).
+    pub(crate) fn name_span(self) -> Span {
+        match self {
+            CensusNode::Regular(e) => e.name_span,
+            CensusNode::Dynamic(s) => s.name_span,
+        }
+    }
+
+    /// Whether this is a `<svelte:element>` — a type selector matches it
+    /// unconditionally, for any type name (`css-prune.js:637-647`).
+    pub(crate) fn is_dynamic(self) -> bool {
+        matches!(self, CensusNode::Dynamic(_))
+    }
 }
 
 /// One nesting level of an element's path: the sibling fragment it lives in, its
@@ -78,8 +136,11 @@ pub(crate) struct PathFrame<'a> {
 enum Owner<'a> {
     /// The component root fragment.
     Root,
-    /// A regular HTML element (an ancestor element, and a sibling-walk boundary).
-    Element(&'a Element<'a>),
+    /// A regular HTML element or a `<svelte:element>` (an ancestor element, and a
+    /// sibling-walk boundary — the oracle's `get_ancestor_elements` and
+    /// `get_element_parent` treat both `RegularElement` and `SvelteElement` as
+    /// element parents, `css-prune.js:859`/`981`).
+    Element(CensusNode<'a>),
     /// A component — transparent for ancestor purposes (not an ancestor element),
     /// and its slot content flows into the parent for siblings.
     Component,
@@ -129,7 +190,7 @@ pub(crate) fn build_census<'a>(root: &Root<'a>) -> ElementCensus<'a> {
     let by_span = elements
         .iter()
         .enumerate()
-        .map(|(i, e)| (span_key(e.node.span), i))
+        .map(|(i, e)| (span_key(e.node.span()), i))
         .collect();
     ElementCensus { elements, by_span }
 }
@@ -155,16 +216,12 @@ fn walk_fragment<'a>(
                 if element.kind == ElementKind::Component {
                     walk_fragment(element.fragment.nodes, Owner::Component, path, elements);
                 } else {
+                    let node = CensusNode::Regular(element);
                     elements.push(CensusElement {
-                        node: element,
+                        node,
                         path: path.clone(),
                     });
-                    walk_fragment(
-                        element.fragment.nodes,
-                        Owner::Element(element),
-                        path,
-                        elements,
-                    );
+                    walk_fragment(element.fragment.nodes, Owner::Element(node), path, elements);
                 }
                 path.pop();
             }
@@ -222,6 +279,20 @@ fn walk_fragment<'a>(
                 walk_fragment(block.body.nodes, Owner::Snippet, path, elements);
                 path.pop();
             }
+            // A `<svelte:element>` is both a scoping leaf and an owner of its
+            // children (an ancestor element). It descends like a regular element —
+            // only the leaf test differs (a type selector matches it
+            // unconditionally), which `CensusNode::Dynamic` carries.
+            FragmentNode::SpecialElement(special) if is_svelte_element(special) => {
+                path.push(frame);
+                let node = CensusNode::Dynamic(special);
+                elements.push(CensusElement {
+                    node,
+                    path: path.clone(),
+                });
+                walk_fragment(special.fragment.nodes, Owner::Element(node), path, elements);
+                path.pop();
+            }
             FragmentNode::SpecialElement(special) if is_svelte_head(special) => {
                 path.push(frame);
                 walk_fragment(special.fragment.nodes, Owner::Head, path, elements);
@@ -238,9 +309,13 @@ fn is_svelte_head(special: &SpecialElement<'_>) -> bool {
     matches!(special.kind, SpecialElementKind::SvelteHead)
 }
 
+fn is_svelte_element(special: &SpecialElement<'_>) -> bool {
+    matches!(special.kind, SpecialElementKind::SvelteElement { .. })
+}
+
 /// An ancestor element and the length of its own path (a prefix of the descendant's).
 pub(crate) struct AncestorRef<'a> {
-    pub(crate) node: &'a Element<'a>,
+    pub(crate) node: CensusNode<'a>,
     /// The ancestor's path is `descendant_path[..path_len]`.
     pub(crate) path_len: usize,
 }
@@ -298,7 +373,7 @@ enum Existence {
 /// which is still testable as a leaf but not navigable further.
 #[derive(Clone, Copy)]
 pub(crate) struct SiblingRef<'a, 'c> {
-    pub(crate) node: &'a Element<'a>,
+    pub(crate) node: CensusNode<'a>,
     pub(crate) path: Option<&'c [PathFrame<'a>]>,
 }
 
@@ -314,7 +389,7 @@ pub(crate) fn get_possible_element_siblings<'a, 'c>(
     adjacent_only: bool,
     source: &str,
 ) -> Result<Vec<SiblingRef<'a, 'c>>, ()> {
-    let mut result: Vec<(&'a Element<'a>, Existence)> = Vec::new();
+    let mut result: Vec<(CensusNode<'a>, Existence)> = Vec::new();
     for level in (0..path.len()).rev() {
         let frame = &path[level];
         let nodes = frame.nodes;
@@ -350,13 +425,13 @@ pub(crate) fn get_possible_element_siblings<'a, 'c>(
 
 fn finish<'a, 'c>(
     census: &'c ElementCensus<'a>,
-    result: Vec<(&'a Element<'a>, Existence)>,
+    result: Vec<(CensusNode<'a>, Existence)>,
 ) -> Vec<SiblingRef<'a, 'c>> {
     result
         .into_iter()
         .map(|(node, _)| SiblingRef {
             node,
-            path: census.path_of(node.span),
+            path: census.path_of(node.span()),
         })
         .collect()
 }
@@ -367,17 +442,24 @@ fn scan_sibling<'a>(
     sib: &'a FragmentNode<'a>,
     adjacent_only: bool,
     source: &str,
-    result: &mut Vec<(&'a Element<'a>, Existence)>,
+    result: &mut Vec<(CensusNode<'a>, Existence)>,
 ) -> Result<bool, ()> {
     match sib {
         FragmentNode::Element(element) if element.kind != ElementKind::Component => {
             // A slotted element (`slot="…"`) is placed elsewhere, not a flow sibling.
             if !has_slot_attribute(element, source) {
-                add_one(result, element, Existence::Definitely);
+                add_one(result, CensusNode::Regular(element), Existence::Definitely);
                 if adjacent_only {
                     return Ok(true);
                 }
             }
+        }
+        // A `<svelte:element>` sibling only PROBABLY exists (its runtime tag may
+        // resolve to nothing), so — unlike a regular element — it never triggers the
+        // `adjacent_only` (`+`) early stop and carries no slot check
+        // (`css-prune.js:1041`).
+        FragmentNode::SpecialElement(special) if is_svelte_element(special) => {
+            add_one(result, CensusNode::Dynamic(special), Existence::Probably);
         }
         FragmentNode::IfBlock(_)
         | FragmentNode::EachBlock(_)
@@ -406,7 +488,7 @@ fn possible_nested_siblings<'a>(
     node: &'a FragmentNode<'a>,
     adjacent_only: bool,
     source: &str,
-    out: &mut Vec<(&'a Element<'a>, Existence)>,
+    out: &mut Vec<(CensusNode<'a>, Existence)>,
 ) -> Result<(), ()> {
     match node {
         FragmentNode::IfBlock(block) => nested_over_fragments(
@@ -439,7 +521,7 @@ fn possible_nested_siblings_each<'a>(
     block: &'a EachBlock<'a>,
     adjacent_only: bool,
     source: &str,
-    out: &mut Vec<(&'a Element<'a>, Existence)>,
+    out: &mut Vec<(CensusNode<'a>, Existence)>,
 ) -> Result<(), ()> {
     nested_over_fragments(
         &[Some(&block.body), block.fallback.as_ref()],
@@ -456,9 +538,9 @@ fn nested_over_fragments<'a>(
     fragments: &[Option<&'a Fragment<'a>>],
     adjacent_only: bool,
     source: &str,
-    out: &mut Vec<(&'a Element<'a>, Existence)>,
+    out: &mut Vec<(CensusNode<'a>, Existence)>,
 ) -> Result<(), ()> {
-    let mut result: Vec<(&'a Element<'a>, Existence)> = Vec::new();
+    let mut result: Vec<(CensusNode<'a>, Existence)> = Vec::new();
     let mut exhaustive = true;
     for fragment in fragments {
         match fragment {
@@ -486,16 +568,22 @@ fn loop_child<'a>(
     children: &'a [FragmentNode<'a>],
     adjacent_only: bool,
     source: &str,
-    result: &mut Vec<(&'a Element<'a>, Existence)>,
+    result: &mut Vec<(CensusNode<'a>, Existence)>,
 ) -> Result<(), ()> {
     let _ = source;
     for child in children.iter().rev() {
         match child {
             FragmentNode::Element(element) if element.kind != ElementKind::Component => {
-                add_one(result, element, Existence::Definitely);
+                add_one(result, CensusNode::Regular(element), Existence::Definitely);
                 if adjacent_only {
                     break;
                 }
+            }
+            // A `<svelte:element>` last child only PROBABLY exists — added as a
+            // possible sibling but never breaking the `adjacent_only` scan
+            // (`css-prune.js:1215`).
+            FragmentNode::SpecialElement(special) if is_svelte_element(special) => {
+                add_one(result, CensusNode::Dynamic(special), Existence::Probably);
             }
             FragmentNode::IfBlock(_)
             | FragmentNode::EachBlock(_)
@@ -518,11 +606,11 @@ fn loop_child<'a>(
 
 /// Add one possible sibling, keeping the higher existence on a repeat span.
 fn add_one<'a>(
-    result: &mut Vec<(&'a Element<'a>, Existence)>,
-    node: &'a Element<'a>,
+    result: &mut Vec<(CensusNode<'a>, Existence)>,
+    node: CensusNode<'a>,
     exist: Existence,
 ) {
-    if let Some(entry) = result.iter_mut().find(|(e, _)| e.span == node.span) {
+    if let Some(entry) = result.iter_mut().find(|(e, _)| e.span() == node.span()) {
         if exist == Existence::Definitely {
             entry.1 = Existence::Definitely;
         }
@@ -532,8 +620,8 @@ fn add_one<'a>(
 }
 
 fn add_all<'a>(
-    result: &mut Vec<(&'a Element<'a>, Existence)>,
-    from: &[(&'a Element<'a>, Existence)],
+    result: &mut Vec<(CensusNode<'a>, Existence)>,
+    from: &[(CensusNode<'a>, Existence)],
 ) {
     for &(node, exist) in from {
         add_one(result, node, exist);

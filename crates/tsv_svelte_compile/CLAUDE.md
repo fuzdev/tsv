@@ -392,12 +392,14 @@ project-wide conventions.
   `<select>` / load-error / custom), and the only forks are the `bind:` handling (a
   `<svelte:element>` validates a `bind:this` via `attribute::validate_dynamic_bind`
   and refuses every other bind) and the spread `flags` argument (always absent — a
-  dynamic tag is never `<input>`/custom). Deferred as safe refusals: a
-  `<svelte:element>` in a component with a scoping `<style>`
-  (`Refusal::SvelteElementScopedStyle` — the CSS census landmine, next sub-slice), a
-  `slot="…"` on a `<svelte:element>` component child (would MISROUTE the
-  `FragmentNode::Element`-only named-slot detection), a legacy `on:`/`let:` (the
-  runes-only fence), and `bind:focused`/the `omit_in_ssr` family.
+  dynamic tag is never `<input>`/custom). A `<svelte:element>` in a component with a
+  scoping `<style>` is **CSS-scoped** like a regular element: the element census
+  holds it as a leaf and owner, a type/universal selector matches it unconditionally,
+  and `emit_svelte_element` synthesizes the hash class into its attributes closure
+  (`env.special_element_scope`). Deferred as safe refusals: a `slot="…"` on a
+  `<svelte:element>` component child (would MISROUTE the `FragmentNode::Element`-only
+  named-slot detection), a legacy `on:`/`let:` (the runes-only fence), and
+  `bind:focused`/the `omit_in_ssr` family.
 - `attribute.rs` — attribute emission: dynamic and mixed attributes →
   `$.attr(name, expr[, true])` / `$.attr_class` / `$.attr_style` with
   `$.stringify` interpolations (a mixed attribute whose every part folds
@@ -472,24 +474,34 @@ project-wide conventions.
   validated but NOT partitioned, reusing `build_style_property`).
 - `element_census.rs` — the **upfront element census** (`ElementCensus`): one
   top-down walk over `root.fragment`, run in `analyze()`, producing a
-  `CensusElement` per regular HTML element (components excluded, matching the
-  oracle's element list) with an ancestor/sibling `path` — the upward navigability
-  the Svelte AST lacks, and the substrate the combinator matcher navigates
-  (`get_ancestor_elements` for descendant/child, `get_possible_element_siblings` /
-  `get_possible_nested_siblings` / `loop_child` for `+`/`~`, with block-descent and
-  the `{#each}` self-adjacency wrap-around). Descends every SSR-reachable fragment
-  (element/component subtrees, `{#if}` / `{#each}` / `{#await}`-pending+then /
-  `{#key}` / `{#snippet}` bodies, `<svelte:head>`) but **not** `{:catch}` (dropped
-  from output), so the census leaf set equals the emitted set — keeping the
-  single-compound match byte-identical to the pre-census emission-fused result.
+  `CensusElement` per scoping candidate — a regular HTML element or a
+  `<svelte:element>` (components excluded, matching the oracle's element list, which
+  holds `RegularElement`/`SvelteElement`) — with an ancestor/sibling `path`, the
+  upward navigability the Svelte AST lacks, and the substrate the combinator matcher
+  navigates (`get_ancestor_elements` for descendant/child,
+  `get_possible_element_siblings` / `get_possible_nested_siblings` / `loop_child` for
+  `+`/`~`, with block-descent and the `{#each}` self-adjacency wrap-around). Each
+  candidate is a `CensusNode { Regular(&Element), Dynamic(&SpecialElement) }`
+  projecting both element types onto one leaf test; a `<svelte:element>` differs only
+  in that a type selector matches it unconditionally (its runtime tag is unknown) and,
+  as a possible sibling, it only PROBABLY exists (so it never triggers the `+`
+  adjacent early-stop and carries no slot check — `css-prune.js:1041`/`1215`).
+  Descends every SSR-reachable fragment (element/component/`<svelte:element>`
+  subtrees, `{#if}` / `{#each}` / `{#await}`-pending+then / `{#key}` / `{#snippet}`
+  bodies, `<svelte:head>`) but **not** `{:catch}` (dropped from output), so the census
+  leaf set equals the emitted set — keeping the single-compound match byte-identical to
+  the pre-census emission-fused result.
 - `css_scope.rs` — CSS scoping: parses a rule's selector into a CHAIN of compounds
   (type / id / class / attribute / universal + trailing pseudo, joined by
   combinators), then matches the chain BACKWARD against the element census
   (`match_scope` → `apply_selector` / `apply_combinator`, a port of the oracle's
   `css-prune.js`; the leaf reuses the joint-AND predicate list —
-  `relative_selector_might_apply_to_node` / `attribute_matches`). Every compound a
+  `relative_selector_might_apply_to_node` / `attribute_matches` — over a `CensusNode`,
+  so a type selector matches a `<svelte:element>` unconditionally while id/class/
+  attribute selectors route through its real attribute list). Every compound a
   match reaches gains the `svelte-tsvhash` class and every element the match touches
-  is scoped (`CssScoping.scoped_elements`, read by `EmitEnv::element_scope`); the
+  is scoped (`CssScoping.scoped_elements`, read by `EmitEnv::element_scope` /
+  `EmitEnv::special_element_scope`); the
   compound is **source-spliced** (appended after the last non-pseudo anchor, or
   replacing a bare `*`) — author whitespace preserved, not reprinted — with a
   per-`ComplexSelector` specificity bump (the first scoped compound a plain

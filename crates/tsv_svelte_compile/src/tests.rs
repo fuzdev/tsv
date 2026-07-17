@@ -3593,8 +3593,26 @@ fn compile_svelte_element_specific_refusals() {
     );
     // Legacy `on:`/`let:` refuse (the runes-only fence).
     assert_refuses("<svelte:element this={tag} on:click={h} />");
-    // A scoping `<style>` refuses (the CSS census landmine — deferred).
-    assert_refuses("<svelte:element this={tag} /><style>div { color: red }</style>");
+    // A scoping `<style>` scopes the element: a type selector matches a
+    // `<svelte:element>` unconditionally, so it synthesizes the hash class and the
+    // selector is used (not pruned → no `CssSelectorNoMatch`).
+    let out = compile(
+        "<svelte:element this={tag} /><style>div { color: red }</style>",
+        &CompileOptions::default(),
+    )
+    .expect("scoped <svelte:element> compiles");
+    assert!(
+        out.js.contains(r#" class="svelte-tsvhash""#),
+        "expected synthesized hash class, got: {}",
+        out.js
+    );
+    assert!(
+        out.css
+            .as_deref()
+            .is_some_and(|css| css.contains("div.svelte-tsvhash")),
+        "expected scoped selector, got: {:?}",
+        out.css
+    );
     // A `bind:this` omits and the element compiles.
     compile(
         "<script>let el;</script><svelte:element this={tag} bind:this={el} />",

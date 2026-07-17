@@ -26,11 +26,11 @@ use tsv_css::ast::internal::{
     RelativeSelector, SimpleSelector,
 };
 use tsv_lang::Span;
-use tsv_svelte::ast::internal::{AttributeNode, AttributeValue, Element, Style};
+use tsv_svelte::ast::internal::{AttributeNode, AttributeValue, Element, SpecialElement, Style};
 use tsv_ts::ast::internal::Expression;
 
 use crate::element_census::{
-    ElementCensus, PathFrame, get_ancestor_elements, get_possible_element_siblings,
+    CensusNode, ElementCensus, PathFrame, get_ancestor_elements, get_possible_element_siblings,
     has_element_parent,
 };
 use crate::transform_server::unsupported;
@@ -183,10 +183,23 @@ pub(crate) struct CssScoping {
 }
 
 impl CssScoping {
-    /// Whether `element` gained the hash class (a lookup — matching already ran).
+    /// Whether the element at `span` gained the hash class (a lookup — matching
+    /// already ran). The scope set is span-keyed, so a regular element and a
+    /// `<svelte:element>` share one lookup.
+    fn span_scoped(&self, span: Span) -> bool {
+        self.scoped_elements.contains(&(span.start, span.end))
+    }
+
+    /// Whether `element` (a regular element) gained the hash class.
     pub(crate) fn element_scoped(&self, element: &Element<'_>) -> bool {
-        self.scoped_elements
-            .contains(&(element.span.start, element.span.end))
+        self.span_scoped(element.span)
+    }
+
+    /// Whether `special` (a `<svelte:element>`) gained the hash class. The oracle
+    /// scopes it whenever a type/universal selector reaches it (its type match is
+    /// unconditional), synthesizing `class="svelte-…"` in its attributes closure.
+    pub(crate) fn special_element_scoped(&self, special: &SpecialElement<'_>) -> bool {
+        self.span_scoped(special.span)
     }
 
     /// The compounds that matched no element (pruning candidates). Each yields a
@@ -667,7 +680,7 @@ fn refuse(sink: &mut Option<&mut Vec<Refusal>>, reason: Refusal) -> Result<(), C
 #[allow(clippy::too_many_arguments)]
 fn apply_selector<'a>(
     sel: &ScopedSelector,
-    element: &'a Element<'a>,
+    element: CensusNode<'a>,
     path: &[PathFrame<'a>],
     from: usize,
     to: usize,
@@ -689,7 +702,8 @@ fn apply_selector<'a>(
         if !relative.global {
             rel_scoped[idx] = true;
         }
-        scoped.insert((element.span.start, element.span.end));
+        let span = element.span();
+        scoped.insert((span.start, span.end));
     }
     Ok(matched)
 }
@@ -773,7 +787,7 @@ fn every_is_global(sel: &ScopedSelector, from: usize, to: usize) -> bool {
 /// slice's compounds (`css-prune.js:436-675`).
 fn relative_might_apply(
     relative: &ScopedRelative,
-    element: &Element<'_>,
+    element: CensusNode<'_>,
     source: &str,
 ) -> Result<bool, CompileError> {
     match relative.kind {
@@ -781,7 +795,7 @@ fn relative_might_apply(
         RelKind::BareGlobal => Ok(true),
         // A plain compound, or a `:global(<compound>)`'s inner compound.
         RelKind::Normal | RelKind::PureGlobal => {
-            let element_name = element.name_span.extract(source);
+            let element_name = element.name_span().extract(source);
             for predicate in &relative.predicates {
                 if !predicate_matches(predicate, element, element_name, source)? {
                     return Ok(false);
@@ -796,13 +810,20 @@ fn relative_might_apply(
 
 fn predicate_matches(
     predicate: &Predicate,
-    element: &Element<'_>,
+    element: CensusNode<'_>,
     element_name: &str,
     source: &str,
 ) -> Result<bool, CompileError> {
     match predicate {
         Predicate::Universal => Ok(true),
         Predicate::Type(name) => {
+            // A `<svelte:element>`'s runtime tag is unknown, so a type selector
+            // matches it for ANY name (`css-prune.js:637-647`, `element.type !==
+            // 'SvelteElement'`). No name compare — the literal `svelte:element` is
+            // never the runtime tag.
+            if element.is_dynamic() {
+                return Ok(true);
+            }
             if !element_name.is_ascii() {
                 return Err(unsupported(Refusal::CssCaseInsensitiveNonAscii));
             }
@@ -861,7 +882,7 @@ fn is_attribute_whitelisted(element_name: &str, attr_name: &str) -> bool {
 /// expression (`{x}`) is `UNKNOWN` → assume match; anything enumerable refuses.
 #[allow(clippy::too_many_arguments)]
 fn attribute_matches(
-    element: &Element<'_>,
+    element: CensusNode<'_>,
     name: &str,
     expected_value: Option<&str>,
     operator: Option<AttributeMatcher>,
@@ -870,7 +891,7 @@ fn attribute_matches(
     source: &str,
 ) -> Result<bool, CompileError> {
     let name_lower = name.to_ascii_lowercase();
-    for node in element.attributes {
+    for node in element.attributes() {
         match node {
             AttributeNode::SpreadAttribute(_) => return Ok(true),
             AttributeNode::BindDirective(bind) if bind.name_span.extract(source) == name => {

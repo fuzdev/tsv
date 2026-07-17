@@ -291,8 +291,9 @@ fn emit_plain_attributes<'arena>(
     // CSS scope: did the upfront census match give this element the
     // `svelte-tsvhash` class? A scoped element folds the hash into its authored
     // `class` / `class:` markup below, or synthesizes it after all plain attributes
-    // when it has neither. (A `<svelte:element>` is never scoped in this slice — the
-    // CSS census landmine is deferred, so its caller passes `scoped = false`.)
+    // when it has neither. Both a regular element and a `<svelte:element>` route here
+    // — the caller passes its census-match result (`element_scope` /
+    // `special_element_scope`).
     let element_scoped = scoped;
     let has_class_attr = attributes.iter().any(
         |attr_node| matches!(attr_node, AttributeNode::Attribute(a) if attribute_is_class(env, a)),
@@ -659,9 +660,9 @@ fn emit_spread_attributes<'arena>(
     }
 
     // Whether the element is CSS-scoped (the caller supplies the lookup: a regular
-    // element passes `env.element_scope`, a `<svelte:element>` passes `false` in this
-    // slice). When scoped, the hash rides the `css_hash` (2nd) argument, never
-    // concatenated into the class value.
+    // element passes `env.element_scope`, a `<svelte:element>` passes
+    // `env.special_element_scope`). When scoped, the hash rides the `css_hash` (2nd)
+    // argument, never concatenated into the class value.
     let object = build_element_spread_object(env, host, name)?;
     let css_hash = scoped.then(|| env.b.string_literal_expr(SCOPE_HASH_CLASS));
     let classes = (!class_directives.is_empty())
@@ -707,10 +708,10 @@ fn emit_spread_attributes<'arena>(
 /// - **childrenFn** (`() => { … }`): the element's fragment, emitted like any
 ///   element child. Elided when the fragment renders nothing.
 ///
-/// 2a scope: the CSS census landmine is deferred, so an emittable `<svelte:element>`
-/// in a component with a scoping `<style>` refuses
-/// ([`Refusal::SvelteElementScopedStyle`]) rather than under-scope — the oracle
-/// scopes it unconditionally.
+/// CSS scope: a type/universal selector matches a `<svelte:element>`
+/// unconditionally, so a styled component scopes every one the census reaches — the
+/// hash class is synthesized into the attributes closure exactly like a regular
+/// element's (via the shared [`emit_host_attributes`], keyed on the census match).
 pub(crate) fn emit_svelte_element<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     se: &'arena SpecialElement<'arena>,
@@ -720,16 +721,13 @@ pub(crate) fn emit_svelte_element<'arena>(
 ) -> Result<(), CompileError> {
     let arena = env.b.arena;
 
-    // 2a defers the CSS census integration: the oracle scopes a `<svelte:element>`
-    // unconditionally (a type/universal selector matches it however its runtime tag
-    // resolves), but tsv's element census does not yet hold it as a scoping leaf, so
-    // emitting it in a styled component would under-scope → a MISMATCH. Refuse the
-    // combination (2b removes this). `env.scope` is `Some` exactly when the component
-    // has a `<style>` — the conservative, safe boundary. Checked at the emit site so
-    // a `<svelte:element>` in a dropped `{:catch}` (never reached here) still compiles.
-    if env.scope.is_some() {
-        return Err(unsupported(Refusal::SvelteElementScopedStyle));
-    }
+    // CSS scope: the oracle scopes a `<svelte:element>` whenever a type/universal
+    // selector reaches it (its type match is unconditional, `css-prune.js:637-647`),
+    // synthesizing `class="svelte-…"` in its attributes closure. The upfront census
+    // (`element_census`) holds it as a scoping leaf and owner, so this is the same
+    // span lookup as a regular element's — passed through `emit_host_attributes`,
+    // where a scoped element with no `class` markup synthesizes one.
+    let scoped = env.special_element_scope(se);
 
     // A `{@const}` is NOT valid as a direct child of a `<svelte:element>` — the
     // oracle rejects it (`const_tag_invalid_placement`; its valid-parent list is
@@ -770,7 +768,7 @@ pub(crate) fn emit_svelte_element<'arena>(
         AttrHost::Dynamic(se),
         "svelte:element",
         &mut attrs_body,
-        false,
+        scoped,
     )?;
     let attr_stmts = attrs_body.finish(&mut env.b, arena);
     let attrs_fn = (!attr_stmts.is_empty()).then(|| paramless_renderer_arrow(env, attr_stmts));

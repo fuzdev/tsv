@@ -51,7 +51,7 @@ use std::collections::HashMap;
 
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{Comment, Span};
-use tsv_svelte::ast::internal::{Element, Root};
+use tsv_svelte::ast::internal::{Element, Root, SpecialElement};
 use tsv_ts::ast::internal::{
     BlockStatement, ExportDefaultDeclaration, ExportDefaultValue, Expression, ExpressionStatement,
     FunctionDeclaration, Statement, VariableDeclaration, VariableDeclarationKind,
@@ -203,6 +203,16 @@ impl<'arena> EmitEnv<'arena, '_> {
         self.scope
             .as_ref()
             .is_some_and(|scope| scope.element_scoped(element))
+    }
+
+    /// Whether this `<svelte:element>` is CSS-scoped — the same upfront census-match
+    /// lookup as [`element_scope`](Self::element_scope), keyed on the special
+    /// element's span. A type or universal selector matches a `<svelte:element>`
+    /// unconditionally, so a styled component scopes every one it reaches.
+    pub(crate) fn special_element_scope(&self, special: &SpecialElement<'arena>) -> bool {
+        self.scope
+            .as_ref()
+            .is_some_and(|scope| scope.special_element_scoped(special))
     }
 
     /// The `each_array` unique name for the next `{#each}` (source order).
