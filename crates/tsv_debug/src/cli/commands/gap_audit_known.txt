@@ -215,7 +215,7 @@ DROPPED	/,,⟨⟩,];	annotation,block,jsdoc_cast
 DROPPED	//*⟨⟩␣	line
 DROPPED	/⟨⟩);	annotation,block,jsdoc_cast,multiline
 DROPPED	/⟨⟩*	multiline
-DROPPED	/⟨⟩/	line,multiline
+DROPPED	/⟨⟩/	multiline
 DROPPED	/⟨⟩/*	line,multiline
 DROPPED	/⟨⟩␣	line,multiline
 DROPPED	:(⟨⟩//	annotation,block,jsdoc_cast,multiline
