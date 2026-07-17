@@ -183,11 +183,13 @@ project-wide conventions.
 - `rune_guard.rs` — the rune refusal walk plus the collection passes riding the
   same exhaustive traversal: refuses any `$`-prefixed identifier reference or
   `$`-rooted call outside the sanctioned rewrites — the sanctioned set now
-  includes a `$bindable(fallback?)` default at a top-level `$props()` property
-  and a statement-position `$inspect(…)`, so the guard exempts those positions
-  while still refusing every other `$bindable`/`$inspect` (value/template
-  positions, nested defaults, a wrong-arity or second `.with`, `$inspect.trace`,
-  a nested-scope `$inspect`, …) — refuses derived-binding
+  includes a `$bindable(fallback?)` default at a top-level `$props()` property, a
+  statement-position `$inspect(…)`, the `$state.snapshot(x)` and `$props.id()`
+  declarator inits, and a template-position `$state.snapshot(x)` (→ `$.snapshot`,
+  `fragment.rs`), so the guard exempts those positions while still refusing every
+  other `$bindable`/`$inspect`/`$state.snapshot`/`$props.id` (value/template
+  positions, nested defaults, a wrong-arity or second `.with`, `$inspect.trace`, a
+  nested-scope / script-position / optional-chained rune, …) — refuses derived-binding
   reads outside bare emitter positions and top-level `await`, and collects
   assignment/update roots (`updated`) and nested-scope declarations (shadow
   candidates) for the evaluator. Exhaustive matches on purpose — new AST
@@ -308,6 +310,11 @@ project-wide conventions.
   `analyze.rs::is_inspect_call`) also dropped, but WITHOUT forcing the wrapper
   (no `has_effects`): its arguments and `.with` callback are still guard-walked
   and its span pushed to `dropped_regions` (a comment inside refuses) — a
+  `$props.id()` declarator SKIPPED (the transform hoists `const <name> =
+  $.props_id($$renderer)` to the component body's first statement, forcing no
+  wrapper; duplicate / non-identifier target / carried comment refuse) — a
+  `$state.snapshot(x)` declarator UNWRAPPED to its argument `x` (like `$state`;
+  both via `classify_rune_init`, which refuses an optional-chained init) — a
   multi-declarator top-level declaration
   splitting into one declaration per declarator, source order (the oracle's
   shape; nested declarations and for-heads stay joined; comments alongside a
@@ -338,7 +345,12 @@ project-wide conventions.
   `guard_dropped`/`guard_pattern`/`guard_dropped_fragment`/`wrap_single`/
   `wrap_value_expr` family prepares a borrowed template expression for a
   synthetic call argument slot, guarding stray runes and rewriting a bare
-  derived read to `d()`.
+  derived read to `d()`. `wrap_value_expr`'s core `rewrite_template_value` is the
+  **item-6 template-value substitution walk**: it also rewrites every
+  `$state.snapshot(x)` sub-node to `$.snapshot(<processed x>)`, rebuilding only the
+  spine down to each snapshot (a `contains_snapshot` fast-path keeps snapshot-free
+  subtrees on the unchanged guarded path, byte-identical to before); the next slice
+  extends this one function for nested `d`→`d()` derived reads.
 - `blocks.rs` — **control-flow blocks** split the single template into
   multiple `$$renderer.push(…)` statements, each block emitting its own
   statements between flushes and merging its closer/opener into the adjacent

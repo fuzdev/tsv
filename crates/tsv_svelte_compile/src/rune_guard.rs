@@ -1,12 +1,15 @@
 //! Rune refusal walk over borrowed script statements — plus the collection
 //! passes that ride the same traversal.
 //!
-//! The server transform rewrites a fixed set of rune shapes (top-level
-//! `$props()` / `$state(…)` / `$derived(…)` declarator inits, statement-position
-//! `$effect(…)`). Every other `$`-prefixed identifier in a walked value position
-//! must REFUSE rather than pass through into runtime-broken JS — rune calls in
-//! nested functions, member-form calls (`$props.id()`), and bare *references*
-//! (`let x = $state;`, a future `$store` subscription) alike. Calls report
+//! The server transform rewrites a fixed set of rune shapes elsewhere (the
+//! declarator inits `$props()` / `$state(…)` / `$state.snapshot(x)` / `$derived(…)`
+//! / `$props.id()`, a `$props()`-default `$bindable(…)`, statement-position
+//! `$effect(…)` / `$inspect(…)`, and a template-position `$state.snapshot(x)` — see
+//! `analyze.rs::classify_rune_init`, `script_rewrite.rs`, and `fragment.rs`). Every
+//! other `$`-prefixed identifier in a walked value position must REFUSE rather than
+//! pass through into runtime-broken JS — rune calls in nested functions, member-form
+//! calls in a non-sanctioned position (`$effect.tracking()`, `$state.foo()`), and
+//! bare *references* (`let x = $state;`, a future `$store` subscription) alike. Calls report
 //! their callee root as a rune; name-only positions (non-computed member
 //! properties / object keys) are not walked, so `obj.$foo` stays allowed.
 //!
