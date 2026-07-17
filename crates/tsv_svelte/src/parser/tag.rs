@@ -324,12 +324,26 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// Parse a render tag: {@render fn()} or {@render fn?.()}
+    ///
+    /// Svelte requires the expression to be a `CallExpression`, or a
+    /// `ChainExpression` whose inner `.expression` is a `CallExpression`
+    /// (`1-parse/state/tag.js`: `render_tag_invalid_expression`). tsv has no
+    /// distinct `ChainExpression` node — an optional chain folds into the call
+    /// node it wraps (`Expression::has_optional_in_chain` drives the wire wrap),
+    /// so `foo()` and `foo?.()` both surface here as a top-level `CallExpression`
+    /// and Svelte's two-branch check collapses to one: the expression must be a
+    /// `CallExpression`. A non-call form (`{@render foo}`, `{@render a?.b}`) is
+    /// rejected, mirroring `require_debug_identifier`.
     fn parse_render_tag(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
-        // TODO: Svelte requires the expression to be a `CallExpression` (or a
-        // `ChainExpression` ending in one) — `render_tag_invalid_expression`
-        // (`1-parse/state/tag.js`); tsv currently over-accepts a non-call
-        // `{@render foo}`.
         let (expression, span) = self.parse_keyword_expression_tag(start, "render")?;
+
+        if !matches!(expression, Expression::CallExpression(_)) {
+            return Err(self.error_msg_at(
+                "{@render ...} tags can only contain call expressions",
+                expression.span().start as usize,
+            ));
+        }
+
         Ok(FragmentNode::RenderTag(RenderTag { expression, span }))
     }
 }
