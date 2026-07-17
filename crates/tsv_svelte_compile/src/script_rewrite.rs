@@ -10,9 +10,9 @@ use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{InfallibleResolve, Span};
 use tsv_svelte::ast::internal::{AttributeNode, AttributeValue, Root};
 use tsv_ts::ast::internal::{
-    Expression, ImportDeclaration, ImportSpecifier, LiteralValue, ModuleExportName, ObjectPattern,
-    ObjectPatternProperty, Property, PropertyKind, RestElement, Statement, VariableDeclaration,
-    VariableDeclarator,
+    AssignmentPattern, Expression, ImportDeclaration, ImportSpecifier, LiteralValue,
+    ModuleExportName, ObjectPattern, ObjectPatternProperty, Property, PropertyKind, RestElement,
+    Statement, VariableDeclaration, VariableDeclarator,
 };
 
 use crate::analyze::{
@@ -520,7 +520,10 @@ pub(crate) fn identifier_binding_name(id: &Expression<'_>, source: &str) -> Opti
 /// Rewrite one instance-script statement for the server module:
 ///
 /// - a top-level `$props()` declarator init becomes `$$props` (and the
-///   component gains the `$$props` param);
+///   component gains the `$$props` param); a `$bindable(fallback?)` default in
+///   the destructure pattern is rewritten to its fallback (`void 0` when
+///   argument-less) and the prop is collected into `bindable` so the transform
+///   appends the trailing `$.bind_props($$props, { … })`;
 /// - `$state(v)` / `$state.raw(v)` inits drop the wrapper (`void 0` when
 ///   argument-less);
 /// - `$derived(e)` → `$.derived(() => e)`; `$derived.by(f)` → `$.derived(f)`;
@@ -548,6 +551,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
     has_comments: bool,
     uses_slots: bool,
     dropped_regions: &mut Vec<Span>,
+    bindable: &mut Vec<BindableEntry>,
 ) -> Result<Option<Statement<'arena>>, CompileError> {
     // A top-level `$:` label is a legacy reactive statement — invalid in
     // runes mode (the oracle rejects it with legacy_reactive_statement_invalid),
@@ -607,8 +611,12 @@ pub(crate) fn rewrite_script_statement<'arena>(
         // Guard the binding pattern (a rune or derived read can hide in a
         // pattern default) — except for state/derived declarators, whose id is
         // an enforced plain identifier and is a *declaration* of the (possibly
-        // derived) name, not a read.
-        if matches!(rune, None | Some(RuneInit::Props)) {
+        // derived) name, not a read. A `$props()` pattern is guard-walked AFTER
+        // its bindable rewrite (in the arm below), so an exempt `$bindable(...)`
+        // default — rewritten to its fallback — isn't seen as a stray rune, while
+        // a `$bindable` left in any UNrecognized position survives the rewrite and
+        // still refuses.
+        if rune.is_none() {
             walk_expression_guarded(&declarator.id, &mut ctx)?;
         }
         // A rune init rewrite drops the call's own syntax around the kept
@@ -631,11 +639,19 @@ pub(crate) fn rewrite_script_statement<'arena>(
         let new_init = match rune {
             Some(RuneInit::Props) => {
                 *uses_props = true;
-                if let Some(injected) =
-                    inject_props_pattern(b, &declarator.id, has_comments, uses_slots)?
-                {
-                    new_id = injected;
+                let (rewritten, entries) =
+                    rewrite_props_pattern(b, &declarator.id, source, has_comments, uses_slots)?;
+                if let Some(rewritten) = rewritten {
+                    new_id = rewritten;
                 }
+                bindable.extend(entries);
+                // Guard-walk the REWRITTEN pattern: the recognized top-level
+                // `$bindable(...)` defaults are now their fallback expressions, so
+                // a stray rune / derived read inside a fallback still refuses,
+                // while a `$bindable` in any unrecognized position (nested, wrong
+                // arity, non-identifier key/local) survived the rewrite and
+                // refuses here.
+                walk_expression_guarded(&new_id, &mut ctx)?;
                 // Span-steal: the synthetic `$$props` takes the replaced
                 // `$props()` call's host span, so the declarator's `=`-gap
                 // comment windows stay exactly the authored ones.
@@ -704,21 +720,142 @@ pub(crate) fn rewrite_script_statement<'arena>(
     })))
 }
 
-/// The oracle injects `$$slots, $$events` into the `$props()` binding pattern
-/// wherever a rest element captures the remaining props (probe-verified):
+/// A bindable prop the transform must list in the trailing
+/// `$.bind_props($$props, { … })` (source order). `key` is the prop name as
+/// declared in the `$props()` object pattern; `local` is the destructure value —
+/// they differ for a renamed prop (`{ value: v = $bindable() }` → `value`/`v`).
+pub(crate) struct BindableEntry {
+    /// The prop key as declared in the `$props()` object pattern.
+    pub key: String,
+    /// The local binding name (the destructured value).
+    pub local: String,
+}
+
+/// The fallback of a rewritable `$bindable(...)` destructure default.
+enum BindableDefault<'arena> {
+    /// `$bindable()` — argument-less; the default becomes `void 0`.
+    ArgLess,
+    /// `$bindable(fallback)` — the default becomes `fallback`.
+    Arg(&'arena Expression<'arena>),
+}
+
+/// Classify a destructure default's right side as a rewritable `$bindable(...)`
+/// call (a plain `$bindable` callee with zero or one argument). `None` for
+/// anything else — a non-call, a member callee, or `$bindable(a, b)` (the oracle
+/// rejects that arity, `rune_invalid_arguments_length`) — so the `$bindable` call
+/// survives the rewrite and the guard walk refuses it.
+fn bindable_default<'arena>(
+    right: &'arena Expression<'arena>,
+    source: &str,
+) -> Option<BindableDefault<'arena>> {
+    let Expression::CallExpression(call) = right else {
+        return None;
+    };
+    let Expression::Identifier(callee) = call.callee else {
+        return None;
+    };
+    if plain_identifier_name(callee, source).as_deref() != Some("$bindable") {
+        return None;
+    }
+    match call.arguments {
+        [] => Some(BindableDefault::ArgLess),
+        [arg] => Some(BindableDefault::Arg(arg)),
+        _ => None,
+    }
+}
+
+/// If this object-pattern property is a top-level `key = $bindable(fallback?)`
+/// default the transform can rewrite — a plain-identifier key, a plain-identifier
+/// destructure value, and a rewritable `$bindable(...)` right — return the entry,
+/// the `Property`, the `AssignmentPattern`, and the fallback argument. `None`
+/// otherwise: the property is emitted unchanged, and a `$bindable` in any
+/// unrecognized shape (a non-identifier key — string/numeric/computed —, a
+/// nested-pattern value, the wrong arity) survives the rewrite for the guard to
+/// refuse — a safe over-refusal, even for a non-identifier-keyed prop the oracle
+/// would compile.
+#[allow(clippy::type_complexity)]
+fn bindable_property<'arena>(
+    prop: &'arena ObjectPatternProperty<'arena>,
+    source: &str,
+) -> Option<(
+    BindableEntry,
+    &'arena Property<'arena>,
+    &'arena AssignmentPattern<'arena>,
+    BindableDefault<'arena>,
+)> {
+    let ObjectPatternProperty::Property(p) = prop else {
+        return None;
+    };
+    if p.computed {
+        return None;
+    }
+    let Expression::AssignmentPattern(assign) = &p.value else {
+        return None;
+    };
+    let default = bindable_default(assign.right, source)?;
+    let Expression::Identifier(key_id) = &p.key else {
+        return None;
+    };
+    let key = plain_identifier_name(key_id, source)?;
+    let Expression::Identifier(left_id) = assign.left else {
+        return None;
+    };
+    let local = plain_identifier_name(left_id, source)?;
+    Some((BindableEntry { key, local }, p, assign, default))
+}
+
+/// Rebuild an object-pattern property, replacing its `$bindable(fallback?)`
+/// default with the fallback (`void 0` when argument-less). A shallow re-slot:
+/// the key, the `AssignmentPattern.left`, and every flag stay borrowed; only the
+/// default's `right` changes.
+fn rewrite_bindable_default<'arena>(
+    b: &mut Builder<'arena>,
+    p: &'arena Property<'arena>,
+    assign: &'arena AssignmentPattern<'arena>,
+    default: BindableDefault<'arena>,
+) -> ObjectPatternProperty<'arena> {
+    let new_right: &'arena Expression<'arena> = match default {
+        BindableDefault::Arg(arg) => arg,
+        BindableDefault::ArgLess => b.arena.alloc(b.void_zero()),
+    };
+    let new_value = Expression::AssignmentPattern(AssignmentPattern {
+        left: assign.left,
+        right: new_right,
+        decorators: assign.decorators,
+        span: assign.span,
+    });
+    ObjectPatternProperty::Property(Property {
+        key: p.key.clone(),
+        value: new_value,
+        kind: p.kind,
+        shorthand: p.shorthand,
+        computed: p.computed,
+        method: p.method,
+        span: p.span,
+    })
+}
+
+/// Rewrite a `$props()` binding pattern for the server module: replace each
+/// recognized top-level `$bindable(fallback?)` default with its fallback
+/// (collecting the bindable props in source order), and inject `$$slots,
+/// $$events` wherever a rest element captures the remaining props (probe-verified):
 ///
 /// - `let {a, ...rest} = $props()` →
 ///   `let { a, $$slots, $$events, ...rest } = $$props;` — injected immediately
 ///   BEFORE the rest element;
 /// - `let props = $props()` (non-destructured) →
 ///   `let { $$slots, $$events, ...props } = $$props;`;
-/// - a plain destructure without a rest element gets NO injection.
+/// - `let { value = $bindable(42) } = $props()` → `let { value = 42 } = $$props;`
+///   plus a `value` entry;
+/// - a plain destructure with neither a rest nor a bindable default gets NO
+///   rewrite.
 ///
-/// Returns the replacement pattern, or `None` to keep the original borrowed
-/// one. Refuses a non-identifier/non-object `$props()` pattern (the oracle
-/// rejects those — props_invalid_identifier) and injection alongside carried
-/// comments (the minted properties' appendix spans between host-span siblings
-/// would sweep host comments).
+/// Returns `(replacement pattern, bindable entries)`. The replacement is `None`
+/// when nothing changed, so the original borrowed pattern is kept. Refuses a
+/// non-identifier/non-object `$props()` pattern (the oracle rejects those —
+/// props_invalid_identifier) and both rewrites alongside carried comments (the
+/// minted appendix spans between host-span siblings would sweep host comments — a
+/// safe over-refusal).
 ///
 /// When the component references `$$slots` (`uses_slots`), the injected
 /// sanitize_slots const owns that name, so the destructured prop deconflicts by
@@ -726,62 +863,84 @@ pub(crate) fn rewrite_script_statement<'arena>(
 /// rule — always the `_` suffix, unconditional; `$$events` never renames, and a
 /// user `$$slots_`/`$$events` reference or declaration is oracle-rejected input,
 /// so no second-order collision exists).
-fn inject_props_pattern<'arena>(
+fn rewrite_props_pattern<'arena>(
     b: &mut Builder<'arena>,
     id: &'arena Expression<'arena>,
+    source: &str,
     has_comments: bool,
     uses_slots: bool,
-) -> Result<Option<Expression<'arena>>, CompileError> {
+) -> Result<(Option<Expression<'arena>>, Vec<BindableEntry>), CompileError> {
+    let arena = b.arena;
     match id {
         Expression::ObjectPattern(obj) => {
             let has_rest = obj
                 .properties
                 .iter()
                 .any(|p| matches!(p, ObjectPatternProperty::RestElement(_)));
-            if !has_rest {
-                return Ok(None);
+            let has_bindable = obj
+                .properties
+                .iter()
+                .any(|p| bindable_property(p, source).is_some());
+            if !has_rest && !has_bindable {
+                return Ok((None, Vec::new()));
             }
             if has_comments {
-                return Err(unsupported(Refusal::CommentsWithRestProps));
+                return Err(unsupported(if has_bindable {
+                    Refusal::CommentsWithBindable
+                } else {
+                    Refusal::CommentsWithRestProps
+                }));
             }
+            let mut entries = Vec::new();
             let mut properties: BumpVec<'arena, ObjectPatternProperty<'arena>> =
-                BumpVec::new_in(b.arena);
+                BumpVec::new_in(arena);
             for prop in obj.properties {
                 if matches!(prop, ObjectPatternProperty::RestElement(_)) {
                     properties.push(slots_pattern_prop(b, uses_slots));
                     properties.push(shorthand_pattern_prop(b, "$$events"));
+                    properties.push(prop.clone());
+                } else if let Some((entry, p, assign, default)) = bindable_property(prop, source) {
+                    entries.push(entry);
+                    properties.push(rewrite_bindable_default(b, p, assign, default));
+                } else {
+                    properties.push(prop.clone());
                 }
-                properties.push(prop.clone());
             }
-            Ok(Some(Expression::ObjectPattern(ObjectPattern {
-                properties: properties.into_bump_slice(),
-                optional: obj.optional,
-                type_annotation: obj.type_annotation.clone(),
-                decorators: obj.decorators,
-                span: obj.span,
-            })))
+            Ok((
+                Some(Expression::ObjectPattern(ObjectPattern {
+                    properties: properties.into_bump_slice(),
+                    optional: obj.optional,
+                    type_annotation: obj.type_annotation.clone(),
+                    decorators: obj.decorators,
+                    span: obj.span,
+                })),
+                entries,
+            ))
         }
         Expression::Identifier(_) => {
             if has_comments {
                 return Err(unsupported(Refusal::CommentsWithNonDestructuredProps));
             }
             let mut properties: BumpVec<'arena, ObjectPatternProperty<'arena>> =
-                BumpVec::new_in(b.arena);
+                BumpVec::new_in(arena);
             properties.push(slots_pattern_prop(b, uses_slots));
             properties.push(shorthand_pattern_prop(b, "$$events"));
             properties.push(ObjectPatternProperty::RestElement(RestElement {
-                argument: b.arena.alloc(id.clone()),
+                argument: arena.alloc(id.clone()),
                 optional: false,
                 type_annotation: None,
                 span: id.span(),
             }));
-            Ok(Some(Expression::ObjectPattern(ObjectPattern {
-                properties: properties.into_bump_slice(),
-                optional: false,
-                type_annotation: None,
-                decorators: None,
-                span: id.span(),
-            })))
+            Ok((
+                Some(Expression::ObjectPattern(ObjectPattern {
+                    properties: properties.into_bump_slice(),
+                    optional: false,
+                    type_annotation: None,
+                    decorators: None,
+                    span: id.span(),
+                })),
+                Vec::new(),
+            ))
         }
         _ => Err(unsupported(Refusal::PropsBindingPattern)),
     }
@@ -789,7 +948,7 @@ fn inject_props_pattern<'arena>(
 
 /// The injected `$$slots` pattern property: shorthand `{ $$slots }` normally,
 /// renamed `{ $$slots: $$slots_ }` when the sanitize_slots const owns the name
-/// (see `inject_props_pattern`).
+/// (see `rewrite_props_pattern`).
 fn slots_pattern_prop<'arena>(
     b: &mut Builder<'arena>,
     uses_slots: bool,

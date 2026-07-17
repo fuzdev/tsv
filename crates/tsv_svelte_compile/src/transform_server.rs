@@ -54,7 +54,8 @@ use tsv_lang::{Comment, Span};
 use tsv_svelte::ast::internal::{Element, Root, SpecialElement};
 use tsv_ts::ast::internal::{
     BlockStatement, ExportDefaultDeclaration, ExportDefaultValue, Expression, ExpressionStatement,
-    FunctionDeclaration, Statement, VariableDeclaration, VariableDeclarationKind,
+    FunctionDeclaration, ObjectExpression, ObjectProperty, Property, PropertyKind, Statement,
+    VariableDeclaration, VariableDeclarationKind,
 };
 
 use crate::analyze::{Bindings, NameSet, RuneInit, Scope, ScopeEntry, classify_rune_init};
@@ -69,9 +70,9 @@ use crate::fragment::{
 };
 use crate::needs_context::{ComponentContext, analyze_component};
 use crate::script_rewrite::{
-    analyze_script, collect_script_comments, document_ts_flag, identifier_binding_name,
-    plain_identifier_name, refuse_runes_invalid_import, refuse_template_typescript,
-    rewrite_script_statement, self_check_no_typescript,
+    BindableEntry, analyze_script, collect_script_comments, document_ts_flag,
+    identifier_binding_name, plain_identifier_name, refuse_runes_invalid_import,
+    refuse_template_typescript, rewrite_script_statement, self_check_no_typescript,
 };
 use crate::snippet::{SnippetAnalysis, analyze_snippets};
 use crate::{CompileError, CompileOutput, Refusal, erase};
@@ -511,6 +512,10 @@ pub(crate) fn compile_server<'arena>(
     let mut updated = NameSet::default();
     let mut nested_declared = NameSet::default();
     let mut dropped_regions: Vec<Span> = Vec::new();
+    // Bindable props collected from the `$props()` destructure defaults (source
+    // order). A non-empty set forces the `$$renderer.component(…)` wrapper and
+    // appends the trailing `$.bind_props($$props, { … })` (below).
+    let mut bindable: Vec<BindableEntry> = Vec::new();
     // `component` is the whole-component analysis, computed up front by `analyze`
     // (the script rewrite needs its `uses_slots`) but left UNRESOLVED: its error
     // must NOT win over the script-loop refusals below, so it is `?`-unwrapped
@@ -550,6 +555,7 @@ pub(crate) fn compile_server<'arena>(
             has_comments,
             uses_slots,
             &mut dropped_regions,
+            &mut bindable,
         )?;
         let Some(rewritten) = rewritten else {
             continue;
@@ -616,7 +622,10 @@ pub(crate) fn compile_server<'arena>(
         bindings.mark_opaque(name);
     }
 
-    let needs_context = has_effects || component.needs_context;
+    // A bindable prop forces the wrapper: the oracle's `$bindable` visitor sets
+    // `needs_context` (the wrapper hosts the trailing `$.bind_props(…)`), so any
+    // bindable prop is a wrapper trigger just like a dropped `$effect`.
+    let needs_context = has_effects || component.needs_context || !bindable.is_empty();
     if needs_context {
         uses_props = true;
     }
@@ -712,6 +721,14 @@ pub(crate) fn compile_server<'arena>(
             parent_name: None,
         },
     )?;
+    // `$.bind_props($$props, { … })` is the component body's LAST statement (after
+    // every template flush, inside the `needs_context` wrapper forced above),
+    // listing the bindable props in source order — shorthand when the prop key and
+    // the local name match, `key: local` when renamed.
+    if !bindable.is_empty() {
+        let stmt = build_bind_props_stmt(&mut env.b, arena, &bindable);
+        out.push_statement(&mut env.b, arena, stmt);
+    }
     let body = out.finish(&mut env.b, arena);
 
     // The template's erased regions get the script's comment rule (a comment in
@@ -917,6 +934,73 @@ pub(crate) fn compile_server<'arena>(
 
 pub(crate) fn unsupported(reason: Refusal) -> CompileError {
     CompileError::Unsupported(reason)
+}
+
+/// `$.bind_props($$props, { … })` — the oracle's trailing bindable-prop
+/// registration, appended as the component body's last statement. The object
+/// lists the bindable props in source order (shorthand `{ value }` when the prop
+/// key equals the local name, `{ value: v }` when renamed).
+fn build_bind_props_stmt<'arena>(
+    b: &mut Builder<'arena>,
+    arena: &'arena bumpalo::Bump,
+    entries: &[BindableEntry],
+) -> Statement<'arena> {
+    let object = build_bindable_object(b, arena, entries);
+    let props_ident = Expression::Identifier(b.ident("$$props"));
+    let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
+    args.push(props_ident);
+    args.push(object);
+    let call = b.member_call("$", "bind_props", args.into_bump_slice());
+    let span = call.span();
+    Statement::ExpressionStatement(ExpressionStatement {
+        expression: call,
+        span,
+        is_directive: false,
+    })
+}
+
+/// The `{ key: local, … }` object literal of a `$.bind_props(…)` call. Every
+/// node is minted into the appendix (like [`build_sanitize_slots_decl`] and the
+/// spread object builders), so no host comment window can be swept; the printer
+/// reprints it canonically, so the minted spacing/commas here are cosmetic.
+fn build_bindable_object<'arena>(
+    b: &mut Builder<'arena>,
+    arena: &'arena bumpalo::Bump,
+    entries: &[BindableEntry],
+) -> Expression<'arena> {
+    let obrace = b.mint("{ ").start;
+    let mut properties: BumpVec<'arena, ObjectProperty<'arena>> = BumpVec::new_in(arena);
+    for (i, entry) in entries.iter().enumerate() {
+        if i > 0 {
+            b.mint(", ");
+        }
+        let shorthand = entry.key == entry.local;
+        let key = b.ident(&entry.key);
+        let key_span = key.span;
+        // Object-shorthand `{ value }` when the key equals the local; otherwise
+        // `{ value: v }` with a distinct value identifier.
+        let value = if shorthand {
+            Expression::Identifier(b.ident(&entry.local))
+        } else {
+            b.mint(": ");
+            Expression::Identifier(b.ident(&entry.local))
+        };
+        properties.push(ObjectProperty::Property(Property {
+            key: Expression::Identifier(key),
+            value,
+            kind: PropertyKind::Init,
+            shorthand,
+            computed: false,
+            method: false,
+            span: key_span,
+        }));
+    }
+    let cbrace = b.mint(" }").end;
+    Expression::ObjectExpression(ObjectExpression {
+        properties: properties.into_bump_slice(),
+        spread_trailing_comma: false,
+        span: Span::new(obrace, cbrace),
+    })
 }
 
 /// `const $$slots = $.sanitize_slots($$props);` — the oracle's `uses_slots`

@@ -53,7 +53,7 @@ The oracle wraps the whole component body in `$$renderer.component(($$renderer) 
 
 **`is_safe_identifier` rule** (`2-analyze/visitors/shared/utils.js:175-194`): walk a member chain down `.object` to its root; a non-identifier root is unsafe; an identifier root is unsafe when its binding's `declaration_kind` is `import` or its `kind` is `prop`/`bindable_prop`/`rest_prop`. A plain local, a global (no binding), and rune bindings (`state`, `derived`, …) are safe.
 
-tsv ports this as `needs_context.rs`, folding props + imports into a name set. `$effect` forces the wrapper through its own dropped-statement path; `$bindable` is refused by the rune guard. Because the port is name-based where the oracle is scope-sensitive, two shapes can't be classified and refuse:
+tsv ports this as `needs_context.rs`, folding props + imports into a name set. `$effect` forces the wrapper through its own dropped-statement path; a `$bindable` prop forces it through the collected bindable set (see the `$bindable` section under Runes). Because the port is name-based where the oracle is scope-sensitive, two shapes can't be classified and refuse:
 
 - **Refused**: `` member/call rooted at prop/import `{name}` that is also bound in a nested scope (needs_context classification ambiguous) ``
 - **Refused**: `member/call rooted at an escaped identifier (classification not ported)` — the root's name can't be read from its raw span.
@@ -96,9 +96,17 @@ A never-updated `$state`/plain binding is statically known and its template read
 
 - **Refused**: `comments in a script with a $$slots reference (injected sanitize_slots)` — the injected first statement would sweep the carried-comment windows.
 
+**`$bindable` — Supported.** A `$bindable(fallback?)` default at a **top-level `$props()` property with a plain-identifier key and destructure value** compiles: the default is rewritten to its fallback (`void 0` when argument-less — `let { value = $bindable(42) }` → `let { value = 42 } = $$props`), the prop forces the `$$renderer.component(…)` wrapper (the oracle's `CallExpression.js:55` `needs_context`), and the component body's last statement becomes `$.bind_props($$props, { key: local, … })` — the bindable props in source order, shorthand `{ value }` when key equals local and `key: local` when renamed (`3-transform/server/visitors/CallExpression.js`, `transform-server.js`). Composes with the rest injection and with an already-firing wrapper trigger.
+
+Every **other** `$bindable` position refuses (the oracle rejects each — `bindable_invalid_location` / `rune_invalid_arguments_length` / `rune_missing_parentheses`), left for the rune guard by surviving the rewrite unchanged: a `$bindable()` outside `$props()`, a nested default (`{ a = { b: $bindable() } }`, an array-pattern default, a nested destructure), a non-destructured `let props = $props()`, `$bindable(a, b)` (wrong arity), and a bare `$bindable` reference. Safe over-refusals (the oracle compiles, tsv declines):
+
+- a **non-identifier key** (a string/numeric/computed key — `{ 'data-x': x = $bindable() }`) refuses via `rune {name}` (the property falls through the rewrite unchanged);
+- a **fallback that reads a `$derived` binding** (`$bindable(d)`) refuses via `read of derived binding {name}` — a derived read is expressible only as a bare template expression, not a borrowed pattern default;
+- **`$bindable` alongside carried script comments** refuses via `comments in a script with a $bindable() prop default` (`CommentsWithBindable`) — the rewrite mints appendix spans a carried-comment window would sweep.
+
 Everything else `$`-shaped refuses (the `rune_guard.rs` exhaustive walk):
 
-- **Refused**: `rune {name}` — any non-sanctioned rune call (`$effect.tracking`, `$inspect`, `$bindable`, `$host`, member-form misuse, a rune call in any non-sanctioned position)
+- **Refused**: `rune {name}` — any non-sanctioned rune call (`$effect.tracking`, `$inspect`, `$host`, member-form misuse, a rune call in any non-sanctioned position, or a `$bindable` outside its one sanctioned position — see the `$bindable` section above)
 - **Refused**: `$-prefixed identifier {name}` — a bare rune reference (oracle-rejected input) or any `$`-prefixed identifier read
 - **Refused**: `read of derived binding {name} (supported only as a bare template expression)`
 - **Refused**: `destructuring a $state declarator` / `destructuring a $derived declarator` / `destructuring a $derived.by declarator`

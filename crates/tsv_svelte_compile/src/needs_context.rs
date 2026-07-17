@@ -15,8 +15,9 @@
 //!   bindings (`state`/`derived`/`each`/…) are all safe.
 //!
 //! (`$effect`/`$bindable` also set `needs_context` in the oracle; the effect
-//! path already forces the wrapper via `has_effects`, and `$bindable` is refused
-//! by the rune guard, so neither is re-derived here.)
+//! path already forces the wrapper via `has_effects`, and a `$bindable` prop
+//! forces it via the collected bindable set in `compile_server`, so neither is
+//! re-derived here.)
 //!
 //! This port folds props + imports into `context_roots`. Because the oracle's
 //! check is scope-sensitive but this port is name-based, a member/call rooted at

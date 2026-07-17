@@ -267,6 +267,12 @@ pub enum Refusal {
     /// Comments in a script with a non-destructured `$props()`.
     #[error("comments in a script with a non-destructured $props() (injected $$slots/$$events)")]
     CommentsWithNonDestructuredProps,
+    /// Comments in a script with a `$bindable()` prop default. The bindable
+    /// rewrite mints an appendix `void 0` and rewrites the `$bindable(...)` call
+    /// syntax inside the destructure pattern, so a carried comment's window would
+    /// sweep those synthetic spans — a safe over-refusal.
+    #[error("comments in a script with a $bindable() prop default")]
+    CommentsWithBindable,
     /// Comments alongside expression-valued attributes.
     #[error("comments in a script alongside expression-valued attributes")]
     CommentsAlongsideExprAttributes,
@@ -810,6 +816,9 @@ impl Refusal {
             Self::CommentsWithNonDestructuredProps => Cow::Borrowed(
                 "comments in a script with a non-destructured $props() (injected $$slots/$$events)",
             ),
+            Self::CommentsWithBindable => {
+                Cow::Borrowed("comments in a script with a $bindable() prop default")
+            }
             Self::CommentsAlongsideExprAttributes => {
                 Cow::Borrowed("comments in a script alongside expression-valued attributes")
             }
