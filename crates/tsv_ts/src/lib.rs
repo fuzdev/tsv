@@ -428,7 +428,7 @@ pub fn parse_pattern_with_comments<'arena>(
 ) -> Result<(Expression<'arena>, Vec<ast::Comment>)> {
     let mut parser = parser::Parser::with_interner(source, base_offset, interner, arena)?;
     let expr = parser
-        .parse_expression_public()
+        .parse_expression_unbounded()
         .map_err(|e| e.with_context(source))?;
     let mut pattern = parser
         .expression_to_pattern(expr)
@@ -437,7 +437,7 @@ pub fn parse_pattern_with_comments<'arena>(
     // like `{:then num: number}` and `{:catch error: Error}`
     if parser.at_colon() {
         let ta = parser
-            .parse_type_annotation_public()
+            .parse_type_annotation()
             .map_err(|e| e.with_context(source))?;
         if let Expression::Identifier(id) = &mut pattern {
             // Re-bind the identifier's binding extra with the parsed type
@@ -449,6 +449,13 @@ pub fn parse_pattern_with_comments<'arena>(
             }));
         }
     }
+    // The pattern (plus any type annotation) must fill the whole slice — the Svelte
+    // callers (`{@const id = …}`, `{:then pattern}`, `{:catch pattern}`) hand us a slice
+    // bounded by `=`/`}`. Without this a trailing token is silently dropped
+    // (`{@const x y = a}` → `{@const x = a}`), losing content.
+    parser
+        .expect_end_of_input()
+        .map_err(|e| e.with_context(source))?;
     let comments = parser.take_comments();
     Ok((pattern, comments))
 }
@@ -466,7 +473,7 @@ pub fn parse_type_annotation_partial<'arena>(
 ) -> Result<(TSTypeAnnotation<'arena>, usize)> {
     let mut parser = parser::Parser::with_interner(source, base_offset, interner, arena)?;
     let ta = parser
-        .parse_type_annotation_public()
+        .parse_type_annotation()
         .map_err(|e| e.with_context(source))?;
     let pos = parser.current_absolute_position();
     Ok((ta, pos))

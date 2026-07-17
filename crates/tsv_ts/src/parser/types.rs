@@ -30,9 +30,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
-    pub(in crate::parser) fn parse_type_annotation(
-        &mut self,
-    ) -> Result<TSTypeAnnotation<'arena>, ParseError> {
+    /// Parse a type annotation (`: Type`) at the current position. Also the public entry
+    /// point for embedders (`tsv_svelte`'s `{:then pattern: T}` / `{#each … as x: T}`).
+    pub fn parse_type_annotation(&mut self) -> Result<TSTypeAnnotation<'arena>, ParseError> {
         let start = self.current_pos().0;
         self.expect(&TokenKind::Colon)?;
 
