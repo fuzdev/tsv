@@ -360,8 +360,9 @@ project-wide conventions.
   source-order object (plain attributes via `attribute::build_spread_object_property`,
   a `bind:` core kind's synthesized `value`/`checked` property at its slot via
   `attribute::build_bind_object_property`, spreads as `...expr`), the scope hash
-  rides `css_hash` (a static-class token OR a `class:` directive name scopes;
-  matched classes recorded in `matched_classes`), the `class:` directives ride
+  rides `css_hash` (the element is scoped when any scoped compound — type/id/
+  class/attribute/universal — matches it via `EmitEnv::element_scope`, which marks
+  the matched compounds in `matched_selectors`), the `class:` directives ride
   `classes` (`attribute::build_spread_class_object` — identifier keys + shorthand)
   and the `style:` directives ride `styles`
   (`attribute::build_spread_style_object` — a FLAT object, no `|important`
@@ -391,9 +392,10 @@ project-wide conventions.
   the phase-2 synthetic empty `''`) into `$.attr_class(base, css_hash, { name:
   expr, … })` (the oracle's `build_attr_class`): the base is the static value /
   `$.clsx(expr)` / `''`; the scope hash concatenates into a string-literal base
-  or rides the 2nd argument; the element is scoped when a static-class token or a
-  `class:` directive name matches a scoped selector (recorded in
-  `matched_classes`). A mixed-value `class="a {b}"` base refuses
+  or rides the 2nd argument; the element is scoped when any scoped compound
+  matches it (`EmitEnv::element_scope`, recorded in `matched_selectors`) — a type/
+  id/attribute selector, not only a class token or `class:` name. A mixed-value
+  `class="a {b}"` base refuses
   (`ClassDirectiveWithMixedClass`). And `emit_style_directives` — the `style:`
   analog (the oracle's `build_attr_style`): `$.attr_style(base, directives)`, TWO
   arguments (no css-hash — style is never scoped). The base mirrors the class base
@@ -446,10 +448,16 @@ project-wide conventions.
   `b.init` applies, checked on the RAW directive expression), and
   `build_spread_style_object` (the `styles` argument — a FLAT object, `|important`
   validated but NOT partitioned, reusing `build_style_property`).
-- `css_scope.rs` — minimal CSS scoping (single class selectors: the
-  `svelte-tsvhash` class appended to matched elements and
-  **source-spliced** into the style text — the author's whitespace is
-  preserved, not reprinted).
+- `css_scope.rs` — CSS scoping for single, no-combinator compounds (type / id /
+  class / attribute / universal simple selectors + trailing pseudo). Each compound
+  becomes a kind-tagged predicate list matched JOINTLY against every candidate
+  element (`element_matches_selector`, a port of the oracle's
+  `relative_selector_might_apply_to_node` / `attribute_matches`); a matched element
+  gains the `svelte-tsvhash` class (`EmitEnv::element_scope`) and the compound is
+  **source-spliced** (appended after the last non-pseudo anchor, or replacing a
+  bare `*`) — author whitespace preserved, not reprinted. Combinators, `:global`,
+  `:is`/`:where`/`:has`/`:not`, `:root`, nesting, empty rules, and a compound
+  matching no element all refuse.
 
 Types: `CompileOptions { generate: Generate, dev: bool }` (default: `Server`,
 non-dev), `CompileOutput { js, css, warnings }`, `CompileWarning { code, message }`

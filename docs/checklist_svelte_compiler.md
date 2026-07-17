@@ -339,10 +339,27 @@ on `<input>` (`bind: directive value` for any other target).
 
 ### Styles (CSS scoping)
 
-Minimal scoping: single class selectors gain the deterministic `svelte-tsvhash` class, source-spliced into the style text (author whitespace preserved).
+Same-element scoping: a top-level, no-combinator compound (type / id / class /
+attribute / universal simple selectors, plus trailing non-filtering
+pseudo-classes/elements) gains the deterministic `svelte-tsvhash` class,
+source-spliced into the style text (author whitespace preserved) — appended after
+the compound's last non-pseudo anchor, or **replacing** a bare `*`. Each compound
+is a kind-tagged predicate list matched JOINTLY against every candidate element
+(all predicates must hold on the SAME element), porting the oracle's
+`relative_selector_might_apply_to_node` / `attribute_matches` restricted to the
+no-combinator case (a spread / matching directive / presence test on a dynamic
+value all "could match"). A scoped element with no `class` markup synthesizes
+`class="svelte-tsvhash"`.
 
-- **Supported**: top-level rules whose selectors are single simple class selectors matching at least one element.
-- **Refused**: `css at-rule in <style>`, `nested css rule in <style>`, `css combinator selector in <style>`, ``non-class css selector in <style> (only `.class` is supported)``, `css selector .{class} matches no element (pruning not implemented)`
+- **Supported**: top-level rules whose selectors are single, no-combinator
+  compounds of type/id/class/attribute/universal (+ trailing pseudo), each
+  matching at least one element.
+- **Refused**: `css at-rule in <style>`, `nested css rule in <style>`, `css
+  combinator selector in <style>`, `unsupported css selector in <style>
+  (:global/:is/:where/:has/:not/:root/nesting)` (also namespaced/escaped names and
+  bare pseudo-only compounds), `css attribute selector against a dynamic attribute
+  value (static-eval not ported)`, `css selector {selector} matches no element
+  (pruning not implemented)`
 
 ---
 

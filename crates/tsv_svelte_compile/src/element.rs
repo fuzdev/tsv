@@ -23,8 +23,8 @@ use crate::analyze::{BindingKind, evaluate, stringify_value};
 use crate::attr_refs::fragment_any;
 use crate::attribute::{
     build_bind_object_property, build_spread_class_object, build_spread_object_property,
-    build_spread_style_object, collapse_attr_whitespace, emit_attribute, emit_bind_directive,
-    emit_class_directives, emit_style_directives, is_load_error_element,
+    build_spread_style_object, emit_attribute, emit_bind_directive, emit_class_directives,
+    emit_style_directives, is_load_error_element,
 };
 use crate::build::escape_template_text;
 use crate::css_scope::SCOPE_HASH_CLASS;
@@ -226,6 +226,15 @@ fn emit_plain_attributes<'arena>(
     let animate_host = env.animate_host_span == Some(element.span);
     validate_directive_combinations(element, animate_host)?;
 
+    // CSS scope: does any scoped selector match this element? (Marks each matched
+    // compound used.) A scoped element gains the `svelte-tsvhash` class — folded
+    // into its authored `class` / `class:` markup below, or synthesized after all
+    // plain attributes when it has neither.
+    let element_scoped = env.element_scope(element, name)?;
+    let has_class_attr = element.attributes.iter().any(
+        |attr_node| matches!(attr_node, AttributeNode::Attribute(a) if attribute_is_class(env, a)),
+    );
+
     // Pre-scan the `class:` and `style:` directives (source order). When present,
     // the authored `class`/`style` attribute (if any) and the same-family directives
     // fuse into one `$.attr_class(base, hash, { name: expr, … })` /
@@ -263,7 +272,7 @@ fn emit_plain_attributes<'arena>(
                 // base of the fused `$.attr_class(...)`/`$.attr_style(...)` call,
                 // emitted here at its source slot.
                 if has_class_directives && !class_call_emitted && attribute_is_class(env, attr) {
-                    emit_class_directives(env, Some(attr), &class_directives, out)?;
+                    emit_class_directives(env, Some(attr), &class_directives, out, element_scoped)?;
                     class_call_emitted = true;
                 } else if has_style_directives
                     && !style_call_emitted
@@ -272,7 +281,7 @@ fn emit_plain_attributes<'arena>(
                     emit_style_directives(env, Some(attr), &style_directives, out)?;
                     style_call_emitted = true;
                 } else {
-                    emit_attribute(env, attr, name, out)?;
+                    emit_attribute(env, attr, name, out, element_scoped)?;
                 }
             }
             // `class:`/`style:` directives fuse into the single
@@ -338,7 +347,12 @@ fn emit_plain_attributes<'arena>(
     // attributes (the oracle appends the synthetic empty `class`, then the synthetic
     // empty `style`, to the end of the attribute list — class before style).
     if has_class_directives && !class_call_emitted {
-        emit_class_directives(env, None, &class_directives, out)?;
+        emit_class_directives(env, None, &class_directives, out, element_scoped)?;
+    } else if element_scoped && !has_class_attr {
+        // A scoped element with no `class` markup of any kind gets a synthetic
+        // `class="svelte-tsvhash"` — appended after all plain attributes, before
+        // any synthetic `style` (the oracle's phase-2 class-before-style order).
+        out.push_text(&format!(" class=\"{SCOPE_HASH_CLASS}\""));
     }
     if has_style_directives && !style_call_emitted {
         emit_style_directives(env, None, &style_directives, out)?;
@@ -374,26 +388,6 @@ fn spread_element_flags(env: &EmitEnv<'_, '_>, element: &Element<'_>, name: &str
     } else {
         0
     }
-}
-
-/// The static (single-`Text`) `class` attribute tokens of `element`, collapsed —
-/// one source of CSS-scope-match candidates on a spread element (a `class:`
-/// directive name is the other; `emit_spread_attributes` matches both).
-fn static_class_tokens(env: &EmitEnv<'_, '_>, element: &Element<'_>) -> Vec<String> {
-    let mut tokens = Vec::new();
-    for attr_node in element.attributes {
-        let AttributeNode::Attribute(attr) = attr_node else {
-            continue;
-        };
-        if !attribute_is_class(env, attr) {
-            continue;
-        }
-        if let Some([AttributeValue::Text(text)]) = attr.value {
-            let collapsed = collapse_attr_whitespace(&text.data(env.source));
-            tokens.extend(collapsed.split_ascii_whitespace().map(str::to_string));
-        }
-    }
-    tokens
 }
 
 /// Build the `{ … }` object (1st argument of `$.attributes`) from every plain
@@ -578,28 +572,11 @@ fn emit_spread_attributes<'arena>(
         return Err(unsupported(Refusal::CommentsAlongsideExprAttributes));
     }
 
-    // Scope matching (before building the object). The element is scoped when a
-    // static-class token OR a `class:` directive name matches a scoped selector;
-    // each match is recorded so the no-match post-check passes. The hash rides the
+    // Scope matching (before building the object): does any scoped compound's
+    // joint predicate list hold on this element? (Marks each matched compound
+    // used, so the no-match post-check passes.) When scoped, the hash rides the
     // `css_hash` (2nd) argument, never concatenated into the class value.
-    let mut matched: Vec<String> = Vec::new();
-    if let Some(scope) = &env.scope {
-        for token in static_class_tokens(env, element) {
-            if scope.class_names.contains(&token) {
-                matched.push(token);
-            }
-        }
-        for directive in &class_directives {
-            let dname = directive.name_span.extract(env.source);
-            if scope.class_names.contains(dname) {
-                matched.push(dname.to_string());
-            }
-        }
-    }
-    let scoped = !matched.is_empty();
-    for token in matched {
-        env.matched_classes.insert(token);
-    }
+    let scoped = env.element_scope(element, name)?;
 
     let object = build_element_spread_object(env, element, name)?;
     let css_hash = scoped.then(|| env.b.string_literal_expr(SCOPE_HASH_CLASS));

@@ -591,17 +591,39 @@ pub enum Refusal {
     /// A nested rule in `<style>`.
     #[error("nested css rule in <style>")]
     CssNestedRule,
+    /// A rule with no declarations (`.foo {}` / only comments). The oracle
+    /// comment-wraps it `/* (empty) … */` in non-dev mode; tsv declines to
+    /// reproduce the wrap and refuses.
+    #[error("empty css rule in <style> (the oracle comment-wraps it)")]
+    CssEmptyRule,
     /// A combinator selector in `<style>`.
     #[error("css combinator selector in <style>")]
     CssCombinatorSelector,
-    /// A non-class selector in `<style>` (only `.class` is supported).
-    #[error("non-class css selector in <style> (only `.class` is supported)")]
-    CssNonClassSelector,
-    /// A scoped class selector that matches no element (pruning not implemented).
-    #[error("css selector .{class} matches no element (pruning not implemented)")]
+    /// A selector shape outside the supported same-element set: `:global`,
+    /// `:is`/`:where`/`:has`/`:not`, `:root`/`:host`, nesting (`&`), a namespaced
+    /// or escaped name, an `An+B`/percentage/invalid simple selector, or a bare
+    /// pseudo-only compound. Type/id/class/attribute/universal compounds (plus
+    /// trailing pseudo) are supported.
+    #[error("unsupported css selector in <style> (:global/:is/:where/:has/:not/:root/nesting)")]
+    CssUnsupportedSelector,
+    /// An attribute selector matched against a dynamic, potentially-enumerable
+    /// attribute value — the oracle's `get_possible_values` bounded static-eval,
+    /// which tsv declines to port (refusing rather than risk a false match).
+    #[error("css attribute selector against a dynamic attribute value (static-eval not ported)")]
+    CssDynamicAttributeMatch,
+    /// A case-insensitive attribute match with a non-ASCII operand (the selector
+    /// name/value or the element's attribute name/value). The oracle folds case
+    /// with full-Unicode `.toLowerCase()`; tsv folds ASCII-only, which can
+    /// disagree (final-sigma, İ, Kelvin/Ångström, …), so a non-ASCII operand
+    /// refuses rather than risk a mis-fold — a safe over-refusal.
+    #[error("css case-insensitive match with a non-ASCII operand (Unicode case-fold not ported)")]
+    CssCaseInsensitiveNonAscii,
+    /// A scoped selector that matches no element (pruning not implemented — the
+    /// oracle comment-wraps the unused rule).
+    #[error("css selector {selector} matches no element (pruning not implemented)")]
     CssSelectorNoMatch {
-        /// The unmatched class name.
-        class: String,
+        /// The unmatched compound's source text.
+        selector: String,
     },
 }
 
@@ -668,7 +690,7 @@ impl Refusal {
             Self::TemplateLevelElement { .. } => Cow::Borrowed("template-level <{name}>"),
             Self::VoidElementChildren { .. } => Cow::Borrowed("children on void element <{name}>"),
             Self::CssSelectorNoMatch { .. } => {
-                Cow::Borrowed("css selector .{class} matches no element")
+                Cow::Borrowed("css selector {selector} matches no element")
             }
             // Static reasons — the message is already the bucket.
             Self::ClientGeneration => Cow::Borrowed("client generation"),
@@ -840,10 +862,19 @@ impl Refusal {
             ),
             Self::CssAtRule => Cow::Borrowed("css at-rule in <style>"),
             Self::CssNestedRule => Cow::Borrowed("nested css rule in <style>"),
-            Self::CssCombinatorSelector => Cow::Borrowed("css combinator selector in <style>"),
-            Self::CssNonClassSelector => {
-                Cow::Borrowed("non-class css selector in <style> (only `.class` is supported)")
+            Self::CssEmptyRule => {
+                Cow::Borrowed("empty css rule in <style> (the oracle comment-wraps it)")
             }
+            Self::CssCombinatorSelector => Cow::Borrowed("css combinator selector in <style>"),
+            Self::CssUnsupportedSelector => Cow::Borrowed(
+                "unsupported css selector in <style> (:global/:is/:where/:has/:not/:root/nesting)",
+            ),
+            Self::CssDynamicAttributeMatch => Cow::Borrowed(
+                "css attribute selector against a dynamic attribute value (static-eval not ported)",
+            ),
+            Self::CssCaseInsensitiveNonAscii => Cow::Borrowed(
+                "css case-insensitive match with a non-ASCII operand (Unicode case-fold not ported)",
+            ),
         }
     }
 }

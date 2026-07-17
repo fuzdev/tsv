@@ -49,7 +49,7 @@
 //!   overlay push/pop sequence risks a false fold verdict, hence a false sole
 //!   blocker (the over-promise direction);
 //! - the emitter refusals that read live per-emission state (`env.scope` /
-//!   `matched_classes` / the block-scope overlays / the per-`{#each}` name
+//!   `matched_selectors` / the block-scope overlays / the per-`{#each}` name
 //!   counters / `animate_host_span`): the styled-component attribute refusals, the
 //!   `bind:`/event/value attribute refusals, the block-placement refusals
 //!   (`{@const}` placement, nested `{#each}`, generated-name collisions,
@@ -157,8 +157,13 @@ pub fn census_detected_buckets() -> Vec<Cow<'static, str>> {
         // CSS scoping.
         Refusal::CssAtRule,
         Refusal::CssNestedRule,
+        Refusal::CssEmptyRule,
         Refusal::CssCombinatorSelector,
-        Refusal::CssNonClassSelector,
+        Refusal::CssUnsupportedSelector,
+        // Its selector-side (non-ASCII name/value) is an `analyze_style` sink
+        // refusal; the element-side (non-ASCII attr/element name/value) is an
+        // emission-time refusal, disclaimed like `CssDynamicAttributeMatch`.
+        Refusal::CssCaseInsensitiveNonAscii,
         // Instance-script rune rewrites / guards / scaffold.
         Refusal::InstanceScriptExport,
         Refusal::LegacyReactiveStatement,
@@ -432,7 +437,7 @@ fn push_unsupported(found: &mut Vec<Refusal>, err: CompileError) {
 
 /// Deduplicate by [`bucket_key`](Refusal::bucket_key), preserving first-seen
 /// order — the census reports a *set* of blocker classes, so a file with three
-/// non-class selectors contributes one `CssNonClassSelector`.
+/// unsupported selectors contributes one `CssUnsupportedSelector`.
 fn dedup_by_bucket(refusals: Vec<Refusal>) -> Vec<Refusal> {
     let mut seen: HashSet<String> = HashSet::new();
     refusals
@@ -458,19 +463,19 @@ mod tests {
 
     #[test]
     fn two_independent_blockers_are_both_detected() {
-        // A non-class CSS selector (CSS analysis) AND a `<script context="module">`
+        // An unsupported CSS selector (CSS analysis) AND a `<script context="module">`
         // (structural top-level) — two independent dimensions, so the census must
         // return BOTH, where `compile()` would bail on only the first.
         let source = "<script context=\"module\">let x = 1;</script>\n\
-                      <style>div { color: red; }</style>\n";
+                      <style>:global(.x) { color: red; }</style>\n";
         let keys = bucket_set(source);
         assert!(
             keys.iter().any(|k| k.contains("module <script")),
             "module script not detected: {keys:?}"
         );
         assert!(
-            keys.iter().any(|k| k.contains("non-class css selector")),
-            "non-class css selector not detected: {keys:?}"
+            keys.iter().any(|k| k.contains("unsupported css selector")),
+            "unsupported css selector not detected: {keys:?}"
         );
         // And `compile()` bails on exactly one of them — the census is strictly
         // more informative.
@@ -483,29 +488,32 @@ mod tests {
     #[test]
     fn multiple_css_refusals_collect_not_bail() {
         // Two distinct CSS refusals in one stylesheet: a combinator selector
-        // (`a > b`) and a bare element selector (`div`, a non-class). The
+        // (`a > b`) and an unsupported pseudo compound (`:has(.x)`). The
         // parameterized `analyze_style` sink must surface both, not just the first.
-        let source = "<style>a > b { color: red; }\ndiv { color: blue; }</style>\n";
+        let source = "<style>a > b { color: red; }\n:has(.x) { color: blue; }</style>\n";
         let keys = bucket_set(source);
         assert!(
             keys.iter().any(|k| k.contains("combinator")),
             "combinator selector not detected: {keys:?}"
         );
         assert!(
-            keys.iter().any(|k| k.contains("non-class")),
-            "non-class selector not detected: {keys:?}"
+            keys.iter().any(|k| k.contains("unsupported css selector")),
+            "unsupported selector not detected: {keys:?}"
         );
     }
 
     #[test]
     fn single_blocker_is_the_only_class() {
-        // A lone non-class CSS selector, nothing else unsupported — the census
+        // A lone unsupported CSS selector, nothing else unsupported — the census
         // returns exactly that one class (the SOLE-blocker shape).
-        let source = "<style>div { color: red; }</style>\n";
+        let source = "<style>:global(.x) { color: red; }</style>\n";
         let keys = bucket_set(source);
         assert_eq!(
             keys,
-            vec!["non-class css selector in <style> (only `.class` is supported)".to_string()],
+            vec![
+                "unsupported css selector in <style> (:global/:is/:where/:has/:not/:root/nesting)"
+                    .to_string()
+            ],
             "expected exactly one blocker class: {keys:?}"
         );
     }
@@ -546,7 +554,7 @@ mod tests {
         // bail-on-first, byte-identical to before — so `compile()` on a stylesheet
         // with two CSS refusals surfaces exactly the FIRST (the combinator), never
         // the collected pair the census would return.
-        let source = "<style>a > b { color: red; }\ndiv { color: blue; }</style>\n";
+        let source = "<style>a > b { color: red; }\n:has(.x) { color: blue; }</style>\n";
         match compile(source, &CompileOptions::default()) {
             Err(CompileError::Unsupported(Refusal::CssCombinatorSelector)) => {}
             other => panic!("gated path must bail on the first CSS refusal, got {other:?}"),

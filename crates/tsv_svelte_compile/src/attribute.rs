@@ -124,6 +124,7 @@ pub(crate) fn emit_attribute<'arena>(
     attr: &'arena Attribute<'arena>,
     element_name: &str,
     out: &mut BodyBuilder<'arena>,
+    element_scoped: bool,
 ) -> Result<(), CompileError> {
     // The oracle lowercases attribute names outside foreign namespaces (svg
     // refuses above) — at EMISSION only. The event-handler decision below tests
@@ -153,34 +154,31 @@ pub(crate) fn emit_attribute<'arena>(
     match values {
         [AttributeValue::Text(text)] => {
             let decoded = text.data(env.source);
-            let mut value = if name == "class" || name == "style" {
+            let value = if name == "class" || name == "style" {
                 collapse_attr_whitespace(&decoded)
             } else {
                 decoded.into_owned()
             };
-            // A string-valued `class` that collapses+trims to empty is dropped
-            // entirely (oracle-probed: `class=""` and `class="  "` emit no
-            // attribute). Class-specific and static-path-specific: a bare
-            // `class` (boolean form, handled above) keeps `class=""`, empty
-            // `style`/`id` stay, and a *folded* mixed class keeps `class=""`
-            // (see `emit_mixed_attribute`).
-            if name == "class" && value.is_empty() {
+            if name == "class" {
+                // CSS scope: a scoped element folds the hash into its `class`
+                // value (`(escaped + ' ' + hash).trim()`, the oracle's order —
+                // escape, then append the safe hash), so `class=""` on a scoped
+                // element becomes `class="svelte-tsvhash"`. A `class` that ends up
+                // empty (unscoped, and blank/whitespace-only) is dropped entirely
+                // (oracle-probed: `class=""`/`class="  "` emit no attribute) — but
+                // a bare boolean `class` keeps `class=""` (handled above), and
+                // empty `style`/`id` stay.
+                let escaped = escape_html_attr(&value);
+                let text = if element_scoped {
+                    format!("{escaped} {SCOPE_HASH_CLASS}").trim().to_string()
+                } else {
+                    escaped
+                };
+                if text.is_empty() {
+                    return Ok(());
+                }
+                out.push_text(&escape_template_text(&format!(" class=\"{text}\"")));
                 return Ok(());
-            }
-            if name == "class"
-                && let Some(scope) = &env.scope
-            {
-                let mut matched = false;
-                for class in value.split_ascii_whitespace() {
-                    if scope.class_names.contains(class) {
-                        env.matched_classes.insert(class.to_string());
-                        matched = true;
-                    }
-                }
-                if matched {
-                    value.push(' ');
-                    value.push_str(SCOPE_HASH_CLASS);
-                }
             }
             out.push_text(&escape_template_text(&format!(
                 " {name}=\"{}\"",
@@ -845,6 +843,7 @@ pub(crate) fn emit_class_directives<'arena>(
     class_attr: Option<&'arena Attribute<'arena>>,
     class_directives: &[&'arena ClassDirective<'arena>],
     out: &mut BodyBuilder<'arena>,
+    element_scoped: bool,
 ) -> Result<(), CompileError> {
     // The synthetic `$.attr_class` call interleaves minted (appendix) and borrowed
     // (host) argument spans; with carried script comments their windows would
@@ -856,26 +855,11 @@ pub(crate) fn emit_class_directives<'arena>(
     let base = build_class_base(env, class_attr)?;
     let base_is_string = matches!(base, ClassBase::StringLiteral(_));
 
-    // Scope matching. `env.scope` and `env.matched_classes` are disjoint fields,
-    // so the immutable scope borrow and the mutable insert coexist.
-    let mut scoped = false;
-    if let Some(scope) = &env.scope {
-        if let ClassBase::StringLiteral(s) = &base {
-            for token in s.split_ascii_whitespace() {
-                if scope.class_names.contains(token) {
-                    env.matched_classes.insert(token.to_string());
-                    scoped = true;
-                }
-            }
-        }
-        for directive in class_directives {
-            let dname = directive.name_span.extract(env.source);
-            if scope.class_names.contains(dname) {
-                env.matched_classes.insert(dname.to_string());
-                scoped = true;
-            }
-        }
-    }
+    // CSS scope: whether any scoped compound matches this element (decided up front
+    // by `element_scope`, including type/id/attribute selectors — not only a class
+    // token or `class:` name). A string base folds the hash into its text; any
+    // other base carries it in the 2nd argument.
+    let scoped = element_scoped;
 
     // The base expression, folding the scope hash into a string-literal base.
     let base_expr = match base {

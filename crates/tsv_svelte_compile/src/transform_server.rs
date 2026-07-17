@@ -47,11 +47,11 @@
 //! handles it. Shapes the transform does not yet cover return a clear
 //! [`CompileError::Unsupported`] rather than guessing.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{Comment, Span};
-use tsv_svelte::ast::internal::Root;
+use tsv_svelte::ast::internal::{Element, Root};
 use tsv_ts::ast::internal::{
     BlockStatement, ExportDefaultDeclaration, ExportDefaultValue, Expression, ExpressionStatement,
     FunctionDeclaration, Statement, VariableDeclaration, VariableDeclarationKind,
@@ -92,12 +92,14 @@ pub(crate) struct EmitEnv<'arena, 's> {
     /// `$state` binding is dynamic — this set recovers that distinction.
     pub(crate) state_names: NameSet,
     pub(crate) scope: Option<ScopeInfo>,
-    /// Scoped selectors that matched an element, accumulated during emission.
-    /// Deliberately **not** an [`Analysis`] product: it is written at emission
-    /// time (the upfront element-census that would front-load it needs
-    /// ancestor/sibling context that doesn't exist yet), so it stays
+    /// Per-scoped-compound "matched some element" flags, parallel to
+    /// `scope.selectors`, accumulated during emission (`element_scope`). A
+    /// compound left `false` after the walk matched no element and refuses
+    /// (`CssSelectorNoMatch`). Deliberately **not** an [`Analysis`] product: it is
+    /// written at emission time (the upfront element-census that would front-load
+    /// it needs ancestor/sibling context that doesn't exist yet), so it stays
     /// `EmitEnv`-only.
-    pub(crate) matched_classes: BTreeSet<String>,
+    pub(crate) matched_selectors: Vec<bool>,
     /// Script comments are being carried — emitters whose synthetic call
     /// windows would sweep host comments (`$.attr` family) must refuse.
     pub(crate) has_comments: bool,
@@ -193,6 +195,40 @@ impl<'arena> EmitEnv<'arena, '_> {
 
     pub(crate) fn pop_overlay(&mut self) {
         self.overlays.pop();
+    }
+
+    /// Whether this regular element is CSS-scoped: does ANY scoped compound's
+    /// joint predicate list hold on it? Every compound that matches is marked
+    /// used ([`matched_selectors`](Self::matched_selectors)) — so a compound that
+    /// matches this element via a later index is still recorded, never
+    /// short-circuited — and the element gains the `svelte-tsvhash` class when the
+    /// result is `true` (the caller injects/extends `class`). Returns `false` when
+    /// the component has no `<style>`.
+    ///
+    /// The predicate match itself can refuse
+    /// ([`Refusal::CssDynamicAttributeMatch`](crate::Refusal::CssDynamicAttributeMatch))
+    /// when it would need the oracle's un-ported `get_possible_values`.
+    pub(crate) fn element_scope(
+        &mut self,
+        element: &Element<'arena>,
+        element_name: &str,
+    ) -> Result<bool, CompileError> {
+        let Some(scope) = &self.scope else {
+            return Ok(false);
+        };
+        let mut scoped = false;
+        for (i, selector) in scope.selectors.iter().enumerate() {
+            if crate::css_scope::element_matches_selector(
+                selector,
+                element,
+                element_name,
+                self.source,
+            )? {
+                self.matched_selectors[i] = true;
+                scoped = true;
+            }
+        }
+        Ok(scoped)
     }
 
     /// The `each_array` unique name for the next `{#each}` (source order).
@@ -622,6 +658,7 @@ pub(crate) fn compile_server<'arena>(
         }
     }
 
+    let selector_count = scope.as_ref().map_or(0, |s| s.selectors.len());
     let mut env = EmitEnv {
         b,
         source,
@@ -629,7 +666,7 @@ pub(crate) fn compile_server<'arena>(
         derived_names,
         state_names,
         scope,
-        matched_classes: BTreeSet::new(),
+        matched_selectors: vec![false; selector_count],
         has_comments,
         overlays: Vec::new(),
         in_each: false,
@@ -701,13 +738,13 @@ pub(crate) fn compile_server<'arena>(
         }
     }
 
-    // A scoped selector that matches no element would be pruned by the oracle —
+    // A scoped compound that matched no element would be pruned by the oracle —
     // pruning isn't implemented, so refuse rather than emit unpruned CSS.
     if let Some(scope) = &env.scope {
-        for class in &scope.class_names {
-            if !env.matched_classes.contains(class) {
+        for (i, selector) in scope.selectors.iter().enumerate() {
+            if !env.matched_selectors[i] {
                 return Err(unsupported(Refusal::CssSelectorNoMatch {
-                    class: class.clone(),
+                    selector: crate::css_scope::selector_display(selector).to_string(),
                 }));
             }
         }
