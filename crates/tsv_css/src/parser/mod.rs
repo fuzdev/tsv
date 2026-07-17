@@ -13,7 +13,8 @@ use crate::ast::internal::{Comment, CssNode, CssStyleSheet};
 use crate::lexer::{Lexer, Token, TokenKind};
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
-use decl_scan::TerminatorKind;
+use decl_scan::{TerminatorKind, ValueFacts};
+use std::cell::Cell;
 use tsv_lang::{ParseError, Span};
 
 pub(crate) struct CssParser<'a, 'arena> {
@@ -41,6 +42,13 @@ pub(crate) struct CssParser<'a, 'arena> {
     /// `self.bvec()` and strings via `self.alloc_str_in()` (CSS has no single-node
     /// `alloc` — every node lands in a child slice).
     pub(crate) arena: &'arena Bump,
+    /// Value facts computed speculatively by the rule/declaration disambiguation scan, for
+    /// the `parse_declaration` that immediately follows to reuse instead of re-walking the
+    /// value. Set (or cleared) at every `scan_rule_or_declaration`; keyed on the value's
+    /// start offset so a stale entry — e.g. from a custom-property declaration that bypasses
+    /// the scan — can never be mistaken for the current value's facts. `Cell` because the
+    /// scan runs behind `&CssParser` (the disambiguation is a read-only lookahead).
+    speculative_value_facts: Cell<Option<(usize, ValueFacts)>>,
 }
 
 impl<'a, 'arena> CssParser<'a, 'arena> {
@@ -64,7 +72,25 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
             in_pseudo_args: false,
             comments: Vec::new(),
             arena,
+            speculative_value_facts: Cell::new(None),
         })
+    }
+
+    /// Record (or clear) the value facts the disambiguation scan produced for the
+    /// declaration it just settled — see [`take_value_facts`](Self::take_value_facts).
+    pub(in crate::parser) fn stash_value_facts(&self, facts: Option<(usize, ValueFacts)>) {
+        self.speculative_value_facts.set(facts);
+    }
+
+    /// Take the stashed value facts, but only if they were computed for the value starting at
+    /// `value_start` — the guard that makes reuse safe. Offsets increase monotonically
+    /// through the parse, so a stale entry (a smaller start) never matches; a match means the
+    /// disambiguation scan and this declaration are looking at the same value.
+    pub(in crate::parser) fn take_value_facts(&self, value_start: usize) -> Option<ValueFacts> {
+        match self.speculative_value_facts.take() {
+            Some((start, facts)) if start == value_start => Some(facts),
+            _ => None,
+        }
     }
 
     /// Create an empty `BumpVec` whose backing buffer lives in the **arena** —
