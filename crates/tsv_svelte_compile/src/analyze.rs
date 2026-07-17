@@ -837,6 +837,62 @@ pub(crate) fn is_effect_call<'arena>(
     }
 }
 
+/// Whether `expr` is a droppable statement-position `$inspect(...)` call — a
+/// bare `$inspect(args)` or a single trailing `.with(callback)`
+/// (`$inspect(args).with(cb)`). Returns every sub-expression the drop must
+/// still guard-walk: the `$inspect` arguments plus a `.with` callback's
+/// arguments (the `$inspect` callee and the `.with` member itself are exempt at
+/// this recognized position).
+///
+/// Unlike `$effect`, this drop does **not** force the `$$renderer.component(…)`
+/// wrapper on its own: the oracle emits nothing for `$inspect` in non-dev SSR,
+/// and the wrapper the `.with` / prop-rooted-argument cases DO get comes solely
+/// from `needs_context` (which walks the raw instance body — `$inspect`
+/// statements included — before this drop).
+///
+/// `None` for anything else — a bare reference, an argument-less `$inspect()`,
+/// a value/template position, a wrong-arity `.with()` / `.with(f, x)` (an
+/// oracle error), or a chain the oracle mis-compiles into invalid JS (`.foo()`,
+/// a second `.with`, a non-call `.with`) — which the rune guard then refuses as
+/// a `$`-rooted call, a safe over-refusal.
+pub(crate) fn is_inspect_call<'arena>(
+    expr: &'arena Expression<'arena>,
+    source: &str,
+) -> Option<Vec<&'arena Expression<'arena>>> {
+    let Expression::CallExpression(call) = expr else {
+        return None;
+    };
+    match call.callee {
+        // Bare `$inspect(args)` — one or more arguments (the oracle rejects
+        // `$inspect()` with `rune_invalid_arguments_length`).
+        Expression::Identifier(_) => (callee_keypath(call.callee, source).as_deref()
+            == Some("$inspect")
+            && !call.arguments.is_empty())
+        .then(|| call.arguments.iter().collect()),
+        // `$inspect(args).with(cb)` — exactly one `.with`, carrying exactly one
+        // argument, over the `$inspect(...)` call. A second `.with` or any other
+        // method leaves the outer call un-rewritten in the oracle → invalid JS;
+        // a wrong outer arity (`.with()` / `.with(f, x)`) is a hard oracle error
+        // (`rune_invalid_arguments_length`). Both stay refused via the guard.
+        Expression::MemberExpression(member) if !member.computed => {
+            let Expression::CallExpression(inner) = member.object else {
+                return None;
+            };
+            if callee_keypath(member.property, source).as_deref() != Some("with")
+                || call.arguments.len() != 1
+                || callee_keypath(inner.callee, source).as_deref() != Some("$inspect")
+                || inner.arguments.is_empty()
+            {
+                return None;
+            }
+            let mut guarded: Vec<&'arena Expression<'arena>> = inner.arguments.iter().collect();
+            guarded.extend(call.arguments.iter());
+            Some(guarded)
+        }
+        _ => None,
+    }
+}
+
 /// The plain (non-computed) identifier keypath of a callee: `$state`,
 /// `$state.raw` — one identifier or one member level.
 fn callee_keypath(callee: &Expression<'_>, source: &str) -> Option<String> {

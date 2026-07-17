@@ -17,7 +17,7 @@ use tsv_ts::ast::internal::{
 
 use crate::analyze::{
     Binding, BindingKind, Bindings, Initial, NameSet, RuneInit, classify_rune_init, is_effect_call,
-    pattern_binding_names,
+    is_inspect_call, pattern_binding_names,
 };
 use crate::attr_refs::{TemplateItem, each_template_item};
 use crate::build::Builder;
@@ -580,6 +580,25 @@ pub(crate) fn rewrite_script_statement<'arena>(
         dropped_regions.push(stmt.span());
         let mut ctx = WalkCtx::new(source, updated, nested_declared, derived_names);
         walk_expression_guarded(callback, &mut ctx)?;
+        return Ok(None);
+    }
+
+    // Statement-position `$inspect(…)` (bare or `.with(cb)`) is dropped on the
+    // server, like `$effect` — but it does NOT force the wrapper on its own.
+    // The `.with` / prop-rooted-argument cases that DO wrap are already covered
+    // by `needs_context` (which walks the raw instance body — `$inspect`
+    // statements included — before this drop). The arguments and `.with`
+    // callback are still guard-walked so a stray rune (`$inspect($state(x))`,
+    // which the oracle rejects) or a derived read refuses; the `$inspect` callee
+    // itself is exempt at this recognized position.
+    if let Statement::ExpressionStatement(expr_stmt) = stmt
+        && let Some(guarded) = is_inspect_call(&expr_stmt.expression, source)
+    {
+        dropped_regions.push(stmt.span());
+        let mut ctx = WalkCtx::new(source, updated, nested_declared, derived_names);
+        for expr in guarded {
+            walk_expression_guarded(expr, &mut ctx)?;
+        }
         return Ok(None);
     }
 

@@ -728,6 +728,22 @@ fn compile_effect_forces_component_wrapper() {
 }
 
 #[test]
+fn compile_inspect_with_wrong_arity_refuses() {
+    // `$inspect(a).with(cb)` drops only with EXACTLY one `.with` argument. A
+    // wrong outer arity is a hard oracle error (`rune_invalid_arguments_length`:
+    // "`$inspect().with` must be called with exactly one argument"), so the
+    // recognizer must not drop it — it falls through to the rune guard.
+    assert_unsupported(
+        "<script>\n\tlet a = $state(0);\n\t$inspect(a).with();\n</script>\n<p>{a}</p>",
+        "$inspect",
+    );
+    assert_unsupported(
+        "<script>\n\tlet a = $state(0);\n\t$inspect(a).with((t, v) => v, 1);\n</script>\n<p>{a}</p>",
+        "$inspect",
+    );
+}
+
+#[test]
 fn compile_rejects_rune_in_nested_function() {
     assert_unsupported(
         "<script>\n\tfunction f() {\n\t\tlet c = $state(0);\n\t\treturn c;\n\t}\n</script>\n<p>text</p>",
