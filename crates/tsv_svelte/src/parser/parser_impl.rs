@@ -12,8 +12,8 @@ use tsv_ts::Expression;
 
 /// Build an expression `Comment` from its already-shifted `span` / `content_span`.
 /// `content` is the comment body, read only to compute the `multiline` flag (whether
-/// it holds a line terminator). Centralizes the `Comment` shape shared by the
-/// source-scan (`extract_ts_comments`) and live-lexer (`try_read_js_comment`) paths.
+/// it holds a line terminator). Centralizes the `Comment` shape built by the
+/// live-lexer (`try_read_js_comment`) path.
 fn expression_comment(
     span: Span,
     content_span: Span,
@@ -242,93 +242,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         self.current_end = self.base_offset + token.end as usize;
 
         Ok(())
-    }
-
-    /// Extract TS comments from content and add them to expression_comments.
-    ///
-    /// Scans for `/* ... */` block comments and `// ...` line comments.
-    /// Returns content with comments replaced by spaces (preserving positions).
-    ///
-    /// # Arguments
-    /// * `content` - The content to scan for comments
-    /// * `base_offset` - Offset in the full source where this content starts
-    ///
-    /// # Returns
-    /// Content with comments replaced by equivalent whitespace
-    pub(crate) fn extract_ts_comments(&mut self, content: &str, base_offset: usize) -> String {
-        let mut result = content.to_string();
-        let bytes = content.as_bytes();
-        let mut i = 0;
-
-        while i < bytes.len() {
-            if i + 1 < bytes.len() && bytes[i] == b'/' && bytes[i + 1] == b'*' {
-                // Block comment: /* ... */
-                let start = i;
-                i += 2;
-                while i + 1 < bytes.len() && !(bytes[i] == b'*' && bytes[i + 1] == b'/') {
-                    i += 1;
-                }
-                if i + 1 < bytes.len() {
-                    i += 2; // Skip */
-                }
-                let end = i;
-
-                // Extract comment content (without /* */)
-                let comment_content = &content[start + 2..end.saturating_sub(2)];
-                self.expression_comments.push(expression_comment(
-                    Span::new((base_offset + start) as u32, (base_offset + end) as u32),
-                    Span::new(
-                        (base_offset + start + 2) as u32,
-                        (base_offset + end.saturating_sub(2)) as u32,
-                    ),
-                    true,
-                    comment_content,
-                    false,
-                ));
-
-                // Replace comment with spaces in result
-                result.replace_range(start..end, &" ".repeat(end - start));
-            } else if i + 1 < bytes.len() && bytes[i] == b'/' && bytes[i + 1] == b'/' {
-                // Line comment: // ...
-                let start = i;
-                i += 2;
-                while i < bytes.len() && bytes[i] != b'\n' {
-                    i += 1;
-                }
-                let end = i;
-
-                // Extract comment content (without //)
-                let comment_content = &content[start + 2..end];
-                self.expression_comments.push(expression_comment(
-                    Span::new((base_offset + start) as u32, (base_offset + end) as u32),
-                    Span::new((base_offset + start + 2) as u32, (base_offset + end) as u32),
-                    false,
-                    comment_content,
-                    false,
-                ));
-
-                // Replace comment with spaces in result
-                result.replace_range(start..end, &" ".repeat(end - start));
-            } else if bytes[i] == b'"' || bytes[i] == b'\'' || bytes[i] == b'`' {
-                // Skip strings to avoid matching // or /* inside them
-                let quote = bytes[i];
-                i += 1;
-                while i < bytes.len() && bytes[i] != quote {
-                    if bytes[i] == b'\\' && i + 1 < bytes.len() {
-                        i += 2; // Skip escaped char
-                    } else {
-                        i += 1;
-                    }
-                }
-                if i < bytes.len() {
-                    i += 1; // Skip closing quote
-                }
-            } else {
-                i += 1;
-            }
-        }
-
-        result
     }
 
     /// Try to read a JS-style comment (`//` or `/* */`) at the current position.
