@@ -339,27 +339,57 @@ on `<input>` (`bind: directive value` for any other target).
 
 ### Styles (CSS scoping)
 
-Same-element scoping: a top-level, no-combinator compound (type / id / class /
-attribute / universal simple selectors, plus trailing non-filtering
-pseudo-classes/elements) gains the deterministic `svelte-tsvhash` class,
-source-spliced into the style text (author whitespace preserved) — appended after
-the compound's last non-pseudo anchor, or **replacing** a bare `*`. Each compound
-is a kind-tagged predicate list matched JOINTLY against every candidate element
-(all predicates must hold on the SAME element), porting the oracle's
-`relative_selector_might_apply_to_node` / `attribute_matches` restricted to the
-no-combinator case (a spread / matching directive / presence test on a dynamic
-value all "could match"). A scoped element with no `class` markup synthesizes
+Selector scoping: a rule's selector is a chain of compounds joined by combinators.
+Each compound (type / id / class / attribute / universal simple selectors, plus
+trailing non-filtering pseudo-classes/elements) that a successful chain match
+reaches gains the deterministic `svelte-tsvhash` class, source-spliced into the
+style text (author whitespace preserved) — appended after the compound's last
+non-pseudo anchor, or **replacing** a bare `*` — and every element the match touches
+gains the class too. Each compound is a kind-tagged predicate list matched JOINTLY
+against a candidate element (all predicates must hold on the SAME element); the chain
+is matched BACKWARD from the rightmost compound over an **upfront element census** (an
+ancestor/sibling path per regular element, since tsv's AST has no upward
+navigability), porting the oracle's `apply_selector` / `apply_combinator` /
+`relative_selector_might_apply_to_node` / `attribute_matches` (a spread / matching
+directive / presence test on a single dynamic expression all "could match"). Per
+`ComplexSelector` the first scoped compound takes a plain `.svelte-tsvhash` (a +0-1-0
+specificity bump), each later one a zero-specificity `:where(.svelte-tsvhash)`; the
+bump resets per comma. A scoped element with no `class` markup synthesizes
 `class="svelte-tsvhash"`.
 
-- **Supported**: top-level rules whose selectors are single, no-combinator
-  compounds of type/id/class/attribute/universal (+ trailing pseudo), each
-  matching at least one element.
-- **Refused**: `css at-rule in <style>`, `nested css rule in <style>`, `css
-  combinator selector in <style>`, `unsupported css selector in <style>
-  (:global/:is/:where/:has/:not/:root/nesting)` (also namespaced/escaped names and
-  bare pseudo-only compounds), `css attribute selector against a dynamic attribute
-  value (static-eval not ported)`, `css selector {selector} matches no element
-  (pruning not implemented)`
+- **Supported**:
+  - single, no-combinator compounds of type/id/class/attribute/universal (+ trailing
+    pseudo), each matching at least one element;
+  - the four **combinators** — descendant ` `, child `>`, next-sibling `+`,
+    subsequent-sibling `~` — over those compounds, including a preceding sibling
+    reached through a `{#if}` / `{#each}` / `{#await}` / `{#key}` block (block descent)
+    and the `{#each}` self-adjacency wrap-around;
+  - **basic `:global`**: leading `:global(<compound>) .y` (the `:global(...)` matches
+    inside, unscoped, its wrapper stripped; the rest scopes), trailing
+    `:global(<compound>)` (dropped from matching by `truncate`, wrapper still
+    stripped), a fully-global `:global(<compound>)` (never pruned, scopes nothing),
+    and a bare `:global` combinator (`div :global.x` → `div.x`, the preceding
+    whitespace eaten).
+- **Refused**:
+  - `css at-rule in <style>` — every at-rule, including `@keyframes` and `@media`;
+  - `nested css rule in <style>` — including a `:global { … }` global block, which is
+    a nested rule;
+  - `empty css rule in <style> (the oracle comment-wraps it)`;
+  - `css combinator selector in <style>` — the `||` column combinator, a combinator
+    whose match would cross a `{#snippet}` / `{@render}` site (the site-resolution
+    product isn't built — a safe over-refusal), and an empty compound;
+  - `unsupported css selector in <style> (:global/:is/:where/:has/:not/:root/nesting)`
+    — `:is` / `:where` / `:has` / `:not`, `:root` / `:host`, nesting (`&`), an
+    unsupported `:global` form (`:global(a, b)`, `.x:global`, `:global(<chain>)`), a
+    bare pseudo-only compound, and namespaced/escaped names;
+  - `css attribute selector against a dynamic attribute value (static-eval not ported)`
+    — an enumerable dynamic attribute value the oracle's `get_possible_values` would
+    enumerate (a safe over-refusal; a single plain expression still assume-matches);
+  - `css case-insensitive match with a non-ASCII operand (Unicode case-fold not ported)`;
+  - `css selector {selector} matches no element (pruning not implemented)`.
+- **Planned** (each its own follow-up sub-slice): `:global { … }` global blocks (a
+  nested-rule / comma-list surface) and `@keyframes` name scoping (needs general
+  at-rule handling first).
 
 ---
 
