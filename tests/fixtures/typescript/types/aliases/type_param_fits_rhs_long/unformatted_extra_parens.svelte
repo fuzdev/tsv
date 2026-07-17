@@ -79,8 +79,7 @@
 		'firstLongMemberName' | 'secondLongMemberName' | 'thirdLongMemberNameX'
 	)['key'];
 	// Indexed-access index union: the bracket expands but the `]` hugs the last member.
-	type UnionIdxKey<Param extends Aaaa | Bbbb> = SomeLongContainerTypeName[
-		'firstLongKeyName' | 'secondLongKeyName' | 'thirdLongKeyNameXX'];
+	type UnionIdxKey<Param extends Aaaa | Bbbb> = SomeLongContainerTypeName[('firstLongKeyName' | 'secondLongKeyName' | 'thirdLongKeyNameXX')];
 
 	// A prefix type operator (`keyof`/`readonly`) RHS is `fluid` too: the operator and
 	// its operand hug the `=` line and break INSIDE the operand — the `<…>` header
