@@ -35,29 +35,39 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         }
     }
 
-    /// Parse an html tag: {@html expression}
-    fn parse_html_tag(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
+    /// Parse a keyword-prefixed single-expression tag — `{@html expr}` /
+    /// `{@render expr}`. Both require whitespace after the keyword
+    /// (`strip_block_keyword`), parse the remaining content as one TS expression
+    /// (which collects comments and enforces end-of-input), and span the whole
+    /// `{@…}`. The caller wraps the `(expression, span)` in its node type.
+    fn parse_keyword_expression_tag(
+        &mut self,
+        start: usize,
+        keyword: &str,
+    ) -> Result<(Expression<'arena>, Span), ParseError> {
         let tag_content_start = self.current_end;
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
 
-        // Parse: "html expression" — Svelte requires whitespace after the keyword.
+        // Svelte requires whitespace after the keyword.
         let expr_str = self
-            .strip_block_keyword(tag_content, "html", tag_content_start)?
+            .strip_block_keyword(tag_content, keyword, tag_content_start)?
             .trim();
 
         let expr_offset = tag_content_start + subslice_offset(tag_content, expr_str);
         let expression = self.parse_ts_expression(expr_str, expr_offset)?;
 
-        // End is right after the closing }
-        let end = after_close;
+        // Span runs from `{@` (start) to just after the closing `}` (after_close).
+        let span = Span {
+            start: start as u32,
+            end: after_close as u32,
+        };
+        Ok((expression, span))
+    }
 
-        Ok(FragmentNode::HtmlTag(HtmlTag {
-            expression,
-            span: Span {
-                start: start as u32,
-                end: end as u32,
-            },
-        }))
+    /// Parse an html tag: {@html expression}
+    fn parse_html_tag(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
+        let (expression, span) = self.parse_keyword_expression_tag(start, "html")?;
+        Ok(FragmentNode::HtmlTag(HtmlTag { expression, span }))
     }
 
     /// Parse a const tag: {@const name = expression}
@@ -228,92 +238,98 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
     /// Parse a debug tag: {@debug} or {@debug x, y, z}
     ///
-    /// Unlike Prettier (which strips comments), we preserve TS comments in debug tags.
-    /// Comments are extracted and stored in Root.comments for lookup by span.
+    /// Mirrors Svelte's `1-parse/state/tag.js`: the whole content after `debug`
+    /// is parsed as one expression (`read_expression`), a top-level comma
+    /// `SequenceExpression` is flattened into the identifier list, and every
+    /// element must be a plain `Identifier` (`debug_tag_invalid_arguments`).
+    /// `{@debug}` — only whitespace before `}` — is "debug all" (an empty list).
+    ///
+    /// Unlike Prettier (which strips comments), we preserve TS comments in debug
+    /// tags; parsing via `parse_ts_expression` collects them into `Root.comments`
+    /// for lookup by span.
     fn parse_debug_tag(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
         let tag_content_start = self.current_end;
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
 
-        // Parse: "debug" or "debug x, y, z"
-        // First get the part after "debug" keyword
-        let (idents_str, idents_offset) = if let Some(stripped) = tag_content.strip_prefix("debug ")
-        {
-            let offset = tag_content_start + "debug ".len();
-            (stripped, offset)
-        } else if let Some(stripped) = tag_content.strip_prefix("debug") {
-            let offset = tag_content_start + "debug".len();
-            (stripped, offset)
-        } else {
-            ("", tag_content_start)
-        };
-
-        // Extract TS comments from the identifiers portion (preserves in Root.comments)
-        // Returns content with comments replaced by spaces (positions preserved)
-        let cleaned_idents = self.extract_ts_comments(idents_str, idents_offset);
+        // Content after the `debug` keyword. Svelte does not require whitespace
+        // after `debug` — `{@debug}`, `{@debug(a,b)}` are both valid — so this
+        // strips only the keyword (the tag dispatch guarantees the prefix).
+        debug_assert!(
+            tag_content.starts_with("debug"),
+            "debug tag dispatch guarantees the `debug` keyword prefix"
+        );
+        let rest = &tag_content["debug".len()..];
+        let rest_offset = tag_content_start + "debug".len();
 
         let mut identifiers = self.bvec();
-        if !cleaned_idents.trim().is_empty() {
-            // Parse comma-separated identifiers from the cleaned content
-            // Since comments are replaced with equal-length spaces, positions are preserved
-            let mut pos = 0;
-            for chunk in cleaned_idents.split(',') {
-                let trimmed = chunk.trim();
-                if !trimmed.is_empty() {
-                    // Find where trimmed content starts within this chunk
-                    let trim_offset = subslice_offset(chunk, trimmed);
-                    let ident_offset = idents_offset + pos + trim_offset;
-                    let expr = self.parse_ts_expression(trimmed, ident_offset)?;
-                    // Svelte requires every {@debug} argument to be a plain
-                    // identifier (`1-parse/state/tag.js`: `debug_tag_invalid_arguments`).
-                    // tsv parses each argument as a full expression, so reject the
-                    // non-identifier forms (regex/member/call/binary/`this`/…) here to
-                    // match Svelte — and, for a regex literal, to avoid re-emitting a
-                    // `/…*/` source span glued to `}` as unreparseable output.
-                    if !matches!(expr, Expression::Identifier(_)) {
-                        return Err(self.error_msg_at(
-                            "{@debug ...} arguments must be identifiers, not arbitrary expressions",
-                            expr.span().start as usize,
-                        ));
+
+        // `{@debug}` — only whitespace before `}` — means "debug all" (no
+        // identifiers). Svelte's `regex_whitespace_with_closing_curly_brace`
+        // (`/\s*}/y`); a comment is not whitespace, so `{@debug /* c */}` falls
+        // through to the parse below, which rejects (there is no expression).
+        let expr_str = rest.trim();
+        if !expr_str.is_empty() {
+            let expr_offset = rest_offset + subslice_offset(rest, expr_str);
+
+            // Parse the whole argument list as one expression (Svelte's
+            // `read_expression`). `parse_ts_expression` enforces end-of-input,
+            // so a trailing/leading/empty-slot comma (`{@debug a,}` /
+            // `{@debug ,a}` / `{@debug a, , b}`) or a trailing token
+            // (`{@debug a b}`) is a parse error, matching Svelte's
+            // `eat('}', true)`. Comments are collected into `Root.comments`.
+            let expr = self.parse_ts_expression(expr_str, expr_offset)?;
+
+            // Flatten a top-level comma sequence — `{@debug a, b}` and
+            // `{@debug (a, b)}` both yield `[a, b]` (a comma inside `()` is not a
+            // top-level separator, so the parenthesized form is one
+            // `SequenceExpression`); a single expression is a one-element list.
+            match expr {
+                Expression::SequenceExpression(seq) => {
+                    for element in seq.expressions {
+                        self.require_debug_identifier(element)?;
+                        identifiers.push(element.clone());
                     }
+                }
+                _ => {
+                    self.require_debug_identifier(&expr)?;
                     identifiers.push(expr);
                 }
-                pos += chunk.len() + 1; // +1 for the comma
             }
         }
-
-        let end = after_close;
 
         Ok(FragmentNode::DebugTag(DebugTag {
             identifiers: identifiers.into_bump_slice(),
             span: Span {
                 start: start as u32,
-                end: end as u32,
+                end: after_close as u32,
             },
         }))
     }
 
+    /// Every `{@debug}` argument must be a plain `Identifier`
+    /// (`1-parse/state/tag.js`: `debug_tag_invalid_arguments`). tsv parses the
+    /// argument list as a full TS expression, so reject the non-identifier forms
+    /// (regex/member/call/binary/`this`/literal) here to match Svelte — and, for
+    /// a regex literal, to avoid re-emitting a `/…*/` source span glued to `}` as
+    /// unreparseable output.
+    fn require_debug_identifier(&self, expr: &Expression<'arena>) -> Result<(), ParseError> {
+        if matches!(expr, Expression::Identifier(_)) {
+            Ok(())
+        } else {
+            Err(self.error_msg_at(
+                "{@debug ...} arguments must be identifiers, not arbitrary expressions",
+                expr.span().start as usize,
+            ))
+        }
+    }
+
     /// Parse a render tag: {@render fn()} or {@render fn?.()}
     fn parse_render_tag(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
-        let tag_content_start = self.current_end;
-        let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
-
-        // Parse: "render expression" where expression must be a call — Svelte
-        // requires whitespace after the keyword.
-        let expr_str = self
-            .strip_block_keyword(tag_content, "render", tag_content_start)?
-            .trim();
-
-        let expr_offset = tag_content_start + subslice_offset(tag_content, expr_str);
-        let expression = self.parse_ts_expression(expr_str, expr_offset)?;
-
-        let end = after_close;
-
-        Ok(FragmentNode::RenderTag(RenderTag {
-            expression,
-            span: Span {
-                start: start as u32,
-                end: end as u32,
-            },
-        }))
+        // TODO: Svelte requires the expression to be a `CallExpression` (or a
+        // `ChainExpression` ending in one) — `render_tag_invalid_expression`
+        // (`1-parse/state/tag.js`); tsv currently over-accepts a non-call
+        // `{@render foo}`.
+        let (expression, span) = self.parse_keyword_expression_tag(start, "render")?;
+        Ok(FragmentNode::RenderTag(RenderTag { expression, span }))
     }
 }
