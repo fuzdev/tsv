@@ -263,6 +263,18 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     let trim_offset = subslice_offset(chunk, trimmed);
                     let ident_offset = idents_offset + pos + trim_offset;
                     let expr = self.parse_ts_expression(trimmed, ident_offset)?;
+                    // Svelte requires every {@debug} argument to be a plain
+                    // identifier (`1-parse/state/tag.js`: `debug_tag_invalid_arguments`).
+                    // tsv parses each argument as a full expression, so reject the
+                    // non-identifier forms (regex/member/call/binary/`this`/…) here to
+                    // match Svelte — and, for a regex literal, to avoid re-emitting a
+                    // `/…*/` source span glued to `}` as unreparseable output.
+                    if !matches!(expr, Expression::Identifier(_)) {
+                        return Err(self.error_msg_at(
+                            "{@debug ...} arguments must be identifiers, not arbitrary expressions",
+                            expr.span().start as usize,
+                        ));
+                    }
                     identifiers.push(expr);
                 }
                 pos += chunk.len() + 1; // +1 for the comma
