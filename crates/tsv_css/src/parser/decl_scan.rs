@@ -18,6 +18,19 @@
 //     keeps lexer errors — an unterminated string, a bad escape, a stray backtick — the
 //     reference's job alone: the byte scan never has to *reject*, only to recognize the
 //     shapes it fully models.
+//
+// The value byte-scan loop lives in `scan_value_core`, shared by two callers. The second
+// is the rule/declaration disambiguation: a block child `identifier :` is told a
+// declaration from a nested rule (`color: red;` vs `span:hover { }`) by walking its value
+// to the first paren-depth-0 `{` (rule) or `;`/`}` (declaration) — the *same* bytes
+// `parse_declaration` then walks again for its facts. `scan_rule_or_declaration` runs the
+// shared loop with the verdict latch on (`WANT_VERDICT`), so that one walk answers the
+// disambiguation *and*, for a declaration, produces the `ValueFacts` the parser stashes for
+// `parse_declaration` to reuse — fusing what used to be two separate byte scans per
+// non-custom declaration into one. The verdict tracks paren depth only (walk1's model): a
+// `;` inside `[…]` really does end the disambiguation run, even though the value scan (which
+// tracks `[]`/`{}` too) reads past it — the shared loop maintains both, and the two agree
+// on the verdict because paren depth evolves identically in each.
 
 use super::CssParser;
 use crate::lexer::{IDENT_CONTINUE_LUT, Lexer, TokenKind, is_ascii_css_whitespace};
@@ -145,89 +158,76 @@ const fn is_inert_content(b: u8) -> bool {
         )
 }
 
-/// Bytes the rule-or-declaration scan can skip. It asks a narrower question than the value
-/// scan — does a `{` arrive before a `;`/`}` at paren depth zero? — so it inspects strictly
-/// less: it tracks only parens, and `[`, `]` and `!` all join the inert set (the token walk
-/// it fronts ignores them too). Same ASCII-half-only rule.
-const SKIP_RULE: [bool; 256] = {
-    let mut t = [false; 256];
-    let mut i = 0;
-    while i < 128 {
-        let b = i as u8;
-        t[i] = !rule_scan_inspects(b)
-            && (is_ascii_css_whitespace(b)
-                || is_inert_content(b)
-                || matches!(b, b'[' | b']' | b'!'));
-        i += 1;
-    }
-    t
-};
-
-/// The bytes `scan_rule_or_declaration_bytes` has a match arm for — strictly fewer than the
-/// value scan's, since it tracks only parens. Same lockstep requirement as
-/// [`value_scan_inspects`].
-const fn rule_scan_inspects(b: u8) -> bool {
-    matches!(
-        b,
-        b'(' | b')' | b'{' | b'}' | b';' | b'"' | b'\'' | b'/' | b'\\'
-    )
+/// What the fused disambiguation scan found: a nested rule, or a declaration together with
+/// the value facts `parse_declaration` would otherwise re-scan.
+enum Disambiguation {
+    /// `identifier … { … }` — a nested rule; no value facts.
+    Rule,
+    /// `identifier : value ;` — a declaration. `value_start` is the offset of the value's
+    /// first byte (past the `:` and the whitespace after it), the key `parse_declaration`
+    /// matches its own re-derived value start against before trusting the facts.
+    Declaration {
+        value_start: usize,
+        facts: ValueFacts,
+    },
 }
 
-/// Whether the `identifier :` at `from` (an offset just past the identifier) opens a
-/// **nested rule** rather than a declaration.
+/// Disambiguate `identifier :` between a nested rule and a declaration, and — for a
+/// declaration — collect its `ValueFacts` in the same walk.
 ///
-/// `color: red;` and `span:hover { }` are both `identifier` `:` — they are told apart only
-/// by what terminates the run: a `{` (a rule) or a `;`/`}` (a declaration). Answering it
-/// means walking the whole value, which is why it is a byte scan and not a token walk;
-/// `None` declines, exactly as `scan_value_bytes` does, and for the same reasons.
-///
-/// Only paren depth is tracked, matching the token walk this fronts: a `;` inside a `[…]`
-/// really does end the run here.
-fn scan_rule_or_declaration_bytes(source: &str, from: usize) -> Option<bool> {
+/// `from` is just past the identifier; the caller's `peek_significant_kind` has already
+/// established the next significant token is `:`. Phase one skips to the value's first byte
+/// exactly as the parser does (`skip_whitespace_and_comments`, `expect(:)`, `skip_whitespace`
+/// — whitespace only, since a comment after the `:` is value content). Phase two is the
+/// shared value loop with the verdict latch on: it stops at the first paren-depth-0 `{` (a
+/// rule) and otherwise runs the value to its terminator, so the one walk answers both
+/// questions. `None` declines — exactly as the value byte scan does, for the same reasons —
+/// and hands the verdict back to `scan_rule_or_declaration_tokens`.
+fn scan_rule_or_declaration_and_value_bytes(source: &str, from: usize) -> Option<Disambiguation> {
     let bytes = source.as_bytes();
     let len = bytes.len();
     let mut i = from;
-    let mut paren: u32 = 0;
 
+    // To the `:` — the first significant byte (whitespace and comments are trivia).
     loop {
-        while i < len && SKIP_RULE[bytes[i] as usize] {
+        while i < len && is_ascii_css_whitespace(bytes[i]) {
             i += 1;
         }
-        if i >= len {
-            return Some(false); // EOF — not a rule
-        }
-        match bytes[i] {
-            b'{' if paren == 0 => return Some(true),
-            b';' | b'}' if paren == 0 => return Some(false),
-            b'{' | b';' | b'}' => i += 1,
-            b')' => {
-                paren = paren.saturating_sub(1);
+        match bytes.get(i)? {
+            b':' => {
                 i += 1;
+                break;
             }
-            b'(' => match url_token_end(source, bytes, from, i) {
-                Some(end) => i = end,
-                None => {
-                    paren += 1;
-                    i += 1;
-                }
-            },
-            b'"' | b'\'' => i = string_end(bytes, i)?,
             b'/' if bytes.get(i + 1) == Some(&b'*') => i = comment_end(bytes, i)?,
-            b'/' => i += 1,
+            // The caller settled that a `:` follows; anything else means the bytes disagree
+            // with the token lookahead, so decline to the reference walk rather than guess.
             _ => return None,
         }
     }
+    // Whitespace only after the `:` — a comment here opens the value.
+    while i < len && is_ascii_css_whitespace(bytes[i]) {
+        i += 1;
+    }
+    let value_start = i;
+
+    match scan_value_core::<true>(source, value_start)? {
+        ValueScanOutcome::Rule => Some(Disambiguation::Rule),
+        ValueScanOutcome::Value(facts) => Some(Disambiguation::Declaration { value_start, facts }),
+    }
 }
 
-/// Byte scan first, the token walk on decline — and in debug the token walk runs behind a
-/// successful byte scan and must agree, so the test suite proves the equivalence.
+/// Byte scan first, the token walk on decline — and in debug the token walk (and, for a
+/// declaration, the value token walk) run behind a successful byte scan and must agree, so
+/// the test suite proves the equivalence. A declaration's facts are stashed on the parser
+/// for `parse_declaration` to reuse; a rule (or a decline) clears the stash.
 pub(super) fn scan_rule_or_declaration(
     parser: &CssParser<'_, '_>,
     from: usize,
 ) -> Result<bool, ParseError> {
     let source = parser.source();
-    match scan_rule_or_declaration_bytes(source, from) {
-        Some(is_rule) => {
+    match scan_rule_or_declaration_and_value_bytes(source, from) {
+        Some(outcome) => {
+            let is_rule = matches!(outcome, Disambiguation::Rule);
             #[cfg(debug_assertions)]
             {
                 // An `Err` here fails the assert too, and must: it would mean the byte scan
@@ -238,10 +238,28 @@ pub(super) fn scan_rule_or_declaration(
                     "rule-or-declaration byte scan disagreed with the token walk at {from}: \
                      scan said {is_rule}, walk said {expected:?}"
                 );
+                if let Disambiguation::Declaration { value_start, facts } = &outcome {
+                    let expected_facts = scan_value_tokens(source, *value_start);
+                    assert!(
+                        expected_facts
+                            .as_ref()
+                            .is_ok_and(|expected| expected == facts),
+                        "fused value scan disagreed with the token walk at {value_start}: \
+                         scan said {facts:?}, walk said {expected_facts:?}"
+                    );
+                }
             }
+            parser.stash_value_facts(match outcome {
+                Disambiguation::Declaration { value_start, facts } => Some((value_start, facts)),
+                Disambiguation::Rule => None,
+            });
             Ok(is_rule)
         }
-        None => scan_rule_or_declaration_tokens(source, from),
+        None => {
+            // The byte scan declined; `parse_declaration` re-scans the value itself.
+            parser.stash_value_facts(None);
+            scan_rule_or_declaration_tokens(source, from)
+        }
     }
 }
 
@@ -353,6 +371,39 @@ pub(super) fn scan_value(
 
 /// The fast path. `None` = "I decline" — hand the value to `scan_value_tokens`.
 fn scan_value_bytes(source: &str, value_start: usize) -> Option<ValueFacts> {
+    // `WANT_VERDICT == false` compiles out the verdict latch, the only path that yields
+    // `Rule`, so only `Value` can arrive; a `Rule` (which cannot) safely declines.
+    match scan_value_core::<false>(source, value_start) {
+        Some(ValueScanOutcome::Value(facts)) => Some(facts),
+        _ => None,
+    }
+}
+
+/// What [`scan_value_core`] found: a declaration value's facts, or — only when the verdict
+/// latch is enabled — that the run is a nested rule.
+enum ValueScanOutcome {
+    /// A paren-depth-0 `{` arrived before any paren-depth-0 `;`/`}` — a nested rule. Only
+    /// produced when `WANT_VERDICT` is set (the disambiguation caller); the plain value scan
+    /// never asks the question and never sees it.
+    Rule,
+    /// The value ran to its terminator; here are its facts.
+    Value(ValueFacts),
+}
+
+/// The value byte-scan loop, from `value_start` (the value's first byte). Shared by the
+/// plain value scan (`WANT_VERDICT == false`) and the rule/declaration disambiguation
+/// (`WANT_VERDICT == true`).
+///
+/// With the latch on, the first paren-depth-0 `{` returns `Rule` and the first paren-depth-0
+/// `;`/`}` fixes the verdict as a declaration — walk1's paren-only model — while the loop
+/// keeps tracking `[]`/`{}` for the *value* terminator (which a `;`/`}` inside them does not
+/// end). The two models share the one `paren` counter and it evolves identically in each, so
+/// the fused verdict is exactly what a standalone paren-only walk would return; the facts are
+/// exactly what the plain scan returns. `None` declines, for the reasons in the module docs.
+fn scan_value_core<const WANT_VERDICT: bool>(
+    source: &str,
+    value_start: usize,
+) -> Option<ValueScanOutcome> {
     let bytes = source.as_bytes();
     let len = bytes.len();
     let mut i = value_start;
@@ -368,6 +419,9 @@ fn scan_value_bytes(source: &str, value_start: usize) -> Option<ValueFacts> {
     // final two tokens, so only the last `!` can possibly open it; a `!` nested in parens
     // (or followed by anything but `important`) is rejected by the forward check below.
     let mut last_bang: Option<usize> = None;
+    // Whether the paren-only verdict has settled on "declaration" (a `;`/`}` at paren depth
+    // zero). Latched once, then a later paren-depth-0 `{` must not be misread as a rule.
+    let mut verdict_is_decl = false;
 
     let (terminator, terminator_kind) = loop {
         while i < len && SKIP[bytes[i] as usize] {
@@ -377,7 +431,18 @@ fn scan_value_bytes(source: &str, value_start: usize) -> Option<ValueFacts> {
             break (len, TerminatorKind::Eof);
         }
         let at_top = paren == 0 && brace == 0 && bracket == 0;
-        match bytes[i] {
+        let b = bytes[i];
+        // Verdict latch (paren-only, walk1's model): the first paren-depth-0 structural byte
+        // decides rule vs declaration. A `{` there is a rule; a `;`/`}` fixes a declaration
+        // and the loop reads on for the value terminator (`[]`/`{}` may push it further).
+        if WANT_VERDICT && !verdict_is_decl && paren == 0 {
+            match b {
+                b'{' => return Some(ValueScanOutcome::Rule),
+                b';' | b'}' => verdict_is_decl = true,
+                _ => {}
+            }
+        }
+        match b {
             b';' if at_top => break (i, TerminatorKind::Semicolon),
             b'}' if at_top => break (i, TerminatorKind::RightBrace),
             b';' => i += 1,
@@ -457,14 +522,14 @@ fn scan_value_bytes(source: &str, value_start: usize) -> Option<ValueFacts> {
     // Empty = no tokens besides whitespace, comments, and the `!important`.
     let is_empty = skip_trivia(bytes, value_start, span_end) >= span_end;
 
-    Some(ValueFacts {
+    Some(ValueScanOutcome::Value(ValueFacts {
         terminator,
         terminator_kind,
         value_end,
         important_end,
         has_comment,
         is_empty,
-    })
+    }))
 }
 
 /// End of the string opened at `open` (past its closing quote), or `None` when the lexer
