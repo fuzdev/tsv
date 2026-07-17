@@ -9,6 +9,7 @@ use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::doc::{DocBuf, GroupId};
+use tsv_lang::source_scan::TriviaProfile;
 use tsv_lang::{comments_in_source_range, comments_to_emit_in_range};
 use tsv_ts::Expression;
 
@@ -200,6 +201,12 @@ impl<'a> Printer<'a> {
     /// content — including a block comment glued to an identifier
     /// (`{@debug /* c */ a}`), which the parser marks `owned_by_node` and the
     /// to-emit axis would skip, dropping it.
+    ///
+    /// Between two identifiers the gap is split at the separator comma (located
+    /// trivia-aware via `find_top_level_delim`): a comment before the comma trails
+    /// the previous identifier, one after it leads the next. Without the split a
+    /// pre-comma comment (`{@debug x /* c */, y}`) falls through both
+    /// per-identifier buckets and is dropped.
     pub(crate) fn build_debug_tag_doc(&self, tag: &internal::DebugTag<'_>) -> DocId {
         let d = self.d();
 
@@ -216,15 +223,38 @@ impl<'a> Printer<'a> {
         let mut last_end = tag.span.start + DEBUG_TAG_OPEN.len() as u32;
 
         for (i, id) in tag.identifiers.iter().enumerate() {
+            let id_start = id.span().start;
             if i > 0 {
+                // Locate the separator comma at bracket depth 0 in the gap between
+                // the previous identifier and this one (each identifier is a plain
+                // `Identifier`, so the gap holds only trivia and the one comma). A
+                // comment before the comma trails the previous identifier; one after
+                // it leads this one. Scanning trivia-aware — the same scan
+                // `parse_const_tag` uses — keeps a `,` inside a comment from
+                // mis-anchoring the split.
+                let comma = crate::parser::find_top_level_delim(
+                    self.source.as_bytes(),
+                    last_end as usize,
+                    id_start as usize,
+                    b',',
+                    TriviaProfile::JS,
+                )
+                .map_or(id_start, |c| c as u32);
+
+                // Comments before the comma trail the previous identifier.
+                for comment in &tag_comments {
+                    if comment.span.start >= last_end && comment.span.end <= comma {
+                        parts.push(self.build_trailing_js_comment_doc(comment));
+                    }
+                }
                 parts.push(d.text(", "));
-                last_end += 2; // ", "
+                last_end = comma.saturating_add(1);
             }
-            // Comments appearing before this identifier.
+            // Comments after the comma (or after the keyword, for the first
+            // identifier) lead this identifier.
             for comment in &tag_comments {
-                if comment.span.start >= last_end && comment.span.end <= id.span().start {
+                if comment.span.start >= last_end && comment.span.end <= id_start {
                     parts.push(self.build_leading_js_comment_doc(comment));
-                    last_end = comment.span.end;
                 }
             }
             parts.push(d.source_span(id.span(), self.source));
