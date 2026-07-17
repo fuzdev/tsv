@@ -1,0 +1,7 @@
+
+	.z.svelte-tsvhash + .z:where(.svelte-tsvhash) {
+		color: green;
+	}
+	.z.svelte-tsvhash ~ .z:where(.svelte-tsvhash) {
+		color: green;
+	}
