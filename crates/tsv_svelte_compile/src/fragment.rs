@@ -18,7 +18,9 @@ use tsv_svelte::ast::internal::{
 use tsv_ts::ast::internal::{Expression, ExpressionStatement, Statement};
 
 use crate::analyze::{NameSet, ScopeEntry, evaluate, stringify_value};
-use crate::attr_refs::{TemplateItem, each_template_item, fragment_any};
+use crate::attr_refs::{
+    TemplateItem, each_reference_bearing_attribute_expression, each_template_item, fragment_any,
+};
 use crate::blocks::{
     emit_await_block, emit_const_tag, emit_each_block, emit_if_block, emit_key_block,
     emit_svelte_head,
@@ -257,12 +259,54 @@ pub(crate) fn emit_fragment<'arena>(
     let mut list: Vec<CleanNode<'arena>> = Vec::with_capacity(nodes.len());
     let mut const_tags: Vec<&'arena ConstTag<'arena>> = Vec::new();
     let mut head_nodes: Vec<&'arena SpecialElement<'arena>> = Vec::new();
+    // The SSR-inert special-element tags (`svelte:window`/`svelte:body`/
+    // `svelte:document`) already seen among this fragment's direct children — the
+    // oracle allows at most one of each (`svelte_meta_duplicate`).
+    let mut seen_inert: Vec<&'static str> = Vec::new();
     for node in nodes {
         match node {
             FragmentNode::SpecialElement(se)
                 if matches!(se.kind, SpecialElementKind::SvelteHead) =>
             {
                 head_nodes.push(se);
+            }
+            // The SSR-inert special elements: `<svelte:window>`/`<svelte:body>`/
+            // `<svelte:document>` compile to NOTHING (their events/binds are
+            // client-only, so the oracle emits no template output for them) and are
+            // parser-guaranteed childless. Emit nothing, but still guard-and-drop
+            // each attribute expression so a stray rune / top-level `await` refuses,
+            // exactly as a dropped event handler on a regular element does. Two
+            // invalid-input shapes the oracle rejects at analysis (tsv's parser is
+            // permissive about both, so the guard lives here): a NESTED one (legal
+            // only at the component root — `svelte_meta_invalid_placement`) and a
+            // DUPLICATE of the same kind (`svelte_meta_duplicate`).
+            FragmentNode::SpecialElement(se)
+                if matches!(
+                    se.kind,
+                    SpecialElementKind::SvelteWindow
+                        | SpecialElementKind::SvelteBody
+                        | SpecialElementKind::SvelteDocument
+                ) =>
+            {
+                let tag = se.kind.tag_name();
+                if !ctx.is_component_root {
+                    return Err(unsupported(Refusal::SpecialElementInvalidPlacement {
+                        name: tag.to_string(),
+                    }));
+                }
+                if seen_inert.contains(&tag) {
+                    return Err(unsupported(Refusal::DuplicateSpecialElement {
+                        name: tag.to_string(),
+                    }));
+                }
+                seen_inert.push(tag);
+                let mut attr_exprs: Vec<&'arena Expression<'arena>> = Vec::new();
+                each_reference_bearing_attribute_expression(se.attributes, &mut |e| {
+                    attr_exprs.push(e);
+                });
+                for expr in attr_exprs {
+                    guard_dropped(env, expr)?;
+                }
             }
             FragmentNode::Text(text) => {
                 list.push(CleanNode::Text(text.data(source).into_owned()));

@@ -583,6 +583,26 @@ pub enum Refusal {
     /// order can't be fixed.
     #[error("<svelte:head> alongside a {{@const}} in the same fragment (hoist order)")]
     SvelteHeadWithConstTag,
+    /// An SSR-inert special element (`<svelte:window>`/`<svelte:body>`/
+    /// `<svelte:document>`) nested inside an element/block/snippet. These are legal
+    /// only as a direct child of the component root; the oracle errors
+    /// `svelte_meta_invalid_placement` at analysis. tsv's parser is permissive about
+    /// placement, so the compiler refuses the nested case rather than emit nothing
+    /// for oracle-rejected input.
+    #[error("<{name}> must be a top-level element (the oracle rejects it)")]
+    SpecialElementInvalidPlacement {
+        /// The special-element tag (`svelte:window`, …).
+        name: String,
+    },
+    /// A second `<svelte:window>`/`<svelte:body>`/`<svelte:document>` of the same
+    /// kind in the component (the oracle errors `svelte_meta_duplicate`: a component
+    /// may have at most one of each). tsv's parser accepts it, so the compiler
+    /// refuses the duplicate rather than emit nothing for oracle-rejected input.
+    #[error("duplicate <{name}> element (the oracle rejects it)")]
+    DuplicateSpecialElement {
+        /// The special-element tag (`svelte:window`, …).
+        name: String,
+    },
 
     // ── CSS scoping ────────────────────────────────────────────────────────
     /// An at-rule in `<style>`.
@@ -860,6 +880,12 @@ impl Refusal {
             Self::SvelteHeadWithConstTag => Cow::Borrowed(
                 "<svelte:head> alongside a {@const} in the same fragment (hoist order)",
             ),
+            Self::SpecialElementInvalidPlacement { .. } => {
+                Cow::Borrowed("<{name}> must be a top-level element (the oracle rejects it)")
+            }
+            Self::DuplicateSpecialElement { .. } => {
+                Cow::Borrowed("duplicate <{name}> element (the oracle rejects it)")
+            }
             Self::CssAtRule => Cow::Borrowed("css at-rule in <style>"),
             Self::CssNestedRule => Cow::Borrowed("nested css rule in <style>"),
             Self::CssEmptyRule => {

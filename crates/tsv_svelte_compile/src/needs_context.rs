@@ -32,7 +32,7 @@
 
 use tsv_svelte::ast::internal::{
     AttributeNode, AwaitBlock, ConstTag, EachBlock, Element, Fragment, FragmentNode, HtmlTag,
-    IfBlock, KeyBlock, RenderTag, Root, SnippetBlock, SpecialElement,
+    IfBlock, KeyBlock, RenderTag, Root, SnippetBlock, SpecialElement, SpecialElementKind,
 };
 use tsv_ts::ast::internal::{
     ArrowFunctionBody, ClassBody, ClassMember, ExportDefaultValue, Expression, ForInOfLeft,
@@ -677,13 +677,22 @@ fn walk_fragment_node(node: &FragmentNode<'_>, nc: &mut Nc<'_>) {
         FragmentNode::ConstTag(tag) => walk_const_tag(tag, nc),
         FragmentNode::SnippetBlock(snippet) => walk_snippet_block(snippet, nc),
         FragmentNode::RenderTag(tag) => walk_render_tag(tag, nc),
-        // Emission refuses these shapes, so on the emitted path their contents
-        // never reach output; matched explicitly so a new variant fails
-        // compilation here. Inside a dropped `{:catch}` the emitter never walks the
-        // fragment, so those refusals never fire — a `new`/prop-rooted access in
-        // one of them must still trigger the wrapper, so they are walked there.
+        // The SSR-inert special elements (`<svelte:window>`/`<svelte:body>`/
+        // `<svelte:document>`) COMPILE (emit nothing), but the oracle still runs
+        // its phase-2 analysis over their attribute expressions — a `new`/prop-
+        // rooted member/call in a window bind or handler fires the wrapper, and a
+        // `bind:` marks its target reassigned — so they are walked on the emitted
+        // path too. The other special-element kinds refuse at emission, so their
+        // references are reachable only through a dropped `{:catch}` (matched
+        // explicitly so a new variant fails compilation here).
         FragmentNode::SpecialElement(se) => {
-            if nc.in_dropped_catch {
+            let ssr_inert = matches!(
+                se.kind,
+                SpecialElementKind::SvelteWindow
+                    | SpecialElementKind::SvelteBody
+                    | SpecialElementKind::SvelteDocument
+            );
+            if nc.in_dropped_catch || ssr_inert {
                 walk_special_element(se, nc);
             }
         }
@@ -698,12 +707,24 @@ fn walk_fragment_node(node: &FragmentNode<'_>, nc: &mut Nc<'_>) {
     }
 }
 
-/// A special element is refused at emission everywhere else, so its references
-/// (the `this={…}` expression, attributes, and children) are reachable only
-/// through a dropped `{:catch}`, where they must be trigger-checked.
+/// Trigger-check a special element's references (the `this={…}` expression,
+/// attributes, and children). Reached on the emitted path for the SSR-inert kinds
+/// (`<svelte:window>`/`<svelte:body>`/`<svelte:document>`, which compile to
+/// nothing but whose attributes the oracle still analyzes) and, for every kind,
+/// through a dropped `{:catch}` (refused at emission there, so reachable only
+/// this way).
 fn walk_special_element(se: &SpecialElement<'_>, nc: &mut Nc<'_>) {
     if let Some(expr) = special_element_reference_expression(se) {
         walk_expr(expr, nc);
+    }
+    // A `bind:` is two-way — it MUTATES its target, so the target's root binding
+    // is reassigned component-wide (the oracle marks it at analysis time). Without
+    // this a `<svelte:window bind:scrollY={y}>` would let a later `{y}` read fold to
+    // its initial value where the oracle keeps it dynamic — mirrors `walk_element`.
+    for attr_node in se.attributes {
+        if let AttributeNode::BindDirective(d) = attr_node {
+            crate::rune_guard::assign_target_roots(&d.expression, nc.source, &mut nc.reassigned);
+        }
     }
     each_reference_bearing_attribute_expression(se.attributes, &mut |expr| walk_expr(expr, nc));
     walk_fragment(&se.fragment, nc);

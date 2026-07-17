@@ -319,7 +319,9 @@ A **static** component invocation compiles to `Name($$renderer, props)` (`shared
 | children on a void element | **Refused**: `children on void element <{name}>` |
 | `<svelte:head>` → `$.head(hash, $$renderer, ($$renderer) => { … })`, hoisted to the fragment front; the head body is a normal fragment (so a `<title>` or other special child refuses through the usual path). The `hash` is the ported `hash("input.svelte")` (`SvelteHead.js`, Svelte's `utils.js`). | Supported |
 | `<svelte:head>` with attributes / sharing a fragment with `{@const}` | **Refused**: `attributes on <svelte:head>` / `<svelte:head> alongside a {@const} in the same fragment (hoist order)` |
-| other special elements (`<slot>`, `<svelte:window>`, `<title>`, …) | **Refused**: `template node special element` |
+| `<svelte:window>` / `<svelte:body>` / `<svelte:document>` → emit **nothing** (SSR-inert: their events/binds are client-only, so the oracle produces no template output; parser-guaranteed childless). Attribute expressions are still guard-dropped (a stray rune / top-level `await` refuses) and still analyzed — a `new`/prop-rooted member/call in a bind or handler fires the `$$renderer.component` wrapper, and a `bind:` marks its target reassigned (a later read stays dynamic, not folded). | Supported |
+| `<svelte:window>` / `<svelte:body>` / `<svelte:document>` at an invalid position — nested (legal only at the component root) or a duplicate of the same kind | **Refused**: `<{name}> must be a top-level element (the oracle rejects it)` / `duplicate <{name}> element (the oracle rejects it)` (both oracle-rejected input — `svelte_meta_invalid_placement` / `svelte_meta_duplicate` — that tsv's permissive parser accepts) |
+| other special elements (`<slot>`, `<svelte:element>`, `<svelte:component>`, `<svelte:self>`, `<svelte:fragment>`, `<svelte:boundary>`, `<title>`) | **Refused**: `template node special element` |
 | `<svelte:options>` | **Refused**: `<svelte:options>` |
 
 ### select-family

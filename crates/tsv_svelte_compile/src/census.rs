@@ -403,22 +403,35 @@ fn import_local_names(body: &[Statement<'_>], source: &str) -> NameSet {
 /// Push the `TemplateNode` refusals a fragment holds, recursing every child
 /// fragment via the shared seam.
 ///
-/// Mirrors [`fragment::clean_and_split`](crate::fragment)'s `other =>` refusal
-/// arm exactly: a **non-head special element** (`<svelte:element>`,
-/// `<svelte:component>`, `<svelte:self>`, `<svelte:window>`, …), a `{@debug}`
-/// tag, or a declaration tag refuses. A bare `<svelte:head>`, a `{@render}` tag,
-/// and every other node are SUPPORTED (their own handled arms), so they are not
-/// refusals — treating `{@render}` as one would fabricate a co-blocker on every
-/// component that renders a snippet.
+/// Mirrors [`fragment::emit_fragment`](crate::fragment)'s special-element handling:
+/// a special element refuses as `template node special element` only when it is
+/// **neither** `<svelte:head>` **nor** one of the SSR-inert kinds
+/// (`<svelte:window>`/`<svelte:body>`/`<svelte:document>`) — so
+/// `<svelte:element>`/`<svelte:component>`/`<svelte:self>`/`<slot>`/… still refuse,
+/// but a valid top-level window/body/document (which now compiles to nothing) does
+/// not. A `{@debug}` or declaration tag refuses; a bare `<svelte:head>`, a
+/// `{@render}` tag, and every other node are SUPPORTED (their own handled arms), so
+/// they are not refusals — treating `{@render}` as one would fabricate a co-blocker
+/// on every component that renders a snippet.
 ///
 /// (A node inside a dropped `{:catch}` branch is not emitted, so the emitter
 /// never refuses it there; walking every child fragment can therefore
 /// over-detect in that doubly-rare position — a special element AND only in a
-/// `{:catch}` — accepted as a diagnostic imprecision.)
+/// `{:catch}` — accepted as a diagnostic imprecision. Likewise a window/body/
+/// document at an INVALID position — nested, or a duplicate — compiles-refuses
+/// (`SpecialElementInvalidPlacement`/`DuplicateSpecialElement`) but is not
+/// re-detected here; such input is oracle-rejected, so it is never a parity
+/// candidate.)
 fn collect_template_nodes(fragment: &Fragment<'_>, found: &mut Vec<Refusal>) {
     for node in fragment.nodes {
         let refused = match node {
-            FragmentNode::SpecialElement(se) => !matches!(se.kind, SpecialElementKind::SvelteHead),
+            FragmentNode::SpecialElement(se) => !matches!(
+                se.kind,
+                SpecialElementKind::SvelteHead
+                    | SpecialElementKind::SvelteWindow
+                    | SpecialElementKind::SvelteBody
+                    | SpecialElementKind::SvelteDocument
+            ),
             FragmentNode::DebugTag(_) | FragmentNode::DeclarationTag(_) => true,
             _ => false,
         };
@@ -533,6 +546,23 @@ mod tests {
             keys.iter()
                 .any(|k| k.contains("template node special element")),
             "special element not detected: {keys:?}"
+        );
+    }
+
+    #[test]
+    fn ssr_inert_special_element_is_not_detected() {
+        // A top-level `<svelte:window>` compiles (emits nothing), so it must NOT
+        // census as `template node special element` — unlike `<svelte:element>`,
+        // which still refuses. A `<svelte:body>` beside it must not appear either.
+        let source = "<svelte:window onkeydown={h} /><svelte:body use:act />\n";
+        assert!(
+            compile(source, &CompileOptions::default()).is_ok(),
+            "sanity: SSR-inert special elements must compile"
+        );
+        let keys = bucket_set(source);
+        assert!(
+            !keys.iter().any(|k| k.contains("special element")),
+            "SSR-inert special element wrongly censused: {keys:?}"
         );
     }
 

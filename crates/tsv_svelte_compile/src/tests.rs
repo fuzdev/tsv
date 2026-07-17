@@ -1846,6 +1846,72 @@ fn dropped_fragments_are_walked() {
 }
 
 #[test]
+fn compile_ssr_inert_special_elements() {
+    // `<svelte:window>`/`<svelte:body>`/`<svelte:document>` are SSR-inert: their
+    // events/binds are client-only, so the oracle emits NOTHING for them. A bare
+    // one leaves only the empty exported function.
+    assert_eq!(
+        compile_js("<svelte:window />"),
+        "import * as $ from 'svelte/internal/server';\n\
+             export default function Input($$renderer) {}\n"
+    );
+    // Beside real content: the content still emits, the window drops (its only
+    // template output is the sibling's push — no window marker).
+    let beside = compile_js("<svelte:window />\n<p>real</p>");
+    assert!(
+        beside.contains("$$renderer.push(`<p>real</p>`)") && !beside.contains("svelte:window"),
+        "window drops, sibling content emits: {beside}"
+    );
+    // The attribute expressions are still WALKED by needs_context: a prop-rooted
+    // member in a window handler fires the `$$renderer.component` wrapper, exactly
+    // as the oracle counts it.
+    let wrapped = compile_js(
+        "<script>\n\tlet { p } = $props();\n</script>\n<svelte:window onkeydown={p.method} />",
+    );
+    assert!(
+        wrapped.contains("$$renderer.component(($$renderer) => {"),
+        "a prop-rooted access in a window handler must fire needs_context: {wrapped}"
+    );
+    // A `bind:` marks its target reassigned, so a later `{y}` read stays dynamic
+    // (not folded to its initial value).
+    let bound = compile_js(
+        "<script>\n\tlet y = $state(0);\n</script>\n<svelte:window bind:scrollY={y} />{y}",
+    );
+    assert!(
+        bound.contains("$.escape(y)"),
+        "a window bind must keep a later read dynamic (not folded): {bound}"
+    );
+    // A stray rune inside a window attribute still refuses (the oracle rejects it
+    // as `state_invalid_placement` at analysis).
+    assert_unsupported("<svelte:window onkeydown={$state(0)} />", "$state");
+}
+
+#[test]
+fn compile_refuses_invalid_ssr_inert_special_elements() {
+    // Invalid-input shapes the oracle rejects at analysis; tsv's parser accepts
+    // them, so the compiler must refuse (never emit nothing for oracle-rejected
+    // input, which would surface as a corpus OVER-ACCEPTANCE).
+    //
+    // PLACEMENT: legal only at the component root — nested inside an element/block/
+    // snippet is `svelte_meta_invalid_placement`.
+    assert_unsupported(
+        "<div><svelte:window onkeydown={() => {}} /></div>",
+        "must be a top-level element",
+    );
+    assert_unsupported(
+        "{#if true}<svelte:body use:act />{/if}",
+        "must be a top-level element",
+    );
+    // DUPLICATE: at most one of each kind (`svelte_meta_duplicate`).
+    assert_unsupported(
+        "<svelte:window /><svelte:window />",
+        "duplicate <svelte:window> element",
+    );
+    // Different kinds side-by-side are fine (not a duplicate).
+    assert_compiles("<svelte:window /><svelte:body />");
+}
+
+#[test]
 fn compile_refuses_runtime_typescript_features() {
     // Constructs with runtime semantics an erasure would silently delete —
     // and the ones the oracle itself mis-compiles into invalid JS.
