@@ -997,7 +997,7 @@ impl<'a> Printer<'a> {
             first_parts.push(leading);
         }
 
-        first_parts.push(self.build_type_doc_maybe_parens(first_type, member_parens));
+        first_parts.push(self.build_intersection_member_type_doc(first_type, member_parens));
 
         // Add trailing block comments after first type
         if intersection.types.len() > 1 {
@@ -1307,7 +1307,7 @@ impl<'a> Printer<'a> {
         {
             self.build_parenthesized_union_doc(inner_union, Some(p), true)
         } else {
-            self.build_type_doc_maybe_parens(t, member_parens)
+            self.build_intersection_member_type_doc(t, member_parens)
         }
     }
 
@@ -1329,13 +1329,10 @@ impl<'a> Printer<'a> {
                 // `false` to keep `build_parenthesized_union_doc` block-comment-only.
                 self.build_parenthesized_union_doc(union, Some(first_paren), false)
             } else {
-                // Matches the default parenthesization in `build_type_doc_maybe_parens`:
-                // the closing `)` sits at the base indent, no sub-tab alignment.
-                d.concat(&[
-                    d.text("("),
-                    d.indent(self.build_type_doc(inner)),
-                    d.text(")"),
-                ])
+                // Matches the bare intersection-member parenthesization in
+                // `build_intersection_member_type_doc`: no inner `d.indent`, the
+                // level comes from the intersection printer's own `& `-line indent.
+                d.concat(&[d.text("("), self.build_type_doc(inner), d.text(")")])
             }
         } else {
             self.build_type_doc(inner)
@@ -1390,7 +1387,7 @@ impl<'a> Printer<'a> {
                 ));
             }
             parts.push(d.text(" "));
-            parts.push(self.build_type_doc_maybe_parens(t, member_parens));
+            parts.push(self.build_intersection_member_type_doc(t, member_parens));
         }
         d.concat(&parts)
     }
@@ -1421,7 +1418,9 @@ impl<'a> Printer<'a> {
             self.push_post_separator_block_comments(&mut parts, prev_type_end, type_start, b'&');
         }
 
-        parts.push(self.build_type_doc_maybe_parens(t, type_needs_parens_in_union_or_intersection));
+        parts.push(
+            self.build_intersection_member_type_doc(t, type_needs_parens_in_union_or_intersection),
+        );
 
         // Trailing block comments + `&` separator (or end-of-intersection comments)
         if !is_last {

@@ -281,6 +281,23 @@ impl<'a> Printer<'a> {
                 hang(self.build_union_type_doc(u))
             }
             TSType::Intersection(i) => hang(self.intersection_hanging_with_indent(i)),
+            // A nested conditional branch is already leveled by its OWN always-on
+            // `indent(parts)` (the `d.indent` at the tail of
+            // `build_conditional_type_doc_inner`), so it must NOT also take the
+            // per-branch indent below. This mirrors Prettier's `forceNoIndent`:
+            // a conditional in true/false position drops its own `indent(parts)`
+            // (`forceNoIndent ? parts : indent(parts)`) precisely so the outer
+            // `printBranch` indent lands it one level in — tsv reaches the same
+            // one-level-per-nesting result from the other side (parts always
+            // indented, branch never), so adding an indent here would double it.
+            // Guarded by `conditional/branch_nested_chain`.
+            TSType::Conditional(_) => {
+                if on_new_line {
+                    d.concat(&[d.hardline(), d.text(INDENT), branch_doc])
+                } else {
+                    d.concat(&[d.text(" "), branch_doc])
+                }
+            }
             _ => {
                 if on_new_line {
                     // Literal tab text (not d.indent) shifts only the first line
@@ -288,7 +305,10 @@ impl<'a> Printer<'a> {
                     // content.
                     d.concat(&[d.hardline(), d.text(INDENT), branch_doc])
                 } else {
-                    d.concat(&[d.text(" "), branch_doc])
+                    // Prettier's `printBranch` = `indent(print(branch))` under
+                    // useTabs: every non-conditional branch (tuple, mapped, object,
+                    // function/constructor type, …) sits one level past the operator.
+                    d.concat(&[d.text(" "), d.indent(branch_doc)])
                 }
             }
         }
