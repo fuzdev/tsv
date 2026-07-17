@@ -159,6 +159,34 @@ impl<'a> Printer<'a> {
         parts.push(d.hardline());
     }
 
+    /// Emit the separator after one comment in a leading run, toward the **physical**
+    /// next comment rather than `emit_next` (the start of the next *emitted* comment,
+    /// or the value/argument when this is the last). An owned comment — glued to the
+    /// token after it, printed by that token's node — is skipped by every emit
+    /// iterator yet still occupies the source gap, so both decisions here must anchor
+    /// past it: [`blank_scan_end`](Self::blank_scan_end) finds the first physical
+    /// comment in `(comment.end, emit_next)`, then a same-line block hugs it with a
+    /// space ([`comment_hugs_next`](Self::comment_hugs_next)) and everything else takes
+    /// the blank-preserving hardline. The single statement of that rule for the
+    /// hand-rolled leading-run emitters whose surrounding loop can't route through
+    /// [`push_leading_comment_run`](Self::push_leading_comment_run)
+    /// (`build_eq_comment_break_rhs`, `append_keyword_value_line_comments`,
+    /// `emit_leading_comments_inline_aware`) — so a run the author glued stays glued
+    /// and a multiline owned comment's own newline is never read as an author blank line.
+    pub(crate) fn push_leading_run_separator(
+        &self,
+        parts: &mut DocBuf,
+        comment: &Comment,
+        emit_next: u32,
+    ) {
+        let next = self.blank_scan_end(comment.span.end, emit_next);
+        if self.comment_hugs_next(comment, next) {
+            parts.push(self.d().text(" "));
+        } else {
+            self.push_blank_preserving_hardline(parts, comment.span.end, next);
+        }
+    }
+
     /// Emit the whole gap between two comma-separated items when the gap contains a
     /// **line** comment (the forced-break case): the comma, the comments, and the
     /// break to the next item, leaving `parts` positioned to emit that item.
@@ -604,9 +632,22 @@ impl<'a> Printer<'a> {
         let mut comments = comments.peekable();
         while let Some(comment) = comments.next() {
             parts.push(self.build_comment_doc(comment));
-            // The next thing after this comment is the following comment, or the
-            // terminal (value/member/item/body) for the last one.
-            let next = comments.peek().map_or(terminal_pos, |c| c.span.start);
+            // The next thing after this comment — the following comment, or the
+            // terminal (value/member/item/body) for the last one. Anchored on the
+            // PHYSICAL next comment, not just the emitted one: an owned comment (glued
+            // to the value, so printed by the value's node and skipped by the emit
+            // iterator) still occupies the gap here, and both the glue test and the
+            // blank-line scan below are physical questions. Anchoring past it would
+            // unglue a run the author wrote glued (`/* a */ /* b⏎*/ v` → `/* a */` on
+            // its own line) and, worse, read the owned comment's own newline as an
+            // author blank line — inserting one on the next pass (non-idempotent).
+            // Owned comments are always the glued suffix of a leading run, so this
+            // only ever differs at the last emitted comment; bounding `blank_scan_end`
+            // at the emit-next keeps it from over-reaching a caller's filtered set.
+            let next = self.blank_scan_end(
+                comment.span.end,
+                comments.peek().map_or(terminal_pos, |c| c.span.start),
+            );
             let hugs = match glue {
                 LeadingGlue::Adjacent => self.comment_hugs_next(comment, next),
                 // A glued (not own-line) single-line block hugs across a source
@@ -727,9 +768,11 @@ impl<'a> Printer<'a> {
                     trailing.push(self.build_comment_doc(comment));
                 } else {
                     leading.push(self.build_comment_doc(comment));
-                    // Preserve an author blank line before the next comment / value.
-                    let next = after_eq.get(ci + 1).map_or(value_start, |c| c.span.start);
-                    self.push_blank_preserving_hardline(&mut leading, comment.span.end, next);
+                    self.push_leading_run_separator(
+                        &mut leading,
+                        comment,
+                        after_eq.get(ci + 1).map_or(value_start, |c| c.span.start),
+                    );
                 }
             }
             Some(d.concat(&[

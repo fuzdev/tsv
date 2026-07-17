@@ -24,6 +24,7 @@ DROPPED	&&⟨⟩␣	multiline
 DROPPED	&⟨⟩{	annotation,block,jsdoc_cast,line,multiline
 DROPPED	&⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	')⟨⟩);	annotation,block,jsdoc_cast,line,multiline
+DROPPED	')⟨⟩];	annotation,block,jsdoc_cast,line,multiline
 DROPPED	')⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	',,⟨⟩,'	annotation,block,jsdoc_cast
 DROPPED	',⟨⟩()=	line
@@ -196,7 +197,7 @@ DROPPED	,⟨⟩>(	annotation,block,jsdoc_cast,multiline
 DROPPED	,⟨⟩>()	annotation,block,jsdoc_cast,multiline
 DROPPED	,⟨⟩>(/	annotation,block,jsdoc_cast,multiline
 DROPPED	,⟨⟩>/*	annotation,block,jsdoc_cast,multiline
-DROPPED	,⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
+DROPPED	,⟨⟩IDENT	annotation,block,jsdoc_cast,multiline
 DROPPED	,⟨⟩]	annotation,block,jsdoc_cast,multiline
 DROPPED	,⟨⟩]);	multiline
 DROPPED	,⟨⟩];	annotation,block,jsdoc_cast,multiline
@@ -215,7 +216,7 @@ DROPPED	/,,⟨⟩,];	annotation,block,jsdoc_cast
 DROPPED	//*⟨⟩␣	line
 DROPPED	/⟨⟩);	annotation,block,jsdoc_cast,multiline
 DROPPED	/⟨⟩*	multiline
-DROPPED	/⟨⟩/	line,multiline
+DROPPED	/⟨⟩/	multiline
 DROPPED	/⟨⟩/*	line,multiline
 DROPPED	/⟨⟩␣	line,multiline
 DROPPED	:(⟨⟩//	annotation,block,jsdoc_cast,multiline
@@ -721,7 +722,7 @@ DOUBLE-PRINTED	␣⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	␣⟨⟩[	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	␣⟨⟩[[	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	␣⟨⟩[{	annotation,block,jsdoc_cast,line,multiline
-DOUBLE-PRINTED	␣⟨⟩as	annotation,block,jsdoc_cast,line,multiline
+DOUBLE-PRINTED	␣⟨⟩as	annotation,block,jsdoc_cast
 DOUBLE-PRINTED	␣⟨⟩async	annotation,block,jsdoc_cast,multiline
 DOUBLE-PRINTED	␣⟨⟩from	annotation,block,jsdoc_cast,multiline
 DOUBLE-PRINTED	␣⟨⟩private	line

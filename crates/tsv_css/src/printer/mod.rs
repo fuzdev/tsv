@@ -161,10 +161,7 @@ impl<'a> Printer<'a> {
             return false;
         }
         let decl_source = decl.span.extract(self.source);
-        // The parser recorded the `property : value` colon; rebase it to the
-        // declaration slice instead of re-scanning (see `CssDeclaration::colon_offset`).
-        let colon_pos = (decl.colon_offset - decl.span.start) as usize;
-        let value_part = &decl_source[colon_pos + 1..];
+        let value_part = &decl_source[decl.colon_pos() + 1..];
         // Fast path: no `/*` at all → no block comment possible.
         if !value_part.contains("/*") {
             return false;
@@ -183,6 +180,51 @@ impl<'a> Printer<'a> {
                 // A lex error (e.g. a genuinely unterminated `/* …`) — fall back to the
                 // conservative substring answer rather than dropping a real comment.
                 Err(_) => return true,
+            }
+        }
+    }
+
+    /// Whether the value spanning `value_span` carries a comment at the comma
+    /// list's **top level** (paren-depth 0).
+    ///
+    /// Such a list breaks one-per-line: prettier force-breaks a comma list with a
+    /// top-level comment, and keying the break here — rather than on the
+    /// space-separated `List` the value parser builds *only* when a space happens to
+    /// follow the comment — makes every render-equivalent authoring reach the one
+    /// broken form in a single pass. The value normalizer inserts a space after a
+    /// comment's `*/`, so a glued `x,/* c */y` and a spaced `x, /* c */ y` would
+    /// otherwise flip the parse (and the break) between passes — the F1 violation the
+    /// `css-normalize-value-text-context-blind` class produces. A comment nested
+    /// inside a function argument (`var(--a, /* c */ red)`) sits at depth ≥ 1 and
+    /// does not count — prettier keeps that inline.
+    ///
+    /// Lexing (not a raw `/*` substring scan) is what keeps it honest: the lexer
+    /// consumes strings and unquoted `url(...)` whole, so a `/*` inside them is not a
+    /// comment token, and a `(` inside a comment is part of the one Comment token —
+    /// neither can miscount the depth. Callers gate on
+    /// `CssDeclaration::has_block_comment` first, so this lexes only when a comment is
+    /// actually present in the declaration.
+    pub(crate) fn comma_value_has_top_level_comment(&self, value_span: Span) -> bool {
+        let text = value_span.extract(self.source);
+        let mut lexer = Lexer::new(text);
+        let mut paren_depth: u32 = 0;
+        loop {
+            match lexer.next_token() {
+                Ok(t) if t.kind == TokenKind::Eof => return false,
+                Ok(t) if t.kind == TokenKind::Comment => {
+                    if paren_depth == 0 {
+                        return true;
+                    }
+                }
+                Ok(t) if t.kind == TokenKind::LeftParen => paren_depth += 1,
+                Ok(t) if t.kind == TokenKind::RightParen => {
+                    paren_depth = paren_depth.saturating_sub(1);
+                }
+                Ok(_) => {}
+                // A lex error (e.g. an unterminated `/* …`): don't force the break
+                // rather than guess — the value still prints, and this governs only
+                // layout, never content.
+                Err(_) => return false,
             }
         }
     }

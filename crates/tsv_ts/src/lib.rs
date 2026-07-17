@@ -29,6 +29,7 @@ use std::rc::Rc;
 
 use tsv_lang::EmbedContext;
 use tsv_lang::doc::arena::{DocArena, DocId};
+use tsv_lang::is_format_ignore_directive;
 use tsv_lang::printing::build_line_breaks_into;
 pub use tsv_lang::{ParseError, Result, SharedInterner};
 
@@ -49,6 +50,30 @@ pub struct PrinterInputs<'a> {
     pub comments: &'a [ast::Comment],
     /// Precomputed newline offsets for O(log n) line/column lookup.
     pub line_breaks: &'a [u32],
+    /// Whether any comment in this document is owned by a node (`owned_by_node`).
+    /// A document-level presence flag that short-circuits the owned-leading-comment
+    /// path (`prepend_owned_leading_comment` & siblings), which otherwise runs a byte
+    /// gate once per expression node — the highest-frequency comment path — to conclude
+    /// "no owned comment" for the ~all documents that have none.
+    ///
+    /// **Compute this once per document, from the parsed comment list** (e.g.
+    /// `comments.iter().any(|c| c.owned_by_node)`), and pass it in. It must NOT be
+    /// derived inside `Printer::with_context` or `tsv_svelte`'s `ts_inputs()`: the latter
+    /// is called per template `{expr}`, so an `any()` scan there is O(islands × comments)
+    /// and regresses `.svelte`. `owned_by_node` is set at parse time (including for
+    /// Svelte-embedded TS, parsed eagerly), so the flag is stable before any printing.
+    pub has_owned_comments: bool,
+    /// Whether any comment in this document is a `format-ignore` directive.
+    /// A document-level presence flag that short-circuits `has_format_ignore_in_range`,
+    /// which otherwise runs a range binary search + directive-string match once per
+    /// top-level statement / member expression / object property — concluding "no
+    /// format-ignore" for the ~all documents that have none.
+    ///
+    /// **Compute this once per document, from the parsed comment list** (e.g.
+    /// `comments.iter().any(|c| is_format_ignore_directive(c.content(source)))`), and pass
+    /// it in — never inside `Printer::with_context` or `tsv_svelte`'s `ts_inputs()` (the
+    /// per-`{expr}` O(islands × comments) trap the sibling `has_owned_comments` documents).
+    pub has_format_ignore: bool,
 }
 
 /// Build an *output* printer — pre-sizes the output buffer to the source
@@ -184,6 +209,11 @@ pub fn format_in(program: &Program<'_>, source: &str, arena: &DocArena) -> Strin
         interner: Rc::clone(&program.interner),
         comments: &program.comments,
         line_breaks: &line_breaks,
+        has_owned_comments: program.comments.iter().any(|c| c.owned_by_node),
+        has_format_ignore: program
+            .comments
+            .iter()
+            .any(|c| is_format_ignore_directive(c.content(source))),
     };
     let mut printer = make_printer(arena, &inputs, EmbedContext::default());
     printer.print_program(program);
@@ -242,6 +272,11 @@ pub fn format_canonical_in(program: &Program<'_>, source: &str, arena: &DocArena
         interner: Rc::clone(&program.interner),
         comments: &program.comments,
         line_breaks: &line_breaks,
+        has_owned_comments: program.comments.iter().any(|c| c.owned_by_node),
+        has_format_ignore: program
+            .comments
+            .iter()
+            .any(|c| is_format_ignore_directive(c.content(source))),
     };
     let mut printer = make_printer(arena, &inputs, EmbedContext::default());
     printer.set_canonical();
@@ -457,7 +492,7 @@ pub fn parse_pattern_with_comments<'arena>(
 ) -> Result<(Expression<'arena>, Vec<ast::Comment>)> {
     let mut parser = parser::Parser::with_interner(source, base_offset, interner, arena)?;
     let expr = parser
-        .parse_expression_public()
+        .parse_expression_unbounded()
         .map_err(|e| e.with_context(source))?;
     let mut pattern = parser
         .expression_to_pattern(expr)
@@ -466,11 +501,18 @@ pub fn parse_pattern_with_comments<'arena>(
     // like `{:then num: number}` and `{:catch error: Error}`
     if parser.at_colon() {
         let ta = parser
-            .parse_type_annotation_public()
+            .parse_type_annotation()
             .map_err(|e| e.with_context(source))?;
         attach_pattern_type_annotation(&mut pattern, ta, arena)
             .map_err(|e| e.with_context(source))?;
     }
+    // The pattern (plus any type annotation) must fill the whole slice — the Svelte
+    // callers (`{@const id = …}`, `{:then pattern}`, `{:catch pattern}`) hand us a slice
+    // bounded by `=`/`}`. Without this a trailing token is silently dropped
+    // (`{@const x y = a}` → `{@const x = a}`), losing content.
+    parser
+        .expect_end_of_input()
+        .map_err(|e| e.with_context(source))?;
     let comments = parser.take_comments();
     Ok((pattern, comments))
 }
@@ -547,7 +589,7 @@ pub fn parse_type_annotation_partial<'arena>(
 ) -> Result<(TSTypeAnnotation<'arena>, usize)> {
     let mut parser = parser::Parser::with_interner(source, base_offset, interner, arena)?;
     let ta = parser
-        .parse_type_annotation_public()
+        .parse_type_annotation()
         .map_err(|e| e.with_context(source))?;
     let pos = parser.current_absolute_position();
     Ok((ta, pos))
@@ -701,6 +743,11 @@ pub fn build_program_doc(
         interner: Rc::clone(&program.interner),
         comments: &program.comments,
         line_breaks,
+        has_owned_comments: program.comments.iter().any(|c| c.owned_by_node),
+        has_format_ignore: program
+            .comments
+            .iter()
+            .any(|c| is_format_ignore_directive(c.content(source))),
     };
     let printer = make_doc_printer(arena, &inputs, embed);
     printer.build_program_doc(program)

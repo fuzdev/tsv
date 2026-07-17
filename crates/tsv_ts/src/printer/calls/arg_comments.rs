@@ -860,10 +860,11 @@ impl<'a> PartitionedComments<'a> {
             if inline_flags[i] {
                 parts.push(d.text(" "));
             } else {
-                // Preserve a blank line the author left between this comment and what
-                // follows it (the next leading comment, or the argument itself).
-                let next = self.leading.get(i + 1).map_or(next_pos, |c| c.span.start);
-                printer.push_blank_preserving_hardline(parts, comment.span.end, next);
+                printer.push_leading_run_separator(
+                    parts,
+                    comment,
+                    self.leading.get(i + 1).map_or(next_pos, |c| c.span.start),
+                );
             }
         }
     }

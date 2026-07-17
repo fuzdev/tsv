@@ -697,6 +697,15 @@ fn assert_unsupported(source: &str, what: &str) {
     );
 }
 
+/// Assert `compile` fails at the parse stage with a message containing `what`.
+fn assert_parse_rejected(source: &str, what: &str) {
+    let err = compile(source, &CompileOptions::default()).unwrap_err();
+    assert!(
+        matches!(&err, CompileError::Parse(e) if e.to_string().contains(what)),
+        "expected Parse({what}), got {err:?} for:\n{source}"
+    );
+}
+
 #[test]
 fn compile_effect_forces_component_wrapper() {
     // Statement-position `$effect(…)` is dropped; the whole body moves
@@ -1651,18 +1660,21 @@ fn compile_template_erasure_feeds_the_shape_predicates() {
 #[test]
 fn compile_render_call_shape_is_decided_before_erasure() {
     // "A `{@render}` holds a call expression" is a PARSE-time rule in the oracle
-    // (`render_tag_invalid_expression`), so it is decided on the raw node. A
-    // wrapper around the CALL is rejected even though erasure would reveal a
-    // call underneath; a wrapper around the CALLEE leaves a call and compiles.
-    assert_unsupported(
+    // (`render_tag_invalid_expression`), so it is decided on the raw node — and
+    // tsv's Svelte parser enforces it there too, matching the oracle exactly. A
+    // wrapper around the CALL is rejected even though erasure would reveal a call
+    // underneath (a `as`-cast or a `!` non-null assertion both leave the outer
+    // node a non-call), so the rejection is a parse error, not a compiler
+    // refusal; a wrapper around the CALLEE would leave a call and compile.
+    assert_parse_rejected(
         "<script lang=\"ts\">\n\tlet { a }: any = $props();\n</script>\n\
              {#snippet s(x)}<p>{x}</p>{/snippet}\n{@render (s(a) as any)}",
-        "{@render}",
+        "call expressions",
     );
-    assert_unsupported(
+    assert_parse_rejected(
         "<script lang=\"ts\">\n\tlet { a }: any = $props();\n</script>\n\
              {#snippet s(x)}<p>{x}</p>{/snippet}\n{@render s(a)!}",
-        "{@render}",
+        "call expressions",
     );
 }
 

@@ -1604,17 +1604,40 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         })
     }
 
-    /// Parse a single expression (used by Svelte for expression tags)
-    pub fn parse_expression_public(&mut self) -> Result<Expression<'arena>, ParseError> {
+    /// Parse a single expression, WITHOUT requiring it to fill the input slice — the raw
+    /// parse the pattern path builds on: `parse_pattern_with_comments` parses here, converts
+    /// the result to a binding pattern, reads an optional `: Type`, then enforces
+    /// end-of-input itself. (Expression tags use `parse_expression_with_comments`, which
+    /// requires full consumption via `expect_end_of_input`.)
+    pub fn parse_expression_unbounded(&mut self) -> Result<Expression<'arena>, ParseError> {
         self.parse_expression()
+    }
+
+    /// Require that parsing has consumed the whole input slice — the current token must
+    /// be `Eof`. Trailing trivia (comments, whitespace) is consumed by the lexer, so only
+    /// a stray *token* trips this.
+    ///
+    /// The Svelte embedders parse an expression or pattern from a slice bounded by `}`
+    /// (`{@html expr}`, `{@const id = init}`, `{:then pattern}`, …) and require it to fill
+    /// the slice exactly — Svelte's `eat('}', true)`. Without this check a trailing token
+    /// is silently dropped (`{@html a b}` → `{@html a}`), which loses content rather than
+    /// diverging visibly.
+    pub fn expect_end_of_input(&self) -> Result<(), ParseError> {
+        if self.current.kind == TokenKind::Eof {
+            Ok(())
+        } else {
+            Err(self.error_expected_found("end of input"))
+        }
     }
 
     /// Parse a single expression and return it with any collected comments.
     /// Used for expressions in Svelte templates where comments need to be preserved.
+    /// The expression must fill the whole slice (see `expect_end_of_input`).
     pub fn parse_expression_with_comments(
         &mut self,
     ) -> Result<(Expression<'arena>, Vec<Comment>), ParseError> {
         let expr = self.parse_expression()?;
+        self.expect_end_of_input()?;
         let comments = self.take_comments();
         Ok((expr, comments))
     }
@@ -1627,7 +1650,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse a single assignment expression and return position where parsing stopped.
     ///
-    /// Unlike `parse_expression_public()`, this stops at top-level commas.
+    /// Unlike `parse_expression_unbounded()`, this stops at top-level commas.
     /// This is useful for parsing expressions embedded in contexts where commas
     /// have other meanings (like `{#each items as pattern, index}`).
     ///
@@ -1655,12 +1678,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Check if the current token is a colon.
     pub fn at_colon(&self) -> bool {
         matches!(self.current.kind, TokenKind::Colon)
-    }
-
-    /// Parse a type annotation (`: Type`) at the current position.
-    /// Public wrapper for use from lib.rs.
-    pub fn parse_type_annotation_public(&mut self) -> Result<TSTypeAnnotation<'arena>, ParseError> {
-        self.parse_type_annotation()
     }
 
     /// Get the current token's start position (absolute, with base_offset).

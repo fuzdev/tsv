@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 334,
+	"end": 845,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -169,24 +169,232 @@
 					"column": 10
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " a glued run whose later member is multiline stays glued (the run is not split)",
+			"start": 326,
+			"end": 407,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " d1 ",
+			"start": 421,
+			"end": 429,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 2
+				},
+				"end": {
+					"line": 24,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " d2\n ",
+			"start": 430,
+			"end": 441,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 11
+				},
+				"end": {
+					"line": 25,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a line comment after `=` forces the break; a following own-line block and a",
+			"start": 447,
+			"end": 525,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 1
+				},
+				"end": {
+					"line": 27,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " glued multiline block stay on consecutive lines (no blank between them)",
+			"start": 527,
+			"end": 601,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
+					"column": 75
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line",
+			"start": 613,
+			"end": 620,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 11
+				},
+				"end": {
+					"line": 29,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " e1 ",
+			"start": 623,
+			"end": 631,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 2
+				},
+				"end": {
+					"line": 30,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " e2\n ",
+			"start": 634,
+			"end": 645,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 2
+				},
+				"end": {
+					"line": 32,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a glued block run stays glued even when a line comment forced the break — its",
+			"start": 651,
+			"end": 731,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 1
+				},
+				"end": {
+					"line": 34,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " later multiline member is not split onto its own line",
+			"start": 733,
+			"end": 789,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 1
+				},
+				"end": {
+					"line": 35,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line",
+			"start": 801,
+			"end": 808,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 11
+				},
+				"end": {
+					"line": 36,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " f1 ",
+			"start": 811,
+			"end": 819,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 2
+				},
+				"end": {
+					"line": 37,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " f2\n ",
+			"start": 820,
+			"end": 831,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 11
+				},
+				"end": {
+					"line": 38,
+					"column": 5
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 333,
+		"end": 844,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 324,
+			"end": 835,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 21,
+					"line": 39,
 					"column": 9
 				}
 			},
@@ -458,6 +666,294 @@
 							"value": " three block comments, all stay after =",
 							"start": 233,
 							"end": 274
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 409,
+					"end": 444,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 8
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 415,
+							"end": 443,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 7
+								},
+								"end": {
+									"line": 25,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 415,
+								"end": 416,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 7
+									},
+									"end": {
+										"line": 23,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 442,
+								"end": 443,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 6
+									},
+									"end": {
+										"line": 25,
+										"column": 7
+									}
+								},
+								"value": 4,
+								"raw": "4",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " d1 ",
+										"start": 421,
+										"end": 429
+									},
+									{
+										"type": "Block",
+										"value": " d2\n ",
+										"start": 430,
+										"end": 441
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a glued run whose later member is multiline stays glued (the run is not split)",
+							"start": 326,
+							"end": 407
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 603,
+					"end": 648,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 8
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 609,
+							"end": 647,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 7
+								},
+								"end": {
+									"line": 32,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 609,
+								"end": 610,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 7
+									},
+									"end": {
+										"line": 29,
+										"column": 8
+									}
+								},
+								"name": "e"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 646,
+								"end": 647,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 6
+									},
+									"end": {
+										"line": 32,
+										"column": 7
+									}
+								},
+								"value": 5,
+								"raw": "5",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " line",
+										"start": 613,
+										"end": 620
+									},
+									{
+										"type": "Block",
+										"value": " e1 ",
+										"start": 623,
+										"end": 631
+									},
+									{
+										"type": "Block",
+										"value": " e2\n ",
+										"start": 634,
+										"end": 645
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a line comment after `=` forces the break; a following own-line block and a",
+							"start": 447,
+							"end": 525
+						},
+						{
+							"type": "Line",
+							"value": " glued multiline block stay on consecutive lines (no blank between them)",
+							"start": 527,
+							"end": 601
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 791,
+					"end": 834,
+					"loc": {
+						"start": {
+							"line": 36,
+							"column": 1
+						},
+						"end": {
+							"line": 38,
+							"column": 8
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 797,
+							"end": 833,
+							"loc": {
+								"start": {
+									"line": 36,
+									"column": 7
+								},
+								"end": {
+									"line": 38,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 797,
+								"end": 798,
+								"loc": {
+									"start": {
+										"line": 36,
+										"column": 7
+									},
+									"end": {
+										"line": 36,
+										"column": 8
+									}
+								},
+								"name": "f"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 832,
+								"end": 833,
+								"loc": {
+									"start": {
+										"line": 38,
+										"column": 6
+									},
+									"end": {
+										"line": 38,
+										"column": 7
+									}
+								},
+								"value": 6,
+								"raw": "6",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " line",
+										"start": 801,
+										"end": 808
+									},
+									{
+										"type": "Block",
+										"value": " f1 ",
+										"start": 811,
+										"end": 819
+									},
+									{
+										"type": "Block",
+										"value": " f2\n ",
+										"start": 820,
+										"end": 831
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a glued block run stays glued even when a line comment forced the break — its",
+							"start": 651,
+							"end": 731
+						},
+						{
+							"type": "Line",
+							"value": " later multiline member is not split onto its own line",
+							"start": 733,
+							"end": 789
 						}
 					]
 				}

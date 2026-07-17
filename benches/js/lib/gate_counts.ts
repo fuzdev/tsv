@@ -286,14 +286,23 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
  * `lib/divergence/patterns.ts`, or consciously re-pin a legitimately-unsupported new pinned
  * suite file); a drop = the backlog shrank, re-pin to record the win. Live dev-repo unknowns
  * are the non-gating WARN, not here. A single-run trip can be the FFI/sidecar heisenbug —
- * confirm on the single repo first. Measured 2026-07-16 (same checkouts + attribution as
+ * confirm on the single repo first. Measured 2026-07-17 (same checkouts + attribution as
  * `CORPUS_FORMAT_MATCH_MIN`; SAFETY 0).
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	svelte: 7,
-	typescript: 136,
+	typescript: 133,
 	css: 22,
 };
+// typescript 136→133 (2026-07-17, ../svelte b4d1583ae, ../kit da5b08ea7, ../svelte.dev
+// c21c2d0, ../prettier 1dcd0b0; svelte 7 + css 22 unchanged, SAFETY 0). The
+// conditional/parenthesized-type body-indent fix (bug141 §Bug 2): two files move
+// unknown→match — ../kit src/types/private.d.ts (a mapped type in a conditional true-branch)
+// and ../svelte src/server/index.d.ts (a tuple in a conditional branch). Both had a
+// broken branch VALUE one indent level short of prettier's `printBranch` (`indent(branch)`
+// under useTabs); now converged. A whole-corpus pre/post per-file bucket diff confirmed
+// exactly these two left, ZERO files entered unknown, SAFETY 0. (svelte/index.d.ts, the
+// third file, was a `partial` — see CORPUS_FORMAT_PARTIAL_PIN.)
 // ─── SUPERSEDED HISTORY (attribution trail; NOT current — pre the 2026-07-16 reproducible
 // split, these were the AGGREGATE over live+framework and moved on dev-repo churn) ───
 // typescript 139→140 (2026-07-14, checkouts unchanged; svelte 7 + css 22 unchanged, SAFETY 0).
@@ -459,16 +468,31 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 // one file moved (0 new unknowns, match/unknown unmoved, SAFETY 0). svelte/css unmoved.
 /**
  * corpus:compare:format --all — EXACT per-language `partial` divergence count over the
- * REPRODUCIBLE subset (same semantics as `CORPUS_FORMAT_UNKNOWN_PIN`). Measured 2026-07-16
+ * REPRODUCIBLE subset (same semantics as `CORPUS_FORMAT_UNKNOWN_PIN`). Measured 2026-07-17
  * (same checkouts + attribution as `CORPUS_FORMAT_MATCH_MIN`; SAFETY 0). svelte is 0 because
  * all 5 live svelte partials — the fuz fill-family `.svelte` pages — are in the non-gating
  * WARN, not the gate.
  */
 export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	svelte: 0,
-	typescript: 57,
+	typescript: 55,
 	css: 9,
 };
+// typescript 56→55 (2026-07-17, checkouts as in CORPUS_FORMAT_UNKNOWN_PIN above; svelte 0 +
+// css 9 unchanged, SAFETY 0). The postfix-operator RHS `fluid` fix: ../kit exports/public.d.ts
+// moves partial→known — `type RemoteFormFieldType<T> = { [K in keyof InputTypeMap]: … }[keyof
+// InputTypeMap]`, an indexed-access RHS whose mapped-type OBJECT was breaking after `=` instead of
+// hugging `= {` and expanding internally. Routing `TSArrayType`/`TSIndexedAccessType` through
+// prettier's `fluid` (like the bare conditional/intersection/function RHS) converged that hunk; the
+// file's remaining hunks are cataloged, so it moved to `known`. Whole-corpus pre/post per-file
+// bucket diff confirmed exactly this file left, ZERO files entered partial (known 155→156), SAFETY 0.
+// typescript 57→56 (2026-07-17, checkouts as in CORPUS_FORMAT_UNKNOWN_PIN above; svelte 0 +
+// css 9 unchanged, SAFETY 0). Same conditional/parenthesized-type body-indent fix (bug141
+// §Bug 2): ../svelte src/index.d.ts moves partial→match — a nested conditional + a
+// parenthesized constructor type as an intersection member, where tsv over-indented the
+// parenthesized member one level past prettier. The surgical intersection-member bare-paren
+// change (`build_intersection_member_type_doc`) converged it. Whole-corpus pre/post per-file
+// bucket diff confirmed exactly this file left, ZERO files entered partial, SAFETY 0.
 // ─── SUPERSEDED HISTORY (attribution trail; NOT current — pre the 2026-07-16 reproducible
 // split, these were the AGGREGATE over live+framework and moved on dev-repo churn) ───
 // typescript 60→59 (2026-07-14, checkouts unchanged; svelte 5 + css 9 unchanged, SAFETY 0). One

@@ -548,6 +548,17 @@ impl<'a> Printer<'a> {
             return (DocBuf::new(), DocBuf::new());
         }
 
+        // Whole-chain comment presence gate (idiom 8): one on-page lookup over the chain's
+        // whole span lets the per-gap emitters below skip their per-gap comment scans for the
+        // ~all chains that hold no comment anywhere. A *presence* flag (on-page counts owned),
+        // so it fails open — it can only add work on a commented chain, never suppress a
+        // comment (the perf80 hazard). Every operand→operator / operator→operand gap the
+        // emitters scan lies within `[first operand start, last operand end]`.
+        let chain_has_comments = self.has_comments_on_page_between(
+            operands[0].span.start,
+            operands[operands.len() - 1].span.end,
+        );
+
         // First operand + first operator (stays at base indent)
         let mut head_parts: DocBuf = smallvec![operands[0].doc];
 
@@ -564,6 +575,7 @@ impl<'a> Printer<'a> {
             operands[0].span.end,
             first_op_pos.start,
             first_op_str,
+            chain_has_comments,
         );
 
         // Build continuation parts
@@ -591,6 +603,7 @@ impl<'a> Printer<'a> {
                 operand,
                 allow_breaks,
                 prev_forced_break,
+                chain_has_comments,
             );
 
             // operand[i] → next operator (if not last operand)
@@ -607,6 +620,7 @@ impl<'a> Printer<'a> {
                     operand.span.end,
                     next_op_pos.start,
                     next_op_str,
+                    chain_has_comments,
                 );
 
                 // Carry this trailing gap forward as the next iteration's leading gap.
@@ -750,6 +764,7 @@ impl<'a> Printer<'a> {
         operand_end: u32,
         op_start: u32,
         op_str: &'static str,
+        chain_has_comments: bool,
     ) -> bool {
         let d = self.d();
 
@@ -758,7 +773,9 @@ impl<'a> Printer<'a> {
         // parts concat, and no per-gap comment scan at all. Byte-identical: the gap is
         // comment-free, so the general path below would build `empty()` here (renders to
         // nothing). The gap ⊆ the binary span, so this can only skip work, never a comment.
-        if !self.has_comments_to_emit_between(operand_end, op_start) {
+        // The whole-chain gate short-circuits the per-gap scan when the chain is
+        // comment-free (`chain_has_comments` false ⇒ this gap holds none to emit either).
+        if !chain_has_comments || !self.has_comments_to_emit_between(operand_end, op_start) {
             parts.push(d.text(" "));
             parts.push(d.text(op_str));
             return false;
@@ -804,6 +821,10 @@ impl<'a> Printer<'a> {
     ///
     /// Handles multiple consecutive comments by preserving their line structure:
     /// - `a && // comment1\n// comment2\nb` keeps each comment on its own line
+    // the operand plus the four layout flags are all load-bearing here
+    // TODO: fold op_end/operand/allow_breaks/lead_with_space/chain_has_comments into a
+    // small `PostOperatorCtx` struct to retire the allow (byte-identical output)
+    #[allow(clippy::too_many_arguments)]
     fn append_post_operator_parts(
         &self,
         parts: &mut DocBuf,
@@ -812,11 +833,20 @@ impl<'a> Printer<'a> {
         operand: &ChainOperand,
         allow_breaks: bool,
         lead_with_space: bool,
+        chain_has_comments: bool,
     ) {
         let d = self.d();
-        // Collect all comments in the range between operator and next operand
-        let comments: CommentVec<'_> =
-            comments_to_emit_in_range(self.comments, op_end, operand.span.start).collect();
+        // Collect all comments in the range between operator and next operand. The
+        // whole-chain gate skips this per-gap scan + collect for the ~all chains with no
+        // comment: `chain_has_comments` false ⇒ this gap (⊆ the chain span) holds none to
+        // emit, so the collect would be empty and the `is_empty()` path below runs — the
+        // gate reaches it without the scan. Byte-identical (a *presence* flag: on-page ⊇
+        // to-emit, so a false gate proves this gap emits nothing).
+        let comments: CommentVec<'_> = if chain_has_comments {
+            comments_to_emit_in_range(self.comments, op_end, operand.span.start).collect()
+        } else {
+            CommentVec::new()
+        };
 
         if comments.is_empty() {
             // No comments - simple case

@@ -119,6 +119,18 @@ pub struct Printer<'a> {
     pub(crate) source: &'a str,
     /// Comments from the program (for printing leading/trailing comments)
     pub(crate) comments: &'a [internal::Comment],
+    /// Whether any comment in this document is owned by a node (`owned_by_node`).
+    /// Document-level presence flag (from `PrinterInputs`), computed once per document
+    /// — never here, per that field's doc (the `.svelte` per-`{expr}` trap). Gates the
+    /// owned-leading-comment path so a document with no owned comment (~all of them)
+    /// skips its per-expression byte gate entirely.
+    pub(crate) has_owned_comments: bool,
+    /// Whether any comment in this document is a `format-ignore` directive.
+    /// Document-level presence flag (from `PrinterInputs`), computed once per document —
+    /// never here (the `.svelte` per-`{expr}` trap). Gates `has_format_ignore_in_range` so
+    /// a document with no format-ignore directive (~all of them) skips the per-node range
+    /// scan + directive-string match entirely.
+    pub(crate) has_format_ignore: bool,
     /// Precomputed line break positions for O(log n) line boundary lookups —
     /// the *layout* table.
     ///
@@ -284,6 +296,8 @@ impl<'a> Printer<'a> {
             interner: Rc::clone(&inputs.interner),
             source: inputs.source,
             comments: inputs.comments,
+            has_owned_comments: inputs.has_owned_comments,
+            has_format_ignore: inputs.has_format_ignore,
             layout_line_breaks: inputs.line_breaks,
             // Normal path: comment classification shares the one real table. The
             // canonical path re-points `layout_line_breaks` at an empty table but
@@ -1170,6 +1184,11 @@ impl<'a> Printer<'a> {
     /// and neither is a format-ignore directive — no owned comment can ever match this
     /// predicate, so skipping and counting give the same answer.
     fn has_format_ignore_in_range(&self, start: u32, end: u32) -> bool {
+        // Document-level short-circuit: no format-ignore directive anywhere in the
+        // document ⇒ none in any sub-range, so skip the range scan + directive match.
+        if !self.has_format_ignore {
+            return false;
+        }
         comments_to_emit_in_range(self.comments, start, end)
             .any(|c| is_format_ignore_directive(c.content(self.source)))
     }

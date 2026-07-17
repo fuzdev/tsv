@@ -108,9 +108,7 @@ impl<'a> Printer<'a> {
 
         // Check source: is there a newline between `:` and the first value?
         let decl_source = decl.span.extract(self.source);
-        // The parser recorded the colon; rebase it to the declaration slice (no re-scan).
-        let colon_pos = (decl.colon_offset - decl.span.start) as usize;
-        let after_colon = &decl_source[colon_pos + 1..];
+        let after_colon = &decl_source[decl.colon_pos() + 1..];
         for ch in after_colon.chars() {
             if ch == '\n' {
                 return true;
@@ -120,8 +118,22 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Structure-based check using shared helper
-        self.any_value_needs_own_line(values)
+        // Structure-based check using shared helper.
+        self.any_value_needs_own_line(values) || self.comma_list_comment_forces_own_line(decl)
+    }
+
+    /// Whether a comment forces this declaration's comma list to break one-per-line.
+    ///
+    /// True for a comment at the list's **top level** (prettier force-breaks such a
+    /// list). Keyed on the comment — not the space-separated `List` the value parser
+    /// builds only when a space follows the comment — so a glued (`x,/* c */y`) and a
+    /// spaced (`x, /* c */ y`) authoring reach the same fixed point in one pass; see
+    /// `comma_value_has_top_level_comment`. The single predicate `should_use_multiline`
+    /// (break after the colon) and `print_decl_multiline` (one element per line) both
+    /// consult, so the two decisions cannot disagree — a split would reintroduce the
+    /// glued-vs-spaced 2-cycle. Gated on the O(1) `has_block_comment`.
+    fn comma_list_comment_forces_own_line(&self, decl: &internal::CssDeclaration<'_>) -> bool {
+        decl.has_block_comment && self.comma_value_has_top_level_comment(decl.value.span())
     }
 
     /// Print a declaration whose comment-free value is a comma- or space-separated
@@ -181,17 +193,28 @@ impl<'a> Printer<'a> {
         // lowercases — custom properties and escaped/comment-bearing names are
         // preserved by `lowercase_property_name`).
         let decl_source = decl.span.extract(self.source);
-        // The parser recorded the `property : value` colon; rebase it to the
-        // declaration slice so the source-extracting paths never re-scan for it.
-        let colon_pos = (decl.colon_offset - decl.span.start) as usize;
         let property_normalized = value_normalization::lowercase_property_name(
             value_normalization::extract_property_name(
                 decl_source,
-                colon_pos,
+                decl.colon_pos(),
                 decl.has_block_comment,
             ),
         );
         self.write(&property_normalized);
+
+        // A property carrying a block comment (`color /* c */`) takes a space before
+        // the colon in tsv's normalized form (`color /* c */ : value`; fixture
+        // `css/tokens/comments/in_property_value_before_colon_prettier_divergence`).
+        // Emit it here, once, so every value-kind dispatch path below agrees on the
+        // separator. Deciding it per-path (only `print_decl_default` did) left the
+        // comma/space-list/string/function/value-comment paths emitting `: ` while the
+        // single-value path emitted ` : ` — a symmetric-position inconsistency that
+        // became a non-idempotency when a leading-comma value (`,ed`) drops its comma
+        // across passes and flips CommaSeparated→Identifier, oscillating the separator.
+        // See `tests/css_property_comment_colon_idempotent.rs`.
+        if self.property_colon_needs_leading_space(decl, &property_normalized) {
+            self.write(" ");
+        }
 
         // Dispatch to appropriate handler based on value type and formatting needs
         if self.is_grid_multirow_value(decl) {
@@ -211,15 +234,19 @@ impl<'a> Printer<'a> {
         } else if matches!(&decl.value, CssValue::String { .. }) {
             self.print_decl_string(decl, decl_source);
         } else {
-            self.print_decl_default(decl, &property_normalized);
+            self.print_decl_default(decl);
         }
     }
 
     /// Print declaration with multiline formatting (structure-based)
     fn print_decl_multiline(&mut self, decl: &internal::CssDeclaration<'_>) {
+        // A top-level comment forces one-per-line even when no space-separated `List`
+        // element is present (the glued-comment authoring) — the same predicate
+        // `should_use_multiline` used to route here, so the two agree.
+        let force_own_line = self.comma_list_comment_forces_own_line(decl);
         self.write(":\n");
         self.indent_level += 1;
-        self.print_css_value_multiline(&decl.value);
+        self.print_css_value_multiline(&decl.value, force_own_line);
         self.indent_level -= 1;
         self.write_declaration_end(decl);
     }
@@ -323,9 +350,8 @@ impl<'a> Printer<'a> {
             self.write_indent();
             self.write(")");
         } else {
-            let colon_pos = (decl.colon_offset - decl.span.start) as usize;
             let normalized =
-                value_normalization::extract_value_with_comments(decl_source, colon_pos);
+                value_normalization::extract_value_with_comments(decl_source, decl.colon_pos());
             self.write(&normalized);
         }
     }
@@ -333,8 +359,8 @@ impl<'a> Printer<'a> {
     /// Print declaration with comments in value (non-function)
     fn print_decl_with_comments(&mut self, decl: &internal::CssDeclaration<'_>, decl_source: &str) {
         self.write(": ");
-        let colon_pos = (decl.colon_offset - decl.span.start) as usize;
-        let normalized = value_normalization::extract_value_with_comments(decl_source, colon_pos);
+        let normalized =
+            value_normalization::extract_value_with_comments(decl_source, decl.colon_pos());
         self.write(&normalized);
         self.write_declaration_end(decl);
     }
@@ -345,9 +371,8 @@ impl<'a> Printer<'a> {
         // from source, not stored).
         let quote = self.source.as_bytes()[decl.value.span().start_usize()] as char;
         self.write(": ");
-        let colon_pos = (decl.colon_offset - decl.span.start) as usize;
         if let Some(formatted) =
-            value_normalization::extract_string_value(decl_source, colon_pos, quote)
+            value_normalization::extract_string_value(decl_source, decl.colon_pos(), quote)
         {
             self.write(&formatted);
         } else {
@@ -357,17 +382,28 @@ impl<'a> Printer<'a> {
         self.write_declaration_end(decl);
     }
 
+    /// Whether the property→colon gap takes a space before the colon.
+    ///
+    /// tsv's normalized form puts one after a property that carries a block comment
+    /// (`color /* c */ : value`) — the parser-recorded `has_block_comment` is false
+    /// iff the declaration holds no `/* … */` anywhere, so a false value proves the
+    /// property text has none and the substring scan is skipped. Consulted once in
+    /// `print_css_declaration`, before the value-kind dispatch, so every path agrees;
+    /// it is the single predicate that keeps the separator from oscillating across a
+    /// value-kind flip (see `tests/css_property_comment_colon_idempotent.rs`).
+    fn property_colon_needs_leading_space(
+        &self,
+        decl: &internal::CssDeclaration<'_>,
+        property: &str,
+    ) -> bool {
+        decl.has_block_comment && property.contains("/*")
+    }
+
     /// Print declaration with default formatting
-    fn print_decl_default(&mut self, decl: &internal::CssDeclaration<'_>, property: &str) {
-        // Property with comment: `color /* comment */` → ` : `
-        // Property without comment: `color` → `: `
-        // The parser-recorded `has_block_comment` is false iff the declaration holds no
-        // `/* … */` anywhere, so the property text provably has none — skip the scan.
-        if decl.has_block_comment && property.contains("/*") {
-            self.write(" : ");
-        } else {
-            self.write(": ");
-        }
+    fn print_decl_default(&mut self, decl: &internal::CssDeclaration<'_>) {
+        // The property→colon separator's leading space (for a comment-bearing property)
+        // is emitted once in `print_css_declaration`; every path writes the bare `: `.
+        self.write(": ");
         // Empty custom-property value carrying !important (`--a: !important;`): the `: `
         // separator already supplies the single space, so emit `!important` without the
         // extra leading space `write_declaration_end` adds — avoids `--a:  !important;`.
@@ -441,14 +477,14 @@ impl<'a> Printer<'a> {
     ///
     /// Exception: Properties with space-separated items (like box-shadow, text-shadow)
     /// or wrappable functions (like gradients) use true one-per-line formatting.
-    fn print_css_value_multiline(&mut self, value: &CssValue<'_>) {
+    fn print_css_value_multiline(&mut self, value: &CssValue<'_>, force_own_line: bool) {
         let CssValue::CommaSeparated { values, .. } = value else {
             // Fallback to regular formatting
             self.print_nested_value(value);
             return;
         };
 
-        if self.any_value_needs_own_line(values) {
+        if force_own_line || self.any_value_needs_own_line(values) {
             // True one-per-line for shadow-like properties and wrappable functions
             for (i, val) in values.iter().enumerate() {
                 self.write_indent();
