@@ -138,6 +138,16 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
 
+        // Zero-comment fast gate: one binary search over the whole template window
+        // short-circuits the two per-interpolation comment lookups below, exactly as
+        // the value-level `build_template_literal_doc` gates its interpolation collects.
+        // Sound because every `${` -> type gap lies within the template span, so no
+        // comment anywhere in the window means every per-interpolation lookup is empty.
+        // Guarded on a non-empty type list so a no-interpolation template (whose loop
+        // body never runs the lookups) pays no search at all.
+        let type_has_comments = !template.types.is_empty()
+            && self.has_comments_to_emit_between(template.span.start, template.span.end);
+
         // First pass: render each type flat and decide its break at its flat position.
         let mut interps: SmallVec<[Interpolation; 4]> =
             SmallVec::with_capacity(template.types.len());
@@ -156,10 +166,13 @@ impl<'a> Printer<'a> {
                 // gate as the emitter's per-comment rule, so the two can't disagree. Where
                 // the comment itself lands is the independent authoring question: own-line
                 // authored expands, trailing `${` stays trailing.
-                let comment_hangs_type =
-                    self.comments_force_own_line_between(dollar_brace_end, type_start);
-                let comments_doc =
-                    self.build_trailing_comments_hang_next(dollar_brace_end, type_start);
+                let comment_hangs_type = type_has_comments
+                    && self.comments_force_own_line_between(dollar_brace_end, type_start);
+                let comments_doc = if type_has_comments {
+                    self.build_trailing_comments_hang_next(dollar_brace_end, type_start)
+                } else {
+                    d.empty()
+                };
                 let type_doc = self.build_type_doc(t);
                 let flat_str = self.render_arena_doc_flat(type_doc);
 
