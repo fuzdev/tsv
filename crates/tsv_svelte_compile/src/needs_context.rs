@@ -677,24 +677,25 @@ fn walk_fragment_node(node: &FragmentNode<'_>, nc: &mut Nc<'_>) {
         FragmentNode::ConstTag(tag) => walk_const_tag(tag, nc),
         FragmentNode::SnippetBlock(snippet) => walk_snippet_block(snippet, nc),
         FragmentNode::RenderTag(tag) => walk_render_tag(tag, nc),
-        // The SSR-inert special elements (`<svelte:window>`/`<svelte:body>`/
-        // `<svelte:document>`) COMPILE (emit nothing), but the oracle still runs
-        // its phase-2 analysis over their attribute expressions — a `new`/prop-
-        // rooted member/call in a window bind or handler fires the wrapper, and a
-        // `bind:` marks its target reassigned — so they are walked on the emitted
-        // path too. The other special-element kinds refuse at emission, so their
-        // references are reachable only through a dropped `{:catch}` (matched
-        // explicitly so a new variant fails compilation here).
+        // The special elements that COMPILE — the SSR-inert kinds
+        // (`<svelte:window>`/`<svelte:body>`/`<svelte:document>`, which emit
+        // nothing) and `<svelte:element>` (which emits `$.element(…)`) — are walked
+        // on the emitted path, because the oracle runs its phase-2 analysis over
+        // their expressions regardless of what SSR emits: a `new`/prop-rooted
+        // member/call in a `this={…}` / bind / handler fires the wrapper, and a
+        // `bind:` marks its target reassigned. The refused-at-emission kinds are
+        // reachable only through a dropped `{:catch}` (matched explicitly so a new
+        // variant fails compilation here).
         FragmentNode::SpecialElement(se) => {
             // Exhaustive `match` (not `matches!`) so a new `SpecialElementKind`
             // variant fails compilation here rather than silently defaulting to
             // the refused-at-emission set.
-            let ssr_inert = match &se.kind {
+            let walk_on_emitted = match &se.kind {
                 SpecialElementKind::SvelteWindow
                 | SpecialElementKind::SvelteBody
-                | SpecialElementKind::SvelteDocument => true,
+                | SpecialElementKind::SvelteDocument
+                | SpecialElementKind::SvelteElement { .. } => true,
                 SpecialElementKind::SvelteHead
-                | SpecialElementKind::SvelteElement { .. }
                 | SpecialElementKind::SvelteComponent { .. }
                 | SpecialElementKind::SvelteSelf
                 | SpecialElementKind::SlotElement
@@ -702,7 +703,7 @@ fn walk_fragment_node(node: &FragmentNode<'_>, nc: &mut Nc<'_>) {
                 | SpecialElementKind::SvelteBoundary
                 | SpecialElementKind::TitleElement => false,
             };
-            if nc.in_dropped_catch || ssr_inert {
+            if nc.in_dropped_catch || walk_on_emitted {
                 walk_special_element(se, nc);
             }
         }
@@ -718,11 +719,12 @@ fn walk_fragment_node(node: &FragmentNode<'_>, nc: &mut Nc<'_>) {
 }
 
 /// Trigger-check a special element's references (the `this={…}` expression,
-/// attributes, and children). Reached on the emitted path for the SSR-inert kinds
-/// (`<svelte:window>`/`<svelte:body>`/`<svelte:document>`, which compile to
-/// nothing but whose attributes the oracle still analyzes) and, for every kind,
-/// through a dropped `{:catch}` (refused at emission there, so reachable only
-/// this way).
+/// attributes, and children). Reached on the emitted path for the kinds that
+/// compile — the SSR-inert `<svelte:window>`/`<svelte:body>`/`<svelte:document>`
+/// (which emit nothing but whose attributes the oracle still analyzes) and
+/// `<svelte:element>` (whose `this={…}` / attributes / children emit) — and, for
+/// every kind, through a dropped `{:catch}` (refused at emission there, so
+/// reachable only this way).
 fn walk_special_element(se: &SpecialElement<'_>, nc: &mut Nc<'_>) {
     if let Some(expr) = special_element_reference_expression(se) {
         walk_expr(expr, nc);

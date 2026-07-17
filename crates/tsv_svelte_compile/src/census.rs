@@ -405,11 +405,11 @@ fn import_local_names(body: &[Statement<'_>], source: &str) -> NameSet {
 ///
 /// Mirrors [`fragment::emit_fragment`](crate::fragment)'s special-element handling:
 /// a special element refuses as `template node special element` only when it is
-/// **neither** `<svelte:head>` **nor** one of the SSR-inert kinds
-/// (`<svelte:window>`/`<svelte:body>`/`<svelte:document>`) — so
-/// `<svelte:element>`/`<svelte:component>`/`<svelte:self>`/`<slot>`/… still refuse,
-/// but a valid top-level window/body/document (which now compiles to nothing) does
-/// not. A `{@debug}` or declaration tag refuses; a bare `<svelte:head>`, a
+/// **neither** `<svelte:head>`, `<svelte:element>`, **nor** one of the SSR-inert
+/// kinds (`<svelte:window>`/`<svelte:body>`/`<svelte:document>`) — so
+/// `<svelte:component>`/`<svelte:self>`/`<slot>`/… still refuse, but a valid
+/// top-level window/body/document (which compiles to nothing) and a
+/// `<svelte:element>` (which compiles to `$.element(…)`) do not. A `{@debug}` or declaration tag refuses; a bare `<svelte:head>`, a
 /// `{@render}` tag, and every other node are SUPPORTED (their own handled arms), so
 /// they are not refusals — treating `{@render}` as one would fabricate a co-blocker
 /// on every component that renders a snippet.
@@ -436,6 +436,7 @@ fn collect_template_nodes(fragment: &Fragment<'_>, found: &mut Vec<Refusal>) {
                     | SpecialElementKind::SvelteWindow
                     | SpecialElementKind::SvelteBody
                     | SpecialElementKind::SvelteDocument
+                    | SpecialElementKind::SvelteElement { .. }
             ),
             FragmentNode::DebugTag(_) | FragmentNode::DeclarationTag(_) => true,
             _ => false,
@@ -543,9 +544,9 @@ mod tests {
 
     #[test]
     fn special_element_is_detected() {
-        // A `<svelte:element>` — the parity-menu special-element class, via the
-        // shared fragment seam.
-        let source = "<svelte:element this={tag}>hi</svelte:element>\n";
+        // A still-refused special element (`<slot>`) — the parity-menu
+        // special-element class, via the shared fragment seam.
+        let source = "<slot />\n";
         let keys = bucket_set(source);
         assert!(
             keys.iter()
@@ -555,10 +556,26 @@ mod tests {
     }
 
     #[test]
+    fn svelte_element_is_not_detected() {
+        // A `<svelte:element>` compiles to `$.element(…)`, so it must NOT census as
+        // `template node special element` — the parity slice unlocked it.
+        let source = "<svelte:element this={tag}>hi</svelte:element>\n";
+        assert!(
+            compile(source, &CompileOptions::default()).is_ok(),
+            "sanity: a plain <svelte:element> must compile"
+        );
+        let keys = bucket_set(source);
+        assert!(
+            !keys.iter().any(|k| k.contains("special element")),
+            "<svelte:element> wrongly censused: {keys:?}"
+        );
+    }
+
+    #[test]
     fn ssr_inert_special_element_is_not_detected() {
         // A top-level `<svelte:window>` compiles (emits nothing), so it must NOT
-        // census as `template node special element` — unlike `<svelte:element>`,
-        // which still refuses. A `<svelte:body>` beside it must not appear either.
+        // census as `template node special element`. A `<svelte:body>` beside it
+        // must not appear either.
         let source = "<svelte:window onkeydown={h} /><svelte:body use:act />\n";
         assert!(
             compile(source, &CompileOptions::default()).is_ok(),

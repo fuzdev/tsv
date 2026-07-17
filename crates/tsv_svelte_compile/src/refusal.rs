@@ -624,6 +624,17 @@ pub enum Refusal {
         /// The special-element tag (`svelte:window`, …).
         name: String,
     },
+    /// An emittable `<svelte:element>` in a component that also carries a scoping
+    /// `<style>`. The oracle scopes a `<svelte:element>` unconditionally (a type or
+    /// universal selector matches it however its runtime tag resolves), synthesizing
+    /// `class="svelte-…"` on it. tsv's element census does not yet hold a
+    /// `<svelte:element>` as a scoping leaf, so it would emit the element without the
+    /// hash class where the oracle emits it with — a MISMATCH. The compiler refuses
+    /// the combination rather than under-scope (a deferral, not an oracle rejection).
+    #[error(
+        "<svelte:element> in a component with a scoping <style> (CSS scoping not integrated yet)"
+    )]
+    SvelteElementScopedStyle,
 
     // ── CSS scoping ────────────────────────────────────────────────────────
     /// An at-rule in `<style>`.
@@ -912,6 +923,9 @@ impl Refusal {
             }
             Self::SpecialElementIllegalAttribute { .. } => {
                 Cow::Borrowed("invalid attribute on <{name}> (the oracle rejects it)")
+            }
+            Self::SvelteElementScopedStyle => {
+                Cow::Borrowed("<svelte:element> in a component with a scoping <style>")
             }
             Self::CssAtRule => Cow::Borrowed("css at-rule in <style>"),
             Self::CssNestedRule => Cow::Borrowed("nested css rule in <style>"),

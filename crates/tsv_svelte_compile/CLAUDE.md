@@ -379,6 +379,25 @@ project-wide conventions.
   fused at its authored-`class`/`style` slot, or after all plain attributes when
   synthetic — the synthetic `class` before the synthetic `style`), and handles a
   `bind:` directive inline at its source slot via `attribute::emit_bind_directive`.
+  A **`<svelte:element this={…}>`** compiles to a statement-level
+  `$.element($$renderer, TAG, attrsFn?, childrenFn?)` call (`emit_svelte_element`,
+  routed from `fragment.rs` like a component): the TAG is the `'div'` literal
+  (`this="div"`, parser-collapsed for a mixed value) or the erased/derived-rewritten
+  expression (`this={expr}`), and the attributes/children are rendered into
+  parameterless closures over the enclosing `$$renderer`. The attribute machinery is
+  **shared** with regular elements via an `AttrHost::{Regular, Dynamic}` enum threaded
+  through `emit_plain_attributes` / `emit_spread_attributes` /
+  `build_element_spread_object` (so the two never drift): passing
+  `name = "svelte:element"` makes the name-keyed guards fall through (never void /
+  `<select>` / load-error / custom), and the only forks are the `bind:` handling (a
+  `<svelte:element>` validates a `bind:this` via `attribute::validate_dynamic_bind`
+  and refuses every other bind) and the spread `flags` argument (always absent — a
+  dynamic tag is never `<input>`/custom). Deferred as safe refusals: a
+  `<svelte:element>` in a component with a scoping `<style>`
+  (`Refusal::SvelteElementScopedStyle` — the CSS census landmine, next sub-slice), a
+  `slot="…"` on a `<svelte:element>` component child (would MISROUTE the
+  `FragmentNode::Element`-only named-slot detection), a legacy `on:`/`let:` (the
+  runes-only fence), and `bind:focused`/the `omit_in_ssr` family.
 - `attribute.rs` — attribute emission: dynamic and mixed attributes →
   `$.attr(name, expr[, true])` / `$.attr_class` / `$.attr_style` with
   `$.stringify` interpolations (a mixed attribute whose every part folds

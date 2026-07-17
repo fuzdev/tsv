@@ -25,6 +25,7 @@ use std::collections::HashMap;
 use tsv_svelte::ast::internal::{
     AttributeNode, AwaitBlock, ConstTag, DebugTag, DeclarationTag, EachBlock, Element, Fragment,
     FragmentNode, HtmlTag, IfBlock, KeyBlock, RenderTag, Root, SnippetBlock, SpecialElement,
+    SpecialElementKind,
 };
 use tsv_ts::ast::internal::{
     ArrowFunctionBody, ClassBody, ClassMember, Expression, ForInOfLeft, ForInit,
@@ -369,10 +370,18 @@ impl<'s> Collector<'s> {
     }
 
     fn special_element(&mut self, se: &SpecialElement<'_>) {
-        // A special element is refused at emission everywhere else, so its own
-        // references (the `this={…}` expression, attributes, directive names) are
-        // reachable only through a dropped `{:catch}` — count them there.
-        if self.in_dropped_catch {
+        // A `<svelte:element>` COMPILES: its `this={…}` expression, attribute
+        // expressions and directive names all emit, so its free references are
+        // collected here on the emitted path (a `this={local}` / `class:x={local}`
+        // inside a snippet body is a free reference to an instance binding that
+        // blocks module-hoist). For an html-shaped element the reference-bearing
+        // view equals the emitted view (the only extra it visits is a legacy `on:`
+        // expression, and a `<svelte:element>` carrying one refuses at emission).
+        // Every other special-element kind refuses at emission (and the SSR-inert
+        // window/body/document are top-level-only, never inside a snippet body), so
+        // their references are reachable only through a dropped `{:catch}`.
+        let emitted = matches!(se.kind, SpecialElementKind::SvelteElement { .. });
+        if self.in_dropped_catch || emitted {
             if let Some(expr) = special_element_reference_expression(se) {
                 self.expr(expr);
             }

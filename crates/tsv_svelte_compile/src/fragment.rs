@@ -14,7 +14,7 @@ use bumpalo::collections::Vec as BumpVec;
 use tsv_svelte::ast::internal::{
     Attribute, AttributeNode, AttributeValue, AwaitBlock, ConstTag, EachBlock, Element,
     ElementKind, ExpressionTag, Fragment, FragmentNode, HtmlTag, IfBlock, KeyBlock, RenderTag,
-    SnippetBlock, SpecialElement, SpecialElementKind, StyleDirectiveValue,
+    SnippetBlock, SpecialElement, SpecialElementKind, SpecialThis, StyleDirectiveValue,
 };
 use tsv_ts::ast::internal::{Expression, ExpressionStatement, Statement};
 
@@ -25,7 +25,7 @@ use crate::blocks::{
     emit_svelte_head,
 };
 use crate::build::{Builder, escape_template_text};
-use crate::element::{component_is_standalone_eligible, emit_element};
+use crate::element::{component_is_standalone_eligible, emit_element, emit_svelte_element};
 use crate::rune_guard::{WalkCtx, walk_expression_guarded};
 use crate::snippet_emit::{
     emit_render_tag, emit_snippet, render_callee_dynamic, render_callee_name,
@@ -193,6 +193,12 @@ enum CleanNode<'arena> {
     Expr(&'arena ExpressionTag<'arena>),
     Html(&'arena HtmlTag<'arena>),
     Element(&'arena Element<'arena>),
+    /// A `<svelte:element this={…}>` — emitted as a statement-level
+    /// `$.element($$renderer, TAG, attrsFn?, childrenFn?)` call (like a component /
+    /// control-flow block, it interrupts the template push stream). A non-text,
+    /// non-expr node for whitespace normalization. Carries the `this` tag alongside
+    /// the element so emission never re-destructures the (guaranteed) kind.
+    SvelteElement(&'arena SpecialElement<'arena>, &'arena SpecialThis<'arena>),
     If(&'arena IfBlock<'arena>),
     Each(&'arena EachBlock<'arena>),
     Await(&'arena AwaitBlock<'arena>),
@@ -297,13 +303,18 @@ pub(crate) fn emit_fragment<'arena>(
                     seen_inert.push(tag);
                     guard_inert_special_element(env, se, kind, tag)?;
                 }
-                // Every other special element refuses (`<svelte:element>`,
-                // `<svelte:component>`, `<svelte:self>`, `<slot>`,
-                // `<svelte:fragment>`, `<svelte:boundary>`, `<title>`) — not emitted
-                // yet. The bucket key matches `fragment_node_kind`'s "special
-                // element".
-                SpecialElementKind::SvelteElement { .. }
-                | SpecialElementKind::SvelteComponent { .. }
+                // `<svelte:element this={…}>` compiles to a statement-level
+                // `$.element(…)` call — routed to the emit list like a component. The
+                // `this` tag is captured here (the one place the kind is
+                // destructured) so emission needs no impossible fallback.
+                SpecialElementKind::SvelteElement { tag } => {
+                    list.push(CleanNode::SvelteElement(se, tag));
+                }
+                // Every other special element refuses (`<svelte:component>`,
+                // `<svelte:self>`, `<slot>`, `<svelte:fragment>`,
+                // `<svelte:boundary>`, `<title>`) — not emitted yet. The bucket key
+                // matches `fragment_node_kind`'s "special element".
+                SpecialElementKind::SvelteComponent { .. }
                 | SpecialElementKind::SvelteSelf
                 | SpecialElementKind::SlotElement
                 | SpecialElementKind::SvelteFragment
@@ -431,6 +442,9 @@ pub(crate) fn emit_fragment<'arena>(
             }
             CleanNode::Element(element) => {
                 emit_element(env, element, out, &ctx, is_standalone)?;
+            }
+            CleanNode::SvelteElement(se, tag) => {
+                emit_svelte_element(env, se, tag, out, &ctx)?;
             }
             CleanNode::Expr(tag) => {
                 emit_expression_tag(env, &tag.expression, out, true)?;

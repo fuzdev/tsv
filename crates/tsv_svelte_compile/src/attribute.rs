@@ -1255,6 +1255,34 @@ pub(crate) fn validate_inert_bind_target<'arena>(
     }
 }
 
+/// Validate a `bind:` on a `<svelte:element>`. The dynamic tag carries no static
+/// element identity, so the input-centric core-kind logic (`bind:value`/`checked`/
+/// `group`) never applies — the oracle rejects those as `bind_invalid_target`. Only
+/// `bind:this` is handled: it OMITS from SSR output (nothing to emit), exactly as on
+/// a regular element — any lvalue (`Identifier`/member chain) or `{get, set}` pair
+/// target, no `$state` gate (a `TS` wrapper is erased first). Every other bind
+/// refuses. Deferred as a **safe over-refusal** (the current alternative is refusing
+/// the whole `<svelte:element>`): `bind:focused` (which the oracle emits as
+/// `$.attr('focused', …)`), the `omit_in_ssr` dimension family (which it drops),
+/// and the `bind:innerHTML`-family content-editable binds.
+///
+/// Returns `Ok(())` for a valid `bind:this` — the caller emits nothing (inline) or
+/// contributes no object property (spread).
+pub(crate) fn validate_dynamic_bind<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    directive: &'arena BindDirective<'arena>,
+) -> Result<(), CompileError> {
+    let bind_name = directive.name_span.extract(env.source).to_string();
+    if bind_name == "this" {
+        let expr = env.erase(&directive.expression)?;
+        if bind_target_root(expr, env.source).is_some() || is_get_set_pair(expr) {
+            return Ok(());
+        }
+        return refuse_bind(&bind_name);
+    }
+    refuse_bind(&bind_name)
+}
+
 /// Build and push `$.attr(name, value[, true])` for a synthesized bind attribute.
 /// The synthetic call interleaves minted (appendix) and borrowed (host) argument
 /// spans; with carried script comments their windows would sweep — refuse,

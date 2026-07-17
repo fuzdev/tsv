@@ -12,7 +12,7 @@ use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{InfallibleResolve, Span};
 use tsv_svelte::ast::internal::{
     Attribute, AttributeNode, AttributeValue, ClassDirective, Element, ElementKind, Fragment,
-    FragmentNode, StyleDirective,
+    FragmentNode, SpecialElement, SpecialElementKind, SpecialThis, StyleDirective,
 };
 use tsv_ts::ast::internal::{
     ArrayExpression, BlockStatement, Expression, ExpressionStatement, ObjectExpression,
@@ -24,7 +24,7 @@ use crate::attr_refs::fragment_any;
 use crate::attribute::{
     build_bind_object_property, build_spread_class_object, build_spread_object_property,
     build_spread_style_object, emit_attribute, emit_bind_directive, emit_class_directives,
-    emit_style_directives, is_load_error_element,
+    emit_style_directives, is_load_error_element, validate_dynamic_bind,
 };
 use crate::build::escape_template_text;
 use crate::css_scope::SCOPE_HASH_CLASS;
@@ -52,13 +52,13 @@ use crate::{CompileError, Refusal};
 /// Runs on the HTML-element path only (components early-return above). Valid
 /// combinations fall through to the per-attribute drop loop unchanged.
 fn validate_directive_combinations(
-    element: &Element<'_>,
+    attributes: &[AttributeNode<'_>],
     animate_host: bool,
 ) -> Result<(), CompileError> {
     let mut intro_seen = false;
     let mut outro_seen = false;
     let mut animate_count = 0usize;
-    for attr in element.attributes {
+    for attr in attributes {
         match attr {
             AttributeNode::TransitionDirective(d) => {
                 if d.direction.has_intro() {
@@ -102,6 +102,72 @@ fn attribute_name_eq(env: &EmitEnv<'_, '_>, attr: &Attribute<'_>, name: &str) ->
     interner
         .resolve_infallible(attr.name)
         .eq_ignore_ascii_case(name)
+}
+
+/// The two element kinds that share the attribute-emission machinery: a regular
+/// HTML element and a `<svelte:element this={…}>`. Both project the same shape onto
+/// [`emit_plain_attributes`] / [`emit_spread_attributes`] — a name, an attribute
+/// list, an optional CSS scope, and the same `class:`/`style:`/spread emission — and
+/// differ only in two localized places:
+///
+/// - the **`bind:` fork**: a regular element routes to the input-centric
+///   [`emit_bind_directive`] / [`build_bind_object_property`]; a `<svelte:element>`
+///   validates a `bind:this` (omit) and refuses every other bind
+///   ([`validate_dynamic_bind`]) — the dynamic tag has no static `<input>` identity;
+/// - the **spread `flags`**: a `<svelte:element>`'s name is always the literal
+///   `svelte:element`, so it is never `<input>`/custom → the 5th `$.attributes`
+///   argument is always absent (`Dynamic` reports flags `0`).
+///
+/// Passing `name = "svelte:element"` makes the other name-keyed logic naturally
+/// correct: it is not void, not `<select>`/`<option>`, not a load-error element, and
+/// not a custom element, so those guards fall through exactly as intended.
+#[derive(Clone, Copy)]
+enum AttrHost<'arena> {
+    Regular(&'arena Element<'arena>),
+    Dynamic(&'arena SpecialElement<'arena>),
+}
+
+impl<'arena> AttrHost<'arena> {
+    fn attributes(self) -> &'arena [AttributeNode<'arena>] {
+        match self {
+            AttrHost::Regular(element) => element.attributes,
+            AttrHost::Dynamic(special) => special.attributes,
+        }
+    }
+
+    /// The element's span — the key for the `animate:` host lookup (and, for a
+    /// regular element, the CSS-scope lookup the caller performs). A
+    /// `<svelte:element>` is never an `animate:` host (that is a keyed-`{#each}`
+    /// sole-child role decided in `blocks.rs` over regular elements), so its
+    /// `animate_host` reads `false` and a stray `animate:` refuses.
+    fn span(self) -> Span {
+        match self {
+            AttrHost::Regular(element) => element.span,
+            AttrHost::Dynamic(special) => special.span,
+        }
+    }
+}
+
+/// Emit an element's open-tag attributes: the per-attribute drop/emit loop, or —
+/// when a `{...spread}` is present — the one fused `$.attributes(…)` call. The
+/// single entry both the regular-element (`<name`-prefixed) and `<svelte:element>`
+/// (attributes-closure) paths route through, so the two never drift.
+fn emit_host_attributes<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    host: AttrHost<'arena>,
+    name: &str,
+    out: &mut BodyBuilder<'arena>,
+    scoped: bool,
+) -> Result<(), CompileError> {
+    let has_spread = host
+        .attributes()
+        .iter()
+        .any(|attr_node| matches!(attr_node, AttributeNode::SpreadAttribute(_)));
+    if has_spread {
+        emit_spread_attributes(env, host, name, out, scoped)
+    } else {
+        emit_plain_attributes(env, host, name, out, scoped)
+    }
 }
 
 /// Emit one element's open tag, children, and close tag into the template.
@@ -161,23 +227,17 @@ pub(crate) fn emit_element<'arena>(
         _ => {}
     }
 
-    // An element carrying a `{...spread}` routes its WHOLE attribute set through
-    // one fused `$.attributes({…}, css_hash, …)` call (the oracle's `has_spread`
-    // path) — a different shape from the per-attribute emission below. This slice
-    // handles a spread alongside plain attributes and other spreads only; a
-    // co-present directive, a `<select>`, or a load-error element refuses inside
-    // `emit_spread_attributes`.
-    let has_spread = element
-        .attributes
-        .iter()
-        .any(|attr_node| matches!(attr_node, AttributeNode::SpreadAttribute(_)));
-
+    // The open tag's attributes: the per-attribute drop/emit loop, or — for an
+    // element carrying a `{...spread}` — one fused `$.attributes(…)` call (routed
+    // inside `emit_host_attributes`).
     out.push_text(&format!("<{name}"));
-    if has_spread {
-        emit_spread_attributes(env, element, &name, out)?;
-    } else {
-        emit_plain_attributes(env, element, &name, out)?;
-    }
+    emit_host_attributes(
+        env,
+        AttrHost::Regular(element),
+        &name,
+        out,
+        env.element_scope(element),
+    )?;
 
     if tsv_html::is_void_element(&name) {
         // XHTML-compliant self-close, matching the oracle.
@@ -215,23 +275,26 @@ pub(crate) fn emit_element<'arena>(
 /// suffix follows it.
 fn emit_plain_attributes<'arena>(
     env: &mut EmitEnv<'arena, '_>,
-    element: &'arena Element<'arena>,
+    host: AttrHost<'arena>,
     name: &str,
     out: &mut BodyBuilder<'arena>,
+    scoped: bool,
 ) -> Result<(), CompileError> {
+    let attributes = host.attributes();
     // The oracle's phase-2 directive-validity checks run before it discards the
     // SSR visit, so a rejected combination must refuse here — not fall through to
     // the drop loop and compile. `animate_host` is whether this element is the
     // sanctioned `animate:` position (decided in `blocks.rs`).
-    let animate_host = env.animate_host_span == Some(element.span);
-    validate_directive_combinations(element, animate_host)?;
+    let animate_host = env.animate_host_span == Some(host.span());
+    validate_directive_combinations(attributes, animate_host)?;
 
     // CSS scope: did the upfront census match give this element the
     // `svelte-tsvhash` class? A scoped element folds the hash into its authored
     // `class` / `class:` markup below, or synthesizes it after all plain attributes
-    // when it has neither.
-    let element_scoped = env.element_scope(element);
-    let has_class_attr = element.attributes.iter().any(
+    // when it has neither. (A `<svelte:element>` is never scoped in this slice — the
+    // CSS census landmine is deferred, so its caller passes `scoped = false`.)
+    let element_scoped = scoped;
+    let has_class_attr = attributes.iter().any(
         |attr_node| matches!(attr_node, AttributeNode::Attribute(a) if attribute_is_class(env, a)),
     );
 
@@ -243,16 +306,14 @@ fn emit_plain_attributes<'arena>(
     // no authored attribute, after all plain attributes (the oracle's phase-2
     // synthetic empty-`class`/`style` injection appends to the attribute list, class
     // before style).
-    let class_directives: Vec<&'arena ClassDirective<'arena>> = element
-        .attributes
+    let class_directives: Vec<&'arena ClassDirective<'arena>> = attributes
         .iter()
         .filter_map(|attr_node| match attr_node {
             AttributeNode::ClassDirective(d) => Some(d),
             _ => None,
         })
         .collect();
-    let style_directives: Vec<&'arena StyleDirective<'arena>> = element
-        .attributes
+    let style_directives: Vec<&'arena StyleDirective<'arena>> = attributes
         .iter()
         .filter_map(|attr_node| match attr_node {
             AttributeNode::StyleDirective(d) => Some(d),
@@ -264,7 +325,7 @@ fn emit_plain_attributes<'arena>(
     let mut class_call_emitted = false;
     let mut style_call_emitted = false;
 
-    for attr_node in element.attributes {
+    for attr_node in attributes {
         match attr_node {
             AttributeNode::Attribute(attr) => {
                 // With `class:`/`style:` directives present, the authored
@@ -323,14 +384,20 @@ fn emit_plain_attributes<'arena>(
                 }
             }
             AttributeNode::AttachTag(attach) => guard_dropped(env, &attach.expression)?,
-            // `bind:` is handled inline at its source slot: a handled core kind
-            // (`this` omits; `value`/`checked`/`group` on `<input>` synthesize a
-            // `$.attr(...)`) emits, everything else refuses (`emit_bind_directive`).
-            // A `bind:group`'s companion `value` attribute still emits normally via
-            // the `Attribute` arm above — it is only READ for the synthesis.
-            AttributeNode::BindDirective(directive) => {
-                emit_bind_directive(env, directive, element, name, out)?;
-            }
+            // `bind:` is handled inline at its source slot. On a regular element a
+            // handled core kind (`this` omits; `value`/`checked`/`group` on `<input>`
+            // synthesize a `$.attr(...)`) emits, everything else refuses
+            // (`emit_bind_directive`); a `bind:group`'s companion `value` attribute
+            // still emits normally via the `Attribute` arm above — it is only READ for
+            // the synthesis. On a `<svelte:element>` only a `bind:this` is handled (it
+            // omits), everything else refuses (`validate_dynamic_bind`) — the dynamic
+            // tag has no static `<input>` identity.
+            AttributeNode::BindDirective(directive) => match host {
+                AttrHost::Regular(element) => {
+                    emit_bind_directive(env, directive, element, name, out)?;
+                }
+                AttrHost::Dynamic(_) => validate_dynamic_bind(env, directive)?,
+            },
             // A legacy `on:` directive and `let:` deliberately refuse — a runes-only
             // fence (the oracle compiles `on:` in runes mode, but it's deprecated
             // Svelte-4 syntax; migrate to `onclick={fn}` / the runes event attribute).
@@ -340,8 +407,8 @@ fn emit_plain_attributes<'arena>(
                 return Err(unsupported(Refusal::NonPlainAttribute));
             }
             // Unreachable: an element carrying a `{...spread}` routed to the spread
-            // path (`has_spread` in `emit_element`), so this per-attribute loop
-            // (the non-spread case) never sees one.
+            // path (`has_spread` in `emit_host_attributes`), so this per-attribute
+            // loop (the non-spread case) never sees one.
             AttributeNode::SpreadAttribute(_) => {}
         }
     }
@@ -406,13 +473,13 @@ fn spread_element_flags(env: &EmitEnv<'_, '_>, element: &Element<'_>, name: &str
 /// collapses when it fits — the same idiom as `build_props_object`.
 fn build_element_spread_object<'arena>(
     env: &mut EmitEnv<'arena, '_>,
-    element: &'arena Element<'arena>,
+    host: AttrHost<'arena>,
     name: &str,
 ) -> Result<Expression<'arena>, CompileError> {
     let arena = env.b.arena;
     let obrace = env.b.mint("{").start;
     let mut properties: BumpVec<'arena, ObjectProperty<'arena>> = BumpVec::new_in(arena);
-    for attr_node in element.attributes {
+    for attr_node in host.attributes() {
         match attr_node {
             AttributeNode::Attribute(attr) => {
                 if let Some(property) = build_spread_object_property(env, attr, name)? {
@@ -422,9 +489,20 @@ fn build_element_spread_object<'arena>(
             // A `bind:` core kind synthesizes its `value`/`checked` object property
             // at the bind's source slot (the oracle inlines the bind into the
             // `attributes` list its `build_spread_object` walks); its validity gates
-            // still apply and refuse an invalid target/type/expression.
+            // still apply and refuse an invalid target/type/expression. On a
+            // `<svelte:element>` only a `bind:this` is valid (it contributes no
+            // property), everything else refuses (`validate_dynamic_bind`).
             AttributeNode::BindDirective(bind) => {
-                if let Some(property) = build_bind_object_property(env, bind, element, name)? {
+                let property = match host {
+                    AttrHost::Regular(element) => {
+                        build_bind_object_property(env, bind, element, name)?
+                    }
+                    AttrHost::Dynamic(_) => {
+                        validate_dynamic_bind(env, bind)?;
+                        None
+                    }
+                };
+                if let Some(property) = property {
                     properties.push(ObjectProperty::Property(property));
                 }
             }
@@ -508,12 +586,14 @@ fn elide_call_args<'arena>(
 /// bind target, a bad `style:` modifier).
 fn emit_spread_attributes<'arena>(
     env: &mut EmitEnv<'arena, '_>,
-    element: &'arena Element<'arena>,
+    host: AttrHost<'arena>,
     name: &str,
     out: &mut BodyBuilder<'arena>,
+    scoped: bool,
 ) -> Result<(), CompileError> {
     // The `<select>` spread trap: the oracle routes a spread on a select through
-    // `$$renderer.select(...)`, a different callee than `$.attributes`.
+    // `$$renderer.select(...)`, a different callee than `$.attributes`. (A
+    // `<svelte:element>`'s name is never `select`, so this never fires for one.)
     if name == "select" {
         return Err(unsupported(Refusal::SpreadOnSelect));
     }
@@ -526,8 +606,8 @@ fn emit_spread_attributes<'arena>(
     // The oracle's phase-2 directive-validity checks (transition/animate placement)
     // run before it discards the SSR visit — a rejected combination must refuse
     // here too, exactly as on a non-spread element.
-    let animate_host = env.animate_host_span == Some(element.span);
-    validate_directive_combinations(element, animate_host)?;
+    let animate_host = env.animate_host_span == Some(host.span());
+    validate_directive_combinations(host.attributes(), animate_host)?;
 
     // Collect the `class:`/`style:` directives (source order) for the 3rd/4th
     // arguments, guard-and-drop the no-op drop family (SSR runs no client lifecycle,
@@ -536,7 +616,7 @@ fn emit_spread_attributes<'arena>(
     // spreads / `bind:` are handled inside the object builder.
     let mut class_directives: Vec<&'arena ClassDirective<'arena>> = Vec::new();
     let mut style_directives: Vec<&'arena StyleDirective<'arena>> = Vec::new();
-    for attr_node in element.attributes {
+    for attr_node in host.attributes() {
         match attr_node {
             AttributeNode::Attribute(_)
             | AttributeNode::SpreadAttribute(_)
@@ -578,12 +658,11 @@ fn emit_spread_attributes<'arena>(
         return Err(unsupported(Refusal::CommentsAlongsideExprAttributes));
     }
 
-    // Scope lookup (before building the object): did the upfront census match give
-    // this element the hash class? When scoped, the hash rides the `css_hash` (2nd)
-    // argument, never concatenated into the class value.
-    let scoped = env.element_scope(element);
-
-    let object = build_element_spread_object(env, element, name)?;
+    // Whether the element is CSS-scoped (the caller supplies the lookup: a regular
+    // element passes `env.element_scope`, a `<svelte:element>` passes `false` in this
+    // slice). When scoped, the hash rides the `css_hash` (2nd) argument, never
+    // concatenated into the class value.
+    let object = build_element_spread_object(env, host, name)?;
     let css_hash = scoped.then(|| env.b.string_literal_expr(SCOPE_HASH_CLASS));
     let classes = (!class_directives.is_empty())
         .then(|| build_spread_class_object(env, &class_directives))
@@ -591,7 +670,15 @@ fn emit_spread_attributes<'arena>(
     let styles = (!style_directives.is_empty())
         .then(|| build_spread_style_object(env, &style_directives))
         .transpose()?;
-    let flags = match spread_element_flags(env, element, name) {
+    // A `<svelte:element>`'s name is always the literal `svelte:element`, so it is
+    // never `<input>`/custom → no `flags` argument (the oracle never sets
+    // `ELEMENT_IS_INPUT`/`ELEMENT_PRESERVE_ATTRIBUTE_CASE` for one, even
+    // `this="input"`).
+    let flags_value = match host {
+        AttrHost::Regular(element) => spread_element_flags(env, element, name),
+        AttrHost::Dynamic(_) => 0,
+    };
+    let flags = match flags_value {
         0 => None,
         f => Some(env.b.number(f64::from(f))),
     };
@@ -599,6 +686,147 @@ fn emit_spread_attributes<'arena>(
     let call = env.b.member_call("$", "attributes", args);
     out.push_expr(call);
     Ok(())
+}
+
+/// Emit a `<svelte:element this={…}>` as a statement-level
+/// `$.element($$renderer, TAG, attrsFn?, childrenFn?)` call (the oracle's
+/// `$.element` server helper). Like a component it splits the template push stream
+/// into its own statement; unlike one it pushes NO trailing `<!---->` anchor, and
+/// its children fragment is neither text-first nor a component root.
+///
+/// - **TAG**: `this="div"` → the `'div'` string literal (the parser has already
+///   collapsed a mixed `this="a{b}"` to its first static chunk, matching the
+///   oracle's legacy warn-and-keep-first); `this={expr}` → the erased expression
+///   with a bare derived read rewritten to `d()` (the template borrow point). No
+///   static fold — the oracle emits the expression as written.
+/// - **attrsFn** (`() => { $$renderer.push(…) }`): the exact regular-element
+///   attribute machinery ([`emit_host_attributes`]) rendered into a parameterless
+///   closure over the enclosing `$$renderer` — a spread becomes `$.attributes({…})`,
+///   `class:`/`style:` become `$.attr_class`/`$.attr_style`. Elided when it would
+///   push nothing (e.g. a sole `bind:this`, which omits).
+/// - **childrenFn** (`() => { … }`): the element's fragment, emitted like any
+///   element child. Elided when the fragment renders nothing.
+///
+/// 2a scope: the CSS census landmine is deferred, so an emittable `<svelte:element>`
+/// in a component with a scoping `<style>` refuses
+/// ([`Refusal::SvelteElementScopedStyle`]) rather than under-scope — the oracle
+/// scopes it unconditionally.
+pub(crate) fn emit_svelte_element<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    se: &'arena SpecialElement<'arena>,
+    tag: &'arena SpecialThis<'arena>,
+    out: &mut BodyBuilder<'arena>,
+    ctx: &FragmentCtx<'_>,
+) -> Result<(), CompileError> {
+    let arena = env.b.arena;
+
+    // 2a defers the CSS census integration: the oracle scopes a `<svelte:element>`
+    // unconditionally (a type/universal selector matches it however its runtime tag
+    // resolves), but tsv's element census does not yet hold it as a scoping leaf, so
+    // emitting it in a styled component would under-scope → a MISMATCH. Refuse the
+    // combination (2b removes this). `env.scope` is `Some` exactly when the component
+    // has a `<style>` — the conservative, safe boundary. Checked at the emit site so
+    // a `<svelte:element>` in a dropped `{:catch}` (never reached here) still compiles.
+    if env.scope.is_some() {
+        return Err(unsupported(Refusal::SvelteElementScopedStyle));
+    }
+
+    // A `{@const}` is NOT valid as a direct child of a `<svelte:element>` — the
+    // oracle rejects it (`const_tag_invalid_placement`; its valid-parent list is
+    // `{#snippet}`/`{#if}`/`{:else if}`/`{:else}`/`{#each}`/`{:then}`/`{:catch}`/
+    // `<svelte:fragment>`/`<svelte:boundary>`/`<Component>`, and a `<svelte:element>`
+    // is not among them). Children are emitted through `emit_child_body`, which
+    // pushes a block-scope overlay (load-bearing for snippet hoisting in the
+    // closure), and `emit_const_tag` treats a non-empty overlay stack as "inside a
+    // block" — so without this guard a direct `{@const}` child would wrongly compile.
+    // Refuse it here rather than drop the overlay. (A `{@const}` deeper inside a
+    // regular child element remains the pre-existing regular-element placement gap —
+    // the same class as `{#if}<div>{@const}</div>{/if}` — tracked separately.)
+    if se
+        .fragment
+        .nodes
+        .iter()
+        .any(|node| matches!(node, FragmentNode::ConstTag(_)))
+    {
+        return Err(unsupported(Refusal::ConstTagOutsideBlock));
+    }
+
+    // TAG — the dynamic tag name.
+    let tag_expr = match tag {
+        SpecialThis::Plain { content, .. } => env.b.string_literal_expr(content),
+        SpecialThis::Braced(et) => {
+            // The template borrow point: erase a TS wrapper, rewrite a bare derived
+            // read to `d()`, guard a stray rune / top-level `await`.
+            let erased = env.erase(&et.expression)?;
+            wrap_value_expr(env, erased)?[0].clone()
+        }
+    };
+
+    // attrsFn — the attribute machinery rendered into a fresh body, then wrapped in
+    // a parameterless closure over the enclosing `$$renderer`. Elided when empty.
+    let mut attrs_body = BodyBuilder::new_in(arena);
+    emit_host_attributes(
+        env,
+        AttrHost::Dynamic(se),
+        "svelte:element",
+        &mut attrs_body,
+        false,
+    )?;
+    let attr_stmts = attrs_body.finish(&mut env.b, arena);
+    let attrs_fn = (!attr_stmts.is_empty()).then(|| paramless_renderer_arrow(env, attr_stmts));
+
+    // childrenFn — the element's fragment, emitted like any element child (not
+    // text-first, not a component root); whitespace is preserved when inside a
+    // `<pre>`/`<textarea>` ancestor. Elided when it renders nothing.
+    let child_stmts = emit_child_body(
+        env,
+        &se.fragment,
+        &[],
+        false,
+        ctx.preserve_whitespace,
+        HashMap::new(),
+    )?;
+    let children_fn = (!child_stmts.is_empty()).then(|| paramless_renderer_arrow(env, child_stmts));
+
+    // `$.element($$renderer, TAG, attrsFn?, childrenFn?)` with the oracle's argument
+    // elision: a present childrenFn forces an absent attrsFn to `void 0`; a trailing
+    // absent argument drops.
+    let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
+    args.push(Expression::Identifier(env.b.ident("$$renderer")));
+    args.push(tag_expr);
+    match (attrs_fn, children_fn) {
+        (attrs, Some(children)) => {
+            args.push(attrs.unwrap_or_else(|| env.b.void_zero()));
+            args.push(children);
+        }
+        (Some(attrs), None) => args.push(attrs),
+        (None, None) => {}
+    }
+    let call = env.b.member_call("$", "element", args.into_bump_slice());
+    let span = call.span();
+    out.push_statement(
+        &mut env.b,
+        arena,
+        Statement::ExpressionStatement(ExpressionStatement {
+            expression: call,
+            span,
+            is_directive: false,
+        }),
+    );
+    Ok(())
+}
+
+/// A parameterless arrow closing over the enclosing `$$renderer`
+/// (`() => { <body> }`) — the shape a `<svelte:element>`'s attributes and children
+/// closures take. They capture the outer `$$renderer` rather than receiving one, so
+/// there is no parameter (unlike a component's `children: ($$renderer) => …` prop,
+/// which is passed a fresh renderer).
+fn paramless_renderer_arrow<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    body: &'arena [Statement<'arena>],
+) -> Expression<'arena> {
+    let block_span = env.b.here();
+    env.b.arrow_block(&[], body, block_span)
 }
 
 /// Whether a component is *dynamic* — the oracle's `metadata.dynamic`
@@ -721,6 +949,20 @@ fn plan_component_children<'arena>(
                     name: name.to_string(),
                 }));
             }
+            // A `<svelte:element slot="x">` as a component child routes to a NAMED
+            // slot in the oracle, but tsv's named-slot detection above is
+            // `FragmentNode::Element`-only, so this arm would fall through to
+            // `has_default` and MISROUTE it into the default `children` — refuse it
+            // (safe) until named-slot support is generalized to special elements. A
+            // slot-less `<svelte:element>` is ordinary default content (`_` below).
+            FragmentNode::SpecialElement(child)
+                if matches!(child.kind, SpecialElementKind::SvelteElement { .. })
+                    && special_element_slot_attribute(env, child) =>
+            {
+                return Err(unsupported(Refusal::ComponentNamedSlot {
+                    name: name.to_string(),
+                }));
+            }
             _ => has_default = true,
         }
     }
@@ -759,6 +1001,18 @@ fn plan_component_children<'arena>(
 /// slot).
 fn child_slot_attribute(env: &EmitEnv<'_, '_>, element: &Element<'_>) -> bool {
     component_has_named_attribute(env, element, "slot")
+}
+
+/// Whether a special element carries a plain `slot="…"` attribute (case-sensitive) —
+/// the named-slot marker on a `<svelte:element>` component child.
+fn special_element_slot_attribute(env: &EmitEnv<'_, '_>, se: &SpecialElement<'_>) -> bool {
+    se.attributes.iter().any(|attr_node| {
+        let AttributeNode::Attribute(attr) = attr_node else {
+            return false;
+        };
+        let interner = env.b.interner.borrow();
+        interner.resolve_infallible(attr.name) == "slot"
+    })
 }
 
 /// Whether an element carries a plain attribute with the given (case-sensitive)

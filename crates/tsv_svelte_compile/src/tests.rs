@@ -3567,6 +3567,43 @@ fn compile_select_family_spread_and_bind_refuse() {
 }
 
 #[test]
+fn compile_svelte_element_const_tag_direct_child_refuses() {
+    // The oracle rejects a `{@const}` as a direct `<svelte:element>` child
+    // (`const_tag_invalid_placement`; a `<svelte:element>` is not among its valid
+    // `{@const}` parents). Without a guard tsv would over-accept: the children
+    // closure pushes a block-scope overlay (load-bearing for snippet hoisting) that
+    // `emit_const_tag` reads as "inside a block". Pin the refusal.
+    assert_refuses("<svelte:element this={tag}>{@const y = 1}{y}</svelte:element>");
+    // A `{#snippet}` direct child stays valid (proves the guard didn't drop the
+    // overlay the hoist analysis needs).
+    compile(
+        "<svelte:element this={tag}>{#snippet s()}x{/snippet}{@render s()}</svelte:element>",
+        &CompileOptions::default(),
+    )
+    .expect("a {#snippet} child of <svelte:element> still compiles");
+}
+
+#[test]
+fn compile_svelte_element_specific_refusals() {
+    // A `bind:` other than `bind:this` refuses — the dynamic tag has no static
+    // `<input>` identity, so the oracle rejects `bind:value`/etc.
+    // (`bind_invalid_target`).
+    assert_refuses(
+        "<script>let x = $state(0);</script><svelte:element this={tag} bind:value={x} />",
+    );
+    // Legacy `on:`/`let:` refuse (the runes-only fence).
+    assert_refuses("<svelte:element this={tag} on:click={h} />");
+    // A scoping `<style>` refuses (the CSS census landmine — deferred).
+    assert_refuses("<svelte:element this={tag} /><style>div { color: red }</style>");
+    // A `bind:this` omits and the element compiles.
+    compile(
+        "<script>let el;</script><svelte:element this={tag} bind:this={el} />",
+        &CompileOptions::default(),
+    )
+    .expect("bind:this on <svelte:element> compiles");
+}
+
+#[test]
 fn compile_slots_reference_injects_sanitize() {
     // A `$$slots` reference injects the binding and takes `$$props`.
     let out = compile("<p>{$$slots}</p>", &CompileOptions::default()).unwrap();
