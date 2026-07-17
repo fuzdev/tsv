@@ -176,10 +176,18 @@ project-wide conventions.
   (`Gray`) anything it can't bound byte-exactly (the oracle's globals tables,
   string→number coercion, non-integer number stringification, …). Bindings
   mirror the oracle: props/updated/no-initial are UNKNOWN; rune inits evaluate
-  through to their argument; shadowed names go `Opaque` (refuse-on-spine).
+  through to their argument; shadowed names go `Opaque` (refuse-on-spine). Also
+  hosts the statement-position rune-call recognizers `is_effect_call` and
+  `is_inspect_call` (the latter matching a bare `$inspect(args)` or a single
+  `$inspect(args).with(cb)`) that the script rewrite's drops key on.
 - `rune_guard.rs` — the rune refusal walk plus the collection passes riding the
   same exhaustive traversal: refuses any `$`-prefixed identifier reference or
-  `$`-rooted call outside the sanctioned rewrites, refuses derived-binding
+  `$`-rooted call outside the sanctioned rewrites — the sanctioned set now
+  includes a `$bindable(fallback?)` default at a top-level `$props()` property
+  and a statement-position `$inspect(…)`, so the guard exempts those positions
+  while still refusing every other `$bindable`/`$inspect` (value/template
+  positions, nested defaults, a wrong-arity or second `.with`, `$inspect.trace`,
+  a nested-scope `$inspect`, …) — refuses derived-binding
   reads outside bare emitter positions and top-level `await`, and collects
   assignment/update roots (`updated`) and nested-scope declarations (shadow
   candidates) for the evaluator. Exhaustive matches on purpose — new AST
@@ -271,8 +279,12 @@ project-wide conventions.
   hoisted to module scope in source order (an import inside the component
   function is invalid JS) + the exported component function. The whole body
   wraps in `$$renderer.component(($$renderer) => { … })` whenever
-  `needs_context` fires (a dropped effect, or the new/member/call analysis in
-  `needs_context.rs`), which also forces the `$$props` parameter.
+  `needs_context` fires (a dropped effect, the new/member/call analysis in
+  `needs_context.rs`, or a non-empty `$bindable` set), which also forces the
+  `$$props` parameter. A non-empty bindable set additionally emits
+  `$.bind_props($$props, { … })` as the component body's last statement (a
+  dropped `$inspect` never contributes here — its wrapper comes only from
+  `needs_context`).
 - `script_rewrite.rs` — the document-wide TypeScript flag and gate
   (`document_ts_flag`/`refuse_template_typescript`), the top-level
   binding-table analysis (`analyze_script`/`analyze_declarator`), and the
@@ -280,14 +292,23 @@ project-wide conventions.
   `$$props` (span-stolen; a rest element in its pattern gains the oracle's
   `$$slots, $$events` injection immediately before it, and a non-destructured
   `let props = $props()` becomes `let { $$slots, $$events, ...props } =
-  $$props` — a plain destructure without a rest gets no injection),
+  $$props` — a plain destructure without a rest gets no injection), a
+  top-level `$props()` destructure default `= $bindable(fallback?)` → its
+  fallback (`void 0` argument-less) with the bindable prop collected in source
+  order for the trailing `$.bind_props($$props, { … })` (shorthand `{ key }`
+  when the key equals its local, else `{ key: local }`),
   `$state(v)`/`$state.raw(v)` → `v` (`void 0` argument-less), `$derived(e)` →
   `$.derived(() => e)` — but the oracle's `b.thunk` runs `unthunk`, which
   collapses the arrow when its body is a call on a bare identifier whose
   arguments match its (empty) parameter list, so an argument-less call passes
   straight through (`$derived(get_library())` → `$.derived(get_library)`) —
   `$derived.by(f)` → `$.derived(f)`, statement-position
-  `$effect`/`$effect.pre` dropped — a multi-declarator top-level declaration
+  `$effect`/`$effect.pre` dropped (forcing the wrapper) — statement-position
+  `$inspect(args)` / `$inspect(args).with(cb)` (recognized by
+  `analyze.rs::is_inspect_call`) also dropped, but WITHOUT forcing the wrapper
+  (no `has_effects`): its arguments and `.with` callback are still guard-walked
+  and its span pushed to `dropped_regions` (a comment inside refuses) — a
+  multi-declarator top-level declaration
   splitting into one declaration per declarator, source order (the oracle's
   shape; nested declarations and for-heads stay joined; comments alongside a
   multi-declarator refuse — the oracle re-anchors them inside the split). Also
