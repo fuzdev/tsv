@@ -145,6 +145,7 @@ Native builds will be published with v0.2, for v0.1 only WASM builds are publish
     JS reaches tsv through the WASM bindings, and native N-API bindings will be published with v0.2
   - no C compiler needed to build tsv
 - optimal
+  - prioritizes speed then binary size and memory usage
   - ships optimal binary artifacts: runtime speed and compiled
     code size are priorities, so if all you need is a formatter or parser,
     a minimal build is available (with lang-specific artifacts likely coming),
