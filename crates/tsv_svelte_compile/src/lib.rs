@@ -23,6 +23,7 @@ mod build;
 mod census;
 mod css_scope;
 mod element;
+mod element_census;
 mod erase;
 
 pub use census::{census, census_detected_buckets};

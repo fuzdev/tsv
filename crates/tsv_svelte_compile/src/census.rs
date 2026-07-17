@@ -48,13 +48,18 @@
 //!   comment-in-erased-type-region template half) — replicating the evaluator's
 //!   overlay push/pop sequence risks a false fold verdict, hence a false sole
 //!   blocker (the over-promise direction);
-//! - the emitter refusals that read live per-emission state (`env.scope` /
-//!   `matched_selectors` / the block-scope overlays / the per-`{#each}` name
-//!   counters / `animate_host_span`): the styled-component attribute refusals, the
-//!   `bind:`/event/value attribute refusals, the block-placement refusals
-//!   (`{@const}` placement, nested `{#each}`, generated-name collisions,
-//!   transition/animate conflicts, snippet/head hoist order), and the component
-//!   invocation refusals; and
+//! - the CSS **matching** refusals — `CssSelectorNoMatch`,
+//!   `CssDynamicAttributeMatch`, the element-side `CssCaseInsensitiveNonAscii`, and a
+//!   snippet-crossing `CssCombinatorSelector` — which need the upfront element census
+//!   plus the selector match (`match_scope`) the census does not run (it only walks
+//!   `analyze_style`'s parse-time sink, so it surfaces the *selector-shape* CSS
+//!   refusals but not the *matching* ones);
+//! - the emitter refusals that read live per-emission state (the block-scope
+//!   overlays / the per-`{#each}` name counters / `animate_host_span`): the
+//!   styled-component attribute refusals, the `bind:`/event/value attribute refusals,
+//!   the block-placement refusals (`{@const}` placement, nested `{#each}`,
+//!   generated-name collisions, transition/animate conflicts, snippet/head hoist
+//!   order), and the component invocation refusals; and
 //! - the pipeline-inline comment-family refusals gated on `has_comments` **and** a
 //!   fragment predicate (comments alongside a block / component / `$derived` / a
 //!   multi-declarator / hoisted imports / `$$slots`, and comments inside a
@@ -467,7 +472,7 @@ mod tests {
         // (structural top-level) — two independent dimensions, so the census must
         // return BOTH, where `compile()` would bail on only the first.
         let source = "<script context=\"module\">let x = 1;</script>\n\
-                      <style>:global(.x) { color: red; }</style>\n";
+                      <style>:has(.x) { color: red; }</style>\n";
         let keys = bucket_set(source);
         assert!(
             keys.iter().any(|k| k.contains("module <script")),
@@ -487,10 +492,10 @@ mod tests {
 
     #[test]
     fn multiple_css_refusals_collect_not_bail() {
-        // Two distinct CSS refusals in one stylesheet: a combinator selector
-        // (`a > b`) and an unsupported pseudo compound (`:has(.x)`). The
+        // Two distinct CSS refusals in one stylesheet: a `||` column combinator
+        // (unsupported) and an unsupported pseudo compound (`:has(.x)`). The
         // parameterized `analyze_style` sink must surface both, not just the first.
-        let source = "<style>a > b { color: red; }\n:has(.x) { color: blue; }</style>\n";
+        let source = "<style>a || b { color: red; }\n:has(.x) { color: blue; }</style>\n";
         let keys = bucket_set(source);
         assert!(
             keys.iter().any(|k| k.contains("combinator")),
@@ -506,7 +511,7 @@ mod tests {
     fn single_blocker_is_the_only_class() {
         // A lone unsupported CSS selector, nothing else unsupported — the census
         // returns exactly that one class (the SOLE-blocker shape).
-        let source = "<style>:global(.x) { color: red; }</style>\n";
+        let source = "<style>:has(.x) { color: red; }</style>\n";
         let keys = bucket_set(source);
         assert_eq!(
             keys,
@@ -552,9 +557,9 @@ mod tests {
         // The census parameterized `analyze_style` with a collect sink. With the
         // sink ABSENT (the `compile()` path) the four checks must stay
         // bail-on-first, byte-identical to before — so `compile()` on a stylesheet
-        // with two CSS refusals surfaces exactly the FIRST (the combinator), never
-        // the collected pair the census would return.
-        let source = "<style>a > b { color: red; }\n:has(.x) { color: blue; }</style>\n";
+        // with two CSS refusals surfaces exactly the FIRST (the `||` combinator),
+        // never the collected pair the census would return.
+        let source = "<style>a || b { color: red; }\n:has(.x) { color: blue; }</style>\n";
         match compile(source, &CompileOptions::default()) {
             Err(CompileError::Unsupported(Refusal::CssCombinatorSelector)) => {}
             other => panic!("gated path must bail on the first CSS refusal, got {other:?}"),

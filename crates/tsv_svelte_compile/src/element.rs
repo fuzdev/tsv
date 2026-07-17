@@ -226,11 +226,11 @@ fn emit_plain_attributes<'arena>(
     let animate_host = env.animate_host_span == Some(element.span);
     validate_directive_combinations(element, animate_host)?;
 
-    // CSS scope: does any scoped selector match this element? (Marks each matched
-    // compound used.) A scoped element gains the `svelte-tsvhash` class — folded
-    // into its authored `class` / `class:` markup below, or synthesized after all
-    // plain attributes when it has neither.
-    let element_scoped = env.element_scope(element, name)?;
+    // CSS scope: did the upfront census match give this element the
+    // `svelte-tsvhash` class? A scoped element folds the hash into its authored
+    // `class` / `class:` markup below, or synthesizes it after all plain attributes
+    // when it has neither.
+    let element_scoped = env.element_scope(element);
     let has_class_attr = element.attributes.iter().any(
         |attr_node| matches!(attr_node, AttributeNode::Attribute(a) if attribute_is_class(env, a)),
     );
@@ -572,11 +572,10 @@ fn emit_spread_attributes<'arena>(
         return Err(unsupported(Refusal::CommentsAlongsideExprAttributes));
     }
 
-    // Scope matching (before building the object): does any scoped compound's
-    // joint predicate list hold on this element? (Marks each matched compound
-    // used, so the no-match post-check passes.) When scoped, the hash rides the
-    // `css_hash` (2nd) argument, never concatenated into the class value.
-    let scoped = env.element_scope(element, name)?;
+    // Scope lookup (before building the object): did the upfront census match give
+    // this element the hash class? When scoped, the hash rides the `css_hash` (2nd)
+    // argument, never concatenated into the class value.
+    let scoped = env.element_scope(element);
 
     let object = build_element_spread_object(env, element, name)?;
     let css_hash = scoped.then(|| env.b.string_literal_expr(SCOPE_HASH_CLASS));

@@ -248,6 +248,14 @@ fn compile_js(source: &str) -> String {
     out.js
 }
 
+/// The scoped CSS a component compiles to (panicking if it declines).
+fn compile_css(source: &str) -> String {
+    compile(source, &CompileOptions::default())
+        .unwrap_or_else(|e| panic!("compile failed for {source:?}: {e:?}"))
+        .css
+        .unwrap_or_else(|| panic!("expected scoped css for {source:?}"))
+}
+
 #[test]
 fn compile_if_else_block() {
     // Branch anchors are single-quoted string pushes; the closer `<!--]-->`
@@ -2632,15 +2640,120 @@ fn compile_css_type_matching_no_element_refuses() {
 }
 
 #[test]
-fn compile_css_refused_selector_shapes() {
-    // The refuse-list held (slice 5+): combinators, `:global`, the logical/
-    // relational pseudos, `:root`, and bare pseudo-only compounds.
+fn compile_css_combinator_selectors() {
+    // Descendant: both compounds scope (each matched element gains the hash), the
+    // first bump is a plain class, the second a zero-specificity `:where(...)`.
+    let out = compile(
+        "<div><p>hi</p></div>\n<style>div p{ color: red }</style>",
+        &CompileOptions::default(),
+    )
+    .expect("descendant compiles");
+    assert!(
+        out.js
+            .contains(r#"<div class="svelte-tsvhash"><p class="svelte-tsvhash">hi</p></div>"#),
+        "{}",
+        out.js
+    );
+    assert_eq!(
+        out.css.as_deref(),
+        Some("div.svelte-tsvhash p:where(.svelte-tsvhash){ color: red }")
+    );
+    // Child `>`, next-sibling `+`, subsequent-sibling `~` all splice the same way.
+    assert_eq!(
+        compile_css("<div><p>hi</p></div>\n<style>div > p{ color: red }</style>"),
+        "div.svelte-tsvhash > p:where(.svelte-tsvhash){ color: red }"
+    );
+    assert_eq!(
+        compile_css("<a></a><b></b>\n<style>a + b{ color: red }</style>"),
+        "a.svelte-tsvhash + b:where(.svelte-tsvhash){ color: red }"
+    );
+    assert_eq!(
+        compile_css("<a></a><b></b>\n<style>a ~ b{ color: red }</style>"),
+        "a.svelte-tsvhash ~ b:where(.svelte-tsvhash){ color: red }"
+    );
+}
+
+#[test]
+fn compile_css_combinator_block_descent_and_each_wrap() {
+    // A preceding sibling reached through a `{#if}` block (block descent) still
+    // matches `a + b`.
+    assert_eq!(
+        compile_css("{#if x}<a></a>{/if}<b></b>\n<style>a + b{ color: red }</style>"),
+        "a.svelte-tsvhash + b:where(.svelte-tsvhash){ color: red }"
+    );
+    // The `{#each}` self-adjacency wrap-around: a later-in-source sibling is a
+    // possible runtime preceding sibling.
+    assert_eq!(
+        compile_css("{#each xs as x}<b></b><a></a>{/each}\n<style>a ~ b{ color: red }</style>"),
+        "a.svelte-tsvhash ~ b:where(.svelte-tsvhash){ color: red }"
+    );
+}
+
+#[test]
+fn compile_css_combinator_no_match_refuses() {
+    // A combinator chain that matches no element is pruned by the oracle — tsv
+    // refuses (no `<span>` for `span + b`).
     assert_unsupported(
-        "<div>x</div>\n<style>div p{ color: red }</style>",
+        "<a></a><b></b>\n<style>span + b{ color: red }</style>",
+        "matches no element",
+    );
+}
+
+#[test]
+fn compile_css_global_leading_trailing_and_bare() {
+    // Leading `:global(.x) .y`: `.x` is global (no hash, wrapper stripped), `.y`
+    // scopes (the first bump, plain class). The `.y` element gains the class.
+    let out = compile(
+        "<div class=\"y\">hi</div>\n<style>:global(.x) .y{ color: red }</style>",
+        &CompileOptions::default(),
+    )
+    .expect("leading :global compiles");
+    assert!(out.js.contains(r#"class="y svelte-tsvhash""#), "{}", out.js);
+    assert_eq!(
+        out.css.as_deref(),
+        Some(".x .y.svelte-tsvhash{ color: red }")
+    );
+    // Trailing `.a :global(.x)`: truncate drops `:global(.x)` from matching, but its
+    // wrapper still strips in output; `.a` scopes.
+    assert_eq!(
+        compile_css("<div class=\"a\">hi</div>\n<style>.a :global(.x){ color: red }</style>"),
+        ".a.svelte-tsvhash .x{ color: red }"
+    );
+    // A fully-global `:global(.x)` is never pruned and scopes no element.
+    assert_eq!(
+        compile_css("<div>hi</div>\n<style>:global(.x){ color: red }</style>"),
+        ".x{ color: red }"
+    );
+    // A bare `:global` combinator: `:global` (and the preceding space) strips.
+    assert_eq!(
+        compile_css(
+            "<div><span class=\"x\">hi</span></div>\n<style>div :global.x{ color: red }</style>"
+        ),
+        "div.svelte-tsvhash.x{ color: red }"
+    );
+}
+
+#[test]
+fn compile_css_specificity_bump_resets_per_comma() {
+    // Bump state resets per comma `ComplexSelector`: the `.a` after the comma gets a
+    // plain class again, not `:where(...)`.
+    assert_eq!(
+        compile_css("<div><p class=\"a\">hi</p></div>\n<style>div p, .a{ color: red }</style>"),
+        "div.svelte-tsvhash p:where(.svelte-tsvhash), .a.svelte-tsvhash{ color: red }"
+    );
+}
+
+#[test]
+fn compile_css_refused_selector_shapes() {
+    // The refuse-list held after slice 5: the `||` column combinator, the logical/
+    // relational pseudos (`:is`/`:where`/`:has`/`:not`), `:root`, and bare
+    // pseudo-only compounds. (The four real combinators and basic `:global` now
+    // compile — see `compile_css_combinator_selectors` / `compile_css_global_*`.)
+    assert_unsupported(
+        "<div>x</div>\n<style>div || p{ color: red }</style>",
         "combinator",
     );
     for selector in [
-        ":global(.x)",
         ":is(.a, .b)",
         ":where(.a)",
         ":has(.a)",
@@ -2653,6 +2766,12 @@ fn compile_css_refused_selector_shapes() {
             "unsupported css selector",
         );
     }
+    // A `:global{}` global block stays refused — it is a nested rule, so it lands on
+    // the nested-rule guard (global blocks are a deferred slice either way).
+    assert_unsupported(
+        "<div>x</div>\n<style>:global { .x { color: red } }</style>",
+        "nested css rule",
+    );
 }
 
 #[test]

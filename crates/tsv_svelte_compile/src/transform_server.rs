@@ -60,8 +60,9 @@ use tsv_ts::ast::internal::{
 use crate::analyze::{Bindings, NameSet, RuneInit, Scope, ScopeEntry, classify_rune_init};
 use crate::blocks::declaration_stmt;
 use crate::build::Builder;
-use crate::css_scope::{ScopeInfo, analyze_style, splice_scoped_css};
+use crate::css_scope::{CssScoping, analyze_style, match_scope, splice_scoped_css};
 use crate::element::fragment_has_component;
+use crate::element_census::build_census;
 use crate::fragment::{
     BodyBuilder, FragmentCtx, emit_fragment, fragment_contains_block,
     fragment_has_snippet_or_render,
@@ -91,15 +92,12 @@ pub(crate) struct EmitEnv<'arena, 's> {
     /// `binding.kind` is `state` (non-`normal`), so a component whose name is a
     /// `$state` binding is dynamic — this set recovers that distinction.
     pub(crate) state_names: NameSet,
-    pub(crate) scope: Option<ScopeInfo>,
-    /// Per-scoped-compound "matched some element" flags, parallel to
-    /// `scope.selectors`, accumulated during emission (`element_scope`). A
-    /// compound left `false` after the walk matched no element and refuses
-    /// (`CssSelectorNoMatch`). Deliberately **not** an [`Analysis`] product: it is
-    /// written at emission time (the upfront element-census that would front-load
-    /// it needs ancestor/sibling context that doesn't exist yet), so it stays
-    /// `EmitEnv`-only.
-    pub(crate) matched_selectors: Vec<bool>,
+    /// The finished CSS scoping — selector→element matching ran upfront over the
+    /// [element census](crate::element_census) in [`analyze`], so emission only
+    /// *reads* it (`element_scope` is a span lookup, `unused_selectors` the
+    /// post-emission no-match check, and `splice_scoped_css` consults the per-relative
+    /// scoped flags). `None` when the component has no `<style>`.
+    pub(crate) scope: Option<CssScoping>,
     /// Script comments are being carried — emitters whose synthetic call
     /// windows would sweep host comments (`$.attr` family) must refuse.
     pub(crate) has_comments: bool,
@@ -197,38 +195,14 @@ impl<'arena> EmitEnv<'arena, '_> {
         self.overlays.pop();
     }
 
-    /// Whether this regular element is CSS-scoped: does ANY scoped compound's
-    /// joint predicate list hold on it? Every compound that matches is marked
-    /// used ([`matched_selectors`](Self::matched_selectors)) — so a compound that
-    /// matches this element via a later index is still recorded, never
-    /// short-circuited — and the element gains the `svelte-tsvhash` class when the
-    /// result is `true` (the caller injects/extends `class`). Returns `false` when
+    /// Whether this regular element is CSS-scoped: did the upfront census match
+    /// give it the `svelte-tsvhash` class? A pure lookup — the matching (including
+    /// which selectors are used) already ran in [`analyze`]. Returns `false` when
     /// the component has no `<style>`.
-    ///
-    /// The predicate match itself can refuse
-    /// ([`Refusal::CssDynamicAttributeMatch`](crate::Refusal::CssDynamicAttributeMatch))
-    /// when it would need the oracle's un-ported `get_possible_values`.
-    pub(crate) fn element_scope(
-        &mut self,
-        element: &Element<'arena>,
-        element_name: &str,
-    ) -> Result<bool, CompileError> {
-        let Some(scope) = &self.scope else {
-            return Ok(false);
-        };
-        let mut scoped = false;
-        for (i, selector) in scope.selectors.iter().enumerate() {
-            if crate::css_scope::element_matches_selector(
-                selector,
-                element,
-                element_name,
-                self.source,
-            )? {
-                self.matched_selectors[i] = true;
-                scoped = true;
-            }
-        }
-        Ok(scoped)
+    pub(crate) fn element_scope(&self, element: &Element<'arena>) -> bool {
+        self.scope
+            .as_ref()
+            .is_some_and(|scope| scope.element_scoped(element))
     }
 
     /// The `each_array` unique name for the next `{#each}` (source order).
@@ -278,9 +252,10 @@ pub(crate) struct Analysis<'arena> {
     /// Top-level `$state`/`$state.raw` binding names — a component named after
     /// one is dynamic (see `component_dynamic`).
     pub(crate) state_names: NameSet,
-    /// The `<style>` scoping analysis (scoped class names + hash-splice
-    /// positions), `None` when the component has no `<style>`.
-    pub(crate) scope: Option<ScopeInfo>,
+    /// The finished `<style>` scoping — selectors parsed **and** matched against the
+    /// element census upfront (scoped-element set, per-selector used flags,
+    /// per-relative hash-splice flags). `None` when the component has no `<style>`.
+    pub(crate) scope: Option<CssScoping>,
     /// Whether the instance script carries comments.
     pub(crate) has_comments: bool,
     /// The `{#snippet}` hoist analysis.
@@ -368,10 +343,18 @@ fn analyze<'arena>(
         refuse_template_typescript(root, source, arena)?;
     }
 
-    // CSS scoping analysis (no minting): which class names are scoped, and
-    // where the hash class splices into the style text.
+    // CSS scoping (no minting): parse the selector chains, then match them against
+    // the element census upfront. The census (`element_census`) gives the ancestor/
+    // sibling navigability tsv's AST lacks, so the whole selector→element table —
+    // which elements gain the hash class, which selectors are used, which compounds
+    // splice a hash — is computed here rather than accumulated during emission. A
+    // dynamic-attribute / non-ASCII / snippet-crossing match refuses here.
     let scope = match root.css {
-        Some(style) => Some(analyze_style(style, source, None)?),
+        Some(style) => {
+            let info = analyze_style(style, source, None)?;
+            let census = build_census(root);
+            Some(match_scope(info, &census, source)?)
+        }
         None => None,
     };
 
@@ -658,7 +641,6 @@ pub(crate) fn compile_server<'arena>(
         }
     }
 
-    let selector_count = scope.as_ref().map_or(0, |s| s.selectors.len());
     let mut env = EmitEnv {
         b,
         source,
@@ -666,7 +648,6 @@ pub(crate) fn compile_server<'arena>(
         derived_names,
         state_names,
         scope,
-        matched_selectors: vec![false; selector_count],
         has_comments,
         overlays: Vec::new(),
         in_each: false,
@@ -738,16 +719,14 @@ pub(crate) fn compile_server<'arena>(
         }
     }
 
-    // A scoped compound that matched no element would be pruned by the oracle —
-    // pruning isn't implemented, so refuse rather than emit unpruned CSS.
-    if let Some(scope) = &env.scope {
-        for (i, selector) in scope.selectors.iter().enumerate() {
-            if !env.matched_selectors[i] {
-                return Err(unsupported(Refusal::CssSelectorNoMatch {
-                    selector: crate::css_scope::selector_display(selector).to_string(),
-                }));
-            }
-        }
+    // A selector chain that matched no element would be pruned by the oracle —
+    // pruning isn't implemented, so refuse rather than emit unpruned CSS. The used
+    // flags were computed upfront (`match_scope`); the check stays post-emission so
+    // an emission refusal keeps priority over it.
+    if let Some(scope) = &env.scope
+        && let Some(reason) = scope.unused_selectors().next()
+    {
+        return Err(unsupported(reason));
     }
 
     // 7. `needs_context` (a dropped effect, or the ported new/member/call
