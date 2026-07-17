@@ -258,11 +258,13 @@ project-wide conventions.
   dropped-fragment view) — but **not** the emission refusals, and not the
   derived-read rule, which is an emission rewrite rather than a validity rule.
 - `transform_server.rs` — the SSR transform **orchestrator**: `compile_server`
-  runs the phase-numbered pipeline (TypeScript erasure/gate, CSS scoping
-  analysis, script analysis, snippet hoist analysis, script rewrite,
+  runs the phase-numbered pipeline (TypeScript erasure/gate, CSS scoping — the
+  element census built and every selector chain matched against it **upfront** in
+  `analyze()`, script analysis, snippet hoist analysis, script rewrite,
   `needs_context`, template emission, wrapping, assembly/print) and owns
   `EmitEnv`, the struct threaded through every emitter in the sibling modules
-  below — the builder, the binding table, the derived-name set, the CSS scope,
+  below — the builder, the binding table, the derived-name set, the finished CSS
+  scope (`CssScoping`, read-only — `element_scope` is a span lookup),
   block-scope overlays, snippet hoist state, and the erased-region windows
   every `EmitEnv::erase` call collects. Module scaffold: `import * as $ from
   'svelte/internal/server'`, then any instance-script `import` declarations
@@ -361,8 +363,8 @@ project-wide conventions.
   a `bind:` core kind's synthesized `value`/`checked` property at its slot via
   `attribute::build_bind_object_property`, spreads as `...expr`), the scope hash
   rides `css_hash` (the element is scoped when any scoped compound — type/id/
-  class/attribute/universal — matches it via `EmitEnv::element_scope`, which marks
-  the matched compounds in `matched_selectors`), the `class:` directives ride
+  class/attribute/universal — matches it, a lookup via `EmitEnv::element_scope` into
+  the upfront-matched `CssScoping` table), the `class:` directives ride
   `classes` (`attribute::build_spread_class_object` — identifier keys + shorthand)
   and the `style:` directives ride `styles`
   (`attribute::build_spread_style_object` — a FLAT object, no `|important`
@@ -393,8 +395,9 @@ project-wide conventions.
   expr, … })` (the oracle's `build_attr_class`): the base is the static value /
   `$.clsx(expr)` / `''`; the scope hash concatenates into a string-literal base
   or rides the 2nd argument; the element is scoped when any scoped compound
-  matches it (`EmitEnv::element_scope`, recorded in `matched_selectors`) — a type/
-  id/attribute selector, not only a class token or `class:` name. A mixed-value
+  matches it (`EmitEnv::element_scope`, a lookup into the upfront-matched
+  `CssScoping` table) — a type/id/attribute selector, not only a class token or
+  `class:` name. A mixed-value
   `class="a {b}"` base refuses
   (`ClassDirectiveWithMixedClass`). And `emit_style_directives` — the `style:`
   analog (the oracle's `build_attr_style`): `$.attr_style(base, directives)`, TWO
@@ -448,16 +451,42 @@ project-wide conventions.
   `b.init` applies, checked on the RAW directive expression), and
   `build_spread_style_object` (the `styles` argument — a FLAT object, `|important`
   validated but NOT partitioned, reusing `build_style_property`).
-- `css_scope.rs` — CSS scoping for single, no-combinator compounds (type / id /
-  class / attribute / universal simple selectors + trailing pseudo). Each compound
-  becomes a kind-tagged predicate list matched JOINTLY against every candidate
-  element (`element_matches_selector`, a port of the oracle's
-  `relative_selector_might_apply_to_node` / `attribute_matches`); a matched element
-  gains the `svelte-tsvhash` class (`EmitEnv::element_scope`) and the compound is
-  **source-spliced** (appended after the last non-pseudo anchor, or replacing a
-  bare `*`) — author whitespace preserved, not reprinted. Combinators, `:global`,
-  `:is`/`:where`/`:has`/`:not`, `:root`, nesting, empty rules, and a compound
-  matching no element all refuse.
+- `element_census.rs` — the **upfront element census** (`ElementCensus`): one
+  top-down walk over `root.fragment`, run in `analyze()`, producing a
+  `CensusElement` per regular HTML element (components excluded, matching the
+  oracle's element list) with an ancestor/sibling `path` — the upward navigability
+  the Svelte AST lacks, and the substrate the combinator matcher navigates
+  (`get_ancestor_elements` for descendant/child, `get_possible_element_siblings` /
+  `get_possible_nested_siblings` / `loop_child` for `+`/`~`, with block-descent and
+  the `{#each}` self-adjacency wrap-around). Descends every SSR-reachable fragment
+  (element/component subtrees, `{#if}` / `{#each}` / `{#await}`-pending+then /
+  `{#key}` / `{#snippet}` bodies, `<svelte:head>`) but **not** `{:catch}` (dropped
+  from output), so the census leaf set equals the emitted set — keeping the
+  single-compound match byte-identical to the pre-census emission-fused result.
+- `css_scope.rs` — CSS scoping: parses a rule's selector into a CHAIN of compounds
+  (type / id / class / attribute / universal + trailing pseudo, joined by
+  combinators), then matches the chain BACKWARD against the element census
+  (`match_scope` → `apply_selector` / `apply_combinator`, a port of the oracle's
+  `css-prune.js`; the leaf reuses the joint-AND predicate list —
+  `relative_selector_might_apply_to_node` / `attribute_matches`). Every compound a
+  match reaches gains the `svelte-tsvhash` class and every element the match touches
+  is scoped (`CssScoping.scoped_elements`, read by `EmitEnv::element_scope`); the
+  compound is **source-spliced** (appended after the last non-pseudo anchor, or
+  replacing a bare `*`) — author whitespace preserved, not reprinted — with a
+  per-`ComplexSelector` specificity bump (the first scoped compound a plain
+  `.svelte-tsvhash`, each later one a zero-specificity `:where(.svelte-tsvhash)`,
+  reset per comma `ComplexSelector`). **Supported**: the four combinators
+  (descendant / child / `+` / `~`, including block-descent and the `{#each}`
+  wrap-around) and basic `:global` (leading `:global(<compound>) .y`, trailing
+  `:global(<compound>)`, a fully-global `:global(<compound>)`, and the bare
+  `:global` combinator `div :global.x` → `div.x`). **Refused**: `:global{}` global
+  blocks (nested rules), `:is`/`:where`/`:has`/`:not`, `:root`/`:host`, nesting, the
+  `||` column combinator, a snippet/render-crossing combinator path (`CssCombinatorSelector`
+  — the site-resolution product isn't built, a safe over-refusal), at-rules /
+  `@keyframes` (`CssAtRule`), empty rules (`CssEmptyRule`), an enumerable dynamic
+  attribute value (`CssDynamicAttributeMatch`), a non-ASCII case-insensitive operand
+  (`CssCaseInsensitiveNonAscii`), and a chain matching no element
+  (`CssSelectorNoMatch`).
 
 Types: `CompileOptions { generate: Generate, dev: bool }` (default: `Server`,
 non-dev), `CompileOutput { js, css, warnings }`, `CompileWarning { code, message }`
