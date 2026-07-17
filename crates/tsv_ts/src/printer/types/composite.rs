@@ -1039,6 +1039,14 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an array type (e.g., `number[]`)
     pub(super) fn build_array_type_doc(&self, arr: &TSArrayType<'_>) -> DocId {
         let d = self.d();
+        // A comment-free parenthesized union element EXPANDS its parens when it breaks
+        // (`(⏎\t| A⏎\t| B⏎)[]`) instead of gluing the leading `|` to the `(`. Any other
+        // parenthesized element (conditional / function / intersection) keeps glued
+        // parens and breaks internally (`(T extends X⏎\t? Y⏎\t: Z)[]`). See the shared
+        // `build_expanded_parenthesized_union_opt`.
+        if let Some(union_doc) = self.build_expanded_parenthesized_union_opt(arr.element_type) {
+            return d.concat(&[union_doc, d.text("[]")]);
+        }
         let needs_parens = type_needs_parens_for_array_element(arr.element_type);
         let element_doc = self.build_type_doc(arr.element_type);
         if needs_parens {

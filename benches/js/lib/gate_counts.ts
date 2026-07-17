@@ -475,9 +475,17 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
  */
 export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	svelte: 0,
-	typescript: 56,
+	typescript: 55,
 	css: 9,
 };
+// typescript 56→55 (2026-07-17, checkouts as in CORPUS_FORMAT_UNKNOWN_PIN above; svelte 0 +
+// css 9 unchanged, SAFETY 0). The postfix-operator RHS `fluid` fix: ../kit exports/public.d.ts
+// moves partial→known — `type RemoteFormFieldType<T> = { [K in keyof InputTypeMap]: … }[keyof
+// InputTypeMap]`, an indexed-access RHS whose mapped-type OBJECT was breaking after `=` instead of
+// hugging `= {` and expanding internally. Routing `TSArrayType`/`TSIndexedAccessType` through
+// prettier's `fluid` (like the bare conditional/intersection/function RHS) converged that hunk; the
+// file's remaining hunks are cataloged, so it moved to `known`. Whole-corpus pre/post per-file
+// bucket diff confirmed exactly this file left, ZERO files entered partial (known 155→156), SAFETY 0.
 // typescript 57→56 (2026-07-17, checkouts as in CORPUS_FORMAT_UNKNOWN_PIN above; svelte 0 +
 // css 9 unchanged, SAFETY 0). Same conditional/parenthesized-type body-indent fix (bug141
 // §Bug 2): ../svelte src/index.d.ts moves partial→match — a nested conditional + a
