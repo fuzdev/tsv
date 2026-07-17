@@ -40,7 +40,7 @@ use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 
 use super::profile::resolve_files;
-use super::roundtrip_audit::{structurally_equivalent, tsv_parse_to_value};
+use crate::audit::properties::{structurally_equivalent, tsv_parse_to_value};
 use crate::cli::CliError;
 
 /// Seeded mutational fuzzer: mutate corpus bytes and assert the parser never

@@ -66,10 +66,9 @@ use futures_util::{StreamExt, stream};
 use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 
+use crate::audit::properties::{structurally_equivalent, tsv_parse_to_value};
 use crate::cli::CliError;
 use crate::deno;
-use crate::diff::{DiffOptions, diff_to_string};
-use crate::render_normalize::{normalize_pair, structural_skeleton};
 
 use super::profile::resolve_files;
 
@@ -471,28 +470,6 @@ fn tsv_reparses(source: &str, parser: ParserType) -> bool {
     }
 }
 
-/// Parse `source` with tsv's own parser and convert to the wire-JSON `Value`
-/// (the same shape the canonical ASTs use). `None` on a tsv parse error.
-///
-/// Shared with the `fuzz` command (mutated-input round-tripping).
-pub(crate) fn tsv_parse_to_value(source: &str, parser: ParserType) -> Option<Value> {
-    let arena = bumpalo::Bump::new();
-    match parser {
-        ParserType::TypeScript => {
-            let ast = tsv_ts::parse(source, &arena).ok()?;
-            Some(tsv_ts::convert_ast_json(&ast, source))
-        }
-        ParserType::Svelte => {
-            let ast = tsv_svelte::parse(source, &arena).ok()?;
-            Some(tsv_svelte::convert_ast_json(&ast, source))
-        }
-        ParserType::Css => {
-            let ast = tsv_css::parse(source, &arena).ok()?;
-            Some(tsv_css::convert_ast_json(&ast, source))
-        }
-    }
-}
-
 /// Phase 2: for the selected files, reparse input and output with the canonical
 /// parsers and record a [`CanVerdict`]. Fans out over the sidecar pool.
 async fn canonical_phase(
@@ -566,42 +543,4 @@ async fn canonical_roundtrip(
     } else {
         (CanVerdict::Divergent, diff)
     }
-}
-
-/// Compare two ASTs for **structural** equivalence — the corruption-hunt basis.
-///
-/// Both are [`normalize_pair`]'d (render-normalized when `render`, then
-/// location-stripped) and compared as [`structural_skeleton`]s, so legitimate
-/// leaf reformatting doesn't read as corruption while an injected / dropped /
-/// re-typed node still does (see `structural_skeleton` for what the skeleton
-/// keeps vs erases). Char-dropping *value* corruption stays covered by the
-/// complementary `corpus:compare:format` SAFETY (differential char-frequency),
-/// which this deliberately does not duplicate.
-///
-/// Returns `(structurally_equal, diff)` — the diff (only with `verbose`) shows the
-/// full location-stripped values, not the skeleton, so it's readable for triage.
-///
-/// Shared with the `fuzz` command (mutated-input round-tripping).
-pub(crate) fn structurally_equivalent(
-    a: Value,
-    b: Value,
-    render: bool,
-    verbose: bool,
-) -> (bool, Option<String>) {
-    let (a, b) = normalize_pair(a, b, render);
-    if structural_skeleton(&a) == structural_skeleton(&b) {
-        return (true, None);
-    }
-    let diff = if verbose {
-        match (
-            serde_json::to_string_pretty(&a),
-            serde_json::to_string_pretty(&b),
-        ) {
-            (Ok(pa), Ok(pb)) => Some(diff_to_string(&pa, &pb, &DiffOptions::ast_diff())),
-            _ => None,
-        }
-    } else {
-        None
-    };
-    (false, diff)
 }

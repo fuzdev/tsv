@@ -222,6 +222,38 @@ pub fn record_verbatim_range(source: &str, start: u32, end: u32) {
     });
 }
 
+/// The spans of every comment registered on this thread's ledger **against `source`**, read
+/// **without draining** it.
+///
+/// The ledger holds the parsed-comment spans (the [`register_parsed`] expectation) but
+/// otherwise surfaces only aggregate counts. The gap-injection audit needs the spans
+/// themselves — to exclude an injection site that falls *inside* an existing comment, which
+/// mutilates the author's comment rather than probing a gap — so this exposes them. Read
+/// before [`take_comment_ledger`], which discards them; the per-injection hot path (which
+/// only ever drains) never pays to collect them.
+///
+/// Spans are byte offsets over `source`. Scoping to `document_key(source)` is what keeps them
+/// in one coordinate space **by construction**: the host and its top-level
+/// `<script>`/`<style>` islands all register host-absolute spans under the host's key and are
+/// returned; a nested `<style>` *element* re-parses island-relative under its own key (see the
+/// module docs) and is structurally excluded — so an island-relative span can never be
+/// mistaken for a host offset. Pass the exact binding the format entry registered against, so
+/// the key matches by pointer identity.
+#[must_use]
+pub fn parsed_comment_spans(source: &str) -> Vec<Span> {
+    if !comment_check_enabled() {
+        return Vec::new();
+    }
+    let key = document_key(source);
+    DOCS.with(|docs| {
+        docs.borrow()
+            .iter()
+            .filter(|d| d.key == key)
+            .flat_map(|d| d.entries.iter().map(|e| e.span))
+            .collect()
+    })
+}
+
 /// Finalize the format: compute the findings, drain, and clear.
 pub fn take_comment_ledger() -> CommentLedger {
     let unregistered_emits = UNREGISTERED.with(|u| std::mem::take(&mut *u.borrow_mut()));
@@ -409,6 +441,58 @@ mod tests {
         });
         assert!(ledger.findings.is_empty(), "{:?}", ledger.findings);
         assert_eq!(ledger.parsed, 2, "two documents, one comment each");
+    }
+
+    #[test]
+    fn parsed_comment_spans_reads_registered_spans_without_draining() {
+        let source = "// a\n// b\nx;\n";
+        let comments = [line_comment(0, 4), line_comment(5, 9)];
+        let (spans, ledger) = with_check(|| {
+            register_parsed(source, &comments);
+            // Read before drain: the spans survive; the ledger below still sees the entries.
+            parsed_comment_spans(source)
+        });
+        assert_eq!(
+            spans,
+            vec![Span::new(0, 4), Span::new(5, 9)],
+            "both registered spans, byte offsets over the source"
+        );
+        // The read did not drain — `take_comment_ledger` (inside `with_check`) still counted
+        // the two entries, reporting them as dropped (nothing was emitted).
+        assert_eq!(ledger.parsed, 2, "the peek left the ledger intact");
+    }
+
+    #[test]
+    fn parsed_comment_spans_scopes_to_the_host_key() {
+        // A nested `<style>` element re-parses island-relative under its own key; its spans
+        // must NOT leak into the host's — an island-relative offset could otherwise coincide
+        // with a host code offset and drop a legit injection site. Both sources register a
+        // comment at the SAME-valued span (0, 4) under DIFFERENT keys, so returning one span
+        // proves the accessor filters by key, not by value.
+        let host = String::from("// h\nx;\n");
+        let island = String::from("// i\ny;\n");
+        let host_comments = [line_comment(0, 4)];
+        let island_comments = [line_comment(0, 4)];
+        let (spans, _ledger) = with_check(|| {
+            register_parsed(&host, &host_comments);
+            register_parsed(&island, &island_comments);
+            parsed_comment_spans(&host)
+        });
+        assert_eq!(
+            spans,
+            vec![Span::new(0, 4)],
+            "only the host's comment, not the island's registered under a different key"
+        );
+    }
+
+    #[test]
+    fn parsed_comment_spans_is_empty_when_disabled() {
+        let _guard = LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        set_comment_check(false);
+        let _ = take_comment_ledger();
+        assert!(parsed_comment_spans("// a\nx;\n").is_empty());
     }
 
     #[test]
