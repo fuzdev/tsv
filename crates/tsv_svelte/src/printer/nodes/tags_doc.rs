@@ -7,9 +7,9 @@ use crate::ast::internal;
 use crate::printer::Printer;
 use smallvec::smallvec;
 use tsv_lang::Span;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::doc::{DocBuf, GroupId};
+use tsv_lang::{comments_in_source_range, comments_to_emit_in_range};
 use tsv_ts::Expression;
 
 // Opening-tag literals whose `.len()` locates the embedded expression past the
@@ -192,12 +192,20 @@ impl<'a> Printer<'a> {
     /// a cataloged divergence (`tags/debug/debug_comment_prettier_divergence`).
     /// Comments are looked up from `Root.comments` by span and interleaved with
     /// the identifiers, matching the (former) buffer printer's placement.
+    ///
+    /// This uses the **in-source** axis (`comments_in_source_range`), not the
+    /// to-emit one: the identifiers are emitted as raw source spans
+    /// (`d.source_span`), not through the ownership-aware expression printer, so
+    /// this builder is the sole positional emitter of *every* comment in its
+    /// content — including a block comment glued to an identifier
+    /// (`{@debug /* c */ a}`), which the parser marks `owned_by_node` and the
+    /// to-emit axis would skip, dropping it.
     pub(crate) fn build_debug_tag_doc(&self, tag: &internal::DebugTag<'_>) -> DocId {
         let d = self.d();
 
         // Comments within the tag's content (after "{@debug" and before "}").
         let tag_comments: Vec<&tsv_lang::Comment> =
-            comments_to_emit_in_range(self.comments, tag.span.start, tag.span.end).collect();
+            comments_in_source_range(self.comments, tag.span.start, tag.span.end).collect();
 
         if tag.identifiers.is_empty() && tag_comments.is_empty() {
             return d.text("{@debug}");
