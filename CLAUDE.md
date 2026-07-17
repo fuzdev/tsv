@@ -1055,6 +1055,26 @@ cargo run -p tsv_debug binding_audit --gate                          # the check
 cargo run -p tsv_debug binding_audit --verbose ../svelte/packages/svelte/src
 ```
 
+**Layout-Neutrality Audit (ownership-blind-gate probe):**
+
+```bash
+# neutrality_audit - does a comment's OWNERSHIP ever change tsv's layout? An owned
+# comment must occupy exactly the page space a same-width ordinary comment does — a
+# layout gate that instead SKIPS owned comments (asks the to-emit question where it
+# should ask on-page) goes blind, and the comment silently changes the layout it
+# should have forced. At each glued block-comment position, format the file with the
+# comment made OWNED (annotation-shaped) and made ORDINARY (plain filler) at the SAME
+# width — only ownership varies, so any layout difference is a gate reading ownership.
+# Pure Rust, no sidecar. A development / characterization tool, NOT a `deno task
+# check` gate: it needs an owned/ordinary CONTRAST to detect anything, and under the
+# "every glued block comment is owned" rule a run passes vacuously — its moment is
+# BEFORE any future ownership-rule change (run it then, over external corpora).
+# TS-family files only; defaults to tests/fixtures.
+cargo run -p tsv_debug neutrality_audit ../svelte/packages/svelte/src
+# Also: --gate (exit 1 on findings; dev-loop convenience), --verbose (the
+# owned-vs-ordinary output diff per finding), --limit N, --json.
+```
+
 **Seeded Mutational Fuzzer (panic / idempotency / structural-reparse safety):**
 
 ```bash

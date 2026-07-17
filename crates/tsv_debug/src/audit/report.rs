@@ -49,11 +49,25 @@
 //!   → `Informational`. A direct map — the whole audit is a severity split. The
 //!   in→out bound subtree rides `detail`.
 //!
-//! **Where it would widen:** [`Finding::example`] is a per-offset reproducer;
-//! roundtrip / binding findings can be file-level, so a real migration would make
-//! it `Option` (or let the reproducer be a bare path). That is a reproducer-shape
-//! generalization, not a flattened distinction — noted rather than done, since gap
-//! always has an example.
+//! **Where it would widen** (checked against every audit command, not just the
+//! three sketched):
+//!
+//! - [`Finding::example`] is a per-offset injection reproducer. Roundtrip /
+//!   binding / swallow findings are file-level, and a fuzz reproducer is a whole
+//!   mutant input (or seed + iteration) — so the real widening is
+//!   reproducer-*shape*, not merely `Option`. A reproducer-shape generalization,
+//!   not a flattened distinction — noted rather than done, since gap always has
+//!   an example.
+//! - [`RunSummary`] is injection-shaped (`sites` / `injections` / `accepted` /
+//!   `payload_labels`). The three audits sketched above happen to fit it, but
+//!   `comment_audit`'s run level carries `registered` and `unregistered_emits`,
+//!   and `fuzz` carries its pristine-reflow path aggregate — none has a slot. A
+//!   migration gives the run level its own per-audit detail slot, exactly as
+//!   [`Finding`] already has one.
+//!
+//! `build_fanout_audit` (synthetic growth curves) and `scan_audit` (a static
+//! source lint over an allow-list) produce no corpus findings at all — outside
+//! the envelope's scope by shape, not flattened by it.
 
 use serde_json::Value;
 
