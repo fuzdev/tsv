@@ -50,7 +50,7 @@
 use std::collections::{BTreeSet, HashMap};
 
 use bumpalo::collections::Vec as BumpVec;
-use tsv_lang::Span;
+use tsv_lang::{Comment, Span};
 use tsv_svelte::ast::internal::Root;
 use tsv_ts::ast::internal::{
     BlockStatement, ExportDefaultDeclaration, ExportDefaultValue, Expression, ExpressionStatement,
@@ -66,12 +66,13 @@ use crate::fragment::{
     BodyBuilder, FragmentCtx, emit_fragment, fragment_contains_block,
     fragment_has_snippet_or_render,
 };
+use crate::needs_context::{ComponentContext, analyze_component};
 use crate::script_rewrite::{
     analyze_script, collect_script_comments, document_ts_flag, identifier_binding_name,
     plain_identifier_name, refuse_runes_invalid_import, refuse_template_typescript,
     rewrite_script_statement, self_check_no_typescript,
 };
-use crate::snippet::SnippetAnalysis;
+use crate::snippet::{SnippetAnalysis, analyze_snippets};
 use crate::{CompileError, CompileOutput, Refusal, erase};
 
 /// The component function name. Derived from the constant filename the
@@ -91,6 +92,11 @@ pub(crate) struct EmitEnv<'arena, 's> {
     /// `$state` binding is dynamic — this set recovers that distinction.
     pub(crate) state_names: NameSet,
     pub(crate) scope: Option<ScopeInfo>,
+    /// Scoped selectors that matched an element, accumulated during emission.
+    /// Deliberately **not** an [`Analysis`] product: it is written at emission
+    /// time (the upfront element-census that would front-load it needs
+    /// ancestor/sibling context that doesn't exist yet), so it stays
+    /// `EmitEnv`-only.
     pub(crate) matched_classes: BTreeSet<String>,
     /// Script comments are being carried — emitters whose synthetic call
     /// windows would sweep host comments (`$.attr` family) must refuse.
@@ -121,7 +127,10 @@ pub(crate) struct EmitEnv<'arena, 's> {
     /// walked).
     pub(crate) hoisted_snippets: Vec<Statement<'arena>>,
     /// Comment-refusal windows of the regions erased from **template** borrow
-    /// points (the script's are collected before emission). See
+    /// points (the script's are an [`Analysis`] product, collected before
+    /// emission). Deliberately **not** an [`Analysis`] product: it is accumulated
+    /// lazily by [`EmitEnv::erase`] as each template expression is reached, so it
+    /// stays `EmitEnv`-only (precomputing it upfront is a deferred option). See
     /// [`EmitEnv::erase`].
     erased_windows: Vec<Span>,
 }
@@ -209,14 +218,84 @@ impl<'arena> EmitEnv<'arena, '_> {
     }
 }
 
-/// Compile a parsed component to server output.
-pub(crate) fn compile_server<'arena>(
+/// The order-independent analysis products of a component, plus the raw inputs
+/// the script-rewrite loop still consumes.
+///
+/// Produced by [`analyze`], which runs the whole SSR setup **except** the two
+/// transform-local parts (`EmitEnv` construction and the script-rewrite loop).
+/// Two products are deliberately *not finished* here because their finalization
+/// depends on the loop's output — see the [`Analysis::bindings`] and
+/// [`Analysis::component`] field notes.
+pub(crate) struct Analysis<'arena> {
+    /// The top-level script binding table (the evaluator's input).
+    ///
+    /// ⚠ **Not frozen when `analyze` returns.** It is populated by
+    /// [`analyze_script`] but the `mark_updated` / `mark_opaque` patch is
+    /// deferred to [`compile_server`]: that patch reads `updated` /
+    /// `nested_declared` from the rewrite loop and `reassigned` / `fn_declared`
+    /// from [`Self::component`], neither of which exists until the loop runs.
+    /// [`compile_server`] finalizes it in place, the same mutation sequence as
+    /// before this factoring.
+    pub(crate) bindings: Bindings<'arena>,
+    /// Derived-binding names (read rewriting / refusal).
+    pub(crate) derived_names: NameSet,
+    /// Top-level `$state`/`$state.raw` binding names — a component named after
+    /// one is dynamic (see `component_dynamic`).
+    pub(crate) state_names: NameSet,
+    /// The `<style>` scoping analysis (scoped class names + hash-splice
+    /// positions), `None` when the component has no `<style>`.
+    pub(crate) scope: Option<ScopeInfo>,
+    /// Whether the instance script carries comments.
+    pub(crate) has_comments: bool,
+    /// The `{#snippet}` hoist analysis.
+    pub(crate) snippets: SnippetAnalysis,
+    /// The whole-component `needs_context`/reassignment analysis, **left
+    /// unresolved on purpose.** [`analyze_component`] is called up front (the
+    /// script rewrite needs its `uses_slots`), but its error must NOT win over
+    /// the script-rewrite loop's refusals — the oracle's refusal priority puts
+    /// the loop first. So [`compile_server`] reads `uses_slots` from this
+    /// `Result` before the loop and only `?`-propagates it after. An eager `?`
+    /// here would flip refusal priority on any file both would decline.
+    pub(crate) component: Result<ComponentContext, CompileError>,
+    /// The type-erased instance-script statement list — the rewrite loop
+    /// iterates it. (NOTHING may read `root.instance.content.body`: the un-erased
+    /// tree still carries TypeScript.)
+    pub(crate) instance_body: &'arena [Statement<'arena>],
+    /// Carried instance-script comments (threaded into the export program).
+    pub(crate) script_comments: Vec<Comment>,
+    /// Comment-refusal windows of the regions erased from the **script**. (The
+    /// template half is *not* here: it is accumulated lazily at each
+    /// [`EmitEnv::erase`] borrow point and stays `EmitEnv`-only — see that
+    /// field. Precomputing it is a deferred option, not this slice's.)
+    pub(crate) erased_windows: Vec<Span>,
+}
+
+/// Run the component's order-independent analysis passes.
+///
+/// # Boundary
+///
+/// This is the SSR setup block **minus** the two transform-local pieces:
+/// `EmitEnv` construction and the script-rewrite loop. The loop mints appendix
+/// lexemes through the [`Builder`] and sits *between* the products here, and two
+/// of those products can only be *finished* after it runs. Rather than thread the
+/// builder through `analyze`, the loop stays inline in [`compile_server`] and
+/// `analyze` returns:
+///
+/// - the products that don't depend on the loop (TypeScript erasure, the CSS
+///   scope, carried comments, the binding table, derived/state names, the snippet
+///   hoist analysis), and
+/// - the two deferred-finalization products as-is: [`Analysis::bindings`]
+///   pre-patch and [`Analysis::component`] unresolved (see their field notes).
+///
+/// `analyze` performs **no minting**, so it needs no [`Builder`]: the setup block
+/// mints nothing until the loop, so the `$` runtime import stays the first
+/// appendix lexeme whether it is minted before or after this call, and the
+/// appendix byte stream is identical either way.
+fn analyze<'arena>(
     root: &Root<'arena>,
     source: &str,
     arena: &'arena bumpalo::Bump,
-) -> Result<CompileOutput, CompileError> {
-    let mut b = Builder::new(arena, source, std::rc::Rc::clone(&root.interner));
-
+) -> Result<Analysis<'arena>, CompileError> {
     if root.module.is_some() {
         return Err(unsupported(Refusal::ModuleScript));
     }
@@ -260,13 +339,10 @@ pub(crate) fn compile_server<'arena>(
         None => None,
     };
 
-    // 1. `import * as $ from 'svelte/internal/server';`
-    let import = b.import_namespace("$", "svelte/internal/server");
-
-    // 2. Comment carry-through: script comments thread into the synthetic
-    // program (their spans are host-absolute, so the detached-comment machinery
-    // works against the buffer). Classes whose placement can't be made to
-    // converge refuse — see `collect_script_comments`.
+    // Comment carry-through: script comments thread into the synthetic program
+    // (their spans are host-absolute, so the detached-comment machinery works
+    // against the buffer). Classes whose placement can't be made to converge
+    // refuse — see `collect_script_comments`.
     let script_comments = collect_script_comments(root, source, instance_body)?;
     let has_comments = !script_comments.is_empty();
     // Comments alongside template blocks refuse: a block splits the template
@@ -283,8 +359,8 @@ pub(crate) fn compile_server<'arena>(
         return Err(unsupported(Refusal::CommentsWithComponent));
     }
 
-    // 3. Script analysis pass: the top-level binding table (evaluator input)
-    // and the derived-name set (read rewriting / refusal).
+    // Script analysis pass: the top-level binding table (evaluator input) and
+    // the derived-name set (read rewriting / refusal).
     let mut bindings = Bindings::empty();
     let mut derived_names = NameSet::default();
     analyze_script(instance_body, source, &mut bindings, &mut derived_names)?;
@@ -294,9 +370,9 @@ pub(crate) fn compile_server<'arena>(
         return Err(unsupported(Refusal::CommentsWithDerived));
     }
 
-    // 3b. Snippet hoist analysis: which top-level `{#snippet}`s go to module
-    // scope. Imports don't disqualify hoisting, so the instance-binding set the
-    // analysis subtracts is the binding table minus the import locals.
+    // Snippet hoist analysis: which top-level `{#snippet}`s go to module scope.
+    // Imports don't disqualify hoisting, so the instance-binding set the analysis
+    // subtracts is the binding table minus the import locals.
     let import_names: NameSet = instance_body
         .iter()
         .filter_map(|stmt| match stmt {
@@ -315,14 +391,83 @@ pub(crate) fn compile_server<'arena>(
         })
         .collect();
     let instance_binding_names: NameSet = bindings.names().map(str::to_string).collect();
-    let snippets =
-        crate::snippet::analyze_snippets(root, source, &instance_binding_names, &import_names)?;
+    let snippets = analyze_snippets(root, source, &instance_binding_names, &import_names)?;
     // Script comments plus snippets/render reshape the component body (a hoisted
     // function, a per-render flush) in ways whose comment windows aren't probed;
     // refuse the combination.
     if has_comments && fragment_has_snippet_or_render(&root.fragment) {
         return Err(unsupported(Refusal::CommentsAlongsideTemplateBlocks));
     }
+
+    // The whole-component analysis. Computed here because the script rewrite
+    // needs its `uses_slots` (the `$props()` rest injection renames its
+    // destructured `$$slots` to `$$slots_` when the injected sanitize_slots
+    // binding exists — a duplicate `$$slots` lexical declaration would be invalid
+    // JS). Its error is deliberately left UNRESOLVED (see `Analysis::component`):
+    // the script-loop refusals must keep winning for inputs that trip both.
+    let component = analyze_component(root, source, instance_body);
+
+    // Top-level `$state`/`$state.raw` binding names — a component named after one
+    // is dynamic (see `component_dynamic`). Order-independent (reads only
+    // `instance_body`), so computed here rather than after the loop.
+    let mut state_names = NameSet::default();
+    for stmt in instance_body {
+        if let Statement::VariableDeclaration(decl) = stmt {
+            for declarator in decl.declarations {
+                if matches!(
+                    declarator
+                        .init
+                        .as_ref()
+                        .and_then(|init| classify_rune_init(init, source)),
+                    Some(RuneInit::State(_))
+                ) && let Some(name) = identifier_binding_name(&declarator.id, source)
+                {
+                    state_names.insert(name);
+                }
+            }
+        }
+    }
+
+    Ok(Analysis {
+        bindings,
+        derived_names,
+        state_names,
+        scope,
+        has_comments,
+        snippets,
+        component,
+        instance_body,
+        script_comments,
+        erased_windows,
+    })
+}
+
+/// Compile a parsed component to server output.
+pub(crate) fn compile_server<'arena>(
+    root: &Root<'arena>,
+    source: &str,
+    arena: &'arena bumpalo::Bump,
+) -> Result<CompileOutput, CompileError> {
+    // Analysis first (setup block minus the rewrite loop and `EmitEnv`). See
+    // `analyze`: `bindings` comes back pre-patch and `component` unresolved.
+    let Analysis {
+        mut bindings,
+        derived_names,
+        state_names,
+        scope,
+        has_comments,
+        snippets,
+        component,
+        instance_body,
+        script_comments,
+        erased_windows,
+    } = analyze(root, source, arena)?;
+
+    // 1. `import * as $ from 'svelte/internal/server';` — the first appendix
+    // lexeme. `analyze` mints nothing, so this heads the appendix exactly as it
+    // did before the setup block was factored out.
+    let mut b = Builder::new(arena, source, std::rc::Rc::clone(&root.interner));
+    let import = b.import_namespace("$", "svelte/internal/server");
 
     // 4. Script rewrite pass: rune rewrites, guard walks, mutation/shadow
     // collection, effect detection. Rewrites drop source regions (rune call
@@ -337,13 +482,10 @@ pub(crate) fn compile_server<'arena>(
     let mut updated = NameSet::default();
     let mut nested_declared = NameSet::default();
     let mut dropped_regions: Vec<Span> = Vec::new();
-    // The whole-component analysis runs up front because the script rewrite
-    // needs `uses_slots` (the `$props()` rest injection renames its destructured
-    // `$$slots` to `$$slots_` when the injected sanitize_slots binding exists —
-    // a duplicate `$$slots` lexical declaration would be invalid JS). Its error
-    // is NOT propagated here: the script-loop refusals below must keep winning
-    // for inputs that trip both, so the `?` stays at the original position.
-    let component = crate::needs_context::analyze_component(root, source, instance_body);
+    // `component` is the whole-component analysis, computed up front by `analyze`
+    // (the script rewrite needs its `uses_slots`) but left UNRESOLVED: its error
+    // must NOT win over the script-loop refusals below, so it is `?`-unwrapped
+    // only after the loop (see `Analysis::component`).
     let uses_slots = component.as_ref().is_ok_and(|c| c.uses_slots);
     for stmt in instance_body {
         // Instance-script exports refuse — every form. The oracle compiles
@@ -423,7 +565,8 @@ pub(crate) fn compile_server<'arena>(
     // oracle's `should_inject_props` includes `should_inject_context`). The same
     // walk collects component-wide reassignments — including mutations inside
     // dropped event handlers — so a mutated binding is not statically folded.
-    // (Computed above the script loop for `uses_slots`; its error surfaces here.)
+    // (Computed by `analyze` for `uses_slots`; its error surfaces here — after
+    // the loop, so the loop's refusals keep priority.)
     let component = component?;
     for name in &component.reassigned {
         updated.insert(name.clone());
@@ -475,26 +618,6 @@ pub(crate) fn compile_server<'arena>(
         for window in &erased_windows {
             if comment.span.start < window.end && comment.span.end > window.start {
                 return Err(unsupported(Refusal::CommentInErasedTypeRegion));
-            }
-        }
-    }
-
-    // Top-level `$state`/`$state.raw` binding names — a component named after one
-    // is dynamic (see `component_dynamic`).
-    let mut state_names = NameSet::default();
-    for stmt in instance_body {
-        if let Statement::VariableDeclaration(decl) = stmt {
-            for declarator in decl.declarations {
-                if matches!(
-                    declarator
-                        .init
-                        .as_ref()
-                        .and_then(|init| classify_rune_init(init, source)),
-                    Some(RuneInit::State(_))
-                ) && let Some(name) = identifier_binding_name(&declarator.id, source)
-                {
-                    state_names.insert(name);
-                }
             }
         }
     }
@@ -734,11 +857,26 @@ pub(crate) fn compile_server<'arena>(
         ],
     )?;
 
-    let mut js = tsv_ts::format_canonical(&import_program, &env.b.buffer);
+    // One caller-owned doc arena shared across the three canonical reprints. The
+    // import / hoisted-snippet / export programs are three disjoint sub-ASTs of
+    // the same `env.b.buffer` source, so no `reset()` is needed between them, and
+    // the arena is a working buffer that never holds content — byte-identical to
+    // three fresh-arena `format_canonical` calls. `env.b.buffer` is not mutated
+    // between the calls, so one immutable borrow spans all three.
+    let doc_arena = tsv_lang::doc::arena::DocArena::for_source(&env.b.buffer);
+    let mut js = tsv_ts::format_canonical_in(&import_program, &env.b.buffer, &doc_arena);
     if let Some(hoisted_program) = &hoisted_program {
-        js.push_str(&tsv_ts::format_canonical(hoisted_program, &env.b.buffer));
+        js.push_str(&tsv_ts::format_canonical_in(
+            hoisted_program,
+            &env.b.buffer,
+            &doc_arena,
+        ));
     }
-    js.push_str(&tsv_ts::format_canonical(&export_program, &env.b.buffer));
+    js.push_str(&tsv_ts::format_canonical_in(
+        &export_program,
+        &env.b.buffer,
+        &doc_arena,
+    ));
     let css = match (root.css, &env.scope) {
         (Some(style), Some(scope)) => Some(splice_scoped_css(style, source, scope)),
         _ => None,
