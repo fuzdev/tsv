@@ -1131,6 +1131,14 @@ pub(crate) fn rewrite_script_statement<'arena>(
 /// source order (the class member order is preserved). Only the call syntax around
 /// the kept argument is dropped, recorded in `dropped_regions` so a comment inside
 /// refuses.
+///
+/// The member list is rebuilt **lazily** (the `erase.rs::class_body`
+/// structural-sharing idiom): `out` stays `None` — allocating nothing — until the
+/// first `$state` field is unwrapped, at which point the untouched prefix is
+/// backfilled once; a rune-free top-level class (the common case) returns
+/// `class.clone()` having allocated no member `Vec`. The per-member side effects —
+/// the guard walk, the refusal checks, the `dropped_regions` pushes — run for every
+/// member regardless of whether `out` ever materializes.
 #[allow(clippy::too_many_arguments)]
 fn rewrite_class_state_fields<'arena>(
     b: &Builder<'arena>,
@@ -1142,6 +1150,7 @@ fn rewrite_class_state_fields<'arena>(
     nested_declared: &mut NameSet,
     dropped_regions: &mut Vec<Span>,
 ) -> Result<Statement<'arena>, CompileError> {
+    let arena = b.arena;
     let mut ctx = WalkCtx::new(
         source,
         updated,
@@ -1154,13 +1163,17 @@ fn rewrite_class_state_fields<'arena>(
     .allow_store_reads(store_names, None)
     .allow_derived_reads();
 
-    let mut members: BumpVec<'arena, ClassMember<'arena>> = BumpVec::new_in(b.arena);
-    let mut changed = false;
-    for member in class.body.body {
-        // The one exempt shape — a DIRECT top-level `$state`/`$state.raw` field.
-        // `!is_static && !computed` keeps static/computed rune fields (which the
-        // oracle rejects as `state_invalid_placement`) on the refusing path.
-        if let ClassMember::PropertyDefinition(p) = member
+    let members = class.body.body;
+    let mut out: Option<BumpVec<'arena, ClassMember<'arena>>> = None;
+    for (i, member) in members.iter().enumerate() {
+        // The per-member step produces `Some(replacement)` for an unwrapped
+        // `$state` field and `None` for an unchanged member — AFTER running the
+        // member's side effects. The lazy `out` then decides allocation only.
+        let replacement = if let ClassMember::PropertyDefinition(p) = member
+            // The one exempt shape — a DIRECT top-level `$state`/`$state.raw`
+            // field. `!is_static && !computed` keeps static/computed rune fields
+            // (which the oracle rejects as `state_invalid_placement`) on the
+            // refusing path.
             && !p.is_static
             && !p.computed
             && let Some(value) = &p.value
@@ -1194,30 +1207,46 @@ fn rewrite_class_state_fields<'arena>(
                     None
                 }
             };
-            members.push(ClassMember::PropertyDefinition(PropertyDefinition {
+            Some(ClassMember::PropertyDefinition(PropertyDefinition {
                 value: new_value,
                 ..p.clone()
-            }));
-            changed = true;
-            continue;
+            }))
+        } else {
+            // Every other member — the normal refusing guard walk.
+            walk_class_member_guarded(member, &mut ctx)?;
+            None
+        };
+
+        match replacement {
+            // Unchanged — only clone into `out` once it has been materialized.
+            None => {
+                if let Some(vec) = out.as_mut() {
+                    vec.push(member.clone());
+                }
+            }
+            // Changed — materialize `out` (backfilling the untouched prefix
+            // `members[..i]` on the first change) and push the replacement.
+            Some(new) => out
+                .get_or_insert_with(|| {
+                    let mut vec = BumpVec::with_capacity_in(members.len(), arena);
+                    vec.extend_from_slice(&members[..i]);
+                    vec
+                })
+                .push(new),
         }
-        // Every other member — the normal refusing guard walk, cloned through.
-        walk_class_member_guarded(member, &mut ctx)?;
-        members.push(member.clone());
     }
 
-    if !changed {
-        // No `$state` field — the guard walk above already ran (its refusals are
-        // the point), so clone the whole class through unchanged.
-        return Ok(Statement::ClassDeclaration(class.clone()));
+    match out {
+        // No `$state` field — allocated nothing; clone the whole class through.
+        None => Ok(Statement::ClassDeclaration(class.clone())),
+        Some(members) => Ok(Statement::ClassDeclaration(ClassDeclaration {
+            body: ClassBody {
+                body: members.into_bump_slice(),
+                span: class.body.span,
+            },
+            ..class.clone()
+        })),
     }
-    Ok(Statement::ClassDeclaration(ClassDeclaration {
-        body: ClassBody {
-            body: members.into_bump_slice(),
-            span: class.body.span,
-        },
-        ..class.clone()
-    }))
 }
 
 /// Whether `arg` — the WHOLE argument of a class-field `$state(…)` /
