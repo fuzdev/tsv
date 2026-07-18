@@ -20,6 +20,11 @@ mod protocol;
 
 pub use error::DenoError;
 
+/// The embedded sidecar source. Re-exported so `render_browser` can assert its
+/// browser-render block-tag set still mirrors the sidecar's.
+#[cfg(test)]
+pub(crate) use actor::SIDECAR_SCRIPT;
+
 use actor::DenoActor;
 use serde_json::Value;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -303,7 +308,7 @@ pub async fn parse_svelte(source: &str) -> Result<Value, DenoError> {
 /// unrelated to rendering (and `runes: false` does not avoid them). Such a
 /// rejection returns [`DenoError::ToolError`]; the render-equivalence check treats
 /// it as "compile unavailable" and falls back to the template-only
-/// `render_normalize` model.
+/// `render_browser` model.
 ///
 /// # Errors
 /// Returns an error if Deno is not available or the compiler rejects the input.
