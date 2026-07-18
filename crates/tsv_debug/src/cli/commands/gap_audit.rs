@@ -2197,7 +2197,10 @@ mod tests {
             mk_shape(
                 "b",
                 500,
-                &["(CallExpression, callee→arguments)", "(MemberExpression, object→property)"],
+                &[
+                    "(CallExpression, callee→arguments)",
+                    "(MemberExpression, object→property)",
+                ],
             ),
             // Disagrees, thin.
             mk_shape("c", 3, &["(Rule, prelude→block)", "(Identifier, ^→$)"]),
