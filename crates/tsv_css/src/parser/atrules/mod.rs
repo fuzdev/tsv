@@ -70,9 +70,15 @@ pub(crate) fn parse_atrule<'arena>(
         return Err(parser.error_expected_after("at-rule name", "@"));
     }
 
-    // Internal AST: use decoded value (spec-compliant)
+    // Internal AST: use decoded value (spec-compliant). The name token's source
+    // span is captured too — the printer emits the name from source (escape-
+    // preserving), not from the decoded string (which may hold a raw control char).
     let name_ident = parser.current_identifier();
     let name = parser.alloc_str_in(name_ident);
+    let name_span = Span {
+        start: parser.span_pos(parser.current_start),
+        end: parser.span_pos(parser.current_end),
+    };
     parser.advance()?;
 
     parser.skip_whitespace()?;
@@ -164,6 +170,7 @@ pub(crate) fn parse_atrule<'arena>(
         parser.advance()?;
         return Ok(CssAtrule {
             name,
+            name_span,
             prelude,
             block: None,
             span: Span { start, end },
@@ -174,6 +181,7 @@ pub(crate) fn parse_atrule<'arena>(
 
     Ok(CssAtrule {
         name,
+        name_span,
         prelude,
         block,
         span: Span { start, end },

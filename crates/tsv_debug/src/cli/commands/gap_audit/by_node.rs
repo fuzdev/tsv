@@ -1,6 +1,8 @@
 //! The report-only by-(node, edge) rollup: folds the fine per-site shape tallies into a
 //! ranked, coarse emitter work-list. Split out of `gap_audit.rs` for navigability.
 
+use std::collections::{BTreeMap, BTreeSet};
+
 use crate::audit::node_edge::NodeEdgeKey;
 
 use super::Tally;
@@ -181,6 +183,198 @@ pub(super) fn report_by_node(rollup: &ByNodeRollup, json: bool) {
     }
 }
 
+/// `n/d` as tenths-of-a-percent (`9.6`), `0.0` when `d == 0` — the rank table's share column,
+/// one decimal finer than [`pct_of`] so the sub-10% head is legible. Integer math (both operands
+/// are finding counts), so no `f64` cast.
+///
+/// The last of three deliberately-distinct share formatters, each pinned to one output shape:
+/// [`pct_of`] (whole-percent `usize`, the human view), [`share_of`] (4-decimal `f64` fraction, the
+/// JSON view), and this one (one-decimal string, the markdown table). The outputs differ, so
+/// they're not unified — a fourth caller would be the moment to parameterize rather than add a
+/// fourth.
+fn tenths_pct(n: usize, d: usize) -> String {
+    let permille = if d > 0 { n * 1000 / d } else { 0 };
+    format!("{}.{}", permille / 10, permille % 10)
+}
+
+/// Print the top-`top` by-(node, edge) clusters as a **paste-ready markdown table** for
+/// TODO_GAPS §Status — the ranked emitter work-list Phase 1 reads fattest-first, so a session can
+/// refresh §Status by pasting instead of parsing `--json` and hand-transcribing. Report-only:
+/// computed after grading, it feeds neither the gate nor the exit code. Under `--json` it prints to
+/// stderr, leaving the JSON document on stdout the sole parseable output.
+pub(super) fn report_rank(rollup: &ByNodeRollup, top: usize, json: bool) {
+    let n = top.min(rollup.clusters.len());
+    let mut lines: Vec<String> = Vec::new();
+    lines.push(format!(
+        "\n**Top {n} by-(node, edge) clusters** ({} findings / {} shapes / {} clusters):\n",
+        rollup.grand_total,
+        rollup.total_shapes,
+        rollup.clusters.len()
+    ));
+    lines.push("| # | cluster | hits | shapes | share |".to_string());
+    lines.push("| ---: | --- | ---: | ---: | ---: |".to_string());
+    for (i, c) in rollup.clusters.iter().take(n).enumerate() {
+        lines.push(format!(
+            "| {} | `{}` | {} | {} | {}% |",
+            i + 1,
+            c.key,
+            c.hits,
+            c.shapes,
+            tenths_pct(c.hits, rollup.grand_total)
+        ));
+    }
+    let top_hits: usize = rollup.clusters.iter().take(n).map(|c| c.hits).sum();
+    lines.push(format!(
+        "\ntop-{n} clusters cover {top_hits}/{} findings ({}%) · regenerate via `deno task gaps:audit:rank`",
+        rollup.grand_total,
+        pct_of(top_hits, rollup.grand_total)
+    ));
+
+    let out = lines.join("\n");
+    if json {
+        eprintln!("{out}");
+    } else {
+        println!("{out}");
+    }
+}
+
+/// Load a prior `gap_audit --json` output's `by_node` array into `(node, edge) → hits`.
+///
+/// `None` on any failure — unreadable path, invalid JSON, or no `by_node` array — each already
+/// WARNED to stderr; `Some(map)` on a successful load, which may legitimately be **empty** (a
+/// `--json` run over a corpus with zero clusters). Report-only, so a bad `--since` path must never
+/// fail the gate or the exit code, only skip the diff. The `Some(empty)` / `None` split is why the
+/// caller can't collapse both to "empty map" — an empty-but-valid baseline still yields a diff
+/// (every current cluster reads as new).
+fn load_since_baseline(path: &str) -> Option<BTreeMap<(String, String), usize>> {
+    let text = match std::fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("warning: --since: cannot read {path} ({e}); skipping the ranking diff");
+            return None;
+        }
+    };
+    let value: serde_json::Value = match serde_json::from_str(&text) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!(
+                "warning: --since: {path} is not valid JSON ({e}); skipping the ranking diff"
+            );
+            return None;
+        }
+    };
+    let Some(arr) = value.get("by_node").and_then(serde_json::Value::as_array) else {
+        eprintln!(
+            "warning: --since: {path} has no `by_node` array (was it produced by \
+             `gap_audit --json`?); skipping the ranking diff"
+        );
+        return None;
+    };
+    Some(
+        arr.iter()
+            .filter_map(|c| {
+                let node = c.get("node")?.as_str()?.to_string();
+                let edge = c.get("edge")?.as_str()?.to_string();
+                let hits = usize::try_from(c.get("hits")?.as_u64()?).ok()?;
+                Some(((node, edge), hits))
+            })
+            .collect(),
+    )
+}
+
+/// One changed-cluster row in the ranking diff.
+#[derive(Debug, PartialEq)]
+struct Mover {
+    /// The `(node, edge)` cluster key.
+    key: (String, String),
+    /// Hit count in the baseline (0 when the cluster is new).
+    then: usize,
+    /// Hit count in this run (0 when the cluster is gone).
+    now: usize,
+    /// `now - then` — negative is the burn-down's win, positive a regression.
+    delta: isize,
+}
+
+/// A runaway guard on the printed mover list — a slice moves a handful of clusters, so this only
+/// trips on a stale/mismatched baseline. Not `--top`: `--top` sizes the `--rank` table, while a
+/// diff wants EVERY changed cluster (a hidden regression would defeat the purpose).
+const SINCE_MOVER_CAP: usize = 80;
+
+/// The changed-cluster rows for the ranking diff: for every `(node, edge)` in EITHER map whose hit
+/// count differs, `(key, then, now, delta)` — a cluster absent from one side reads as 0 there (gone
+/// → `n → 0`, new → `0 → n`), an unchanged cluster is dropped. Sorted biggest-reduction-first
+/// (delta ascending — the burn-down's win at the top, regressions at the bottom), ties broken by
+/// key so the diff is deterministic. Pure, so it unit-tests without touching stdout.
+fn since_movers(
+    now: &BTreeMap<(String, String), usize>,
+    baseline: &BTreeMap<(String, String), usize>,
+) -> Vec<Mover> {
+    let mut keys: BTreeSet<(String, String)> = now.keys().cloned().collect();
+    keys.extend(baseline.keys().cloned());
+    let mut movers: Vec<Mover> = keys
+        .into_iter()
+        .filter_map(|k| {
+            let then = baseline.get(&k).copied().unwrap_or(0);
+            let now_hits = now.get(&k).copied().unwrap_or(0);
+            let delta = now_hits as isize - then as isize;
+            (delta != 0).then_some(Mover {
+                key: k,
+                then,
+                now: now_hits,
+                delta,
+            })
+        })
+        .collect();
+    movers.sort_by(|a, b| a.delta.cmp(&b.delta).then_with(|| a.key.cmp(&b.key)));
+    movers
+}
+
+/// Print the per-cluster ranking DELTA of this run against a prior `--json` baseline — "did my
+/// slice move the cluster?" (`(CallExpression, arguments→$)  2861 → 2790  (−71)`). Only clusters
+/// whose hit count CHANGED are listed, biggest reduction first (the burn-down's win at the top),
+/// then the biggest regressions; a cluster gone to zero or newly appearing is shown against 0.
+/// EVERY changed cluster is shown (capped only by [`SINCE_MOVER_CAP`], a runaway guard, not by
+/// `--top`). Report-only: a bad baseline warns and skips (see [`load_since_baseline`]), never
+/// failing the gate. Under `--json` it prints to stderr.
+pub(super) fn report_since(rollup: &ByNodeRollup, path: &str, json: bool) {
+    let Some(baseline) = load_since_baseline(path) else {
+        return; // the loader already warned
+    };
+    let now: BTreeMap<(String, String), usize> = rollup
+        .clusters
+        .iter()
+        .map(|c| ((c.key.node_type.clone(), c.key.edge.clone()), c.hits))
+        .collect();
+    let movers = since_movers(&now, &baseline);
+
+    let mut lines: Vec<String> = Vec::new();
+    let net: isize = movers.iter().map(|m| m.delta).sum();
+    lines.push(format!(
+        "\nranking diff vs {path} — {} cluster(s) changed (net {net:+} findings):",
+        movers.len()
+    ));
+    for m in movers.iter().take(SINCE_MOVER_CAP) {
+        let (node, edge) = &m.key;
+        lines.push(format!(
+            "  ({node}, {edge})  {} → {}  ({:+})",
+            m.then, m.now, m.delta
+        ));
+    }
+    if movers.len() > SINCE_MOVER_CAP {
+        lines.push(format!("  … and {} more", movers.len() - SINCE_MOVER_CAP));
+    }
+    if movers.is_empty() {
+        lines.push("  (no cluster moved — identical ranking)".to_string());
+    }
+
+    let out = lines.join("\n");
+    if json {
+        eprintln!("{out}");
+    } else {
+        println!("{out}");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::{Hit, Kind, Payload};
@@ -258,5 +452,69 @@ mod tests {
         assert!(approx(share_of(1, 3), 0.3333));
         assert!(approx(share_of(2, 4), 0.5));
         assert_eq!(pct_of(1, 3), 33);
+    }
+
+    /// `tenths_pct` renders one decimal and guards the zero denominator — the rank table's share.
+    #[test]
+    fn tenths_pct_one_decimal_and_zero_guard() {
+        assert_eq!(tenths_pct(2861, 29811), "9.5"); // 9.597% truncates to 9.5
+        assert_eq!(tenths_pct(0, 0), "0.0");
+        assert_eq!(tenths_pct(1, 3), "33.3"); // 33.33%
+        assert_eq!(tenths_pct(1, 1), "100.0");
+    }
+
+    fn cluster(node: &str, edge: &str, hits: usize) -> ((String, String), usize) {
+        ((node.to_string(), edge.to_string()), hits)
+    }
+
+    fn mover(node: &str, edge: &str, then: usize, now: usize, delta: isize) -> Mover {
+        Mover {
+            key: (node.to_string(), edge.to_string()),
+            then,
+            now,
+            delta,
+        }
+    }
+
+    /// The `--since` diff: an unchanged cluster is dropped, a gone one reads `n → 0`, a new one
+    /// `0 → n`, and the rows sort biggest-reduction-first with `net = Σ delta`. This is exactly the
+    /// logic the `--top`/`--since` doc mismatch would have slipped past — pinned here.
+    #[test]
+    fn since_movers_diffs_gone_new_unchanged_and_sorts() {
+        let baseline: BTreeMap<(String, String), usize> = [
+            cluster("Call", "a→$", 100), // reduced −20
+            cluster("Arr", "e→$", 50),   // increased +40
+            cluster("Gone", "x→y", 7),   // absent now → 0
+            cluster("Same", "s→$", 12),  // unchanged → dropped
+        ]
+        .into_iter()
+        .collect();
+        let now: BTreeMap<(String, String), usize> = [
+            cluster("Call", "a→$", 80),
+            cluster("Arr", "e→$", 90),
+            cluster("New", "n→$", 5), // absent in baseline → new
+            cluster("Same", "s→$", 12),
+        ]
+        .into_iter()
+        .collect();
+
+        let movers = since_movers(&now, &baseline);
+        // Four moved; "Same" (unchanged) is excluded.
+        assert_eq!(movers.len(), 4);
+        // Biggest reduction first: Call (−20), Gone (−7), then New (+5), Arr (+40).
+        assert_eq!(movers[0], mover("Call", "a→$", 100, 80, -20));
+        assert_eq!(movers[1], mover("Gone", "x→y", 7, 0, -7));
+        assert_eq!(movers[2], mover("New", "n→$", 0, 5, 5));
+        assert_eq!(movers[3], mover("Arr", "e→$", 50, 90, 40));
+        let net: isize = movers.iter().map(|m| m.delta).sum();
+        assert_eq!(net, 18); // −20 −7 +5 +40
+    }
+
+    /// Identical maps yield no movers (the "no cluster moved" path).
+    #[test]
+    fn since_movers_empty_when_identical() {
+        let m: BTreeMap<(String, String), usize> =
+            [cluster("Call", "a→$", 100)].into_iter().collect();
+        assert!(since_movers(&m, &m).is_empty());
     }
 }

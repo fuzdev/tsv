@@ -42,18 +42,16 @@ pub(super) fn is_only_whitespace_and_comments(text: &str) -> bool {
 
 impl<'a> Printer<'a> {
     /// Emit the ` as <binding>` tail of a namespace binding (`* as ns`), starting
-    /// just past the `*`. Preserves a comment in the `*`→`as` gap and the `as`→binding
-    /// gap in place. `star_end` is the position just past `*`; `binding` is the
+    /// just past the `*`. `star_end` is the position just past `*`; `binding` is the
     /// namespace name (`exported` for a re-export — which may be a string,
     /// `export * as 'str' from` — or `local` for an import, always an identifier).
     ///
-    /// Both gaps route through the shared header-gap helper, so a *line* comment in
-    /// either indents its continuation one level and a block comment trails inline.
-    /// In the `*`→`as` gap that matches prettier's freedom (it relocates the comment
-    /// after `as`). In the `as`→binding gap it is a deliberate indent-only divergence:
-    /// prettier keeps the comment in place but flattens the binding (`* as // c\nns`),
-    /// while tsv indents it for uniformity with the sibling gaps — and the forced
-    /// hardline also avoids pulling the binding onto the comment line. See
+    /// Delegates to the shared [`Self::build_as_binding_continuation`]: a *line*
+    /// comment in the `*`→`as` gap or the `as`→binding gap stays in place and indents
+    /// its continuation one level, and a block comment trails inline. In the `*`→`as`
+    /// gap that matches prettier's freedom (it relocates the comment after `as`); in
+    /// the `as`→binding gap it is a deliberate indent-only divergence (prettier keeps
+    /// the comment in place but flattens the binding, `* as // c\nns`). See
     /// conformance_prettier.md §Comment relocation.
     pub(super) fn append_namespace_as_binding(
         &self,
@@ -61,11 +59,30 @@ impl<'a> Printer<'a> {
         star_end: u32,
         binding: &internal::ModuleExportName<'_>,
     ) {
+        parts.push(self.build_as_binding_continuation(star_end, binding));
+    }
+
+    /// Build the ` as <binding>` continuation shared by the namespace `*`→`as` binding
+    /// ([`Self::append_namespace_as_binding`]) and the renamed named-specifier `a as b`
+    /// rename ([`Self::build_renamed_specifier_doc`]) — the two differ only in what
+    /// precedes `as` (a `*`, or the `imported`/`local` name), so both route their
+    /// `as`-gap comments here. Starting just past `left_end`, locate `as`, then build
+    /// ` as ` + the `as`→binding gap continuation: a *line* comment in the `left`→`as`
+    /// gap or the `as`→binding gap stays where the author wrote it and drops its tail
+    /// one indent level (so a `//` can't swallow the `as` or the binding), while a block
+    /// comment trails inline. Both gaps route through the same preserve-in-place
+    /// header-gap helpers the rest of the module header uses. See conformance_prettier.md
+    /// §Uniform Forced-Continuation Indent and §Comment relocation.
+    pub(super) fn build_as_binding_continuation(
+        &self,
+        left_end: u32,
+        binding: &internal::ModuleExportName<'_>,
+    ) -> DocId {
         let d = self.d();
         let binding_start = binding.span().start;
-        let as_pos = self.find_keyword_in_range(star_end, binding_start, "as");
-        // `as` + the `as`→binding gap (line comment indents the binding, block trails
-        // inline) + the binding name. The `as ` token supplies the leading space.
+        let as_pos = self.find_keyword_in_range(left_end, binding_start, "as");
+        // `as ` + the `as`→binding gap (line comment indents the binding, block trails
+        // inline) + the binding name. The `as ` token supplies the trailing space.
         let as_end = as_pos.map_or(binding_start, |p| p + "as".len() as u32);
         let as_clause = d.concat(&[
             d.text("as "),
@@ -75,10 +92,10 @@ impl<'a> Printer<'a> {
                 self.build_module_export_name_doc(binding),
             ),
         ]);
-        // `*`→`as` gap, preserved in place; the leading space comes from the helper
-        // (the preceding `*` has no trailing space).
+        // `left`→`as` gap, preserved in place; the leading space comes from the helper
+        // (the preceding `*`/name has no trailing space).
         let gap_end = as_pos.unwrap_or(binding_start);
-        parts.push(self.gap_comment_indented_continuation(star_end, gap_end, as_clause));
+        self.gap_comment_indented_continuation(left_end, gap_end, as_clause)
     }
 
     /// The comment-and-continuation tail of a preserved header gap, *without* a
