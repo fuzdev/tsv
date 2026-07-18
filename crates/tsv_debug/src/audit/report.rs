@@ -303,7 +303,15 @@ pub(crate) fn print_report(s: &RunSummary, findings: &[Finding]) {
     }
 }
 
-pub(crate) fn print_json(s: &RunSummary, findings: &[Finding]) {
+/// Print the findings as JSON, folding in any audit-specific **top-level** sections `extra`
+/// carries (the run-level per-audit detail slot the module docs flag as future work — gap uses
+/// it for its report-only `by_node` / `agreement` rollup). An empty `extra` reproduces the bare
+/// envelope byte-for-byte, so an audit with nothing to add passes `&Map::new()`.
+pub(crate) fn print_json(
+    s: &RunSummary,
+    findings: &[Finding],
+    extra: &serde_json::Map<String, Value>,
+) {
     let shapes: Vec<Value> = findings
         .iter()
         .map(|f| {
@@ -339,7 +347,7 @@ pub(crate) fn print_json(s: &RunSummary, findings: &[Finding]) {
             })
         })
         .collect();
-    let out = serde_json::json!({
+    let mut out = serde_json::json!({
         "files": s.files_done,
         "sites": s.sites,
         "injections": s.injections,
@@ -350,6 +358,13 @@ pub(crate) fn print_json(s: &RunSummary, findings: &[Finding]) {
         "findings": findings.iter().map(Finding::count).sum::<usize>(),
         "shapes": shapes,
     });
+    // Fold the audit's own top-level sections in beside the envelope's. `out` is the object
+    // literal above, so this branch is always taken — a defensive match, not a real fork.
+    if let Value::Object(map) = &mut out {
+        for (k, v) in extra {
+            map.insert(k.clone(), v.clone());
+        }
+    }
     println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
 }
 

@@ -25,7 +25,7 @@ deno task gaps:audit           # the gate: tests/fixtures, ~17 s
 deno task gaps:audit:update    # regenerate the snapshot after fixing a shape
 
 # Directly, against a real codebase — where the real yield is:
-cargo run --profile corpus -p tsv_debug --features comment_check gap_audit ~/dev/zzz/src
+cargo run --profile corpus -p tsv_debug --features audits gap_audit ~/dev/zzz/src
 ```
 
 Build with **`--profile corpus`** (release + `panic = "unwind"`). Plain `--release` is
@@ -145,6 +145,38 @@ It is **report-only** — it never changes the ratchet grade or the exit code. T
 totals are a worst-first **approximation**: each shape's whole count is attributed to its one
 canonical example's `(node, edge)`, so a generic shape occurring in several structural contexts
 lands wholly in one, rather than being split per site.
+
+#### Attribution agreement — how trustworthy the ranking is
+
+That approximation is now **measured**, so a burn-down doesn't commit to the ranking on faith.
+Both the `--json` output and the human `--by-node` view key **every** kept example (not just the
+canonical one) and report whether all of a shape's examples land on one cluster. `--json` carries
+two additive top-level sections:
+
+- **`by_node`** — the ranked cluster work-list, one `{node, edge, hits, shapes, share,
+  example_shape}` per cluster, hits-descending. This is what per-slice tooling reads to ask "did
+  my fix move the cluster?".
+- **`agreement`** — `{shapes_agreeing, shapes_total, shapes_agreeing_share, hits_agreeing,
+  hits_total, hits_agreeing_share, unresolved_shapes, unresolved_count, top_disagreers}`, where
+  each `top_disagreers` entry is `{kind, shape, hits, clusters}` — the fattest shapes whose kept
+  examples span more than one cluster, which is exactly where the canonical-attribution error
+  concentrates.
+
+Measured over `tests/fixtures`: **91% of shapes agree unweighted (603/662) but only 77%
+hit-weighted (22905/29811)**, with **zero** unresolved. The gap is not spread across the corpus —
+a dozen *generic* shapes carry almost all of it, led by whitespace-only `␣⟨⟩␣` (3973 hits, ~58%
+of the whole disagreeing total) splitting `(CallExpression, arguments→$)` against
+`(Property, key→value)`. The long tail of specific-token shapes is homogeneous; the fat, generic
+shapes are not.
+
+**Verdict — the canonical-example rollup is trustworthy for the tail but MIS-RANKS the headline.**
+The disagreement lands precisely on the highest-hit shapes a burn-down order reads off, so the
+top of the ranking carries thousands-of-hits error bars. The trustworthy fix is **record-time
+keying**: key each finding by its own attribution offset *as it is recorded* (one wire parse per
+seed — already done for Svelte's `code_regions` — plus a `node_edge_key` walk per hit), tallying
+`(node, edge)` clusters exactly, instead of approximating from one canonical example post-hoc.
+Until then, treat the cluster ranking as a coarse guide and cross-check a candidate emitter
+against the `agreement` disagreers before committing a slice to it.
 
 ### `UNCONFIRMED` / `PARTIAL`
 
