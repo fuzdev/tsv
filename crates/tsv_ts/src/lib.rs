@@ -665,6 +665,26 @@ pub fn build_expression_doc_with_comments(
     printer.build_expression_doc(expression)
 }
 
+/// Build a DocId for a single comment (`/* … */` / `// …`) in the caller's arena,
+/// through the same rendering the standalone TS printer uses.
+///
+/// A multi-line block comment reindents to context and propagates its break via a
+/// `MultilineText` node, identically to an owned leading comment
+/// (`prepend_owned_leading_comment`). `tsv_svelte` uses it for a *non-owned* leading
+/// comment in a directive-value gap (`bind:value={/* c⏎*/ (a > b)}`): a discarded
+/// grouping `(` leaves the comment positional rather than owned, so the gap emits it —
+/// and a multi-line block there must force the same expansion the bare (owned)
+/// authoring takes, which the gap's plain source-span emitter cannot. `EmbedContext`
+/// is irrelevant to comment rendering, so it is not exposed (a default is used).
+pub fn build_comment_doc(
+    arena: &DocArena,
+    comment: &ast::Comment,
+    inputs: &PrinterInputs<'_>,
+) -> DocId {
+    let printer = make_doc_printer(arena, inputs, EmbedContext::default());
+    printer.build_comment_doc(comment)
+}
+
 /// Build a DocId for a function parameter list (`(…)`) with comments, in the caller's arena.
 ///
 /// Routes each parameter through the same comment-aware, `FunctionParameter`-context

@@ -417,9 +417,10 @@ install); Bun for `bench:bun`. The aggregate `deno task bench` needs both and
 fails fast if either is missing; run the per-runtime tasks for the ones you have.
 
 Compares: canonical (prettier + svelte/compiler), native (FFI under Deno / N-API under Node
-and Bun), WASM, and alternatives (oxc-parser, oxfmt, biome-wasm). Each runtime's results save
-to `benches/js/results/report.<runtime>.{json,md}` (committed; every row carries a `runtime`
-field), plus the combined `report.{json,md}`. To publish to tsv.fuz.dev: `npm run update-benchmarks` in ~/dev/tsv.fuz.dev. See
+and Bun), WASM, and alternatives (oxc-parser, oxfmt, biome-wasm, and dprint-wasm —
+`dprint-plugin-typescript`, the engine `deno fmt` runs, TS/JS only). Each runtime's
+results save to `benches/js/results/report.<runtime>.{json,md}` (committed; every row
+carries a `runtime` field), plus the combined `report.{json,md}`. To publish to tsv.fuz.dev: `npm run update-benchmarks` in ~/dev/tsv.fuz.dev. See
 ./benches/js/CLAUDE.md.
 
 ### Performance Profiling

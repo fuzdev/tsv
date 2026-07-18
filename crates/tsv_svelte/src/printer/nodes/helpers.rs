@@ -172,15 +172,24 @@ pub(super) fn indent_body(printer: &Printer<'_>, body_doc: DocId, has_leading_ws
 }
 
 impl<'a> Printer<'a> {
+    /// Collect the leading-comment run in `[from, to)` — one doc per comment via
+    /// [`build_leading_js_comment_doc`](Self::build_leading_js_comment_doc), so every
+    /// leading-comment site (directive/tag values, block heads, `{@const}` init,
+    /// braced attribute expressions, destructure patterns) flows through the one
+    /// emitter that reindents+breaks a multi-line block. Empty when the range holds
+    /// none. Callers concat it, or `extend` an in-progress buffer with it.
+    pub(in crate::printer) fn leading_comment_docs(&self, from: u32, to: u32) -> DocBuf {
+        comments_to_emit_in_range(self.comments, from, to)
+            .map(|c| self.build_leading_js_comment_doc(c))
+            .collect()
+    }
+
     /// Emit every comment in `[start, end)` in **leading** style: a block comment as
     /// `/* … */ ` (inline, trailing space); a line comment as `// …` + `hardline` (a `//`
     /// runs to end of line, so the following token drops to the next line to avoid
     /// swallowing it). Empty doc when the range holds no comments.
     fn build_pattern_leading_comments(&self, start: u32, end: u32) -> DocId {
-        let docs: DocBuf = comments_to_emit_in_range(self.comments, start, end)
-            .map(|c| self.build_leading_js_comment_doc(c))
-            .collect();
-        self.d().concat(&docs)
+        self.d().concat(&self.leading_comment_docs(start, end))
     }
 
     /// Emit every comment in `[start, end)` in **trailing** style: a block comment as
@@ -559,9 +568,7 @@ impl<'a> Printer<'a> {
         let expr_end = expr.span().end;
 
         // Build docs for leading comments (between span_start and expression start)
-        let leading_docs: DocBuf = comments_to_emit_in_range(self.comments, span_start, expr_start)
-            .map(|c| self.build_leading_js_comment_doc(c))
-            .collect();
+        let leading_docs = self.leading_comment_docs(span_start, expr_start);
 
         // Embed for embedded expression context: binary chains use ContinuationIndent style.
         // first_line_offset estimates the column position for width calculations.
@@ -617,9 +624,7 @@ impl<'a> Printer<'a> {
         let expr_end = expr.span().end;
 
         // Build docs for leading comments
-        let leading_docs: DocBuf = comments_to_emit_in_range(self.comments, span_start, expr_start)
-            .map(|c| self.build_leading_js_comment_doc(c))
-            .collect();
+        let leading_docs = self.leading_comment_docs(span_start, expr_start);
 
         // In multiline contexts, set up embedded expression context so binary chains
         // use ContinuationIndent style. first_line_offset estimates the column position.
