@@ -219,9 +219,16 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         Ok(())
     }
 
-    /// Advance the lexer to a specific position in the source.
-    /// Used when we've manually scanned ahead (e.g., for {@attach} parsing).
-    /// Preserves the current `inside_tag` state for correct tokenization.
+    /// Advance the lexer to a specific position in the source, used after a manual byte
+    /// scan (e.g. `{@attach}` / RCDATA / raw-text parsing).
+    ///
+    /// Preserves the current `inside_tag` state. ⚠️ After a scan that jumped the cursor
+    /// forward, that state is a **stale** artifact of wherever the lexer's last token
+    /// happened to land (the scan ignored it), so "preserve" gives the right mode only
+    /// when `pos` resumes adjacent to that token, or when the mode genuinely carries (an
+    /// `{expr}` tag, a JS comment, a mid-tag attribute resync). A caller resuming into a
+    /// KNOWN mode past an unrelated token must set `self.lexer.inside_tag` explicitly
+    /// first — see `parse_rcdata_content`, which forces template mode after `</textarea>`.
     pub(crate) fn advance_to_position(&mut self, pos: usize) -> Result<(), ParseError> {
         // Save the inside_tag state before creating new lexer
         let was_inside_tag = self.lexer.inside_tag;
