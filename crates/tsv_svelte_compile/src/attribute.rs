@@ -291,11 +291,6 @@ fn emit_dynamic_attribute<'arena>(
 ) -> Result<(), CompileError> {
     // Event handlers (`on*` single-expression attributes) are dropped in
     // `emit_attribute` before dispatch, so they never reach here.
-    // The `$.attr` family interleaves minted (appendix) and borrowed (host)
-    // argument spans; with host comments present their windows would sweep.
-    if env.has_comments {
-        return Err(unsupported(Refusal::CommentsAlongsideExprAttributes));
-    }
     // The template borrow point. Both shape predicates below read the node's
     // variant, so they must see the ERASED one: `class={'a' as string}` is a
     // string literal to the oracle (inline-literal path), and a `TSAsExpression`
@@ -445,9 +440,6 @@ fn emit_mixed_attribute<'arena>(
 ) -> Result<(), CompileError> {
     // Event attributes (RAW name starting `on`) are refused by the dispatch in
     // `emit_attribute` before this is reached.
-    if env.has_comments {
-        return Err(unsupported(Refusal::CommentsAlongsideExprAttributes));
-    }
     if (name == "class" || name == "style") && env.scope.is_some() {
         return Err(unsupported(Refusal::InterpolatedAttrOnStyled {
             name: name.to_string(),
@@ -845,13 +837,6 @@ pub(crate) fn emit_class_directives<'arena>(
     out: &mut BodyBuilder<'arena>,
     element_scoped: bool,
 ) -> Result<(), CompileError> {
-    // The synthetic `$.attr_class` call interleaves minted (appendix) and borrowed
-    // (host) argument spans; with carried script comments their windows would
-    // sweep — refuse, matching the dynamic-attribute path.
-    if env.has_comments {
-        return Err(unsupported(Refusal::CommentsAlongsideExprAttributes));
-    }
-
     let base = build_class_base(env, class_attr)?;
     let base_is_string = matches!(base, ClassBase::StringLiteral(_));
 
@@ -1108,13 +1093,6 @@ pub(crate) fn emit_style_directives<'arena>(
     style_directives: &[&'arena StyleDirective<'arena>],
     out: &mut BodyBuilder<'arena>,
 ) -> Result<(), CompileError> {
-    // The synthetic `$.attr_style` call interleaves minted (appendix) and borrowed
-    // (host) argument spans; with carried script comments their windows would
-    // sweep — refuse, matching the dynamic-attribute path.
-    if env.has_comments {
-        return Err(unsupported(Refusal::CommentsAlongsideExprAttributes));
-    }
-
     let base = build_style_base(env, style_attr)?;
     let directives = build_style_directives_arg(env, style_directives)?;
 
@@ -1284,9 +1262,6 @@ pub(crate) fn validate_dynamic_bind<'arena>(
 }
 
 /// Build and push `$.attr(name, value[, true])` for a synthesized bind attribute.
-/// The synthetic call interleaves minted (appendix) and borrowed (host) argument
-/// spans; with carried script comments their windows would sweep — refuse,
-/// matching the dynamic-attribute path.
 fn push_bind_attr<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     name: &str,
@@ -1294,9 +1269,6 @@ fn push_bind_attr<'arena>(
     boolean: bool,
     out: &mut BodyBuilder<'arena>,
 ) -> Result<(), CompileError> {
-    if env.has_comments {
-        return Err(unsupported(Refusal::CommentsAlongsideExprAttributes));
-    }
     let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(env.b.arena);
     args.push(env.b.string_literal_expr(name));
     args.push(value);

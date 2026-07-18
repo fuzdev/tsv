@@ -249,15 +249,6 @@ pub enum Refusal {
          (the oracle re-anchors comments inside the split)"
     )]
     CommentsAlongsideMultiDeclarator,
-    /// Comments alongside hoisted imports.
-    #[error(
-        "comments in a script alongside imports \
-         (placement around hoisted imports not carried through yet)"
-    )]
-    CommentsAlongsideImports,
-    /// Comments alongside template blocks.
-    #[error("comments in a script alongside template blocks (placement not carried through yet)")]
-    CommentsAlongsideTemplateBlocks,
     /// Comments in a script that uses `$derived`.
     #[error("comments in a script that uses $derived (not carried through yet)")]
     CommentsWithDerived,
@@ -297,18 +288,16 @@ pub enum Refusal {
     /// sweep those synthetic spans — a safe over-refusal.
     #[error("comments in a script with a $bindable() prop default")]
     CommentsWithBindable,
-    /// Comments alongside expression-valued attributes.
-    #[error("comments in a script alongside expression-valued attributes")]
-    CommentsAlongsideExprAttributes,
     /// Comments alongside a `$$slots` reference (the injected
     /// `sanitize_slots` first statement would sweep the comment windows).
     #[error("comments in a script with a $$slots reference (injected sanitize_slots)")]
     CommentsWithSlots,
-    /// Comments alongside a component invocation (the component call's minted
-    /// object-literal / borrowed prop-value spans would sweep the comment
-    /// windows).
-    #[error("comments in a script alongside a component invocation")]
-    CommentsWithComponent,
+    /// A multi-line block comment in the script (the oracle re-indents its
+    /// interior lines to the emit position; tsv carries them verbatim).
+    #[error(
+        "multi-line block comment in script (interior-line re-indentation not carried through)"
+    )]
+    MultilineBlockComment,
     /// A `format-ignore` directive comment in the script.
     #[error("format-ignore directive comment in script")]
     FormatIgnoreComment,
@@ -817,12 +806,6 @@ impl Refusal {
             Self::CommentsAlongsideMultiDeclarator => Cow::Borrowed(
                 "comments in a script alongside a multi-declarator declaration (the oracle re-anchors comments inside the split)",
             ),
-            Self::CommentsAlongsideImports => Cow::Borrowed(
-                "comments in a script alongside imports (placement around hoisted imports not carried through yet)",
-            ),
-            Self::CommentsAlongsideTemplateBlocks => Cow::Borrowed(
-                "comments in a script alongside template blocks (placement not carried through yet)",
-            ),
             Self::CommentsWithDerived => {
                 Cow::Borrowed("comments in a script that uses $derived (not carried through yet)")
             }
@@ -853,15 +836,12 @@ impl Refusal {
             Self::CommentsWithBindable => {
                 Cow::Borrowed("comments in a script with a $bindable() prop default")
             }
-            Self::CommentsAlongsideExprAttributes => {
-                Cow::Borrowed("comments in a script alongside expression-valued attributes")
-            }
             Self::CommentsWithSlots => Cow::Borrowed(
                 "comments in a script with a $$slots reference (injected sanitize_slots)",
             ),
-            Self::CommentsWithComponent => {
-                Cow::Borrowed("comments in a script alongside a component invocation")
-            }
+            Self::MultilineBlockComment => Cow::Borrowed(
+                "multi-line block comment in script (interior-line re-indentation not carried through)",
+            ),
             Self::FormatIgnoreComment => Cow::Borrowed("format-ignore directive comment in script"),
             Self::TemplateComments => Cow::Borrowed(
                 "template comments (only instance-script comments are carried through)",

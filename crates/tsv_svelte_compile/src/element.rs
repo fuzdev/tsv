@@ -20,7 +20,6 @@ use tsv_ts::ast::internal::{
 };
 
 use crate::analyze::{BindingKind, evaluate, stringify_value};
-use crate::attr_refs::fragment_any;
 use crate::attribute::{
     build_bind_object_property, build_spread_class_object, build_spread_object_property,
     build_spread_style_object, emit_attribute, emit_bind_directive, emit_class_directives,
@@ -513,8 +512,9 @@ fn build_element_spread_object<'arena>(
                 let argument = wrap_value_expr(env, expr)?[0].clone();
                 let argument_alloc = arena.alloc(argument);
                 // The span is the borrowed argument's — the printer emits `...`
-                // statically and its comment windows over this span are empty
-                // (comments refuse before we reach here).
+                // statically and its comment windows over this template-region span
+                // are empty (a carried script comment lives before the last surviving
+                // statement, so it never falls in a template-region window).
                 properties.push(ObjectProperty::SpreadElement(SpreadElement {
                     argument: argument_alloc,
                     span: argument_alloc.span(),
@@ -650,13 +650,6 @@ fn emit_spread_attributes<'arena>(
                 return Err(unsupported(Refusal::NonPlainAttribute));
             }
         }
-    }
-
-    // The synthetic `$.attributes` call interleaves minted (appendix) and borrowed
-    // (host) argument spans; with carried script comments their windows would sweep
-    // — refuse, matching the `$.attr` family.
-    if env.has_comments {
-        return Err(unsupported(Refusal::CommentsAlongsideExprAttributes));
     }
 
     // Whether the element is CSS-scoped (the caller supplies the lookup: a regular
@@ -1484,16 +1477,4 @@ fn build_component_mixed_value<'arena>(
         return Ok(env.b.string_literal_expr(&raw));
     }
     Ok(env.b.template_literal(&texts, exprs.into_bump_slice()))
-}
-
-/// Recursively test whether a fragment contains a component (`<Foo … />`) — the
-/// comments+component refusal gate. Rides the shared child-fragment seam
-/// ([`fragment_any`]).
-pub(crate) fn fragment_has_component(fragment: &Fragment<'_>) -> bool {
-    fragment_any(fragment, &|node| {
-        matches!(
-            node,
-            FragmentNode::Element(element) if element.kind == ElementKind::Component
-        )
-    })
 }

@@ -47,17 +47,32 @@ pub(crate) fn collect_script_comments(
         return Err(unsupported(Refusal::TemplateComments));
     };
     let content = script.content.span;
-    // The statement bounds are read from the ERASED body: an erased statement
-    // prints nothing, so the printer's first/last emitted statement is the first
-    // and last *surviving* one.
+    // A carried comment is placed as a leading comment of a *surviving body*
+    // statement — one that prints in the component function from source. An
+    // `import` hoists to a separate module-scope program (comment-free), and a
+    // statement-position `$effect`/`$inspect` drops, so neither can anchor a
+    // comment. The bound is therefore the last SURVIVING statement's end (not the
+    // erased body's last, which may be a trailing dropped `$effect`), defaulting to
+    // `content.start` when nothing survives (an import-only script).
     //
-    // A comment after the LAST script statement diverges: the oracle's printer
-    // re-attaches it as a leading comment of the next emitted node (inside the
-    // template's `$.escape(…)` argument), a placement this transform can't
-    // reproduce — refuse the class.
+    // A comment at or past that bound has no surviving anchor: the oracle
+    // re-attaches it into the template (a leading comment of the next emitted node,
+    // inside a `$.escape(…)` argument / a component prop object / an `{#if}`
+    // condition), a placement this transform can't reproduce — refuse the class.
+    let survives = |stmt: &Statement<'_>| match stmt {
+        Statement::ImportDeclaration(_) => false,
+        Statement::ExpressionStatement(expr_stmt) => {
+            is_effect_call(&expr_stmt.expression, source).is_none()
+                && is_inspect_call(&expr_stmt.expression, source).is_none()
+        }
+        _ => true,
+    };
     let last_stmt_end = instance_body
-        .last()
-        .map_or(content.start, |stmt| stmt.span().end);
+        .iter()
+        .filter(|stmt| survives(stmt))
+        .map(|stmt| stmt.span().end)
+        .max()
+        .unwrap_or(content.start);
     // A leading comment glued to the `<script>` line (no newline before it) shares
     // its source line with the function's synthetic opening brace, so the printer
     // trails it after the `{` instead of onto its own line — refuse the class
@@ -73,6 +88,13 @@ pub(crate) fn collect_script_comments(
         }
         if comment.span.start >= last_stmt_end {
             return Err(unsupported(Refusal::CommentAfterLastStatement));
+        }
+        // A multi-line block comment carries verbatim, but the oracle (esrap)
+        // re-indents its interior lines to the emit position, so the two diverge on
+        // any interior line whose source indentation differs from the target — refuse
+        // until the printer re-indents block-comment interiors to match.
+        if comment.multiline {
+            return Err(unsupported(Refusal::MultilineBlockComment));
         }
         if comment.span.end <= first_stmt_start {
             let gap = &source[content.start as usize..comment.span.start as usize];

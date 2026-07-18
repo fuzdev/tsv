@@ -23,7 +23,7 @@ use tsv_ts::ast::internal::{
 };
 
 use crate::analyze::{NameSet, ScopeEntry, evaluate, stringify_value};
-use crate::attr_refs::{TemplateItem, each_template_item, fragment_any};
+use crate::attr_refs::{TemplateItem, each_template_item};
 use crate::blocks::{
     emit_await_block, emit_const_tag, emit_each_block, emit_if_block, emit_key_block,
     emit_svelte_head,
@@ -627,36 +627,6 @@ fn inert_bind_is_valid(kind: &SpecialElementKind<'_>, name: &str) -> bool {
         // kind, so the other arms are unreachable.)
         _ => false,
     }
-}
-
-/// Recursively test whether a fragment contains any control-flow block or
-/// `{@const}` tag (the comments+blocks refusal gate). Rides the shared
-/// child-fragment seam ([`fragment_any`]), so it descends every sub-fragment —
-/// `SpecialElement` included — like its `fragment_has_*` siblings.
-pub(crate) fn fragment_contains_block(fragment: &Fragment<'_>) -> bool {
-    fragment_any(fragment, &|node| {
-        matches!(
-            node,
-            FragmentNode::IfBlock(_)
-                | FragmentNode::EachBlock(_)
-                | FragmentNode::AwaitBlock(_)
-                | FragmentNode::KeyBlock(_)
-                | FragmentNode::ConstTag(_)
-        )
-    })
-}
-
-/// Recursively test whether a fragment contains a `{#snippet}` or `{@render}`
-/// (the comments+snippet/render refusal gate — a hoisted snippet function or a
-/// per-render flush reshapes the body in ways whose comment windows aren't
-/// probed). Rides the shared child-fragment seam ([`fragment_any`]).
-pub(crate) fn fragment_has_snippet_or_render(fragment: &Fragment<'_>) -> bool {
-    fragment_any(fragment, &|node| {
-        matches!(
-            node,
-            FragmentNode::SnippetBlock(_) | FragmentNode::RenderTag(_)
-        )
-    })
 }
 
 /// Emit a block body fragment into a fresh child body builder, prepending `pre`

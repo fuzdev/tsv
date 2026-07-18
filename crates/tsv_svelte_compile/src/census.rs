@@ -61,9 +61,12 @@
 //!   generated-name collisions, transition/animate conflicts, snippet/head hoist
 //!   order), and the component invocation refusals; and
 //! - the pipeline-inline comment-family refusals gated on `has_comments` **and** a
-//!   fragment predicate (comments alongside a block / component / `$derived` / a
-//!   multi-declarator / hoisted imports / `$$slots`, and comments inside a
-//!   rewritten rune region).
+//!   script-side condition (comments alongside a `$derived` / argument-less
+//!   `$state()` / a rest-element or non-destructured `$props()` / a `$bindable()`
+//!   default / a `$props.id()` / a `$$slots` reference / a multi-declarator, and
+//!   comments inside a rewritten rune region). The template shapes that once gated
+//!   comment carry — blocks, component invocations, expression attributes,
+//!   `{#snippet}`/`{@render}`, hoisted imports — now carry through.
 //!
 //! [`census_detected_buckets`] is the single source of truth for which
 //! [`bucket_key`](crate::Refusal::bucket_key)s the census attempts; the caller
@@ -196,6 +199,7 @@ pub fn census_detected_buckets() -> Vec<Cow<'static, str>> {
         Refusal::TemplateComments,
         Refusal::CommentAfterLastStatement,
         Refusal::LeadingCommentGluedToScript,
+        Refusal::MultilineBlockComment,
         Refusal::FormatIgnoreComment,
         Refusal::CommentsWithTemplateBeforeScript,
         // Template nodes the shared fragment seam detects (the `other =>` refusal

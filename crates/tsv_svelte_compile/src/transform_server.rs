@@ -62,12 +62,8 @@ use crate::analyze::{Bindings, NameSet, RuneInit, Scope, ScopeEntry, classify_ru
 use crate::blocks::declaration_stmt;
 use crate::build::Builder;
 use crate::css_scope::{CssScoping, analyze_style, match_scope, splice_scoped_css};
-use crate::element::fragment_has_component;
 use crate::element_census::build_census;
-use crate::fragment::{
-    BodyBuilder, FragmentCtx, emit_fragment, fragment_contains_block,
-    fragment_has_snippet_or_render,
-};
+use crate::fragment::{BodyBuilder, FragmentCtx, emit_fragment};
 use crate::needs_context::{ComponentContext, analyze_component};
 use crate::script_rewrite::{
     BindableEntry, analyze_script, collect_script_comments, document_ts_flag,
@@ -99,9 +95,6 @@ pub(crate) struct EmitEnv<'arena, 's> {
     /// post-emission no-match check, and `splice_scoped_css` consults the per-relative
     /// scoped flags). `None` when the component has no `<style>`.
     pub(crate) scope: Option<CssScoping>,
-    /// Script comments are being carried — emitters whose synthetic call
-    /// windows would sweep host comments (`$.attr` family) must refuse.
-    pub(crate) has_comments: bool,
     /// Active block-scope overlays (each items/indexes, `{:then}` values,
     /// `{@const}` bindings), innermost last.
     pub(crate) overlays: Vec<HashMap<String, ScopeEntry<'arena>>>,
@@ -375,19 +368,6 @@ fn analyze<'arena>(
     // refuse — see `collect_script_comments`.
     let script_comments = collect_script_comments(root, source, instance_body)?;
     let has_comments = !script_comments.is_empty();
-    // Comments alongside template blocks refuse: a block splits the template
-    // into multiple pushes and moves content into branch bodies, and the
-    // resulting comment-window placement is unprobed — refuse rather than risk a
-    // misplaced comment.
-    if has_comments && fragment_contains_block(&root.fragment) {
-        return Err(unsupported(Refusal::CommentsAlongsideTemplateBlocks));
-    }
-    // Comments alongside a component invocation refuse: the component call's
-    // minted object-literal / borrowed prop-value spans interleave with the
-    // carried-comment windows in unprobed ways.
-    if has_comments && fragment_has_component(&root.fragment) {
-        return Err(unsupported(Refusal::CommentsWithComponent));
-    }
 
     // Script analysis pass: the top-level binding table (evaluator input) and
     // the derived-name set (read rewriting / refusal).
@@ -422,12 +402,6 @@ fn analyze<'arena>(
         .collect();
     let instance_binding_names: NameSet = bindings.names().map(str::to_string).collect();
     let snippets = analyze_snippets(root, source, &instance_binding_names, &import_names)?;
-    // Script comments plus snippets/render reshape the component body (a hoisted
-    // function, a per-render flush) in ways whose comment windows aren't probed;
-    // refuse the combination.
-    if has_comments && fragment_has_snippet_or_render(&root.fragment) {
-        return Err(unsupported(Refusal::CommentsAlongsideTemplateBlocks));
-    }
 
     // The whole-component analysis. Computed here because the script rewrite
     // needs its `uses_slots` (the `$props()` rest injection renames its
@@ -591,12 +565,6 @@ pub(crate) fn compile_server<'arena>(
             other => body.push(other),
         }
     }
-    // A comment sitting among hoisted imports would land in the export program's
-    // comment list while its import node prints in a separate module-scope
-    // program — a placement this transform doesn't reconcile yet.
-    if has_comments && !user_imports.is_empty() {
-        return Err(unsupported(Refusal::CommentsAlongsideImports));
-    }
     // The hoisted `const <name> = $.props_id($$renderer)` is a synthetic
     // (appendix-span) first statement, so its leading comment window would sweep
     // every carried script comment — the same hazard the `$$slots` sanitize decl
@@ -679,7 +647,6 @@ pub(crate) fn compile_server<'arena>(
         derived_names,
         state_names,
         scope,
-        has_comments,
         overlays: Vec::new(),
         in_each: false,
         animate_host_span: None,

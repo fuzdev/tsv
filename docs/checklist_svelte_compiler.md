@@ -202,17 +202,28 @@ The next four are cases where the oracle's strip pass has **no visitor case**, s
 
 ### Comment placement classes
 
-Instance-script comments carry through by default. The classes where the oracle re-anchors comments in ways the span-window model can't reproduce refuse:
+Instance-script comments carry through by default, regardless of what the
+template emits: a script comment is a leading comment of a surviving script
+statement, and every template emitter (blocks, component invocations, expression
+attributes, the drop family) writes only template-region spans, which no
+script-comment window can reach. Hoisted imports are no obstacle — the oracle
+relocates every script comment down into the component body (leading the first
+surviving statement) with the imports hoisted comment-free, and tsv reproduces
+that.
 
-- **Refused**: `comment after the last script statement (the oracle re-attaches it into the template)`
+- **Supported**: comments alongside template blocks (`{#if}`/`{#each}`/`{#await}`/`{#key}`/`{@const}`), a component invocation, `{#snippet}`/`{@render}` (hoisted or body-local), expression-valued attributes (`class={c}`, `style:` / `class:` / `bind:` directives, `{...spread}`), and hoisted imports (a comment before/between/after imports relocates down to lead the first surviving statement, as the oracle does) — provided a surviving body statement exists to anchor the comment (an import-only script, or a comment after the last surviving statement, refuses; see below).
+
+The classes that still refuse are the ones where the comment has no surviving
+anchor and the oracle re-anchors it in a way the span-window model can't reproduce,
+or where a rune rewrite mints a script-region span a comment window would sweep:
+
+- **Refused**: `comment after the last script statement (the oracle re-attaches it into the template)` — also fires when a comment sits after the last *surviving* statement (imports hoist, `$effect`/`$inspect` drop), including an import-only script (nothing survives to anchor it)
 - **Refused**: `leading comment glued to the <script> line (no newline before it)`
+- **Refused**: `multi-line block comment in script (interior-line re-indentation not carried through)` — the oracle re-indents a block comment's interior lines to the emit position; tsv carries them verbatim
 - **Refused**: `comments with template markup before the script (window ordering)`
 - **Refused**: `comment inside a rewritten rune region (dropped by the transform)`
-- **Refused**: `comments in a script that uses $derived (not carried through yet)`
+- **Refused**: `comments in a script that uses $derived (not carried through yet)` — the `$.derived(() => e)` thunk wraps a **script-region** operand, so its argument-list window sweeps later script comments (a double-print); the rune rewrites below share this shape
 - **Refused**: `comments in a script with an argument-less $state()`
-- **Refused**: `comments in a script alongside imports (placement around hoisted imports not carried through yet)`
-- **Refused**: `comments in a script alongside template blocks (placement not carried through yet)`
-- **Refused**: `comments in a script alongside expression-valued attributes`
 - **Refused**: `format-ignore directive comment in script`
 - **Refused**: `template comments (only instance-script comments are carried through)`
 
@@ -292,7 +303,7 @@ A **static** component invocation compiles to `Name($$renderer, props)` (`shared
 - **Refused**: `--custom-property attribute on <{name}> component` — the oracle wraps the call in `$.css_props`.
 - **Refused**: `bind: directive on <{name}> component` — the oracle emits a `do…while` settle loop.
 - **Refused**: `directive on <{name}> component` — a non-`bind:` directive (`use:`/`transition:`/…; mostly oracle-rejected input).
-- **Refused**: `comments in a script alongside a component invocation` — the component call's minted / borrowed prop-value spans would sweep the carried-comment windows.
+- **Supported**: carried script comments alongside a component invocation — the component call's prop values are template-region borrows, so no comment window sweeps a script comment (see [Comment placement classes](#comment-placement-classes)).
 
 ### Attributes
 

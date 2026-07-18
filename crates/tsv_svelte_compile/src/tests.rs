@@ -459,10 +459,47 @@ fn compile_rejects_const_at_root() {
 }
 
 #[test]
-fn compile_rejects_comments_with_blocks() {
+fn compile_carries_comments_with_blocks() {
+    // A script comment carries through as a leading comment of its surviving
+    // statement, unaffected by a template block: the block emits template-region
+    // spans only, so no comment window sweeps the script comment.
+    let js = compile_js("<script>\n\t// note\n\tlet a = 1;\n</script>\n{#if a}<p>x</p>{/if}");
+    assert!(
+        js.contains("// note"),
+        "the script comment must carry through: {js}"
+    );
+}
+
+#[test]
+fn compile_refuses_comment_in_import_only_script() {
+    // No surviving body statement (the import hoists to module scope), so the
+    // carried comment has nothing to anchor to — the oracle relocates it into the
+    // template. Refuse.
     assert_unsupported(
-        "<script>\n\t// note\n\tlet { a } = $props();\n</script>\n{#if a}<p>x</p>{/if}",
-        "comments in a script alongside template blocks",
+        "<script>\n\t// note\n\timport Foo from './Foo.svelte';\n</script>\n<Foo />",
+        "comment after the last script statement",
+    );
+}
+
+#[test]
+fn compile_refuses_comment_before_dropped_effect() {
+    // The last SURVIVING statement is `let x = 1`; the `$effect` drops in SSR, so a
+    // comment between them is after the last surviving statement and the oracle
+    // re-anchors it into the template. Refuse.
+    assert_unsupported(
+        "<script>\n\tlet x = 1;\n\t// note\n\t$effect(() => {});\n</script>\n<p>{x}</p>",
+        "comment after the last script statement",
+    );
+}
+
+#[test]
+fn compile_refuses_multiline_block_comment() {
+    // The oracle re-indents a block comment's interior lines to the emit position;
+    // tsv carries them verbatim, so they diverge. Refuse until the printer
+    // re-indents block-comment interiors.
+    assert_unsupported(
+        "<script>\n\t/*\n\tmulti\n\tline\n\t*/\n\tlet x = 1;\n</script>\n<p>{x}</p>",
+        "multi-line block comment in script",
     );
 }
 
@@ -1777,11 +1814,14 @@ fn compile_refuses_component_directives_and_css_vars() {
 }
 
 #[test]
-fn compile_refuses_comments_with_component() {
-    // Carried script comments alongside a component invocation refuse.
-    assert_unsupported(
-        "<script>\n\t// note\n\tlet x = 1;\n</script>\n<Foo a={x} />",
-        "comments in a script alongside a component invocation",
+fn compile_carries_comments_with_component() {
+    // Carried script comments alongside a component invocation carry through: the
+    // component call's prop values are template-region borrows, so the comment
+    // stays a leading comment of its script statement.
+    let js = compile_js("<script>\n\t// note\n\tlet x = 1;\n</script>\n<Foo a={x} />");
+    assert!(
+        js.contains("// note"),
+        "the script comment must carry through: {js}"
     );
 }
 
@@ -4095,36 +4135,6 @@ fn validate_output_js_rejects_corrupt_output_loudly() {
             "import * as $ from 'svelte/internal/server';\nexport default function Input($$renderer) {\n\t$$renderer.push(`<p>x</p>`);\n}\n",
         )
         .expect("valid output must validate");
-}
-
-#[test]
-fn fragment_contains_block_descends_special_element() {
-    use crate::fragment::fragment_contains_block;
-
-    // `<svelte:head>` is a SpecialElement; the `{#if}` inside it is a control-flow
-    // block. The shared child-fragment seam descends the special element's
-    // fragment (the sanctioned alignment with the `fragment_has_*` siblings), so
-    // the nested block is found — a hand-written walk that skipped SpecialElement
-    // would miss it.
-    let arena = bumpalo::Bump::new();
-    let root = tsv_svelte::parse(
-        "<svelte:head>{#if x}<title>t</title>{/if}</svelte:head>",
-        &arena,
-    )
-    .expect("parse");
-    assert!(
-        fragment_contains_block(&root.fragment),
-        "a block nested in a SpecialElement fragment must be found"
-    );
-
-    // Control: the same special element with no nested block is block-free.
-    let plain_arena = bumpalo::Bump::new();
-    let plain = tsv_svelte::parse("<svelte:head><title>t</title></svelte:head>", &plain_arena)
-        .expect("parse");
-    assert!(
-        !fragment_contains_block(&plain.fragment),
-        "a SpecialElement with no nested block must not be reported"
-    );
 }
 
 /// Assert `compile` produces server output (a durable "compiles" pin — the exact

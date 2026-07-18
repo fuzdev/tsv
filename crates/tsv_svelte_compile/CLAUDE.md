@@ -98,8 +98,11 @@ project-wide conventions.
     unique-name order), a root-level `{@const}`, a destructured `{@const}`, a
     `{@const}` shadowing a `$derived` binding, a member/call rooted at a
     prop/import that is also shadowed in a nested scope (`needs_context`
-    classification ambiguous), a leading comment glued to the `<script>` line,
-    and any block alongside carried script comments also refuse.
+    classification ambiguous), and a leading comment glued to the `<script>` line
+    also refuse. Carried script comments alongside a template block, a component
+    invocation, an expression-valued attribute, `{#snippet}`/`{@render}`, or
+    hoisted imports **compile** — those emitters write template-region spans only,
+    which no script-comment window reaches.
     The output is **self-validated by reparse** before it returns: generated JS
     that `tsv_ts` rejects surfaces as `CompileError::CorruptOutput` (a compiler
     bug — a divergent shape slipped every guard), never a silently invalid
@@ -248,13 +251,10 @@ project-wide conventions.
     exhaustively-matched answer to "which sub-fragments does this node contain"
     (element/special-element fragments, `{#if}` branches, `{#each}` body+fallback,
     `{#await}` pending/then/catch, `{#key}` fragment, `{#snippet}` body). The
-    `fragment_has_*` refusal predicates ride it through the `fragment_any`
-    combinator — each supplying only its own narrow per-node test — and the
-    snippet-name collector recurses through it, so the recursion shape has a single
-    home. A new `FragmentNode` variant, or a new child fragment on an existing
-    variant, fails compilation HERE rather than drifting across the copies (which
-    is how `fragment_contains_block` came to skip `SpecialElement` while its
-    siblings recursed; unifying it onto the seam realigns that descent). The
+    snippet-name collector and the element census recurse through it, so the
+    recursion shape has a single home. A new `FragmentNode` variant, or a new child
+    fragment on an existing variant, fails compilation HERE rather than drifting
+    across hand-written copies. The
     scope-tracking / dropped-`{:catch}` walks (`needs_context.rs`, `snippet.rs`'s
     free-variable collector) keep their own exhaustive matches on purpose: their
     descent is entangled with per-node scope binding, the emission-vs-dropped
@@ -322,13 +322,17 @@ project-wide conventions.
   shape; nested declarations and for-heads stay joined; comments alongside a
   multi-declarator refuse — the oracle re-anchors them inside the split). Also
   `collect_script_comments`: instance-script comments carry through into the
-  synthetic program (host-absolute spans; the import prints as a separate
-  comment-free program so no window bridges a low anchor to its appendix
-  source literal); divergent placement classes refuse — comments after the
-  last script statement (the oracle re-attaches them into the template),
-  template-expression comments, comments inside dropped rune regions, and
-  comments alongside `$derived` / argument-less `$state()` /
-  expression-valued attributes (window-sweep hazards) — and
+  synthetic program (host-absolute spans; the imports print in a separate
+  comment-free program, and the oracle relocates a script comment down into the
+  component body — leading the first surviving statement — which the carry
+  reproduces). Divergent placement classes still refuse — comments after the last
+  script statement (the oracle re-attaches them into the template),
+  template-expression comments, comments inside dropped rune regions, and comments
+  alongside a rune rewrite that mints a **script-region** span a comment window
+  would sweep (`$derived` — the `$.derived(() => e)` thunk — and argument-less
+  `$state()`). A template block, a component invocation, an expression-valued
+  attribute, `{#snippet}`/`{@render}`, and hoisted imports emit **template-region**
+  spans only, so a carried comment window can't reach them and they compile. Also
   `self_check_no_typescript`, the type-erasure self-check that closes the
   loop on the finished program (see `erase.rs`).
 - `fragment.rs` — the per-fragment walk (`emit_fragment`) and its
