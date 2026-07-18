@@ -33,25 +33,10 @@ pub(crate) const KEY_BLOCK_OPEN: &str = "{#key ";
 /// forms by `compose_if_tail`. Building a full doc per form instead would rebuild
 /// every nested body once per form, compounding to O(2^depth) on nested blocks (the
 /// build-fanout audit guards against that).
-///
-/// Each piece carries `has_content` ([`fragment_has_printable`]): a branch with no printable
-/// content emits no body **and** suppresses the `hardline` before the next marker / close, so
-/// an empty branch **collapses** (`{:else}{/if}`) instead of straddling a blank line — the same
-/// empty-section collapse the inline form already performs and the `{#await}` tails perform.
 enum IfPiece {
-    Consequent {
-        body: DocId,
-        has_content: bool,
-    },
-    ElseIf {
-        head: DocId,
-        body: DocId,
-        has_content: bool,
-    },
-    Else {
-        body: DocId,
-        has_content: bool,
-    },
+    Consequent(DocId),
+    ElseIf { head: DocId, body: DocId },
+    Else(DocId),
 }
 
 /// The pre-built, **mode-agnostic** pieces of an await tail (each present section's
@@ -67,25 +52,7 @@ struct AwaitPieces {
     catch_body: Option<DocId>,
 }
 
-/// Whether a fragment carries **printable content** — any node that is not whitespace-only
-/// text. The single predicate behind every empty-section collapse: an empty (or
-/// whitespace-only) section contributes no body *and* suppresses the separator that would
-/// otherwise precede the next marker / close, so its markers **glue**
-/// (`{:catch e}{/await}`, `{:else}{/if}`) instead of straddling a blank line.
-pub(super) fn fragment_has_printable(fragment: &Fragment<'_>) -> bool {
-    fragment.nodes.iter().any(|n| !n.is_whitespace_only_text())
-}
-
 /// Build one `{#await}` section body (`pending` / `then` / `catch`).
-///
-/// A section with no printable content contributes no body (`empty`) — mirroring the
-/// space-only path's `push_await_space_only_body` guard. This matters for a *kept* empty
-/// `:catch` (an empty `{:catch}` is preserved for correctness, unlike a dropped empty
-/// `:then` — see `then_has_content`): its marker is emitted and its body is nothing. The
-/// caller additionally suppresses the pre-close `hardline` (see `fragment_has_printable`),
-/// so the marker glues to the close. Without the guard, `indent_body`'s leading `hardline`
-/// over an empty body plus the tail's own pre-`{/await}` `hardline` would emit a **spurious
-/// blank line** between them.
 ///
 /// `expand` is the construct-wide boundary decision (see `Printer::body_boundaries_break`):
 /// every section's boundaries break together, so a section authored inline still drops to
@@ -93,9 +60,6 @@ pub(super) fn fragment_has_printable(fragment: &Fragment<'_>) -> bool {
 /// section's own authored whitespace would let a render-free character weld one section's
 /// body to its keyword while the others break.
 fn build_await_section_body(printer: &Printer<'_>, fragment: &Fragment<'_>, expand: bool) -> DocId {
-    if !fragment_has_printable(fragment) {
-        return printer.d().empty();
-    }
     let body_doc = if expand {
         printer.build_nodes_doc_multiline(fragment.nodes)
     } else {
@@ -104,15 +68,23 @@ fn build_await_section_body(printer: &Printer<'_>, fragment: &Fragment<'_>, expa
     indent_body(printer, body_doc, expand)
 }
 
+/// Whether a fragment carries **printable content** — any node that is not whitespace-only
+/// text. An empty (or whitespace-only) section has no content, so it has no authored
+/// boundary whitespace worth preserving: its separators are `softline`s, which glue it
+/// inline and open it to a blank line once the construct breaks.
+fn fragment_has_printable(fragment: &Fragment<'_>) -> bool {
+    fragment.nodes.iter().any(|n| !n.is_whitespace_only_text())
+}
+
 /// The space-only await boundary separator — the **one rule** both a body's leading edge
 /// (`indent_body_soft`) and the separator before the following marker / `{/await}` follow:
 /// a `line` (a space inline, a newline on break) when the boundary was **authored with
 /// whitespace**, else a `softline` (glued inline, still a newline on break).
 ///
 /// Preserving the authored boundary — instead of always synthesizing a space — keeps a
-/// glued content body glued (`}x{`) and a spaced one spaced (`} x {`), matching prettier
-/// and killing the cross-section authoring-dependence (a render-free space in one section
-/// no longer re-spaces another section's body — the boundary is render-free, see
+/// glued content body glued (`}x{`) and a spaced one spaced (`} x {`), matching prettier and
+/// killing the cross-section authoring-dependence (a render-free space in one section no
+/// longer re-spaces another section's body — the boundary is render-free, see
 /// `Printer::body_boundaries_break`). Either way both forms become a newline on break, so
 /// the whole construct still expands as a unit.
 fn boundary_sep(printer: &Printer<'_>, authored_ws: bool) -> DocId {
@@ -120,10 +92,10 @@ fn boundary_sep(printer: &Printer<'_>, authored_ws: bool) -> DocId {
     if authored_ws { d.line() } else { d.softline() }
 }
 
-/// Build `indent([<sep>, body_doc])` for a space-only await section body, where `<sep>`
-/// is [`boundary_sep`] keyed on the body's authored **leading** boundary whitespace: a
-/// space (fits) / newline (break) when authored with leading whitespace, glued (fits) /
-/// newline (break) when authored glued.
+/// Build `indent([<sep>, body_doc])` for a space-only await section body, where `<sep>` is
+/// [`boundary_sep`] keyed on the body's authored **leading** boundary whitespace: a space
+/// (fits) / newline (break) when authored with leading whitespace, glued (fits) / newline
+/// (break) when authored glued.
 fn indent_body_soft(printer: &Printer<'_>, body_doc: DocId, leading_ws: bool) -> DocId {
     let sep = boundary_sep(printer, leading_ws);
     let inner = printer.d().concat(&[sep, body_doc]);
@@ -588,10 +560,9 @@ impl<'a> Printer<'a> {
     /// [`Self::compose_if_tail`], so a nested body is built once rather than once per
     /// form (a per-form build would rebuild it twice, compounding to O(2^depth)).
     fn build_if_pieces(&self, block: &internal::IfBlock<'_>) -> Vec<IfPiece> {
-        let mut pieces = vec![IfPiece::Consequent {
-            body: self.build_fragment_doc(&block.consequent),
-            has_content: fragment_has_printable(&block.consequent),
-        }];
+        let mut pieces = vec![IfPiece::Consequent(
+            self.build_fragment_doc(&block.consequent),
+        )];
         let mut alt = block.alternate.as_ref();
         while let Some(a) = alt {
             if let Some(else_if) = Self::get_flattenable_else_if(a) {
@@ -607,17 +578,10 @@ impl<'a> Printer<'a> {
                     self.block_dangle_allowed(),
                 );
                 let body = self.build_fragment_doc(&else_if.consequent);
-                pieces.push(IfPiece::ElseIf {
-                    head,
-                    body,
-                    has_content: fragment_has_printable(&else_if.consequent),
-                });
+                pieces.push(IfPiece::ElseIf { head, body });
                 alt = else_if.alternate.as_ref();
             } else {
-                pieces.push(IfPiece::Else {
-                    body: self.build_nodes_doc(a.nodes),
-                    has_content: fragment_has_printable(a),
-                });
+                pieces.push(IfPiece::Else(self.build_nodes_doc(a.nodes)));
                 alt = None;
             }
         }
@@ -632,44 +596,26 @@ impl<'a> Printer<'a> {
     fn compose_if_tail(&self, pieces: &[IfPiece], multiline: bool) -> DocId {
         let d = self.d();
         let mut parts: DocBuf = DocBuf::new();
-        // Whether the branch just emitted carried printable content — gates the `hardline`
-        // before the next marker / `{/if}`, so an EMPTY branch collapses and its markers glue.
-        let mut last_had_content = false;
         for piece in pieces {
             match piece {
-                IfPiece::Consequent { body, has_content } => {
-                    if *has_content {
-                        parts.push(self.indent_body_expand(*body, multiline));
-                    }
-                    last_had_content = *has_content;
-                }
-                IfPiece::ElseIf {
-                    head,
-                    body,
-                    has_content,
-                } => {
-                    if multiline && last_had_content {
+                IfPiece::Consequent(body) => parts.push(self.indent_body_expand(*body, multiline)),
+                IfPiece::ElseIf { head, body } => {
+                    if multiline {
                         parts.push(d.hardline());
                     }
                     parts.push(*head);
-                    if *has_content {
-                        parts.push(self.indent_body_expand(*body, multiline));
-                    }
-                    last_had_content = *has_content;
+                    parts.push(self.indent_body_expand(*body, multiline));
                 }
-                IfPiece::Else { body, has_content } => {
-                    if multiline && last_had_content {
+                IfPiece::Else(body) => {
+                    if multiline {
                         parts.push(d.hardline());
                     }
                     parts.push(d.text("{:else}"));
-                    if *has_content {
-                        parts.push(self.indent_body_expand(*body, multiline));
-                    }
-                    last_had_content = *has_content;
+                    parts.push(self.indent_body_expand(*body, multiline));
                 }
             }
         }
-        if multiline && last_had_content {
+        if multiline {
             parts.push(d.hardline());
         }
         parts.push(d.text("{/if}"));
@@ -750,30 +696,23 @@ impl<'a> Printer<'a> {
         // consequent twice, keeping the nested-block fanout exponential. For inline: the
         // regular fragment doc (preserves spaces); for multiline: the multiline doc (line
         // structure with hardlines). Always indent() for internal break indentation.
-        // An EMPTY branch emits no body and suppresses the separator before the next marker /
-        // close, so its markers glue (see `compose_if_tail` / `IfPiece`).
-        let mut last_had_content = fragment_has_printable(&block.consequent);
-        let mut parts: DocBuf = smallvec![head_doc];
-        if last_had_content {
-            let body_doc = if is_inline {
-                self.build_fragment_doc(&block.consequent)
-            } else {
-                self.build_nodes_doc_multiline(block.consequent.nodes)
-            };
-            parts.push(indent_body(self, body_doc, expand));
-        }
+        let body_doc = if is_inline {
+            self.build_fragment_doc(&block.consequent)
+        } else {
+            self.build_nodes_doc_multiline(block.consequent.nodes)
+        };
+        let indented_body = indent_body(self, body_doc, expand);
+
+        let mut parts: DocBuf = smallvec![head_doc, indented_body];
 
         if let Some(alt) = &block.alternate {
-            if expand && last_had_content {
+            if expand {
                 parts.push(d.hardline());
             }
-            let (alt_doc, alt_had_content) =
-                self.build_if_alternate_doc(alt, expand, in_multiline_context);
-            parts.push(alt_doc);
-            last_had_content = alt_had_content;
+            parts.push(self.build_if_alternate_doc(alt, expand, in_multiline_context));
         }
 
-        if expand && last_had_content {
+        if expand {
             parts.push(d.hardline());
         }
 
@@ -846,15 +785,12 @@ impl<'a> Printer<'a> {
     /// `expand` is the construct-wide boundary decision (see `body_boundaries_break`) — it
     /// is *not* re-derived per branch, because hug is all-or-nothing: a branch that renders
     /// inline still drops to its own line once any sibling branch went multiline.
-    /// Returns `(doc, last_branch_had_content)` — the flag lets the caller suppress the
-    /// `hardline` before `{/if}` when the final branch is EMPTY, so its markers glue
-    /// (`{:else}{/if}`) rather than straddling a blank line (see [`IfPiece`]).
     fn build_if_alternate_doc(
         &self,
         alt: &Fragment<'_>,
         expand: bool,
         in_multiline_context: bool,
-    ) -> (DocId, bool) {
+    ) -> DocId {
         let d = self.d();
         // Check if this can be flattened to {:else if ...}
         if let Some(else_if) = Self::get_flattenable_else_if(alt) {
@@ -862,17 +798,14 @@ impl<'a> Printer<'a> {
             let expr_doc = self.build_else_if_expr_doc(else_if, in_multiline_context);
 
             // Build the body inline only when the whole construct stays inline; once it
-            // expands, every branch body carries multiline line structure. An empty branch
-            // contributes no body at all.
-            let mut last_had_content = fragment_has_printable(&else_if.consequent);
-            let indented_body = last_had_content.then(|| {
-                let body_doc = if expand {
-                    self.build_nodes_doc_multiline(else_if.consequent.nodes)
-                } else {
-                    self.build_fragment_doc(&else_if.consequent)
-                };
-                indent_body(self, body_doc, expand)
-            });
+            // expands, every branch body carries multiline line structure.
+            let body_doc = if expand {
+                self.build_nodes_doc_multiline(else_if.consequent.nodes)
+            } else {
+                self.build_fragment_doc(&else_if.consequent)
+            };
+
+            let indented_body = indent_body(self, body_doc, expand);
 
             // `build_else_if_expr_doc` builds the condition with `in_multiline_context`
             // as its wrapping flag, so the dangle keys on the same condition.
@@ -884,27 +817,19 @@ impl<'a> Printer<'a> {
                 else_if.opening_tag_span.end - 1,
                 in_multiline_context && self.block_dangle_allowed(),
             );
-            let mut parts: DocBuf = smallvec![head_doc];
-            parts.extend(indented_body);
+            let mut parts: DocBuf = smallvec![head_doc, indented_body];
 
             if let Some(nested_alt) = &else_if.alternate {
-                if expand && last_had_content {
+                if expand {
                     parts.push(d.hardline());
                 }
-                let (nested_doc, nested_had_content) =
-                    self.build_if_alternate_doc(nested_alt, expand, in_multiline_context);
-                parts.push(nested_doc);
-                last_had_content = nested_had_content;
+                parts.push(self.build_if_alternate_doc(nested_alt, expand, in_multiline_context));
             }
 
-            return (d.concat(&parts), last_had_content);
+            return d.concat(&parts);
         }
 
-        // Plain {:else} — an empty one emits its marker and nothing else.
-        if !fragment_has_printable(alt) {
-            return (d.text("{:else}"), false);
-        }
-
+        // Plain {:else}
         let body_doc = if expand {
             self.build_nodes_doc_multiline(alt.nodes)
         } else {
@@ -913,7 +838,7 @@ impl<'a> Printer<'a> {
 
         let indented_body = indent_body(self, body_doc, expand);
 
-        (d.concat(&[d.text("{:else}"), indented_body]), true)
+        d.concat(&[d.text("{:else}"), indented_body])
     }
 
     /// Whether the each block's body and its optional `{:else}` fallback are both
@@ -930,51 +855,27 @@ impl<'a> Printer<'a> {
     /// (mode-agnostic), for composition into both expanding-construct tails by
     /// [`Self::compose_each_tail`] — so a nested body is built once rather than once
     /// per form (a per-form build would rebuild it twice, compounding to O(2^depth)).
-    /// Each piece is `(doc, has_content)` — a branch with no printable content emits no body
-    /// and suppresses the following separator, so an empty branch collapses (see [`IfPiece`]).
-    fn build_each_pieces(
-        &self,
-        block: &internal::EachBlock<'_>,
-    ) -> ((DocId, bool), Option<(DocId, bool)>) {
-        let body = (
-            self.build_fragment_doc(&block.body),
-            fragment_has_printable(&block.body),
-        );
-        let fallback = block
-            .fallback
-            .as_ref()
-            .map(|f| (self.build_fragment_doc(f), fragment_has_printable(f)));
+    fn build_each_pieces(&self, block: &internal::EachBlock<'_>) -> (DocId, Option<DocId>) {
+        let body = self.build_fragment_doc(&block.body);
+        let fallback = block.fallback.as_ref().map(|f| self.build_fragment_doc(f));
         (body, fallback)
     }
 
     /// Compose an each-block tail (body + optional `{:else}` fallback + `{/each}`) in
     /// inline or expanded form from pre-built pieces, for `build_expanding_construct`.
     /// Cheap — only indent / hardline wrapping, no body rebuilds.
-    fn compose_each_tail(
-        &self,
-        body: (DocId, bool),
-        fallback: Option<(DocId, bool)>,
-        multiline: bool,
-    ) -> DocId {
+    fn compose_each_tail(&self, body: DocId, fallback: Option<DocId>, multiline: bool) -> DocId {
         let d = self.d();
         let mut parts: DocBuf = DocBuf::new();
-        // See `compose_if_tail`: an EMPTY branch emits no body and suppresses the separator
-        // before the next marker / `{/each}`, so its markers glue.
-        let (body_doc, mut last_had_content) = body;
-        if last_had_content {
-            parts.push(self.indent_body_expand(body_doc, multiline));
-        }
-        if let Some((fb_doc, fb_has_content)) = fallback {
-            if multiline && last_had_content {
+        parts.push(self.indent_body_expand(body, multiline));
+        if let Some(fb) = fallback {
+            if multiline {
                 parts.push(d.hardline());
             }
             parts.push(d.text("{:else}"));
-            if fb_has_content {
-                parts.push(self.indent_body_expand(fb_doc, multiline));
-            }
-            last_had_content = fb_has_content;
+            parts.push(self.indent_body_expand(fb, multiline));
         }
-        if multiline && last_had_content {
+        if multiline {
             parts.push(d.hardline());
         }
         parts.push(d.text("{/each}"));
@@ -1094,38 +995,32 @@ impl<'a> Printer<'a> {
         // Build the body only on the non-fast path (the fast path above builds its own
         // shared pieces). For inline: regular fragment doc (preserves spacing); for
         // multiline: the multiline doc (line structure with hardlines).
-        // An EMPTY branch emits no body and suppresses the separator before the next marker /
-        // close, so its markers glue (see `compose_each_tail` / `IfPiece`).
-        let mut last_had_content = fragment_has_printable(&block.body);
-        let mut parts: DocBuf = smallvec![head_doc];
-        if last_had_content {
-            let body_doc = if is_inline {
-                self.build_fragment_doc(&block.body)
-            } else {
-                self.build_nodes_doc_multiline(block.body.nodes)
-            };
-            parts.push(indent_body(self, body_doc, expand));
-        }
+        let body_doc = if is_inline {
+            self.build_fragment_doc(&block.body)
+        } else {
+            self.build_nodes_doc_multiline(block.body.nodes)
+        };
+        let indented_body = indent_body(self, body_doc, expand);
+
+        let mut parts: DocBuf = smallvec![head_doc, indented_body];
 
         if let Some(fallback) = &block.fallback {
-            if expand && last_had_content {
+            if expand {
                 parts.push(d.hardline());
             }
 
             parts.push(d.text("{:else}"));
 
-            last_had_content = fragment_has_printable(fallback);
-            if last_had_content {
-                let fallback_doc = if expand {
-                    self.build_nodes_doc_multiline(fallback.nodes)
-                } else {
-                    self.build_fragment_doc(fallback)
-                };
-                parts.push(indent_body(self, fallback_doc, expand));
-            }
+            let fallback_doc = if expand {
+                self.build_nodes_doc_multiline(fallback.nodes)
+            } else {
+                self.build_fragment_doc(fallback)
+            };
+
+            parts.push(indent_body(self, fallback_doc, expand));
         }
 
-        if expand && last_had_content {
+        if expand {
             parts.push(d.hardline());
         }
 
@@ -1252,92 +1147,71 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    /// Push a space-only section's body to `parts` when it carries printable content, and
-    /// **report `(had_content, trailing_ws)`**. A whitespace-only section
-    /// (`build_nodes_doc_multiline` drops its whitespace-only nodes, so its body is empty)
-    /// contributes nothing (`(false, false)`); the caller emits a separator before the next
-    /// marker only after a section that returned `had_content = true`, so an empty section
-    /// **collapses** — its surrounding markers glue (`{#await p}{:then v}{/await}`), exactly
-    /// as every other empty construct does. A content section keeps its `indent_body_soft`,
-    /// whose leading separator preserves the body's authored *leading* boundary whitespace;
-    /// the returned `trailing_ws` reports the body's authored *trailing* boundary whitespace,
-    /// which the caller uses to pick the separator *after* it (`line` vs `softline`).
-    fn push_await_space_only_body(
-        &self,
-        parts: &mut DocBuf,
-        fragment: &Fragment<'_>,
-    ) -> (bool, bool) {
-        if fragment_has_printable(fragment) {
-            let leading_ws = self.fragment_has_any_leading_ws(fragment);
-            let trailing_ws = self.fragment_has_any_trailing_ws(fragment);
-            let body = self.build_nodes_doc_multiline(fragment.nodes);
-            parts.push(indent_body_soft(self, body, leading_ws));
-            (true, trailing_ws)
-        } else {
-            (false, false)
+    /// Push a space-only section's body to `parts` and **report its authored trailing boundary
+    /// whitespace**, which the caller uses to pick the separator *after* it ([`boundary_sep`]).
+    ///
+    /// Every section pushes — there is no empty-section special case. A content section keeps
+    /// its own authored boundary (leading via `indent_body_soft`, trailing via the return), so
+    /// a body authored glued stays glued and a spaced one keeps its space. A section with no
+    /// printable content has nothing to preserve, so it takes `softline`s on both sides and
+    /// returns `false`: inline they collapse and its markers glue
+    /// (`{#await p}{:then v}{/await}`), and once the construct breaks they become newlines,
+    /// leaving the empty section its own blank line — the same shape the newline-authored tail
+    /// produces, so the two paths agree.
+    fn push_await_space_only_body(&self, parts: &mut DocBuf, fragment: &Fragment<'_>) -> bool {
+        if !fragment_has_printable(fragment) {
+            // Empty section: no content, so nothing to preserve — a `softline` on each side.
+            // Inline both collapse and the markers glue (`{:catch e}{/await}`); once the
+            // construct breaks they become newlines, leaving the section its blank line.
+            parts.push(indent_body_soft(self, self.d().empty(), false));
+            return false;
         }
+        let leading_ws = self.fragment_has_any_leading_ws(fragment);
+        let trailing_ws = self.fragment_has_any_trailing_ws(fragment);
+        let body = self.build_nodes_doc_multiline(fragment.nodes);
+        parts.push(indent_body_soft(self, body, leading_ws));
+        trailing_ws
     }
 
-    /// Build the await tail for the **space-only** layout. Each content-bearing section body
-    /// (`indent_body_soft`, via `push_await_space_only_body`) **preserves its own authored
-    /// boundary whitespace** — a body authored glued stays glued (`}x{`), one authored with a
-    /// space keeps the space (`} x {`), matching prettier — so a render-free space in one
-    /// section never re-spaces another section's body. A **whitespace-only** section
-    /// contributes no body and its markers **glue** (`{#await p}{:then v}{/await}`): the
-    /// separator before a marker (`line` when the preceding body had trailing whitespace, else
-    /// `softline`) is emitted only after a section that carried content, so an empty section
-    /// collapses to `}{` exactly as every other empty construct does — while the `{:then}` /
-    /// `{:catch}` markers are kept (prettier instead deletes the whole section; see
-    /// `conformance_prettier.md` §Svelte: Blocks). The whole construct still breaks together as
-    /// a unit under the caller's `group` — both `line` and `softline` become a newline on
-    /// break, so every body drops to its own line. Mirrors `compose_await_tail`, but with
-    /// **authored-whitespace-keyed** separators and soft-indented bodies (the head is prepended
-    /// + grouped by the caller).
+    /// Build the await tail for the **space-only** layout. A content-bearing section body
+    /// (`indent_body_soft`, via `push_await_space_only_body`) is wrapped in single spaces, but
+    /// a **whitespace-only** section contributes no body and its markers **glue**
+    /// (`{#await p}{:then v}{/await}`): a separator `line` is emitted only after a section that
+    /// carried content, so an empty section collapses to `}{` exactly as every other empty
+    /// construct does — while the `{:then}` / `{:catch}` markers are kept (prettier instead
+    /// deletes the whole section; see `conformance_prettier.md` §Svelte: Blocks). The whole
+    /// construct still breaks together as a unit under the caller's `group`. Mirrors
+    /// `compose_await_tail`, but with **conditional** `line()` separators and soft-indented
+    /// bodies (the head is prepended + grouped by the caller).
     fn build_await_tail_space_only(&self, block: &internal::AwaitBlock<'_>) -> DocId {
         let d = self.d();
         let (is_then_shorthand, is_catch_shorthand) = Self::await_shorthand_flags(block);
         let mut parts: DocBuf = DocBuf::new();
-        // Whether the section immediately before the next marker carried content (gates that
-        // marker's leading separator, so an empty section's markers glue) and, if so, whether
-        // it was authored with trailing boundary whitespace (picks `line` vs `softline`, so a
-        // body glued to the following marker stays glued).
-        let mut prev_had_content = false;
+        // The authored trailing boundary whitespace of the section just emitted — picks the
+        // separator before the next marker / close (`line` when the author wrote whitespace
+        // there, else `softline`). An empty section reports `false`, so its markers glue
+        // inline and open to a blank line when the construct breaks.
         let mut prev_trailing_ws = false;
         if let Some(pending) = &block.pending {
-            (prev_had_content, prev_trailing_ws) =
-                self.push_await_space_only_body(&mut parts, pending);
+            prev_trailing_ws = self.push_await_space_only_body(&mut parts, pending);
         }
         if !is_then_shorthand && let Some(kw) = self.await_then_keyword(block) {
-            if prev_had_content {
-                parts.push(boundary_sep(self, prev_trailing_ws));
-            }
+            parts.push(boundary_sep(self, prev_trailing_ws));
             parts.push(kw);
-            prev_had_content = false;
             prev_trailing_ws = false;
         }
         if let Some(then_block) = &block.then {
-            (prev_had_content, prev_trailing_ws) =
-                self.push_await_space_only_body(&mut parts, then_block);
+            prev_trailing_ws = self.push_await_space_only_body(&mut parts, then_block);
         }
         if !is_catch_shorthand && let Some(kw) = self.await_catch_keyword(block) {
-            if prev_had_content {
-                parts.push(boundary_sep(self, prev_trailing_ws));
-            }
+            parts.push(boundary_sep(self, prev_trailing_ws));
             parts.push(kw);
-            prev_had_content = false;
             prev_trailing_ws = false;
         }
         if let Some(catch_block) = &block.catch {
-            (prev_had_content, prev_trailing_ws) =
-                self.push_await_space_only_body(&mut parts, catch_block);
+            prev_trailing_ws = self.push_await_space_only_body(&mut parts, catch_block);
         }
-        // A trailing EMPTY section emits no separator, so its marker glues to the close
-        // (`{:catch e}{/await}`) — the empty-section collapse every other block performs
-        // (prettier glues an empty branch the same way: `{:else}{/if}`). A section that
-        // carried content picks `line`/`softline` from its authored trailing whitespace.
-        if prev_had_content {
-            parts.push(boundary_sep(self, prev_trailing_ws));
-        }
+        parts.push(boundary_sep(self, prev_trailing_ws));
         parts.push(d.text("{/await}"));
         d.concat(&parts)
     }
@@ -1352,41 +1226,31 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let (is_then_shorthand, is_catch_shorthand) = Self::await_shorthand_flags(block);
         let mut parts: DocBuf = DocBuf::new();
-        // Whether the most recently emitted section carried printable content — gates the
-        // `hardline` before `{/await}`, so a trailing EMPTY section (a kept empty `:catch`)
-        // collapses and its marker glues to the close (`{:catch e}{/await}`), matching the
-        // space-only tail and prettier's empty-branch collapse (`{:else}{/if}`).
-        let mut last_had_content = false;
         if let Some(pending) = &block.pending {
             parts.push(build_await_section_body(self, pending, expand));
-            last_had_content = fragment_has_printable(pending);
         }
         if !is_then_shorthand && let Some(kw) = self.await_then_keyword(block) {
             if expand {
                 parts.push(d.hardline());
             }
             parts.push(kw);
-            last_had_content = false;
         }
         // An empty-body `:then` is dropped (marker via `await_then_keyword` above, body here).
         if then_has_content(block)
             && let Some(then_block) = &block.then
         {
             parts.push(build_await_section_body(self, then_block, expand));
-            last_had_content = fragment_has_printable(then_block);
         }
         if !is_catch_shorthand && let Some(kw) = self.await_catch_keyword(block) {
             if expand {
                 parts.push(d.hardline());
             }
             parts.push(kw);
-            last_had_content = false;
         }
         if let Some(catch_block) = &block.catch {
             parts.push(build_await_section_body(self, catch_block, expand));
-            last_had_content = fragment_has_printable(catch_block);
         }
-        if expand && last_had_content {
+        if expand {
             parts.push(d.hardline());
         }
         parts.push(d.text("{/await}"));

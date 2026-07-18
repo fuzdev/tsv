@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 514,
+	"end": 527,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,37 +10,37 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 246,
-				"data": " An empty {:catch} is a rejection handler, so tsv keeps it (prettier deletes it). The empty section still COLLAPSES: its marker glues to the close ({:catch error}{/await}), the same way prettier collapses an empty {:else} to {:else}{/if}. "
+				"end": 255,
+				"data": " An empty {:catch} is a rejection handler, so tsv keeps it (prettier deletes it). In the block form the kept-but-empty section keeps its own line, so {:catch error} and {/await} sit on their own lines with the empty body's blank line between them. "
 			},
 			{
 				"type": "Text",
-				"start": 246,
-				"end": 248,
+				"start": 255,
+				"end": 257,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 248,
-				"end": 301,
+				"start": 257,
+				"end": 310,
 				"data": " empty :catch after a multi-node pending body "
 			},
 			{
 				"type": "Text",
-				"start": 301,
-				"end": 302,
+				"start": 310,
+				"end": 311,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "AwaitBlock",
-				"start": 302,
-				"end": 361,
+				"start": 311,
+				"end": 372,
 				"expression": {
 					"type": "Identifier",
-					"start": 310,
-					"end": 317,
+					"start": 319,
+					"end": 326,
 					"loc": {
 						"start": {
 							"line": 4,
@@ -57,18 +57,18 @@
 				"error": {
 					"type": "Identifier",
 					"name": "error",
-					"start": 347,
-					"end": 352,
+					"start": 356,
+					"end": 361,
 					"loc": {
 						"start": {
 							"line": 7,
 							"column": 8,
-							"character": 347
+							"character": 356
 						},
 						"end": {
 							"line": 7,
 							"column": 13,
-							"character": 352
+							"character": 361
 						}
 					}
 				},
@@ -77,26 +77,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 318,
-							"end": 320,
+							"start": 327,
+							"end": 329,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 320,
-							"end": 328,
+							"start": 329,
+							"end": 337,
 							"name": "p",
 							"name_loc": {
 								"start": {
 									"line": 5,
 									"column": 2,
-									"character": 321
+									"character": 330
 								},
 								"end": {
 									"line": 5,
 									"column": 3,
-									"character": 322
+									"character": 331
 								}
 							},
 							"attributes": [],
@@ -105,8 +105,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 323,
-										"end": 324,
+										"start": 332,
+										"end": 333,
 										"raw": "a",
 										"data": "a"
 									}
@@ -115,26 +115,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 328,
-							"end": 330,
+							"start": 337,
+							"end": 339,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 330,
-							"end": 338,
+							"start": 339,
+							"end": 347,
 							"name": "p",
 							"name_loc": {
 								"start": {
 									"line": 6,
 									"column": 2,
-									"character": 331
+									"character": 340
 								},
 								"end": {
 									"line": 6,
 									"column": 3,
-									"character": 332
+									"character": 341
 								}
 							},
 							"attributes": [],
@@ -143,8 +143,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 333,
-										"end": 334,
+										"start": 342,
+										"end": 343,
 										"raw": "b",
 										"data": "b"
 									}
@@ -153,8 +153,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 338,
-							"end": 339,
+							"start": 347,
+							"end": 348,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -163,44 +163,52 @@
 				"then": null,
 				"catch": {
 					"type": "Fragment",
-					"nodes": []
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 362,
+							"end": 364,
+							"raw": "\n\n",
+							"data": "\n\n"
+						}
+					]
 				}
 			},
 			{
 				"type": "Text",
-				"start": 361,
-				"end": 363,
+				"start": 372,
+				"end": 374,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 363,
-				"end": 419,
+				"start": 374,
+				"end": 430,
 				"data": " full form (pending + then bodies), empty :catch "
 			},
 			{
 				"type": "Text",
-				"start": 419,
-				"end": 420,
+				"start": 430,
+				"end": 431,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "AwaitBlock",
-				"start": 420,
-				"end": 513,
+				"start": 431,
+				"end": 526,
 				"expression": {
 					"type": "Identifier",
-					"start": 428,
-					"end": 435,
+					"start": 439,
+					"end": 446,
 					"loc": {
 						"start": {
-							"line": 10,
+							"line": 12,
 							"column": 8
 						},
 						"end": {
-							"line": 10,
+							"line": 12,
 							"column": 15
 						}
 					},
@@ -209,36 +217,36 @@
 				"value": {
 					"type": "Identifier",
 					"name": "value",
-					"start": 464,
-					"end": 469,
+					"start": 475,
+					"end": 480,
 					"loc": {
 						"start": {
-							"line": 13,
+							"line": 15,
 							"column": 7,
-							"character": 464
+							"character": 475
 						},
 						"end": {
-							"line": 13,
+							"line": 15,
 							"column": 12,
-							"character": 469
+							"character": 480
 						}
 					}
 				},
 				"error": {
 					"type": "Identifier",
 					"name": "error",
-					"start": 499,
-					"end": 504,
+					"start": 510,
+					"end": 515,
 					"loc": {
 						"start": {
-							"line": 16,
+							"line": 18,
 							"column": 8,
-							"character": 499
+							"character": 510
 						},
 						"end": {
-							"line": 16,
+							"line": 18,
 							"column": 13,
-							"character": 504
+							"character": 515
 						}
 					}
 				},
@@ -247,26 +255,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 436,
-							"end": 438,
+							"start": 447,
+							"end": 449,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 438,
-							"end": 446,
+							"start": 449,
+							"end": 457,
 							"name": "p",
 							"name_loc": {
 								"start": {
-									"line": 11,
+									"line": 13,
 									"column": 2,
-									"character": 439
+									"character": 450
 								},
 								"end": {
-									"line": 11,
+									"line": 13,
 									"column": 3,
-									"character": 440
+									"character": 451
 								}
 							},
 							"attributes": [],
@@ -275,8 +283,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 441,
-										"end": 442,
+										"start": 452,
+										"end": 453,
 										"raw": "a",
 										"data": "a"
 									}
@@ -285,26 +293,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 446,
-							"end": 448,
+							"start": 457,
+							"end": 459,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 448,
-							"end": 456,
+							"start": 459,
+							"end": 467,
 							"name": "p",
 							"name_loc": {
 								"start": {
-									"line": 12,
+									"line": 14,
 									"column": 2,
-									"character": 449
+									"character": 460
 								},
 								"end": {
-									"line": 12,
+									"line": 14,
 									"column": 3,
-									"character": 450
+									"character": 461
 								}
 							},
 							"attributes": [],
@@ -313,8 +321,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 451,
-										"end": 452,
+										"start": 462,
+										"end": 463,
 										"raw": "b",
 										"data": "b"
 									}
@@ -323,8 +331,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 456,
-							"end": 457,
+							"start": 467,
+							"end": 468,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -335,26 +343,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 470,
-							"end": 472,
+							"start": 481,
+							"end": 483,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 472,
-							"end": 480,
+							"start": 483,
+							"end": 491,
 							"name": "p",
 							"name_loc": {
 								"start": {
-									"line": 14,
+									"line": 16,
 									"column": 2,
-									"character": 473
+									"character": 484
 								},
 								"end": {
-									"line": 14,
+									"line": 16,
 									"column": 3,
-									"character": 474
+									"character": 485
 								}
 							},
 							"attributes": [],
@@ -363,8 +371,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 475,
-										"end": 476,
+										"start": 486,
+										"end": 487,
 										"raw": "c",
 										"data": "c"
 									}
@@ -373,26 +381,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 480,
-							"end": 482,
+							"start": 491,
+							"end": 493,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 482,
-							"end": 490,
+							"start": 493,
+							"end": 501,
 							"name": "p",
 							"name_loc": {
 								"start": {
-									"line": 15,
+									"line": 17,
 									"column": 2,
-									"character": 483
+									"character": 494
 								},
 								"end": {
-									"line": 15,
+									"line": 17,
 									"column": 3,
-									"character": 484
+									"character": 495
 								}
 							},
 							"attributes": [],
@@ -401,8 +409,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 485,
-										"end": 486,
+										"start": 496,
+										"end": 497,
 										"raw": "d",
 										"data": "d"
 									}
@@ -411,8 +419,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 490,
-							"end": 491,
+							"start": 501,
+							"end": 502,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -420,7 +428,15 @@
 				},
 				"catch": {
 					"type": "Fragment",
-					"nodes": []
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 516,
+							"end": 518,
+							"raw": "\n\n",
+							"data": "\n\n"
+						}
+					]
 				}
 			}
 		]

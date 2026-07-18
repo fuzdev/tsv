@@ -4,10 +4,11 @@ The **block (multiline)** counterpart to [await/empty_catch](../empty_catch_pret
 an `{#await}` with an **empty-body `:catch`** whose sibling sections render block-style. Prettier
 **deletes** the empty catch; **tsv keeps it**.
 
-Keeping it does **not** mean giving it a line: the empty section still **collapses**, so its marker
-glues to the close — `{:catch error}{/await}` — exactly as prettier collapses an empty `{:else}` to
-`{:else}{/if}` and as every other empty construct behaves. A section that carries content keeps its
-own indented line and `{/await}` drops to its own line as usual.
+In the block form the kept section keeps its own line like any other: `{:catch error}` and
+`{/await}` each sit on their own line, with the empty body's blank line between them. (Inline, the
+same section collapses and the markers glue — `{#await p}x{:catch e}{/await}` — see
+[await/empty_catch](../empty_catch_prettier_divergence/); the separators are soft, so they vanish
+when the construct fits and become newlines when it breaks.)
 
 This is the same deliberate **correctness** divergence as the inline case: an empty `{:catch}` still
 *handles* a rejected promise (renders nothing), so deleting it lets the rejection **propagate** — a
@@ -17,15 +18,14 @@ matching prettier; only `:catch` diverges.)
 - **empty `:catch` after a multi-node pending body**
 - **full form (pending + then bodies), empty `:catch`**
 
-**One fixed point, however the block was authored.** All three authorings converge on `input.svelte` —
-the block layout is reached either by authoring it across lines or by *breaking*, and the empty catch
-collapses the same way in both:
+**One fixed point, however the block was authored.** Both variants converge on `input.svelte` —
+the block layout is reached either by authoring it across lines or by *breaking*, and the empty
+catch lands the same way in both:
 
-- `unformatted_ours_blank.svelte` — a blank line authored inside the empty catch body
-  (`{:catch error}⏎⏎{/await}`); the section is whitespace-only and render-free, so tsv drops it and
-  the marker glues.
-- `unformatted_ours_space_only.svelte` — the same document authored **inline** (bodies glued, a space
-  in the catch), which reaches the block layout by breaking.
+- `unformatted_ours_glued.svelte` — the empty catch authored glued to the close
+  (`{:catch error}{/await}`) inside an otherwise block-form await.
+- `unformatted_ours_space_only.svelte` — the same document authored **inline** (bodies glued, a
+  space in the catch), which reaches the block layout by breaking.
 
 Prettier deletes the catch in every case, so neither normalizes to `input.svelte` — hence
 `unformatted_ours_*`.
@@ -38,8 +38,8 @@ body-drop (a distinct third stable form) — see
 
 ## Reason
 
-Correctness over conformance: an empty `:catch` is a rejection handler, so removing it changes runtime
-behavior. tsv keeps it — inline or block-style — while still collapsing it like any empty section. See
+Correctness over conformance: an empty `:catch` is a rejection handler, so removing it changes
+runtime behavior. tsv keeps it — inline or block-style. See
 [conformance_prettier.md §Svelte: Blocks](../../../../../../docs/conformance_prettier.md#svelte-blocks).
 
 ## Related
