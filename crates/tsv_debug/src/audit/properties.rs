@@ -14,13 +14,15 @@
 //!   [`ledger_format_with_comments`] / [`pristine_format`] drive `format_source`
 //!   with the print-once comment ledger armed, and the [`Verdict`] /
 //!   [`VerifyOutcome`] / [`VerifySummary`] verdict types turn a ledger claim
-//!   into a falsifiable, self-verified outcome. `gap_audit` is the only consumer
-//!   today.
+//!   into a falsifiable, self-verified outcome. `gap_audit` and `blank_audit` are
+//!   the consumers.
 //!
-//! It is the intended future home for the rest of the shared property set — the
-//! no-panic guard, the F1 idempotency fixed point, the reparse-skeleton compare,
-//! and the ledger-clean check — as the other audits (roundtrip / fuzz / F1 sweep)
-//! migrate onto the substrate.
+//! The shared property set is still growing: [`f1_check`] now lives here — the
+//! core that (wrapped in `catch_unwind` by its callers) drives the no-panic
+//! guard, the F1 idempotency fixed point, the reparse-skeleton compare, and the
+//! leaf-conservation check — and `fuzz` consumes it (as does `blank_audit`). Still
+//! pending: `roundtrip_audit`'s phase-1 reparse gate has not yet migrated onto the
+//! substrate.
 
 use std::collections::BTreeMap;
 
@@ -596,7 +598,7 @@ mod coord_tests {
 // The ledger-driven property layer is only reachable through the `comment_check`
 // feature (it arms `tsv_lang::comment_ledger`), so production and default
 // `tsv_debug` builds compile it out entirely — the same gate the audits that
-// consume it (`comment_audit`, `gap_audit`) sit behind.
+// consume it (`comment_audit`, `gap_audit`, `blank_audit`) sit behind.
 #[cfg(feature = "comment_check")]
 pub(crate) use ledger::*;
 

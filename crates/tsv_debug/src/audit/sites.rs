@@ -669,9 +669,9 @@ fn byte_span(node: &serde_json::Value, map: &Utf16ToByte) -> Option<(usize, usiz
 /// re-attaches to mirror acorn (`leadingComments` / `trailingComments` per node, plus the
 /// language root's detached `comments` list) — arrays of comment NODES, not emitter children.
 /// Left in, they become child ROLES, and since a comment attaches only where the seed happens
-/// to carry one, the SAME structural gap would label `leadingComments→id` on one corpus and
-/// `^→id` on another purely by which canonical example sorts first — splitting one emitter's
-/// edge in two. Skipping them is sound: a comment's span lies outside its host node's
+/// to carry one, the SAME structural gap would label `leadingComments→id` on the hits whose seed
+/// carries a comment there and `^→id` on the hits without one — data-dependent across hits,
+/// splitting one emitter's edge in two. Skipping them is sound: a comment's span lies outside its host node's
 /// structural span (and comment interiors are excluded from injection sites), so one never
 /// *strictly contains* an offset the descent would enter, and it carries no span-bearing
 /// descendant — so this only relabels a mislabeled `leadingComments→X` / `X→trailingComments`

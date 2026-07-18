@@ -13,13 +13,13 @@
 //! - any **unpinnable** key (see [`SnapshotKey::is_pinnable`]) — an invariant so
 //!   absolute it is never allowed into the list whose shrinking is the goal.
 //!
-//! `gap_audit` (`gap_audit_known.txt`) is the only consumer today. It is written
-//! generic — parameterized on the snapshot **path**, the **key type**
-//! ([`SnapshotKey`], which owns its own line render/parse and its pinnability
-//! rule), and (via that trait) the **pinnable predicate** — so a second injection
-//! audit (e.g. blank-line injection) can adopt it without copying the
-//! read/render/grade/refuse-narrow logic. It is deliberately *minimal*: no
-//! generality beyond what a second consumer would actually reuse.
+//! `gap_audit` (`gap_audit_known.txt`) and `blank_audit` (`blank_audit_known.txt`)
+//! are the consumers. It is written generic — parameterized on the snapshot
+//! **path**, the **key type** ([`SnapshotKey`], which owns its own line
+//! render/parse and its pinnability rule), and (via that trait) the **pinnable
+//! predicate** — so the second injection audit (blank-line injection) adopted it
+//! without copying the read/render/grade/refuse-narrow logic. It is deliberately
+//! *minimal*: no generality beyond what a second consumer would actually reuse.
 //!
 //! What the snapshot buys and does not: a shape not on the list fails the gate,
 //! so no *new* kind of bug lands silently; but a new instance at an **existing**

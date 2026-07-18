@@ -840,8 +840,8 @@ cargo run -p tsv_debug --features audits swallow_audit ~/dev/zzz/src   # audit a
 # cargo feature — off by default, so it's compiled out of prod wasm/cli/ffi AND
 # default tsv_debug builds (profile/perf sessions measure production-shaped render
 # code). The `swallow:audit` deno task builds it via the `audits` umbrella feature
-# (swallow_check + comment_check), so it shares one binary with comments:audit and
-# gaps:audit; `--features swallow_check` alone still works for a targeted run. Gated
+# (swallow_check + comment_check), so it shares one binary with comments:audit,
+# gaps:audit, and blanks:audit; `--features swallow_check` alone still works for a targeted run. Gated
 # in `deno task check` (via `swallow:audit`) over tests/fixtures.
 #
 # Coverage is every render that appends to the output buffer — the main loop AND
@@ -868,7 +868,7 @@ cargo run -p tsv_debug --features audits comment_audit ~/dev/zzz/src   # audit a
 # cargo feature — off by default, so it's compiled out of prod wasm/cli/ffi AND default
 # tsv_debug builds (profile/perf sessions measure production-shaped code). The
 # `comments:audit` deno task builds it via the `audits` umbrella feature (swallow_check +
-# comment_check), sharing one binary with swallow:audit and gaps:audit; `--features
+# comment_check), sharing one binary with swallow:audit, gaps:audit, and blanks:audit; `--features
 # comment_check` alone still works for a targeted run. Gated in `deno task check` (via
 # `comments:audit`) over tests/fixtures.
 #

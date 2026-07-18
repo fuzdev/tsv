@@ -357,7 +357,7 @@ pub(crate) fn print_report(s: &RunSummary, findings: &[Finding]) {
 
 /// Print the findings as JSON, folding in any audit-specific **top-level** sections `extra`
 /// carries (the run-level per-audit detail slot the module docs flag as future work — gap uses
-/// it for its report-only `by_node` / `agreement` rollup). An empty `extra` reproduces the bare
+/// it for its report-only `by_node` (+ `by_node_unresolved`) rollup). An empty `extra` reproduces the bare
 /// envelope byte-for-byte, so an audit with nothing to add passes `&Map::new()`.
 pub(crate) fn print_json(
     s: &RunSummary,
