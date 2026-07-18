@@ -42,7 +42,8 @@ use phases::{
     validate_formatter_idempotent, validate_formatter_prettier, validate_invalid_syntax,
     validate_normalization_ours, validate_normalization_prettier, validate_parser_external,
     validate_parser_ours, validate_parser_ours_matches_expected, validate_prettier_nonconvergent,
-    validate_prettier_rejects, validate_tsv_rejects, validate_tsv_rejects_canonical,
+    validate_prettier_rejects, validate_render_equivalence, validate_tsv_rejects,
+    validate_tsv_rejects_canonical,
 };
 
 /// Result of validating a single fixture
@@ -73,6 +74,19 @@ pub struct FixtureValidation {
     pub diff_output: String,
     /// Undocumented Prettier outputs from unformatted_ours_* files (informational, not blocking)
     pub undocumented_prettier_outputs: Vec<UndocumentedPrettierOutput>,
+    /// Allow-listed benign fallback divergences that FIRED on this fixture (keys into
+    /// the phase's `BENIGN_FALLBACK_DIVERGENCES`). Collected so the summary can ratchet
+    /// the list for staleness — an entry that stops firing means the oracle improved (or
+    /// the fixture moved) and must be re-pinned. An *unlisted* fallback divergence is a
+    /// `ValidationError::RenderEquivalenceFallbackDivergence` and fails outright.
+    pub render_equiv_benign_fired: Vec<String>,
+    /// Whitespace variants confirmed render-equivalent via the authoritative
+    /// `svelte compile` render-key arm.
+    pub render_equiv_verified_compile: usize,
+    /// Whitespace variants confirmed render-equivalent via the template-only
+    /// `render_normalize` fallback arm — the compile-blind spot, counted so it
+    /// stays visible.
+    pub render_equiv_verified_fallback: usize,
 }
 
 /// An undocumented Prettier output discovered during N10 cross-path analysis
@@ -101,6 +115,9 @@ impl FixtureValidation {
             input_file_name: None,
             diff_output: String::new(),
             undocumented_prettier_outputs: Vec::new(),
+            render_equiv_benign_fired: Vec::new(),
+            render_equiv_verified_compile: 0,
+            render_equiv_verified_fallback: 0,
         }
     }
 
@@ -271,6 +288,13 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
         // N1, N3, N6, N7, N7b, N8, N9a, N10: Prettier normalization
         validate_normalization_prettier(&mut result, fixture, &input, input_ext, &files).await;
     }
+
+    // Phase 5b: Render-equivalence — every whitespace variant (unformatted_* /
+    // unformatted_ours_*) must render identically to `input`. Formatter-independent
+    // (compares the variant's and input's own renders), so it runs regardless of
+    // the prettier branch above — including prettier_rejects / prettier_nonconvergent
+    // dirs, where unformatted_ours_* is still allowed. Svelte templates only.
+    validate_render_equivalence(&mut result, fixture, &input, &files).await;
 
     // Phase 6: Invalid syntax validation (input_invalid_* files)
     // Skip in prettier_only mode (these test our parser rejection, not prettier)

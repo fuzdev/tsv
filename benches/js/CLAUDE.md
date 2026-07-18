@@ -20,10 +20,11 @@ Uses [@fuzdev/fuz_util](https://github.com/fuzdev/fuz_util) benchmarking library
 | Gate | Composition | Corpus / oracle | Cadence |
 | --- | --- | --- | --- |
 | **`deno task check`** | `cargo fmt --check` · `pins:audit` · `typecheck` · `conformance:audit` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `binding:audit` · `authoring:audit` · `fuzz:audit` · `test:deno` · `cargo test` (incl. fixtures) · `swallow:audit` · `comments:audit` · `gaps:audit` · `blanks:audit` · `check:ast-types` · `clippy` | **committed tree only** — `tests/fixtures` + pure-Rust/Deno audits, no external oracle | every commit; the CI `check` job |
-| **`deno task conformance:all`** | `conformance` (one process, five FFI legs: `svelte-fixtures` · `ts-fixtures` · `ts-repo` · `corpus:compare:parse --all` · `corpus:compare:format --all`) **+** `conformance:test262` (pure Rust; JS parser vs test262 positives) | `../svelte`, `../acorn-typescript`, `../typescript` (tsc baselines), `../prettier`, `../test262`; the **`gates`** corpus view (~6,200) | release; `scripts/publish.ts` **Step 3b** |
+| **`deno task conformance:all`** | `conformance` (one process, five FFI legs: `svelte-fixtures` · `ts-fixtures` · `ts-repo` · `corpus:compare:parse --all` · `corpus:compare:format --all` — plus `render:audit` over the pinned checkouts, the one leg that runs as a subprocess) **+** `conformance:test262` (pure Rust; JS parser vs test262 positives) | `../svelte`, `../acorn-typescript`, `../typescript` (tsc baselines), `../prettier`, `../test262`; the **`gates`** corpus view (~6,200) | release; `scripts/publish.ts` **Step 3b** |
 | **`deno task bench` / `bench:conformance`** | perf throughput ×3 runtimes + compose; parse-coverage report | **`perf`** view (~3,200; 100%-coverage invariant) / **`conformance`** view (fixtures + wpt/test262 harvests; coverage-only + node-only) | dev / release cadence; feeds tsv.fuz.dev |
 | **`deno task idempotency:sweep`** | `tsv_debug fuzz --iterations 0` over the corpus dirs — F1 (`format(format(x)) == format(x)`) + no-panic + structural reparse on every file **as authored** | **`perf`** view (real code; absent checkouts skipped with a warning) | after a printer change; conformance cadence |
 | **`deno task audit:corpus`** | the pure-Rust content-loss / robustness suite over **real code**: `roundtrip_audit --gate` · `comment_audit` · `binding_audit --gate` (real code gating; prettier suites report-only) · `authoring_audit` · `fuzz --iterations 0` (the idempotency:sweep leg) | **`perf`** view + the pinned `../prettier` format suites (absent dev repos skipped with a warning; floor = `../svelte` src) | release; `scripts/publish.ts` **Step 3c**; conformance cadence |
+| **`deno task render:audit <paths>`** | `render_audit --gate` — per `.svelte` file, does `tsv format` change what it RENDERS? Compares the browser-visible render key of the source vs of `format(source)`. The corpus-scale arm of the fixture **R** rules (which gate only the curated `tests/fixtures`). **Needs the Deno sidecar** (`svelte compile`), so it is deliberately NOT a leg of the pure-Rust `audit:corpus` — it rides `conformance` instead, as its one subprocess leg | standalone: any `.svelte` corpus, given explicitly (e.g. the dev repos). As a `conformance` leg: the version-pinned `framework` + `suite` checkouts (`../svelte` src + tests, svelte.dev, kit) — so a live working tree can't move a release verdict | release (in `conformance`); standalone after a printer change |
 
 **JS parser (test262) IS release-gated** via `conformance:test262` (pure Rust,
 `tsv_debug test262 --gate`), folded into `conformance:all` which `publish.ts` Step
@@ -143,6 +144,12 @@ one per runtime (`current_runtime()`). Under Bun the `node:wasi` entry fails to
 load, so the Bun report has no oxc-parser-wasm row (same class as the biome-wasm
 Bun-load issue). (Node also has oxc-parser **native**, the more relevant Node
 number, regardless.)
+
+**dprint-wasm runs under all three.** Unlike `biome-wasm` and `oxc-parser-wasm`, the
+`@dprint/formatter` host loads its plugin from a plain buffer (`createFromBuffer` over
+`node:fs`) with no wasm-bindgen `start` hook and no `node:wasi` dependency — verified
+byte-identical output under Deno, Node, and Bun — so it contributes a row to every
+runtime's report.
 
 ## Corpus Comparison
 
@@ -863,7 +870,10 @@ Things the published numbers measure that aren't quite what they look like:
   Every formatter IS configured to the same layout targets to the extent its
   options allow — printWidth/lineWidth 100, tabs, single quotes, no trailing
   commas — for prettier (`canonical.ts` `PRETTIER_OPTIONS`), oxfmt
-  (`oxc.ts` `format_async`), and biome (`biome.ts` `applyConfiguration`),
+  (`oxc.ts` `format_async`), biome (`biome.ts` `applyConfiguration`), and dprint
+  (`dprint.ts` `setConfig` — `quoteStyle: preferSingle` is the faithful analogue of
+  prettier's `singleQuote: true`, which likewise switches quotes to avoid escaping;
+  `trailingCommas: never` fans out to dprint's 12 per-construct keys),
   matching tsv's fixed config; unmatched defaults (biome's width is 80; oxfmt
   and biome default to double quotes) would make the rows wrap/rewrite
   different amounts of code, conflating config with engine speed. (oxfmt's own
@@ -884,9 +894,36 @@ Things the published numbers measure that aren't quite what they look like:
   baseline is `prettier` (JS) and the flagship `tsv` row is the native FFI
   binary (AOT Rust). That's a fair "what you get replacing prettier with tsv"
   number, not a language-neutral algorithm comparison. The same-tier reads are
-  WASM-vs-WASM (`tsv_wasm` vs `biome-wasm` vs `oxc-parser-wasm`) and
+  WASM-vs-WASM (`tsv_wasm` vs `biome-wasm` vs `dprint-wasm` vs `oxc-parser-wasm`) and
   native-vs-native (`tsv` vs `oxfmt`/`oxc-parser`); compare within a tier before
   attributing a gap to the formatter rather than the runtime.
+- **PGO native flagship (forthcoming — policy; no such row ships today).** The
+  standalone native flagship (the bare `@fuzdev/tsv` binary) is planned to ship
+  with profile-guided optimization (PGO) — native-only, a measured ~17–19%
+  wall-time win, **byte-identical** output. PGO lands **Linux-only first**, on
+  that single-target standalone build; the cross-platform prebuilt `.node`
+  binaries built on GitHub (the N-API matrix) stay standard-release until matrix
+  PGO is a later step — so the PGO row represents the Linux standalone flagship,
+  not what a cross-platform npm/N-API consumer gets yet. When that row lands the
+  policy is: **(1) both rows** — a standard-release native row *and* a PGO native
+  row, never PGO silently folded into the single native number, so the win stays
+  legible; **(2) measure what ships** — publish PGO numbers only once a shipped
+  native artifact actually carries the PGO recipe, and label which one (the Linux
+  standalone flagship for now); until then the standard-release row is the honest
+  native number; **(3)
+  disjoint training corpus** — the PGO profile is trained on a corpus disjoint
+  from the benchmark measurement corpus, so a published number is never
+  train-on-test (the profile generalizes to held-out code, so disjointness costs
+  nothing); **(4) byte-identical** — PGO changes only code layout, not output, so
+  it touches neither correctness nor the output-shape caveat above. Fairness
+  framing: PGO is a standard toolchain optimization. Against the JS reference
+  tools (`prettier`, `svelte/compiler`) it partly *closes a gap* — V8's JIT
+  already does profile-guided runtime optimization for them for free. Against the
+  native AOT competitors (`oxc-parser`, `oxfmt`, `biome`), which ship standard
+  release builds, PGO is a build-config advantage they don't take in their
+  published artifacts — fair to report as "what tsv ships vs what they ship," but
+  disclosed here so a native-vs-native read isn't mistaken for same-build-config.
+  Never mix a PGO or instrumented binary into a regression anchor series.
 - **Self-corpus / representativeness.** The perf corpus is real-world code
   only (the fixture suites live in the `gates`/`conformance` views — see
   [Corpus](#corpus)), but it's still dominated by the author's own fuz
@@ -1196,6 +1233,7 @@ benches/js/
 │   ├── check_node_modules.ts # node_modules preflight: exists + not stale vs package.json (all entry points)
 │   ├── compare_cli.ts     # Shared scaffolding for the corpus_compare_* entry points
 │   ├── corpus.ts          # DevReposLoader + DirectoryLoader (load/stream; node: builtins)
+│   ├── dprint.ts          # dprint WASM wrapper (TypeScript/JS only; the engine `deno fmt` runs)
 │   ├── gate_counts.ts     # Pinned gate counts (exact pins + live-corpus minimums + negative-bucket pins) — see §Pinned gate counts
 │   ├── harvest_stamp.ts   # Harvest freshness stamps (source commit + pins) — skip unchanged re-harvests
 │   ├── prettier_cache.ts  # Content-addressed prettier-output cache for the format comparison
@@ -1244,8 +1282,8 @@ via `Cargo.lock`. Upgrading is always a deliberate, committed act. A plain
 cd benches/js && npm outdated   # shows current vs latest
 # bump the version in benches/js/package.json, then:
 deno task bench:install   # re-install at the new pins (+ re-fetch the oxc wasi binding)
-deno task smoke           # confirm every impl still loads + formats (36 checks)
-deno check --config benches/js/deno.json benches/js/bench.ts benches/js/lib/biome.ts  # catch type-surface breakage smoke can't (e.g. a major bump renaming an options field)
+deno task smoke           # confirm every impl still loads + formats (37 checks)
+deno check --config benches/js/deno.json benches/js/bench.ts benches/js/lib/biome.ts benches/js/lib/dprint.ts  # catch type-surface breakage smoke can't (e.g. a major bump renaming an options field)
 deno task bench           # regenerate report.{deno,node,bun}.* + combined report.{json,md}
 # commit package.json + package-lock.json + results/report.*
 ```
@@ -1318,6 +1356,21 @@ prettier. This is load-bearing, not cosmetic, on two axes:
   (Svelte via biome's experimental HTML-superset support — `html.experimentalFullSupportEnabled`;
   it formats the template **and** the embedded `<script>`/`<style>`, so it's comparable
   work to prettier-plugin-svelte / tsv, just on an experimental path)
+- dprint (WASM) — Formatter; languages: **TypeScript, JS only**. This is the engine
+  **`deno fmt` runs** for TS/JS (`dprint-plugin-typescript`), loaded in-process as its
+  Wasm plugin. Deliberately NOT a `deno fmt` subprocess row: that would exist only
+  under Deno (against this harness's three-runtime design) and would time process
+  spawn + IPC rather than format work, cold on every call against warm opponents. So
+  the row is named for what it measures — the engine — not the CLI, whose wrapping
+  (config discovery, file IO, its own CSS/HTML/markdown plugins) is out of scope.
+  `@dprint/typescript` matches `ts,tsx,js,jsx,mjs,cjs,mts,cts` and **rejects CSS and
+  Svelte outright** (verified), so unlike oxfmt/biome it contributes no css or svelte
+  row; dprint's CSS (malva) and HTML plugins are separate Wasm plugins, not wired up.
+  Config is asserted to LAND: `lib/dprint.ts` fails init if `getConfigDiagnostics()`
+  is non-empty, since dprint reports an unrecognized key as a diagnostic rather than
+  throwing — without that check a renamed key would silently leave an option at its
+  default and skew the row (the config-vs-engine conflation the fairness rules exist
+  to prevent).
 
 ### OXC Package Details
 
@@ -1400,6 +1453,9 @@ Benchmark output includes binary/WASM size comparison across implementations:
   so the row's mechanism is unambiguous. `deno task bench` builds all of them; the
   subset rows are omitted if those builds haven't been run.
 - **biome**: WASM (`.wasm`) from node_modules
+- **dprint**: WASM (`.wasm` — `@dprint/typescript`'s `plugin.wasm`) from node_modules.
+  TS/JS-only scope, so it size-compares against the format-only tsv builds
+  (`tsv_format_wasm` / `tsv format (ffi)`), not the full both-features bundle.
 - **oxc-parser**: N-API binding (`.node`) and WASM (`.wasm` from `binding-wasm32-wasi`) from node_modules
 - **oxfmt**: N-API binding (`.node`) from node_modules (no WASM variant)
 

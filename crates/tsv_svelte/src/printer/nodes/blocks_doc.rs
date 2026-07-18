@@ -68,13 +68,37 @@ fn build_await_section_body(printer: &Printer<'_>, fragment: &Fragment<'_>, expa
     indent_body(printer, body_doc, expand)
 }
 
-/// Build `indent([line, body_doc])` for space-only await blocks.
+/// Whether a fragment carries **printable content** — any node that is not whitespace-only
+/// text. An empty (or whitespace-only) section has no content, so it has no authored
+/// boundary whitespace worth preserving: its separators are `softline`s, which glue it
+/// inline and open it to a blank line once the construct breaks.
+fn fragment_has_printable(fragment: &Fragment<'_>) -> bool {
+    fragment.nodes.iter().any(|n| !n.is_whitespace_only_text())
+}
+
+/// The space-only await boundary separator — the **one rule** both a body's leading edge
+/// (`indent_body_soft`) and the separator before the following marker / `{/await}` follow:
+/// a `line` (a space inline, a newline on break) when the boundary was **authored with
+/// whitespace**, else a `softline` (glued inline, still a newline on break).
 ///
-/// In flat mode (fits): ` body_doc` (space + content)
-/// In break mode (exceeds print width): newline + indent + body_doc
-fn indent_body_soft(printer: &Printer<'_>, body_doc: DocId) -> DocId {
-    let line = printer.d().line();
-    let inner = printer.d().concat(&[line, body_doc]);
+/// Preserving the authored boundary — instead of always synthesizing a space — keeps a
+/// glued content body glued (`}x{`) and a spaced one spaced (`} x {`), matching prettier and
+/// killing the cross-section authoring-dependence (a render-free space in one section no
+/// longer re-spaces another section's body — the boundary is render-free, see
+/// `Printer::body_boundaries_break`). Either way both forms become a newline on break, so
+/// the whole construct still expands as a unit.
+fn boundary_sep(printer: &Printer<'_>, authored_ws: bool) -> DocId {
+    let d = printer.d();
+    if authored_ws { d.line() } else { d.softline() }
+}
+
+/// Build `indent([<sep>, body_doc])` for a space-only await section body, where `<sep>` is
+/// [`boundary_sep`] keyed on the body's authored **leading** boundary whitespace: a space
+/// (fits) / newline (break) when authored with leading whitespace, glued (fits) / newline
+/// (break) when authored glued.
+fn indent_body_soft(printer: &Printer<'_>, body_doc: DocId, leading_ws: bool) -> DocId {
+    let sep = boundary_sep(printer, leading_ws);
+    let inner = printer.d().concat(&[sep, body_doc]);
     printer.d().indent(inner)
 }
 
@@ -157,11 +181,38 @@ enum AwaitShorthand {
     None,
 }
 
+/// Whether an await block's `:then` section carries a printable body. An **empty-body** `:then`
+/// (`{#await p} {:then v}{/await}`, or the shorthand `{#await p then v}{/await}`) is dropped
+/// entirely — marker and binding — matching prettier, since the `value` binding is unused when
+/// nothing renders. (A `:catch` is *not* dropped when empty: an empty `{:catch}` still handles a
+/// rejection, so removing it would change semantics — see `conformance_prettier.md` §Svelte: Blocks.)
+fn then_has_content(block: &internal::AwaitBlock<'_>) -> bool {
+    block
+        .then
+        .as_ref()
+        .is_some_and(|t| t.nodes.iter().any(|n| !n.is_whitespace_only_text()))
+}
+
 /// Classify an await block's head shorthand. See [`AwaitShorthand`].
+///
+/// A pending fragment that is empty **or space-only** (whitespace with no newline) carries no
+/// body, so — exactly like an absent pending — the first **surviving** section folds into the
+/// head shorthand (`then v` / `catch e`). This is what makes a space-only pending
+/// (`{#await p} {:then v}{/await}`) converge to the same fixed point as a truly-empty one instead
+/// of lingering as an un-folded full form. A **newline**-authored empty pending is left un-folded
+/// (its `is_boundary_break` node counts as a body) — it keeps the full multiline form.
+///
+/// An empty-body `:then` is not a survivor (it is dropped, see [`then_has_content`]), so the fold
+/// skips it to the `:catch`.
 fn await_shorthand(block: &internal::AwaitBlock<'_>) -> AwaitShorthand {
-    if block.pending.is_some() {
+    let has_pending_body = block.pending.as_ref().is_some_and(|p| {
+        p.nodes
+            .iter()
+            .any(|n| !n.is_whitespace_only_text() || n.is_boundary_break())
+    });
+    if has_pending_body {
         AwaitShorthand::None
-    } else if block.then.is_some() {
+    } else if then_has_content(block) {
         AwaitShorthand::Then
     } else if block.error.is_some() || block.catch.is_some() {
         AwaitShorthand::Catch
@@ -365,26 +416,37 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Post-build fold of a preceding sibling's split-off `>` (`gt_prefix`) on a block
+    /// Post-build placement of a preceding sibling's split-off `>` (`gt_prefix`) on a block
     /// builder's **non-expanding** return paths — the tails that don't thread `gt_prefix`
-    /// through `build_expanding_construct`/`build_expanding_block` (authored-multiline
-    /// bodies, `{#await}`'s space-only / newline tails). Dangle the `>` onto its own line
-    /// (`⏎>{#…}`) when the block's doc unconditionally breaks; otherwise leave the doc
-    /// untouched. `None` (every non-dangle caller) is a no-op.
+    /// through `build_expanding_construct`/`build_expanding_block` (authored-multiline bodies,
+    /// `{#await}`'s newline/empty tail). The `>` must track whether the block **renders**
+    /// inline or multiline — hug when inline (`>{#…}`), dangle onto its own line when
+    /// multiline (`⏎>{#…}`) — and must never be dropped. Three cases by how `doc` breaks:
     ///
-    /// This replicates, in one build, the discriminator `try_block_sibling_gt_dangle`
-    /// previously applied by building the block twice (a throwaway no-`gt` probe to test
-    /// `will_break`, then a rebuild): the probe and the rebuild used identical context, so
-    /// `will_break` of this path's (gt-free) doc equals the probe's verdict. A non-fast tail
-    /// that breaks reaches here only via `will_break` true (dangle); the one path that can
-    /// still fit inline is `{#await}`'s space-only `group`, where the `>` is currently
-    /// dropped — a pre-existing latent bug (`</a{#await…}`) preserved here byte-for-byte; see
-    /// the TODO at that return.
+    /// - **force-break** (`will_break`: a `hardline` / propagated `breakParent`) → the block is
+    ///   unconditionally multiline, so dangle statically.
+    /// - **can break at render but not forced** (`can_break`, e.g. a short empty block whose
+    ///   only break point is a **long head** that width-wraps) → the inline-vs-multiline choice
+    ///   is a *render-time* decision `will_break` can't see, so fold the `>` with `if_break` in
+    ///   an enclosing `group`: hug when the group fits, dangle when it breaks. Placing it
+    ///   statically here would hug a `>` whose block then wraps — reparse-safe but
+    ///   **non-idempotent** (the wrap reflows on the next pass).
+    /// - **cannot break** (no line at all, e.g. an empty `{#await p}{/await}` with a short head)
+    ///   → always inline, so hug statically.
+    ///
+    /// `None` (every non-dangle caller) is a no-op. Distinct from the space-only tail, which
+    /// needs its `group` **unconditionally** (its section separators break under it) and so
+    /// folds the `>` at its own return rather than here.
     fn dangle_gt(&self, gt_prefix: Option<DocId>, doc: DocId) -> DocId {
         let d = self.d();
         match gt_prefix {
+            None => doc,
             Some(gt) if d.will_break(doc) => d.concat(&[d.hardline(), gt, doc]),
-            _ => doc,
+            Some(gt) if d.can_break(doc) => {
+                let folded = d.if_break(d.concat(&[d.hardline(), gt]), gt);
+                d.group(d.concat(&[folded, doc]))
+            }
+            Some(gt) => d.concat(&[gt, doc]),
         }
     }
 
@@ -982,6 +1044,10 @@ impl<'a> Printer<'a> {
     /// `{:then}` if the then-section has content, else `None`. Whether to emit it is the
     /// caller's decision: a `then`-shorthand carries it in the head instead.
     fn await_then_keyword(&self, block: &internal::AwaitBlock<'_>) -> Option<DocId> {
+        // An empty-body `:then` is dropped entirely — no marker — matching prettier.
+        if !then_has_content(block) {
+            return None;
+        }
         let d = self.d();
         if let Some(value) = &block.value {
             Some(d.concat(&[
@@ -989,10 +1055,8 @@ impl<'a> Printer<'a> {
                 self.build_pattern_doc(value),
                 d.text("}"),
             ]))
-        } else if block.then.as_ref().is_some_and(|t| !t.nodes.is_empty()) {
-            Some(d.text("{:then}"))
         } else {
-            None
+            Some(d.text("{:then}"))
         }
     }
 
@@ -1036,7 +1100,12 @@ impl<'a> Printer<'a> {
             then_kw: (!is_then_shorthand)
                 .then(|| self.await_then_keyword(block))
                 .flatten(),
-            then_body: block.then.as_ref().map(|t| self.build_fragment_doc(t)),
+            // An empty-body `:then` is dropped (marker + body); keep only a content body.
+            then_body: block
+                .then
+                .as_ref()
+                .filter(|_| then_has_content(block))
+                .map(|t| self.build_fragment_doc(t)),
             catch_kw: (!is_catch_shorthand)
                 .then(|| self.await_catch_keyword(block))
                 .flatten(),
@@ -1078,36 +1147,71 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    /// Build the await tail for the **space-only** layout: each present section body
-    /// (`indent_body_soft`) and each un-shorthanded `{:then}` / `{:catch}` keyword are
-    /// separated by `line()` docs, so the whole construct breaks together as a unit under
-    /// the caller's `group`. Mirrors `compose_await_tail`, but with `line()` separators and
-    /// soft-indented bodies (the head is prepended + grouped by the caller).
+    /// Push a space-only section's body to `parts` and **report its authored trailing boundary
+    /// whitespace**, which the caller uses to pick the separator *after* it ([`boundary_sep`]).
+    ///
+    /// Every section pushes — there is no empty-section special case. A content section keeps
+    /// its own authored boundary (leading via `indent_body_soft`, trailing via the return), so
+    /// a body authored glued stays glued and a spaced one keeps its space. A section with no
+    /// printable content has nothing to preserve, so it takes `softline`s on both sides and
+    /// returns `false`: inline they collapse and its markers glue
+    /// (`{#await p}{:then v}{/await}`), and once the construct breaks they become newlines,
+    /// leaving the empty section its own blank line — the same shape the newline-authored tail
+    /// produces, so the two paths agree.
+    fn push_await_space_only_body(&self, parts: &mut DocBuf, fragment: &Fragment<'_>) -> bool {
+        if !fragment_has_printable(fragment) {
+            // Empty section: no content, so nothing to preserve — a `softline` on each side.
+            // Inline both collapse and the markers glue (`{:catch e}{/await}`); once the
+            // construct breaks they become newlines, leaving the section its blank line.
+            parts.push(indent_body_soft(self, self.d().empty(), false));
+            return false;
+        }
+        let leading_ws = self.fragment_has_any_leading_ws(fragment);
+        let trailing_ws = self.fragment_has_any_trailing_ws(fragment);
+        let body = self.build_nodes_doc_multiline(fragment.nodes);
+        parts.push(indent_body_soft(self, body, leading_ws));
+        trailing_ws
+    }
+
+    /// Build the await tail for the **space-only** layout. A content-bearing section body
+    /// (`indent_body_soft`, via `push_await_space_only_body`) is wrapped in single spaces, but
+    /// a **whitespace-only** section contributes no body and its markers **glue**
+    /// (`{#await p}{:then v}{/await}`): a separator `line` is emitted only after a section that
+    /// carried content, so an empty section collapses to `}{` exactly as every other empty
+    /// construct does — while the `{:then}` / `{:catch}` markers are kept (prettier instead
+    /// deletes the whole section; see `conformance_prettier.md` §Svelte: Blocks). The whole
+    /// construct still breaks together as a unit under the caller's `group`. Mirrors
+    /// `compose_await_tail`, but with **conditional** `line()` separators and soft-indented
+    /// bodies (the head is prepended + grouped by the caller).
     fn build_await_tail_space_only(&self, block: &internal::AwaitBlock<'_>) -> DocId {
         let d = self.d();
         let (is_then_shorthand, is_catch_shorthand) = Self::await_shorthand_flags(block);
         let mut parts: DocBuf = DocBuf::new();
+        // The authored trailing boundary whitespace of the section just emitted — picks the
+        // separator before the next marker / close (`line` when the author wrote whitespace
+        // there, else `softline`). An empty section reports `false`, so its markers glue
+        // inline and open to a blank line when the construct breaks.
+        let mut prev_trailing_ws = false;
         if let Some(pending) = &block.pending {
-            let body = self.build_nodes_doc_multiline(pending.nodes);
-            parts.push(indent_body_soft(self, body));
+            prev_trailing_ws = self.push_await_space_only_body(&mut parts, pending);
         }
         if !is_then_shorthand && let Some(kw) = self.await_then_keyword(block) {
-            parts.push(d.line());
+            parts.push(boundary_sep(self, prev_trailing_ws));
             parts.push(kw);
+            prev_trailing_ws = false;
         }
         if let Some(then_block) = &block.then {
-            let body = self.build_nodes_doc_multiline(then_block.nodes);
-            parts.push(indent_body_soft(self, body));
+            prev_trailing_ws = self.push_await_space_only_body(&mut parts, then_block);
         }
         if !is_catch_shorthand && let Some(kw) = self.await_catch_keyword(block) {
-            parts.push(d.line());
+            parts.push(boundary_sep(self, prev_trailing_ws));
             parts.push(kw);
+            prev_trailing_ws = false;
         }
         if let Some(catch_block) = &block.catch {
-            let body = self.build_nodes_doc_multiline(catch_block.nodes);
-            parts.push(indent_body_soft(self, body));
+            prev_trailing_ws = self.push_await_space_only_body(&mut parts, catch_block);
         }
-        parts.push(d.line());
+        parts.push(boundary_sep(self, prev_trailing_ws));
         parts.push(d.text("{/await}"));
         d.concat(&parts)
     }
@@ -1131,7 +1235,10 @@ impl<'a> Printer<'a> {
             }
             parts.push(kw);
         }
-        if let Some(then_block) = &block.then {
+        // An empty-body `:then` is dropped (marker via `await_then_keyword` above, body here).
+        if then_has_content(block)
+            && let Some(then_block) = &block.then
+        {
             parts.push(build_await_section_body(self, then_block, expand));
         }
         if !is_catch_shorthand && let Some(kw) = self.await_catch_keyword(block) {
@@ -1270,12 +1377,20 @@ impl<'a> Printer<'a> {
         });
         if has_space_only {
             let tail = self.build_await_tail_space_only(block);
-            // TODO: this `group` can fit inline, so `dangle_gt` leaves it untouched and a
-            // preceding sibling's split-off `>` (gt_prefix) is dropped here — pre-existing
-            // latent bug (`</a{#await…}`) preserved byte-for-byte by the build-once dangle.
-            // Fix separately (fixtures-first): fold the `>` into the group so it hugs when
-            // flat / dangles when the group breaks.
-            return self.dangle_gt(gt_prefix, d.group(d.concat(&[head_doc, tail])));
+            // This `group` can fit inline, so its break is a *render-time* decision that
+            // `will_break` (and thus `dangle_gt`) can't see. Fold a preceding sibling's
+            // split-off `>` (`gt_prefix`) *inside* the group with `if_break`, keyed on the
+            // group's own flat/break state: hug when it fits (`>{#await…}`), dangle onto its
+            // own line when it breaks (`⏎>{#await…}`). The `None` arm is a bare group,
+            // byte-identical to a block with no preceding sibling.
+            let group_body = d.concat(&[head_doc, tail]);
+            return match gt_prefix {
+                Some(gt) => {
+                    let folded_gt = d.if_break(d.concat(&[d.hardline(), gt]), gt);
+                    d.group(d.concat(&[folded_gt, group_body]))
+                }
+                None => d.group(group_body),
+            };
         }
 
         // Any section rendering multiline breaks *every* boundary — each section body, the

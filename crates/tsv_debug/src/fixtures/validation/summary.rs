@@ -56,6 +56,18 @@ pub struct ValidationSummary {
     pub results: Vec<FixtureValidation>,
     pub cross_fixture_duplicates: Vec<Vec<String>>,
     pub total_undocumented_prettier: usize,
+    /// Whitespace variants confirmed render-equivalent via the authoritative
+    /// `svelte compile` render-key arm.
+    pub total_render_equiv_compile: usize,
+    /// Whitespace variants confirmed render-equivalent via the template-only
+    /// `render_browser` fallback arm (the compile-blind spot).
+    pub total_render_equiv_fallback: usize,
+    /// Allow-listed benign fallback divergences that fired across the run, used to
+    /// ratchet the list for staleness (see `detect_stale_benign_render_equiv`).
+    pub render_equiv_benign_fired: std::collections::HashSet<String>,
+    /// Allow-listed benign fallback divergences that did NOT fire — the list has gone
+    /// stale and must be re-pinned. Populated only on an unfiltered run; blocks validity.
+    pub stale_benign_render_equiv: Vec<&'static str>,
 }
 
 impl ValidationSummary {
@@ -76,6 +88,10 @@ impl ValidationSummary {
             result.prettier_intermediate_to_variant_count;
         self.total_invalid_syntax += result.invalid_syntax_count;
         self.total_undocumented_prettier += result.undocumented_prettier_outputs.len();
+        self.total_render_equiv_compile += result.render_equiv_verified_compile;
+        self.total_render_equiv_fallback += result.render_equiv_verified_fallback;
+        self.render_equiv_benign_fired
+            .extend(result.render_equiv_benign_fired.iter().cloned());
 
         if result.is_valid() {
             self.passed_fixtures += 1;
@@ -98,8 +114,19 @@ impl ValidationSummary {
         self.cross_fixture_duplicates = detector.find_duplicates();
     }
 
+    /// Ratchet the render-equivalence benign allow-list: every entry must still fire.
+    ///
+    /// Call ONLY on an unfiltered run (like `detect_cross_fixture_duplicates`) — a
+    /// narrowed run visits too few fixtures, so every unvisited entry would read as stale.
+    pub fn detect_stale_benign_render_equiv(&mut self) {
+        self.stale_benign_render_equiv =
+            super::phases::stale_benign_entries(&self.render_equiv_benign_fired);
+    }
+
     pub fn is_valid(&self) -> bool {
-        self.failed_fixtures == 0 && self.cross_fixture_duplicates.is_empty()
+        self.failed_fixtures == 0
+            && self.cross_fixture_duplicates.is_empty()
+            && self.stale_benign_render_equiv.is_empty()
     }
 
     pub fn failed_results(&self) -> impl Iterator<Item = &FixtureValidation> {
@@ -224,8 +251,25 @@ pub fn print_validation_results(summary: &ValidationSummary, verbose: bool) {
         eprintln!();
     }
 
+    // Print stale render-equivalence allow-list entries (the ratchet)
+    if !summary.stale_benign_render_equiv.is_empty() {
+        eprintln!("✗ Stale render-equivalence benign allow-list entries (no longer firing):");
+        for entry in &summary.stale_benign_render_equiv {
+            eprintln!("      - {entry}");
+        }
+        eprintln!(
+            "    The fallback oracle improved, or the fixture changed/moved. Re-pin:\n\
+             \x20   drop the entry from BENIGN_FALLBACK_DIVERGENCES in\n\
+             \x20   crates/tsv_debug/src/fixtures/validation/phases/render_equivalence.rs"
+        );
+        eprintln!();
+    }
+
     // Print summary
-    if failed.is_empty() && summary.cross_fixture_duplicates.is_empty() {
+    if failed.is_empty()
+        && summary.cross_fixture_duplicates.is_empty()
+        && summary.stale_benign_render_equiv.is_empty()
+    {
         let mut parts = vec![format!(
             "✓ All {} fixtures validated",
             summary.total_fixtures
@@ -302,6 +346,28 @@ pub fn print_validation_results(summary: &ValidationSummary, verbose: bool) {
                     println!("    Investigate: deno task fixtures:audit {fixture_name}");
                 }
             }
+        }
+
+        // Render-equivalence: the compile/fallback coverage split. Divergences on
+        // either arm are gating errors and show in the failure path, not here; the
+        // only thing worth noting on a green run is how many benign fallback
+        // artifacts are still pinned (the list shrinking is the goal).
+        if summary.total_render_equiv_compile > 0 || summary.total_render_equiv_fallback > 0 {
+            println!();
+            println!(
+                "Render-equivalence: {} verified ({} via compile, {} via render_browser fallback){}",
+                summary.total_render_equiv_compile + summary.total_render_equiv_fallback,
+                summary.total_render_equiv_compile,
+                summary.total_render_equiv_fallback,
+                if summary.render_equiv_benign_fired.is_empty() {
+                    String::new()
+                } else {
+                    format!(
+                        ", {} benign fallback artifact(s) pinned",
+                        summary.render_equiv_benign_fired.len()
+                    )
+                },
+            );
         }
     } else {
         eprintln!("════════════════════");

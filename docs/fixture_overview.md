@@ -427,6 +427,58 @@ on real codebases.
   - **Blocking** when the fixture documents stable forms but the output matches none of them — `ValidationError::UndocumentedPrettierOutput`. This means Prettier drifted, or the target is undocumented; add/update a matching `variant_*`/`prettier_variant_*`/`divergent_variant_*` (or a `prettier_intermediate*_*` for multi-pass). This is what pins Prettier's _specific_ one-pass-stable output for a normalization divergence (the analogue of N8 for `output_prettier` and N7b for multi-pass convergence).
   - **Informational** only when the fixture documents the divergence by README alone (no `output_prettier`/`prettier_variant_*`/`variant_*` files): novel outputs are NOTEs suggesting investigation via `deno task fixtures:audit`
 
+**Render-equivalence validations (R)** — a whitespace variant must *render* like input:
+
+The N rules prove only that a variant *normalizes to* input (`ours(variant) == input`);
+they never prove the variant is **render-equivalent** to input. So a formatter bug that
+changes the rendered output *and* happens to land on input would pass N green — worst for
+`unformatted_ours_*`, where N6 makes prettier deliberately disagree, leaving `ours` (the
+formatter under test) as the sole witness. R closes that hole for **Svelte templates**
+(`.svelte` only — `.svelte.ts`/`.ts`/`.css` have nothing Svelte renders), independent of
+the formatter, over both `unformatted_*` and `unformatted_ours_*`:
+
+- **R1 (compile arm, authoritative — GATES)**: `render_key(variant) == render_key(input)`,
+  where the render key is `svelte compile --generate server` reduced to its browser-visible
+  render (baked template text, `${…}` holed out, `<script>`/`<style>`/HTML comments stripped,
+  whitespace collapsed with block-boundary whitespace dropped). Svelte bakes render-time
+  whitespace trimming at compile time but leaves inter-node runs for the browser to collapse,
+  so equal keys prove equal renders. A mismatch is `ValidationError::RenderEquivalenceMismatch`
+  — the formatter changed the render while normalizing the variant (a real bug, or a
+  mis-authored variant). Because the key is baked-template-only, a `<script>`/`<style>`
+  reformatting that leaves the template unchanged shares a key.
+- **R2 (fallback arm, ratcheted — GATES against an allow-list)**: `compile` runs the full semantic
+  **analyzer**, which is far stricter than the parser, and synthetic parser/formatter fixtures
+  routinely violate it — TS features needing a preprocessor, experimental `await`, an illegal
+  default export, a `bind:` to an undeclared or non-assignable target, duplicate declarations,
+  invalid node placement, CSS analysis errors. (~6% of variant-bearing fixtures; the analysis
+  errors are unrelated to rendering, and `runes: false` does not avoid them.) When either side
+  won't compile, fall back to a template-only compare (`instance`/`module`/`css` erased) under
+  the `render_browser` model — the Svelte 5 compiler's whitespace rules (`render_normalize`)
+  plus the browser rules the compile arm applies: block-boundary whitespace vanishes, and a
+  quoted single-expression attribute value (`a="{x}"`) compares equal to its bare spelling
+  (`a={x}`). That model still over-flags by construction — it compares expression/structure
+  syntax that never reaches the render (parens, comment position, `{#await x then y}` ↔
+  `{#await x}{:then y}`) — so its divergences are gated against a hand-verified allow-list,
+  `BENIGN_FALLBACK_DIVERGENCES` in `phases/render_equivalence.rs`. A divergence **not** on the
+  list FAILS (`ValidationError::RenderEquivalenceFallbackDivergence`); a listed entry that stops
+  firing FAILS as stale, forcing a re-pin (checked only on an unfiltered run).
+
+  ⚠️ **Unlike the `gap_audit` / `blank_audit` ratchets, a line on that list is NOT a known bug** —
+  it is a known false positive of the weak oracle. Shrinking the list means *improving the
+  oracle*, never fixing the formatter, and each entry carries its rationale. The entries that
+  remain are the ones whose retirement would mean reimplementing what the compile arm already
+  does (holing out expression subtrees, await-shorthand structural normalization), so they are
+  deliberately not pursued. To triage a new one: compile both sides with the fixture's `bind:`
+  targets declared as `$state` (the same transform on each) and compare the server output —
+  identical ⇒ an oracle artifact to pin, different ⇒ a real render change to fix.
+
+**Scope caveat.** R gates only `tests/fixtures`, whose variants are hand-authored to be
+render-equivalent — so it is a *regression guard*, not a discovery tool. The corpus-scale arm
+that asks the same question of **real code** is `deno task render:audit <paths>` (same oracle,
+comparing a file against its own formatted output); it needs the Deno sidecar, so it runs at
+release cadence — a leg of `deno task conformance` over the pinned checkouts — rather than in
+`deno task check`. See the root CLAUDE.md §Debug Tooling.
+
 **Invalid syntax validations (I)** - Syntax rejection tests:
 
 - **I1**: `input_invalid_*.svelte` must fail to parse with BOTH our parser AND Svelte's parser
