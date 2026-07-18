@@ -715,11 +715,13 @@ cargo run -p tsv_debug canonical_compile file.svelte --json              # { js,
 # Also: --target server|client (default server), --dev, --content <str>, --stdin. Compile errors exit non-zero.
 
 # compile_compare - diff tsv's Svelte compile against the canonical compiler, comparing
-# the CANONICALIZED JS of both sides (intent-erased reprint via tsv_svelte_compile::canonicalize_js,
-# so a diff is a real code difference, not incidental whitespace). Self-checks canonicalizer
-# idempotence on the oracle side. Exit codes: 0 parity, 1 real diff, 2 error (including a component
-# shape tsv's compiler doesn't cover yet — that prints the oracle canonical form as the target).
-# --json emits { target, parity, ours_status, hunks }.
+# the CANONICALIZED JS of both sides (intent-erased reprint via tsv_svelte_compile::canonicalize_js).
+# The parity bar tolerates a comment-POSITION difference (compare_canonical: same code + same comment
+# sequence, no bundler annotation — tsv's comment placement vs the oracle's esrap), so a remaining diff
+# is a real code difference, not incidental whitespace. Self-checks canonicalizer idempotence on the
+# oracle side. Exit codes: 0 parity (byte-exact OR comment-position-tolerated), 1 real diff, 2 error
+# (including a component shape tsv's compiler doesn't cover yet — that prints the oracle canonical form
+# as the target). --json emits { target, parity, comment_position_tolerated, ours_status, hunks }.
 cargo run -p tsv_debug compile_compare file.svelte                       # human diff / oracle canonical form
 cargo run -p tsv_debug compile_compare --content '<h1>hi</h1>' --json    # machine-readable report
 # Also: --target server|client (default server), --content <str>, --stdin. The ad-hoc one-file view;
@@ -735,9 +737,10 @@ cargo run -p tsv_debug compile_fixture_init tests/fixtures_compile/feature/case 
 # Also: --force (overwrite existing input).
 
 # compile_fixtures_validate - validate compile fixtures. Per fixture, all gating: (a) oracle
-# freshness — canonicalize(oracle(input)) must equal the committed expected_server.js (+ css match);
-# (b) ours — tsv_svelte_compile::compile must succeed and its canonicalized JS + CSS must equal the
-# expectations (parity); (c) the committed expected_server.js must be a canonicalize fixed point.
+# freshness — canonicalize(oracle(input)) must equal the committed expected_server.js byte-exact (+ css
+# match); (b) ours — tsv_svelte_compile::compile must succeed and its canonicalized JS must be PARITY
+# with expected_server.js (byte-exact or comment-position-tolerated, compare_canonical) + CSS match;
+# (c) the committed expected_server.js must be a canonicalize fixed point.
 # The pure-Rust slice of the contract (input parses, expected idempotent, OURS-VS-EXPECTED parity —
 # compile() needs no Deno) also runs sidecar-free in
 # `cargo test --workspace --test compile_fixtures_tests`, the offline parity gate.
@@ -746,9 +749,11 @@ cargo run -p tsv_debug compile_fixtures_validate [pattern...]
 
 # compile_corpus_compare - the compile-parity wide net: compile every .svelte under the given roots
 # with the canonical compiler (oracle) AND tsv, comparing the canonical reprints of both sides.
-# Buckets per file: parity / refused (sub-bucketed by refusal reason — a clean "not yet", never a
-# bug) / oracle-rejected (legacy mode, invalid syntax; out of scope) / MISMATCH (both compiled,
-# canonical forms differ — always a bug by the refusal contract) / error (harness failure).
+# Buckets per file: parity (byte-exact OR comment-POSITION-tolerated — tsv's comment placement vs the
+# oracle's; not a bug, surfaced in a separate comment_position sub-count) / refused (sub-bucketed by
+# refusal reason — a clean "not yet", never a bug) / oracle-rejected (legacy mode, invalid syntax; out
+# of scope) / MISMATCH (both compiled, canonical CODE differs — always a bug by the refusal contract) /
+# error (harness failure).
 # Every oracle-rejected file is also probed with tsv's compile(): a success is reported in a loud
 # OVER-ACCEPTANCE section (nothing invalid in runes mode may compile — a refusal-contract gap),
 # without affecting the exit code.
