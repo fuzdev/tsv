@@ -144,6 +144,12 @@ load, so the Bun report has no oxc-parser-wasm row (same class as the biome-wasm
 Bun-load issue). (Node also has oxc-parser **native**, the more relevant Node
 number, regardless.)
 
+**dprint-wasm runs under all three.** Unlike `biome-wasm` and `oxc-parser-wasm`, the
+`@dprint/formatter` host loads its plugin from a plain buffer (`createFromBuffer` over
+`node:fs`) with no wasm-bindgen `start` hook and no `node:wasi` dependency — verified
+byte-identical output under Deno, Node, and Bun — so it contributes a row to every
+runtime's report.
+
 ## Corpus Comparison
 
 Compare formatting output against Prettier on arbitrary codebases:
@@ -855,7 +861,10 @@ Things the published numbers measure that aren't quite what they look like:
   Every formatter IS configured to the same layout targets to the extent its
   options allow — printWidth/lineWidth 100, tabs, single quotes, no trailing
   commas — for prettier (`canonical.ts` `PRETTIER_OPTIONS`), oxfmt
-  (`oxc.ts` `format_async`), and biome (`biome.ts` `applyConfiguration`),
+  (`oxc.ts` `format_async`), biome (`biome.ts` `applyConfiguration`), and dprint
+  (`dprint.ts` `setConfig` — `quoteStyle: preferSingle` is the faithful analogue of
+  prettier's `singleQuote: true`, which likewise switches quotes to avoid escaping;
+  `trailingCommas: never` fans out to dprint's 12 per-construct keys),
   matching tsv's fixed config; unmatched defaults (biome's width is 80; oxfmt
   and biome default to double quotes) would make the rows wrap/rewrite
   different amounts of code, conflating config with engine speed. (oxfmt's own
@@ -876,7 +885,7 @@ Things the published numbers measure that aren't quite what they look like:
   baseline is `prettier` (JS) and the flagship `tsv` row is the native FFI
   binary (AOT Rust). That's a fair "what you get replacing prettier with tsv"
   number, not a language-neutral algorithm comparison. The same-tier reads are
-  WASM-vs-WASM (`tsv_wasm` vs `biome-wasm` vs `oxc-parser-wasm`) and
+  WASM-vs-WASM (`tsv_wasm` vs `biome-wasm` vs `dprint-wasm` vs `oxc-parser-wasm`) and
   native-vs-native (`tsv` vs `oxfmt`/`oxc-parser`); compare within a tier before
   attributing a gap to the formatter rather than the runtime.
 - **Self-corpus / representativeness.** The perf corpus is real-world code
@@ -1188,6 +1197,7 @@ benches/js/
 │   ├── check_node_modules.ts # node_modules preflight: exists + not stale vs package.json (all entry points)
 │   ├── compare_cli.ts     # Shared scaffolding for the corpus_compare_* entry points
 │   ├── corpus.ts          # DevReposLoader + DirectoryLoader (load/stream; node: builtins)
+│   ├── dprint.ts          # dprint WASM wrapper (TypeScript/JS only; the engine `deno fmt` runs)
 │   ├── gate_counts.ts     # Pinned gate counts (exact pins + live-corpus minimums + negative-bucket pins) — see §Pinned gate counts
 │   ├── harvest_stamp.ts   # Harvest freshness stamps (source commit + pins) — skip unchanged re-harvests
 │   ├── prettier_cache.ts  # Content-addressed prettier-output cache for the format comparison
@@ -1236,8 +1246,8 @@ via `Cargo.lock`. Upgrading is always a deliberate, committed act. A plain
 cd benches/js && npm outdated   # shows current vs latest
 # bump the version in benches/js/package.json, then:
 deno task bench:install   # re-install at the new pins (+ re-fetch the oxc wasi binding)
-deno task smoke           # confirm every impl still loads + formats (36 checks)
-deno check --config benches/js/deno.json benches/js/bench.ts benches/js/lib/biome.ts  # catch type-surface breakage smoke can't (e.g. a major bump renaming an options field)
+deno task smoke           # confirm every impl still loads + formats (37 checks)
+deno check --config benches/js/deno.json benches/js/bench.ts benches/js/lib/biome.ts benches/js/lib/dprint.ts  # catch type-surface breakage smoke can't (e.g. a major bump renaming an options field)
 deno task bench           # regenerate report.{deno,node,bun}.* + combined report.{json,md}
 # commit package.json + package-lock.json + results/report.*
 ```
@@ -1310,6 +1320,21 @@ prettier. This is load-bearing, not cosmetic, on two axes:
   (Svelte via biome's experimental HTML-superset support — `html.experimentalFullSupportEnabled`;
   it formats the template **and** the embedded `<script>`/`<style>`, so it's comparable
   work to prettier-plugin-svelte / tsv, just on an experimental path)
+- dprint (WASM) — Formatter; languages: **TypeScript, JS only**. This is the engine
+  **`deno fmt` runs** for TS/JS (`dprint-plugin-typescript`), loaded in-process as its
+  Wasm plugin. Deliberately NOT a `deno fmt` subprocess row: that would exist only
+  under Deno (against this harness's three-runtime design) and would time process
+  spawn + IPC rather than format work, cold on every call against warm opponents. So
+  the row is named for what it measures — the engine — not the CLI, whose wrapping
+  (config discovery, file IO, its own CSS/HTML/markdown plugins) is out of scope.
+  `@dprint/typescript` matches `ts,tsx,js,jsx,mjs,cjs,mts,cts` and **rejects CSS and
+  Svelte outright** (verified), so unlike oxfmt/biome it contributes no css or svelte
+  row; dprint's CSS (malva) and HTML plugins are separate Wasm plugins, not wired up.
+  Config is asserted to LAND: `lib/dprint.ts` fails init if `getConfigDiagnostics()`
+  is non-empty, since dprint reports an unrecognized key as a diagnostic rather than
+  throwing — without that check a renamed key would silently leave an option at its
+  default and skew the row (the config-vs-engine conflation the fairness rules exist
+  to prevent).
 
 ### OXC Package Details
 
@@ -1392,6 +1417,9 @@ Benchmark output includes binary/WASM size comparison across implementations:
   so the row's mechanism is unambiguous. `deno task bench` builds all of them; the
   subset rows are omitted if those builds haven't been run.
 - **biome**: WASM (`.wasm`) from node_modules
+- **dprint**: WASM (`.wasm` — `@dprint/typescript`'s `plugin.wasm`) from node_modules.
+  TS/JS-only scope, so it size-compares against the format-only tsv builds
+  (`tsv_format_wasm` / `tsv format (ffi)`), not the full both-features bundle.
 - **oxc-parser**: N-API binding (`.node`) and WASM (`.wasm` from `binding-wasm32-wasi`) from node_modules
 - **oxfmt**: N-API binding (`.node`) from node_modules (no WASM variant)
 

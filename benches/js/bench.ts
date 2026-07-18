@@ -1014,6 +1014,7 @@ interface BaselineVersions {
 	oxc_parser?: string;
 	oxfmt?: string;
 	biome?: string;
+	dprint?: string;
 }
 
 interface Baseline {
@@ -1281,6 +1282,7 @@ function generate_markdown_report(
 	if (versions.oxc_parser) version_parts.push(`oxc-parser@${versions.oxc_parser}`);
 	if (versions.oxfmt) version_parts.push(`oxfmt@${versions.oxfmt}`);
 	if (versions.biome) version_parts.push(`@biomejs/wasm-bundler@${versions.biome}`);
+	if (versions.dprint) version_parts.push(`@dprint/typescript@${versions.dprint}`);
 	lines.push(`**Versions:** ${version_parts.join(', ')}\n`);
 
 	lines.push(
@@ -1560,6 +1562,7 @@ const binary_sizes = await collect_binary_sizes({
 	has_wasm: !!impls.wasm,
 	has_oxc: !!impls.oxc,
 	has_biome: !!impls.biome,
+	has_dprint: !!impls.dprint,
 });
 
 // Build results data (used by all output paths and always saved)

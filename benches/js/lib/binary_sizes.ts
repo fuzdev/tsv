@@ -56,6 +56,7 @@ const LABELS = {
 	tsv_parse_wasm: 'tsv_parse_wasm',
 	tsv_wasm: 'tsv_wasm',
 	biome_wasm: 'biome (wasm)',
+	dprint_wasm: 'dprint (wasm)',
 	oxc_parser_napi: 'oxc-parser (napi)',
 	oxfmt_napi: 'oxfmt (napi)',
 	oxc_parser_wasm: 'oxc-parser (wasm)',
@@ -194,6 +195,7 @@ export async function collect_binary_sizes(
 		has_wasm?: boolean;
 		has_oxc?: boolean;
 		has_biome?: boolean;
+		has_dprint?: boolean;
 	},
 ): Promise<BinarySize[]> {
 	const project_root = fileURLToPath(new URL('../../..', import.meta.url));
@@ -280,6 +282,18 @@ export async function collect_binary_sizes(
 			LABELS.biome_wasm,
 			'wasm',
 			[`${node_modules}/@biomejs/wasm-bundler`],
+			'.wasm',
+		);
+	}
+
+	// dprint WASM (the `dprint-plugin-typescript` plugin — TS/JS only, so this is
+	// scope-matched against the format-only builds, not the full tsv bundle)
+	if (options?.has_dprint !== false) {
+		await push_resolved(
+			staged,
+			LABELS.dprint_wasm,
+			'wasm',
+			[`${node_modules}/@dprint/typescript`],
 			'.wasm',
 		);
 	}

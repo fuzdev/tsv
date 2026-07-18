@@ -73,7 +73,8 @@ export type ImplementationName =
 	| 'wasm'
 	| 'oxc'
 	| 'oxc-wasm'
-	| 'biome-wasm';
+	| 'biome-wasm'
+	| 'dprint-wasm';
 
 /** Common interface for parser/formatter implementations */
 export interface TsvImplementation {

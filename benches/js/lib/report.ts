@@ -79,6 +79,7 @@ const DISPLAY_ORDER = [
 	'tsv_wasm-internal',
 	// Third-party alternatives (alphabetical)
 	'biome-wasm',
+	'dprint-wasm',
 	'oxc-parser',
 	'oxc-parser-wasm',
 	'oxfmt',
@@ -397,6 +398,7 @@ export function generate_versions_info(versions: {
 	oxc_parser?: string;
 	oxfmt?: string;
 	biome?: string;
+	dprint?: string;
 }): string {
 	const lines: string[] = [];
 	lines.push('');
@@ -411,6 +413,7 @@ export function generate_versions_info(versions: {
 	if (versions.oxc_parser) alt_versions.push(`oxc-parser@${versions.oxc_parser}`);
 	if (versions.oxfmt) alt_versions.push(`oxfmt@${versions.oxfmt}`);
 	if (versions.biome) alt_versions.push(`@biomejs/wasm-bundler@${versions.biome}`);
+	if (versions.dprint) alt_versions.push(`@dprint/typescript@${versions.dprint}`);
 
 	if (alt_versions.length > 0) {
 		lines.push(`  ${alt_versions.join(', ')}`);
@@ -638,6 +641,12 @@ function build_comparison_data(
 		const biome_ns = get_mean_ns(group_name, 'biome-wasm');
 		if (biome_ns !== null) {
 			comparisons.push({ name: 'biome-wasm', ratio: ratio(tsv_wasm_ns, biome_ns) });
+		}
+		// dprint is TypeScript/JS-only, so this contributes a row for that language
+		// alone — the same-tier WASM-vs-WASM read (see CLAUDE.md §Fairness Caveats).
+		const dprint_ns = get_mean_ns(group_name, 'dprint-wasm');
+		if (dprint_ns !== null) {
+			comparisons.push({ name: 'dprint-wasm', ratio: ratio(tsv_wasm_ns, dprint_ns) });
 		}
 
 		wasm_rows.push({

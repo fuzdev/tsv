@@ -18,6 +18,7 @@ import { current_runtime } from './runtime.ts';
 import { OxcImplementation } from './oxc.ts';
 import { OxcWasmImplementation } from './oxc_wasm.ts';
 import { BiomeImplementation } from './biome.ts';
+import { DprintImplementation } from './dprint.ts';
 import { type AllVersions, load_all_versions } from './versions.ts';
 
 export type { TsvImplementation };
@@ -38,6 +39,8 @@ export interface InitializedImplementations {
 	oxc_wasm: OxcWasmImplementation | undefined;
 	/** Biome implementation (via WASM) - undefined if not available */
 	biome: BiomeImplementation | undefined;
+	/** dprint implementation (via WASM; the engine `deno fmt` runs) - undefined if not available */
+	dprint: DprintImplementation | undefined;
 }
 
 /** Options for implementation initialization */
@@ -166,6 +169,21 @@ export async function init_implementations(
 		}
 	}
 
+	// Initialize dprint (optional)
+	let dprint_impl: DprintImplementation | undefined;
+	const dprint = new DprintImplementation(versions.dprint);
+	try {
+		await dprint.init();
+		logger('  ✓ dprint (WASM)');
+		dprint_impl = dprint;
+	} catch (e) {
+		if (skip_missing) {
+			logger(`  ⚠ dprint: not available`);
+		} else {
+			throw e;
+		}
+	}
+
 	logger('');
 
 	return {
@@ -176,6 +194,7 @@ export async function init_implementations(
 		oxc: oxc_impl,
 		oxc_wasm: oxc_wasm_impl,
 		biome: biome_impl,
+		dprint: dprint_impl,
 	};
 }
 
@@ -394,6 +413,16 @@ export function get_benchmark_tasks(
 				run: (source) => impls.biome!.format(source, language),
 			});
 		}
+
+		// dprint formatter (TypeScript/JS only — the engine `deno fmt` runs)
+		if (impls.dprint?.supports_format_language(language)) {
+			tasks.push({
+				name: 'dprint-wasm',
+				tracking_key: `${group_name}/dprint`,
+				is_async: false,
+				run: (source) => impls.dprint!.format(source, language),
+			});
+		}
 	}
 
 	return tasks;
@@ -476,6 +505,16 @@ export function get_formatters(impls: InitializedImplementations): FormatterInfo
 		});
 	}
 
+	// dprint - sync
+	if (impls.dprint) {
+		formatters.push({
+			name: 'dprint-wasm',
+			is_async: false,
+			format: (source, lang) => impls.dprint!.format(source, lang),
+			supports_language: (lang) => impls.dprint!.supports_format_language(lang),
+		});
+	}
+
 	return formatters;
 }
 
@@ -484,6 +523,7 @@ export interface AlternativeVersions {
 	oxc_parser?: string;
 	oxfmt?: string;
 	biome?: string;
+	dprint?: string;
 }
 
 /**
@@ -495,5 +535,8 @@ export function get_alternative_versions(impls: InitializedImplementations): Alt
 		oxc_parser: impls.oxc?.versions['oxc-parser'],
 		oxfmt: impls.oxc?.versions.oxfmt,
 		biome: impls.biome?.versions.wasm,
+		// The plugin version is the one worth citing — `@dprint/formatter` is just
+		// the Wasm host, the TS/JS formatting behavior lives in the plugin.
+		dprint: impls.dprint?.versions.typescript,
 	};
 }
