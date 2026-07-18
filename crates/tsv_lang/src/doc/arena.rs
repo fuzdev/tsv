@@ -968,6 +968,21 @@ impl DocArena {
         self.line_comment_ids.borrow().binary_search(&id.0).is_ok()
     }
 
+    /// Whether `id` is a bare collapsible `Line` separator (`Normal`/`Soft`) — a fill
+    /// part that separates from what follows rather than being content itself. The fill
+    /// renderer uses it to recognize a *trailing* separator that a leading-separator
+    /// parity shift has stranded in the last-item position, so it renders it by fit
+    /// (space when it fits, newline when it doesn't) instead of the content path — which
+    /// would break to a new line and then render the `Line` flat, stranding a stray
+    /// leading space at the head of the continuation.
+    #[inline]
+    pub(crate) fn is_collapsible_line(&self, id: DocId) -> bool {
+        matches!(
+            self.nodes.borrow()[id.index()],
+            DocNode::Line(LineKind::Normal | LineKind::Soft)
+        )
+    }
+
     /// Tag `id` as the doc node that emits the comment at `span` in `source`.
     ///
     /// The print-once comment ledger's build-side seam for a doc-based printer: the

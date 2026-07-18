@@ -110,6 +110,36 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
 
         // Case 1: Last item
         if offset + 1 >= parts.len() {
+            // A fill built with a LEADING separator (a `leading_line` — Svelte text after an
+            // expression tag) shifts the content/separator parity by one, so a fill that also
+            // ends in a separator (a `trailing_line` — text before an expression tag) lands its
+            // trailing `line` HERE, in the last-item slot, instead of as Case 2's separator. It
+            // is a boundary separator to whatever follows the fill, not content: render it by fit
+            // exactly as Case 2 does (Flat → the space it stands for when the next node fits,
+            // Break → the newline when it doesn't). The generic content path below would instead
+            // emit a manual newline+indent AND THEN render the `Line` in Flat mode — a space —
+            // stranding a stray leading space at the head of the continuation line (the
+            // fill-break-before-an-expression-tag non-idempotency).
+            if arena.is_collapsible_line(content) {
+                let sep_mode = if content_fits {
+                    Mode::Flat
+                } else {
+                    Mode::Break
+                };
+                render_single_doc(
+                    arena,
+                    content,
+                    output,
+                    pos,
+                    indent_level,
+                    sep_mode,
+                    render,
+                    embed,
+                    resolver,
+                    should_remeasure,
+                );
+                break;
+            }
             if !content_fits {
                 let line_start_pos = line_start_column(indent_level, render, embed);
                 if *pos != line_start_pos {

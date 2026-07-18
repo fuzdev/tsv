@@ -53,6 +53,7 @@
 		"authoring:audit": "cargo run -p tsv_debug --quiet authoring_audit",
 		"fuzz:audit": "cargo run -p tsv_debug --quiet fuzz --seed 0 --iterations 5000",
 		"idempotency:sweep": "deno run --allow-read --allow-env --allow-sys --allow-run=cargo --config benches/js/deno.json benches/js/idempotency_sweep.ts",
+		"audit:corpus": "deno run --allow-read --allow-env --allow-sys --allow-run=cargo --config benches/js/deno.json benches/js/corpus_audit.ts",
 		"metrics": "cargo run -p tsv_debug --quiet metrics",
 
 		"bench:install": "node benches/js/install_deps.ts",
