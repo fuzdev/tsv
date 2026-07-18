@@ -1,0 +1,246 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 60,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Component",
+				"start": 0,
+				"end": 18,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 5,
+						"character": 5
+					}
+				},
+				"attributes": [
+					{
+						"type": "SpreadAttribute",
+						"start": 6,
+						"end": 15,
+						"expression": {
+							"type": "Identifier",
+							"start": 10,
+							"end": 14,
+							"loc": {
+								"start": {
+									"line": 1,
+									"column": 10
+								},
+								"end": {
+									"line": 1,
+									"column": 14
+								}
+							},
+							"name": "rest"
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 18,
+				"end": 19,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 19,
+				"end": 39,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 20
+					},
+					"end": {
+						"line": 2,
+						"column": 5,
+						"character": 24
+					}
+				},
+				"attributes": [
+					{
+						"type": "SpreadAttribute",
+						"start": 25,
+						"end": 36,
+						"expression": {
+							"type": "CallExpression",
+							"start": 29,
+							"end": 35,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 10
+								},
+								"end": {
+									"line": 2,
+									"column": 16
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 29,
+								"end": 33,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 10
+									},
+									"end": {
+										"line": 2,
+										"column": 14
+									}
+								},
+								"name": "make"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 39,
+				"end": 40,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 40,
+				"end": 59,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 41
+					},
+					"end": {
+						"line": 3,
+						"column": 5,
+						"character": 45
+					}
+				},
+				"attributes": [
+					{
+						"type": "SpreadAttribute",
+						"start": 46,
+						"end": 56,
+						"expression": {
+							"type": "MemberExpression",
+							"start": 50,
+							"end": 55,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 10
+								},
+								"end": {
+									"line": 3,
+									"column": 15
+								}
+							},
+							"object": {
+								"type": "MemberExpression",
+								"start": 50,
+								"end": 53,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 10
+									},
+									"end": {
+										"line": 3,
+										"column": 13
+									}
+								},
+								"object": {
+									"type": "Identifier",
+									"start": 50,
+									"end": 51,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 10
+										},
+										"end": {
+											"line": 3,
+											"column": 11
+										}
+									},
+									"name": "x"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 52,
+									"end": 53,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 12
+										},
+										"end": {
+											"line": 3,
+											"column": 13
+										}
+									},
+									"name": "y"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 54,
+								"end": 55,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 14
+									},
+									"end": {
+										"line": 3,
+										"column": 15
+									}
+								},
+								"name": "z"
+							},
+							"computed": false,
+							"optional": false
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

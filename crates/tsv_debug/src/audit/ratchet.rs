@@ -113,13 +113,22 @@ impl Ratchet {
             .collect())
     }
 
-    /// Render the snapshot file for `found`: the header, then one line per
-    /// **pinnable** key in `found`'s [`Ord`] order (the non-pinnable ones are
-    /// dropped here and accounted for by [`Self::grade`]).
+    /// Render the snapshot file for `found`: the header, an honest `# shapes: N` count
+    /// stamp, then one line per **pinnable** key in `found`'s [`Ord`] order (the
+    /// non-pinnable ones are dropped here and accounted for by [`Self::grade`]).
+    ///
+    /// The stamp exists because the file also carries blank / `#`-comment lines, so a
+    /// casual `head`/`wc -l` over-counts the shapes. It is another `#` line, so
+    /// [`Self::parse_known`] ignores it and the gate is indifferent to it — `--update`
+    /// keeps it honest.
     pub(crate) fn render<K: SnapshotKey>(&self, found: &BTreeSet<K>) -> String {
+        let pinnable: Vec<&K> = found.iter().filter(|k| k.is_pinnable()).collect();
         let mut out = String::new();
         out.push_str(self.header);
-        for key in found.iter().filter(|k| k.is_pinnable()) {
+        out.push_str("# shapes: ");
+        out.push_str(&pinnable.len().to_string());
+        out.push('\n');
+        for key in pinnable {
             out.push_str(&key.to_line());
             out.push('\n');
         }
@@ -265,8 +274,8 @@ mod tests {
             .collect();
         let r = Ratchet::new(PathBuf::from("/unused"), "# header\n", "cmd");
         let rendered = r.render(&found);
-        // Header, then pinnable keys in Ord order (rank, then name).
-        assert_eq!(rendered, "# header\n0\ta\n0\tb\n1\tc\n");
+        // Header, the count stamp, then pinnable keys in Ord order (rank, then name).
+        assert_eq!(rendered, "# header\n# shapes: 3\n0\ta\n0\tb\n1\tc\n");
         let parsed: BTreeSet<ToyKey> = rendered
             .lines()
             .filter(|l| !l.starts_with('#') && !l.is_empty())
@@ -289,8 +298,8 @@ mod tests {
         let both: BTreeSet<ToyKey> = [key(0, "a"), key(9, "boom")].into_iter().collect();
         let rendered = t.ratchet.render(&both);
         assert_eq!(
-            rendered, "# header\n0\ta\n",
-            "only the pinnable key is written"
+            rendered, "# header\n# shapes: 1\n0\ta\n",
+            "only the pinnable key is written, and the stamp counts just it"
         );
 
         // Grading the found set against the just-written snapshot: no new/stale

@@ -664,19 +664,22 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let Some(after_dots) = trimmed.strip_prefix("...") else {
             return Err(self.error_expected_at("'...' in spread attribute", content_start));
         };
-        let expr_str = after_dots.trim();
 
-        if expr_str.is_empty() {
+        if after_dots.trim().is_empty() {
             return Err(self.error_msg_at("Spread attribute requires an expression", content_start));
         }
 
-        // Calculate the offset of the expression in the source
-        // Skip leading whitespace + "..."
+        // The offset of the byte just past `...`. `after_dots` is passed UNTRIMMED and the TS
+        // parser's lexer skips any whitespace between `...` and the expression — exactly as the
+        // expression-tag reader (`parse_expression_tag_at`) does — so the expression's span lands
+        // on its real first token, not the intervening whitespace. Trimming the string here while
+        // leaving the offset at `...` shifted every span by the gap width, so a span-identity
+        // identifier re-sliced the wrong bytes and dropped the expression (`{...\n\nb}` → `{...\n}`).
         let leading_ws = content.len() - trimmed.len();
         let expr_offset = content_start + leading_ws + "...".len();
 
         // Parse the expression using the TypeScript parser
-        let expression = self.parse_ts_expression(expr_str, expr_offset)?;
+        let expression = self.parse_ts_expression(after_dots, expr_offset)?;
 
         // Advance the lexer past the entire {...} construct
         self.advance_to_position(end)?;

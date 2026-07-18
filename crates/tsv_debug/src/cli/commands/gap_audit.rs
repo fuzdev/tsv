@@ -108,7 +108,7 @@ mod verify;
 use argh::FromArgs;
 use std::collections::{BTreeMap, BTreeSet};
 
-use by_node::{by_node_json_sections, compute_by_node, report_by_node};
+use by_node::{by_node_json_sections, compute_by_node, report_by_node, report_rank, report_since};
 use snapshot::{KnownKey, count_panics, is_pinnable, known_shapes_path, ratchet, snapshot_keys};
 use verify::{verify_example, victim_seed_offset};
 
@@ -155,6 +155,24 @@ pub struct GapAuditCommand {
     /// it never changes the ratchet grade or the exit code
     #[argh(switch)]
     by_node: bool,
+
+    /// print the top-N by-(node, edge) clusters as a paste-ready MARKDOWN table for
+    /// TODO_GAPS §Status — the ranked emitter work-list Phase 1 reads fattest-first, kept
+    /// current without a hand-transcribe. Report-only (implies the record-time keying
+    /// `--by-node` uses); never touches the ratchet grade or the exit code
+    #[argh(switch)]
+    rank: bool,
+
+    /// path to a prior `gap_audit --json` output; print the per-cluster ranking DELTA against
+    /// it (`(CallExpression, arguments→$) 2861 → 2790 (−71)`) so a slice can see whether it
+    /// moved its target cluster. Report-only (implies record-time keying)
+    #[argh(option)]
+    since: Option<String>,
+
+    /// with `--rank`, how many clusters the markdown table shows (default 12). A `--since` diff
+    /// always lists every changed cluster, so `--top` does not bound it
+    #[argh(option, default = "12")]
+    top: usize,
 
     /// inject at EVERY char boundary, including positions strictly inside a WORD.
     /// A diagnostic, not a stricter mode: it relaxes only the word-interior filter,
@@ -791,7 +809,8 @@ impl GapAuditCommand {
         let all_bytes = self.all_bytes;
         // Key each hit to its `(node, edge)` at record time only when a rollup consumer will read
         // it — the same condition as `compute_by_node` below, so a graded gate run pays nothing.
-        let key_by_node = self.json || self.by_node;
+        // `--rank` (the markdown table) and `--since` (the ranking diff) are two more such consumers.
+        let key_by_node = self.json || self.by_node || self.rank || self.since.is_some();
         // Stride-chunked worker pool (see `audit::parallel::run_pool`); a worker panic outside the
         // per-injection catch fails the run rather than silently dropping a tally.
         let mut total = run_pool(
@@ -871,17 +890,39 @@ impl GapAuditCommand {
         comment_ledger::set_comment_check(false);
 
         if self.update {
+            // Read the pre-write snapshot so the yield line can distinguish RETIRED (a bug a
+            // slice actually fixed, so its line is gone) from RE-PINNED (an unchanged known bug)
+            // — a split `git diff --stat` on the snapshot can't show. Guarded on existence so a
+            // first-ever/absent-file re-pin regenerates cleanly (the whole point of `--update`),
+            // without `parse_known`'s read-failure message. `unwrap_or_default()` also absorbs a
+            // corrupt-but-present file: the yield line then reads every shape as `+added` — a
+            // cosmetic degradation of a report line, never the gate, since `write` overwrites the
+            // file on the next line regardless.
+            let previous: BTreeSet<KnownKey> = if known_shapes_path().exists() {
+                ratchet().parse_known().unwrap_or_default()
+            } else {
+                BTreeSet::new()
+            };
             let found = snapshot_keys(&total.shapes);
             ratchet().write(&found)?;
             // Count what was actually written (the pinnable keys), not every shape — a
             // panic is not pinned (see `is_pinnable`), so reporting `total.shapes.len()`
             // would overstate the file by exactly the crashes it deliberately omits.
-            let written = found.iter().filter(|k| k.is_pinnable()).count();
+            let pinned: BTreeSet<KnownKey> =
+                found.iter().filter(|k| k.is_pinnable()).cloned().collect();
+            let written = pinned.len();
             println!(
                 "✓ wrote {} shape(s) to {}",
                 written,
                 known_shapes_path().display()
             );
+            // Yield line: RETIRED = pinned before, gone now (the slice's win); ADDED = pinned now,
+            // absent before (a newly-reached or regressed shape). RE-PINNED (the intersection) is
+            // silent — it's the unchanged bulk. `net` is the file's change in size.
+            let retired = previous.difference(&pinned).count();
+            let added = pinned.difference(&previous).count();
+            let net = added as isize - retired as isize;
+            println!("  yield: gaps −{retired} +{added} (net {net:+})");
             // Spend the verify pass rather than discarding it. Pinning is the moment ~700
             // claims get frozen, so it is exactly when it's worth saying which ones the
             // audit could not reproduce. A WARNING, not a refusal: an unconfirmed shape is
@@ -935,12 +976,18 @@ impl GapAuditCommand {
             report::print_report(&summary, &findings);
         }
 
-        // The human by-node view — printed on every path (default or narrowed), after the report
-        // and before the exit decision, so it never perturbs the grade or exit.
-        if let Some(rollup) = &rollup
-            && self.by_node
-        {
-            report_by_node(rollup, self.json);
+        // The human by-node views — printed on every path (default or narrowed), after the report
+        // and before the exit decision, so they never perturb the grade or exit.
+        if let Some(rollup) = &rollup {
+            if self.by_node {
+                report_by_node(rollup, self.json);
+            }
+            if self.rank {
+                report_rank(rollup, self.top, self.json);
+            }
+            if let Some(since_path) = &self.since {
+                report_since(rollup, since_path, self.json);
+            }
         }
 
         // Off the default corpus the snapshot doesn't apply — every finding is news.
@@ -1159,6 +1206,9 @@ mod tests {
             json: false,
             report: false,
             by_node: false,
+            rank: false,
+            since: None,
+            top: 12,
             all_bytes: false,
             payload: None,
             jobs: None,
@@ -1207,20 +1257,22 @@ mod tests {
         };
         assert_eq!(all_bytes.narrowing_flags(), vec!["--all-bytes"]);
 
-        // `--json` / `--report` / `--by-node` / `--jobs` change how a run is REPORTED and
-        // scheduled, never which sites it reaches, so they must not disqualify one — a gate
-        // you can't run under --json, with the by-node view, or on a fixed thread count, would
-        // just get bypassed.
+        // `--json` / `--report` / `--by-node` / `--rank` / `--since` / `--jobs` change how a run
+        // is REPORTED and scheduled, never which sites it reaches, so they must not disqualify one
+        // — a gate you can't run under --json, with the by-node/rank views, a ranking diff, or on a
+        // fixed thread count, would just get bypassed.
         let reporting_only = GapAuditCommand {
             json: true,
             report: true,
             by_node: true,
+            rank: true,
+            since: Some("baseline.json".to_string()),
             jobs: Some(1),
             ..full_run()
         };
         assert!(
             reporting_only.narrowing_flags().is_empty(),
-            "--json / --report / --by-node / --jobs don't change the shape set"
+            "--json / --report / --by-node / --rank / --since / --jobs don't change the shape set"
         );
 
         // They compose, so the error message can name every offender at once.

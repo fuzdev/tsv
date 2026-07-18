@@ -40,7 +40,10 @@ reported as the finding it is.
 | `--payload <one>` | `block` \| `line` \| `jsdoc_cast` \| `annotation` \| `multiline` |
 | `--all-bytes` | also inject strictly inside words — a diagnostic, not a stricter mode (comment interiors stay excluded) |
 | `--by-node` | also print the coarse by-`(node, edge)` rollup after the run (report-only; see [Reading a finding](#reading-a-finding)) |
-| `--update` | rewrite the committed snapshot |
+| `--rank` | print the top-N `(node, edge)` clusters as a paste-ready **markdown table** for `TODO_GAPS` §Status (report-only; `deno task gaps:audit:rank`) |
+| `--since <baseline.json>` | print the per-cluster ranking **delta** vs a prior `--json` output — "did my slice move the cluster?" (report-only) |
+| `--top N` | with `--rank`, how many clusters the table shows (default 12); a `--since` diff always lists every changed cluster |
+| `--update` | rewrite the committed snapshot (prints a `# shapes: N` stamp + a RETIRED/RE-PINNED yield line) |
 
 ### Full runs vs narrowed runs
 
@@ -54,8 +57,8 @@ what the snapshot means, so:
 - **the ratchet is skipped**, with an explicit `○ ratchet SKIPPED` note. A narrowed run
   reports; it does not grade, and a green one is *not* a passing gate.
 
-`--json`, `--jobs`, and `--by-node` change how a run is reported and scheduled, never which
-sites it reaches, so they don't narrow it.
+`--json`, `--jobs`, `--by-node`, `--rank`, and `--since` change how a run is reported and
+scheduled, never which sites it reaches, so they don't narrow it.
 
 Off the default corpus (an explicit path) the snapshot doesn't apply at all — every finding
 is news, and any finding exits 1.
@@ -155,6 +158,27 @@ It is **report-only** — it never changes the ratchet grade or the exit code.
 `{node, edge, hits, shapes, share, example_shape}` per cluster, hits-descending, what per-slice
 tooling reads to ask "did my fix move the cluster?" — plus a top-level `by_node_unresolved`, the
 count in the `UNRESOLVED` tail.
+
+### The ranking, productized (`--rank` / `--since`)
+
+The `--by-node` rollup is the raw material; three thin views make it something a session
+consumes directly instead of parsing `--json` and hand-transcribing (all report-only —
+byte-identical to the gate):
+
+- **`deno task gaps:audit:rank`** (`--rank`, `--top N`) prints the top-N clusters as a
+  **paste-ready markdown table** for `TODO_GAPS` §Status — rank, `` `(node, edge)` ``, hits,
+  shapes, share — so the fattest-first work-list stays current by paste, not by
+  re-transcription (which rots as slices land).
+- **`--since <baseline.json>`** diffs this run's ranking against a prior `--json` output and
+  prints only the clusters whose hit count **changed** — `(CallExpression, arguments→$) 2861 →
+  2790 (−71)`, biggest reduction first — the direct answer to "did my slice move its target
+  cluster?". A missing/malformed baseline **warns and skips**; it never fails the gate.
+- **`gaps:audit:update`** prints, after the write, a `# shapes: N` count stamp (into the
+  snapshot header — the file also carries `#`/blank lines, so a casual `head`/`wc -l`
+  over-counts) and a **yield line** — `yield: gaps −R +A (net ±K)` — where `R` is RETIRED (a
+  bug this slice fixed, its line gone) and `A` is newly-pinned; the RE-PINNED bulk (the
+  unchanged intersection) is silent. It reads the pre-write snapshot to make the RETIRED /
+  RE-PINNED split a `git diff --stat` cannot.
 
 ### `UNCONFIRMED` / `PARTIAL`
 

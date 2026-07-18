@@ -43,6 +43,7 @@
 		"comments:audit": "cargo test -p tsv_lang --features audits --quiet && cargo run -p tsv_debug --features audits --quiet comment_audit",
 		"gaps:audit": "cargo run --profile corpus -p tsv_debug --features audits --quiet gap_audit",
 		"gaps:audit:update": "cargo run --profile corpus -p tsv_debug --features audits --quiet gap_audit --update",
+		"gaps:audit:rank": "cargo run --profile corpus -p tsv_debug --features audits --quiet gap_audit --rank",
 		"blanks:audit": "cargo run --profile corpus -p tsv_debug --features audits --quiet blank_audit",
 		"blanks:audit:update": "cargo run --profile corpus -p tsv_debug --features audits --quiet blank_audit --update",
 		"scan:audit": "cargo run -p tsv_debug --quiet scan_audit",
