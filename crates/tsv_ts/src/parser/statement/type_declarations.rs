@@ -399,12 +399,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             .or_else(|| self.this_as_name());
         if let Some(param_name) = param_name {
             // Type predicate: `identifier is Type` or `asserts identifier is Type`.
-            // The `is` must not be preceded by a line terminator (TS
-            // `parameterName [no LineTerminator here] is Type`): a newline before it
-            // makes it not a predicate, leaving `is` a stray token (acorn-typescript's
-            // `hasPrecedingLineBreak` guard). Same rule as the arrow `=>` / conditional
-            // `extends`.
-            if self.peek_is_contextual_keyword("is") && !self.peek_preceded_by_line_terminator() {
+            // The `is` must not be preceded by a line terminator
+            // (`parameterName [no LineTerminator here] is Type`); see
+            // `peek_predicate_is_ahead`.
+            if self.peek_predicate_is_ahead() {
                 let (id_start, id_end) = self.current_pos();
                 self.advance()?;
 

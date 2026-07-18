@@ -1475,6 +1475,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         matches!(self.peek_kind(), TokenKind::Identifier) && self.peek_value() == keyword
     }
 
+    /// Whether a type-predicate `is` follows the current subject token — the
+    /// `parameterName [no LineTerminator here] is Type` rule (a newline before
+    /// `is` makes it a stray token, matching acorn-typescript's
+    /// `hasPrecedingLineBreak` guard, like the arrow `=>` / conditional
+    /// `extends`). Assumes the current token is the predicate subject
+    /// (`x` / `this`). Shared by the return-position predicate parser and the
+    /// `this is T` primary-type sites. Does not consume any tokens (only peeks).
+    #[inline]
+    pub(super) fn peek_predicate_is_ahead(&mut self) -> bool {
+        self.peek_is_contextual_keyword("is") && !self.peek_preceded_by_line_terminator()
+    }
+
     /// Eat a leading `asserts` type-predicate keyword, committing only when an
     /// identifier or keyword follows it. Mirrors tsc's `parseNonArrayType`
     /// dispatch (`parser.ts`): `asserts` is a type-predicate prefix iff
