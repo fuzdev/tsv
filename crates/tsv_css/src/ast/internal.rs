@@ -762,6 +762,15 @@ pub struct CssAtrule<'arena> {
     /// category as `CssDeclaration.property` / `Container.name`.
     pub name: &'arena str,
 
+    /// Source span of the name token (the `<ident>` after `@`, delimiter-excluded).
+    /// The **printer** emits the name from this span, not from decoded `name`: an
+    /// escaped name (`@m\A x`) decodes to a raw control char, and emitting that
+    /// verbatim injects it into the output (content loss on reparse). Emitting the
+    /// source slice preserves the escape, matching every other decoded-name site in
+    /// this crate (`CssDeclaration.property`, preludes). Unused by the wire writer,
+    /// which emits the decoded `name` to match parseCss.
+    pub name_span: Span,
+
     /// Prelude value (structured for @import, raw string for others)
     pub prelude: PreludeValue<'arena>,
 

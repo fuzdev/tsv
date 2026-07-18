@@ -644,6 +644,10 @@ pub(crate) fn lowercase_property_name(name: Cow<'_, str>) -> Cow<'_, str> {
 /// (`\`) name is left verbatim (lowercasing would corrupt an escape's hex digits);
 /// an already-lowercase name borrows unchanged. The `@` is written separately by the
 /// printer, so `name` is just the keyword.
+///
+/// Takes the name's **source** slice (`CssAtrule.name_span`), not the decoded
+/// `CssAtrule.name`: an escaped name still carries its `\` here, so the escape-guard
+/// below is what preserves it (the decoded form would hold a raw control char instead).
 pub(crate) fn lowercase_at_rule_name(name: &str) -> Cow<'_, str> {
     if !name.bytes().any(|b| b.is_ascii_uppercase()) || name.contains('\\') {
         return Cow::Borrowed(name);
