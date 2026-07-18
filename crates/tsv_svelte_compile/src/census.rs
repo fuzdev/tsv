@@ -418,11 +418,12 @@ fn import_local_names(body: &[Statement<'_>], source: &str) -> NameSet {
 ///
 /// Mirrors [`fragment::emit_fragment`](crate::fragment)'s special-element handling:
 /// a special element refuses as `template node special element` only when it is
-/// **neither** `<svelte:head>`, `<svelte:element>`, **nor** one of the SSR-inert
-/// kinds (`<svelte:window>`/`<svelte:body>`/`<svelte:document>`) — so
+/// **neither** `<svelte:head>`, `<svelte:element>`, `<title>`, **nor** one of the
+/// SSR-inert kinds (`<svelte:window>`/`<svelte:body>`/`<svelte:document>`) — so
 /// `<svelte:component>`/`<svelte:self>`/`<slot>`/… still refuse, but a valid
-/// top-level window/body/document (which compiles to nothing) and a
-/// `<svelte:element>` (which compiles to `$.element(…)`) do not. A `{@debug}` or declaration tag refuses; a bare `<svelte:head>`, a
+/// top-level window/body/document (which compiles to nothing), a
+/// `<svelte:element>` (which compiles to `$.element(…)`), and a `<title>` (which
+/// compiles to `$$renderer.title(…)`) do not. A `{@debug}` or declaration tag refuses; a bare `<svelte:head>`, a
 /// `{@render}` tag, and every other node are SUPPORTED (their own handled arms), so
 /// they are not refusals — treating `{@render}` as one would fabricate a co-blocker
 /// on every component that renders a snippet.
@@ -450,6 +451,7 @@ fn collect_template_nodes(fragment: &Fragment<'_>, found: &mut Vec<Refusal>) {
                     | SpecialElementKind::SvelteBody
                     | SpecialElementKind::SvelteDocument
                     | SpecialElementKind::SvelteElement { .. }
+                    | SpecialElementKind::TitleElement
             ),
             FragmentNode::DebugTag(_) | FragmentNode::DeclarationTag(_) => true,
             _ => false,

@@ -279,6 +279,13 @@ pub(crate) fn emit_fragment<'arena>(
     let mut list: Vec<CleanNode<'arena>> = Vec::with_capacity(nodes.len());
     let mut const_tags: Vec<&'arena ConstTag<'arena>> = Vec::new();
     let mut head_nodes: Vec<&'arena SpecialElement<'arena>> = Vec::new();
+    // `<title>` elements hoist to the front of their fragment exactly like
+    // `<svelte:head>` — the oracle's `clean_nodes` lists `TitleElement` in the
+    // hoisted set and its visitor pushes to `state.init` (emitted before all
+    // template content), so a `<title>` always precedes its head siblings
+    // regardless of source order, and never participates in surrounding
+    // whitespace normalization.
+    let mut title_nodes: Vec<&'arena SpecialElement<'arena>> = Vec::new();
     // The SSR-inert special-element tags (`svelte:window`/`svelte:body`/
     // `svelte:document`) already seen among this fragment's direct children — the
     // oracle allows at most one of each (`svelte_meta_duplicate`).
@@ -290,6 +297,10 @@ pub(crate) fn emit_fragment<'arena>(
             // rather than silently falling through to a refusal or a drop).
             FragmentNode::SpecialElement(se) => match &se.kind {
                 SpecialElementKind::SvelteHead => head_nodes.push(se),
+                // `<title>` (only classified as a `TitleElement` inside
+                // `<svelte:head>`) hoists like a head node, emitting a
+                // `$$renderer.title(($$renderer) => …)` statement.
+                SpecialElementKind::TitleElement => title_nodes.push(se),
                 // The SSR-inert special elements: `<svelte:window>`/`<svelte:body>`/
                 // `<svelte:document>` compile to NOTHING (their events/binds are
                 // client-only, so the oracle emits no template output for them).
@@ -327,14 +338,13 @@ pub(crate) fn emit_fragment<'arena>(
                 }
                 // Every other special element refuses (`<svelte:component>`,
                 // `<svelte:self>`, `<slot>`, `<svelte:fragment>`,
-                // `<svelte:boundary>`, `<title>`) — not emitted yet. The bucket key
-                // matches `fragment_node_kind`'s "special element".
+                // `<svelte:boundary>`) — not emitted yet. The bucket key matches
+                // `fragment_node_kind`'s "special element".
                 SpecialElementKind::SvelteComponent { .. }
                 | SpecialElementKind::SvelteSelf
                 | SpecialElementKind::SlotElement
                 | SpecialElementKind::SvelteFragment
-                | SpecialElementKind::SvelteBoundary
-                | SpecialElementKind::TitleElement => {
+                | SpecialElementKind::SvelteBoundary => {
                     return Err(unsupported(Refusal::TemplateNode {
                         kind: "special element",
                     }));
@@ -390,9 +400,11 @@ pub(crate) fn emit_fragment<'arena>(
     if !head_nodes.is_empty() && !const_tags.is_empty() {
         return Err(unsupported(Refusal::SvelteHeadWithConstTag));
     }
-    // A snippet sharing a block with a `{@const}`/`<svelte:head>` can't fix the
-    // relative hoist order across kinds — refuse the mix.
-    if !hoisted_snippets.is_empty() && (!const_tags.is_empty() || !head_nodes.is_empty()) {
+    // A snippet sharing a block with a `{@const}`/`<svelte:head>`/`<title>` can't
+    // fix the relative hoist order across kinds — refuse the mix.
+    if !hoisted_snippets.is_empty()
+        && (!const_tags.is_empty() || !head_nodes.is_empty() || !title_nodes.is_empty())
+    {
         return Err(unsupported(Refusal::SnippetHoistOrder));
     }
     for tag in &const_tags {
@@ -400,6 +412,9 @@ pub(crate) fn emit_fragment<'arena>(
     }
     for head in &head_nodes {
         emit_svelte_head(env, head, out)?;
+    }
+    for title in &title_nodes {
+        emit_title_element(env, title, out)?;
     }
     for snippet in &hoisted_snippets {
         emit_snippet(env, snippet, out)?;
@@ -843,6 +858,74 @@ fn emit_expression_tag<'arena>(
         env.b.member_call("$", "html", wrapped)
     };
     out.push_expr(call);
+    Ok(())
+}
+
+/// Emit a `<title>` (a `TitleElement` inside `<svelte:head>`) as
+/// `$$renderer.title(($$renderer) => { $$renderer.push(`<title>…</title>`) })`.
+///
+/// The oracle hoists a `TitleElement` into `state.init` (why the caller emits it
+/// with the other hoisted nodes) and processes its children with
+/// `process_children` directly — **no** `clean_nodes`, so title children are not
+/// whitespace-normalized the way an ordinary fragment's are. Its children are
+/// guaranteed `Text`/`ExpressionTag` only; anything else is `title_invalid_content`
+/// in the oracle's analysis phase, and any attribute is `title_illegal_attribute`.
+/// tsv's parser is permissive about both, so each refuses here. A `{expr}` child
+/// emits exactly like a regular element's text content: a statically-known value
+/// folds, otherwise it emits `$.escape(expr)`.
+pub(crate) fn emit_title_element<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    title: &'arena SpecialElement<'arena>,
+    out: &mut BodyBuilder<'arena>,
+) -> Result<(), CompileError> {
+    // Any attribute on <title> is `title_illegal_attribute` in the oracle.
+    if !title.attributes.is_empty() {
+        return Err(unsupported(Refusal::TitleAttributes));
+    }
+    let arena = env.b.arena;
+    let source = env.source;
+
+    // Build `<title>` + children + `</title>` into a fresh body. Title children are
+    // only text/expression, so this flushes to a single `$$renderer.push(…)`.
+    let mut body = BodyBuilder::new_in(arena);
+    body.push_text("<title>");
+    for node in title.fragment.nodes {
+        match node {
+            FragmentNode::Text(text) => {
+                let decoded = text.data(source);
+                body.push_text(&escape_template_text(&escape_html_text(&decoded)));
+            }
+            FragmentNode::ExpressionTag(tag) => {
+                emit_expression_tag(env, &tag.expression, &mut body, true)?;
+            }
+            // A non-text/expression child is `title_invalid_content` in the oracle.
+            _ => return Err(unsupported(Refusal::TitleInvalidContent)),
+        }
+    }
+    body.push_text("</title>");
+    let body_stmts = body.finish(&mut env.b, arena);
+
+    // Wrap in `$$renderer.title(($$renderer) => { … })` — the closure receives a
+    // `$$renderer` parameter (like `$.head`'s closure), not the enclosing one.
+    let here = env.b.here();
+    let renderer_param = Expression::Identifier(env.b.ident("$$renderer"));
+    let params = std::slice::from_ref(arena.alloc(renderer_param));
+    let arrow = env.b.arrow_block(params, body_stmts, here);
+    let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
+    args.push(arrow);
+    let call = env
+        .b
+        .member_call("$$renderer", "title", args.into_bump_slice());
+    let span = call.span();
+    out.push_statement(
+        &mut env.b,
+        arena,
+        Statement::ExpressionStatement(ExpressionStatement {
+            expression: call,
+            span,
+            is_directive: false,
+        }),
+    );
     Ok(())
 }
 

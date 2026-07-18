@@ -387,10 +387,19 @@ impl<'s> Collector<'s> {
         // blocks module-hoist). For an html-shaped element the reference-bearing
         // view equals the emitted view (the only extra it visits is a legacy `on:`
         // expression, and a `<svelte:element>` carrying one refuses at emission).
-        // Every other special-element kind refuses at emission (and the SSR-inert
+        // `<svelte:head>`/`<title>` also compile, but carry no reference-bearing
+        // `this`/attributes (a head/title attribute refuses at emission), so
+        // including them here is consistency, not behavior — their child fragment,
+        // walked unconditionally below, is where their references live. Every other
+        // special-element kind refuses at emission (and the SSR-inert
         // window/body/document are top-level-only, never inside a snippet body), so
         // their references are reachable only through a dropped `{:catch}`.
-        let emitted = matches!(se.kind, SpecialElementKind::SvelteElement { .. });
+        let emitted = matches!(
+            se.kind,
+            SpecialElementKind::SvelteElement { .. }
+                | SpecialElementKind::SvelteHead
+                | SpecialElementKind::TitleElement
+        );
         if self.in_dropped_catch || emitted {
             if let Some(expr) = special_element_reference_expression(se) {
                 self.expr(expr);

@@ -90,9 +90,11 @@ fn svelte_hash(s: &str) -> String {
 /// Emit `$.head(hash, $$renderer, ($$renderer) => { … })` for `<svelte:head>`.
 ///
 /// The head fragment is a normal fragment emitted into the closure body, so a
-/// `<title>` (a `TitleElement` needing `$$renderer.title`) or any other special
-/// child refuses through the usual `emit_fragment` path. Attributes on the head
-/// element are refused (the oracle carries none in this subset).
+/// `<title>` (a `TitleElement`) hoists there and emits its own
+/// `$$renderer.title(($$renderer) => …)` statement (`fragment.rs`), while any other
+/// unsupported special child refuses through the usual `emit_fragment` path.
+/// Attributes on the head element are refused (the oracle carries none in this
+/// subset).
 pub(crate) fn emit_svelte_head<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     head: &'arena SpecialElement<'arena>,

@@ -714,13 +714,15 @@ fn walk_fragment_node(node: &FragmentNode<'_>, nc: &mut Nc<'_>) {
         FragmentNode::RenderTag(tag) => walk_render_tag(tag, nc),
         // The special elements that COMPILE — the SSR-inert kinds
         // (`<svelte:window>`/`<svelte:body>`/`<svelte:document>`, which emit
-        // nothing) and `<svelte:element>` (which emits `$.element(…)`) — are walked
-        // on the emitted path, because the oracle runs its phase-2 analysis over
-        // their expressions regardless of what SSR emits: a `new`/prop-rooted
-        // member/call in a `this={…}` / bind / handler fires the wrapper, and a
-        // `bind:` marks its target reassigned. The refused-at-emission kinds are
-        // reachable only through a dropped `{:catch}` (matched explicitly so a new
-        // variant fails compilation here).
+        // nothing), `<svelte:element>` (which emits `$.element(…)`), and
+        // `<svelte:head>`/`<title>` (which emit `$.head`/`$$renderer.title`) — are
+        // walked on the emitted path, because the oracle runs its phase-2 analysis
+        // over their expressions regardless of what SSR emits: a `new`/prop-rooted
+        // member/call in a `this={…}` / bind / handler, or inside a head child (a
+        // `<meta content={new Date()}>` / `<title>{new Date()}</title>`), fires the
+        // wrapper, and a `bind:` marks its target reassigned. The refused-at-emission
+        // kinds are reachable only through a dropped `{:catch}` (matched explicitly
+        // so a new variant fails compilation here).
         FragmentNode::SpecialElement(se) => {
             // Exhaustive `match` (not `matches!`) so a new `SpecialElementKind`
             // variant fails compilation here rather than silently defaulting to
@@ -729,14 +731,14 @@ fn walk_fragment_node(node: &FragmentNode<'_>, nc: &mut Nc<'_>) {
                 SpecialElementKind::SvelteWindow
                 | SpecialElementKind::SvelteBody
                 | SpecialElementKind::SvelteDocument
-                | SpecialElementKind::SvelteElement { .. } => true,
-                SpecialElementKind::SvelteHead
-                | SpecialElementKind::SvelteComponent { .. }
+                | SpecialElementKind::SvelteElement { .. }
+                | SpecialElementKind::SvelteHead
+                | SpecialElementKind::TitleElement => true,
+                SpecialElementKind::SvelteComponent { .. }
                 | SpecialElementKind::SvelteSelf
                 | SpecialElementKind::SlotElement
                 | SpecialElementKind::SvelteFragment
-                | SpecialElementKind::SvelteBoundary
-                | SpecialElementKind::TitleElement => false,
+                | SpecialElementKind::SvelteBoundary => false,
             };
             if nc.in_dropped_catch || walk_on_emitted {
                 walk_special_element(se, nc);

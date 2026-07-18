@@ -4087,12 +4087,39 @@ fn compile_svelte_head_emits_head_call() {
 }
 
 #[test]
-fn compile_rejects_head_with_title() {
-    // `<title>` inside head needs `$$renderer.title` — refused via the normal
-    // special-element path when emitting the head body.
-    assert_unsupported(
+fn compile_svelte_head_title_emits_title_call() {
+    // `<title>` inside `<svelte:head>` → `$$renderer.title(($$renderer) => …)`,
+    // hoisted before any sibling head content.
+    let out = compile(
         "<svelte:head><title>Hi</title></svelte:head>",
-        "special element",
+        &CompileOptions::default(),
+    )
+    .unwrap();
+    assert!(
+        out.js.contains("$$renderer.title(($$renderer) =>")
+            && out.js.contains("$$renderer.push(`<title>Hi</title>`)"),
+        "title call wrong: {}",
+        out.js
+    );
+}
+
+#[test]
+fn compile_rejects_title_attribute() {
+    // Any attribute on `<title>` is `title_illegal_attribute` in the oracle; tsv's
+    // parser accepts it, so the compiler refuses.
+    assert_unsupported(
+        "<svelte:head><title foo=\"x\">Hi</title></svelte:head>",
+        "attribute on <title>",
+    );
+}
+
+#[test]
+fn compile_rejects_title_invalid_content() {
+    // A `<title>` child that is neither text nor `{expression}` is
+    // `title_invalid_content` in the oracle; tsv's parser accepts it, so refuse.
+    assert_unsupported(
+        "<svelte:head><title>{#if x}a{/if}</title></svelte:head>",
+        "invalid <title> content",
     );
 }
 

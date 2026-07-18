@@ -613,6 +613,18 @@ pub enum Refusal {
     /// Attributes on a `<svelte:head>` element (not carried in this subset).
     #[error("attributes on <svelte:head>")]
     SvelteHeadAttributes,
+    /// An attribute on a `<title>` element. The oracle rejects every attribute on
+    /// `<title>` in its analysis phase (`title_illegal_attribute`); tsv's parser
+    /// accepts them, so the compiler refuses rather than emit for oracle-rejected
+    /// input.
+    #[error("attribute on <title> (the oracle rejects it)")]
+    TitleAttributes,
+    /// A `<title>` child that is neither `Text` nor `ExpressionTag` (an element, a
+    /// block, an `{@html}`, …). The oracle rejects it in its analysis phase
+    /// (`title_invalid_content`); tsv's parser accepts it, so the compiler refuses
+    /// rather than emit for oracle-rejected input.
+    #[error("invalid <title> content (only text and {{expression}} — the oracle rejects it)")]
+    TitleInvalidContent,
     /// A `<svelte:head>` sharing a fragment with a `{@const}` — their hoisted
     /// order can't be fixed.
     #[error("<svelte:head> alongside a {{@const}} in the same fragment (hoist order)")]
@@ -939,6 +951,10 @@ impl Refusal {
                 Cow::Borrowed("<option> (oracle emits $$renderer.option closures)")
             }
             Self::SvelteHeadAttributes => Cow::Borrowed("attributes on <svelte:head>"),
+            Self::TitleAttributes => Cow::Borrowed("attribute on <title> (the oracle rejects it)"),
+            Self::TitleInvalidContent => Cow::Borrowed(
+                "invalid <title> content (only text and {expression} — the oracle rejects it)",
+            ),
             Self::SvelteHeadWithConstTag => Cow::Borrowed(
                 "<svelte:head> alongside a {@const} in the same fragment (hoist order)",
             ),
