@@ -8,7 +8,7 @@
 
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{InfallibleResolve, Span};
-use tsv_svelte::ast::internal::{AttributeNode, AttributeValue, FragmentNode, Root};
+use tsv_svelte::ast::internal::{AttributeNode, AttributeValue, ElementKind, FragmentNode, Root};
 use tsv_ts::ast::internal::{
     AssignmentPattern, ClassBody, ClassDeclaration, ClassMember, Expression, ImportDeclaration,
     ImportSpecifier, LiteralValue, ModuleExportName, ObjectPattern, ObjectPatternProperty,
@@ -68,18 +68,22 @@ pub(crate) fn collect_script_comments(
         return Ok(Vec::new());
     };
     let content = script.content.span;
-    // A carried comment is placed as a leading comment of a *surviving body*
-    // statement — one that prints in the component function from source. An
-    // `import` hoists to a separate module-scope program (comment-free), and a
-    // statement-position `$effect`/`$inspect` drops, so neither can anchor a
-    // comment. The bound is therefore the last SURVIVING statement's end (not the
-    // erased body's last, which may be a trailing dropped `$effect`), defaulting to
-    // `content.start` when nothing survives (an import-only script).
+    // A comment at or past the last SURVIVING statement has no statement left to
+    // lead — an `import` hoists to the comment-free module program and a
+    // statement-position `$effect`/`$inspect` drops, so neither anchors one. The
+    // bound is the last surviving statement's end, `content.start` when nothing
+    // survives (an import-only script).
     //
-    // A comment at or past that bound has no surviving anchor: the oracle
-    // re-attaches it into the template (a leading comment of the next emitted node,
-    // inside a `$.escape(…)` argument / a component prop object / an `{#if}`
-    // condition), a placement this transform can't reproduce — refuse the class.
+    // Such a comment still carries: the oracle re-attaches it into the template
+    // (trailing the final push, or nested inside the next emitted node — an
+    // `{#if}` condition, an `$.ensure_array_like(…)` / `$.attr(…)` argument) while
+    // tsv's printer lands it at the end of the synthetic function body (the body
+    // block's span runs `[content.start, rbrace_end)`, so the block's trailing
+    // window captures it exactly once). The placements differ, but the parity bar
+    // grades comment DROP / COUNT / CONTENT, not position.
+    //
+    // The one shape that does NOT converge is a template emitting a nested block —
+    // see [`template_emits_nested_block`].
     let survives = |stmt: &Statement<'_>| match stmt {
         Statement::ImportDeclaration(_) => false,
         Statement::ExpressionStatement(expr_stmt) => {
@@ -94,6 +98,7 @@ pub(crate) fn collect_script_comments(
         .map(|stmt| stmt.span().end)
         .max()
         .unwrap_or(content.start);
+    let nested_block = template_emits_nested_block(root.fragment.nodes);
     // A leading comment glued to the `<script>` line (no newline before it) shares
     // its source line with the function's synthetic opening brace, so the printer
     // trails it after the `{` instead of onto its own line — refuse the class
@@ -112,15 +117,17 @@ pub(crate) fn collect_script_comments(
         if comment.span.start < content.start || comment.span.end > content.end {
             return Err(unsupported(Refusal::TemplateComments));
         }
-        if comment.span.start >= last_stmt_end {
-            return Err(unsupported(Refusal::CommentAfterLastStatement));
-        }
         // A multi-line block comment carries verbatim, but the oracle (esrap)
         // re-indents its interior lines to the emit position, so the two diverge on
         // any interior line whose source indentation differs from the target — refuse
-        // until the printer re-indents block-comment interiors to match.
+        // until the printer re-indents block-comment interiors to match. Checked
+        // before the after-last rule below so this independent gate keeps its own
+        // refusal bucket whatever the template emits.
         if comment.multiline {
             return Err(unsupported(Refusal::MultilineBlockComment));
+        }
+        if nested_block && comment.span.start >= last_stmt_end {
+            return Err(unsupported(Refusal::CommentAfterLastStatementWithBlock));
         }
         if comment.span.end <= first_stmt_start {
             let gap = &source[content.start as usize..comment.span.start as usize];
@@ -163,6 +170,84 @@ pub(crate) fn collect_script_comments(
         }
     }
     Ok(comments)
+}
+
+/// Does the template emit a **synthetic block** — a `{ … }` body the oracle
+/// builds with no source `loc`?
+///
+/// This decides whether a comment past the last surviving script statement can be
+/// carried. The oracle's printer (esrap) walks one `comment_index` over the comment
+/// list, and `body()` opens every block with `reset_comment_index(node)`. That reset
+/// has two arms: a block with **no** `loc` sets the index to `comments.length`,
+/// **discarding every comment not yet written**; a block that **has** a `loc`
+/// re-seeks the index absolutely (`comments.findIndex(…)`), which can move it
+/// **backward**. So a loc-less block annihilates the index and the next loc-bearing
+/// block **recovers** it.
+///
+/// That recovery — not an exemption — is what carries an after-last comment through
+/// to the component body. The body block is assigned the instance script's `loc`
+/// (the transform's "trick esrap into including comments" line), and when the
+/// component needs a context wrapper the transform **reassigns** `component_block`
+/// to a fresh loc-LESS block around that loc-bearing one. The wrapper does annihilate
+/// the index; the inner block then seeks back over the comment, so it still reaches
+/// the body's closing flush. A template block gets no such recovery — it is loc-less,
+/// reached after the body has already seeked, with nothing loc-bearing behind it to
+/// seek back — so the comment is DROPPED, a divergence the parity bar grades, unlike
+/// a mere position difference.
+///
+/// The scan is deliberately blunt: it answers "does a synthetic block exist
+/// anywhere", not "is one reached before the comment would flush". A loc-bearing
+/// expression emitted first (an `{#if}` test, an `{#each}` expression) flushes the
+/// comment ahead of the block and the oracle keeps it — so `{#if x}` with an
+/// after-last comment converges in practice, and this scan over-refuses it.
+/// Tightening that costs an ordered next-emitted-node walk plus the oracle's
+/// fold/rewrite rules for which expressions keep a `loc`; a safe over-refusal is
+/// preferred to guessing.
+///
+/// The [`FragmentNode::SpecialElement`] arm is intentionally blanket-TRUE for the
+/// same reason. Several kinds do emit a block and genuinely drop the comment
+/// (`<svelte:head>`, `<svelte:element>`, `<svelte:boundary>`), but `<svelte:window>`
+/// and `<slot>` emit no block at all and are knowingly over-refused — the blanket arm
+/// buys a conservative safety margin, not a claim that every kind drops.
+///
+/// ⚠️ This TRUE/FALSE split is keyed to the **pinned** oracle's `reset_comment_index`
+/// behavior (esrap 2.2.12, via the pinned Svelte compiler). If that pin moves, re-probe
+/// the split against the new oracle rather than assuming it carries over.
+///
+/// Exhaustively matched so a new [`FragmentNode`] variant fails compilation here
+/// rather than silently defaulting to "no block".
+fn template_emits_nested_block(nodes: &[FragmentNode<'_>]) -> bool {
+    nodes.iter().any(|node| match node {
+        // Leaves and the tags that emit a bare call — no block.
+        FragmentNode::Text(_)
+        | FragmentNode::Comment(_)
+        | FragmentNode::ExpressionTag(_)
+        | FragmentNode::HtmlTag(_)
+        | FragmentNode::RenderTag(_) => false,
+        // Every block/closure emitter: `{#if}`/`{#each}` bodies, the `$.await` and
+        // `$.head`/`$.element` closures, a `{#snippet}` function.
+        FragmentNode::IfBlock(_)
+        | FragmentNode::EachBlock(_)
+        | FragmentNode::AwaitBlock(_)
+        | FragmentNode::KeyBlock(_)
+        | FragmentNode::SnippetBlock(_)
+        | FragmentNode::SpecialElement(_)
+        // Refused elsewhere; counted here so the scan never under-reports.
+        | FragmentNode::ConstTag(_)
+        | FragmentNode::DeclarationTag(_)
+        | FragmentNode::DebugTag(_) => true,
+        FragmentNode::Element(element) => match element.kind {
+            // A component's children become a `children: ($$renderer) => { … }`
+            // snippet prop — a block. Childless (or whitespace-only), it is a bare
+            // `Foo($$renderer, {…})` call.
+            ElementKind::Component => {
+                element.fragment.nodes.iter().any(|child| {
+                    !matches!(child, FragmentNode::Text(text) if text.is_ascii_ws_only)
+                })
+            }
+            ElementKind::Html => template_emits_nested_block(element.fragment.nodes),
+        },
+    })
 }
 
 /// The oracle's `unthunk` peephole, at the only arity a thunk can have.

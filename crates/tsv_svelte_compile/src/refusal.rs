@@ -321,12 +321,12 @@ pub enum Refusal {
     /// A comment inside a rewritten (dropped) rune region.
     #[error("comment inside a rewritten rune region (dropped by the transform)")]
     CommentInRewrittenRuneRegion,
-    /// A comment after the last script statement (the oracle re-attaches it into
-    /// the template).
+    /// A comment after the last surviving script statement in a component whose
+    /// template emits a nested block (the oracle drops it).
     #[error(
-        "comment after the last script statement (the oracle re-attaches it into the template)"
+        "comment after the last script statement in a template that emits a nested block (the oracle drops it)"
     )]
-    CommentAfterLastStatement,
+    CommentAfterLastStatementWithBlock,
     /// A leading comment glued to the `<script>` line.
     #[error("leading comment glued to the <script> line (no newline before it)")]
     LeadingCommentGluedToScript,
@@ -900,8 +900,8 @@ impl Refusal {
             Self::CommentInRewrittenRuneRegion => {
                 Cow::Borrowed("comment inside a rewritten rune region (dropped by the transform)")
             }
-            Self::CommentAfterLastStatement => Cow::Borrowed(
-                "comment after the last script statement (the oracle re-attaches it into the template)",
+            Self::CommentAfterLastStatementWithBlock => Cow::Borrowed(
+                "comment after the last script statement in a template that emits a nested block (the oracle drops it)",
             ),
             Self::LeadingCommentGluedToScript => {
                 Cow::Borrowed("leading comment glued to the <script> line (no newline before it)")

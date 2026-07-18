@@ -411,8 +411,26 @@ project-wide conventions.
   synthetic program (host-absolute spans; the imports print in a separate
   comment-free program, and the oracle relocates a script comment down into the
   component body — leading the first surviving statement — which the carry
-  reproduces). Divergent placement classes still refuse — comments after the last
-  script statement (the oracle re-attaches them into the template),
+  reproduces). A comment past the last **surviving** statement has no statement to
+  lead and falls to the end of the synthetic function body (whose block span runs
+  `[content.start, rbrace_end)`, so it is captured exactly once) while the oracle
+  re-attaches it into the template — a position difference the bar tolerates. The
+  exception is `template_emits_nested_block`: the oracle's printer walks one comment
+  index, and opening a block with **no source `loc`** resets it to the end, DROPPING
+  every comment not yet written — while opening a block that **has** a `loc` re-seeks
+  that index absolutely, which can move it **backward**. So a loc-less block
+  annihilates the index and the next loc-bearing one RECOVERS it. That recovery, not
+  an exemption, carries the comment through the component body: the body block is
+  assigned the instance script's `loc`, and a context-wrapped component reassigns the
+  outer block to a fresh loc-less one around it, so the wrapper annihilates and the
+  inner block seeks back. A template block gets no recovery — so a template emitting
+  a nested block refuses (`CommentAfterLastStatementWithBlock`), a blunt "does one
+  exist anywhere" scan that deliberately over-refuses the case where a loc-bearing
+  head expression flushes the comment first, and likewise the block-free special
+  elements (`<svelte:window>`, `<slot>`). The split is keyed to the pinned oracle's
+  `reset_comment_index` behavior (esrap 2.2.12) — re-probe it if that pin moves.
+  Divergent placement classes
+  also still refuse —
   template-expression comments, comments inside dropped rune regions, and comments
   alongside a rune rewrite that mints a **script-region** span a comment window
   would sweep (`$derived` — the `$.derived(() => e)` thunk — and argument-less

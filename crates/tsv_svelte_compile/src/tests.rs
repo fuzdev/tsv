@@ -471,24 +471,87 @@ fn compile_carries_comments_with_blocks() {
 }
 
 #[test]
-fn compile_refuses_comment_in_import_only_script() {
-    // No surviving body statement (the import hoists to module scope), so the
-    // carried comment has nothing to anchor to — the oracle relocates it into the
-    // template. Refuse.
-    assert_unsupported(
-        "<script>\n\t// note\n\timport Foo from './Foo.svelte';\n</script>\n<Foo />",
-        "comment after the last script statement",
+fn compile_comment_in_import_only_script() {
+    // No surviving body statement (the import hoists to the comment-free module
+    // program), so the carried comment leads the first synthetic statement instead.
+    // The oracle trails it after that statement — a position difference the parity
+    // bar tolerates, with the comment carried exactly once on both sides.
+    let js =
+        compile_js("<script>\n\t// note\n\timport Foo from './Foo.svelte';\n</script>\n<Foo />");
+    assert_eq!(
+        js,
+        "import * as $ from 'svelte/internal/server';\n\
+             import Foo from './Foo.svelte';\n\
+             export default function Input($$renderer) {\n\
+             \t// note\n\
+             \tFoo($$renderer, {});\n\
+             }\n"
     );
 }
 
 #[test]
-fn compile_refuses_comment_before_dropped_effect() {
-    // The last SURVIVING statement is `let x = 1`; the `$effect` drops in SSR, so a
-    // comment between them is after the last surviving statement and the oracle
-    // re-anchors it into the template. Refuse.
+fn compile_refuses_comment_after_last_statement_with_a_nested_block() {
+    // A template that emits a synthetic (loc-less) block makes the oracle's printer
+    // reset its monotonic comment index to the end, DROPPING every comment not yet
+    // written — so an after-last comment vanishes from the oracle's output while
+    // tsv keeps it. A drop is graded (unlike a position difference), so refuse.
+    let what = "template that emits a nested block";
+    for template in [
+        "{#if x}<p>a</p>{/if}",
+        "{#each [x] as n}<p>{n}</p>{/each}",
+        "{#await x}<p>a</p>{:then v}<p>{v}</p>{/await}",
+        "{#key x}<p>a</p>{/key}",
+        "<div>{#if x}<p>a</p>{/if}</div>",
+        "<svelte:head><title>t</title></svelte:head>",
+    ] {
+        assert_unsupported(
+            &format!("<script>\n\tlet x = 1;\n\t// note\n</script>\n{template}"),
+            what,
+        );
+    }
+    // A component's children become a `children: ($$renderer) => { … }` block.
     assert_unsupported(
+        "<script>\n\timport Foo from './Foo.svelte';\n\tlet x = 1;\n\t// note\n</script>\n<Foo>{x}</Foo>",
+        what,
+    );
+}
+
+#[test]
+fn compile_carries_comment_after_last_statement_without_a_nested_block() {
+    // The boundary of the refusal above: a component with no children (or only
+    // whitespace) emits a bare call, not a block — probed against the oracle, which
+    // keeps the comment in both forms. A `{@render}` is likewise a bare call.
+    for template in ["<Foo />", "<Foo>\n</Foo>"] {
+        let js = compile_js(&format!(
+            "<script>\n\timport Foo from './Foo.svelte';\n\tlet x = 1;\n\t// note\n</script>\n{template}"
+        ));
+        assert!(js.contains("// note"), "comment must carry: {js}");
+    }
+    let js = compile_js(
+        "<script>\n\tlet { children } = $props();\n\t// note\n</script>\n{@render children()}",
+    );
+    assert!(js.contains("// note"), "comment must carry: {js}");
+}
+
+#[test]
+fn compile_comment_before_dropped_effect() {
+    // The last SURVIVING statement is `let x = 1`; the `$effect` drops in SSR, so
+    // the comment between them has no statement left to lead and falls to the
+    // template emission that follows — inside the `needs_context` wrapper the
+    // dropped effect forces.
+    let js = compile_js(
         "<script>\n\tlet x = 1;\n\t// note\n\t$effect(() => {});\n</script>\n<p>{x}</p>",
-        "comment after the last script statement",
+    );
+    assert_eq!(
+        js,
+        "import * as $ from 'svelte/internal/server';\n\
+             export default function Input($$renderer, $$props) {\n\
+             \t$$renderer.component(($$renderer) => {\n\
+             \t\tlet x = 1;\n\
+             \t\t// note\n\
+             \t\t$$renderer.push(`<p>1</p>`);\n\
+             \t});\n\
+             }\n"
     );
 }
 
@@ -1477,13 +1540,24 @@ fn compile_carries_script_comments_losslessly() {
 }
 
 #[test]
-fn compile_rejects_divergent_comment_classes() {
-    // After the last script statement: the oracle re-attaches into the
-    // template — refused.
-    assert_unsupported(
-        "<script>\n\tlet a = 1;\n\t// after last\n</script>\n<p>text</p>",
-        "after the last script statement",
+fn compile_carries_comment_after_last_statement() {
+    // A comment past the last script statement leads the first synthetic statement
+    // (the template flush). The oracle instead trails it after that statement —
+    // position-tolerated, same single comment.
+    let js = compile_js("<script>\n\tlet a = 1;\n\t// after last\n</script>\n<p>text</p>");
+    assert_eq!(
+        js,
+        "import * as $ from 'svelte/internal/server';\n\
+             export default function Input($$renderer) {\n\
+             \tlet a = 1;\n\
+             \t// after last\n\
+             \t$$renderer.push(`<p>text</p>`);\n\
+             }\n"
     );
+}
+
+#[test]
+fn compile_rejects_template_expression_comments() {
     // Template-expression comments aren't carried yet.
     assert_unsupported("<p>{/* c */ 1}</p>", "template comments");
 }

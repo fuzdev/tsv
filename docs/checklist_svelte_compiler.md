@@ -246,7 +246,16 @@ relocates every script comment down into the component body (leading the first
 surviving statement) with the imports hoisted comment-free, and tsv reproduces
 that.
 
-- **Supported**: comments alongside template blocks (`{#if}`/`{#each}`/`{#await}`/`{#key}`/`{@const}`), a component invocation, `{#snippet}`/`{@render}` (hoisted or body-local), expression-valued attributes (`class={c}`, `style:` / `class:` / `bind:` directives, `{...spread}`), hoisted imports (a comment before/between/after imports relocates down to lead the first surviving statement, as the oracle does), and a **`$derived(e)`/`$derived.by(f)` declarator** (the synthetic `$.derived(…)` and its arrow steal the replaced init's host span — `build.rs::derived_call` — so a following script comment flows to the next statement instead of being swept into the derived slot) — provided a surviving body statement exists to anchor the comment (an import-only script, or a comment after the last surviving statement, refuses; see below).
+- **Supported**: comments alongside template blocks (`{#if}`/`{#each}`/`{#await}`/`{#key}`/`{@const}`), a component invocation, `{#snippet}`/`{@render}` (hoisted or body-local), expression-valued attributes (`class={c}`, `style:` / `class:` / `bind:` directives, `{...spread}`), hoisted imports (a comment before/between/after imports relocates down to lead the first surviving statement, as the oracle does), and a **`$derived(e)`/`$derived.by(f)` declarator** (the synthetic `$.derived(…)` and its arrow steal the replaced init's host span — `build.rs::derived_call` — so a following script comment flows to the next statement instead of being swept into the derived slot).
+
+A comment **past the last surviving statement** (imports hoist, `$effect`/`$inspect`
+drop, so an import-only script has none) carries too: with no statement left to
+lead it falls to the end of the synthetic function body, whose block span runs
+`[content.start, rbrace_end)` and captures it exactly once. The oracle instead
+re-attaches it into the template — trailing the final push, or nested inside the
+next emitted node (an `{#if}` condition, an `$.ensure_array_like(…)` /
+`$.attr(…)` argument) — a position difference the parity bar tolerates. The one
+carve-out is a template that emits a **nested block**, which refuses (see below).
 
 **Comment position is tolerated, not pinned.** A carried comment that tsv places
 by its own comment philosophy where the oracle (esrap) relocates it — a comment at
@@ -258,7 +267,7 @@ The classes that still refuse are the ones where the comment has no surviving
 anchor and the oracle re-anchors it in a way the span-window model can't reproduce,
 or where a rune rewrite mints a script-region span a comment window would sweep:
 
-- **Refused**: `comment after the last script statement (the oracle re-attaches it into the template)` — also fires when a comment sits after the last *surviving* statement (imports hoist, `$effect`/`$inspect` drop), including an import-only script (nothing survives to anchor it)
+- **Refused**: `comment after the last script statement in a template that emits a nested block (the oracle drops it)` — the oracle's printer walks one comment index; opening a block with no source `loc` resets it to the end, discarding every comment not yet written, while opening a block that has a `loc` re-seeks that index absolutely and so can move it backward. A loc-less block therefore annihilates the index and the next loc-bearing one recovers it — which is how the comment survives the component body (that block is assigned the instance script's `loc`, and a context-wrapped component wraps it in a fresh loc-less block, so the wrapper annihilates and the inner block seeks back). A template block gets no such recovery, so the comment vanishes from the oracle's output while tsv keeps it — a DROP, which the parity bar grades. The scan (`script_rewrite.rs::template_emits_nested_block`) asks only whether a synthetic block exists anywhere — `{#if}`/`{#each}`/`{#await}`/`{#key}`/`{#snippet}`, a special element, or a component with children — not whether one is reached before the comment would flush, so it over-refuses the common case where a loc-bearing head expression (an `{#if}` test) flushes the comment first, and likewise the special elements that emit no block at all (`<svelte:window>`, `<slot>`). The split is keyed to the pinned oracle's `reset_comment_index` behavior (esrap 2.2.12) — re-probe it if that pin moves
 - **Refused**: `leading comment glued to the <script> line (no newline before it)`
 - **Refused**: `multi-line block comment in script (interior-line re-indentation not carried through)` — the oracle re-indents a block comment's interior lines to the emit position; tsv carries them verbatim
 - **Refused**: `comments with template markup before the script (window ordering)`

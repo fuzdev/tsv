@@ -198,7 +198,7 @@ pub fn census_detected_buckets() -> Vec<Cow<'static, str>> {
         Refusal::SnippetHoistAmbiguous { name: s() },
         // Comment carry-through (the classes collect_script_comments owns).
         Refusal::TemplateComments,
-        Refusal::CommentAfterLastStatement,
+        Refusal::CommentAfterLastStatementWithBlock,
         Refusal::LeadingCommentGluedToScript,
         Refusal::MultilineBlockComment,
         Refusal::FormatIgnoreComment,
