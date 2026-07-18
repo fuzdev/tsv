@@ -31,6 +31,7 @@
 
 use std::collections::HashSet;
 
+use tsv_lang::{InfallibleResolve, SharedInterner};
 use tsv_ts::ast::internal::{
     ArrowFunctionBody, ClassBody, ClassMember, ExportDefaultValue, Expression, ForInOfLeft,
     ForInit, FunctionExpression, ObjectPatternProperty, ObjectProperty, Statement,
@@ -40,7 +41,7 @@ use crate::analyze::{NameSet, pattern_binding_names};
 use crate::{CompileError, Refusal};
 
 /// The walk's shared state: the source names resolve against, the collection
-/// sinks, and the refusal set.
+/// sinks, the refusal set, and the interner (to decode an escaped identifier).
 pub(crate) struct WalkCtx<'a> {
     pub source: &'a str,
     /// Assignment/update target root names (fed back as `updated` bindings).
@@ -49,6 +50,9 @@ pub(crate) struct WalkCtx<'a> {
     pub nested_declared: &'a mut HashSet<String>,
     /// Derived binding names — reading one anywhere in walked code refuses.
     pub derived_names: &'a HashSet<String>,
+    /// The parse's interner — to decode an escaped identifier's name (an owned
+    /// `Rc<RefCell<…>>` clone, a cheap refcount bump, avoids a new lifetime).
+    pub interner: SharedInterner,
     /// Current function-nesting depth (0 = the statement being walked).
     fn_depth: usize,
 }
@@ -59,12 +63,14 @@ impl<'a> WalkCtx<'a> {
         updated: &'a mut HashSet<String>,
         nested_declared: &'a mut HashSet<String>,
         derived_names: &'a HashSet<String>,
+        interner: SharedInterner,
     ) -> Self {
         Self {
             source,
             updated,
             nested_declared,
             derived_names,
+            interner,
             fn_depth: 0,
         }
     }
@@ -475,6 +481,20 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
                 return Err(CompileError::Unsupported(Refusal::DerivedBindingRead {
                     name: name.to_string(),
                 }));
+            }
+            // An ESCAPED identifier (`d` → `d`) that decodes to a `$derived`
+            // name is a derived read the oracle emits as `d()`; the template
+            // value-walk can't rewrite an escaped read (classification not ported,
+            // like needs_context/snippet), so refuse rather than emit a bare `d` —
+            // a MISMATCH. A plain escaped local (not a derived name) stays legal.
+            if let Some(sym) = id.escaped_name {
+                let interner = ctx.interner.borrow();
+                let name = interner.resolve_infallible(sym);
+                if ctx.derived_names.contains(name) {
+                    return Err(CompileError::Unsupported(Refusal::DerivedBindingRead {
+                        name: name.to_string(),
+                    }));
+                }
             }
             Ok(())
         }

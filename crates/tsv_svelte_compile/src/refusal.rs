@@ -213,8 +213,11 @@ pub enum Refusal {
         /// The `$`-prefixed identifier.
         name: String,
     },
-    /// A `$derived` binding read outside a bare template-expression position.
-    #[error("read of derived binding {name} (supported only as a bare template expression)")]
+    /// A `$derived` binding read in a position the template value-walk does not
+    /// rewrite to `d()` — a pattern default, a script-position read, a read under
+    /// an unsupported wrapper, or an escaped-identifier read whose decoded name is
+    /// a `$derived` binding.
+    #[error("read of derived binding {name} (unsupported read position)")]
     DerivedBindingRead {
         /// The derived binding name.
         name: String,

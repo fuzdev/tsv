@@ -688,6 +688,95 @@ fn compile_derived_rune_rewrites_init_and_read() {
     );
 }
 
+#[test]
+fn compile_derived_read_refuses_deferred_positions() {
+    // The template VALUE walk rewrites a nested derived read to `d()` (the fixtures
+    // `runes/derived_read_*`). Positions NOT routed through that walk keep refusing
+    // the derived read (`DerivedBindingRead`, "read of derived binding") — never a
+    // MISMATCH.
+    //
+    // A `{#each}` context pattern default: the oracle emits a BARE `d` here
+    // (`let { v = d }`), so tsv could match by borrowing verbatim — but patterns are
+    // not rewritten this slice, so refusing is a deferred safe over-refusal.
+    assert_unsupported(
+        "<script>\n\tlet { a, xs } = $props();\n\tlet d = $derived(a * 2);\n</script>\n{#each xs as { v = d }}{v}{/each}",
+        "read of derived binding",
+    );
+    // A `{:then}` value pattern default: here the oracle emits `d()`
+    // (`({ x = d() }) => …`), so borrowing the pattern verbatim WOULD emit a bare `d`
+    // — a MISMATCH. Refusing is mandatory until patterns route through the walk.
+    assert_unsupported(
+        "<script>\n\tlet { a, p } = $props();\n\tlet d = $derived(a * 2);\n</script>\n{#await p then { x = d }}{x}{/await}",
+        "read of derived binding",
+    );
+    // A script-position derived read (`let e = d + 1`): the oracle emits
+    // `let e = d() + 1`, but this is out of scope for the template-only walk — the
+    // rune guard over the script refuses it.
+    assert_unsupported(
+        "<script>\n\tlet { a } = $props();\n\tlet d = $derived(a * 2);\n\tlet e = d + 1;\n</script>\n<p>{e}</p>",
+        "read of derived binding",
+    );
+    // A derived assignment target (`{d = 1}`) — the guard refuses the derived read
+    // (and a template mutation would refuse too).
+    assert_unsupported(
+        "<script>\n\tlet { a } = $props();\n\tlet d = $derived(a * 2);\n</script>\n{d = 1}",
+        "read of derived binding",
+    );
+    // A derived read under an ObjectExpression (`{f({ x: d })}`) — a wrapper kind the
+    // value walk does not descend, so it never reaches the rewrite and the guard
+    // refuses it (a safe over-refusal).
+    assert_unsupported(
+        "<script>\n\tlet { a } = $props();\n\tlet d = $derived(a * 2);\n\tfunction f(o) {\n\t\treturn o;\n\t}\n</script>\n{f({ x: d })}",
+        "read of derived binding",
+    );
+    // An ESCAPED-identifier read of a `$derived` name: the six source bytes
+    // `d` are the escaped spelling of the identifier `d`, which the oracle emits
+    // as `d()`. The value-walk can't rewrite an escaped read (classification not
+    // ported), so the rune guard refuses it rather than emit a bare `d` — a MISMATCH.
+    // Both bare and nested.
+    assert_unsupported(
+        "<script>\n\tlet { a } = $props();\n\tlet d = $derived(a * 2);\n</script>\n{\\u0064}",
+        "read of derived binding",
+    );
+    assert_unsupported(
+        "<script>\n\tlet { a } = $props();\n\tlet d = $derived(a * 2);\n</script>\n{\\u0064 + 1}",
+        "read of derived binding",
+    );
+}
+
+#[test]
+fn compile_escaped_local_read_still_compiles() {
+    // An escaped identifier is NOT auto-refused — only one decoding to a `$derived`
+    // name is. An escaped read of a plain (non-derived) local compiles, reading the
+    // binding bare (`d`, never `d()`).
+    let out = compile(
+        "<script>\n\tlet { a } = $props();\n\tlet d = a * 2;\n</script>\n{\\u0064}",
+        &CompileOptions::default(),
+    )
+    .unwrap();
+    assert!(
+        out.js.contains("$.escape(d)"),
+        "escaped plain-local read must compile bare: {}",
+        out.js
+    );
+}
+
+#[test]
+fn compile_derived_read_state_stays_bare() {
+    // Only names in `derived_names` rewrite. A reassigned `$state` binding is NOT
+    // derived, so a nested read of it stays bare (`s + 1`, never `s() + 1`).
+    let out = compile(
+        "<script>\n\tlet s = $state(1);\n\tfunction inc() {\n\t\ts += 1;\n\t}\n</script>\n{s + 1}",
+        &CompileOptions::default(),
+    )
+    .unwrap();
+    assert!(
+        out.js.contains("$.escape(s + 1)"),
+        "state read must stay bare: {}",
+        out.js
+    );
+}
+
 /// Assert `compile` refuses with an `Unsupported` message containing `what`.
 fn assert_unsupported(source: &str, what: &str) {
     let err = compile(source, &CompileOptions::default()).unwrap_err();
@@ -906,6 +995,18 @@ fn compile_state_snapshot_derived_arg_becomes_call() {
         "got: {}",
         out.js
     );
+    // A NESTED derived read inside the snapshot argument (`d + 1`) also rewrites —
+    // the snapshot walk and the derived-read walk compose on one node set.
+    let nested = compile(
+        "<script>\n\tlet a = $state(1);\n\tlet d = $derived(a * 2);\n</script>\n{$state.snapshot(d + 1)}",
+        &CompileOptions::default(),
+    )
+    .unwrap();
+    assert!(
+        nested.js.contains("$.escape($.snapshot(d() + 1))"),
+        "nested derived in snapshot arg: {}",
+        nested.js
+    );
 }
 
 #[test]
@@ -930,12 +1031,6 @@ fn compile_state_snapshot_refuses_wrong_arity_and_deferred_positions() {
     assert_unsupported(
         "<script>\n\tlet x = $state(1);\n\tfunction f() {\n\t\treturn $state.snapshot(x);\n\t}\n</script>\n<p>text</p>",
         "$state",
-    );
-    // A nested (non-bare) derived read inside the snapshot argument (deferred) —
-    // the derived-read guard refuses it.
-    assert_unsupported(
-        "<script>\n\tlet a = $state(1);\n\tlet d = $derived(a * 2);\n</script>\n{$state.snapshot(d + 1)}",
-        "derived",
     );
 }
 

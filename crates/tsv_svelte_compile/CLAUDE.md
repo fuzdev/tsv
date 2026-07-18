@@ -189,8 +189,10 @@ project-wide conventions.
   `fragment.rs`), so the guard exempts those positions while still refusing every
   other `$bindable`/`$inspect`/`$state.snapshot`/`$props.id` (value/template
   positions, nested defaults, a wrong-arity or second `.with`, `$inspect.trace`, a
-  nested-scope / script-position / optional-chained rune, …) — refuses derived-binding
-  reads outside bare emitter positions and top-level `await`, and collects
+  nested-scope / script-position / optional-chained rune, …) — refuses a derived-binding
+  read the template value-walk does not rewrite to `d()` (a pattern default, a
+  script-position read, a read under an unsupported wrapper, or an escaped-identifier
+  read whose decoded name is a `$derived` binding) and top-level `await`, and collects
   assignment/update roots (`updated`) and nested-scope declarations (shadow
   candidates) for the evaluator. Exhaustive matches on purpose — new AST
   variants fail compilation here instead of silently skipping the guard.
@@ -339,18 +341,23 @@ project-wide conventions.
   expression count as one text); interior whitespace is verbatim;
   `<pre>`/`<textarea>` preserve everything; a text-first fragment (component
   root or `{#each}` body — the oracle's `is_text_first` parent set) gets a
-  `<!---->` prefix. `{expr}` → `$.escape(expr)` (a bare derived read becomes
-  `d()`; known evaluations fold as static text), `{@html expr}` →
+  `<!---->` prefix. `{expr}` → `$.escape(expr)` (a derived read, bare or nested,
+  becomes `d()`; known evaluations fold as static text), `{@html expr}` →
   `$.html(expr)`; entities decode then re-escape (`[&<]` in text). The
   `guard_dropped`/`guard_pattern`/`guard_dropped_fragment`/`wrap_single`/
   `wrap_value_expr` family prepares a borrowed template expression for a
-  synthetic call argument slot, guarding stray runes and rewriting a bare
-  derived read to `d()`. `wrap_value_expr`'s core `rewrite_template_value` is the
-  **item-6 template-value substitution walk**: it also rewrites every
-  `$state.snapshot(x)` sub-node to `$.snapshot(<processed x>)`, rebuilding only the
-  spine down to each snapshot (a `contains_snapshot` fast-path keeps snapshot-free
-  subtrees on the unchanged guarded path, byte-identical to before); the next slice
-  extends this one function for nested `d`→`d()` derived reads.
+  synthetic call argument slot, guarding stray runes and rewriting a derived
+  read (bare or nested) to `d()`. `wrap_value_expr`'s core `rewrite_template_value`
+  is the **item-6 template-value substitution walk**: it rewrites every read of a
+  `$derived` binding — bare (`{d}`) or nested at any depth (`{d + 1}`, `{obj[d]}`,
+  `{f(d)}`, `{d.x}`) — to `d()`, and every `$state.snapshot(x)` sub-node to
+  `$.snapshot(<processed x>)`, rebuilding only the spine down to each rewrite target
+  (a `contains_rewrite_target` fast-path keeps target-free subtrees on the unchanged
+  guarded path, byte-identical, and `contains_rewrite_target`/`rebuild_value` stay in
+  lockstep on one node set). A derived read or snapshot under a node kind the walk
+  does not descend (an object literal, an arrow, a tagged template), a pattern
+  default, or a script-position read is left for the guard, which refuses it (a safe
+  over-refusal).
 - `blocks.rs` — **control-flow blocks** split the single template into
   multiple `$$renderer.push(…)` statements, each block emitting its own
   statements between flushes and merging its closer/opener into the adjacent

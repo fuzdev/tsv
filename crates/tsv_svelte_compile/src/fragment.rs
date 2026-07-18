@@ -6,7 +6,7 @@
 //! the alternating static-text/interpolation template pending a
 //! `$$renderer.push(…)` flush. The `guard_*`/`wrap_*` family prepares a borrowed
 //! template expression for a synthetic call argument slot, guarding stray runes
-//! and rewriting a bare derived read to `d()`.
+//! and rewriting every derived read — bare or nested — to `d()`.
 
 use std::collections::HashMap;
 
@@ -731,7 +731,13 @@ pub(crate) fn guard_dropped<'arena>(
     // The component-wide reassignment/shadow collection is `needs_context`'s job
     // (it walks the dropped regions too), so these two are throwaways.
     let no_derived = NameSet::default();
-    let mut ctx = WalkCtx::new(env.source, &mut updated, &mut nested, &no_derived);
+    let mut ctx = WalkCtx::new(
+        env.source,
+        &mut updated,
+        &mut nested,
+        &no_derived,
+        std::rc::Rc::clone(&env.b.interner),
+    );
     walk_expression_guarded(expr, &mut ctx)
 }
 
@@ -741,17 +747,31 @@ pub(crate) fn guard_dropped<'arena>(
 ///
 /// A pattern is not a dropped region: its *default values* are real emitted
 /// expressions (`{#each xs as { a = d }}`), and this emitter borrows the pattern
-/// through untouched — it never rewrites a derived read inside one to `d()` the
-/// way `wrap_value_expr` does for a value position. So the derived rule stays ON
-/// here (unlike [`guard_dropped`]): a derived read in a pattern default would
-/// otherwise emit a bare `d` where the oracle emits `d()`. A MISMATCH, so refuse.
+/// through untouched — it never routes a pattern position through the value walk,
+/// so it never rewrites a derived read inside one to `d()`. The derived rule stays
+/// ON here (unlike [`guard_dropped`]), and the two pattern positions want it for
+/// opposite reasons, both satisfied by one uniform "keep it on and refuse":
+///
+/// - the `{:then}` value default (`{#await p then {x = d}}`): the oracle emits
+///   `({ x = d() })` — `d()`. Borrowing the pattern verbatim would emit a bare
+///   `d` → a MISMATCH, so refusing is **mandatory** here.
+/// - the `{#each}` context default (`{#each xs as {v = d}}`): the oracle emits
+///   `let { v = d }` — a bare `d`. tsv *could* match by borrowing verbatim, but
+///   keeps the rule ON as a **deferred safe over-refusal** (patterns are not
+///   rewritten this slice; refusing is never a MISMATCH).
 pub(crate) fn guard_pattern<'arena>(
     env: &EmitEnv<'arena, '_>,
     pattern: &'arena Expression<'arena>,
 ) -> Result<(), CompileError> {
     let mut updated = NameSet::default();
     let mut nested = NameSet::default();
-    let mut ctx = WalkCtx::new(env.source, &mut updated, &mut nested, &env.derived_names);
+    let mut ctx = WalkCtx::new(
+        env.source,
+        &mut updated,
+        &mut nested,
+        &env.derived_names,
+        std::rc::Rc::clone(&env.b.interner),
+    );
     walk_expression_guarded(pattern, &mut ctx)
 }
 
@@ -837,21 +857,39 @@ fn emit_expression_tag<'arena>(
 /// position routes through ([`emit_expression_tag`], [`wrap_single`], the
 /// attribute/spread/component-prop borrow points). It:
 ///
-/// - rewrites a bare read of a derived binding to `d()`;
+/// - rewrites every read of a `$derived` binding — bare (`{d}`) or nested at any
+///   depth (`{d + 1}`, `{obj[d]}`, `{f(d)}`, `{d.x}`) — to the derived-thunk call
+///   `d()`;
 /// - rewrites every `$state.snapshot(x)` sub-node it descends into
 ///   `$.snapshot(<processed x>)`, processing the argument as a value in turn (a
-///   bare derived arg → `d()`, a nested snapshot → `$.snapshot(...)`); and
-/// - guards everything else (stray runes, non-bare derived reads, template
-///   mutations, top-level await refuse) and passes it through borrowed.
+///   derived arg → `d()`, a nested snapshot → `$.snapshot(...)`); and
+/// - guards everything else and passes it through borrowed — stray runes,
+///   top-level await, a template mutation, and a derived read or `$state.snapshot`
+///   under a node kind this walk does not descend (an `ObjectExpression`, an
+///   arrow, a tagged template) all refuse there (a safe over-refusal).
 ///
-/// A `$state.snapshot` in a position this walk does not descend is left for the
-/// guard, which refuses it — a safe over-refusal the next slice can widen (that
-/// same slice extends this walk to rewrite nested `d` → `d()` reads).
+/// It rebuilds only the spine down to each rewrite target; a target-free subtree
+/// stays on the guarded fast path, byte-identical to before (and does no extra
+/// allocation).
 pub(crate) fn wrap_value_expr<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     expr: &'arena Expression<'arena>,
 ) -> Result<&'arena [Expression<'arena>], CompileError> {
     Ok(std::slice::from_ref(rewrite_template_value(env, expr)?))
+}
+
+/// Whether `expr` is a bare read of a `$derived` binding — a plain (non-escaped)
+/// identifier whose name is in `derived_names`. Such a read rewrites to the
+/// derived-thunk call `d()` at every value position, at any depth.
+fn is_bare_derived_read(source: &str, derived_names: &NameSet, expr: &Expression<'_>) -> bool {
+    if let Expression::Identifier(id) = expr
+        && id.escaped_name.is_none()
+    {
+        let start = id.span.start as usize;
+        let name = &source[start..start + id.name_len as usize];
+        return derived_names.contains(name);
+    }
+    false
 }
 
 /// The recursive core of [`wrap_value_expr`]: rewrite one value expression,
@@ -862,15 +900,9 @@ fn rewrite_template_value<'arena>(
     expr: &'arena Expression<'arena>,
 ) -> Result<&'arena Expression<'arena>, CompileError> {
     // A bare read of a derived binding becomes `d()`.
-    if let Expression::Identifier(id) = expr
-        && id.escaped_name.is_none()
-    {
-        let start = id.span.start as usize;
-        let name = &env.source[start..start + id.name_len as usize];
-        if env.derived_names.contains(name) {
-            let call = env.b.call_expr(expr, &[]);
-            return Ok(env.b.arena.alloc(call));
-        }
+    if is_bare_derived_read(env.source, &env.derived_names, expr) {
+        let call = env.b.call_expr(expr, &[]);
+        return Ok(env.b.arena.alloc(call));
     }
     // A `$state.snapshot(x)` call → `$.snapshot(<processed x>)`.
     if let Some(arg) = snapshot_call_arg(env.source, expr) {
@@ -880,15 +912,16 @@ fn rewrite_template_value<'arena>(
             .member_call("$", "snapshot", std::slice::from_ref(processed));
         return Ok(env.b.arena.alloc(call));
     }
-    // No snapshot in this subtree: guard it whole and pass through borrowed — the
-    // unchanged pre-item-6 path, so every snapshot-free template expression keeps
-    // its exact behavior (and does no extra allocation).
-    if !contains_snapshot(env.source, expr) {
+    // No rewrite target in this subtree: guard it whole and pass through borrowed
+    // — the guarded fast path, so every target-free template expression keeps its
+    // exact behavior (and does no extra allocation).
+    if !contains_rewrite_target(env.source, &env.derived_names, expr) {
         guard_template_value(env, expr)?;
         return Ok(expr);
     }
-    // A snapshot sits nested inside a wrapper — rebuild along the path.
-    rebuild_with_snapshots(env, expr)
+    // A rewrite target (a nested derived read or `$state.snapshot`) sits inside a
+    // wrapper — rebuild along the spine.
+    rebuild_value(env, expr)
 }
 
 /// Guard a snapshot-free template value expression (the pre-item-6 behavior):
@@ -901,7 +934,13 @@ fn guard_template_value<'arena>(
 ) -> Result<(), CompileError> {
     let mut updated = NameSet::default();
     let mut nested = NameSet::default();
-    let mut ctx = WalkCtx::new(env.source, &mut updated, &mut nested, &env.derived_names);
+    let mut ctx = WalkCtx::new(
+        env.source,
+        &mut updated,
+        &mut nested,
+        &env.derived_names,
+        std::rc::Rc::clone(&env.b.interner),
+    );
     walk_expression_guarded(expr, &mut ctx)?;
     if !updated.is_empty() {
         return Err(unsupported(Refusal::MutationInTemplateExpr));
@@ -927,58 +966,74 @@ fn snapshot_call_arg<'arena>(
     call.arguments.first()
 }
 
-/// Whether `expr` contains a `$state.snapshot(...)` call anywhere this walk
-/// descends. A false negative is safe — the snapshot then reaches the rune guard,
+/// Whether `expr` contains a rewrite target — a bare `$derived` read (→ `d()`)
+/// or a `$state.snapshot(...)` call (→ `$.snapshot(...)`) — anywhere this walk
+/// descends. A false negative is safe: the target then reaches the rune guard,
 /// which refuses it (a safe over-refusal). Descends exactly the wrapper node kinds
-/// [`rebuild_with_snapshots`] rebuilds.
-fn contains_snapshot(source: &str, expr: &Expression<'_>) -> bool {
+/// [`rebuild_value`] rebuilds — the two stay in lockstep on one node set.
+fn contains_rewrite_target(source: &str, derived_names: &NameSet, expr: &Expression<'_>) -> bool {
+    if is_bare_derived_read(source, derived_names, expr) {
+        return true;
+    }
     if snapshot_call_arg(source, expr).is_some() {
         return true;
     }
     match expr {
         Expression::CallExpression(c) => {
-            contains_snapshot(source, c.callee)
-                || c.arguments.iter().any(|a| contains_snapshot(source, a))
+            contains_rewrite_target(source, derived_names, c.callee)
+                || c.arguments
+                    .iter()
+                    .any(|a| contains_rewrite_target(source, derived_names, a))
         }
         Expression::NewExpression(n) => {
-            contains_snapshot(source, n.callee)
-                || n.arguments.iter().any(|a| contains_snapshot(source, a))
+            contains_rewrite_target(source, derived_names, n.callee)
+                || n.arguments
+                    .iter()
+                    .any(|a| contains_rewrite_target(source, derived_names, a))
         }
         Expression::BinaryExpression(b) => {
-            contains_snapshot(source, b.left) || contains_snapshot(source, b.right)
+            contains_rewrite_target(source, derived_names, b.left)
+                || contains_rewrite_target(source, derived_names, b.right)
         }
         Expression::MemberExpression(m) => {
-            contains_snapshot(source, m.object)
-                || (m.computed && contains_snapshot(source, m.property))
+            contains_rewrite_target(source, derived_names, m.object)
+                || (m.computed && contains_rewrite_target(source, derived_names, m.property))
         }
         Expression::ConditionalExpression(c) => {
-            contains_snapshot(source, c.test)
-                || contains_snapshot(source, c.consequent)
-                || contains_snapshot(source, c.alternate)
+            contains_rewrite_target(source, derived_names, c.test)
+                || contains_rewrite_target(source, derived_names, c.consequent)
+                || contains_rewrite_target(source, derived_names, c.alternate)
         }
-        Expression::UnaryExpression(u) => contains_snapshot(source, u.argument),
-        Expression::ParenthesizedExpression(p) => contains_snapshot(source, p.expression),
-        Expression::SequenceExpression(s) => {
-            s.expressions.iter().any(|e| contains_snapshot(source, e))
+        Expression::UnaryExpression(u) => {
+            contains_rewrite_target(source, derived_names, u.argument)
         }
-        Expression::SpreadElement(s) => contains_snapshot(source, s.argument),
-        Expression::ArrayExpression(a) => a
-            .elements
+        Expression::ParenthesizedExpression(p) => {
+            contains_rewrite_target(source, derived_names, p.expression)
+        }
+        Expression::SequenceExpression(s) => s
+            .expressions
             .iter()
-            .any(|e| e.as_ref().is_some_and(|e| contains_snapshot(source, e))),
-        Expression::TemplateLiteral(t) => {
-            t.expressions.iter().any(|e| contains_snapshot(source, e))
-        }
+            .any(|e| contains_rewrite_target(source, derived_names, e)),
+        Expression::SpreadElement(s) => contains_rewrite_target(source, derived_names, s.argument),
+        Expression::ArrayExpression(a) => a.elements.iter().any(|e| {
+            e.as_ref()
+                .is_some_and(|e| contains_rewrite_target(source, derived_names, e))
+        }),
+        Expression::TemplateLiteral(t) => t
+            .expressions
+            .iter()
+            .any(|e| contains_rewrite_target(source, derived_names, e)),
         _ => false,
     }
 }
 
-/// Rebuild a value expression that contains a nested `$state.snapshot(...)`,
-/// recursing [`rewrite_template_value`] on every value-position child (a
-/// snapshot-free child re-enters the guarded fast path). A node kind this match
-/// does not cover falls through to the guard, which refuses the snapshot it
-/// carries — a safe over-refusal.
-fn rebuild_with_snapshots<'arena>(
+/// Rebuild a value expression along the spine down to each nested rewrite target
+/// (a `$state.snapshot(...)` call or a bare `$derived` read), recursing
+/// [`rewrite_template_value`] on every value-position child (a target-free child
+/// re-enters the guarded fast path). A node kind this match does not cover falls
+/// through to the guard, which refuses the target it carries — a safe
+/// over-refusal.
+fn rebuild_value<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     expr: &'arena Expression<'arena>,
 ) -> Result<&'arena Expression<'arena>, CompileError> {

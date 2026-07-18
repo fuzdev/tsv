@@ -618,7 +618,13 @@ pub(crate) fn rewrite_script_statement<'arena>(
     {
         *has_effects = true;
         dropped_regions.push(stmt.span());
-        let mut ctx = WalkCtx::new(source, updated, nested_declared, derived_names);
+        let mut ctx = WalkCtx::new(
+            source,
+            updated,
+            nested_declared,
+            derived_names,
+            std::rc::Rc::clone(&b.interner),
+        );
         walk_expression_guarded(callback, &mut ctx)?;
         return Ok(None);
     }
@@ -635,7 +641,13 @@ pub(crate) fn rewrite_script_statement<'arena>(
         && let Some(guarded) = is_inspect_call(&expr_stmt.expression, source)
     {
         dropped_regions.push(stmt.span());
-        let mut ctx = WalkCtx::new(source, updated, nested_declared, derived_names);
+        let mut ctx = WalkCtx::new(
+            source,
+            updated,
+            nested_declared,
+            derived_names,
+            std::rc::Rc::clone(&b.interner),
+        );
         for expr in guarded {
             walk_expression_guarded(expr, &mut ctx)?;
         }
@@ -643,7 +655,13 @@ pub(crate) fn rewrite_script_statement<'arena>(
     }
 
     let Statement::VariableDeclaration(decl) = stmt else {
-        let mut ctx = WalkCtx::new(source, updated, nested_declared, derived_names);
+        let mut ctx = WalkCtx::new(
+            source,
+            updated,
+            nested_declared,
+            derived_names,
+            std::rc::Rc::clone(&b.interner),
+        );
         walk_statement_guarded(stmt, &mut ctx, 0)?;
         return Ok(Some(stmt.clone()));
     };
@@ -654,14 +672,26 @@ pub(crate) fn rewrite_script_statement<'arena>(
             .is_some_and(|i| classify_rune_init(i, source).is_some())
     });
     if !has_rune_init {
-        let mut ctx = WalkCtx::new(source, updated, nested_declared, derived_names);
+        let mut ctx = WalkCtx::new(
+            source,
+            updated,
+            nested_declared,
+            derived_names,
+            std::rc::Rc::clone(&b.interner),
+        );
         walk_statement_guarded(stmt, &mut ctx, 0)?;
         return Ok(Some(stmt.clone()));
     }
 
     let mut declarations: BumpVec<'arena, VariableDeclarator<'arena>> = BumpVec::new_in(b.arena);
     for declarator in decl.declarations {
-        let mut ctx = WalkCtx::new(source, updated, nested_declared, derived_names);
+        let mut ctx = WalkCtx::new(
+            source,
+            updated,
+            nested_declared,
+            derived_names,
+            std::rc::Rc::clone(&b.interner),
+        );
         let rune = declarator
             .init
             .as_ref()
