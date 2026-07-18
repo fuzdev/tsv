@@ -60,7 +60,7 @@ pub struct ValidationSummary {
     /// `svelte compile` render-key arm.
     pub total_render_equiv_compile: usize,
     /// Whitespace variants confirmed render-equivalent via the template-only
-    /// `render_normalize` fallback arm (the compile-blind spot).
+    /// `render_browser` fallback arm (the compile-blind spot).
     pub total_render_equiv_fallback: usize,
     /// Allow-listed benign fallback divergences that fired across the run, used to
     /// ratchet the list for staleness (see `detect_stale_benign_render_equiv`).
@@ -355,7 +355,7 @@ pub fn print_validation_results(summary: &ValidationSummary, verbose: bool) {
         if summary.total_render_equiv_compile > 0 || summary.total_render_equiv_fallback > 0 {
             println!();
             println!(
-                "Render-equivalence: {} verified ({} via compile, {} via render_normalize fallback){}",
+                "Render-equivalence: {} verified ({} via compile, {} via render_browser fallback){}",
                 summary.total_render_equiv_compile + summary.total_render_equiv_fallback,
                 summary.total_render_equiv_compile,
                 summary.total_render_equiv_fallback,

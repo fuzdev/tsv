@@ -22,7 +22,7 @@ use tokio::time::{Duration, timeout};
 const READ_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Embedded sidecar script
-const SIDECAR_SCRIPT: &str = include_str!("sidecar.ts");
+pub(crate) const SIDECAR_SCRIPT: &str = include_str!("sidecar.ts");
 
 /// Deno config for import map (ensures acorn-typescript uses same acorn
 /// instance). `"lock": false` keeps concurrent sidecars (e.g. several test
