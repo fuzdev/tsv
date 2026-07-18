@@ -31,23 +31,26 @@
 //!   declarations, invalid node placement, CSS analysis errors (~6% of
 //!   variant-bearing fixtures). Those errors are unrelated to rendering, and
 //!   `runes: false` does not avoid them. When either side won't compile, fall back
-//!   to a **template-only** `render_normalize` compare (canonical parse,
+//!   to a **template-only** [`crate::render_browser`] compare (canonical parse,
 //!   `instance`/`module`/`css` erased, Svelte-5 whitespace normalization).
 //!   Template-only because a script-only difference (e.g. a dropped
 //!   `EmptyStatement`, `a();;` → `a();`) is a formatter normalization, not a render
-//!   change. This model **over-flags by construction** — it lacks the block-boundary
-//!   whitespace model and compares expression/structure syntax (parens, comment
-//!   position, `{#await x then y}` ↔ `{#await x}{:then y}`) that never reaches the
-//!   render — so its divergences are gated against the hand-verified
-//!   [`BENIGN_FALLBACK_DIVERGENCES`] allow-list rather than trusted outright: an
-//!   unlisted one fails, and a listed one that stops firing fails as stale.
+//!   change. On top of the Svelte 5 compiler model it applies the *browser* model
+//!   ([`crate::render_browser`]): block-boundary whitespace vanishes, and a quoted
+//!   single-expression attribute value compares equal to its bare spelling.
+//!   The model still **over-flags by construction** — it compares expression and
+//!   structure syntax (parens, comment position, `{#await x then y}` ↔
+//!   `{#await x}{:then y}`) that never reaches the render — so its divergences are
+//!   gated against the hand-verified [`BENIGN_FALLBACK_DIVERGENCES`] allow-list
+//!   rather than trusted outright: an unlisted one fails, and a listed one that
+//!   stops firing fails as stale.
 
 use serde_json::Value;
 
 use crate::deno;
 use crate::diff;
 use crate::fixtures::{Fixture, FixtureFiles, InputType, read_file};
-use crate::render_normalize::normalize_pair;
+use crate::render_browser::browser_normalize_pair;
 
 use super::super::FixtureValidation;
 use super::super::errors::ValidationError;
@@ -57,10 +60,10 @@ use super::super::errors::ValidationError;
 ///
 /// ⚠️ **Unlike the `gap_audit` / `blank_audit` ratchets, a line here is NOT a known
 /// bug** — it is a known FALSE POSITIVE of the weak fallback oracle (see the module
-/// docs: no block-boundary model, compares expression/structure syntax that never
-/// reaches the render). Shrinking this list means **improving the oracle**, never
-/// fixing the formatter. The compile arm is unaffected: an authoritative divergence
-/// always fails, and is never allow-listed.
+/// docs: it compares expression/structure syntax that never reaches the render).
+/// Shrinking this list means **improving the oracle**, never fixing the formatter.
+/// The compile arm is unaffected: an authoritative divergence always fails, and is
+/// never allow-listed.
 ///
 /// Each entry was verified authoritatively by compiling both sides with the `bind:`
 /// targets declared as `$state` — the same transform applied to both — and comparing
@@ -72,16 +75,6 @@ use super::super::errors::ValidationError;
 /// The list is ratcheted: a fallback divergence NOT listed here fails, and a listed
 /// entry that no longer fires fails as stale (so a fixed oracle forces a re-pin).
 const BENIGN_FALLBACK_DIVERGENCES: &[&str] = &[
-    // Inter-sibling whitespace around BLOCK elements (compact ↔ expanded). The baked
-    // template differs by spaces the browser drops at a block boundary.
-    // TODO: giving the fallback the compile arm's block-boundary model (see the
-    // sidecar's `visibleSegments` / `BLOCK_TAGS`) would retire this entry.
-    "svelte/directives/modifier_preservation_prettier_divergence/unformatted_ours_compact.svelte",
-    // Quoted vs bare directive value (`bind:value="{a}"` ↔ `bind:value={a}`) — the
-    // attribute-value *representation* differs, the expression and render do not.
-    // TODO: normalizing the quoted/bare attribute-value shape before comparing would
-    // retire this entry.
-    "svelte/directives/quoted_expression/unformatted_quoted.svelte",
     // Paren + multiline-comment position inside a directive expression. Verified: the
     // generated JS differs only in a *comment's* indentation, never in template text.
     // Retiring these needs the fallback to hole out expression subtrees — i.e. to
@@ -128,7 +121,7 @@ fn benign_key(fixture: &Fixture, variant_name: &str) -> String {
 enum Oracle {
     /// Authoritative: equal `svelte compile --generate server` render keys.
     Compile,
-    /// Fallback: the in-process template-only `render_normalize` model (compile
+    /// Fallback: the in-process template-only `render_browser` model (compile
     /// unavailable).
     Fallback,
 }
@@ -279,7 +272,7 @@ async fn render_equivalent(
         };
     }
 
-    // Fallback arm: the template-only render_normalize model (compile unavailable
+    // Fallback arm: the template-only render_browser model (compile unavailable
     // on a side). Erase `instance`/`module`/`css` so a script/style-only
     // reformatting — which the compile arm ignores by construction — is ignored
     // here too, leaving a pure template-render compare.
@@ -300,7 +293,7 @@ async fn render_equivalent(
         return Verdict::Indeterminate;
     };
     let (normalized_variant, normalized_input) =
-        normalize_pair(variant_ast, input_val.clone(), true);
+        browser_normalize_pair(variant_ast, input_val.clone());
     if normalized_variant == normalized_input {
         Verdict::Equivalent(Oracle::Fallback)
     } else {
