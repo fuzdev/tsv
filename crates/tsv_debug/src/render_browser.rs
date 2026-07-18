@@ -199,24 +199,8 @@ fn unwrap_single_expression_values(value: &mut Value) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::render_normalize::test_ast::*;
     use serde_json::json;
-
-    fn text(data: &str) -> Value {
-        json!({"type": "Text", "raw": data, "data": data})
-    }
-
-    fn element(name: &str, nodes: Vec<Value>) -> Value {
-        json!({
-            "type": "RegularElement",
-            "name": name,
-            "attributes": [],
-            "fragment": {"type": "Fragment", "nodes": nodes},
-        })
-    }
-
-    fn root(nodes: Vec<Value>) -> Value {
-        json!({"type": "Root", "fragment": {"type": "Fragment", "nodes": nodes}})
-    }
 
     fn attribute(name: &str, value: Value) -> Value {
         json!({"type": "Attribute", "name": name, "value": value})
@@ -227,6 +211,11 @@ mod tests {
             "type": "ExpressionTag",
             "expression": {"type": "Identifier", "name": name},
         })
+    }
+
+    /// The `value` of the first attribute of the root's first element.
+    fn attribute_value(normalized: &Value) -> &Value {
+        &frag_nodes(normalized)[0]["attributes"][0]["value"]
     }
 
     /// The entry that this model retires: `<div/> <input/>` renders like
@@ -305,45 +294,48 @@ mod tests {
     /// The other entry this model retires: `a="{x}"` compares equal to `a={x}`.
     #[test]
     fn quoted_single_expression_value_equals_bare() {
-        let quoted = browser_render_normalize(root(vec![json!({
-            "type": "RegularElement",
-            "name": "div",
-            "attributes": [attribute("a", json!([expression_tag("x")]))],
-            "fragment": {"type": "Fragment", "nodes": []},
-        })]));
-        let bare = browser_render_normalize(root(vec![json!({
-            "type": "RegularElement",
-            "name": "div",
-            "attributes": [attribute("a", expression_tag("x"))],
-            "fragment": {"type": "Fragment", "nodes": []},
-        })]));
+        let quoted = browser_render_normalize(root(vec![element_with_attributes(
+            "div",
+            vec![attribute("a", json!([expression_tag("x")]))],
+            vec![],
+        )]));
+        let bare = browser_render_normalize(root(vec![element_with_attributes(
+            "div",
+            vec![attribute("a", expression_tag("x"))],
+            vec![],
+        )]));
         assert_eq!(quoted, bare);
     }
 
     /// A multi-chunk value is a real concatenation — it keeps its array.
     #[test]
     fn multi_chunk_value_is_not_unwrapped() {
-        let normalized = browser_render_normalize(root(vec![json!({
-            "type": "RegularElement",
-            "name": "div",
-            "attributes": [attribute("a", json!([expression_tag("x"), expression_tag("y")]))],
-            "fragment": {"type": "Fragment", "nodes": []},
-        })]));
-        let value = &normalized["fragment"]["nodes"][0]["attributes"][0]["value"];
-        assert!(value.is_array(), "a two-chunk value must stay an array");
+        let normalized = browser_render_normalize(root(vec![element_with_attributes(
+            "div",
+            vec![attribute(
+                "a",
+                json!([expression_tag("x"), expression_tag("y")]),
+            )],
+            vec![],
+        )]));
+        assert!(
+            attribute_value(&normalized).is_array(),
+            "a two-chunk value must stay an array"
+        );
     }
 
     /// A quoted *text* value is not an `ExpressionTag`, so it is left alone.
     #[test]
     fn text_value_is_not_unwrapped() {
-        let normalized = browser_render_normalize(root(vec![json!({
-            "type": "RegularElement",
-            "name": "div",
-            "attributes": [attribute("a", json!([{"type": "Text", "raw": "t", "data": "t"}]))],
-            "fragment": {"type": "Fragment", "nodes": []},
-        })]));
-        let value = &normalized["fragment"]["nodes"][0]["attributes"][0]["value"];
-        assert!(value.is_array(), "a text value must stay an array");
+        let normalized = browser_render_normalize(root(vec![element_with_attributes(
+            "div",
+            vec![attribute("a", json!([text("t")]))],
+            vec![],
+        )]));
+        assert!(
+            attribute_value(&normalized).is_array(),
+            "a text value must stay an array"
+        );
     }
 
     /// [`BLOCK_TAGS`] must stay identical to the sidecar's own set, or the
@@ -361,10 +353,19 @@ mod tests {
             .find("]);")
             .expect("BLOCK_TAGS must be closed by `]);`");
 
+        // Odd-indexed `'`-split segments are the quoted tag names.
         let sidecar: std::collections::BTreeSet<&str> =
             body[..end].split('\'').skip(1).step_by(2).collect();
-        let ours: std::collections::BTreeSet<&str> = BLOCK_TAGS.iter().copied().collect();
+        // Distinguish "the two sets disagree" from "this parse stopped working"
+        // (e.g. the sidecar list reformatted to double quotes) — otherwise the
+        // latter reports as a bogus mismatch against an empty set.
+        assert!(
+            !sidecar.is_empty(),
+            "failed to parse any tag out of the sidecar's BLOCK_TAGS — \
+             single-quoted entries expected; update this parse, not the assertion"
+        );
 
+        let ours: std::collections::BTreeSet<&str> = BLOCK_TAGS.iter().copied().collect();
         assert_eq!(
             ours, sidecar,
             "BLOCK_TAGS must mirror the sidecar's browser-render set"
