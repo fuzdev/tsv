@@ -504,6 +504,23 @@ fn compile_refuses_multiline_block_comment() {
 }
 
 #[test]
+fn compile_refuses_comment_with_store() {
+    // A store reference injects `var $$store_subs;` as a synthetic (appendix-span)
+    // component-body statement whose leading comment window would sweep the carried
+    // script comment (a double-print). Refuse. A script-position write mints
+    // `$.store_set`/`$.store_get`, which sweep the same way.
+    assert_unsupported(
+        "<script>\n\timport { writable } from 'svelte/store';\n\tlet count = writable(0);\n\t// note\n\tfunction inc() {\n\t\t$count += 1;\n\t}\n</script>\n<button onclick={inc}>{$count}</button>",
+        "references a store",
+    );
+    // A template-only `$name` read still injects the var, so it refuses too.
+    assert_unsupported(
+        "<script>\n\timport { writable } from 'svelte/store';\n\tlet count = writable(0);\n\t// note\n\tlet x = 1;\n</script>\n<p>{$count}{x}</p>",
+        "references a store",
+    );
+}
+
+#[test]
 fn compile_hoistable_snippet_and_render() {
     // A top-level snippet whose only reference is its own parameter hoists to
     // module scope; `{@render foo(1)}` becomes `foo($$renderer, 1)`, standalone

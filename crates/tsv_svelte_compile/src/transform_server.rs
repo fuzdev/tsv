@@ -390,11 +390,6 @@ fn analyze<'arena>(
     let mut bindings = Bindings::empty();
     let mut derived_names = NameSet::default();
     analyze_script(instance_body, source, &mut bindings, &mut derived_names)?;
-    if has_comments && !derived_names.is_empty() {
-        // The `$.derived(() => …)` wrapper and `d()` reads bridge host and
-        // appendix spans in ways whose comment windows sweep wrongly.
-        return Err(unsupported(Refusal::CommentsWithDerived));
-    }
 
     // Snippet hoist analysis: which top-level `{#snippet}`s go to module scope.
     // Imports don't disqualify hoisting, so the instance-binding set the analysis
@@ -647,6 +642,17 @@ pub(crate) fn compile_server<'arena>(
     // (the oracle's `should_inject_props` includes `uses_slots`). Carried script
     // comments plus the injected first statement would sweep the function-body
     // comment windows, so refuse that combination for now.
+    // A store reference makes the component inject `var $$store_subs;` as a
+    // component-body statement (below). Being a synthetic (appendix-span)
+    // statement, it sweeps the function-body / wrapper-block leading comment
+    // window exactly as the `$$slots` injection does, so refuse a carried script
+    // comment alongside it — including a template-only `$name` read, which still
+    // injects the var. (The script-position store rewrite mints — `$.store_get`
+    // / `$.store_set` — sweep the same way; both are covered here since either
+    // implies `uses_stores`.)
+    if component.uses_stores && has_comments {
+        return Err(unsupported(Refusal::CommentsWithStore));
+    }
     if component.uses_slots {
         if has_comments {
             return Err(unsupported(Refusal::CommentsWithSlots));

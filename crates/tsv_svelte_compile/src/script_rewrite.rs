@@ -849,15 +849,28 @@ pub(crate) fn rewrite_script_statement<'arena>(
                 // argument-less, non-optional call on an identifier — so
                 // `$derived(get_library())` emits `$.derived(get_library)`, not
                 // `$.derived(() => get_library())`.
+                //
+                // The synthetic `$.derived(...)` and its arrow steal the replaced
+                // `$derived(...)` init's host span so a carried script comment's
+                // declarator/call windows stay empty (`derived_call`), the
+                // call-structure analog of the `$$props` span-steal above.
+                let anchor = declarator
+                    .init
+                    .as_ref()
+                    .map_or(declarator.span, Expression::span);
                 let argument = match unthunk_callee(expr) {
                     Some(callee) => callee,
-                    None => &*b.arena.alloc(b.arrow_expr(expr)),
+                    None => &*b.arena.alloc(b.arrow_expr_at(anchor, expr)),
                 };
-                Some(b.member_call("$", "derived", std::slice::from_ref(argument)))
+                Some(b.derived_call(anchor, argument))
             }
             Some(RuneInit::DerivedBy(f)) => {
                 walk_expression_guarded(f, &mut ctx)?;
-                Some(b.member_call("$", "derived", std::slice::from_ref(f)))
+                let anchor = declarator
+                    .init
+                    .as_ref()
+                    .map_or(declarator.span, Expression::span);
+                Some(b.derived_call(anchor, f))
             }
             None => {
                 if let Some(init) = &declarator.init {

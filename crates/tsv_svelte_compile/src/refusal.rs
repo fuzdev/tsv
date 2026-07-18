@@ -265,9 +265,14 @@ pub enum Refusal {
          (the oracle re-anchors comments inside the split)"
     )]
     CommentsAlongsideMultiDeclarator,
-    /// Comments in a script that uses `$derived`.
-    #[error("comments in a script that uses $derived (not carried through yet)")]
-    CommentsWithDerived,
+    /// Comments in a script that makes a store reference. The `var $$store_subs;`
+    /// injection (and the `$.store_get`/`$.store_set` mints) are synthetic
+    /// (appendix-span) nodes whose leading comment window would sweep the carried
+    /// script comments — a safe over-refusal, like [`Self::CommentsWithSlots`].
+    /// Fires for a template-only `$name` read too (the var is injected all the
+    /// same).
+    #[error("comments in a script that references a store ($$store_subs injection)")]
+    CommentsWithStore,
     /// A comment inside a rewritten (dropped) rune region.
     #[error("comment inside a rewritten rune region (dropped by the transform)")]
     CommentInRewrittenRuneRegion,
@@ -827,9 +832,9 @@ impl Refusal {
             Self::CommentsAlongsideMultiDeclarator => Cow::Borrowed(
                 "comments in a script alongside a multi-declarator declaration (the oracle re-anchors comments inside the split)",
             ),
-            Self::CommentsWithDerived => {
-                Cow::Borrowed("comments in a script that uses $derived (not carried through yet)")
-            }
+            Self::CommentsWithStore => Cow::Borrowed(
+                "comments in a script that references a store ($$store_subs injection)",
+            ),
             Self::CommentInRewrittenRuneRegion => {
                 Cow::Borrowed("comment inside a rewritten rune region (dropped by the transform)")
             }

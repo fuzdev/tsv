@@ -112,6 +112,14 @@ impl<'arena> Builder<'arena> {
         Identifier::simple(ident_name, span)
     }
 
+    /// [`Self::ident_at`] as an arena-allocated expression (no minting — the
+    /// interned-name channel supplies the text, so the span steers comment
+    /// windows only).
+    pub fn ident_expr_at(&self, name: &str, span: Span) -> &'arena Expression<'arena> {
+        self.arena
+            .alloc(Expression::Identifier(self.ident_at(name, span)))
+    }
+
     /// A single-quoted string literal minted into the appendix. `content` must
     /// not itself require escaping (module specifiers do not).
     pub fn string_literal(&mut self, content: &str) -> Literal<'arena> {
@@ -273,19 +281,63 @@ impl<'arena> Builder<'arena> {
         })
     }
 
-    /// `() => <body>` — an expression-bodied arrow around a borrowed expression
-    /// (the `$derived(e)` → `$.derived(() => e)` thunk).
-    pub fn arrow_expr(&mut self, body: &'arena Expression<'arena>) -> Expression<'arena> {
-        let header = self.mint("() => ");
+    /// `() => <body>` for the `$derived` thunk, with every synthetic span
+    /// collapsed onto `anchor` (the replaced `$derived(...)` init's host span)
+    /// instead of the appendix. Only the borrowed `body` keeps its host span;
+    /// `() => ` is static punctuation, so the fictional spans never reach output.
+    /// This keeps the enclosing `$.derived(...)` call's argument comment windows
+    /// empty for a carried script comment (see [`Self::derived_call`]).
+    pub fn arrow_expr_at(
+        &self,
+        anchor: Span,
+        body: &'arena Expression<'arena>,
+    ) -> Expression<'arena> {
         Expression::ArrowFunctionExpression(ArrowFunctionExpression {
             type_parameters: None,
             params: &[],
             body: ArrowFunctionBody::Expression(body),
             return_type: None,
             r#async: false,
-            params_start: Some(header.start),
-            arrow_token: body.span().start,
-            span: Span::new(header.start, body.span().end),
+            params_start: Some(anchor.start),
+            arrow_token: anchor.start,
+            span: anchor,
+        })
+    }
+
+    /// `$.derived(<argument>)` for a `$derived` / `$derived.by` rewrite. Every
+    /// synthetic leaf (`$`, `derived`) collapses onto `anchor.start` and the
+    /// outer call span *steals* `anchor` — the replaced `$derived(...)` init's
+    /// host span — so the enclosing declarator's `=`-gap window and the call's
+    /// own internal windows stay empty for a carried script comment (the same
+    /// fictional-span discipline the `$$props` span-steal uses). The interned
+    /// `$`/`derived` names and the static `.`/`(`/`)` supply the text, so the
+    /// fictional spans never reach output: a comment after the declarator flows
+    /// to the next statement instead of being swept into the `$.derived(...)`
+    /// slot. Byte-identical to the appendix-spanned [`Self::member_call`] form
+    /// when the script carries no comments.
+    pub fn derived_call(
+        &self,
+        anchor: Span,
+        argument: &'arena Expression<'arena>,
+    ) -> Expression<'arena> {
+        let low = Span::new(anchor.start, anchor.start);
+        let object = self.ident_expr_at("$", low);
+        let property = self.ident_expr_at("derived", low);
+        let callee = self
+            .arena
+            .alloc(Expression::MemberExpression(MemberExpression {
+                object,
+                property,
+                computed: false,
+                optional: false,
+                span: low,
+            }));
+        Expression::CallExpression(CallExpression {
+            callee,
+            type_arguments: None,
+            arguments: std::slice::from_ref(argument),
+            optional: false,
+            span: anchor,
         })
     }
 
