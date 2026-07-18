@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 350,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 311,
+				"end": 341,
+				"name": "m\nx",
+				"prelude": "",
+				"block": {
+					"type": "Block",
+					"start": 318,
+					"end": 341,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 322,
+								"end": 323,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 322,
+										"end": 323,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 322,
+														"end": 323
+													}
+												],
+												"start": 322,
+												"end": 323
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 324,
+								"end": 338,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 329,
+										"end": 333,
+										"property": "x",
+										"value": "y"
+									}
+								]
+							},
+							"start": 322,
+							"end": 338
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 342,
+			"styles": "\n\t/* An escaped control char is part of the at-rule NAME token (parseCss decodes\n\t   the whole run to the name; postcss/prettier instead splits it into name +\n\t   prelude and prints `@m \\A x {`). tsv preserves the source escape verbatim so\n\t   the decoded control char never lands raw in the output. */\n\t@m\\A x {\n\t\ta {\n\t\t\tx: y;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 351,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
