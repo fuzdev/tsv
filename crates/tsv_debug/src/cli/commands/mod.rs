@@ -29,6 +29,7 @@ pub mod line_width;
 pub mod metrics;
 pub mod neutrality_audit;
 pub mod profile;
+pub mod render_audit;
 pub mod roundtrip_audit;
 pub mod scan_audit;
 #[cfg(feature = "swallow_check")]
