@@ -26,6 +26,7 @@ use std::collections::BTreeMap;
 
 use serde_json::Value;
 
+use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 
 use crate::diff::{DiffOptions, diff_to_string};
@@ -52,6 +53,58 @@ pub(crate) fn tsv_parse_to_value(source: &str, parser: ParserType) -> Option<Val
         ParserType::Css => {
             let ast = tsv_css::parse(source, &arena).ok()?;
             Some(tsv_css::convert_ast_json(&ast, source))
+        }
+    }
+}
+
+/// Translates the wire AST's positions into byte offsets.
+///
+/// The wire emits **UTF-16 code-unit** offsets (`tsv_lang::location::ByteToCharMap`), not
+/// byte offsets — they coincide on ASCII and diverge the moment a file holds a `é` or an
+/// emoji. Slicing `source` with a raw wire offset is then off by the multi-byte count:
+/// wrong regions, or a panic on a non-char-boundary. Nothing downstream can catch that —
+/// an ASCII-only corpus grades identical either way — so the map is unit-tested against a
+/// direct `char_indices` walk instead.
+///
+/// The shared wire→byte primitive of the audit substrate: the gap-injection region walk
+/// ([`sites::code_regions`](crate::audit::sites) / `node_edge_key`) and the
+/// `binding_audit` re-binding gate both key wire node spans against byte offsets through it,
+/// so there is one map, not two inverse copies.
+pub(crate) struct Utf16ToByte {
+    /// `None` for an all-ASCII source, where the two spaces are identical and the table is
+    /// pure overhead (the overwhelmingly common case).
+    table: Option<Vec<usize>>,
+    len: usize,
+}
+
+impl Utf16ToByte {
+    pub(crate) fn new(source: &str) -> Self {
+        if source.is_ascii() {
+            return Self {
+                table: None,
+                len: source.len(),
+            };
+        }
+        // One entry per UTF-16 code unit; an astral char spans two units and both map to
+        // the char's byte start, so a boundary offset always lands on a char boundary.
+        let mut table = Vec::with_capacity(source.len() + 1);
+        for (byte, ch) in source.char_indices() {
+            for _ in 0..ch.len_utf16() {
+                table.push(byte);
+            }
+        }
+        table.push(source.len());
+        Self {
+            table: Some(table),
+            len: source.len(),
+        }
+    }
+
+    /// The byte offset for a wire offset, or `None` if it is out of range.
+    pub(crate) fn byte(&self, wire: usize) -> Option<usize> {
+        match &self.table {
+            None => (wire <= self.len).then_some(wire),
+            Some(t) => t.get(wire).copied(),
         }
     }
 }
@@ -273,6 +326,81 @@ pub(crate) fn leaf_conservation_diff(input: &Value, output: &Value) -> Option<St
     ))
 }
 
+/// The outcome of the shared format fixed-point check ([`f1_check`]) on one input — every
+/// step's failure a distinct variant.
+///
+/// The panic-free property core the [`fuzz`](crate::cli::commands) and
+/// [`blank_audit`](crate::cli::commands) commands share: parse → format → reparse →
+/// structural-skeleton compare → leaf conservation → idempotency fixed point. It does **not**
+/// catch panics — the caller wraps the call in
+/// [`catch_unwind`](std::panic::catch_unwind) (fuzz's `attempt`, blank_audit's inject loop),
+/// so a panic is the caller's own finding and this stays a pure, panic-free classifier.
+///
+/// `Rejected` (tsv cleanly refused) and `Ok` (every invariant held) are **not** findings; the
+/// rest each name one broken invariant.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum F1Outcome {
+    /// tsv's parser cleanly rejected the input — expected, not a finding.
+    Rejected,
+    /// Parsed, formatted idempotently, reparsed structurally equal, leaves conserved.
+    Ok,
+    /// Parsed, but `format` errored (should be impossible — `format` re-parses internally).
+    FormatError,
+    /// `format`'s output does not reparse (tsv rejects its own output).
+    Unreparseable,
+    /// Output reparses with an **equal skeleton** but a decode-invariant leaf value changed
+    /// (a mis-decoded string, a miscanonicalized number, a mangled comment) — the
+    /// skeleton-blind class.
+    LeafValueCorruption,
+    /// Output reparses but the document structure changed (delimiter/structure corruption).
+    StructuralDivergence,
+    /// `format(format(x)) != format(x)` — a non-idempotent fixed point.
+    NonIdempotent,
+}
+
+/// Run the shared format-fixed-point invariants on one already-valid-UTF-8 input. See
+/// [`F1Outcome`] for the variants.
+///
+/// `render` toggles Svelte-5 render-time whitespace normalization before the structural
+/// compare (matching `roundtrip_audit`'s default). Panic-free by contract — the caller
+/// catches panics; this only ever *returns* an outcome.
+///
+/// Hoisted here from `fuzz::check` so a second consumer ([`blank_audit`](crate::cli::commands))
+/// can drive the no-panic guard, the F1 idempotency fixed point, the reparse-skeleton compare,
+/// and the leaf-conservation check without copying the six-step sequence — exactly the
+/// migration this module's docs anticipate.
+pub(crate) fn f1_check(src: &str, parser: ParserType, render: bool) -> F1Outcome {
+    // 1. Parse. A clean rejection is the common, expected case for garbage / a broken splice.
+    let Some(wire_in) = tsv_parse_to_value(src, parser) else {
+        return F1Outcome::Rejected;
+    };
+    // 2. Format (parses internally — an error here means parse/format disagree).
+    let Ok(f1) = format_source(src, parser) else {
+        return F1Outcome::FormatError;
+    };
+    // 3. Reparse the output.
+    let Some(wire_out) = tsv_parse_to_value(&f1, parser) else {
+        return F1Outcome::Unreparseable;
+    };
+    // 4. Same document (structure)? Compute the leaf diff first, before the move-consuming
+    //    structural compare.
+    let leaf_changed = leaf_conservation_diff(&wire_in, &wire_out).is_some();
+    let (equal, _) = structurally_equivalent(wire_in, wire_out, render, false);
+    if !equal {
+        return F1Outcome::StructuralDivergence;
+    }
+    // 5. Same shape, but a decode-invariant leaf value changed — the skeleton-blind class.
+    if leaf_changed {
+        return F1Outcome::LeafValueCorruption;
+    }
+    // 6. Idempotent fixed point.
+    match format_source(&f1, parser) {
+        Ok(f2) if f2 == f1 => F1Outcome::Ok,
+        Ok(_) => F1Outcome::NonIdempotent,
+        Err(_) => F1Outcome::FormatError,
+    }
+}
+
 #[cfg(test)]
 mod leaf_tests {
     use super::*;
@@ -401,6 +529,67 @@ mod leaf_tests {
         assert_eq!(ms.get("s:\"x\""), Some(&1));
         assert_eq!(ms.get("s:\"s\""), Some(&1));
         assert_eq!(ms.len(), 2);
+    }
+}
+
+#[cfg(test)]
+mod coord_tests {
+    use super::*;
+
+    /// The wire→byte map, graded against a direct walk on every prefix of strings covering
+    /// each width class: ASCII (1 byte / 1 unit), 2- and 3-byte BMP (n bytes / 1 unit), and
+    /// astral (4 bytes / **2** units — the arm an "offset == char index" reading gets wrong).
+    ///
+    /// This is the only thing that can fail on a bad map: the corpus is ~all ASCII, where
+    /// every arm is the identity, so a broken translation formats byte-identically.
+    #[test]
+    fn utf16_to_byte_matches_a_direct_walk() {
+        for src in [
+            "",
+            "abc",
+            "é",
+            "aéb",
+            "日本語",
+            "a😀b",
+            "😀😀",
+            "const é = 1; // 日本\nx😀y",
+        ] {
+            let map = Utf16ToByte::new(src);
+
+            // Every char boundary must round-trip: the char's UTF-16 offset maps back to
+            // exactly its byte offset.
+            let mut units = 0usize;
+            for (byte, ch) in src.char_indices() {
+                assert_eq!(
+                    map.byte(units),
+                    Some(byte),
+                    "src {src:?}: utf16 offset {units} should be byte {byte}"
+                );
+                units += ch.len_utf16();
+            }
+            // The end offset maps to the source length, and one past it is out of range.
+            assert_eq!(map.byte(units), Some(src.len()), "src {src:?}: end offset");
+            assert_eq!(map.byte(units + 1), None, "src {src:?}: past the end");
+
+            // Every produced offset is a char boundary — the property that keeps slicing
+            // from panicking.
+            for u in 0..=units {
+                let b = map.byte(u).expect("in range");
+                assert!(src.is_char_boundary(b), "src {src:?}: byte {b} mid-char");
+            }
+        }
+    }
+
+    /// The ASCII fast path must be indistinguishable from the table, not merely close.
+    #[test]
+    fn utf16_to_byte_ascii_fast_path_matches_the_table() {
+        let src = "const a = 1;\n\tb();";
+        let fast = Utf16ToByte::new(src);
+        assert!(fast.table.is_none(), "ASCII source should skip the table");
+        for u in 0..=src.len() + 1 {
+            let table_answer = if u <= src.len() { Some(u) } else { None };
+            assert_eq!(fast.byte(u), table_answer, "offset {u}");
+        }
     }
 }
 

@@ -187,6 +187,8 @@ deno task fuzz:audit                 # seeded mutational fuzzer over tests/fixtu
 deno task comments:audit             # print-once comment ledger: every comment a document PARSES must be EMITTED exactly once (pure Rust, no sidecar; gated in `deno task check`) — reports DROPPED (silent content loss) and DOUBLE-PRINTED; the structural guard on the detached comment model, tsv's `ensureAllCommentsPrinted`; see Debug Tooling
 deno task gaps:audit                 # gap-injection audit: inject a comment into EVERY gap (five payloads, one per ownership path) and re-run the ledger — the discovery arm `comments:audit` can't be, since it only formats each file AS AUTHORED and no fixture covers most positions (eight such drops were found BY HAND, all green on every gate). Pure Rust, no sidecar; gated in `deno task check` as a RATCHET over a generated shape snapshot (`gap_audit_known.txt`): every line is a known bug and the file shrinking is the goal, so a shape not on the list, one on it that no longer fires, or any PANIC, FAILS. ~17 s. Full reference: ./docs/gap_audit.md
 deno task gaps:audit:update          # regenerate that snapshot after fixing a shape (or when a new fixture merely REACHES a pre-existing one); refuses a narrowed run
+deno task blanks:audit               # blank-line injection audit: inject a blank line into EVERY code gap and grade six policy-free invariants — no panic, F1 idempotency, structural reparse, leaf conservation, ledger-clean, and blank-run ≤ 1. Mechanizes the blank-line handling class (the specifier-list / array-pattern bugs). Pure Rust, no sidecar; gated in `deno task check` as a RATCHET over `blank_audit_known.txt` (like gaps:audit): a graded shape not on the list, one that no longer fires, or any PANIC, FAILS. STRUCTURAL-DIVERGENCE is held REPORT-ONLY (fuzz-soft parity: reported but never gated, filtered out of the ratchet); every other policy kind IS pinned. A fast path (a blank the formatter ABSORBS reproduces the proven-clean pristine output, so nothing is checked) keeps it near gaps:audit's cost. ~24 s. Full reference: ./docs/blank_audit.md
+deno task blanks:audit:update        # regenerate that snapshot after fixing a shape; refuses a narrowed run
 deno task idempotency:sweep          # F1 (idempotency) sweep over the real-code corpus (the `perf` view — sibling dev repos + upstream framework source). NOT in `deno task check`: machine-dependent corpus, minutes not seconds. Run at conformance cadence or after a printer change; see Debug Tooling
 ```
 
@@ -917,6 +919,41 @@ cargo run --profile corpus -p tsv_debug --features audits gap_audit ~/dev/zzz/sr
 Full reference — flags, the ratchet, reading a finding, triage + re-pin workflow,
 scope: ./docs/gap_audit.md. Design rationale (why byte offsets and not tokens, why the
 ledger is the oracle, why five payloads) lives in the `gap_audit` module docs.
+
+**Blank-Line Injection Audit (blank-line handling discovery):**
+
+```bash
+# blank_audit - inject a blank line into EVERY code gap and grade six policy-free
+# invariants on the result: (1) no panic, (2) F1 idempotency (pass 2 is a fixed
+# point), (3) structural reparse, (4) leaf conservation, (5) ledger-clean (no
+# dropped/double-printed comment), (6) blank-run ≤ 1 (no 2+ blank run outside a
+# template quasi / <pre> / <textarea> / format-ignore region). Mechanizes the
+# blank-line handling class — the specifier-list / array-pattern bugs. Invariants
+# 1-4 are the shared `f1_check` (also driving `fuzz`); 5 is the print-once ledger;
+# 6 is a region-scoped output scan. Pure Rust, no sidecar.
+cargo run --profile corpus -p tsv_debug --features audits blank_audit   # tests/fixtures
+cargo run --profile corpus -p tsv_debug --features audits blank_audit ~/dev/zzz/src
+# Also: --json, --report, --jobs N, --limit N, --update. Build with `--profile
+# corpus` (release + panic=unwind) so a formatter panic is caught + reported.
+#
+# GATED as a RATCHET (like gap_audit): `blank_audit_known.txt` is a machine-generated
+# snapshot of the known-bug shapes, every line a bug, the file shrinking is the goal.
+# A graded shape not on the list, one that no longer fires, or any PANIC, FAILS. Unlike
+# fuzz/roundtrip, NON-IDEMPOTENT and every policy kind ARE pinned (born red over a live
+# bug family); PANIC stays absolute; and STRUCTURAL-DIVERGENCE is held REPORT-ONLY
+# (fuzz-soft parity — reported but never gated, filtered out of the ratchet, `"gated":
+# false` in --json). A FAST PATH — a blank the formatter ABSORBS reproduces the file's
+# proven-clean pristine output byte-for-byte, so nothing is checked — keeps it near
+# gap_audit's one-format-per-site cost; only a KEPT blank pays the full battery (~19%
+# of injections over tests/fixtures). ~24 s.
+# Scope: TS + Svelte body; CSS deferred; string/template interiors excluded (a raw
+# newline there is lexed as content, not a gap); only format fixed points injected.
+```
+
+Full reference — flags, the ratchet, reading a finding, the six invariants, scope:
+./docs/blank_audit.md. Design rationale (the fast path, why a blank is graded against
+the injected input not the pristine, the string-interior exclusion) lives in the
+`blank_audit` module docs.
 
 **Build-Fanout Audit (exponential-rebuild regression guard):**
 

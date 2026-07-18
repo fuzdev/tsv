@@ -13,10 +13,11 @@
 //! - **site / example** — where the finding is, and a by-hand reproducer.
 //! - **verdict_string** — the human one-line verdict suffix.
 //! - **detail** ([`Detail`]) — the audit-specific payload, carried **verbatim**
-//!   and rendered by the audit's own arm. Enum-dispatched, one variant per audit;
-//!   [`gap_audit`](crate::cli::commands) ([`Detail::Gap`]) is the only one today.
+//!   and rendered by the audit's own arm. Enum-dispatched, one variant per audit:
+//!   [`gap_audit`](crate::cli::commands) ([`Detail::Gap`]) and
+//!   [`blank_audit`](crate::cli::commands) ([`Detail::Blank`]).
 //!
-//! `gap_audit` is the only consumer, so the envelope is concrete (no generics /
+//! Two consumers today (gap and blank), so the envelope is concrete (no generics /
 //! `dyn`), but the skeleton is audit-agnostic and the detail slot is where each
 //! audit's own vocabulary lives.
 //!
@@ -138,10 +139,28 @@ pub(crate) struct GapDetail {
     pub(crate) verify_total: Option<usize>,
 }
 
+/// `blank_audit`'s audit-specific detail — the per-shape aggregate the envelope carries
+/// verbatim. Simpler than [`GapDetail`]: a blank injection has no bystander (it drops nothing
+/// of the author's by relocation) and no verify pass (its properties are self-evident — a
+/// non-idempotent format or a 2+ blank run either reproduces or does not).
+pub(crate) struct BlankDetail {
+    /// The verbatim finding-kind label — `NON-IDEMPOTENT` / `BLANK-RUN` / `UNREPARSEABLE` / … /
+    /// `PANIC`.
+    pub(crate) kind_label: &'static str,
+    /// How many injections hit this shape.
+    pub(crate) count: usize,
+    /// Distinct seed files the shape fired in.
+    pub(crate) files: usize,
+    /// Whether this shape is part of the RATCHET-GRADED set. `false` for the report-only
+    /// `STRUCTURAL-DIVERGENCE` class (fuzz-soft parity), which prints but never gates.
+    pub(crate) gated: bool,
+}
+
 /// The audit-specific detail slot — one variant per audit (enum-dispatch, the
 /// fuz-stack idiom over `dyn`). Adding an audit adds a variant and a printer arm.
 pub(crate) enum Detail {
     Gap(GapDetail),
+    Blank(BlankDetail),
 }
 
 /// One finding in the shared envelope.
@@ -161,8 +180,10 @@ impl Finding {
     /// The per-shape instance count, read out of the audit-specific detail — the
     /// worst-first sort key of the human report.
     fn count(&self) -> usize {
-        let Detail::Gap(d) = &self.detail;
-        d.count
+        match &self.detail {
+            Detail::Gap(d) => d.count,
+            Detail::Blank(d) => d.count,
+        }
     }
 }
 
@@ -233,11 +254,26 @@ pub(crate) fn print_report(s: &RunSummary, findings: &[Finding]) {
     print_header(s);
 
     if findings.is_empty() {
-        println!(
-            "✓ every injected comment printed exactly once — no gap drops a comment across \
-             {} injections",
-            s.accepted
-        );
+        // The clean-run headline is the one piece of prose that differs by audit (each names
+        // the invariant it upholds), keyed on the run's `audit`. Gap's branch is byte-identical
+        // to the original; a graded gap gate never reaches it anyway (it holds ~700 findings),
+        // so this only fires for a clean off-corpus run. `findings` here is the blank audit's
+        // GRADED set (report-only STRUCTURAL-DIVERGENCE is split off before this call and printed
+        // in its own section), so the headline speaks only for the gated invariants — it must NOT
+        // claim invariant 3 (reparse) held whole, since a soft struct-div finding violates it
+        // ungated.
+        if s.audit == "blank_audit" {
+            println!(
+                "✓ no injected blank broke a gated invariant across {} accepted injections",
+                s.accepted
+            );
+        } else {
+            println!(
+                "✓ every injected comment printed exactly once — no gap drops a comment across \
+                 {} injections",
+                s.accepted
+            );
+        }
         return;
     }
 
@@ -255,39 +291,55 @@ pub(crate) fn print_report(s: &RunSummary, findings: &[Finding]) {
     rows.sort_by_key(|f| std::cmp::Reverse(f.count()));
 
     for f in &rows {
-        let Detail::Gap(d) = &f.detail;
-        println!(
-            "  {:>7}×  {:<14} {}{}",
-            d.count, d.kind_label, f.site, f.verdict_string
-        );
-        println!(
-            "            {} file(s) · payloads: {}{}",
-            d.files,
-            d.payloads.join(", "),
-            match d.bystander_hits {
-                0 => String::new(),
-                n if n == d.count => "  (ALL hits knock out a BYSTANDER comment)".to_string(),
-                n => format!("  ({n} of {} hits knock out a bystander)", d.count),
+        match &f.detail {
+            Detail::Gap(d) => {
+                println!(
+                    "  {:>7}×  {:<14} {}{}",
+                    d.count, d.kind_label, f.site, f.verdict_string
+                );
+                println!(
+                    "            {} file(s) · payloads: {}{}",
+                    d.files,
+                    d.payloads.join(", "),
+                    match d.bystander_hits {
+                        0 => String::new(),
+                        n if n == d.count =>
+                            "  (ALL hits knock out a BYSTANDER comment)".to_string(),
+                        n => format!("  ({n} of {} hits knock out a bystander)", d.count),
+                    }
+                );
+                let ex = &f.example;
+                if ex.injected {
+                    // Injection site and victim site coincide — one offset reproduces and locates it.
+                    println!(
+                        "            e.g. inject {} at {}:{}  {}",
+                        ex.payload, ex.path, ex.injection_offset, ex.snippet
+                    );
+                } else {
+                    // A bystander: injecting at one site drops a DIFFERENT comment. Show both — the
+                    // injection offset reproduces the drop, the attribution offset (and the snippet)
+                    // is where the victim comment lived, which is what the shape keys on.
+                    println!(
+                        "            e.g. inject {} at {}:{} → drops the comment at :{}  {}",
+                        ex.payload, ex.path, ex.injection_offset, ex.attribution_offset, ex.snippet
+                    );
+                }
+                println!("            comment: {:?}", ex.text);
+                println!();
             }
-        );
-        let ex = &f.example;
-        if ex.injected {
-            // Injection site and victim site coincide — one offset reproduces and locates it.
-            println!(
-                "            e.g. inject {} at {}:{}  {}",
-                ex.payload, ex.path, ex.injection_offset, ex.snippet
-            );
-        } else {
-            // A bystander: injecting at one site drops a DIFFERENT comment. Show both — the
-            // injection offset reproduces the drop, the attribution offset (and the snippet)
-            // is where the victim comment lived, which is what the shape keys on.
-            println!(
-                "            e.g. inject {} at {}:{} → drops the comment at :{}  {}",
-                ex.payload, ex.path, ex.injection_offset, ex.attribution_offset, ex.snippet
-            );
+            Detail::Blank(d) => {
+                // A blank finding has neither bystander nor verify vocabulary: one injected blank
+                // line, one violated invariant, keyed at the injection site.
+                println!("  {:>7}×  {:<14} {}", d.count, d.kind_label, f.site);
+                println!("            {} file(s)", d.files);
+                let ex = &f.example;
+                println!(
+                    "            e.g. inject blank at {}:{}  {}",
+                    ex.path, ex.injection_offset, ex.snippet
+                );
+                println!();
+            }
         }
-        println!("            comment: {:?}", ex.text);
-        println!();
     }
 
     let unconfirmed = count_confidence(findings, Confidence::Unconfirmed);
@@ -315,36 +367,55 @@ pub(crate) fn print_json(
     let shapes: Vec<Value> = findings
         .iter()
         .map(|f| {
-            let Detail::Gap(d) = &f.detail;
             let ex = &f.example;
-            serde_json::json!({
-                // The producing audit — redundant with the run's `audit` for a
-                // single-audit run, load-bearing once findings from several audits
-                // share one list (see the module-doc sketches).
-                "audit": f.audit,
-                // The envelope severity, surfaced for scriptable triage: `gate-failing`
-                // (gap's PANIC) vs `informational` (a drop/double-print the ratchet grades).
-                "severity": f.severity.label(),
-                "kind": d.kind_label,
-                "shape": f.site,
-                "count": d.count,
-                "files": d.files,
-                "payloads": d.payloads,
-                "bystander_hits": d.bystander_hits,
-                "verdict": verdict_json(f.confidence),
-                "verify_confirmed": d.verify_confirmed,
-                "verify_total": d.verify_total,
-                "example_payload": ex.payload,
-                "example_path": ex.path,
-                // Two offsets: the injection site (reproduces the drop) and the attribution
-                // site (the victim's own location for a bystander; == injection when injected).
-                // The shape/snippet key on the attribution offset.
-                "example_injection_offset": ex.injection_offset,
-                "example_attribution_offset": ex.attribution_offset,
-                "example_snippet": ex.snippet,
-                "example_text": ex.text,
-                "example_injected": ex.injected,
-            })
+            match &f.detail {
+                Detail::Gap(d) => serde_json::json!({
+                    // The producing audit — redundant with the run's `audit` for a
+                    // single-audit run, load-bearing once findings from several audits
+                    // share one list (see the module-doc sketches).
+                    "audit": f.audit,
+                    // The envelope severity, surfaced for scriptable triage: `gate-failing`
+                    // (gap's PANIC) vs `informational` (a drop/double-print the ratchet grades).
+                    "severity": f.severity.label(),
+                    "kind": d.kind_label,
+                    "shape": f.site,
+                    "count": d.count,
+                    "files": d.files,
+                    "payloads": d.payloads,
+                    "bystander_hits": d.bystander_hits,
+                    "verdict": verdict_json(f.confidence),
+                    "verify_confirmed": d.verify_confirmed,
+                    "verify_total": d.verify_total,
+                    "example_payload": ex.payload,
+                    "example_path": ex.path,
+                    // Two offsets: the injection site (reproduces the drop) and the attribution
+                    // site (the victim's own location for a bystander; == injection when injected).
+                    // The shape/snippet key on the attribution offset.
+                    "example_injection_offset": ex.injection_offset,
+                    "example_attribution_offset": ex.attribution_offset,
+                    "example_snippet": ex.snippet,
+                    "example_text": ex.text,
+                    "example_injected": ex.injected,
+                }),
+                Detail::Blank(d) => serde_json::json!({
+                    "audit": f.audit,
+                    // `gate-failing` (blank's PANIC) vs `informational` (every other kind, which
+                    // the ratchet grades).
+                    "severity": f.severity.label(),
+                    "kind": d.kind_label,
+                    "shape": f.site,
+                    "count": d.count,
+                    "files": d.files,
+                    // Whether this shape gates: `false` for the report-only STRUCTURAL-DIVERGENCE
+                    // class (kept in the report, excluded from the ratchet), so a consumer can
+                    // filter the gated set out of the whole finding list.
+                    "gated": d.gated,
+                    "example_payload": ex.payload,
+                    "example_path": ex.path,
+                    "example_injection_offset": ex.injection_offset,
+                    "example_snippet": ex.snippet,
+                }),
+            }
         })
         .collect();
     let mut out = serde_json::json!({

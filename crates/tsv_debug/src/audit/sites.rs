@@ -18,7 +18,7 @@
 
 use tsv_cli::cli::input::ParserType;
 
-use crate::audit::properties::tsv_parse_to_value;
+use crate::audit::properties::{Utf16ToByte, tsv_parse_to_value};
 
 /// Whether `c` can sit inside an identifier — the site filter's notion of "in a word".
 fn is_word(c: char) -> bool {
@@ -31,53 +31,6 @@ fn span_of(node: &serde_json::Value) -> Option<(usize, usize)> {
     let s = node.get("start")?.as_u64()? as usize;
     let e = node.get("end")?.as_u64()? as usize;
     (e >= s).then_some((s, e))
-}
-
-/// Translates the wire AST's positions into byte offsets.
-///
-/// The wire emits **UTF-16 code-unit** offsets (`tsv_lang::location::ByteToCharMap`), not
-/// byte offsets — they coincide on ASCII and diverge the moment a file holds a `é` or an
-/// emoji. Slicing `source` with a raw wire offset is then off by the multi-byte count:
-/// wrong regions, or a panic on a non-char-boundary. Nothing downstream can catch that —
-/// an ASCII-only corpus grades identical either way — so the map is unit-tested against a
-/// direct `char_indices` walk instead.
-struct Utf16ToByte {
-    /// `None` for an all-ASCII source, where the two spaces are identical and the table is
-    /// pure overhead (the overwhelmingly common case).
-    table: Option<Vec<usize>>,
-    len: usize,
-}
-
-impl Utf16ToByte {
-    fn new(source: &str) -> Self {
-        if source.is_ascii() {
-            return Self {
-                table: None,
-                len: source.len(),
-            };
-        }
-        // One entry per UTF-16 code unit; an astral char spans two units and both map to
-        // the char's byte start, so a boundary offset always lands on a char boundary.
-        let mut table = Vec::with_capacity(source.len() + 1);
-        for (byte, ch) in source.char_indices() {
-            for _ in 0..ch.len_utf16() {
-                table.push(byte);
-            }
-        }
-        table.push(source.len());
-        Self {
-            table: Some(table),
-            len: source.len(),
-        }
-    }
-
-    /// The byte offset for a wire offset, or `None` if it is out of range.
-    fn byte(&self, wire: usize) -> Option<usize> {
-        match &self.table {
-            None => (wire <= self.len).then_some(wire),
-            Some(t) => t.get(wire).copied(),
-        }
-    }
 }
 
 /// Collect the ranges the payload would actually be **lexed as a comment** in.
@@ -397,6 +350,98 @@ pub(crate) fn injection_sites(
         }
     }
     sites
+}
+
+/// The byte spans a **blank-line** injection must never land inside, because there the payload
+/// becomes string CONTENT rather than a code gap — the third exclusion class, alongside
+/// [`injection_sites`]' word interiors and comment interiors.
+///
+/// It exists for the blank-line audit specifically. tsv's TS/CSS lexers are permissive: a
+/// quoted string is scanned only for its close quote or a `\`, so a **raw newline inside a
+/// string is accepted as content**, not a syntax error. A blank line injected there therefore
+/// does *not* trip `Formatted::Rejected` (the way a word- or delimiter-splitting injection
+/// does) — it silently yields a string holding a blank run, which then reads as a false finding
+/// (a `BlankRun` the output scan can't tell from a real one, since it now lives inside a plain
+/// string). The gap audit never hits this because a comment injected inside a string simply
+/// isn't lexed as a comment (no finding); a blank *is* content, so it must be excluded up
+/// front. Combine the result with the seed's comment spans and hand the union to
+/// [`injection_sites`] — every span is non-overlapping (a string is neither a comment nor
+/// another string; quasis nest but don't overlap), so its single-candidate `inside_*` scan
+/// stays correct.
+///
+/// Two carriers, read off `wire` (the parse of `source`, in the wire's UTF-16 space, translated
+/// through [`Utf16ToByte`] exactly as [`code_regions`] does):
+///
+/// - a **string `Literal`** (a `Literal` whose `value` is a JSON string — never a regex, whose
+///   `value` is `{}`, nor a bigint / number, which can hold no newline and are word interiors
+///   anyway) contributes its **full** span, quotes included. The span already brackets the
+///   content, so excluding *strictly inside* it (the [`injection_sites`] rule) drops every
+///   interior offset while keeping the gaps just before the open quote and just after the close
+///   quote.
+/// - a **`TemplateElement`** (a template quasi) contributes its span **widened by one byte on
+///   each side**. Unlike a string, a quasi's span is content-*only* — the backtick / `${` / `}`
+///   delimiters sit just outside it — so the bare span brackets nothing to exclude (`` `x` ``'s
+///   quasi `x` is `[s, s+1)`, with no offset strictly inside). Widening to `(s-1, e+1)` excludes
+///   the content *and* its two delimiter-adjacent boundaries, while leaving the `${ … }`
+///   expression interior (a real code gap) and the gaps outside the backticks untouched. Every
+///   delimiter is ASCII, so the ±1 stays on a char boundary.
+///
+/// Scope: TS and Svelte-embedded TS. CSS is deferred — a `.css` seed is skipped and `<style>` is
+/// unprobed by [`code_regions`], so CSS string interiors are never a site — which is why a
+/// generic `type`-keyed walk suffices (CSS AST nodes carry neither `Literal`(string) nor
+/// `TemplateElement`).
+pub(crate) fn string_and_template_spans(
+    source: &str,
+    wire: &serde_json::Value,
+) -> Vec<tsv_lang::Span> {
+    let map = Utf16ToByte::new(source);
+    let mut out = Vec::new();
+    collect_string_template(wire, &map, &mut out);
+    out
+}
+
+/// Walk `wire` accumulating the string-literal / template-quasi exclusion spans (byte space).
+/// See [`string_and_template_spans`].
+fn collect_string_template(
+    node: &serde_json::Value,
+    map: &Utf16ToByte,
+    out: &mut Vec<tsv_lang::Span>,
+) {
+    match node {
+        serde_json::Value::Object(obj) => {
+            match obj.get("type").and_then(serde_json::Value::as_str) {
+                // A string literal — its `value` is a JSON string (a regex's is `{}`, a
+                // bigint's / null's is not a string). The full span brackets the quotes.
+                Some("Literal") if obj.get("value").is_some_and(serde_json::Value::is_string) => {
+                    if let Some((s, e)) = byte_span(node, map) {
+                        out.push(tsv_lang::Span::new(s as u32, e as u32));
+                    }
+                }
+                // A template quasi — content-only span, widened by one ASCII delimiter byte
+                // each side so its boundaries are excluded but the `${…}` holes are not.
+                Some("TemplateElement") => {
+                    if let Some((s, e)) = byte_span(node, map) {
+                        out.push(tsv_lang::Span::new(
+                            s.saturating_sub(1) as u32,
+                            (e + 1) as u32,
+                        ));
+                    }
+                }
+                _ => {}
+            }
+            for (k, v) in obj {
+                if k != "loc" {
+                    collect_string_template(v, map, out);
+                }
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for v in items {
+                collect_string_template(v, map, out);
+            }
+        }
+        _ => {}
+    }
 }
 
 /// Words kept verbatim in a [`site_shape`] rather than abstracted to `IDENT`.
@@ -729,20 +774,42 @@ fn edge_between(children: &[WireChild<'_>], offset: usize) -> String {
 ///
 /// `None` when `offset` is outside the wire root's span, the root carries no span, or the
 /// innermost node has no `type`.
+///
+/// Thin wrapper over [`node_edge_key_with_map`]: it builds the [`Utf16ToByte`] map from `source`
+/// per call. The record-time keyer instead builds the map **once per file** and reuses it across
+/// every hit via [`node_edge_key_with_map`] — the reason this one must never move into a loop
+/// over all injection sites. The source-based convenience form: currently only the `sites.rs`
+/// tests drive it (so they exercise `with_map` and the map-build transitively — the multibyte
+/// coverage rides here), hence `allow(dead_code)` for the non-test build.
+#[allow(dead_code)] // source-based wrapper; exercised by the sites tests, kept as the single-offset API
 pub(crate) fn node_edge_key(
     wire: &serde_json::Value,
     source: &str,
     offset: usize,
 ) -> Option<NodeEdgeKey> {
     let map = Utf16ToByte::new(source);
-    let (root_start, root_end) = byte_span(wire, &map)?;
+    node_edge_key_with_map(wire, &map, offset)
+}
+
+/// [`node_edge_key`]'s walk, over a **prebuilt** [`Utf16ToByte`] map.
+///
+/// `map` must be the wire→byte map of the same `source` `wire` was parsed from (the wire's own
+/// positions are UTF-16, translated through it). Split from [`node_edge_key`] so a caller keying
+/// many offsets against one file — the record-time by-node keyer — pays the map build once rather
+/// than per offset.
+pub(crate) fn node_edge_key_with_map(
+    wire: &serde_json::Value,
+    map: &Utf16ToByte,
+    offset: usize,
+) -> Option<NodeEdgeKey> {
+    let (root_start, root_end) = byte_span(wire, map)?;
     if offset < root_start || offset > root_end {
         return None;
     }
     let mut node = wire;
     loop {
         let mut children = Vec::new();
-        wire_children(node, &map, &mut children);
+        wire_children(node, map, &mut children);
         let inner = children
             .iter()
             .find(|c| c.start < offset && offset < c.end)
@@ -764,62 +831,6 @@ pub(crate) fn node_edge_key(
 mod tests {
     use super::*;
     use crate::audit::properties::{Formatted, ledger_format};
-
-    /// The wire→byte map, graded against a direct walk on every prefix of strings covering
-    /// each width class: ASCII (1 byte / 1 unit), 2- and 3-byte BMP (n bytes / 1 unit), and
-    /// astral (4 bytes / **2** units — the arm an "offset == char index" reading gets wrong).
-    ///
-    /// This is the only thing that can fail on a bad map: the corpus is ~all ASCII, where
-    /// every arm is the identity, so a broken translation formats byte-identically.
-    #[test]
-    fn utf16_to_byte_matches_a_direct_walk() {
-        for src in [
-            "",
-            "abc",
-            "é",
-            "aéb",
-            "日本語",
-            "a😀b",
-            "😀😀",
-            "const é = 1; // 日本\nx😀y",
-        ] {
-            let map = Utf16ToByte::new(src);
-
-            // Every char boundary must round-trip: the char's UTF-16 offset maps back to
-            // exactly its byte offset.
-            let mut units = 0usize;
-            for (byte, ch) in src.char_indices() {
-                assert_eq!(
-                    map.byte(units),
-                    Some(byte),
-                    "src {src:?}: utf16 offset {units} should be byte {byte}"
-                );
-                units += ch.len_utf16();
-            }
-            // The end offset maps to the source length, and one past it is out of range.
-            assert_eq!(map.byte(units), Some(src.len()), "src {src:?}: end offset");
-            assert_eq!(map.byte(units + 1), None, "src {src:?}: past the end");
-
-            // Every produced offset is a char boundary — the property that keeps slicing
-            // from panicking.
-            for u in 0..=units {
-                let b = map.byte(u).expect("in range");
-                assert!(src.is_char_boundary(b), "src {src:?}: byte {b} mid-char");
-            }
-        }
-    }
-
-    /// The ASCII fast path must be indistinguishable from the table, not merely close.
-    #[test]
-    fn utf16_to_byte_ascii_fast_path_matches_the_table() {
-        let src = "const a = 1;\n\tb();";
-        let fast = Utf16ToByte::new(src);
-        assert!(fast.table.is_none(), "ASCII source should skip the table");
-        for u in 0..=src.len() + 1 {
-            let table_answer = if u <= src.len() { Some(u) } else { None };
-            assert_eq!(fast.byte(u), table_answer, "offset {u}");
-        }
-    }
 
     /// A region is only useful if it names a spot a comment can actually go: the `Program`
     /// span must start after `>` and end before `</script>`.
@@ -972,6 +983,27 @@ mod tests {
         assert_eq!(site_shape("é.b", 2), "IDENT⟨⟩.");
     }
 
+    /// Every reserved control-flow/declaration keyword the lexer recognizes must be in
+    /// [`SHAPE_KEYWORDS`], or the shape key silently degrades it to `IDENT` — merging a
+    /// keyword-headed bug (`return⟨⟩`) into the generic-identifier entry and hiding it under
+    /// one ratchet line. That is a *quiet* failure: nothing else notices a keyword fell out
+    /// of the table, because both keys are well-formed shapes. The oracle is
+    /// `tsv_ts::reserved_words()` (the lexer's own list), so a keyword added to the lexer
+    /// without a matching `SHAPE_KEYWORDS` entry fails here. Holds today with zero re-key.
+    #[test]
+    fn reserved_keywords_are_all_shape_keywords() {
+        let missing: Vec<&str> = tsv_ts::reserved_words()
+            .iter()
+            .copied()
+            .filter(|w| !SHAPE_KEYWORDS.contains(w))
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "reserved words missing from SHAPE_KEYWORDS (they would degrade to IDENT and merge \
+             two distinct bugs onto one ratchet line): {missing:?}"
+        );
+    }
+
     /// The word filter must keep both dot gaps of a punctuator-joined header — the exact
     /// positions the whole audit exists to probe — while dropping word interiors.
     #[test]
@@ -1016,6 +1048,98 @@ mod tests {
         // surrounded by non-word chars, so no offset is a word interior — every gap is a site.
         let none = injection_sites(src, &[(0, src.len())], &[], false);
         assert_eq!(none, vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    }
+
+    /// The blank-audit sites for `src` under the string/template exclusion — the harness the
+    /// three tests below share. Parses `src`, collects the exclusion spans, and returns the
+    /// surviving injection offsets over the whole file.
+    fn blank_sites(src: &str) -> Vec<usize> {
+        let wire = tsv_parse_to_value(src, ParserType::TypeScript).expect("snippet parses");
+        let spans = string_and_template_spans(src, &wire);
+        injection_sites(src, &[(0, src.len())], &spans, false)
+    }
+
+    /// A string literal's interior is excluded — a blank injected between the quotes is string
+    /// CONTENT, not a code gap (tsv's permissive lexer accepts a raw newline there). The full
+    /// span brackets the quotes, so the gaps just before `'` and just after `'` survive.
+    #[test]
+    fn string_and_template_excludes_a_string_interior() {
+        // const s = 'ab';  — `'`@10 a@11 b@12 `'`@13 ;@14
+        let src = "const s = 'ab';";
+        let sites = blank_sites(src);
+        // Interior (after the open quote through the close quote) is gone …
+        for off in [11, 12, 13] {
+            assert!(
+                !sites.contains(&off),
+                "offset {off} inside the string must be excluded"
+            );
+        }
+        // … the surrounding gaps stay.
+        assert!(
+            sites.contains(&10),
+            "the gap before the open quote survives"
+        );
+        assert!(
+            sites.contains(&14),
+            "the gap after the close quote survives"
+        );
+    }
+
+    /// A template quasi's content AND its two delimiter-adjacent boundaries are excluded, while
+    /// the `${ … }` expression interior — a real code gap — is kept. The widen-by-one is what
+    /// separates the two: a content-only span alone would exclude nothing.
+    #[test]
+    fn string_and_template_excludes_quasi_but_keeps_the_hole() {
+        // const t = `x${y}z`;  — `@10 x@11 $@12 {@13 y@14 }@15 z@16 `@17 ;@18
+        let src = "const t = `x${y}z`;";
+        let sites = blank_sites(src);
+        // Quasi content + delimiter boundaries: excluded (template text, not a gap).
+        for off in [11, 12, 16, 17] {
+            assert!(
+                !sites.contains(&off),
+                "offset {off} in the template text must be excluded"
+            );
+        }
+        // The `${ y }` expression interior is a real code gap — a blank there is valid.
+        assert!(
+            sites.contains(&14),
+            "the `{{` → `y` gap inside the hole survives"
+        );
+        assert!(
+            sites.contains(&15),
+            "the `y` → `}}` gap inside the hole survives"
+        );
+        // Outside the backticks, the gaps stay too.
+        assert!(sites.contains(&10), "the gap before the backtick survives");
+        assert!(sites.contains(&18), "the gap after the backtick survives");
+    }
+
+    /// MULTIBYTE: the wire's spans are UTF-16, so a `é` before the string shifts every wire
+    /// offset one unit short of its byte position. Only a correct `Utf16ToByte` translation
+    /// excludes the right BYTES; an identity ("offset == char index") reading would exclude the
+    /// open-quote gap (byte 11) and miss the interior (byte 13) — the exact ASCII-invisible bug
+    /// the arithmetic guard exists to catch (the corpus can't grade it: an all-ASCII file is
+    /// byte-identical either way).
+    #[test]
+    fn string_and_template_translates_multibyte_offsets() {
+        // const é = 'x';  — `é` is 2 bytes / 1 UTF-16 unit; `'`@byte11 x@12 `'`@13 ;@14
+        let src = "const é = 'x';";
+        assert_eq!(&src[11..14], "'x'", "the string is at bytes 11..14");
+        let sites = blank_sites(src);
+        for off in [12, 13] {
+            assert!(
+                !sites.contains(&off),
+                "byte {off} inside the string must be excluded"
+            );
+        }
+        assert!(
+            sites.contains(&11),
+            "the gap before the open quote (byte 11) survives"
+        );
+        assert!(
+            sites.contains(&14),
+            "the gap after the close quote (byte 14) survives"
+        );
     }
 
     /// Parse `src` and key `offset` — the node-edge harness the tests below share. Both

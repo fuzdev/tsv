@@ -102,11 +102,11 @@
 //! perturbation site the payload went in at.
 
 use argh::FromArgs;
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 use crate::audit::properties::{
-    Formatted, Pristine, Verdict, VerifyOutcome, VerifySummary, ledger_format,
+    Formatted, Pristine, Utf16ToByte, Verdict, VerifyOutcome, VerifySummary, ledger_format,
     ledger_format_with_comments, pristine_format, tsv_parse_to_value,
 };
 use crate::audit::ratchet::{GateDiff, Ratchet, SnapshotKey};
@@ -114,7 +114,7 @@ use crate::audit::report::{
     self, Confidence, Detail, Finding, GapDetail, ReportExample, RunSummary, Severity,
 };
 use crate::audit::sites::{
-    NodeEdgeKey, code_regions, injection_sites, node_edge_key, site_shape, snippet,
+    NodeEdgeKey, code_regions, injection_sites, node_edge_key_with_map, site_shape, snippet,
 };
 use crate::cli::CliError;
 use tsv_cli::cli::input::ParserType;
@@ -520,6 +520,12 @@ struct Tally {
     /// fallback. Expected to be zero; a nonzero count means a reflow the linear span-shift
     /// can't place (see [`victim_seed_offset`]), surfaced rather than silently mis-keyed.
     victim_map_fallbacks: usize,
+    /// Exact per-`(node, edge)` hit tallies, accumulated at record time. Empty on a plain gate
+    /// run (keying off); the `--by-node` / `--json` rollup reads it directly, no re-parse.
+    node_edge_hits: BTreeMap<NodeEdgeKey, NodeClusterAccum>,
+    /// Hits that were keyed (`key_by_node` on) but whose attribution offset resolved to no node
+    /// — the UNRESOLVED tail. Stays zero on a gate run, since keying is off there.
+    node_edge_unresolved: usize,
     /// Files already non-clean before injection — reported, never injected into (see
     /// [`audit_file`]).
     dirty_files: Vec<String>,
@@ -545,14 +551,52 @@ struct Hit<'a> {
     text: String,
     /// Whether the offending comment is the injected one rather than a bystander.
     injected: bool,
+    /// The `(node, edge)` this hit's [`Self::attribution_offset`] keys to — computed at record
+    /// time in [`audit_file`] against the seed's wire, exactly (never a post-hoc approximation).
+    /// `None` means either keying was off (the plain gate run, which reads no rollup) OR keying
+    /// ran and the offset resolved to no node; [`Tally::record`] tells the two apart via its
+    /// `key_by_node` argument.
+    node_edge: Option<NodeEdgeKey>,
+}
+
+/// One `(node, edge)` cluster's exact accumulation over the hits keyed to it at record time.
+///
+/// Replaces the post-hoc canonical approximation: every hit folds into the cluster its own
+/// attribution offset keys to, so [`Self::hits`] is an exact per-site tally, not a whole-shape
+/// count attributed to one canonical example.
+#[derive(Default)]
+struct NodeClusterAccum {
+    /// Exact number of hits keyed to this cluster.
+    hits: usize,
+    /// The distinct site shapes that landed here — sorted, so `.iter().next()` is the smallest.
+    shapes: BTreeSet<String>,
 }
 
 impl Tally {
-    fn record(&mut self, hit: Hit<'_>) {
+    /// Record one finding. `key_by_node` states whether this run keys hits to `(node, edge)`
+    /// clusters (the `--by-node` / `--json` rollup consumers) — it is the ONLY thing that lets
+    /// `record` tell an unresolved offset (keying on, `hit.node_edge` is `None`) apart from a
+    /// plain gate run (keying off, every `node_edge` is `None`, and no rollup is ever read).
+    fn record(&mut self, hit: Hit<'_>, key_by_node: bool) {
         // Both the shape and the snippet key on the ATTRIBUTION offset — the victim's own site
         // for a bystander — so a bystander drop is filed under the emitter that dropped it,
         // never the perturbation site the payload went in at.
         let shape = site_shape(hit.source, hit.attribution_offset);
+        // Fold this hit into its `(node, edge)` cluster EXACTLY — keyed on its own attribution
+        // offset (already computed in `audit_file`), so a shape spanning several structural
+        // contexts splits across them per hit rather than landing wholly on one canonical
+        // example's cluster.
+        match &hit.node_edge {
+            Some(key) => {
+                let c = self.node_edge_hits.entry(key.clone()).or_default();
+                c.hits += 1;
+                c.shapes.insert(shape.clone());
+            }
+            // Keyed, but the offset resolved to no node — the UNRESOLVED tail. Counted only when
+            // keying ran, so a gate run (keying off, every `node_edge` `None`) stays at zero.
+            None if key_by_node => self.node_edge_unresolved += 1,
+            None => {}
+        }
         let candidate = Example {
             payload: hit.payload.label(),
             path: hit.path.to_string(),
@@ -589,6 +633,12 @@ impl Tally {
         self.files_done += other.files_done;
         self.parse_skipped += other.parse_skipped;
         self.victim_map_fallbacks += other.victim_map_fallbacks;
+        self.node_edge_unresolved += other.node_edge_unresolved;
+        for (k, v) in other.node_edge_hits {
+            let c = self.node_edge_hits.entry(k).or_default();
+            c.hits += v.hits;
+            c.shapes.extend(v.shapes);
+        }
         self.dirty_files.extend(other.dirty_files);
         for (k, v) in other.shapes {
             match self.shapes.get_mut(&k) {
@@ -755,6 +805,17 @@ fn victim_seed_offset(
     (seed_offset <= seed.len() && seed.is_char_boundary(seed_offset)).then_some(seed_offset)
 }
 
+/// Key a seed byte `offset` to its `(node, edge)` cluster using the file's prebuilt wire + map.
+///
+/// `None` when keying is off for this run (`node_map` is `None`) or the offset resolves to no
+/// node — [`Tally::record`]'s `key_by_node` argument tells the two apart for the unresolved tally.
+fn key_node_edge(
+    node_map: Option<&(serde_json::Value, Utf16ToByte)>,
+    offset: usize,
+) -> Option<NodeEdgeKey> {
+    node_map.and_then(|(wire, map)| node_edge_key_with_map(wire, map, offset))
+}
+
 /// Audit one file: verify it is clean **as authored**, then inject at every site.
 ///
 /// The pristine check is load-bearing, not a formality. A file that already drops a comment
@@ -762,7 +823,13 @@ fn victim_seed_offset(
 /// signal — so such a file is reported once and skipped. Over `tests/fixtures` this never
 /// fires (`comments:audit` gates it green); over a real corpus it is the honest split
 /// between "you already knew" and "the injection found it".
-fn audit_file(path: &std::path::Path, payloads: &[Payload], all_bytes: bool, tally: &mut Tally) {
+fn audit_file(
+    path: &std::path::Path,
+    payloads: &[Payload],
+    all_bytes: bool,
+    key_by_node: bool,
+    tally: &mut Tally,
+) {
     let display = path.to_string_lossy().into_owned();
     // Intentionally-invalid fixtures don't parse — nothing to inject into.
     if path
@@ -790,6 +857,15 @@ fn audit_file(path: &std::path::Path, payloads: &[Payload], all_bytes: bool, tal
     };
     tally.files_done += 1;
 
+    // Only a rollup consumer (`--by-node` / `--json`) keys hits to `(node, edge)`. When it does,
+    // parse the seed's wire and build the UTF-16→byte map ONCE per file, reused across every hit;
+    // the plain gate run sets `key_by_node = false` and pays nothing here. (For Svelte,
+    // `code_regions` re-parses internally — a second parse on a report-only run is deliberate,
+    // sub-1%.) A parse failure leaves this `None`, so every hit keys unresolved.
+    let node_map: Option<(serde_json::Value, Utf16ToByte)> = key_by_node
+        .then(|| tsv_parse_to_value(&source, parser).map(|wire| (wire, Utf16ToByte::new(&source))))
+        .flatten();
+
     let regions = code_regions(&source, parser);
     let sites = injection_sites(&source, &regions, &comment_spans, all_bytes);
     tally.sites += sites.len();
@@ -806,16 +882,20 @@ fn audit_file(path: &std::path::Path, payloads: &[Payload], all_bytes: bool, tal
 
             let findings = match ledger_format(&injected_src, parser) {
                 Formatted::Panicked => {
-                    tally.record(Hit {
-                        kind: Kind::Panic,
-                        payload,
-                        path: &display,
-                        source: &source,
-                        injection_offset: offset,
-                        attribution_offset: offset,
-                        text: text.to_string(),
-                        injected: true,
-                    });
+                    tally.record(
+                        Hit {
+                            kind: Kind::Panic,
+                            payload,
+                            path: &display,
+                            source: &source,
+                            injection_offset: offset,
+                            attribution_offset: offset,
+                            text: text.to_string(),
+                            injected: true,
+                            node_edge: key_node_edge(node_map.as_ref(), offset),
+                        },
+                        key_by_node,
+                    );
                     continue;
                 }
                 // The injection isn't a legal comment here — the offset names no gap.
@@ -854,19 +934,26 @@ fn audit_file(path: &std::path::Path, payloads: &[Payload], all_bytes: bool, tal
                         }
                     }
                 };
-                tally.record(Hit {
-                    kind: match f.kind {
-                        CommentFindingKind::Dropped => Kind::Dropped,
-                        CommentFindingKind::DoublePrinted => Kind::DoublePrinted,
+                tally.record(
+                    Hit {
+                        kind: match f.kind {
+                            CommentFindingKind::Dropped => Kind::Dropped,
+                            CommentFindingKind::DoublePrinted => Kind::DoublePrinted,
+                        },
+                        payload,
+                        path: &display,
+                        source: &source,
+                        injection_offset: offset,
+                        attribution_offset,
+                        text: f.text,
+                        injected,
+                        // Key on the ATTRIBUTION offset — the victim's own site for a bystander,
+                        // the injection site otherwise — so the cluster is the emitter that
+                        // dropped the comment, matching the shape/snippet keying above.
+                        node_edge: key_node_edge(node_map.as_ref(), attribution_offset),
                     },
-                    payload,
-                    path: &display,
-                    source: &source,
-                    injection_offset: offset,
-                    attribution_offset,
-                    text: f.text,
-                    injected,
-                });
+                    key_by_node,
+                );
             }
         }
     }
@@ -972,6 +1059,9 @@ impl GapAuditCommand {
             .min(files.len());
 
         let all_bytes = self.all_bytes;
+        // Key each hit to its `(node, edge)` at record time only when a rollup consumer will read
+        // it — the same condition as `compute_by_node` below, so a graded gate run pays nothing.
+        let key_by_node = self.json || self.by_node;
         let mut total = Tally::default();
         // Chunk by stride rather than by block: fixture sizes cluster by directory, and
         // the work is QUADRATIC in file size, so contiguous blocks would leave one thread
@@ -984,7 +1074,7 @@ impl GapAuditCommand {
                     scope.spawn(move || {
                         let mut tally = Tally::default();
                         for path in files.iter().skip(worker).step_by(jobs) {
-                            audit_file(path, payloads, all_bytes, &mut tally);
+                            audit_file(path, payloads, all_bytes, key_by_node, &mut tally);
                         }
                         tally
                     })
@@ -1093,11 +1183,12 @@ impl GapAuditCommand {
         };
 
         let (summary, findings) = build_report(&total, &payloads);
-        // The by-node rollup + attribution-agreement measurement is report-only, and both its
-        // consumers parse seed files — so compute it at most once, only when a consumer needs it:
-        // `--json` always folds it in (per-slice tooling reads it to ask "did my fix move the
-        // cluster?"), and the human `--by-node` view renders it as text.
-        let rollup = (self.json || self.by_node).then(|| compute_by_node(&total));
+        // The by-node rollup is report-only and reads the EXACT per-site tallies already
+        // accumulated at record time (no file I/O, no parse) — so compute it only when a consumer
+        // needs it: `--json` folds it in (per-slice tooling reads it to ask "did my fix move the
+        // cluster?"), and the human `--by-node` view renders it as text. Gated on the same
+        // `key_by_node` that armed the record-time keying, so the tallies it reads are complete.
+        let rollup = key_by_node.then(|| compute_by_node(&total));
         if self.json {
             let extra = rollup
                 .as_ref()
@@ -1326,240 +1417,81 @@ fn confidence_of(summary: VerifySummary) -> Confidence {
     }
 }
 
-/// One `(node_type, edge)` cluster in the by-node rollup — the finding shapes that share an
-/// enclosing AST node-edge, and their summed count.
-struct NodeCluster {
-    /// Summed finding count across the cluster's shapes.
-    total: usize,
-    /// How many distinct site shapes rolled into it.
-    shapes: usize,
-    /// The lexicographically smallest shape, shown as the cluster's example.
-    smallest_shape: String,
-}
-
-/// A seed parsed once for the by-node pass, so shapes sharing a file don't re-read/re-parse it.
-struct ParsedSeed {
-    source: String,
-    wire: serde_json::Value,
-}
-
-/// One cluster row in the ranked (worst-first) by-node work-list — the human/JSON-ready form of
-/// a [`NodeCluster`], carrying its own key.
+/// One cluster row in the ranked (worst-first) by-node work-list — one `(node, edge)` and its
+/// EXACT per-site hit tally, read straight off [`Tally::node_edge_hits`].
 struct ClusterRow {
     key: NodeEdgeKey,
     hits: usize,
+    /// How many distinct site shapes landed in this cluster.
     shapes: usize,
-    smallest_shape: String,
+    /// The lexicographically smallest shape in the cluster, shown as its example.
+    example_shape: String,
 }
 
-/// One fat shape whose kept examples key to MORE than one `(node, edge)` cluster — the canonical
-/// rollup attributes its whole count to just one, so it is where that approximation's error
-/// concentrates.
-struct Disagreer {
-    kind_label: &'static str,
-    shape: String,
-    hits: usize,
-    /// The distinct `(node, edge)` clusters this shape's kept examples span, as display strings.
-    clusters: Vec<String>,
-}
-
-/// Whether the canonical-example rollup can be trusted: does a shape's WHOLE count belong on one
-/// `(node, edge)` cluster, or does the shape span several? Measured by keying **every** kept
-/// example (not just the canonical) and asking whether they all land on one cluster.
-struct Agreement {
-    /// Shapes whose kept examples all key to a single cluster (canonical attribution is exact).
-    shapes_agreeing: usize,
-    /// Shapes with at least one resolvable example — the denominator (a fully-unresolved shape is
-    /// outside it, exactly as it is outside the cluster totals).
-    shapes_measured: usize,
-    /// Hits summed over the agreeing shapes — the hit-weighted numerator.
-    hits_agreeing: usize,
-    /// Hits summed over the measured shapes — the hit-weighted denominator.
-    hits_measured: usize,
-    /// The fattest disagreeing shapes, worst-first, capped at [`TOP_DISAGREERS`].
-    top_disagreers: Vec<Disagreer>,
-}
-
-/// The whole by-node rollup + its trustworthiness measurement, computed once and shared by the
-/// human `--by-node` view and the `--json` sections.
+/// The by-node rollup, shared by the human `--by-node` view and the `--json` section.
+///
+/// Every field is an EXACT per-site tally accumulated at record time (see
+/// [`Tally::node_edge_hits`]) — no canonical-example approximation, so no agreement measure to
+/// carry. The one residual caveat is the [`Self::unresolved_count`] tail (offsets that key to no
+/// node), zero over `tests/fixtures`.
 struct ByNodeRollup {
     /// Clusters ranked worst-first (hits desc, then key).
     clusters: Vec<ClusterRow>,
     grand_total: usize,
     unresolved_count: usize,
-    unresolved_shapes: usize,
     total_shapes: usize,
-    agreement: Agreement,
 }
 
-/// How many disagreeing shapes the report lists — enough to see where the canonical-attribution
-/// error concentrates without dumping the whole tail.
-const TOP_DISAGREERS: usize = 15;
-
-/// One shape's resolved cluster membership — the pure input to [`aggregate_agreement`], split out
-/// so the agreement arithmetic (the "corpus can't grade it" class — every share is exact yet no
-/// corpus diff would flag an off-by-one) is unit-testable without file I/O.
-struct ShapeClusters {
-    kind_label: &'static str,
-    shape: String,
-    hits: usize,
-    /// The distinct `(node, edge)` clusters the shape's kept examples resolved to, as display
-    /// strings. Empty ⇒ the shape is fully unresolved and outside the agreement denominator.
-    clusters: Vec<String>,
-}
-
-/// Fold each shape's resolved cluster membership into the [`Agreement`] tally: one resolved
-/// cluster ⇒ agrees, more than one ⇒ disagrees (and is a candidate disagreer), none ⇒ unmeasured.
-/// Pure — the caller does the file I/O to build the [`ShapeClusters`].
-fn aggregate_agreement(shapes: &[ShapeClusters]) -> Agreement {
-    let mut shapes_agreeing = 0usize;
-    let mut shapes_measured = 0usize;
-    let mut hits_agreeing = 0usize;
-    let mut hits_measured = 0usize;
-    let mut disagreers: Vec<Disagreer> = Vec::new();
-    for s in shapes {
-        match s.clusters.len() {
-            0 => {} // fully unresolved — outside the measured denominator, like the cluster tail
-            1 => {
-                shapes_agreeing += 1;
-                shapes_measured += 1;
-                hits_agreeing += s.hits;
-                hits_measured += s.hits;
-            }
-            _ => {
-                shapes_measured += 1;
-                hits_measured += s.hits;
-                disagreers.push(Disagreer {
-                    kind_label: s.kind_label,
-                    shape: s.shape.clone(),
-                    hits: s.hits,
-                    clusters: s.clusters.clone(),
-                });
-            }
-        }
-    }
-    // Fattest first — a high-hit shape disagreeing mis-ranks far more than a 2-hit one. Ties
-    // break on the shape name so the list is deterministic.
-    disagreers.sort_by(|a, b| b.hits.cmp(&a.hits).then_with(|| a.shape.cmp(&b.shape)));
-    disagreers.truncate(TOP_DISAGREERS);
-    Agreement {
-        shapes_agreeing,
-        shapes_measured,
-        hits_agreeing,
-        hits_measured,
-        top_disagreers: disagreers,
-    }
-}
-
-/// Resolve one seed offset to its `(node, edge)` cluster, parsing (and caching) the seed file.
+/// Turn the run's EXACT record-time `(node, edge)` tallies into the ranked cluster work-list.
 ///
-/// A `node_edge_key` call rebuilds `Utf16ToByte` from the source each time — fine over the ≤5
-/// kept examples per shape this is called on, but the reason it must never move into a loop over
-/// all injection sites.
-fn resolve_key(
-    cache: &mut HashMap<String, Option<ParsedSeed>>,
-    path: &str,
-    attribution_offset: usize,
-) -> Option<NodeEdgeKey> {
-    let seed = cache.entry(path.to_string()).or_insert_with(|| {
-        let source = std::fs::read_to_string(path).ok()?;
-        let parser = ParserType::from_extension(path);
-        let wire = tsv_parse_to_value(&source, parser)?;
-        Some(ParsedSeed { source, wire })
-    });
-    seed.as_ref()
-        .and_then(|s| node_edge_key(&s.wire, &s.source, attribution_offset))
-}
-
-/// Build the COARSE by-(node, edge) rollup AND measure how trustworthy it is.
+/// Pure over [`Tally::node_edge_hits`] — no file I/O, no parse. Every hit was keyed to its own
+/// site's `(node, edge)` at record time (in [`audit_file`]), so a shape occurring in several
+/// structural contexts is split across them per hit, not attributed wholesale to one canonical
+/// example. Report-only: it feeds neither the gate nor the exit code.
 ///
-/// The rollup keys each shape's **canonical** example by its [`NodeEdgeKey`] and sums the shapes'
-/// finding counts per key — folding the ~700 fine token shapes into the few dozen printer
-/// clusters a burn-down works through. But canonical = the smallest `(path, attribution_offset)`,
-/// arbitrary w.r.t. structure, so attributing a shape's WHOLE count to it is only sound when the
-/// shape occupies one cluster. So this also keys **every** kept example and measures per-shape
-/// [`Agreement`]: a shape whose kept examples span more than one cluster is where the canonical
-/// approximation mis-ranks, and the fattest such shapes are the error's concentration.
-///
-/// Report-only: it feeds neither the gate nor the exit code.
+/// Only ever called when record-time keying was on (`--by-node` / `--json`), so every finding is
+/// accounted exactly once — the conservation invariant `grand_total + unresolved_count == Σ shape
+/// counts` must hold (asserted below).
 fn compute_by_node(total: &Tally) -> ByNodeRollup {
-    let mut clusters: BTreeMap<NodeEdgeKey, NodeCluster> = BTreeMap::new();
-    let mut cache: HashMap<String, Option<ParsedSeed>> = HashMap::new();
-    let mut unresolved_count = 0usize;
-    let mut unresolved_shapes = 0usize;
-    let mut shape_clusters: Vec<ShapeClusters> = Vec::with_capacity(total.shapes.len());
+    let grand_total: usize = total.node_edge_hits.values().map(|c| c.hits).sum();
+    let unresolved_count = total.node_edge_unresolved;
 
-    for ((kind, shape), agg) in &total.shapes {
-        // Canonical attribution — the cluster rollup (unchanged from the T2 slice).
-        //
-        // TODO: record-time keying. Attributing a shape's WHOLE count to its canonical example's
-        // cluster is only exact when the shape occupies one cluster, and the `agreement` measure
-        // below shows it does not for the fattest, generic shapes (hit-weighted agreement ~77%
-        // over `tests/fixtures`, the disagreement led by `␣⟨⟩␣` splitting across emitters) — so
-        // the headline ranking a burn-down reads is mis-ranked. The exact fix is to key each hit
-        // at RECORD time by its own `attribution_offset`: parse the seed's wire once per file in
-        // `audit_file` (already done for Svelte in `code_regions`), build one `Utf16ToByte`, key
-        // each `Hit` before `Tally::record`, and accumulate a `BTreeMap<NodeEdgeKey, …>` exactly —
-        // retiring this post-hoc canonical approximation. Left as a follow-up: it is a data-model
-        // change, not this measurement slice's scope.
-        let ex = agg.canonical();
-        match resolve_key(&mut cache, &ex.path, ex.attribution_offset) {
-            Some(k) => {
-                let c = clusters.entry(k).or_insert_with(|| NodeCluster {
-                    total: 0,
-                    shapes: 0,
-                    smallest_shape: shape.clone(),
-                });
-                c.total += agg.count;
-                c.shapes += 1;
-                if shape.as_str() < c.smallest_shape.as_str() {
-                    c.smallest_shape.clone_from(shape);
-                }
-            }
-            None => {
-                unresolved_count += agg.count;
-                unresolved_shapes += 1;
-            }
-        }
+    // Every hit is keyed exactly once — into a cluster or the unresolved tail — so the two must
+    // sum to the run's total finding count. A miskey (a hit counted twice, or dropped) is the
+    // "corpus can't grade it" class: it would leave every formatted file byte-identical. A PLAIN
+    // `assert_eq!` (not `debug_assert_eq!`) so it fires under `--profile corpus`/release too — the
+    // very profile the `--by-node` / `--json` report path runs in, where a `debug_assert` elides
+    // and a conservation break would ship as silently-wrong report data. Cheap to keep loud: this
+    // runs at most once per invocation over ~156 clusters, never a hot loop, and `tsv_debug` is
+    // dev-only (never prod wasm/cli/ffi). It guards COUNT conservation only; correct-cluster keying
+    // rests on the `sites.rs` node-edge unit suite plus `compute_by_node_splits_…`.
+    assert_eq!(
+        grand_total + unresolved_count,
+        total.shapes.values().map(|agg| agg.count).sum::<usize>(),
+        "record-time keying must account every finding once: clusters + unresolved == Σ shape counts"
+    );
 
-        // Agreement — the distinct resolved clusters across ALL kept examples (≤5), not just the
-        // canonical one.
-        let mut distinct: BTreeSet<NodeEdgeKey> = BTreeSet::new();
-        for ex in &agg.examples {
-            if let Some(k) = resolve_key(&mut cache, &ex.path, ex.attribution_offset) {
-                distinct.insert(k);
-            }
-        }
-        shape_clusters.push(ShapeClusters {
-            kind_label: kind.label(),
-            shape: shape.clone(),
-            hits: agg.count,
-            clusters: distinct.iter().map(NodeEdgeKey::to_string).collect(),
-        });
-    }
-
-    // Worst-first: the fattest emitter cluster is the highest-leverage fix. Ties break on the
-    // key, so the ranking is deterministic.
-    let grand_total: usize = clusters.values().map(|c| c.total).sum();
-    let mut rows: Vec<(NodeEdgeKey, NodeCluster)> = clusters.into_iter().collect();
-    rows.sort_by(|a, b| b.1.total.cmp(&a.1.total).then_with(|| a.0.cmp(&b.0)));
-    let clusters: Vec<ClusterRow> = rows
-        .into_iter()
-        .map(|(key, c)| ClusterRow {
-            key,
-            hits: c.total,
-            shapes: c.shapes,
-            smallest_shape: c.smallest_shape,
+    let mut clusters: Vec<ClusterRow> = total
+        .node_edge_hits
+        .iter()
+        .map(|(key, accum)| ClusterRow {
+            key: key.clone(),
+            hits: accum.hits,
+            shapes: accum.shapes.len(),
+            // BTreeSet is sorted, so `.next()` is the lexicographically smallest shape. An accum
+            // always carries ≥1 shape (it's created when a hit is folded), so the default is dead.
+            example_shape: accum.shapes.iter().next().cloned().unwrap_or_default(),
         })
         .collect();
+    // Worst-first: the fattest emitter cluster is the highest-leverage fix. Ties break on the
+    // key, so the ranking is deterministic.
+    clusters.sort_by(|a, b| b.hits.cmp(&a.hits).then_with(|| a.key.cmp(&b.key)));
 
     ByNodeRollup {
         clusters,
         grand_total,
         unresolved_count,
-        unresolved_shapes,
         total_shapes: total.shapes.len(),
-        agreement: aggregate_agreement(&shape_clusters),
     }
 }
 
@@ -1582,9 +1514,11 @@ fn share_of(n: usize, d: usize) -> f64 {
     }
 }
 
-/// The audit-specific top-level `--json` sections `report::print_json` folds in beside the
-/// envelope: `by_node` (the ranked cluster work-list per-slice tooling consumes) and `agreement`
-/// (whether that ranking can be trusted). Additive — the envelope's own fields are untouched.
+/// The audit-specific top-level `--json` section `report::print_json` folds in beside the
+/// envelope: `by_node`, the ranked cluster work-list per-slice tooling consumes — now EXACT
+/// per-site tallies, not a canonical approximation — plus `by_node_unresolved`, the count in the
+/// UNRESOLVED tail (offsets that keyed to no node; zero over `tests/fixtures`). Additive — the
+/// envelope's own fields are untouched.
 fn by_node_json_sections(rollup: &ByNodeRollup) -> serde_json::Map<String, serde_json::Value> {
     let by_node: Vec<serde_json::Value> = rollup
         .clusters
@@ -1596,56 +1530,30 @@ fn by_node_json_sections(rollup: &ByNodeRollup) -> serde_json::Map<String, serde
                 "hits": c.hits,
                 "shapes": c.shapes,
                 "share": share_of(c.hits, rollup.grand_total),
-                "example_shape": c.smallest_shape,
+                "example_shape": c.example_shape,
             })
         })
         .collect();
-
-    let ag = &rollup.agreement;
-    let top_disagreers: Vec<serde_json::Value> = ag
-        .top_disagreers
-        .iter()
-        .map(|d| {
-            serde_json::json!({
-                "kind": d.kind_label,
-                "shape": d.shape,
-                "hits": d.hits,
-                "clusters": d.clusters,
-            })
-        })
-        .collect();
-    let agreement = serde_json::json!({
-        "shapes_agreeing": ag.shapes_agreeing,
-        "shapes_total": ag.shapes_measured,
-        "shapes_agreeing_share": share_of(ag.shapes_agreeing, ag.shapes_measured),
-        "hits_agreeing": ag.hits_agreeing,
-        "hits_total": ag.hits_measured,
-        "hits_agreeing_share": share_of(ag.hits_agreeing, ag.hits_measured),
-        "unresolved_shapes": rollup.unresolved_shapes,
-        "unresolved_count": rollup.unresolved_count,
-        "top_disagreers": top_disagreers,
-    });
 
     let mut m = serde_json::Map::new();
     m.insert("by_node".to_string(), serde_json::Value::Array(by_node));
-    m.insert("agreement".to_string(), agreement);
+    m.insert(
+        "by_node_unresolved".to_string(),
+        serde_json::json!(rollup.unresolved_count),
+    );
     m
 }
 
-/// Print the COARSE by-(node, edge) rollup — a ranked emitter work-list — plus the
-/// attribution-agreement measurement of how trustworthy that ranking is.
+/// Print the COARSE by-(node, edge) rollup — a ranked emitter work-list of EXACT per-site tallies.
 ///
-/// A shape whose canonical example no longer reads/parses, or whose offset keys to no node, falls
-/// into the `UNRESOLVED` tail (reported, never fatal). Report-only: computed after grading, it
-/// feeds neither the gate nor the exit code. Under `--json` it prints to stderr, leaving the JSON
-/// document on stdout the sole parseable output.
+/// A finding whose offset keys to no node falls into the `UNRESOLVED` tail (reported, never fatal;
+/// zero over `tests/fixtures`). Report-only: computed after grading, it feeds neither the gate nor
+/// the exit code. Under `--json` it prints to stderr, leaving the JSON document on stdout the sole
+/// parseable output.
 fn report_by_node(rollup: &ByNodeRollup, json: bool) {
     let mut lines: Vec<String> = Vec::new();
-    let unresolved = if rollup.unresolved_shapes > 0 {
-        format!(
-            "  ·  {} finding(s) across {} shape(s) UNRESOLVED",
-            rollup.unresolved_count, rollup.unresolved_shapes
-        )
+    let unresolved = if rollup.unresolved_count > 0 {
+        format!("  ·  {} finding(s) UNRESOLVED", rollup.unresolved_count)
     } else {
         String::new()
     };
@@ -1660,7 +1568,7 @@ fn report_by_node(rollup: &ByNodeRollup, json: bool) {
         let key = c.key.to_string();
         lines.push(format!(
             "  {:>7}×  {:>4} shape(s)  {key:<42}  e.g. {}",
-            c.hits, c.shapes, c.smallest_shape
+            c.hits, c.shapes, c.example_shape
         ));
     }
     let top10: usize = rollup.clusters.iter().take(10).map(|c| c.hits).sum();
@@ -1670,40 +1578,10 @@ fn report_by_node(rollup: &ByNodeRollup, json: bool) {
         pct_of(top10, rollup.grand_total)
     ));
     lines.push(
-        "note: each shape's whole count is attributed to its canonical example's (node, edge), \
-         so a generic shape spanning several structural contexts lands wholly in one — the \
-         totals are a worst-first approximation, not an exact per-site tally."
+        "note: each finding is keyed to its own site's (node, edge) at record time, so these \
+         totals are EXACT per-site tallies."
             .to_string(),
     );
-
-    // The attribution-agreement measurement — how much of that approximation to trust.
-    let ag = &rollup.agreement;
-    lines.push(String::new());
-    lines.push(format!(
-        "attribution agreement — {}/{} measured shape(s) key ALL kept examples to ONE cluster \
-         ({}% unweighted); hit-weighted {}/{} ({}%)",
-        ag.shapes_agreeing,
-        ag.shapes_measured,
-        pct_of(ag.shapes_agreeing, ag.shapes_measured),
-        ag.hits_agreeing,
-        ag.hits_measured,
-        pct_of(ag.hits_agreeing, ag.hits_measured),
-    ));
-    if !ag.top_disagreers.is_empty() {
-        lines.push(
-            "  fattest DISAGREEING shape(s) — canonical attribution mis-ranks their whole count \
-             onto one of these clusters:"
-                .to_string(),
-        );
-        for d in &ag.top_disagreers {
-            lines.push(format!(
-                "    {:>7}×  {:<20} spans {}",
-                d.hits,
-                d.shape,
-                d.clusters.join("  |  ")
-            ));
-        }
-    }
 
     let out = lines.join("\n");
     if json {
@@ -2127,28 +2005,38 @@ mod tests {
         assert_eq!(site_shape(src, member_dot), "IDENT⟨⟩.");
 
         let mut tally = Tally::default();
+        // Keying off here (`node_edge: None`, `key_by_node: false`): this test is about site-shape
+        // keying, not the `(node, edge)` rollup.
         // The injected comment: attribution == injection at the `import.` dot.
-        tally.record(Hit {
-            kind: Kind::Dropped,
-            payload: Payload::Block,
-            path: "p.ts",
-            source: src,
-            injection_offset: import_dot,
-            attribution_offset: import_dot,
-            text: "/* c */".to_string(),
-            injected: true,
-        });
+        tally.record(
+            Hit {
+                kind: Kind::Dropped,
+                payload: Payload::Block,
+                path: "p.ts",
+                source: src,
+                injection_offset: import_dot,
+                attribution_offset: import_dot,
+                text: "/* c */".to_string(),
+                injected: true,
+                node_edge: None,
+            },
+            false,
+        );
         // A bystander the SAME injection knocked out, whose victim lived at the `y.z` dot.
-        tally.record(Hit {
-            kind: Kind::Dropped,
-            payload: Payload::Block,
-            path: "p.ts",
-            source: src,
-            injection_offset: import_dot,
-            attribution_offset: member_dot,
-            text: "/* pre-existing */".to_string(),
-            injected: false,
-        });
+        tally.record(
+            Hit {
+                kind: Kind::Dropped,
+                payload: Payload::Block,
+                path: "p.ts",
+                source: src,
+                injection_offset: import_dot,
+                attribution_offset: member_dot,
+                text: "/* pre-existing */".to_string(),
+                injected: false,
+                node_edge: None,
+            },
+            false,
+        );
 
         assert!(
             tally
@@ -2173,58 +2061,62 @@ mod tests {
         );
     }
 
-    /// A shape carrying its resolved cluster set — filler for the agreement arithmetic.
-    fn mk_shape(shape: &str, hits: usize, clusters: &[&str]) -> ShapeClusters {
-        ShapeClusters {
-            kind_label: "DROPPED",
-            shape: shape.to_string(),
-            hits,
-            clusters: clusters.iter().map(|c| (*c).to_string()).collect(),
+    /// A `(node, edge)` key spelled out, so the split test reads as the clusters it asserts.
+    fn node_edge(node_type: &str, edge: &str) -> NodeEdgeKey {
+        NodeEdgeKey {
+            node_type: node_type.to_string(),
+            edge: edge.to_string(),
         }
     }
 
-    /// The agreement tally — the "corpus can't grade it" class: every share is exact yet no
-    /// corpus diff would flag an off-by-one, so it is unit-tested directly. A shape with one
-    /// resolved cluster AGREES (its whole count belongs on that cluster); one with more DISAGREES
-    /// (the canonical rollup mis-ranks it); a fully-unresolved shape is outside BOTH denominators,
-    /// exactly as it is outside the cluster totals. Disagreers rank fattest-first, hit-weighted.
+    /// Record-time keying splits ONE site-shape across its DISTINCT `(node, edge)` clusters — the
+    /// exact thing the retired canonical approximation got wrong (a fat generic shape like `␣⟨⟩␣`
+    /// landing wholly on one cluster). Three hits share the site-shape `␣⟨⟩␣` but carry two
+    /// different node-edge keys; the rollup must split the count 2/1 across the two clusters, not
+    /// lump all three onto one. The "corpus can't grade it" class: a miskey would still leave every
+    /// formatted file byte-identical, so only this unit test catches it.
     #[test]
-    fn aggregate_agreement_splits_agree_disagree_and_ranks_by_hits() {
-        let shapes = [
-            // Agrees: all kept examples key to one cluster.
-            mk_shape("a", 100, &["(CallExpression, callee→arguments)"]),
-            // Disagrees, FAT: spans two clusters — this is where mis-ranking concentrates.
-            mk_shape(
-                "b",
-                500,
-                &[
-                    "(CallExpression, callee→arguments)",
-                    "(MemberExpression, object→property)",
-                ],
-            ),
-            // Disagrees, thin.
-            mk_shape("c", 3, &["(Rule, prelude→block)", "(Identifier, ^→$)"]),
-            // Fully unresolved: no example keyed to a node — outside the measured denominator.
-            mk_shape("d", 9, &[]),
-        ];
-        let ag = aggregate_agreement(&shapes);
+    fn compute_by_node_splits_one_shape_across_its_clusters() {
+        let call = node_edge("CallExpression", "arguments→$");
+        let prop = node_edge("Property", "key→value");
+        let mut tally = Tally::default();
+        // `source = "a  b"`, offset 2 (between the two spaces) → the site-shape `␣⟨⟩␣`. All three
+        // hits share it, but two key to the call cluster and one to the property cluster.
+        for edge in [&call, &call, &prop] {
+            tally.record(
+                Hit {
+                    kind: Kind::Dropped,
+                    payload: Payload::Block,
+                    path: "p.ts",
+                    source: "a  b",
+                    injection_offset: 2,
+                    attribution_offset: 2,
+                    text: "/* c */".to_string(),
+                    injected: true,
+                    node_edge: Some(edge.clone()),
+                },
+                true,
+            );
+        }
 
-        // Only `a` agrees; `d` is not measured at all.
-        assert_eq!(ag.shapes_agreeing, 1);
-        assert_eq!(ag.shapes_measured, 3, "a, b, c — not the unresolved d");
-        assert_eq!(ag.hits_agreeing, 100);
-        assert_eq!(ag.hits_measured, 603, "100 + 500 + 3, excluding d's 9");
+        // One site-shape recorded three hits …
+        assert_eq!(
+            tally.shapes.len(),
+            1,
+            "all three hits share the `␣⟨⟩␣` site-shape"
+        );
+        assert_eq!(tally.shapes[&(Kind::Dropped, "␣⟨⟩␣".to_string())].count, 3);
 
-        // The two disagreers, fattest first.
-        assert_eq!(ag.top_disagreers.len(), 2);
-        assert_eq!(ag.top_disagreers[0].shape, "b");
-        assert_eq!(ag.top_disagreers[0].hits, 500);
-        assert_eq!(ag.top_disagreers[0].clusters.len(), 2);
-        assert_eq!(ag.top_disagreers[1].shape, "c");
-
-        // The shares the report headlines with.
-        assert_eq!(pct_of(ag.shapes_agreeing, ag.shapes_measured), 33);
-        assert!(approx(share_of(ag.hits_agreeing, ag.hits_measured), 0.1658));
+        // … yet the rollup splits them EXACTLY across two clusters (2/1), never lumped onto one.
+        let rollup = compute_by_node(&tally);
+        assert_eq!(rollup.grand_total, 3, "every hit is accounted");
+        assert_eq!(rollup.unresolved_count, 0, "both keys resolved");
+        assert_eq!(rollup.clusters.len(), 2, "the shape spans two clusters");
+        // Worst-first: the call cluster (2 hits) ranks before the property cluster (1 hit).
+        assert_eq!(rollup.clusters[0].key, call);
+        assert_eq!(rollup.clusters[0].hits, 2);
+        assert_eq!(rollup.clusters[1].key, prop);
+        assert_eq!(rollup.clusters[1].hits, 1);
     }
 
     /// A four-decimal share compares within one ULP-ish epsilon — `assert_eq!` on `f64` trips

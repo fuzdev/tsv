@@ -57,6 +57,7 @@ use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 use tsv_lang::source_scan::{TriviaProfile, skip_trivia};
 
+use crate::audit::properties::Utf16ToByte;
 use crate::cli::CliError;
 use crate::render_normalize::structural_skeleton;
 
@@ -379,7 +380,7 @@ fn extract_bindings(source: &str) -> Option<Vec<CommentBinding>> {
     let arena = bumpalo::Bump::new();
     let program = tsv_ts::parse_preserve_parens(source, &arena).ok()?;
     let wire = tsv_ts::convert_ast_json(&program, source);
-    let b2c = byte_to_utf16(source);
+    let map = Utf16ToByte::new(source);
     let bytes = source.as_bytes();
 
     let mut out = Vec::new();
@@ -388,7 +389,7 @@ fn extract_bindings(source: &str) -> Option<Vec<CommentBinding>> {
             continue;
         }
         let content = c.content(source).to_string();
-        let binding = comment_binding(bytes, source, &wire, &b2c, c, &content);
+        let binding = comment_binding(bytes, source, &wire, &map, c, &content);
         out.push(CommentBinding {
             content,
             owned: c.owned_by_node,
@@ -403,7 +404,7 @@ fn comment_binding(
     bytes: &[u8],
     source: &str,
     wire: &Value,
-    b2c: &[u32],
+    map: &Utf16ToByte,
     comment: &tsv_lang::Comment,
     content: &str,
 ) -> Option<Binding> {
@@ -414,7 +415,7 @@ fn comment_binding(
         return None;
     }
     let skeleton_at =
-        |pos: usize| outermost_at(wire, b2c[pos]).map(|n| structural_skeleton(&strip_parens(n)));
+        |pos: usize| outermost_at(wire, map, pos).map(|n| structural_skeleton(&strip_parens(n)));
 
     if tsv_ts::is_jsdoc_type_cast_comment(content) {
         // A cast's parens are expected: it must be followed by `(`, and it binds
@@ -437,31 +438,27 @@ fn comment_binding(
     })
 }
 
-/// `byte offset -> UTF-16 code-unit offset` — wire `start`/`end` are UTF-16
-/// (acorn/JS semantics), while comment spans and source scanning are byte-space.
-fn byte_to_utf16(source: &str) -> Vec<u32> {
-    let mut map = vec![0u32; source.len() + 1];
-    let mut u16off = 0u32;
-    for (b, ch) in source.char_indices() {
-        map[b] = u16off;
-        u16off += ch.len_utf16() as u32;
-    }
-    map[source.len()] = u16off;
-    map
-}
-
-/// The outermost wire node whose `start` equals `target` (pre-order DFS — the
-/// first hit is the shallowest, i.e. widest, node beginning there).
-fn outermost_at(v: &Value, target: u32) -> Option<&Value> {
+/// The outermost wire node whose byte-start equals `target_byte` (pre-order DFS —
+/// the first hit is the shallowest, i.e. widest, node beginning there).
+///
+/// Wire `start`/`end` are **UTF-16** code-unit offsets (acorn/JS semantics), while
+/// `target_byte` and every source scan here are byte-space. A node's `start` is
+/// translated to bytes through `map` and compared to `target_byte` — start-only, the
+/// faithful analog of the previous UTF-16 `start`-equality match (no `end`, so no node
+/// is narrowed out by a missing `end` translation). The two spaces coincide on ASCII
+/// and diverge past any multibyte char — see
+/// `glued_binding_resolves_through_a_multibyte_offset`.
+fn outermost_at<'a>(v: &'a Value, map: &Utf16ToByte, target_byte: usize) -> Option<&'a Value> {
     if let Value::Object(m) = v
         && m.contains_key("type")
-        && m.get("start").and_then(Value::as_u64) == Some(u64::from(target))
+        && let Some(start) = m.get("start").and_then(Value::as_u64)
+        && map.byte(start as usize) == Some(target_byte)
     {
         return Some(v);
     }
     match v {
-        Value::Object(m) => m.values().find_map(|c| outermost_at(c, target)),
-        Value::Array(a) => a.iter().find_map(|c| outermost_at(c, target)),
+        Value::Object(m) => m.values().find_map(|c| outermost_at(c, map, target_byte)),
+        Value::Array(a) => a.iter().find_map(|c| outermost_at(c, map, target_byte)),
         _ => None,
     }
 }
@@ -654,6 +651,50 @@ mod tests {
             Some(Binding::Cast(sk)) => assert_eq!(top_type(sk), "CallExpression"),
             other => panic!(
                 "cast should bind the inner call, got {}",
+                describe(other.as_ref())
+            ),
+        }
+    }
+
+    /// NON-ASCII coordinate guard — the whole risk of the byte-space rewrite.
+    ///
+    /// The audit compares wire node `start`s (UTF-16 code units, acorn semantics)
+    /// against byte offsets from source scanning. The two coincide on ASCII and
+    /// **diverge** the moment a file holds a multibyte char, so every corpus/gate run
+    /// (all ASCII, in practice) grades byte-space and UTF-16-space arithmetic
+    /// identically and is blind to a coordinate bug here — only a hand-built non-ASCII
+    /// case can catch it.
+    ///
+    /// The `é` (2 bytes / 1 UTF-16 unit) before the glued comment's bound token pushes
+    /// `foo`'s byte offset (19) one past its wire UTF-16 start (18). The correct
+    /// byte-space resolution (translate the node's UTF-16 `start` through `Utf16ToByte`,
+    /// then compare to the byte anchor) binds the `foo` `Identifier`. A byte-vs-UTF-16
+    /// confusion would instead hunt for a node at UTF-16 offset 19 — byte 20, mid-`foo`,
+    /// where nothing begins — and resolve to `None`. So `Some(Glued Identifier)` vs
+    /// `None` is a value only correct arithmetic yields, making this a real guard rather
+    /// than a vacuous pass.
+    #[test]
+    fn glued_binding_resolves_through_a_multibyte_offset() {
+        let src = "const é = /* c */ foo;\n";
+        let bindings = extract_bindings(src).expect("parses");
+        let comment = bindings
+            .iter()
+            .find(|b| b.content.contains('c'))
+            .expect("block comment present");
+        match &comment.binding {
+            Some(Binding::Glued {
+                skeleton,
+                anchor_is_paren,
+            }) => {
+                assert_eq!(
+                    top_type(skeleton),
+                    "Identifier",
+                    "the glued comment must bind the `foo` identifier"
+                );
+                assert!(!*anchor_is_paren, "the bound token is `foo`, not a `(`");
+            }
+            other => panic!(
+                "glued comment should bind the Identifier, got {}",
                 describe(other.as_ref())
             ),
         }
