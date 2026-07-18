@@ -15,6 +15,7 @@
 # it is reported but never gated. It is excluded from this file by construction.
 #
 # Format: KIND<TAB>SHAPE
+# shapes: 183
 NON-IDEMPOTENT	''⟨⟩,
 NON-IDEMPOTENT	').⟨⟩IDENT
 NON-IDEMPOTENT	')⟨⟩.
@@ -163,9 +164,6 @@ NON-IDEMPOTENT	␣⟨⟩satisfies
 NON-IDEMPOTENT	␣⟨⟩type
 NON-IDEMPOTENT	␣⟨⟩yield
 NON-IDEMPOTENT	␣⟨⟩␣
-UNREPARSEABLE	...⟨⟩/*
-UNREPARSEABLE	...⟨⟩IDENT
-LEAF-CORRUPTION	...⟨⟩IDENT
 DROPPED	'⟨⟩/*
 DROPPED	'⟨⟩//
 DROPPED	'⟨⟩␣
@@ -177,8 +175,6 @@ DROPPED	++⟨⟩␣
 DROPPED	,⟨⟩IDENT
 DROPPED	,⟨⟩['
 DROPPED	,⟨⟩␣
-DROPPED	...⟨⟩/*
-DROPPED	...⟨⟩IDENT
 DROPPED	/⟨⟩/*
 DROPPED	/⟨⟩␣
 DROPPED	?.⟨⟩[

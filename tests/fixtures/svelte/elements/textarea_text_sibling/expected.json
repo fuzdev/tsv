@@ -1,0 +1,151 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 250,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 84,
+				"data": " Bare text sibling directly after </textarea> (was rejected: stale tag mode) "
+			},
+			{
+				"type": "Text",
+				"start": 84,
+				"end": 85,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 85,
+				"end": 106,
+				"name": "textarea",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 86
+					},
+					"end": {
+						"line": 2,
+						"column": 9,
+						"character": 94
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 106,
+				"end": 109,
+				"raw": "x\n\n",
+				"data": "x\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 109,
+				"end": 150,
+				"data": " Content inside AND trailing text "
+			},
+			{
+				"type": "Text",
+				"start": 150,
+				"end": 151,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 151,
+				"end": 177,
+				"name": "textarea",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 152
+					},
+					"end": {
+						"line": 5,
+						"column": 9,
+						"character": 160
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"start": 161,
+							"end": 166,
+							"type": "Text",
+							"raw": "inner",
+							"data": "inner"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 177,
+				"end": 183,
+				"raw": "tail\n\n",
+				"data": "tail\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 183,
+				"end": 216,
+				"data": " Multi-word trailing text "
+			},
+			{
+				"type": "Text",
+				"start": 216,
+				"end": 217,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 217,
+				"end": 238,
+				"name": "textarea",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 218
+					},
+					"end": {
+						"line": 8,
+						"column": 9,
+						"character": 226
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 238,
+				"end": 249,
+				"raw": "hello world",
+				"data": "hello world"
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

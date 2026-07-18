@@ -383,6 +383,49 @@ if (no_check) {
 	}
 }
 
+// Step 3c: Corpus robustness audit
+//
+// The pure-Rust content-loss / panic / non-idempotency audits over REAL code (the perf corpus
+// view — live dev repos + pinned framework source — plus the pinned Prettier suites). This is the
+// extension-robustness bar: `tests/fixtures` is format-stable by construction, so `deno task check`
+// is structurally blind to a content-loss / panic / reflow bug in real code — every such bug this
+// cycle was found by a corpus audit or a wide fuzz seed, never by `check`. `deno task audit:corpus`
+// warn-skips absent dev-repo checkouts, so its reproducible floor is the ../svelte framework source;
+// like Step 3b, a --wetrun without that floor BLOCKS (releasing without the audit needs --no-check),
+// a dry-run warn-and-skips. The FFI/prettier SAFETY half (content loss vs prettier) rides Step 3b's
+// corpus:compare:format --all; this is the pure-Rust half those gates can't reach.
+let audit_corpus_skip_reason: string | null = null;
+if (no_check) {
+	console.log('\n=== Step 3c: Corpus robustness audit — SKIPPED (--no-check) ===');
+	audit_corpus_skip_reason = '--no-check';
+} else {
+	console.log('\n=== Step 3c: Corpus robustness audit (deno task audit:corpus) ===');
+	if (!exists('../svelte/packages/svelte/src')) {
+		audit_corpus_skip_reason = 'missing ../svelte checkout (the reproducible corpus floor)';
+		if (wetrun) {
+			console.error(
+				`  FAIL: ${audit_corpus_skip_reason} — the corpus audit cannot run over real code. ` +
+					'Clone it, or pass --no-check to release without the audit (explicitly).',
+			);
+			Deno.exit(1);
+		}
+		console.warn(
+			`  WARN: skipping — ${audit_corpus_skip_reason}. ` +
+				'A --wetrun would FAIL here; run `deno task audit:corpus` on a machine with the corpus.',
+		);
+	} else {
+		run(
+			'deno task audit:corpus',
+			'deno',
+			['task', 'audit:corpus'],
+			undefined,
+			'  Corpus robustness audit found a content-loss / panic / non-idempotency regression over\n' +
+				'  REAL code (what `deno task check`’s fixture-only gate cannot see). Triage the failing\n' +
+				'  leg by name with the matching `tsv_debug` audit on the single repo it points at.',
+		);
+	}
+}
+
 // Step 4: Build
 
 console.log('\n=== Step 4: Build WASM bundles (npm + deno) ===');
@@ -535,6 +578,12 @@ if (conformance_skip_reason !== null) {
 	// last thing on screen, not a scrolled-away footnote.
 	console.warn(`\n  ⚠ Step 3b conformance gates did NOT run (${conformance_skip_reason}).`);
 	console.warn('    Run `deno task conformance:all` and verify it passes for this release.');
+}
+if (audit_corpus_skip_reason !== null) {
+	// Re-warn at the very end — same reasoning as the Step 3b re-warn: a release whose real-code
+	// robustness audit never ran must be the last thing on screen, not a scrolled-away footnote.
+	console.warn(`\n  ⚠ Step 3c corpus robustness audit did NOT run (${audit_corpus_skip_reason}).`);
+	console.warn('    Run `deno task audit:corpus` and verify it passes for this release.');
 }
 if (!wetrun) {
 	console.log(`\n  Dry-run complete for v${version} — all checks passed.`);
