@@ -93,9 +93,14 @@ project-wide conventions.
     `<option>` / populated `<select>`/`<optgroup>` (the oracle emits closure
     calls / `<!>` anchors there), template-expression comments, and every
     `$`-prefixed identifier reference or call outside the sanctioned rewrites
-    below (a template-position store read — `$name` whose `$`-stripped base is a
-    binding — IS sanctioned, emitting `$.store_get`; a script-position store read
-    and a store write are deferred) — return `CompileError::Unsupported` with a
+    below (a store **read** — `$name` whose `$`-stripped base is a binding — in a
+    template OR script position is sanctioned, emitting `$.store_get`; a store
+    **write** `$name = v` / **update** `$name++` in a script or dropped-handler
+    position is sanctioned too, emitting `$.store_set` / `$.update_store` — see
+    `store_rewrite.rs`; a store **member** write (`$obj.x = 5` → `$.store_mutate`),
+    a store **destructuring** write (`[$count] = …` → an IIFE), and a subscription
+    whose base is bound in a nested scope (`store_invalid_scoped_subscription`)
+    still refuse) — return `CompileError::Unsupported` with a
     clear description, never
     guessed output. Within the supported blocks, nested `{#each}` (unreproducible
     unique-name order), a root-level `{@const}`, a destructured `{@const}`, a
@@ -192,13 +197,20 @@ project-wide conventions.
   includes a `$bindable(fallback?)` default at a top-level `$props()` property, a
   statement-position `$inspect(…)`, the `$state.snapshot(x)` and `$props.id()`
   declarator inits, a template-position `$state.snapshot(x)` (→ `$.snapshot`,
-  `fragment.rs`), and a template-position store read (`$name` where the
-  `$`-stripped base is a binding and not a rune → `$.store_get`, `fragment.rs`), so
-  the guard exempts those positions while still refusing every
+  `fragment.rs`), and a **store access** (`$name` where the `$`-stripped base is a
+  binding and not a rune — a bare reference OR a call/new **callee root** `$fn()` /
+  `$obj.m()` / `new $C()`, via `store_read_exemption` shared by the identifier,
+  call, and new arms), which the guard now EXEMPTS in a script or dropped
+  position when the caller opts in via `WalkCtx::allow_store_reads` (a
+  template-position store read is exempted by `fragment.rs`'s value walk before it
+  reaches the guard) — the store rewrite (`store_rewrite.rs`) or a dropped-region
+  drop handles it. So the guard exempts those positions while still refusing every
   other `$bindable`/`$inspect`/`$state.snapshot`/`$props.id` (value/template
   positions, nested defaults, a wrong-arity or second `.with`, `$inspect.trace`, a
-  nested-scope / script-position / optional-chained rune, …), a **script-position
-  store read** and a store **write** (`$name = …` / `$name++`, deferred), and a
+  nested-scope / optional-chained rune, …), a store read reaching the
+  **template-value** or **pattern** guard (an unsupported wrapper position, where
+  the caller passes no store exemption), a **shadowed** store base in a
+  dropped-region position (`store_invalid_scoped_subscription`), and a
   `$name` whose base is not a binding (the oracle's `global_reference_invalid`) —
   refuses a derived-binding
   read the template value-walk does not rewrite to `d()` (a pattern default, a
@@ -217,7 +229,28 @@ project-wide conventions.
   in a nested scope is ambiguous for this name-based port and refuses, as does one
   rooted at an escaped identifier (classification not ported). Descends
   into `{#snippet}` bodies (a function-like subtree — a `new`/prop-rooted access
-  there still fires the flag) and `{@render}` arguments.
+  there still fires the flag) and `{@render}` arguments. Also computes
+  `uses_stores` in the same whole-component walk — the oracle's analysis-driven
+  store-subscription gate: any valid `$name` store reference *anywhere* (read or
+  write, emitted or dropped — an event handler, `{:catch}`) sets it, so the
+  `var $$store_subs;` / `$.unsubscribe_stores(…)` injection fires for a store used
+  only in a dropped handler too. It is decided here, NOT at emission time.
+- `store_rewrite.rs` — **store-access rewriting** for the instance script (the
+  script analog of `fragment.rs`'s template value walk). A tree→tree pass over the
+  FINAL synthetic body (after erasure + rune rewrites, so a read inside a
+  `$.derived(() => …)` thunk is reached) with `erase.rs`'s `Option<T>`
+  structural-sharing shape and exhaustive matches: a store **read** `$name` →
+  `$.store_get(…)` at any depth; an **assignment** `$name = v` → `$.store_set(name,
+  v)` and a compound `$name += v` → `$.store_set(name, $.store_get(…) + v)`
+  (reconstructing the binary the oracle's `build_assignment_value` produces); an
+  **update** `$name++`/`++$name`/`$name--`/`--$name` → `$.update_store[_pre]((…),
+  '$name', name[, -1])`. Refuses a member write (`$obj.x = 5`), a destructuring
+  write (`[$count] = …`), and a shadowed base (`store_invalid_scoped_subscription`,
+  `store_shadowed` = `nested_declared` ∪ `component.fn_declared`). Respects
+  **name-only positions** (a non-computed member property / object-or-class key is
+  a name, never a read) — the one place it diverges from `erase.rs`. Builders live
+  in `build.rs` (`store_set`, `update_store`, sharing `store_subs_assign`/
+  `store_base_value` with `store_get`).
 - `snippet.rs` — the `{#snippet}` hoist analysis (name-based port of Svelte's
   `can_hoist_snippet`): which top-level snippets go to true module scope. Collects
   each snippet's free references (a flat scope-tracking walk) minus its bound
@@ -296,11 +329,15 @@ project-wide conventions.
   `$$props` parameter. A non-empty bindable set additionally emits
   `$.bind_props($$props, { … })` as the component body's last statement (a
   dropped `$inspect` never contributes here — its wrapper comes only from
-  `needs_context`). A template store read (`EmitEnv::uses_stores`) injects
+  `needs_context`). Any valid store access (`EmitEnv::uses_stores`, computed
+  upfront by `needs_context`, not at emission) injects
   `var $$store_subs;` as a component-body statement (after the `$props.id()` hoist,
   before the body) and `if ($$store_subs) $.unsubscribe_stores($$store_subs);` as
   the last statement (before any `$.bind_props`) — both at the component-body level
-  and INDEPENDENT of the wrapper (a store read does not force `needs_context`).
+  and INDEPENDENT of the wrapper (a store access does not force `needs_context`).
+  The script store rewrite (`store_rewrite.rs`) runs over the instance body between
+  the rune-rewrite loop and `EmitEnv` construction, using the `store_names` /
+  `store_shadowed` sets frozen there.
 - `script_rewrite.rs` — the document-wide TypeScript flag and gate
   (`document_ts_flag`/`refuse_template_typescript`), the top-level
   binding-table analysis (`analyze_script`/`analyze_declarator`), and the
@@ -372,9 +409,10 @@ project-wide conventions.
   block-local overlay (a shadowed base is the oracle's
   `store_invalid_scoped_subscription`, left for the guard to refuse) — to
   `$.store_get(($$store_subs ??= {}), '$name', name)` (the store value reads `name()`
-  when `name` is a `$derived`, the store the derived currently holds; flagging
-  `EmitEnv::uses_stores` for the `var $$store_subs` / `$.unsubscribe_stores` injection;
-  a store read in a top-level `{#snippet}` also blocks its module-hoist — `snippet.rs`),
+  when `name` is a `$derived`, the store the derived currently holds; the
+  `var $$store_subs` / `$.unsubscribe_stores` injection is decided upfront by
+  `needs_context`'s `uses_stores`, NOT flagged here; a store read in a top-level
+  `{#snippet}` also blocks its module-hoist — `snippet.rs`),
   rebuilding only the spine down to each rewrite target
   (a `contains_rewrite_target` fast-path keeps target-free subtrees on the unchanged
   guarded path, byte-identical, and `contains_rewrite_target`/`rebuild_value` stay in

@@ -605,6 +605,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
     stmt: &'arena Statement<'arena>,
     source: &str,
     derived_names: &NameSet,
+    store_names: &NameSet,
     updated: &mut NameSet,
     nested_declared: &mut NameSet,
     uses_props: &mut bool,
@@ -646,7 +647,11 @@ pub(crate) fn rewrite_script_statement<'arena>(
             nested_declared,
             derived_names,
             std::rc::Rc::clone(&b.interner),
-        );
+        )
+        // Exempt valid `$name` store reads from the guard's `$`-prefixed refusal:
+        // the store rewrite handles them after the loop. The shadow refusal is
+        // deferred there too (it needs the full nested-scope set), so pass `None`.
+        .allow_store_reads(store_names, None);
         walk_expression_guarded(callback, &mut ctx)?;
         return Ok(None);
     }
@@ -669,7 +674,11 @@ pub(crate) fn rewrite_script_statement<'arena>(
             nested_declared,
             derived_names,
             std::rc::Rc::clone(&b.interner),
-        );
+        )
+        // Exempt valid `$name` store reads from the guard's `$`-prefixed refusal:
+        // the store rewrite handles them after the loop. The shadow refusal is
+        // deferred there too (it needs the full nested-scope set), so pass `None`.
+        .allow_store_reads(store_names, None);
         for expr in guarded {
             walk_expression_guarded(expr, &mut ctx)?;
         }
@@ -683,7 +692,11 @@ pub(crate) fn rewrite_script_statement<'arena>(
             nested_declared,
             derived_names,
             std::rc::Rc::clone(&b.interner),
-        );
+        )
+        // Exempt valid `$name` store reads from the guard's `$`-prefixed refusal:
+        // the store rewrite handles them after the loop. The shadow refusal is
+        // deferred there too (it needs the full nested-scope set), so pass `None`.
+        .allow_store_reads(store_names, None);
         walk_statement_guarded(stmt, &mut ctx, 0)?;
         return Ok(Some(stmt.clone()));
     };
@@ -700,7 +713,11 @@ pub(crate) fn rewrite_script_statement<'arena>(
             nested_declared,
             derived_names,
             std::rc::Rc::clone(&b.interner),
-        );
+        )
+        // Exempt valid `$name` store reads from the guard's `$`-prefixed refusal:
+        // the store rewrite handles them after the loop. The shadow refusal is
+        // deferred there too (it needs the full nested-scope set), so pass `None`.
+        .allow_store_reads(store_names, None);
         walk_statement_guarded(stmt, &mut ctx, 0)?;
         return Ok(Some(stmt.clone()));
     }
@@ -713,7 +730,11 @@ pub(crate) fn rewrite_script_statement<'arena>(
             nested_declared,
             derived_names,
             std::rc::Rc::clone(&b.interner),
-        );
+        )
+        // Exempt valid `$name` store reads from the guard's `$`-prefixed refusal:
+        // the store rewrite handles them after the loop. The shadow refusal is
+        // deferred there too (it needs the full nested-scope set), so pass `None`.
+        .allow_store_reads(store_names, None);
         let rune = declarator
             .init
             .as_ref()

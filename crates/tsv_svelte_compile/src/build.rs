@@ -459,13 +459,11 @@ impl<'arena> Builder<'arena> {
         Expression::Literal(self.string_literal(content))
     }
 
-    /// `$.store_get(($$store_subs ??= {}), '$<base>', <base>)` — the oracle's SSR
-    /// store auto-subscription read (`Identifier.js` → `serialize_get_binding` for a
-    /// `store_sub` binding). `base` is the `$`-stripped store name; the string key
-    /// keeps the leading `$` (`'$count'`). The printer parenthesizes the `??=`
-    /// assignment argument to match the canonical form.
-    pub fn store_get(&mut self, base: &str, base_is_derived: bool) -> Expression<'arena> {
-        // `$$store_subs ??= {}`
+    /// `$$store_subs ??= {}` — the store-subscription accumulator argument shared
+    /// by [`store_get`](Self::store_get) and [`update_store`](Self::update_store).
+    /// The printer parenthesizes this `??=` assignment to match the canonical
+    /// form (`($$store_subs ??= {})`).
+    fn store_subs_assign(&mut self) -> Expression<'arena> {
         let subs_left = self.ident_expr("$$store_subs");
         self.mint(" ??= ");
         let obj_span = self.mint("{}");
@@ -476,26 +474,83 @@ impl<'arena> Builder<'arena> {
                 spread_trailing_comma: false,
                 span: obj_span,
             }));
-        let assign = Expression::AssignmentExpression(AssignmentExpression {
+        Expression::AssignmentExpression(AssignmentExpression {
             left: subs_left,
             operator: AssignmentOperator::NullishAssign,
             right: obj,
             span: Span::new(subs_left.span().start, obj_span.end),
-        });
-        let name_lit = self.string_literal_expr(&format!("${base}"));
-        // The store base is read like any binding: a `$derived` base reads `d()`.
-        let base_value = if base_is_derived {
+        })
+    }
+
+    /// The store's value expression — `<base>()` when `base` is a `$derived`
+    /// binding (the store the derived currently holds), else the bare `<base>`
+    /// identifier.
+    fn store_base_value(&mut self, base: &str, base_is_derived: bool) -> Expression<'arena> {
+        if base_is_derived {
             let callee = self.ident_expr(base);
             self.call_expr(callee, &[])
         } else {
             Expression::Identifier(self.ident(base))
-        };
+        }
+    }
+
+    /// `$.store_get(($$store_subs ??= {}), '$<base>', <base>)` — the oracle's SSR
+    /// store auto-subscription read (`Identifier.js` → `serialize_get_binding` for a
+    /// `store_sub` binding). `base` is the `$`-stripped store name; the string key
+    /// keeps the leading `$` (`'$count'`). The printer parenthesizes the `??=`
+    /// assignment argument to match the canonical form.
+    pub fn store_get(&mut self, base: &str, base_is_derived: bool) -> Expression<'arena> {
+        let assign = self.store_subs_assign();
+        let name_lit = self.string_literal_expr(&format!("${base}"));
+        // The store base is read like any binding: a `$derived` base reads `d()`.
+        let base_value = self.store_base_value(base, base_is_derived);
         let mut args: bumpalo::collections::Vec<'arena, Expression<'arena>> =
             bumpalo::collections::Vec::new_in(self.arena);
         args.push(assign);
         args.push(name_lit);
         args.push(base_value);
         self.member_call("$", "store_get", args.into_bump_slice())
+    }
+
+    /// `$.store_set(<base>, <value>)` — the oracle's SSR store write
+    /// (`AssignmentExpression.js` → `serialize_set_binding` for a `store_sub`
+    /// binding). `base` is the `$`-stripped store name (the store object is
+    /// referenced bare, never `$$store_subs`); `value` is the already-rewritten
+    /// right-hand side (a compound `+=` is reconstructed as `store_get(...) <op>
+    /// rhs` by the caller).
+    pub fn store_set(&mut self, base: &str, value: Expression<'arena>) -> Expression<'arena> {
+        let base_ident = Expression::Identifier(self.ident(base));
+        let mut args: bumpalo::collections::Vec<'arena, Expression<'arena>> =
+            bumpalo::collections::Vec::new_in(self.arena);
+        args.push(base_ident);
+        args.push(value);
+        self.member_call("$", "store_set", args.into_bump_slice())
+    }
+
+    /// `$.update_store[_pre](($$store_subs ??= {}), '$<base>', <base>[, -1])` — the
+    /// oracle's SSR store increment/decrement (`UpdateExpression.js`). `prefix`
+    /// selects `update_store_pre` (`++$x` / `--$x`) over `update_store`
+    /// (`$x++` / `$x--`); `decrement` appends the trailing `-1` argument
+    /// (increment elides it). The printer parenthesizes the `??=` assignment
+    /// argument, like [`store_get`](Self::store_get).
+    pub fn update_store(&mut self, base: &str, prefix: bool, decrement: bool) -> Expression<'arena> {
+        let assign = self.store_subs_assign();
+        let name_lit = self.string_literal_expr(&format!("${base}"));
+        let base_ident = Expression::Identifier(self.ident(base));
+        let mut args: bumpalo::collections::Vec<'arena, Expression<'arena>> =
+            bumpalo::collections::Vec::new_in(self.arena);
+        args.push(assign);
+        args.push(name_lit);
+        args.push(base_ident);
+        if decrement {
+            args.push(self.number(-1.0));
+        }
+        let property = if prefix {
+            "update_store_pre"
+        } else {
+            "update_store"
+        };
+        self.member_call("$", property, args.into_bump_slice())
     }
 
     /// `var $$store_subs;` — the store-subscription accumulator, injected as a

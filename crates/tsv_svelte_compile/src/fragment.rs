@@ -701,13 +701,19 @@ pub(crate) fn guard_dropped<'arena>(
     // The component-wide reassignment/shadow collection is `needs_context`'s job
     // (it walks the dropped regions too), so these two are throwaways.
     let no_derived = NameSet::default();
+    // A valid `$name` store reference in a dropped region (an event handler,
+    // `{:catch}`, an each/key expression) is allowed — the region isn't emitted,
+    // so no rewrite is needed, and the `var $$store_subs` injection is already
+    // decided by `needs_context`. A shadowed base still refuses here (the oracle's
+    // `store_invalid_scoped_subscription`), so we pass the full shadow set.
     let mut ctx = WalkCtx::new(
         env.source,
         &mut updated,
         &mut nested,
         &no_derived,
         std::rc::Rc::clone(&env.b.interner),
-    );
+    )
+    .allow_store_reads(&env.store_names, Some(&env.store_shadowed));
     walk_expression_guarded(expr, &mut ctx)
 }
 
@@ -897,19 +903,19 @@ fn rewrite_template_value<'arena>(
         return Ok(env.b.arena.alloc(call));
     }
     // A bare read of a store binding becomes
-    // `$.store_get(($$store_subs ??= {}), '$name', name)` and flags the component
-    // for the `var $$store_subs` / `$.unsubscribe_stores` injection. A store base
-    // shadowed by a block-local (an `{#each}`/`{#await}`/snippet binding) is NOT the
-    // top-level store — the oracle errors `store_invalid_scoped_subscription`, so it
-    // is left for the guard to refuse (a safe refusal). A `$derived` base reads
-    // `d()` (the store the derived currently holds).
+    // `$.store_get(($$store_subs ??= {}), '$name', name)`. The `var $$store_subs`
+    // / `$.unsubscribe_stores` injection is analysis-driven (`EmitEnv::uses_stores`,
+    // set upfront by `needs_context`), NOT flagged here. A store base shadowed by a
+    // block-local (an `{#each}`/`{#await}`/snippet binding) is NOT the top-level
+    // store — the oracle errors `store_invalid_scoped_subscription`, so it is left
+    // for the guard to refuse (a safe refusal). A `$derived` base reads `d()` (the
+    // store the derived currently holds).
     if let Some(base) = bare_store_read(env.source, &env.store_names, expr)
         && !env
             .overlays
             .iter()
             .any(|overlay| overlay.contains_key(&base))
     {
-        env.uses_stores = true;
         let call = env.b.store_get(&base, env.derived_names.contains(&base));
         return Ok(env.b.arena.alloc(call));
     }

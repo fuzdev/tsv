@@ -50,10 +50,16 @@ use crate::snippet_emit::render_call_expression;
 use crate::{CompileError, Refusal};
 
 /// The accumulating analysis state.
+#[allow(clippy::struct_excessive_bools)] // independent monotonic accumulator flags, not a state machine
 struct Nc<'a> {
     source: &'a str,
     /// Prop + import names — the roots whose member/call access is unsafe.
     context_roots: &'a NameSet,
+    /// Top-level component binding names — the store-subscription base set. Any
+    /// `$name` reference whose `$`-stripped base is here is a store access, so
+    /// the component needs the `$$store_subs` injection (the oracle's gate:
+    /// `analysis.instance.scope.declarations` holds a `store_sub` binding).
+    store_names: &'a NameSet,
     /// Names bound anywhere below the component's top-level instance scope.
     shadowed: NameSet,
     /// Context-root names observed as the root of a member/call access.
@@ -79,6 +85,12 @@ struct Nc<'a> {
     /// Set by any `$$slots` reference (the oracle's `uses_slots`): the component
     /// gains `const $$slots = $.sanitize_slots($$props)` and the `$$props` param.
     uses_slots: bool,
+    /// Set by any valid `$name` store reference anywhere in the component (read
+    /// or write, emitted or dropped): the component gains the `var $$store_subs;`
+    /// / `$.unsubscribe_stores(…)` injection. Analysis-driven, exactly like the
+    /// oracle's store-subscription gate — so a store referenced only in a dropped
+    /// event handler still injects.
+    uses_stores: bool,
     /// Whether the walk is inside a **dropped** `{:catch}` subtree, where the
     /// emitter never walks the fragment so the emission refusals that let the
     /// default attribute traversal skip element spreads / directives / `{@attach}`
@@ -102,6 +114,10 @@ pub(crate) struct ComponentContext {
     pub fn_declared: NameSet,
     /// Whether the component references `$$slots` (oracle's `uses_slots`).
     pub uses_slots: bool,
+    /// Whether the component makes any valid `$name` store reference anywhere
+    /// (read or write, emitted or dropped) — the `var $$store_subs;` /
+    /// `$.unsubscribe_stores(…)` injection gate.
+    pub uses_stores: bool,
 }
 
 /// Analyze the component for the `$$renderer.component(…)` wrapper decision and
@@ -121,6 +137,7 @@ pub(crate) fn analyze_component(
     root: &Root<'_>,
     source: &str,
     instance_body: &[Statement<'_>],
+    store_names: &NameSet,
 ) -> Result<ComponentContext, CompileError> {
     let mut context_roots = NameSet::default();
     collect_context_roots(instance_body, source, &mut context_roots);
@@ -128,6 +145,7 @@ pub(crate) fn analyze_component(
     let mut nc = Nc {
         source,
         context_roots: &context_roots,
+        store_names,
         shadowed: NameSet::default(),
         member_roots: NameSet::default(),
         needs: false,
@@ -136,6 +154,7 @@ pub(crate) fn analyze_component(
         fn_declared: NameSet::default(),
         fn_depth: 0,
         uses_slots: false,
+        uses_stores: false,
         in_dropped_catch: false,
     };
 
@@ -162,6 +181,7 @@ pub(crate) fn analyze_component(
         reassigned: nc.reassigned,
         fn_declared: nc.fn_declared,
         uses_slots: nc.uses_slots,
+        uses_stores: nc.uses_stores,
     })
 }
 
@@ -364,10 +384,17 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
         Expression::ClassExpression(c) => walk_class_body(&c.body, nc),
 
         // A bare identifier reference: detect `$$slots` (the oracle's
-        // `uses_slots`), otherwise a leaf.
+        // `uses_slots`) and a `$name` store access (the store-subscription gate),
+        // otherwise a leaf.
         Expression::Identifier(id) => {
-            if plain_name(id, nc.source) == Some("$$slots") {
-                nc.uses_slots = true;
+            if let Some(name) = plain_name(id, nc.source) {
+                if name == "$$slots" {
+                    nc.uses_slots = true;
+                } else if crate::analyze::store_read_base(name)
+                    .is_some_and(|base| nc.store_names.contains(base))
+                {
+                    nc.uses_stores = true;
+                }
             }
         }
         // Leaves — no children, no bindings.

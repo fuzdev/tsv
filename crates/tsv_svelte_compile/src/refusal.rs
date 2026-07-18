@@ -225,6 +225,22 @@ pub enum Refusal {
     /// A top-level `await` (async component output is not implemented).
     #[error("top-level await (async component output not implemented)")]
     TopLevelAwait,
+    /// A `$name` store subscription whose `$`-stripped base is bound in a nested
+    /// scope rather than at the component top level (the oracle's
+    /// `store_invalid_scoped_subscription` error). Refused by the name-based
+    /// shadow check — a base declared inside any function/block subtree is
+    /// ambiguous, so refuse rather than read the wrong binding.
+    #[error("store subscription $name whose base is not a top-level component binding")]
+    StoreScopedSubscription,
+    /// A store write to a member target (`$obj.foo = …` / `$obj.foo++`). The
+    /// oracle emits `$.store_mutate(…)`; not implemented, so refuse.
+    #[error("store member write ($store.x = …) — $.store_mutate not implemented")]
+    StoreMemberWrite,
+    /// A store write through a destructuring assignment target (`[$count] = …`,
+    /// `({ x: $count } = …)`). The oracle builds an IIFE/sequence; not
+    /// implemented, so refuse.
+    #[error("store destructuring write ([$store] = …) not implemented")]
+    StoreDestructuringWrite,
 
     // ── `needs_context` classification ─────────────────────────────────────
     /// A member/call rooted at a prop/import that a nested scope also binds —
@@ -800,6 +816,11 @@ impl Refusal {
             Self::TopLevelAwait => {
                 Cow::Borrowed("top-level await (async component output not implemented)")
             }
+            Self::StoreScopedSubscription => {
+                Cow::Borrowed("store subscription whose base is not a top-level component binding")
+            }
+            Self::StoreMemberWrite => Cow::Borrowed("store member write ($.store_mutate)"),
+            Self::StoreDestructuringWrite => Cow::Borrowed("store destructuring write"),
             Self::MemberCallEscapedRoot => Cow::Borrowed(
                 "member/call rooted at an escaped identifier (classification not ported)",
             ),

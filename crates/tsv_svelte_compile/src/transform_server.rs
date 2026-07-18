@@ -71,7 +71,7 @@ use crate::script_rewrite::{
     refuse_template_typescript, rewrite_script_statement, self_check_no_typescript,
 };
 use crate::snippet::{SnippetAnalysis, analyze_snippets};
-use crate::{CompileError, CompileOutput, Refusal, erase};
+use crate::{CompileError, CompileOutput, Refusal, erase, store_rewrite};
 
 /// The component function name. Derived from the constant filename the
 /// deterministic oracle compiles under (`input.svelte` → `Input`).
@@ -93,9 +93,17 @@ pub(crate) struct EmitEnv<'arena, 's> {
     /// (`$name` where the `$`-stripped base is a binding → `$.store_get`). Read by
     /// the template value walk ([`fragment::wrap_value_expr`]).
     pub(crate) store_names: NameSet,
-    /// Set when any store read was rewritten in the template — forces the
-    /// `var $$store_subs;` / `if ($$store_subs) $.unsubscribe_stores($$store_subs);`
-    /// component-body injection.
+    /// Store bases bound in a nested scope (`nested_declared` ∪
+    /// `component.fn_declared`). A `$name` store read whose base is here is the
+    /// oracle's `store_invalid_scoped_subscription`; the dropped-region guard
+    /// refuses it. See [`fragment::guard_dropped`].
+    pub(crate) store_shadowed: NameSet,
+    /// Whether the component makes any valid `$name` store reference anywhere
+    /// (read or write, emitted or dropped) — forces the `var $$store_subs;` /
+    /// `if ($$store_subs) $.unsubscribe_stores($$store_subs);` component-body
+    /// injection. Computed upfront by [`needs_context::analyze_component`], the
+    /// oracle's analysis-driven store-subscription gate (so a store referenced
+    /// only in a dropped handler still injects), NOT set at emission time.
     pub(crate) uses_stores: bool,
     /// The finished CSS scoping — selector→element matching ran upfront over the
     /// [element census](crate::element_census) in [`analyze`], so emission only
@@ -411,13 +419,21 @@ fn analyze<'arena>(
     let instance_binding_names: NameSet = bindings.names().map(str::to_string).collect();
     let snippets = analyze_snippets(root, source, &instance_binding_names, &import_names)?;
 
+    // Every top-level binding name is a candidate store base — a `$name` reference
+    // is a store auto-subscription iff `name` is a binding. The binding NAME set is
+    // frozen here (the later `mark_updated`/`mark_opaque` patch changes kinds, not
+    // names), so it serves `analyze_component`'s store-injection gate (the same set
+    // is recomputed in `compile_server` for the script guard / store rewrite /
+    // template walk). Reuses the already-collected snippet-analysis input.
+    let store_names: NameSet = instance_binding_names;
+
     // The whole-component analysis. Computed here because the script rewrite
     // needs its `uses_slots` (the `$props()` rest injection renames its
     // destructured `$$slots` to `$$slots_` when the injected sanitize_slots
     // binding exists — a duplicate `$$slots` lexical declaration would be invalid
     // JS). Its error is deliberately left UNRESOLVED (see `Analysis::component`):
     // the script-loop refusals must keep winning for inputs that trip both.
-    let component = analyze_component(root, source, instance_body);
+    let component = analyze_component(root, source, instance_body, &store_names);
 
     // Top-level `$state`/`$state.raw` binding names — a component named after one
     // is dynamic (see `component_dynamic`). Order-independent (reads only
@@ -474,6 +490,14 @@ pub(crate) fn compile_server<'arena>(
         script_comments,
         erased_windows,
     } = analyze(root, source, arena)?;
+
+    // Every top-level binding name is a candidate store base: `$name` is a store
+    // auto-subscription iff `name` is a binding (an unbound `$name` is the
+    // oracle's `global_reference_invalid` error). The binding NAME set is stable
+    // under the later `mark_updated`/`mark_opaque` patch (which changes kinds,
+    // not names), so it is frozen here — read by the script guard (below), the
+    // store rewrite, and the template value walk (`EmitEnv::store_names`).
+    let store_names: NameSet = bindings.names().map(str::to_string).collect();
 
     // 1. `import * as $ from 'svelte/internal/server';` — the first appendix
     // lexeme. `analyze` mints nothing, so this heads the appendix exactly as it
@@ -534,6 +558,7 @@ pub(crate) fn compile_server<'arena>(
             stmt,
             source,
             &derived_names,
+            &store_names,
             &mut updated,
             &mut nested_declared,
             &mut uses_props,
@@ -648,10 +673,32 @@ pub(crate) fn compile_server<'arena>(
         }
     }
 
-    // Every top-level binding name is a candidate store base: `$name` is a store
-    // auto-subscription iff `name` is a binding (the oracle's rule — an unbound
-    // `$name` is a `global_reference_invalid` error).
-    let store_names: NameSet = bindings.names().map(str::to_string).collect();
+    // A store base bound in a nested scope is the oracle's
+    // `store_invalid_scoped_subscription` — the store rewrite (and the dropped
+    // guard) refuse a store read whose base is here. `nested_declared` (script
+    // side) ∪ `component.fn_declared` (whole component, template included) is the
+    // name-based shadow set: a conservative superset (a sibling-scope collision
+    // over-refuses, which is safe — never an over-acceptance).
+    let mut store_shadowed = nested_declared.clone();
+    store_shadowed.extend(component.fn_declared.iter().cloned());
+
+    // Rewrite script-position store reads and writes over the FINAL synthetic body
+    // (after erasure + rune rewrites), so a read inside a `$.derived(() => …)`
+    // thunk is reached too: `$name` → `$.store_get(…)`, `$name = v` →
+    // `$.store_set(…)`, `$name++` → `$.update_store(…)`; a member/destructuring
+    // write, or a read whose base is shadowed, refuses. The `var $$store_subs`
+    // injection is analysis-driven (`component.uses_stores`) and independent of
+    // this rewrite — it fires for a store referenced only in a dropped handler too.
+    let body_slice = body.into_bump_slice();
+    let body = store_rewrite::rewrite_store_accesses(
+        &mut b,
+        source,
+        &store_names,
+        &store_shadowed,
+        &derived_names,
+        body_slice,
+    )?
+    .unwrap_or(body_slice);
 
     let mut env = EmitEnv {
         b,
@@ -660,7 +707,8 @@ pub(crate) fn compile_server<'arena>(
         derived_names,
         state_names,
         store_names,
-        uses_stores: false,
+        store_shadowed,
+        uses_stores: component.uses_stores,
         scope,
         overlays: Vec::new(),
         in_each: false,
@@ -700,7 +748,7 @@ pub(crate) fn compile_server<'arena>(
     // `$$renderer.push(…)` template flushes (blocks split the pushes).
     let mut out = BodyBuilder::new_in(arena);
     for stmt in body {
-        out.stmts.push(stmt);
+        out.stmts.push(stmt.clone());
     }
     emit_fragment(
         &mut env,

@@ -119,13 +119,33 @@ An **optional-chained rune init** — `$state?.(x)`, `$state.snapshot?.(x)`, `$s
 Everything else `$`-shaped refuses (the `rune_guard.rs` exhaustive walk):
 
 - **Refused**: `rune {name}` — any non-sanctioned rune call (`$effect.tracking`, `$host`, member-form misuse, a rune call in any non-sanctioned position, or a `$bindable` / `$inspect` / `$state.snapshot` / `$props.id` outside its sanctioned position — see the rune sections above)
-- **Refused**: `$-prefixed identifier {name}` — a bare rune reference (oracle-rejected input) or any `$`-prefixed identifier read
+- **Refused**: `$-prefixed identifier {name}` — a bare rune reference (oracle-rejected input) or a `$`-prefixed identifier read whose base is **not** a component binding (a valid `$name` store access is exempted — see Stores below)
 - **Refused**: `read of derived binding {name} (unsupported read position)` — a template value read of a `$derived` binding (bare or nested) rewrites to `d()`; this refuses only the positions the value-walk does not reach: a **pattern default** (`{#each xs as {v = d}}` — the oracle emits bare `d`, a deferred safe over-refusal; `{#await p then {x = d}}` — the oracle emits `d()`, so refusing is mandatory), a **script-position** read (`let e = d + 1`, template-only slice), a read under an **unsupported wrapper** (an object literal, an arrow, a tagged template), and an **escaped-identifier** derived read (`{d}` — classification not ported; refused rather than emit bare `d`)
 - **Refused**: `destructuring a $state declarator` / `destructuring a $state.snapshot declarator` / `destructuring a $derived declarator` / `destructuring a $derived.by declarator`
 - **Refused**: `binding pattern shape ({kind})` — a `$props()`-family binding whose pattern the analyzer doesn't classify
 - **Refused**: `top-level await (async component output not implemented)`
 
 A `$`-prefixed *member name* (`a.$foo`) is not a rune reference and stays compilable.
+
+### Stores (`$name` auto-subscription) — Supported
+
+A `$name` reference whose `$`-stripped base is a top-level component binding (an import OR a local `let`/`const`, and not a rune keyword — `store_read_base`) is a store auto-subscription. Reads and writes are lowered to the oracle's SSR runtime calls:
+
+| Shape | Emitted |
+| --- | --- |
+| **read** `$count` (template OR script, ANY value position — a declarator init, a function body, a binary/conditional, a **callee** `$fn()` / `$obj.m()` / `new $C()`, at any depth) | `$.store_get(($$store_subs ??= {}), '$count', count)` (`Identifier.js` → `serialize_get_binding`); a `$derived` base reads `count()` |
+| **assignment** `$count = v` | `$.store_set(count, <v rewritten>)` (`AssignmentExpression.js`) |
+| **compound** `$count += v` | `$.store_set(count, $.store_get(…) + <v>)` (reconstructing the oracle's `build_assignment_value`) |
+| **postfix update** `$count++` / `$count--` | `$.update_store(($$store_subs ??= {}), '$count', count[, -1])` (`UpdateExpression.js`) |
+| **prefix update** `++$count` / `--$count` | `$.update_store_pre(($$store_subs ??= {}), '$count', count[, -1])` |
+
+The script rewrite lives in `store_rewrite.rs` (a tree→tree pass over the final synthetic body, so a read inside a `$.derived(() => …)` thunk is reached); the template read stays in `fragment.rs::rewrite_template_value`. Either presence — read or write, **emitted or dropped** (an event handler, `{:catch}`) — makes `needs_context` set `uses_stores`, which injects `var $$store_subs;` (component-body top) and `if ($$store_subs) $.unsubscribe_stores($$store_subs);` (last statement); a store access does **not** force the `$$renderer.component(…)` wrapper. Refused (safe over-refusals — the oracle compiles, tsv declines this slice):
+
+- **member write** `$obj.foo = 5` / `$obj.foo++` → the oracle emits `$.store_mutate`; refuse (`store member write`)
+- **destructuring write** `[$count] = arr` / `({ x: $count } = obj)` → the oracle builds an IIFE; refuse (`store destructuring write`)
+- **scoped subscription** `$count` whose base is bound in a nested scope → the oracle's `store_invalid_scoped_subscription` error; refuse via a name-based shadow check (`store_shadowed` = `nested_declared` ∪ `component.fn_declared`), which correctly refuses the true shadow and over-refuses a harmless sibling-scope collision (both safe). A store read in a callee/new position (`$fn()`, `new $C()`) is exempted from the guard's rune refusal exactly like a bare read (`rune_guard.rs::store_read_exemption`), and a shadowed callee refuses the same way
+- **template-position write** `{($count = 5)}` → refused via `DollarPrefixedIdentifier` — the template value guard trips on the `$count` read before the `updated`-nonempty check, since a store write is not a template value-walk rewrite target (only script + dropped-handler writes are in scope). `MutationInTemplateExpr` fires only for a **non-store** template mutation `{(x = 5)}`
+- **rune-keyword base** `let state = writable(0); {$state}` → `$state`'s base `state` is a `RUNE_BASES` keyword, so `store_read_base` returns `None` and it is never recognized as a store — a deliberate conservative over-refusal shared with the template path (a `$name` whose base collides with a rune keyword is refused as a bare `$`-prefixed identifier), not introduced by this slice
 
 ---
 

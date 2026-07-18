@@ -39,6 +39,7 @@ mod rune_guard;
 mod script_rewrite;
 mod snippet;
 mod snippet_emit;
+mod store_rewrite;
 mod transform_server;
 
 pub use refusal::Refusal;

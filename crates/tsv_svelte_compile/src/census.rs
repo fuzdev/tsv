@@ -310,11 +310,15 @@ fn collect<'arena>(
     if let Err(err) = analyze_script(erased_body, source, &mut bindings, &mut derived_names) {
         push_unsupported(found, err);
     }
+    // The store-subscription base set (top-level binding names), mirroring
+    // `compile_server`: fed to `analyze_component` (the store-injection gate) and
+    // the script guard (which exempts valid `$name` store reads from refusal).
+    let store_names: NameSet = bindings.names().map(str::to_string).collect();
 
     // `needs_context` member/call classification (reused verbatim). It walks the
     // raw fragment, exactly as `compile_server` does. Only `uses_slots` is read
     // out here (for the rewrite below); the MemberCall refusal is captured on Err.
-    let uses_slots = match analyze_component(root, source, erased_body) {
+    let uses_slots = match analyze_component(root, source, erased_body, &store_names) {
         Ok(ctx) => ctx.uses_slots,
         Err(err) => {
             push_unsupported(found, err);
@@ -364,6 +368,7 @@ fn collect<'arena>(
             stmt,
             source,
             &derived_names,
+            &store_names,
             &mut updated,
             &mut nested_declared,
             &mut uses_props,

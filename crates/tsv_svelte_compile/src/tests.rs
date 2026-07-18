@@ -4255,22 +4255,99 @@ fn compile_store_read_subscribes() {
 }
 
 #[test]
-fn compile_store_read_refuses_deferred_positions() {
-    // First slice = template-position reads only. A script-position read, a store
-    // assignment (`$.store_set`), and a store update (`$.update_store`) are all
-    // deferred — the rune guard refuses the `$`-prefixed reference (safe
-    // over-refusals; the oracle compiles them).
-    assert_unsupported(
+fn compile_store_script_reads_and_writes() {
+    // Script-position reads, writes, and updates all compile now: a read →
+    // `$.store_get`, an assignment → `$.store_set`, an update → `$.update_store`.
+    let read = compile_js(
         "<script>\n\timport { count } from './s';\n\tconst d = $count * 2;\n</script>\n<p>{d}</p>",
-        "$count",
     );
-    assert_unsupported(
+    assert!(
+        read.contains("const d = $.store_get(($$store_subs ??= {}), '$count', count) * 2"),
+        "script read: {read}"
+    );
+    let write = compile_js(
         "<script>\n\timport { count } from './s';\n\tfunction f() { $count = 5; }\n</script>\n<button onclick={f}>{$count}</button>",
-        "$count",
+    );
+    assert!(write.contains("$.store_set(count, 5)"), "store write: {write}");
+    let update = compile_js(
+        "<script>\n\timport { count } from './s';\n\tfunction f() { $count++; }\n</script>\n<button onclick={f}>{$count}</button>",
+    );
+    assert!(
+        update.contains("$.update_store(($$store_subs ??= {}), '$count', count)"),
+        "store update: {update}"
+    );
+    // A store read in CALLEE / new position (`$fn()`, `new $C()`) is rewritten too
+    // (it forces the needs_context wrapper — a call rooted at the import).
+    let callee = compile_js(
+        "<script>\n\timport { fn } from './s';\n\tfunction f() { return $fn(); }\n</script>\n{f()}",
+    );
+    assert!(
+        callee.contains("$.store_get(($$store_subs ??= {}), '$fn', fn)()"),
+        "callee store read: {callee}"
+    );
+    let new_call = compile_js(
+        "<script>\n\timport { C } from './s';\n\tfunction f() { return new $C(); }\n</script>\n{f()}",
+    );
+    assert!(
+        new_call.contains("new ($.store_get(($$store_subs ??= {}), '$C', C))()"),
+        "new store read: {new_call}"
+    );
+}
+
+#[test]
+fn compile_store_write_refuses_member_and_destructuring() {
+    // A member write (`$obj.foo = 5` → `$.store_mutate`) and a destructuring write
+    // (`[$count] = arr` → an IIFE) are out of scope for this slice — refuse rather
+    // than emit the un-ported lowering.
+    assert_unsupported(
+        "<script>\n\timport { obj } from './s';\n\tfunction f() { $obj.foo = 5; }\n</script>\n<button onclick={f}>x</button>",
+        "store member write",
     );
     assert_unsupported(
-        "<script>\n\timport { count } from './s';\n\tfunction f() { $count++; }\n</script>\n<button onclick={f}>{$count}</button>",
+        "<script>\n\timport { count } from './s';\n\tfunction f(arr) { [$count] = arr; }\n</script>\n<button onclick={f}>x</button>",
+        "store destructuring write",
+    );
+    // A member UPDATE (`$obj.foo++`) refuses the same way.
+    assert_unsupported(
+        "<script>\n\timport { obj } from './s';\n\tfunction f() { $obj.foo++; }\n</script>\n<button onclick={f}>x</button>",
+        "store member write",
+    );
+}
+
+#[test]
+fn compile_store_refuses_scoped_subscription() {
+    // `$count` where the base `count` is bound in a nested scope is the oracle's
+    // `store_invalid_scoped_subscription` error. Refuse (name-based shadow check).
+    assert_unsupported(
+        "<script>\n\timport { writable } from 'svelte/store';\n\tlet count = writable(0);\n\tfunction f(count) { return $count; }\n</script>\n<p>{f}</p>",
+        "not a top-level component binding",
+    );
+    // A base that is not a component binding at all (`$missing`) stays refused as a
+    // bare `$`-prefixed identifier (the oracle's `global_reference_invalid`).
+    assert_unsupported(
+        "<script>\n\tfunction f(count) { return $count; }\n</script>\n<p>{f}</p>",
         "$count",
+    );
+    // A store read in CALLEE position with a shadowed LOCAL base refuses via the
+    // same `StoreScopedSubscription` path as a bare read (the callee-exemption in
+    // the guard mirrors the bare-read shadow handling). A local base keeps
+    // `needs_context` out of the way — a `$fn()` rooted at an IMPORT instead
+    // refuses earlier as `MemberCallAmbiguousRoot` (also a refusal, no
+    // over-acceptance).
+    assert_unsupported(
+        "<script>\n\timport { writable } from 'svelte/store';\n\tlet fn = writable(0);\n\tfunction f(fn) { return $fn(); }\n</script>\n<p>{f}</p>",
+        "not a top-level component binding",
+    );
+    // The coordinator's literal example — a callee whose base is a bare param
+    // (not a top-level binding) — refuses as a rune call ($fn is not a store base).
+    assert_unsupported(
+        "<script>\n\tfunction f(fn) { return $fn(); }\n</script>\n<p>{f}</p>",
+        "rune $fn",
+    );
+    // A genuine rune call in callee position stays refused (never exempted).
+    assert_unsupported(
+        "<script>\n\tlet x = $state(0);\n\tfunction f() { return $state(1); }\n</script>\n<p>{f}</p>",
+        "rune",
     );
 }
 

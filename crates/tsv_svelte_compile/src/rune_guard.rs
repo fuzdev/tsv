@@ -55,6 +55,20 @@ pub(crate) struct WalkCtx<'a> {
     /// The parse's interner — to decode an escaped identifier's name (an owned
     /// `Rc<RefCell<…>>` clone, a cheap refcount bump, avoids a new lifetime).
     pub interner: SharedInterner,
+    /// Top-level component binding names, for recognizing a `$name` store
+    /// auto-subscription. `Some` **exempts** a valid store read from the
+    /// `$`-prefixed-identifier refusal (it is rewritten elsewhere — the script
+    /// [store rewrite](crate::store_rewrite) or a dropped-region drop). `None`
+    /// keeps the refuse-every-`$name` behavior (the template value guard and the
+    /// pattern guard, where a store read reaching them is in an unsupported
+    /// position — a safe over-refusal).
+    store_names: Option<&'a HashSet<String>>,
+    /// Store bases bound in a nested scope — the oracle's
+    /// `store_invalid_scoped_subscription`. Consulted only when `store_names` is
+    /// `Some`: a shadowed base **refuses** here (the dropped guard, which owns the
+    /// refusal for its region); the script guard passes `None` and defers the
+    /// shadow refusal to the store rewrite, which has the full shadow set.
+    store_shadowed: Option<&'a HashSet<String>>,
     /// Current function-nesting depth (0 = the statement being walked).
     fn_depth: usize,
 }
@@ -73,8 +87,24 @@ impl<'a> WalkCtx<'a> {
             nested_declared,
             derived_names,
             interner,
+            store_names: None,
+            store_shadowed: None,
             fn_depth: 0,
         }
+    }
+
+    /// Exempt valid `$name` store reads from the `$`-prefixed refusal (they are
+    /// rewritten elsewhere). `store_shadowed`, when `Some`, refuses a base bound
+    /// in a nested scope (the dropped guard); the script guard passes `None` and
+    /// leaves that refusal to the store rewrite.
+    pub(crate) fn allow_store_reads(
+        mut self,
+        store_names: &'a HashSet<String>,
+        store_shadowed: Option<&'a HashSet<String>>,
+    ) -> Self {
+        self.store_names = Some(store_names);
+        self.store_shadowed = store_shadowed;
+        self
     }
 }
 
@@ -139,6 +169,33 @@ fn rune_error(name: &str) -> CompileError {
     CompileError::Unsupported(Refusal::Rune {
         name: name.to_string(),
     })
+}
+
+/// Whether a `$`-prefixed `name` (an identifier reference OR a call/new callee
+/// root) is a store access the current context exempts from refusal:
+///
+/// - `Some(Ok(()))` — an exempt store read (the store rewrite / a dropped-region
+///   drop handles it): the caller must NOT refuse, and (for a call/new) should
+///   fall through to recurse so the callee's own `$name` is rewritten;
+/// - `Some(Err(…))` — a shadowed base, the oracle's `store_invalid_scoped_subscription`;
+/// - `None` — NOT an exempt store (stores not allowed in this context, a genuine
+///   rune whose base is a `RUNE_BASES` keyword, or a `$name` whose base is not a
+///   binding): the caller refuses exactly as before.
+///
+/// Shared by the identifier, call, and new arms so a callee-position store read
+/// (`$fn()`, `$obj.m()`, `new $C()`) is exempted identically to a bare read.
+fn store_read_exemption(ctx: &WalkCtx<'_>, name: &str) -> Option<Result<(), CompileError>> {
+    let store_names = ctx.store_names?;
+    let base = crate::analyze::store_read_base(name)?;
+    if !store_names.contains(base) {
+        return None;
+    }
+    if ctx.store_shadowed.is_some_and(|shadowed| shadowed.contains(base)) {
+        return Some(Err(CompileError::Unsupported(
+            Refusal::StoreScopedSubscription,
+        )));
+    }
+    Some(Ok(()))
 }
 
 /// Record the root identifier(s) of an assignment target (through member
@@ -444,17 +501,32 @@ fn walk_class_body(body: &ClassBody<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), Co
 
 fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), CompileError> {
     match expr {
-        // The rune guard: any call/new whose callee roots in a `$`-identifier.
+        // The rune guard: any call/new whose callee roots in a `$`-identifier. A
+        // store-base callee root (`$fn()`, `$obj.m()`, `new $C()`) is a store read
+        // in callee position — EXEMPT it (the store rewrite descends into the
+        // callee and rewrites it, exactly as for a bare read; the template path
+        // already compiles `{$fn()}`), then recurse. A genuine rune callee stays
+        // refused (`store_read_base` excludes `RUNE_BASES`, so `$state()` etc. are
+        // never store bases), as does a shadowed base
+        // (`store_invalid_scoped_subscription`).
         Expression::CallExpression(call) => {
             if let Some(name) = dollar_callee_root(call.callee, ctx.source) {
-                return Err(rune_error(name));
+                match store_read_exemption(ctx, name) {
+                    Some(Ok(())) => {}
+                    Some(Err(err)) => return Err(err),
+                    None => return Err(rune_error(name)),
+                }
             }
             walk_expression(call.callee, ctx)?;
             walk_expressions(call.arguments, ctx)
         }
         Expression::NewExpression(new_expr) => {
             if let Some(name) = dollar_callee_root(new_expr.callee, ctx.source) {
-                return Err(rune_error(name));
+                match store_read_exemption(ctx, name) {
+                    Some(Ok(())) => {}
+                    Some(Err(err)) => return Err(err),
+                    None => return Err(rune_error(name)),
+                }
             }
             walk_expression(new_expr.callee, ctx)?;
             walk_expressions(new_expr.arguments, ctx)
@@ -471,11 +543,20 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
                 // `$$slots` is a real runtime reference (the transform injects
                 // `const $$slots = $.sanitize_slots($$props)`), not a rune.
                 if name != "$$slots" {
-                    return Err(CompileError::Unsupported(
-                        Refusal::DollarPrefixedIdentifier {
-                            name: name.to_string(),
-                        },
-                    ));
+                    // A valid `$name` store read is exempt when the caller opts in
+                    // (the script guard / the dropped-region guard): it is rewritten
+                    // to `$.store_get(...)` by the store rewrite, or dropped with its
+                    // region. A shadowed base is the oracle's
+                    // `store_invalid_scoped_subscription` (refused here for the
+                    // dropped guard; the script guard defers it to the store rewrite).
+                    return match store_read_exemption(ctx, name) {
+                        Some(result) => result,
+                        None => Err(CompileError::Unsupported(
+                            Refusal::DollarPrefixedIdentifier {
+                                name: name.to_string(),
+                            },
+                        )),
+                    };
                 }
             }
             if let Some(name) = identifier_name(id, ctx.source)
