@@ -11,7 +11,13 @@
 //!    hard crash / DoS — and the corpus profile (`panic = "unwind"`) only ever
 //!    catches panics on *real* code. This fuzzer drives mutated bytes through the
 //!    parser+formatter under [`std::panic::catch_unwind`], so a panic is a
-//!    reported finding, not a crash.
+//!    reported finding, not a crash. A *hang* (the exponential-rebuild class)
+//!    can't be caught in-process, so the loop leaves two tripwires instead:
+//!    every attempt's input is written to a last-input repro file **before** the
+//!    attempt (a killed hung run leaves its exact input on disk), and any attempt
+//!    over `--slow-budget-ms` wall-clock is reported (never fatal — a new
+//!    blowup instance shows up here first, on shapes `build_fanout_audit`'s
+//!    synthetic axes don't build).
 //! 2. **Idempotency.** For any input tsv accepts, `format` is a fixed point:
 //!    `format(format(x)) == format(x)` (the fixture F1 invariant, here on inputs
 //!    no fixture covers).
@@ -33,12 +39,27 @@
 //! valid-UTF-8 mutants reach the parser (the `&str` boundary the real CLI/WASM
 //! entry points enforce); a mutation that breaks UTF-8 is skipped, not counted.
 //!
+//! **Corpus-add-stable.** Each seed file draws its mutants from its **own** PRNG
+//! stream, keyed by `(master seed, file path)` and scheduled round-robin — so
+//! adding, removing, or renaming a fixture changes only *that file's* mutants:
+//! every other file's stream is byte-identical, and a shrunken per-file budget
+//! trims a stream's **tail** rather than rewriting it. A corpus edit therefore
+//! can't reshuffle the gate onto an unrelated latent bug; it can only add the
+//! new file's own mutants (which surfacing a real bug is the gate working).
+//!
+//! Beyond the corpus-derived gate run, two opt-in discovery aids: `--evolve`
+//! feeds accepted mutants back into the seed pool (walking deeper into the
+//! accepted-input space, where the formatter invariants actually bite), and
+//! `--minimize` ddmin-shrinks each hard finding into a consumable reproduction.
+//!
 //! Not the differential leg (tsv-vs-canonical verdict): that needs the Deno
 //! sidecar. This stays pure-Rust and self-contained, matching the
 //! `test262 --gate` / `roundtrip_audit --gate` direction.
 
 use argh::FromArgs;
+use std::collections::HashSet;
 use std::path::PathBuf;
+use std::time::{Duration, Instant};
 
 use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
@@ -54,18 +75,22 @@ use crate::cli::CliError;
 /// equal.
 ///
 /// Defaults to `tests/fixtures` as the seed corpus. Deterministic for a given
-/// `--seed` + corpus, so a failing run reproduces exactly; raise `--iterations`
-/// (or vary `--seed`) for discovery. Exits 1 on any finding (a panic, a
+/// `--seed` + corpus — and corpus-add-stable: each seed file's mutants come from
+/// its own path-keyed PRNG stream, so a corpus edit changes only that file's
+/// mutants. Raise `--iterations` (or vary `--seed`) for discovery; add
+/// `--evolve` and `--minimize` there. Exits 1 on any finding (a panic, a
 /// non-idempotent format, or output that doesn't reparse to the same document),
 /// 0 when clean — so it doubles as a CI gate.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "fuzz")]
+#[allow(clippy::struct_excessive_bools)] // independent CLI flags
 pub struct FuzzCommand {
-    /// PRNG seed (default 0) — same seed + corpus ⇒ identical run
+    /// PRNG master seed (default 0) — same seed + corpus ⇒ identical run
     #[argh(option, default = "0")]
     seed: u64,
 
-    /// number of mutated inputs to test (default 2000)
+    /// number of mutated inputs to test (default 2000), scheduled round-robin
+    /// over the seed files (each file's mutants come from its own stream)
     #[argh(option, default = "2000")]
     iterations: usize,
 
@@ -91,6 +116,26 @@ pub struct FuzzCommand {
     /// non-fatal unless you're in discovery mode
     #[argh(switch)]
     strict: bool,
+
+    /// wall-clock budget per attempt in ms (default 2000); attempts over it are
+    /// reported, never fatal — the tripwire for a NEW exponential-rebuild
+    /// instance on shapes `build_fanout_audit`'s synthetic axes don't build
+    #[argh(option, default = "2000")]
+    slow_budget_ms: u64,
+
+    /// discovery mode: a mutant that passes every invariant joins the seed pool
+    /// (bounded at 2x the initial corpus), so later mutants walk deeper into the
+    /// ACCEPTED-input space — the formatter's coverage. Off by default: the
+    /// gate's mutant set should stay corpus-derived and prefix-stable
+    #[argh(switch)]
+    evolve: bool,
+
+    /// ddmin-shrink each stored HARD finding before reporting/dumping: greedily
+    /// remove byte chunks while the same outcome reproduces (bounded probes).
+    /// Without it a finding is a whole seed file with up to --max-mutations
+    /// random edits
+    #[argh(switch)]
+    minimize: bool,
 
     /// write each failing input to this directory for reproduction
     #[argh(option)]
@@ -142,10 +187,87 @@ impl Rng {
     }
 }
 
+/// Per-file stream seed: FNV-1a over the path bytes XOR the master seed,
+/// finalized through one SplitMix64 step. Keying each file's mutant stream by
+/// its own path is what makes the gate corpus-add-stable (see the module doc).
+fn stream_seed(master: u64, path: &str) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325; // FNV-1a offset basis
+    for &b in path.as_bytes() {
+        h = (h ^ u64::from(b)).wrapping_mul(0x0000_0100_0000_01B3); // FNV-1a prime
+    }
+    Rng::new(h ^ master).next_u64()
+}
+
 /// Bytes that push a mutant toward *structurally* interesting input — the
 /// delimiters, operators, and whitespace where parser/formatter edge cases live —
 /// rather than uniformly-random noise that almost always fails to parse.
 const INTERESTING: &[u8] = b"{}()[]<>;:,.\"'`/\\=+-*&|!?@#$%^~\n\t abc012";
+
+/// Multi-byte sequences the single-byte ops essentially never assemble: the
+/// unicode span/width stress set (NBSP, zero-width space, BOM, a combining
+/// mark, CJK, a 4-byte emoji) plus CR/CRLF. Without these the fuzzer is blind
+/// to non-ASCII span math — bit-flips almost never form valid multi-byte UTF-8,
+/// so those mutants die at the `from_utf8` boundary.
+const INTERESTING_SEQUENCES: &[&str] = &[
+    "\u{A0}",
+    "\u{200B}",
+    "\u{FEFF}",
+    "e\u{301}",
+    "\u{4E2D}",
+    "\u{1F600}",
+    "\r\n",
+    "\r",
+];
+
+/// Structure-bearing tokens byte-level ops essentially never assemble — Svelte
+/// block/tag delimiters, TS operators, comment fences, CSS forms — aimed at the
+/// parser's ACCEPT paths: a mutant must parse before the F1/reparse invariants
+/// grade the formatter at all.
+const INTERESTING_TOKENS: &[&str] = &[
+    "{#if ",
+    "{:else}",
+    "{/if}",
+    "{#each ",
+    "{/each}",
+    "{#snippet ",
+    "{/snippet}",
+    "{@render ",
+    "{@const ",
+    "{@html ",
+    "${",
+    "/**",
+    "*/",
+    "//",
+    "<!--",
+    "-->",
+    "</script>",
+    "<script>",
+    "=>",
+    "?.",
+    "...",
+    " satisfies ",
+    " as const",
+    " extends ",
+    "@media ",
+    "calc(",
+    "url(",
+    "!important",
+    "\\3A ",
+];
+
+/// Insert one of `set` at a random position, snapped forward to a UTF-8
+/// boundary so a splice into the middle of an existing multi-byte char doesn't
+/// waste the mutant on invalid UTF-8.
+fn insert_str(rng: &mut Rng, buf: &mut Vec<u8>, set: &[&str]) {
+    let s = set[rng.below(set.len())];
+    let mut at = rng.below(buf.len() + 1);
+    while at < buf.len() && (buf[at] & 0xC0) == 0x80 {
+        at += 1;
+    }
+    for (k, b) in s.bytes().enumerate() {
+        buf.insert(at + k, b);
+    }
+}
 
 /// Apply 1..=`max_ops` byte-level mutation operators to a copy of `seed`.
 fn mutate(rng: &mut Rng, seed: &[u8], max_ops: usize) -> Vec<u8> {
@@ -156,7 +278,7 @@ fn mutate(rng: &mut Rng, seed: &[u8], max_ops: usize) -> Vec<u8> {
             buf.push(rng.byte());
             continue;
         }
-        match rng.below(8) {
+        match rng.below(10) {
             // Flip one bit.
             0 => {
                 let i = rng.below(buf.len());
@@ -198,6 +320,10 @@ fn mutate(rng: &mut Rng, seed: &[u8], max_ops: usize) -> Vec<u8> {
                 let i = rng.below(buf.len());
                 buf.truncate(i.max(1));
             }
+            // Insert a multi-byte unicode/CRLF sequence (span/width stress).
+            7 => insert_str(rng, &mut buf, INTERESTING_SEQUENCES),
+            // Insert a structure-bearing token (aimed at the accept paths).
+            8 => insert_str(rng, &mut buf, INTERESTING_TOKENS),
             // Swap two bytes.
             _ => {
                 let a = rng.below(buf.len());
@@ -269,7 +395,7 @@ impl Outcome {
 }
 
 /// Run the three invariant checks on one (already valid-UTF-8) mutant. Any panic
-/// is caught by the caller's [`catch_unwind`](std::panic::catch_unwind); this
+/// is caught by [`attempt`]'s [`catch_unwind`](std::panic::catch_unwind); this
 /// returns the non-panic outcome.
 fn check(src: &str, parser: ParserType, render: bool) -> Outcome {
     // 1. Parse. A clean rejection is the common, expected case for garbage.
@@ -304,6 +430,78 @@ fn check(src: &str, parser: ParserType, render: bool) -> Outcome {
     }
 }
 
+/// One guarded attempt: write the last-input repro, clear the panic slot, run
+/// [`check`] under `catch_unwind`, map a panic to [`Outcome::Panic`].
+fn attempt(src: &str, parser: ParserType, render: bool, last: &mut LastInput) -> Outcome {
+    last.write(parser, src);
+    LAST_PANIC.with(|c| *c.borrow_mut() = None);
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| check(src, parser, render))) {
+        Ok(o) => o,
+        Err(_) => Outcome::Panic,
+    }
+}
+
+/// File extension for a parser — dump + last-input repro file names.
+fn parser_ext(parser: ParserType) -> &'static str {
+    match parser {
+        ParserType::TypeScript => "ts",
+        ParserType::Svelte => "svelte",
+        ParserType::Css => "css",
+    }
+}
+
+/// Best-effort pre-attempt repro file: written **before** every parse/format
+/// attempt and removed on an orderly exit, so an input that HANGS the formatter
+/// (the exponential-rebuild class — `catch_unwind` can't see an infinite loop)
+/// leaves its exact bytes on disk for triage after the process is killed.
+struct LastInput {
+    /// The paths written this run (one per extension), removed on cleanup.
+    paths: HashSet<PathBuf>,
+    warned: bool,
+}
+
+impl LastInput {
+    fn new() -> Self {
+        Self {
+            paths: HashSet::new(),
+            warned: false,
+        }
+    }
+
+    /// The per-process repro path pattern, for the startup notice.
+    fn pattern() -> PathBuf {
+        std::env::temp_dir().join(format!("tsv_fuzz_last_input_{}.*", std::process::id()))
+    }
+
+    fn write(&mut self, parser: ParserType, src: &str) {
+        let path = std::env::temp_dir().join(format!(
+            "tsv_fuzz_last_input_{}.{}",
+            std::process::id(),
+            parser_ext(parser)
+        ));
+        match std::fs::write(&path, src) {
+            Ok(()) => {
+                self.paths.insert(path);
+            }
+            Err(e) => {
+                if !self.warned {
+                    eprintln!(
+                        "warning: cannot write last-input repro {}: {e}",
+                        path.display()
+                    );
+                    self.warned = true;
+                }
+            }
+        }
+    }
+
+    fn cleanup(self) {
+        for p in self.paths {
+            let _ = std::fs::remove_file(p);
+        }
+    }
+}
+
 /// One recorded finding, enough to reproduce and triage.
 struct Finding {
     /// The mutation iteration that produced it, or `None` when the *unmutated*
@@ -321,53 +519,150 @@ struct Seed {
     display: String,
     bytes: Vec<u8>,
     parser: ParserType,
+    /// This file's own mutant stream — keyed by `(master seed, path)`, so a
+    /// corpus edit elsewhere never changes the mutants THIS file produces.
+    rng: Rng,
 }
 
-/// The findings a run accumulates: exact counts plus a **bounded** store of the
-/// findings themselves (they hold the mutant text, so a noisy discovery run must not
-/// balloon memory — the counts stay exact regardless).
+/// Bound on stored findings per severity (they hold the mutant text, so a noisy
+/// discovery run must not balloon memory — the counts stay exact regardless).
+/// Hard findings get their **own** store so a noisy soft
+/// (`structural_divergence`) run can never crowd a hard finding's reproduction
+/// out of the report/dump.
+const HARD_STORE_CAP: usize = 100;
+const SOFT_STORE_CAP: usize = 50;
+
+/// The findings a run accumulates: exact counts plus bounded per-severity
+/// stores of the findings themselves.
 ///
 /// Owns the counters so both passes (pristine seeds, then mutants) share one
 /// [`Self::record`] rather than threading a `&mut` per counter through a closure.
 struct Found {
     hard: usize,
     soft: usize,
-    store: Vec<Finding>,
-    cap: usize,
+    hard_store: Vec<Finding>,
+    soft_store: Vec<Finding>,
 }
 
 impl Found {
-    fn new(cap: usize) -> Self {
+    fn new() -> Self {
         Self {
             hard: 0,
             soft: 0,
-            store: Vec::new(),
-            cap,
+            hard_store: Vec::new(),
+            soft_store: Vec::new(),
         }
     }
 
-    /// Count a finding and store it if there is room. `iteration` is `None` for a
-    /// pristine (unmutated) seed.
-    fn record(&mut self, outcome: Outcome, iteration: Option<usize>, seed: &Seed, src: &str) {
-        if outcome.is_hard() {
-            self.hard += 1;
+    /// Count a finding and store it if its severity's store has room.
+    /// `iteration` is `None` for a pristine (unmutated) seed.
+    fn record(
+        &mut self,
+        outcome: Outcome,
+        iteration: Option<usize>,
+        seed_path: &str,
+        parser: ParserType,
+        src: &str,
+    ) {
+        let (count, store, cap) = if outcome.is_hard() {
+            (&mut self.hard, &mut self.hard_store, HARD_STORE_CAP)
         } else {
-            self.soft += 1;
-        }
-        if self.store.len() < self.cap {
+            (&mut self.soft, &mut self.soft_store, SOFT_STORE_CAP)
+        };
+        *count += 1;
+        if store.len() < cap {
             let panic = if outcome == Outcome::Panic {
                 LAST_PANIC.with(|c| c.borrow_mut().take())
             } else {
                 None
             };
-            self.store.push(Finding {
+            store.push(Finding {
                 iteration,
-                parser: seed.parser,
+                parser,
                 outcome,
-                seed_path: seed.display.clone(),
+                seed_path: seed_path.to_string(),
                 input: src.to_string(),
                 panic,
             });
+        }
+    }
+}
+
+/// Probe budget per finding for `--minimize` — each probe is a full
+/// parse+format attempt on a shrinking input (cheap; panicky findings pay
+/// unwind cost per probe).
+const MINIMIZE_PROBE_BUDGET: usize = 1000;
+
+/// Greedy ddmin-lite: repeatedly remove byte chunks (halving the chunk size on
+/// stall) while the SAME outcome reproduces. Deterministic and bounded by
+/// [`MINIMIZE_PROBE_BUDGET`]. The result is a locally minimal reproduction —
+/// the point is a consumable finding, not a global minimum.
+fn minimize(
+    orig: &str,
+    parser: ParserType,
+    render: bool,
+    target: Outcome,
+    last: &mut LastInput,
+) -> String {
+    let mut best = orig.as_bytes().to_vec();
+    let mut probes = 0usize;
+    let mut chunk = (best.len() / 2).max(1);
+    loop {
+        let mut removed_any = false;
+        let mut i = 0;
+        while i < best.len() && probes < MINIMIZE_PROBE_BUDGET {
+            let end = (i + chunk).min(best.len());
+            let mut cand = Vec::with_capacity(best.len() - (end - i));
+            cand.extend_from_slice(&best[..i]);
+            cand.extend_from_slice(&best[end..]);
+            probes += 1;
+            let reproduces = !cand.is_empty()
+                && std::str::from_utf8(&cand)
+                    .is_ok_and(|s| attempt(s, parser, render, last) == target);
+            if reproduces {
+                best = cand;
+                removed_any = true; // retry the same offset at this chunk size
+            } else {
+                i += chunk;
+            }
+        }
+        if probes >= MINIMIZE_PROBE_BUDGET || (chunk == 1 && !removed_any) {
+            break;
+        }
+        if !removed_any {
+            chunk = (chunk / 2).max(1);
+        }
+    }
+    // `best` is valid UTF-8 by construction (candidates are only accepted after
+    // a successful `from_utf8`); the fallback is pure defensiveness.
+    String::from_utf8(best).unwrap_or_else(|_| orig.to_string())
+}
+
+/// Cap on stored slow-attempt entries (the count stays exact).
+const SLOW_STORE_CAP: usize = 20;
+
+/// Wall-clock outliers: attempts that exceeded `--slow-budget-ms`. Never fatal —
+/// debug-build timing is noisy — but a NEW exponential-rebuild instance shows
+/// up here first.
+struct Slow {
+    count: usize,
+    store: Vec<(String, u128)>,
+}
+
+impl Slow {
+    fn new() -> Self {
+        Self {
+            count: 0,
+            store: Vec::new(),
+        }
+    }
+
+    fn track(&mut self, elapsed: Duration, budget_ms: u64, origin: impl FnOnce() -> String) {
+        if elapsed.as_millis() > u128::from(budget_ms) {
+            self.count += 1;
+            if self.store.len() < SLOW_STORE_CAP {
+                self.store.push((origin(), elapsed.as_millis()));
+            }
         }
     }
 }
@@ -392,13 +687,14 @@ impl FuzzCommand {
             files.truncate(self.limit);
         }
 
-        let seeds: Vec<Seed> = files
+        let mut seeds: Vec<Seed> = files
             .iter()
             .filter_map(|p| {
                 let display = p.to_string_lossy().into_owned();
                 let bytes = std::fs::read(p).ok()?;
                 Some(Seed {
                     parser: ParserType::from_extension(&display),
+                    rng: Rng::new(stream_seed(self.seed, &display)),
                     display,
                     bytes,
                 })
@@ -419,7 +715,12 @@ impl FuzzCommand {
         }
 
         let render = !self.no_render;
-        let mut rng = Rng::new(self.seed);
+        let mut last_input = LastInput::new();
+        eprintln!(
+            "last-input repro: {} (written before each attempt; removed on a clean exit — \
+             if this run hangs, the hung input is in that file)",
+            LastInput::pattern().display()
+        );
 
         // Record each panic's message/location instead of letting the default
         // hook print it (the fuzzer triggers panics on purpose). The loop is
@@ -433,13 +734,13 @@ impl FuzzCommand {
         let mut skipped_non_utf8 = 0usize;
         let mut rejected = 0usize;
         let mut ok = 0usize;
+        let mut evolved = 0usize;
         let mut pristine_reflow = 0usize;
         // Paths of the pristine seeds that reflowed (see the pass-1 soft arm). Bounded
         // like the findings store, though each entry is only a path; the count stays exact.
         let mut reflow_paths: Vec<String> = Vec::new();
-        // Bound stored findings (they hold the mutant text) so a noisy discovery
-        // run can't balloon memory; the counts inside stay exact.
-        let mut found = Found::new(self.max_findings.max(20) * 4);
+        let mut found = Found::new();
+        let mut slow = Slow::new();
 
         // Pass 1 — every seed **as authored**. The mutation loop below only ever drives
         // mutants, so a pristine corpus file is never itself checked; yet the corpus is
@@ -454,13 +755,11 @@ impl FuzzCommand {
             };
             tested += 1;
 
-            LAST_PANIC.with(|c| *c.borrow_mut() = None);
-            let outcome = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                check(src, seed.parser, render)
-            })) {
-                Ok(o) => o,
-                Err(_) => Outcome::Panic,
-            };
+            let started = Instant::now();
+            let outcome = attempt(src, seed.parser, render, &mut last_input);
+            slow.track(started.elapsed(), self.slow_budget_ms, || {
+                format!("as authored · {}", seed.display)
+            });
 
             match outcome {
                 Outcome::Rejected => rejected += 1,
@@ -481,33 +780,52 @@ impl FuzzCommand {
                         reflow_paths.push(seed.display.clone());
                     }
                 }
-                finding => found.record(finding, None, seed, src),
+                finding => found.record(finding, None, &seed.display, seed.parser, src),
             }
         }
 
-        // Pass 2 — mutants.
+        // Pass 2 — mutants, round-robin over the (sorted) seed files, each file
+        // drawing from its own stream (the corpus-add-stability property).
+        let evolve_cap = seeds.len() * 2;
         for iteration in 0..self.iterations {
-            let seed = &seeds[rng.below(seeds.len())];
-            let mutated = mutate(&mut rng, &seed.bytes, self.max_mutations);
+            let idx = iteration % seeds.len();
+            let mutated = {
+                let Seed { rng, bytes, .. } = &mut seeds[idx];
+                mutate(rng, bytes, self.max_mutations)
+            };
             let Ok(src) = std::str::from_utf8(&mutated) else {
                 skipped_non_utf8 += 1;
                 continue;
             };
             tested += 1;
 
-            LAST_PANIC.with(|c| *c.borrow_mut() = None);
-            let outcome = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                check(src, seed.parser, render)
-            })) {
-                Ok(o) => o,
-                Err(_) => Outcome::Panic,
-            };
+            let parser = seeds[idx].parser;
+            let started = Instant::now();
+            let outcome = attempt(src, parser, render, &mut last_input);
+            slow.track(started.elapsed(), self.slow_budget_ms, || {
+                format!("iter {iteration} · {}", seeds[idx].display)
+            });
 
             match outcome {
                 Outcome::Rejected => rejected += 1,
-                Outcome::Ok => ok += 1,
+                Outcome::Ok => {
+                    ok += 1;
+                    if self.evolve && seeds.len() < evolve_cap {
+                        // The evolved seed gets its own stream, keyed by its
+                        // synthetic display name (unique per origin iteration).
+                        let display = format!("{}·evolved@i{iteration}", seeds[idx].display);
+                        let rng = Rng::new(stream_seed(self.seed, &display));
+                        evolved += 1;
+                        seeds.push(Seed {
+                            display,
+                            bytes: mutated,
+                            parser,
+                            rng,
+                        });
+                    }
+                }
                 finding => {
-                    found.record(finding, Some(iteration), seed, src);
+                    found.record(finding, Some(iteration), &seeds[idx].display, parser, src);
                     // Only HARD findings stop the run early — soft ones (render-
                     // model-noisy structural divergences) are counted, not fatal.
                     if self.max_findings > 0 && found.hard >= self.max_findings {
@@ -517,34 +835,50 @@ impl FuzzCommand {
             }
         }
 
-        std::panic::set_hook(prev_hook);
+        // Shrink hard findings while the custom panic hook is still installed
+        // (minimizing a panic finding re-panics per probe).
+        if self.minimize {
+            for f in &mut found.hard_store {
+                f.input = minimize(&f.input, f.parser, render, f.outcome, &mut last_input);
+            }
+        }
 
-        self.dump_findings(&found.store);
+        std::panic::set_hook(prev_hook);
+        last_input.cleanup();
+
+        let all: Vec<&Finding> = found
+            .hard_store
+            .iter()
+            .chain(found.soft_store.iter())
+            .collect();
+        self.dump_findings(&all);
         let stats = Stats {
             tested,
             skipped_non_utf8,
             rejected,
             ok,
+            evolved,
             hard_count: found.hard,
             soft_count: found.soft,
             pristine_reflow,
             reflow_paths,
+            slow_count: slow.count,
+            slow: slow.store,
         };
-        self.report(&stats, &found.store)
+        self.report(&stats, &found.hard_store, &found.soft_store)
     }
 
     /// Write each finding's input to `--dump-dir` (if set) for reproduction.
-    fn dump_findings(&self, findings: &[Finding]) {
+    fn dump_findings(&self, findings: &[&Finding]) {
         let Some(dir) = &self.dump_dir else {
             return;
         };
         for (n, f) in findings.iter().enumerate() {
-            let ext = match f.parser {
-                ParserType::TypeScript => "ts",
-                ParserType::Svelte => "svelte",
-                ParserType::Css => "css",
-            };
-            let name = format!("finding_{n:03}_{}.{ext}", f.outcome.label());
+            let name = format!(
+                "finding_{n:03}_{}.{}",
+                f.outcome.label(),
+                parser_ext(f.parser)
+            );
             let path = PathBuf::from(dir).join(name);
             if let Err(e) = std::fs::write(&path, &f.input) {
                 eprintln!("warning: could not write {}: {e}", path.display());
@@ -558,12 +892,13 @@ impl FuzzCommand {
         stats.hard_count > 0 || (self.strict && stats.soft_count > 0)
     }
 
-    fn report(&self, stats: &Stats, findings: &[Finding]) -> Result<(), CliError> {
+    fn report(&self, stats: &Stats, hard: &[Finding], soft: &[Finding]) -> Result<(), CliError> {
         let fail = self.is_fail(stats);
 
         if self.json {
-            let findings_json: Vec<serde_json::Value> = findings
+            let findings_json: Vec<serde_json::Value> = hard
                 .iter()
+                .chain(soft.iter())
                 .map(|f| {
                     serde_json::json!({
                         "iteration": f.iteration,
@@ -576,6 +911,11 @@ impl FuzzCommand {
                     })
                 })
                 .collect();
+            let slow_json: Vec<serde_json::Value> = stats
+                .slow
+                .iter()
+                .map(|(origin, ms)| serde_json::json!({ "origin": origin, "ms": ms }))
+                .collect();
             let out = serde_json::json!({
                 "seed": self.seed,
                 "iterations": self.iterations,
@@ -583,10 +923,14 @@ impl FuzzCommand {
                 "skipped_non_utf8": stats.skipped_non_utf8,
                 "rejected": stats.rejected,
                 "ok": stats.ok,
+                "evolved": stats.evolved,
                 "hard_findings": stats.hard_count,
                 "soft_findings": stats.soft_count,
                 "pristine_reflow": stats.pristine_reflow,
                 "pristine_reflow_paths": stats.reflow_paths,
+                "slow_budget_ms": self.slow_budget_ms,
+                "slow_count": stats.slow_count,
+                "slow": slow_json,
                 "strict": self.strict,
                 "findings": findings_json,
             });
@@ -603,6 +947,12 @@ impl FuzzCommand {
             stats.rejected
         );
         println!("  {:>7}  ok (parsed, idempotent, reparses equal)", stats.ok);
+        if self.evolve {
+            println!(
+                "  {:>7}  accepted mutants evolved into the seed pool",
+                stats.evolved
+            );
+        }
         println!(
             "  {:>7}  seed files that reflow structurally when formatted, as authored\n           (not a failure — see below)",
             stats.pristine_reflow
@@ -616,13 +966,9 @@ impl FuzzCommand {
             stats.soft_count
         );
 
-        // HARD findings first — the reliable, dep-free bugs.
-        let hard: Vec<&Finding> = findings.iter().filter(|f| f.outcome.is_hard()).collect();
-        let soft: Vec<&Finding> = findings.iter().filter(|f| !f.outcome.is_hard()).collect();
-
         if !hard.is_empty() {
             println!("✗ HARD findings (real bugs):\n");
-            for f in &hard {
+            for f in hard {
                 print_finding(f);
             }
             println!();
@@ -682,7 +1028,25 @@ impl FuzzCommand {
             println!();
         }
 
-        if self.dump_dir.is_none() && !findings.is_empty() {
+        if stats.slow_count > 0 {
+            println!(
+                "○ {} attempt(s) over the --slow-budget-ms wall-clock budget ({} ms) — not a",
+                stats.slow_count, self.slow_budget_ms
+            );
+            println!(
+                "  failure (debug-build timing is noisy), but a NEW exponential-rebuild instance"
+            );
+            println!("  shows up here first (fanout_audit guards only the known synthetic axes):");
+            for (origin, ms) in &stats.slow {
+                println!("    {ms:>6} ms  {origin}");
+            }
+            if stats.slow_count > stats.slow.len() {
+                println!("    … and {} more", stats.slow_count - stats.slow.len());
+            }
+            println!();
+        }
+
+        if self.dump_dir.is_none() && (!hard.is_empty() || !soft.is_empty()) {
             println!("(pass --dump-dir DIR to write each failing input for reproduction)");
         }
 
@@ -720,6 +1084,8 @@ struct Stats {
     skipped_non_utf8: usize,
     rejected: usize,
     ok: usize,
+    /// Accepted mutants fed back into the seed pool (`--evolve` only).
+    evolved: usize,
     hard_count: usize,
     soft_count: usize,
     /// Pristine seeds whose formatting reflows the whitespace skeleton. Not a run
@@ -728,6 +1094,10 @@ struct Stats {
     pristine_reflow: usize,
     /// The seed paths behind `pristine_reflow`, capped at [`REFLOW_PATH_CAP`].
     reflow_paths: Vec<String>,
+    /// Attempts over the `--slow-budget-ms` wall-clock budget.
+    slow_count: usize,
+    /// `(origin, elapsed ms)` behind `slow_count`, capped at [`SLOW_STORE_CAP`].
+    slow: Vec<(String, u128)>,
 }
 
 /// Cap on stored `reflow_paths` — enough to triage, bounded on a noisy corpus.

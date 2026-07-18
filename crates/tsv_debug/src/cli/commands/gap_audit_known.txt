@@ -19,6 +19,7 @@ DROPPED	#⟨⟩private	annotation,block,jsdoc_cast,line,multiline
 DROPPED	&⟨⟩{	annotation,block,jsdoc_cast,line,multiline
 DROPPED	&⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	')⟨⟩);	annotation,block,jsdoc_cast,line,multiline
+DROPPED	')⟨⟩];	annotation,block,jsdoc_cast,line,multiline
 DROPPED	')⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	',,⟨⟩,'	annotation,block,jsdoc_cast
 DROPPED	',⟨⟩()=	line
