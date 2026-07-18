@@ -40,7 +40,7 @@ use crate::fixtures::remove_locations;
 /// for a render-equivalence AST comparison.
 #[must_use]
 pub fn render_normalize(mut value: Value) -> Value {
-    normalize_node(&mut value, false);
+    for_each_fragment(&mut value, false, &mut normalize_fragment_nodes);
     value
 }
 
@@ -104,32 +104,43 @@ pub fn structural_skeleton(v: &Value) -> Value {
     }
 }
 
-/// `preserve` = whether we are inside a whitespace-preserving element
-/// (`<pre>` / `<textarea>`), in which case `Fragment` content is left verbatim.
-fn normalize_node(value: &mut Value, preserve: bool) {
+/// Call `f` on every template `Fragment`'s node list, threading the
+/// whitespace-**preserve** context (`<pre>` / `<textarea>`, inside which
+/// `Fragment` content is left verbatim).
+///
+/// `pub(crate)` because [`crate::render_browser`] — the browser-model layer
+/// above this one — walks the same shape. Two subtleties make this worth
+/// sharing rather than re-deriving per layer:
+///
+/// - A `Fragment` has no tag name of its own, so its node list belongs to the
+///   context its *parent element* established: `f` gets the `preserve` passed
+///   into this call, while descendants get `child_preserve`.
+/// - The flip is keyed on the element, not the fragment, so it must be computed
+///   before recursing into *any* of the map's values.
+pub(crate) fn for_each_fragment(
+    value: &mut Value,
+    preserve: bool,
+    f: &mut impl FnMut(&mut Vec<Value>, bool),
+) {
     match value {
         Value::Object(map) => {
             // An element whose tag preserves whitespace flips the context for
             // its descendants (the `fragment` it owns and everything below).
             let child_preserve = preserve || node_preserves_whitespace(map);
 
-            // A `Fragment` is a child of its element, so its node list is
-            // normalized under the context the *parent element* established —
-            // i.e. the `preserve` flag passed into this call, not
-            // `child_preserve` (a Fragment has no tag name of its own).
             if map.get("type").and_then(Value::as_str) == Some("Fragment")
                 && let Some(Value::Array(nodes)) = map.get_mut("nodes")
             {
-                normalize_fragment_nodes(nodes, preserve);
+                f(nodes, preserve);
             }
 
             for v in map.values_mut() {
-                normalize_node(v, child_preserve);
+                for_each_fragment(v, child_preserve, f);
             }
         }
         Value::Array(arr) => {
             for v in arr.iter_mut() {
-                normalize_node(v, preserve);
+                for_each_fragment(v, preserve, f);
             }
         }
         _ => {}
@@ -172,11 +183,16 @@ fn normalize_fragment_nodes(nodes: &mut Vec<Value>, preserve: bool) {
     nodes.retain(|node| !is_empty_text(node));
 }
 
-fn is_text(node: &Value) -> bool {
+/// True when this node is a `Text` node. `pub(crate)` for
+/// [`crate::render_browser`], the browser-model layer above this one.
+pub(crate) fn is_text(node: &Value) -> bool {
     node.get("type").and_then(Value::as_str) == Some("Text")
 }
 
-fn is_empty_text(node: &Value) -> bool {
+/// True when this node is a `Text` node left empty by a trim — nothing a
+/// browser renders, so callers drop it. `pub(crate)`: the browser layer's
+/// block-boundary trim empties nodes the same way.
+pub(crate) fn is_empty_text(node: &Value) -> bool {
     is_text(node) && node.get("data").and_then(Value::as_str) == Some("")
 }
 
@@ -191,12 +207,18 @@ fn collapse_text_ws(node: &mut Value) {
     }
 }
 
-enum TrimEnd {
+/// Which end of a `Text` node's content a trim applies to.
+pub(crate) enum TrimEnd {
     Start,
     End,
 }
 
-fn trim_text(node: &mut Value, which: TrimEnd) {
+/// Strip the boundary `' '` from one end of a `Text` node's `data`/`raw`.
+///
+/// `pub(crate)`: the browser layer trims the identical way at a block boundary,
+/// and the "only `' '`, so U+00A0 survives" rule below must not be re-derived
+/// per layer.
+pub(crate) fn trim_text(node: &mut Value, which: TrimEnd) {
     for key in ["data", "raw"] {
         if let Some(Value::String(s)) = node.get_mut(key) {
             // After collapse the only boundary whitespace is an ASCII space;
@@ -238,32 +260,50 @@ fn is_ascii_html_ws(ch: char) -> bool {
     matches!(ch, ' ' | '\t' | '\n' | '\r' | '\u{0C}')
 }
 
+/// Minimal Svelte-AST builders for the whitespace-model tests.
+///
+/// Shared with [`crate::render_browser`]'s tests: it layers the browser model on
+/// top of this one, so its cases are built from the same shapes and would
+/// otherwise be a verbatim copy of these.
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
+pub(crate) mod test_ast {
+    use serde_json::{Value, json};
 
-    fn text(data: &str) -> Value {
+    pub(crate) fn text(data: &str) -> Value {
         json!({"type": "Text", "raw": data, "data": data})
     }
 
-    fn element(name: &str, nodes: Vec<Value>) -> Value {
+    pub(crate) fn element(name: &str, nodes: Vec<Value>) -> Value {
+        element_with_attributes(name, vec![], nodes)
+    }
+
+    pub(crate) fn element_with_attributes(
+        name: &str,
+        attributes: Vec<Value>,
+        nodes: Vec<Value>,
+    ) -> Value {
         json!({
             "type": "RegularElement",
             "name": name,
-            "attributes": [],
+            "attributes": attributes,
             "fragment": {"type": "Fragment", "nodes": nodes},
         })
     }
 
-    fn root(nodes: Vec<Value>) -> Value {
+    pub(crate) fn root(nodes: Vec<Value>) -> Value {
         json!({"type": "Root", "fragment": {"type": "Fragment", "nodes": nodes}})
     }
 
     /// Extract a fragment's node list for assertions.
-    fn frag_nodes(v: &Value) -> &Vec<Value> {
+    pub(crate) fn frag_nodes(v: &Value) -> &Vec<Value> {
         v["fragment"]["nodes"].as_array().unwrap()
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::test_ast::*;
+    use super::*;
 
     #[test]
     fn block_style_content_equals_flowed_content() {

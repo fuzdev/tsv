@@ -189,7 +189,7 @@ deno task gaps:audit                 # gap-injection audit: inject a comment int
 deno task gaps:audit:update          # regenerate that snapshot after fixing a shape (or when a new fixture merely REACHES a pre-existing one); refuses a narrowed run
 deno task blanks:audit               # blank-line injection audit: inject a blank line into EVERY code gap and grade six policy-free invariants — no panic, F1 idempotency, structural reparse, leaf conservation, ledger-clean, and blank-run ≤ 1. Mechanizes the blank-line handling class (the specifier-list / array-pattern bugs). Pure Rust, no sidecar; gated in `deno task check` as a RATCHET over `blank_audit_known.txt` (like gaps:audit): a graded shape not on the list, one that no longer fires, or any PANIC, FAILS. STRUCTURAL-DIVERGENCE is held REPORT-ONLY (fuzz-soft parity: reported but never gated, filtered out of the ratchet); every other policy kind IS pinned. A fast path (a blank the formatter ABSORBS reproduces the proven-clean pristine output, so nothing is checked) keeps it near gaps:audit's cost. ~24 s. Full reference: ./docs/blank_audit.md
 deno task blanks:audit:update        # regenerate that snapshot after fixing a shape; refuses a narrowed run
-deno task render:audit <paths>       # render-equivalence over REAL code: does `tsv format` change what a Svelte component RENDERS? Per `.svelte` file, compares the browser-visible render key (`svelte compile --generate server`, reduced) of the source vs of format(source). The corpus-scale arm of the fixture R rules — those gate a CURATED corpus (hand-authored render-equivalent variants), so they are a regression guard, not discovery; real code is the exposure. Catches what no other gate sees: corpus:compare:format's SAFETY is char-frequency (blind — the characters only MOVE), roundtrip_audit's skeleton erases the whitespace that carries the meaning, and authoring_audit asks about CONVERGENCE, never whether the fixed point renders like the input. Needs the Deno sidecar, so NOT in `deno task check` (and not in the pure-Rust `audit:corpus`); run at conformance cadence or after a printer change. Files whose format is a no-op are skipped; files Svelte's ANALYZER rejects are counted compile-blind. `--gate` exits 1 on findings; also `--json`, `--limit N`. See [Debug Tooling](#debug-tooling)
+deno task render:audit <paths>       # render-equivalence over REAL code: does `tsv format` change what a Svelte component RENDERS? Per `.svelte` file, compares the browser-visible render key (`svelte compile --generate server`, reduced) of the source vs of format(source). The corpus-scale arm of the fixture R rules — those gate a CURATED corpus (hand-authored render-equivalent variants), so they are a regression guard, not discovery; real code is the exposure. Catches what no other gate sees: corpus:compare:format's SAFETY is char-frequency (blind — the characters only MOVE), roundtrip_audit's skeleton erases the whitespace that carries the meaning, and authoring_audit asks about CONVERGENCE, never whether the fixed point renders like the input. Needs the Deno sidecar, so NOT in `deno task check` (and not in the pure-Rust `audit:corpus`) — it is release-gated as a leg of `deno task conformance` instead, scoped there to the version-pinned checkouts so a live working tree can't move the verdict; run it standalone on any corpus after a printer change. Files whose format is a no-op are skipped; files Svelte's ANALYZER rejects are counted compile-blind. `--gate` exits 1 on findings; also `--json`, `--limit N`. See [Debug Tooling](#debug-tooling)
 deno task idempotency:sweep          # F1 (idempotency) sweep over the real-code corpus (the `perf` view — sibling dev repos + upstream framework source). NOT in `deno task check`: machine-dependent corpus, minutes not seconds. Run at conformance cadence or after a printer change; see Debug Tooling
 deno task audit:corpus               # the standing content-loss / robustness gate over REAL code (the extension-robustness bar `deno task check`'s fixture-only scope is structurally blind to): roundtrip_audit --gate + comment_audit + binding_audit --gate (real gating; prettier suites report-only) + authoring_audit + fuzz --iterations 0, over the `perf` view + the pinned prettier suites. Pure Rust; absent dev repos warn-skip (floor = ../svelte src). NOT in `deno task check` (machine-dependent corpus, minutes); wired into publish Step 3c alongside conformance:all's SAFETY. Run at conformance/release cadence or after a printer change; see benches/js/CLAUDE.md §Gate map
 ```
@@ -307,7 +307,8 @@ deno task conformance:ts-repo          # tsv's TS parser vs the tsc corpus (../t
 
 deno task conformance                  # the pre-release aggregate: the three gates above + corpus:compare:parse
 # --all + corpus:compare:format --all, in ONE process (benches/js/conformance.ts; oracle modules load
-# once, fail-fast, corpus FFI built once). The external-oracle correctness gates that can't live in
+# once, fail-fast, corpus FFI built once), then render:audit over the version-pinned checkouts (a
+# subprocess — it drives its own sidecar). The external-oracle correctness gates that can't live in
 # `deno task check`. The format leg's prettier calls ride a content-addressed cache
 # (benches/js/lib/prettier_cache.ts; TSV_PRETTIER_CACHE=0 disables).
 
@@ -1127,8 +1128,11 @@ cargo run -p tsv_debug binding_audit --verbose ../svelte/packages/svelte/src
 cargo run --profile corpus -p tsv_debug --quiet render_audit ~/dev/zzz/src
 deno task render:audit ../svelte/packages/svelte/tests   # (--gate baked in)
 # Also: --gate (exit 1 on findings), --json, --limit N. Needs the Deno sidecar, so
-# NOT in `deno task check` — and not in the pure-Rust `audit:corpus` either; run at
-# conformance cadence or after a printer change. Files whose format is a no-op are
+# NOT in `deno task check` — and not in the pure-Rust `audit:corpus` either. It is
+# release-gated as a leg of `deno task conformance` (the one leg that runs as a
+# subprocess), scoped there to the version-pinned `framework` + `suite` checkouts so
+# a live working tree can't move a release verdict; run it standalone on any corpus
+# after a printer change. Files whose format is a no-op are
 # skipped (trivially render-equal); files Svelte's semantic ANALYZER rejects are
 # counted as compile-blind (that arm cannot speak there). The in-repo, any-corpus
 # form of ../test-svelte-prettier-whitespace/whitespace-safety-check.mjs.

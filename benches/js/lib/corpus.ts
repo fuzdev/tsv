@@ -592,11 +592,27 @@ export async function corpus_missing_entries(
  * use `stream()` (fail-fast) instead — a silently smaller corpus can't be
  * allowed to pass a gate.
  */
-export async function corpus_present_dirs(
+export function corpus_present_dirs(
 	view: CorpusView,
 	logger: Logger = console.log,
 ): Promise<string[]> {
-	const tiers = TIERS_BY_VIEW[view];
+	return corpus_present_dirs_for_tiers(TIERS_BY_VIEW[view], logger);
+}
+
+/**
+ * [`corpus_present_dirs`] over an explicit tier set rather than a view's.
+ *
+ * For a consumer whose scope isn't any one view: `conformance`'s `render:audit`
+ * leg wants the version-pinned checkouts (`framework` for `../svelte` src,
+ * svelte.dev and kit; `suite` for `../svelte`'s test tree), a pair no view
+ * carries together — `framework` is a perf/gates tier and `suite` a conformance
+ * one. Selecting by tier keeps a release verdict off the live `real` dev repos
+ * without inventing a view for one caller.
+ */
+export async function corpus_present_dirs_for_tiers(
+	tiers: readonly CorpusTier[],
+	logger: Logger = console.log,
+): Promise<string[]> {
 	const dirs: string[] = [];
 	for (const entry of CORPUS_ENTRIES.filter((e) => tiers.includes(e.tier))) {
 		if (entry.path === undefined) continue;
