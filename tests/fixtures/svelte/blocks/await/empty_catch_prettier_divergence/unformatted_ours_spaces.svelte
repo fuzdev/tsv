@@ -4,7 +4,7 @@
 {#await promise} {:catch error} {/await}
 
 <!-- empty :catch after content: kept -->
-{#await promise}x{:catch error}{/await}
+{#await promise}x{:catch error} {/await}
 
 <!-- inline sibling before an empty-catch await: the </a> closing > stays hugged -->
 <div>

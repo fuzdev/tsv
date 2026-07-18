@@ -54,12 +54,24 @@ struct AwaitPieces {
 
 /// Build one `{#await}` section body (`pending` / `then` / `catch`).
 ///
+/// A **whitespace-only** section contributes no body (`empty`) — mirroring the space-only
+/// path's `push_await_space_only_body` guard. This matters for a *kept* empty `:catch`
+/// (an empty `{:catch}` is preserved for correctness, unlike a dropped empty `:then` — see
+/// `then_has_content`): its marker is emitted and its body is nothing, so `{:catch e}` sits
+/// on its own line and `{/await}` on the next. Without the guard, `indent_body`'s leading
+/// `hardline` over an empty body plus the tail's own pre-`{/await}` `hardline` would emit a
+/// **spurious blank line** between them (and diverge from the space-only path, which glues
+/// the empty section — an authoring-dependent non-idempotency).
+///
 /// `expand` is the construct-wide boundary decision (see `Printer::body_boundaries_break`):
 /// every section's boundaries break together, so a section authored inline still drops to
 /// its own line once any sibling section went multiline. Keying it per-section on that
 /// section's own authored whitespace would let a render-free character weld one section's
 /// body to its keyword while the others break.
 fn build_await_section_body(printer: &Printer<'_>, fragment: &Fragment<'_>, expand: bool) -> DocId {
+    if !fragment.nodes.iter().any(|n| !n.is_whitespace_only_text()) {
+        return printer.d().empty();
+    }
     let body_doc = if expand {
         printer.build_nodes_doc_multiline(fragment.nodes)
     } else {
@@ -68,13 +80,29 @@ fn build_await_section_body(printer: &Printer<'_>, fragment: &Fragment<'_>, expa
     indent_body(printer, body_doc, expand)
 }
 
-/// Build `indent([line, body_doc])` for space-only await blocks.
+/// The space-only await boundary separator — the **one rule** both a body's leading edge
+/// (`indent_body_soft`) and the separator before the following marker / `{/await}` follow:
+/// a `line` (a space inline, a newline on break) when the boundary was **authored with
+/// whitespace**, else a `softline` (glued inline, still a newline on break).
 ///
-/// In flat mode (fits): ` body_doc` (space + content)
-/// In break mode (exceeds print width): newline + indent + body_doc
-fn indent_body_soft(printer: &Printer<'_>, body_doc: DocId) -> DocId {
-    let line = printer.d().line();
-    let inner = printer.d().concat(&[line, body_doc]);
+/// Preserving the authored boundary — instead of always synthesizing a space — keeps a
+/// glued content body glued (`}x{`) and a spaced one spaced (`} x {`), matching prettier
+/// and killing the cross-section authoring-dependence (a render-free space in one section
+/// no longer re-spaces another section's body — the boundary is render-free, see
+/// `Printer::body_boundaries_break`). Either way both forms become a newline on break, so
+/// the whole construct still expands as a unit.
+fn boundary_sep(printer: &Printer<'_>, authored_ws: bool) -> DocId {
+    let d = printer.d();
+    if authored_ws { d.line() } else { d.softline() }
+}
+
+/// Build `indent([<sep>, body_doc])` for a space-only await section body, where `<sep>`
+/// is [`boundary_sep`] keyed on the body's authored **leading** boundary whitespace: a
+/// space (fits) / newline (break) when authored with leading whitespace, glued (fits) /
+/// newline (break) when authored glued.
+fn indent_body_soft(printer: &Printer<'_>, body_doc: DocId, leading_ws: bool) -> DocId {
+    let sep = boundary_sep(printer, leading_ws);
+    let inner = printer.d().concat(&[sep, body_doc]);
     printer.d().indent(inner)
 }
 
@@ -1124,66 +1152,91 @@ impl<'a> Printer<'a> {
     }
 
     /// Push a space-only section's body to `parts` when it carries printable content, and
-    /// **report whether it did**. A whitespace-only section (`build_nodes_doc_multiline`
-    /// drops its whitespace-only nodes, so its body is empty) contributes nothing; the caller
-    /// emits a separator `line` only after a section that returned `true`, so an empty section
+    /// **report `(had_content, trailing_ws)`**. A whitespace-only section
+    /// (`build_nodes_doc_multiline` drops its whitespace-only nodes, so its body is empty)
+    /// contributes nothing (`(false, false)`); the caller emits a separator before the next
+    /// marker only after a section that returned `had_content = true`, so an empty section
     /// **collapses** — its surrounding markers glue (`{#await p}{:then v}{/await}`), exactly
     /// as every other empty construct does. A content section keeps its `indent_body_soft`,
-    /// whose leading `line` is the space *before* the content; the returned `true` gates the
-    /// space *after* it.
-    fn push_await_space_only_body(&self, parts: &mut DocBuf, fragment: &Fragment<'_>) -> bool {
+    /// whose leading separator preserves the body's authored *leading* boundary whitespace;
+    /// the returned `trailing_ws` reports the body's authored *trailing* boundary whitespace,
+    /// which the caller uses to pick the separator *after* it (`line` vs `softline`).
+    fn push_await_space_only_body(
+        &self,
+        parts: &mut DocBuf,
+        fragment: &Fragment<'_>,
+    ) -> (bool, bool) {
         if fragment.nodes.iter().any(|n| !n.is_whitespace_only_text()) {
+            let leading_ws = self.fragment_has_any_leading_ws(fragment);
+            let trailing_ws = self.fragment_has_any_trailing_ws(fragment);
             let body = self.build_nodes_doc_multiline(fragment.nodes);
-            parts.push(indent_body_soft(self, body));
-            true
+            parts.push(indent_body_soft(self, body, leading_ws));
+            (true, trailing_ws)
         } else {
-            false
+            (false, false)
         }
     }
 
-    /// Build the await tail for the **space-only** layout. A content-bearing section body
-    /// (`indent_body_soft`, via `push_await_space_only_body`) is wrapped in single spaces, but
-    /// a **whitespace-only** section contributes no body and its markers **glue**
-    /// (`{#await p}{:then v}{/await}`): a separator `line` is emitted only after a section that
-    /// carried content, so an empty section collapses to `}{` exactly as every other empty
-    /// construct does — while the `{:then}` / `{:catch}` markers are kept (prettier instead
-    /// deletes the whole section; see `conformance_prettier.md` §Svelte: Blocks). The whole
-    /// construct still breaks together as a unit under the caller's `group`. Mirrors
-    /// `compose_await_tail`, but with **conditional** `line()` separators and soft-indented
-    /// bodies (the head is prepended + grouped by the caller).
+    /// Build the await tail for the **space-only** layout. Each content-bearing section body
+    /// (`indent_body_soft`, via `push_await_space_only_body`) **preserves its own authored
+    /// boundary whitespace** — a body authored glued stays glued (`}x{`), one authored with a
+    /// space keeps the space (`} x {`), matching prettier — so a render-free space in one
+    /// section never re-spaces another section's body. A **whitespace-only** section
+    /// contributes no body and its markers **glue** (`{#await p}{:then v}{/await}`): the
+    /// separator before a marker (`line` when the preceding body had trailing whitespace, else
+    /// `softline`) is emitted only after a section that carried content, so an empty section
+    /// collapses to `}{` exactly as every other empty construct does — while the `{:then}` /
+    /// `{:catch}` markers are kept (prettier instead deletes the whole section; see
+    /// `conformance_prettier.md` §Svelte: Blocks). The whole construct still breaks together as
+    /// a unit under the caller's `group` — both `line` and `softline` become a newline on
+    /// break, so every body drops to its own line. Mirrors `compose_await_tail`, but with
+    /// **authored-whitespace-keyed** separators and soft-indented bodies (the head is prepended
+    /// + grouped by the caller).
     fn build_await_tail_space_only(&self, block: &internal::AwaitBlock<'_>) -> DocId {
         let d = self.d();
         let (is_then_shorthand, is_catch_shorthand) = Self::await_shorthand_flags(block);
         let mut parts: DocBuf = DocBuf::new();
-        // Whether the section immediately before the next marker carried content — gates that
-        // marker's leading separator `line`, so an empty section's markers glue.
+        // Whether the section immediately before the next marker carried content (gates that
+        // marker's leading separator, so an empty section's markers glue) and, if so, whether
+        // it was authored with trailing boundary whitespace (picks `line` vs `softline`, so a
+        // body glued to the following marker stays glued).
         let mut prev_had_content = false;
+        let mut prev_trailing_ws = false;
         if let Some(pending) = &block.pending {
-            prev_had_content = self.push_await_space_only_body(&mut parts, pending);
+            (prev_had_content, prev_trailing_ws) =
+                self.push_await_space_only_body(&mut parts, pending);
         }
         if !is_then_shorthand && let Some(kw) = self.await_then_keyword(block) {
             if prev_had_content {
-                parts.push(d.line());
+                parts.push(boundary_sep(self, prev_trailing_ws));
             }
             parts.push(kw);
             prev_had_content = false;
+            prev_trailing_ws = false;
         }
         if let Some(then_block) = &block.then {
-            prev_had_content = self.push_await_space_only_body(&mut parts, then_block);
+            (prev_had_content, prev_trailing_ws) =
+                self.push_await_space_only_body(&mut parts, then_block);
         }
         if !is_catch_shorthand && let Some(kw) = self.await_catch_keyword(block) {
             if prev_had_content {
-                parts.push(d.line());
+                parts.push(boundary_sep(self, prev_trailing_ws));
             }
             parts.push(kw);
             prev_had_content = false;
+            prev_trailing_ws = false;
         }
         if let Some(catch_block) = &block.catch {
-            prev_had_content = self.push_await_space_only_body(&mut parts, catch_block);
+            (prev_had_content, prev_trailing_ws) =
+                self.push_await_space_only_body(&mut parts, catch_block);
         }
-        if prev_had_content {
-            parts.push(d.line());
-        }
+        // The close always rides a soft separator so it drops to its own line when the
+        // construct breaks — even after an EMPTY last section (a kept empty `:catch`): a
+        // `line` when that section carried content with trailing whitespace, else a
+        // `softline` (glued inline, a newline on break). Omitting it for an empty last
+        // section would glue `{:catch e}{/await}` even when broken, diverging from the
+        // newline path's `{:catch e}⏎{/await}` — an authoring-dependent non-idempotency.
+        parts.push(boundary_sep(self, prev_had_content && prev_trailing_ws));
         parts.push(d.text("{/await}"));
         d.concat(&parts)
     }
