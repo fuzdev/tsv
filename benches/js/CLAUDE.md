@@ -23,6 +23,7 @@ Uses [@fuzdev/fuz_util](https://github.com/fuzdev/fuz_util) benchmarking library
 | **`deno task conformance:all`** | `conformance` (one process, five FFI legs: `svelte-fixtures` · `ts-fixtures` · `ts-repo` · `corpus:compare:parse --all` · `corpus:compare:format --all`) **+** `conformance:test262` (pure Rust; JS parser vs test262 positives) | `../svelte`, `../acorn-typescript`, `../typescript` (tsc baselines), `../prettier`, `../test262`; the **`gates`** corpus view (~6,200) | release; `scripts/publish.ts` **Step 3b** |
 | **`deno task bench` / `bench:conformance`** | perf throughput ×3 runtimes + compose; parse-coverage report | **`perf`** view (~3,200; 100%-coverage invariant) / **`conformance`** view (fixtures + wpt/test262 harvests; coverage-only + node-only) | dev / release cadence; feeds tsv.fuz.dev |
 | **`deno task idempotency:sweep`** | `tsv_debug fuzz --iterations 0` over the corpus dirs — F1 (`format(format(x)) == format(x)`) + no-panic + structural reparse on every file **as authored** | **`perf`** view (real code; absent checkouts skipped with a warning) | after a printer change; conformance cadence |
+| **`deno task audit:corpus`** | the pure-Rust content-loss / robustness suite over **real code**: `roundtrip_audit --gate` · `comment_audit` · `binding_audit --gate` (real code gating; prettier suites report-only) · `authoring_audit` · `fuzz --iterations 0` (the idempotency:sweep leg) | **`perf`** view + the pinned `../prettier` format suites (absent dev repos skipped with a warning; floor = `../svelte` src) | release; `scripts/publish.ts` **Step 3c**; conformance cadence |
 
 **JS parser (test262) IS release-gated** via `conformance:test262` (pure Rust,
 `tsv_debug test262 --gate`), folded into `conformance:all` which `publish.ts` Step
@@ -36,9 +37,21 @@ partly caught by `corpus:compare:parse` (CSS AST vs `parseCss`).
 pins, checkout alignment, oracle presence, corpus entries, build artifacts)
 ahead of time; Step 3b re-probes the three parser checkouts + `node_modules` and
 **fails a `--wetrun`** on any miss (`--no-check` is the only release-without-gates
-path). CI runs `deno task check` only — it has no sibling checkouts, so of the
-pinned counts only the committed-tree ones (`fixtures_validate`, `swallow_audit`)
-execute there (see §Pinned gate counts).
+path). Step 3c (`audit:corpus`) re-probes `../svelte` src (its reproducible floor)
+with the same posture — a `--wetrun` without it BLOCKS, a dry-run warn-skips; the
+audit itself warn-skips any absent dev-repo checkout. CI runs `deno task check`
+only — it has no sibling checkouts, so of the pinned counts only the committed-tree
+ones (`fixtures_validate`, `swallow_audit`) execute there (see §Pinned gate counts).
+
+**`deno task check` cannot prove real-code robustness** (`tests/fixtures` is
+format-stable by construction, so it never exercises a content-loss / panic /
+reflow bug on real source), so the extension-robustness bar is two release-cadence
+gates over real code: **Step 3b**'s `corpus:compare:format --all` SAFETY (content
+loss vs prettier — needs the FFI + prettier sidecar) and **Step 3c**'s
+`audit:corpus` (the pure-Rust half: reparse-corruption, dropped/double comments,
+comment re-binding, boundary-whitespace + F1 idempotency, no-panic). Every
+content-loss / non-idempotency bug this release cycle was found by one of these,
+never by `check`.
 
 Corpus **views** are defined in §Corpus; the pinned counts every graded gate
 enforces are in §Pinned gate counts.
