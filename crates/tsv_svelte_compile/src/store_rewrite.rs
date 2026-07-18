@@ -212,14 +212,12 @@ impl<'arena> StoreRewriter<'_, 'arena> {
     ) -> Result<Option<Statement<'arena>>, CompileError> {
         use tsv_ts::ast::internal as ast;
         Ok(match stmt {
-            Statement::ExpressionStatement(s) => {
-                self.expr(&s.expression)?.map(|expression| {
-                    Statement::ExpressionStatement(ast::ExpressionStatement {
-                        expression,
-                        ..s.clone()
-                    })
+            Statement::ExpressionStatement(s) => self.expr(&s.expression)?.map(|expression| {
+                Statement::ExpressionStatement(ast::ExpressionStatement {
+                    expression,
+                    ..s.clone()
                 })
-            }
+            }),
             Statement::VariableDeclaration(decl) => {
                 map_slice!(self, decl.declarations, variable_declarator).map(|declarations| {
                     Statement::VariableDeclaration(ast::VariableDeclaration {
@@ -237,9 +235,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                 }),
                 None => None,
             },
-            Statement::BlockStatement(block) => {
-                self.block(block)?.map(Statement::BlockStatement)
-            }
+            Statement::BlockStatement(block) => self.block(block)?.map(Statement::BlockStatement),
             Statement::FunctionDeclaration(decl) => self
                 .function_declaration(decl)?
                 .map(Statement::FunctionDeclaration),
@@ -400,10 +396,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                 })
             }),
             Statement::LabeledStatement(s) => self.statement_ref(s.body)?.map(|body| {
-                Statement::LabeledStatement(ast::LabeledStatement {
-                    body,
-                    ..s.clone()
-                })
+                Statement::LabeledStatement(ast::LabeledStatement { body, ..s.clone() })
             }),
 
             // No store-bearing children, or a statement kind that cannot appear
@@ -431,7 +424,10 @@ impl<'arena> StoreRewriter<'_, 'arena> {
         })
     }
 
-    fn for_init(&mut self, init: &ForInit<'arena>) -> Result<Option<ForInit<'arena>>, CompileError> {
+    fn for_init(
+        &mut self,
+        init: &ForInit<'arena>,
+    ) -> Result<Option<ForInit<'arena>>, CompileError> {
         Ok(match init {
             ForInit::VariableDeclaration(decl) => {
                 map_slice!(self, decl.declarations, variable_declarator).map(|declarations| {
@@ -612,10 +608,12 @@ impl<'arena> StoreRewriter<'_, 'arena> {
         &mut self,
         body: &ClassBody<'arena>,
     ) -> Result<Option<ClassBody<'arena>>, CompileError> {
-        Ok(map_slice!(self, body.body, class_member).map(|members| ClassBody {
-            body: members,
-            span: body.span,
-        }))
+        Ok(
+            map_slice!(self, body.body, class_member).map(|members| ClassBody {
+                body: members,
+                span: body.span,
+            }),
+        )
     }
 
     fn class_member(
@@ -653,14 +651,12 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                     }))
                 }
             }
-            ClassMember::StaticBlock(block) => {
-                self.statements(block.body)?.map(|stmts| {
-                    ClassMember::StaticBlock(StaticBlock {
-                        body: stmts,
-                        span: block.span,
-                    })
+            ClassMember::StaticBlock(block) => self.statements(block.body)?.map(|stmts| {
+                ClassMember::StaticBlock(StaticBlock {
+                    body: stmts,
+                    span: block.span,
                 })
-            }
+            }),
             // Type-only — no value children.
             ClassMember::IndexSignature(_) => None,
         })
@@ -770,12 +766,14 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                 if test.is_none() && consequent.is_none() && alternate.is_none() {
                     None
                 } else {
-                    Some(Expression::ConditionalExpression(ast::ConditionalExpression {
-                        test: test.unwrap_or(cond.test),
-                        consequent: consequent.unwrap_or(cond.consequent),
-                        alternate: alternate.unwrap_or(cond.alternate),
-                        span: cond.span,
-                    }))
+                    Some(Expression::ConditionalExpression(
+                        ast::ConditionalExpression {
+                            test: test.unwrap_or(cond.test),
+                            consequent: consequent.unwrap_or(cond.consequent),
+                            alternate: alternate.unwrap_or(cond.alternate),
+                            span: cond.span,
+                        },
+                    ))
                 }
             }
             Expression::UnaryExpression(unary) => self.expr_ref(unary.argument)?.map(|argument| {
@@ -792,37 +790,35 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                     })
                 })
             }
-            Expression::ObjectExpression(obj) => {
-                map_slice!(self, obj.properties, object_property).map(|properties| {
+            Expression::ObjectExpression(obj) => map_slice!(self, obj.properties, object_property)
+                .map(|properties| {
                     Expression::ObjectExpression(ast::ObjectExpression {
                         properties,
                         ..obj.clone()
                     })
-                })
-            }
+                }),
             Expression::ArrowFunctionExpression(arrow) => {
                 self.arrow(arrow)?.map(Expression::ArrowFunctionExpression)
             }
             Expression::FunctionExpression(func) => self
                 .function_expression(func)?
                 .map(Expression::FunctionExpression),
-            Expression::ClassExpression(class) => {
-                self.class_expression(class)?.map(Expression::ClassExpression)
-            }
+            Expression::ClassExpression(class) => self
+                .class_expression(class)?
+                .map(Expression::ClassExpression),
             Expression::SpreadElement(spread) => self.expr_ref(spread.argument)?.map(|argument| {
                 Expression::SpreadElement(ast::SpreadElement {
                     argument,
                     span: spread.span,
                 })
             }),
-            Expression::TemplateLiteral(template) => {
-                map_slice!(self, template.expressions, expr).map(|expressions| {
+            Expression::TemplateLiteral(template) => map_slice!(self, template.expressions, expr)
+                .map(|expressions| {
                     Expression::TemplateLiteral(ast::TemplateLiteral {
                         expressions,
                         ..template.clone()
                     })
-                })
-            }
+                }),
             Expression::TaggedTemplateExpression(tagged) => {
                 let tag = self.expr_ref(tagged.tag)?;
                 let quasi = map_slice!(self, tagged.quasi.expressions, expr);
@@ -975,9 +971,9 @@ impl<'arena> StoreRewriter<'_, 'arena> {
             // An object-LITERAL property: a shorthand `{ $s }` (≡ `{ $s: $s }`)
             // whose value is rewritten must un-shorthand — the value is no longer
             // the key identifier (`{ $s: $.store_get(…) }`).
-            ObjectProperty::Property(prop) => self
-                .property(prop, true)?
-                .map(ObjectProperty::Property),
+            ObjectProperty::Property(prop) => {
+                self.property(prop, true)?.map(ObjectProperty::Property)
+            }
             ObjectProperty::SpreadElement(spread) => {
                 self.expr_ref(spread.argument)?.map(|argument| {
                     ObjectProperty::SpreadElement(tsv_ts::ast::internal::SpreadElement {
@@ -1001,12 +997,14 @@ impl<'arena> StoreRewriter<'_, 'arena> {
             ObjectPatternProperty::Property(prop) => self
                 .property(prop, false)?
                 .map(ObjectPatternProperty::Property),
-            ObjectPatternProperty::RestElement(rest) => self.expr_ref(rest.argument)?.map(|argument| {
-                ObjectPatternProperty::RestElement(RestElement {
-                    argument,
-                    ..rest.clone()
+            ObjectPatternProperty::RestElement(rest) => {
+                self.expr_ref(rest.argument)?.map(|argument| {
+                    ObjectPatternProperty::RestElement(RestElement {
+                        argument,
+                        ..rest.clone()
+                    })
                 })
-            }),
+            }
         })
     }
 
@@ -1098,11 +1096,13 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                 if left.is_none() && right.is_none() {
                     Ok(None)
                 } else {
-                    Ok(Some(Expression::AssignmentExpression(AssignmentExpression {
-                        left: left.unwrap_or(assign.left),
-                        right: right.unwrap_or(assign.right),
-                        ..assign.clone()
-                    })))
+                    Ok(Some(Expression::AssignmentExpression(
+                        AssignmentExpression {
+                            left: left.unwrap_or(assign.left),
+                            right: right.unwrap_or(assign.right),
+                            ..assign.clone()
+                        },
+                    )))
                 }
             }
         }

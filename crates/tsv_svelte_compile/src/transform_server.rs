@@ -64,6 +64,7 @@ use crate::build::Builder;
 use crate::css_scope::{CssScoping, analyze_style, match_scope, splice_scoped_css};
 use crate::element_census::build_census;
 use crate::fragment::{BodyBuilder, FragmentCtx, emit_fragment};
+use crate::namespace::{FragmentParent, Namespace, infer_namespace};
 use crate::needs_context::{ComponentContext, analyze_component};
 use crate::script_rewrite::{
     BindableEntry, analyze_script, collect_script_comments, document_ts_flag,
@@ -756,6 +757,15 @@ pub(crate) fn compile_server<'arena>(
     for stmt in body {
         out.stmts.push(stmt.clone());
     }
+    // The root fragment re-infers its namespace from its own nodes (Svelte's
+    // `Fragment` visitor with the `Root` parent — in the deep-walk special list),
+    // starting from the html document default.
+    let root_namespace = infer_namespace(
+        &env,
+        Namespace::Html,
+        FragmentParent::Special,
+        root.fragment.nodes,
+    );
     emit_fragment(
         &mut env,
         &root.fragment,
@@ -767,6 +777,8 @@ pub(crate) fn compile_server<'arena>(
             is_standalone: false,
             preserve_whitespace: false,
             parent_name: None,
+            namespace: root_namespace,
+            in_svg_text: false,
         },
     )?;
     // `if ($$store_subs) $.unsubscribe_stores($$store_subs);` is the store-cleanup

@@ -30,6 +30,7 @@ use crate::blocks::{
 };
 use crate::build::{Builder, escape_template_text};
 use crate::element::{component_is_standalone_eligible, emit_element, emit_svelte_element};
+use crate::namespace::{ChildNamespace, Namespace, infer_namespace};
 use crate::rune_guard::{WalkCtx, walk_expression_guarded};
 use crate::snippet_emit::{
     emit_render_tag, emit_snippet, render_callee_dynamic, render_callee_name,
@@ -247,8 +248,18 @@ pub(crate) struct FragmentCtx<'p> {
     pub(crate) is_standalone: bool,
     /// Inside `<pre>`/`<textarea>`: no whitespace normalization.
     pub(crate) preserve_whitespace: bool,
-    /// The enclosing element's name (`None` at the root).
+    /// The enclosing element's name (`None` at the root, and `None` through a
+    /// block/component/`<svelte:element>` body — matching the oracle's `parent`,
+    /// which is the block node, not an element, for the select/table and svg
+    /// `<text>` per-immediate-parent checks).
     pub(crate) parent_name: Option<&'p str>,
+    /// This fragment's SSR namespace (Svelte's re-inferred `state.namespace`),
+    /// which governs the svg whitespace-removal rule in [`normalize_whitespace`].
+    pub(crate) namespace: Namespace,
+    /// Whether the immediate parent or any ancestor is an svg `<text>` element —
+    /// svg whitespace is kept inside `<text>` (the oracle's `parent.name !==
+    /// 'text' && !path.some(text)` guard, collapsed to one ancestor-aware flag).
+    pub(crate) in_svg_text: bool,
 }
 
 /// Walk a fragment: normalize whitespace per the oracle's `clean_nodes` rules,
@@ -395,7 +406,7 @@ pub(crate) fn emit_fragment<'arena>(
     }
 
     if !ctx.preserve_whitespace {
-        normalize_whitespace(&mut list, ctx.parent_name);
+        normalize_whitespace(&mut list, ctx.parent_name, ctx.namespace, ctx.in_svg_text);
     }
 
     // A lone leading newline text in <pre> is dropped (the browser would drop
@@ -640,9 +651,13 @@ pub(crate) fn emit_child_body<'arena>(
     pre: &[Statement<'arena>],
     mark_text_first: bool,
     preserve_whitespace: bool,
+    ns: ChildNamespace,
     overlay: HashMap<String, ScopeEntry<'arena>>,
 ) -> Result<&'arena [Statement<'arena>], CompileError> {
     let arena = env.b.arena;
+    // Re-infer this fragment's namespace from its own nodes (Svelte's `Fragment`
+    // visitor), falling back to the inherited namespace.
+    let namespace = infer_namespace(env, ns.inherited, ns.parent, fragment.nodes);
     env.push_overlay(overlay)?;
     let mut child = BodyBuilder::new_in(arena);
     for stmt in pre {
@@ -659,6 +674,8 @@ pub(crate) fn emit_child_body<'arena>(
             is_standalone: false,
             preserve_whitespace,
             parent_name: None,
+            namespace,
+            in_svg_text: ns.in_svg_text,
         },
     );
     env.pop_overlay();
@@ -1188,8 +1205,14 @@ const REMOVE_WS_ENTIRELY_PARENTS: &[&str] = &[
 /// then each text node's edge runs abutting a non-text node collapse to one
 /// space (or nothing after a whitespace-ending text) — runs abutting `{expr}`
 /// tags stay, interior whitespace stays. An all-collapsed `" "` text is dropped
-/// entirely under the `select`/`table`-family parents.
-fn normalize_whitespace(list: &mut Vec<CleanNode<'_>>, parent_name: Option<&str>) {
+/// entirely under the `select`/`table`-family parents, and — the svg case — under
+/// the `svg` namespace anywhere except inside a `<text>` element.
+fn normalize_whitespace(
+    list: &mut Vec<CleanNode<'_>>,
+    parent_name: Option<&str>,
+    namespace: Namespace,
+    in_svg_text: bool,
+) {
     // Boundary: drop whitespace-only text nodes, then trim the edge runs of a
     // surviving edge text node.
     while matches!(list.first(), Some(CleanNode::Text(t)) if is_ws_only(t)) {
@@ -1205,8 +1228,12 @@ fn normalize_whitespace(list: &mut Vec<CleanNode<'_>>, parent_name: Option<&str>
         *t = replace_trailing_ws(t, "");
     }
 
-    let can_remove_entirely =
-        parent_name.is_some_and(|name| REMOVE_WS_ENTIRELY_PARENTS.contains(&name));
+    // The oracle's `can_remove_entirely`: under the svg namespace, collapsed
+    // whitespace is dropped rather than kept as a space — EXCEPT inside a `<text>`
+    // element (svg `<text>` preserves whitespace) — plus the `select`/`table`-family
+    // parents.
+    let can_remove_entirely = (namespace == Namespace::Svg && !in_svg_text)
+        || parent_name.is_some_and(|name| REMOVE_WS_ENTIRELY_PARENTS.contains(&name));
 
     // Inner pass: mutate in place reading the (already-mutated) previous
     // neighbor, mirroring the oracle's in-place iteration; drops applied after

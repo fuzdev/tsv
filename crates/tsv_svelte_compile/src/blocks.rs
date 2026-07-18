@@ -26,6 +26,7 @@ use crate::fragment::{
     BodyBuilder, FragmentCtx, emit_child_body, guard_dropped, guard_dropped_fragment,
     guard_pattern, wrap_single,
 };
+use crate::namespace::{ChildNamespace, FragmentParent, Namespace};
 use crate::script_rewrite::plain_identifier_name;
 use crate::transform_server::{EmitEnv, unsupported};
 use crate::{CompileError, Refusal};
@@ -40,6 +41,18 @@ fn check_name_free(env: &EmitEnv<'_, '_>, name: &str) -> Result<(), CompileError
         }));
     }
     Ok(())
+}
+
+/// The namespace context a control-flow block body inherits: the enclosing
+/// fragment's namespace as the fallback, re-inferred from the body's own DIRECT
+/// children (a block is not in the oracle's deep-walk special list, so only the
+/// shallow loop runs), carrying the svg-`<text>` flag through.
+fn block_child_ns(ctx: &FragmentCtx<'_>) -> ChildNamespace {
+    ChildNamespace {
+        inherited: ctx.namespace,
+        parent: FragmentParent::Block,
+        in_svg_text: ctx.in_svg_text,
+    }
 }
 
 /// A single-declarator `let`/`const` declaration statement.
@@ -90,7 +103,21 @@ pub(crate) fn emit_svelte_head<'arena>(
         return Err(unsupported(Refusal::SvelteHeadAttributes));
     }
     // The head body: a normal fragment (not text-first-marked) in the closure.
-    let body = emit_child_body(env, &head.fragment, &[], false, false, HashMap::new())?;
+    // `<svelte:head>` is not in the oracle's deep-walk special list, and its
+    // content is html at the component root.
+    let body = emit_child_body(
+        env,
+        &head.fragment,
+        &[],
+        false,
+        false,
+        ChildNamespace {
+            inherited: Namespace::Html,
+            parent: FragmentParent::Block,
+            in_svg_text: false,
+        },
+        HashMap::new(),
+    )?;
     let here = env.b.here();
     let renderer_param = Expression::Identifier(env.b.ident("$$renderer"));
     let params = std::slice::from_ref(arena.alloc(renderer_param));
@@ -255,6 +282,7 @@ pub(crate) fn emit_if_block<'arena>(
             std::slice::from_ref(&anchor),
             false,
             preserve,
+            block_child_ns(ctx),
             HashMap::new(),
         )?;
         let block = block_stmt(&env.b, body);
@@ -270,6 +298,7 @@ pub(crate) fn emit_if_block<'arena>(
             std::slice::from_ref(&else_anchor),
             false,
             preserve,
+            block_child_ns(ctx),
             HashMap::new(),
         )?,
         None => {
@@ -450,6 +479,7 @@ pub(crate) fn emit_each_block<'arena>(
         &array_name,
         &index_name,
         preserve,
+        block_child_ns(ctx),
         overlay,
     );
     env.in_each = false;
@@ -483,6 +513,7 @@ pub(crate) fn emit_each_block<'arena>(
             std::slice::from_ref(&else_anchor),
             true,
             preserve,
+            block_child_ns(ctx),
             HashMap::new(),
         )?;
         let else_branch = block_stmt(&env.b, fallback_stmts);
@@ -514,6 +545,7 @@ pub(crate) fn emit_each_block<'arena>(
 /// The `{#each}` body: `let CTX = each_array[IDX]` (when `as` is present) then
 /// the body fragment (which gets the text-first `<!---->` marker). `context` is
 /// the **erased** binding pattern.
+#[allow(clippy::too_many_arguments)] // one cohesive each-body emit; splitting would just re-thread the same state
 fn emit_each_body<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     each: &'arena EachBlock<'arena>,
@@ -521,6 +553,7 @@ fn emit_each_body<'arena>(
     array_name: &str,
     index_name: &str,
     preserve: bool,
+    ns: ChildNamespace,
     overlay: HashMap<String, ScopeEntry<'arena>>,
 ) -> Result<&'arena [Statement<'arena>], CompileError> {
     let arena = env.b.arena;
@@ -537,7 +570,7 @@ fn emit_each_body<'arena>(
         );
         pre.push(let_stmt);
     }
-    emit_child_body(env, &each.body, &pre, true, preserve, overlay)
+    emit_child_body(env, &each.body, &pre, true, preserve, ns, overlay)
 }
 
 /// Emit `{#await}`: `$.await($$renderer, expr, () => {pending}, (value?) => {then})`
@@ -566,7 +599,15 @@ pub(crate) fn emit_await_block<'arena>(
     // Pending arrow: `() => { pending }` (empty when there is no pending content).
     let empty: &'arena [Statement<'arena>] = &[];
     let pending_stmts = match &await_block.pending {
-        Some(frag) => emit_child_body(env, frag, &[], false, preserve, HashMap::new())?,
+        Some(frag) => emit_child_body(
+            env,
+            frag,
+            &[],
+            false,
+            preserve,
+            block_child_ns(ctx),
+            HashMap::new(),
+        )?,
         None => empty,
     };
     let pending_here = env.b.here();
@@ -592,7 +633,15 @@ pub(crate) fn emit_await_block<'arena>(
                     overlay.insert(name, ScopeEntry::Masked);
                 }
             }
-            emit_child_body(env, frag, &[], false, preserve, overlay)?
+            emit_child_body(
+                env,
+                frag,
+                &[],
+                false,
+                preserve,
+                block_child_ns(ctx),
+                overlay,
+            )?
         }
         None => empty,
     };
@@ -637,7 +686,15 @@ pub(crate) fn emit_key_block<'arena>(
     let preserve = ctx.preserve_whitespace;
     guard_dropped(env, &key.expression)?;
     out.push_text("<!---->");
-    let body = emit_child_body(env, &key.fragment, &[], false, preserve, HashMap::new())?;
+    let body = emit_child_body(
+        env,
+        &key.fragment,
+        &[],
+        false,
+        preserve,
+        block_child_ns(ctx),
+        HashMap::new(),
+    )?;
     let block = block_stmt(&env.b, body);
     out.push_statement(&mut env.b, arena, (*block).clone());
     out.push_text("<!---->");

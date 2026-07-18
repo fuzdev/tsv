@@ -21,7 +21,7 @@ use std::path::Path;
 use tsv_debug::compile_fixtures::{
     COMPILE_FIXTURES_DIR, walk_compile_fixtures, with_trailing_newline,
 };
-use tsv_svelte_compile::{CompileOptions, canonicalize_js, compile};
+use tsv_svelte_compile::{CompileOptions, canonicalize_js, compare_canonical, compile};
 
 #[test]
 fn test_all_compile_fixtures() {
@@ -103,8 +103,12 @@ fn test_all_compile_fixtures() {
         if let (Some(input), Some(expected_js)) = (&input, &expected_js) {
             match compile(input, &CompileOptions::default()) {
                 Ok(ours) => {
+                    // Parity tolerates a comment-POSITION difference (tsv's comment
+                    // placement vs the oracle's, which `expected_server.js` records) —
+                    // same code, same comment sequence, no bundler annotation.
                     match canonicalize_js(&ours.js) {
-                        Ok(canonical) if &canonical == expected_js => {}
+                        Ok(canonical) if compare_canonical(&canonical, expected_js).is_parity() => {
+                        }
                         Ok(canonical) => failures.push(format!(
                             "{name}: compiled js differs from expected_server.js\n\
                              --- ours ---\n{canonical}--- expected ---\n{expected_js}"

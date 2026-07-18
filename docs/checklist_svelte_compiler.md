@@ -231,7 +231,13 @@ relocates every script comment down into the component body (leading the first
 surviving statement) with the imports hoisted comment-free, and tsv reproduces
 that.
 
-- **Supported**: comments alongside template blocks (`{#if}`/`{#each}`/`{#await}`/`{#key}`/`{@const}`), a component invocation, `{#snippet}`/`{@render}` (hoisted or body-local), expression-valued attributes (`class={c}`, `style:` / `class:` / `bind:` directives, `{...spread}`), and hoisted imports (a comment before/between/after imports relocates down to lead the first surviving statement, as the oracle does) — provided a surviving body statement exists to anchor the comment (an import-only script, or a comment after the last surviving statement, refuses; see below).
+- **Supported**: comments alongside template blocks (`{#if}`/`{#each}`/`{#await}`/`{#key}`/`{@const}`), a component invocation, `{#snippet}`/`{@render}` (hoisted or body-local), expression-valued attributes (`class={c}`, `style:` / `class:` / `bind:` directives, `{...spread}`), hoisted imports (a comment before/between/after imports relocates down to lead the first surviving statement, as the oracle does), and a **`$derived(e)`/`$derived.by(f)` declarator** (the synthetic `$.derived(…)` and its arrow steal the replaced init's host span — `build.rs::derived_call` — so a following script comment flows to the next statement instead of being swept into the derived slot) — provided a surviving body statement exists to anchor the comment (an import-only script, or a comment after the last surviving statement, refuses; see below).
+
+**Comment position is tolerated, not pinned.** A carried comment that tsv places
+by its own comment philosophy where the oracle (esrap) relocates it — a comment at
+an operator / conditional boundary inside an expression — still reaches parity: the
+parity bar tolerates a comment-*position* difference (same code, same comment
+sequence). See the crate `CLAUDE.md` §The Parity Bar.
 
 The classes that still refuse are the ones where the comment has no surviving
 anchor and the oracle re-anchors it in a way the span-window model can't reproduce,
@@ -241,8 +247,8 @@ or where a rune rewrite mints a script-region span a comment window would sweep:
 - **Refused**: `leading comment glued to the <script> line (no newline before it)`
 - **Refused**: `multi-line block comment in script (interior-line re-indentation not carried through)` — the oracle re-indents a block comment's interior lines to the emit position; tsv carries them verbatim
 - **Refused**: `comments with template markup before the script (window ordering)`
-- **Refused**: `comment inside a rewritten rune region (dropped by the transform)`
-- **Refused**: `comments in a script that uses $derived (not carried through yet)` — the `$.derived(() => e)` thunk wraps a **script-region** operand, so its argument-list window sweeps later script comments (a double-print); the rune rewrites below share this shape
+- **Refused**: `comment inside a rewritten rune region (dropped by the transform)` — includes a comment INTERIOR to a `$derived(e)`/`$derived.by(f)` argument, whose synthesized `() => …` arrow would double-print it (the whole derived init is a dropped region; a comment *around* the derived declarator still carries)
+- **Refused**: `comments in a script that references a store ($$store_subs injection)` — the `var $$store_subs;` injection (and the `$.store_get`/`$.store_set` mints) are synthetic spans whose windows would sweep the carried comments; fires for a template-only `$name` read too (`CommentsWithStore`)
 - **Refused**: `comments in a script with an argument-less $state()`
 - **Refused**: `format-ignore directive comment in script`
 - **Refused**: `template comments (only instance-script comments are carried through)`
@@ -253,7 +259,7 @@ or where a rune rewrite mints a script-region span a comment window would sweep:
 
 ### Static emission — Supported
 
-The oracle's normalization (`3-transform/utils.js:126` `clean_nodes`, `escape_html`), probe-verified: whitespace-only boundary text drops and edge runs trim per fragment; a text edge run abutting a non-text node collapses to one space (text + `{expr}` count as one text); interior whitespace is verbatim; `<pre>`/`<textarea>` preserve everything; entities decode then re-escape (`[&<]` in text, `[&"<]` in static attributes); boolean attributes emit `name=""`; `class`/`style` values collapse+trim; a string-valued `class` that collapses+trims to empty is dropped entirely (static path only — bare `class` keeps `class=""`, empty `style`/`id` stay, a *folded* mixed class keeps `class=""`); void elements close `/>`; a text-first fragment (component root or `{#each}` body — `3-transform/utils.js:295` `is_text_first`) gets a `<!---->` prefix.
+The oracle's normalization (`3-transform/utils.js:126` `clean_nodes`, `escape_html`), probe-verified: whitespace-only boundary text drops and edge runs trim per fragment; a text edge run abutting a non-text node collapses to one space (text + `{expr}` count as one text) — **removed entirely** under the `svg` namespace (inferred per fragment, `namespace.rs`) except inside `<text>`, and under the select/table-family parents; interior whitespace is verbatim; `<pre>`/`<textarea>` preserve everything; entities decode then re-escape (`[&<]` in text, `[&"<]` in static attributes); boolean attributes emit `name=""`; `class`/`style` values collapse+trim; a string-valued `class` that collapses+trims to empty is dropped entirely (static path only — bare `class` keeps `class=""`, empty `style`/`id` stay, a *folded* mixed class keeps `class=""`); void elements close `/>`; a text-first fragment (component root or `{#each}` body — `3-transform/utils.js:295` `is_text_first`) gets a `<!---->` prefix.
 
 ### Expressions — Supported
 
@@ -365,7 +371,7 @@ A **static** component invocation compiles to `Name($$renderer, props)` (`shared
 | components (`<Foo … />`) | Supported (self-closing / prop-only) — see [Components](#components) |
 | `<option>` | **Refused**: `<option> (oracle emits $$renderer.option closures)` |
 | populated `<select>` / `<optgroup>` | **Refused**: `` <{name}> with children (oracle emits a `<!>` anchor) `` (empty `<select>` is Supported) |
-| SVG / MathML | **Refused**: `<{name}> (foreign namespace)` |
+| SVG / MathML | Supported — the fragment's `svg`/`mathml` namespace is inferred (`namespace.rs`, Svelte's `infer_namespace`), so collapsed inter-node whitespace is removed under `svg` (except inside `<text>`), attribute-name case is preserved (`viewBox`), and a spread sets the namespaced `flags`. `<a>`/`<title>` are svg only under an svg ancestor. |
 | template-level `<script>` / `<style>` | **Refused**: `template-level <{name}>` |
 | children on a void element | **Refused**: `children on void element <{name}>` |
 | `<svelte:head>` → `$.head(hash, $$renderer, ($$renderer) => { … })`, hoisted to the fragment front; the head body is a normal fragment (so a `<title>` or other special child refuses through the usual path). The `hash` is the ported `hash("input.svelte")` (`SvelteHead.js`, Svelte's `utils.js`). | Supported |

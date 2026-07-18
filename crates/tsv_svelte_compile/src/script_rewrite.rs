@@ -773,14 +773,19 @@ pub(crate) fn rewrite_script_statement<'arena>(
         if let (Some(init), Some(_)) = (&declarator.init, &rune) {
             let init_span = init.span();
             match rune {
-                Some(RuneInit::State(Some(arg)))
-                | Some(RuneInit::StateSnapshot(arg))
-                | Some(RuneInit::Derived(arg))
-                | Some(RuneInit::DerivedBy(arg)) => {
+                // `$state(v)` / `$state.snapshot(x)` unwrap to the bare argument (no
+                // synthesized syntax around it), so the borrowed argument carries its
+                // own interior comments and only the call syntax around it is dropped.
+                Some(RuneInit::State(Some(arg))) | Some(RuneInit::StateSnapshot(arg)) => {
                     let arg_span = arg.span();
                     dropped_regions.push(Span::new(init_span.start, arg_span.start));
                     dropped_regions.push(Span::new(arg_span.end, init_span.end));
                 }
+                // `$derived(e)` / `$derived.by(f)` wrap the argument in a synthesized
+                // `() => …` arrow whose param-list span sweeps a comment INTERIOR to the
+                // argument into a double-print (and the oracle relocates it). Drop the
+                // WHOLE init span so a comment anywhere inside refuses — the argument's
+                // borrowed expression must not carry a comment through the arrow synthesis.
                 _ => dropped_regions.push(init_span),
             }
         }

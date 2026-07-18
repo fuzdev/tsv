@@ -585,7 +585,12 @@ impl<'arena> Builder<'arena> {
     /// (`$x++` / `$x--`); `decrement` appends the trailing `-1` argument
     /// (increment elides it). The printer parenthesizes the `??=` assignment
     /// argument, like [`store_get`](Self::store_get).
-    pub fn update_store(&mut self, base: &str, prefix: bool, decrement: bool) -> Expression<'arena> {
+    pub fn update_store(
+        &mut self,
+        base: &str,
+        prefix: bool,
+        decrement: bool,
+    ) -> Expression<'arena> {
         let assign = self.store_subs_assign();
         let name_lit = self.string_literal_expr(&format!("${base}"));
         let base_ident = Expression::Identifier(self.ident(base));

@@ -14,6 +14,7 @@ use tsv_ts::ast::internal::{CallExpression, Expression, ExpressionStatement, Sta
 
 use crate::analyze::{ScopeEntry, pattern_binding_names};
 use crate::fragment::{BodyBuilder, emit_child_body, wrap_single};
+use crate::namespace::{ChildNamespace, FragmentParent, Namespace};
 use crate::snippet::snippet_name;
 use crate::transform_server::{EmitEnv, unsupported};
 use crate::{CompileError, Refusal};
@@ -104,8 +105,23 @@ pub(crate) fn build_snippet_function<'arena>(
     }
 
     // Snippet bodies are in the oracle's `is_text_first` parent set, so a
-    // text-first body gets the leading `<!---->` anchor.
-    let body = emit_child_body(env, &snippet.body, &[], true, false, overlay)?;
+    // text-first body gets the leading `<!---->` anchor. A `{#snippet}` is in the
+    // deep-walk special list and re-infers its namespace from its own nodes; the
+    // defining-scope namespace is not threaded through the hoist, so the html
+    // default is the fallback when the body holds no elements.
+    let body = emit_child_body(
+        env,
+        &snippet.body,
+        &[],
+        true,
+        false,
+        ChildNamespace {
+            inherited: Namespace::Html,
+            parent: FragmentParent::Special,
+            in_svg_text: false,
+        },
+        overlay,
+    )?;
 
     // `($$renderer, ...params)` — the synthetic renderer first, then the erased
     // parameter patterns.

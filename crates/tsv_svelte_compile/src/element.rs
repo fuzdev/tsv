@@ -30,6 +30,9 @@ use crate::css_scope::SCOPE_HASH_CLASS;
 use crate::fragment::{
     BodyBuilder, FragmentCtx, emit_child_body, emit_fragment, guard_dropped, wrap_value_expr,
 };
+use crate::namespace::{
+    ChildNamespace, FragmentParent, Namespace, determine_namespace_for_children,
+};
 use crate::script_rewrite::plain_identifier_name;
 use crate::snippet_emit::build_snippet_function;
 use crate::transform_server::{EmitEnv, unsupported};
@@ -157,15 +160,16 @@ fn emit_host_attributes<'arena>(
     name: &str,
     out: &mut BodyBuilder<'arena>,
     scoped: bool,
+    namespace: Namespace,
 ) -> Result<(), CompileError> {
     let has_spread = host
         .attributes()
         .iter()
         .any(|attr_node| matches!(attr_node, AttributeNode::SpreadAttribute(_)));
     if has_spread {
-        emit_spread_attributes(env, host, name, out, scoped)
+        emit_spread_attributes(env, host, name, out, scoped, namespace)
     } else {
-        emit_plain_attributes(env, host, name, out, scoped)
+        emit_plain_attributes(env, host, name, out, scoped, namespace)
     }
 }
 
@@ -192,12 +196,6 @@ pub(crate) fn emit_element<'arena>(
         ElementKind::Component => return emit_component(env, element, out, &name, is_standalone),
     }
     match name.as_str() {
-        // Namespace-dependent whitespace/emission rules not implemented.
-        "svg" | "math" => {
-            return Err(unsupported(Refusal::ForeignNamespace {
-                name: name.clone(),
-            }));
-        }
         // Template-level <script>/<style> have special semantics in the oracle.
         "script" | "style" => {
             return Err(unsupported(Refusal::TemplateLevelElement {
@@ -236,6 +234,10 @@ pub(crate) fn emit_element<'arena>(
         &name,
         out,
         env.element_scope(element),
+        // The element sits in the enclosing fragment's namespace — the ancestor
+        // signal for its own `<a>`/`<title>` svg-ness (attribute-name casing,
+        // spread flags).
+        parent_ctx.namespace,
     )?;
 
     if tsv_html::is_void_element(&name) {
@@ -262,6 +264,14 @@ pub(crate) fn emit_element<'arena>(
                 || name == "pre"
                 || name == "textarea",
             parent_name: Some(&name),
+            // An element's children fragment is in the element's own namespace
+            // (Svelte's `determine_namespace_for_children`) — computed from the
+            // element's name and the namespace IT sits in (`parent_ctx.namespace`,
+            // the ancestor signal for a `<a>`/`<title>` element).
+            namespace: determine_namespace_for_children(&name, parent_ctx.namespace),
+            // Entering an svg `<text>` turns whitespace preservation on for its
+            // whole subtree (the oracle's ancestor `<text>` guard).
+            in_svg_text: parent_ctx.in_svg_text || name == "text",
         },
     )?;
     out.push_text(&format!("</{name}>"));
@@ -278,6 +288,7 @@ fn emit_plain_attributes<'arena>(
     name: &str,
     out: &mut BodyBuilder<'arena>,
     scoped: bool,
+    namespace: Namespace,
 ) -> Result<(), CompileError> {
     let attributes = host.attributes();
     // The oracle's phase-2 directive-validity checks run before it discards the
@@ -342,7 +353,7 @@ fn emit_plain_attributes<'arena>(
                     emit_style_directives(env, Some(attr), &style_directives, out)?;
                     style_call_emitted = true;
                 } else {
-                    emit_attribute(env, attr, name, out, element_scoped)?;
+                    emit_attribute(env, attr, name, out, element_scoped, namespace)?;
                 }
             }
             // `class:`/`style:` directives fuse into the single
@@ -444,13 +455,24 @@ fn is_custom_element_node(env: &EmitEnv<'_, '_>, element: &Element<'_>, name: &s
 }
 
 /// The ELEMENT flag bits the oracle folds into the 5th `$.attributes(…)` argument
-/// (`prepare_element_spread`). svg/math (`ELEMENT_IS_NAMESPACED`) already refuse
-/// as a foreign namespace, so only two arise here, in the oracle's `else if`
-/// precedence: a custom element preserves attribute case
-/// (`ELEMENT_PRESERVE_ATTRIBUTE_CASE`, `2`), else an `<input>` gets
-/// `ELEMENT_IS_INPUT` (`4`); every other element is `0`.
-fn spread_element_flags(env: &EmitEnv<'_, '_>, element: &Element<'_>, name: &str) -> u32 {
-    if is_custom_element_node(env, element, name) {
+/// (`prepare_element_spread`), in its `if`/`else if` precedence: an svg/mathml
+/// element is namespaced AND preserves attribute case (`ELEMENT_IS_NAMESPACED |
+/// ELEMENT_PRESERVE_ATTRIBUTE_CASE`, `1 | 2 = 3`), else a custom element preserves
+/// attribute case (`ELEMENT_PRESERVE_ATTRIBUTE_CASE`, `2`), else an `<input>` gets
+/// `ELEMENT_IS_INPUT` (`4`); every other element is `0`. `inherited` is the
+/// namespace the element sits in — the ancestor signal for a `<a>`/`<title>`
+/// element's svg-ness.
+fn spread_element_flags(
+    env: &EmitEnv<'_, '_>,
+    element: &Element<'_>,
+    name: &str,
+    inherited: Namespace,
+) -> u32 {
+    if crate::namespace::element_is_svg(name, inherited)
+        || crate::namespace::element_is_mathml(name)
+    {
+        3
+    } else if is_custom_element_node(env, element, name) {
         2
     } else if name == "input" {
         4
@@ -475,6 +497,7 @@ fn build_element_spread_object<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     host: AttrHost<'arena>,
     name: &str,
+    namespace: Namespace,
 ) -> Result<Expression<'arena>, CompileError> {
     let arena = env.b.arena;
     let obrace = env.b.mint("{").start;
@@ -482,7 +505,7 @@ fn build_element_spread_object<'arena>(
     for attr_node in host.attributes() {
         match attr_node {
             AttributeNode::Attribute(attr) => {
-                if let Some(property) = build_spread_object_property(env, attr, name)? {
+                if let Some(property) = build_spread_object_property(env, attr, name, namespace)? {
                     properties.push(ObjectProperty::Property(property));
                 }
             }
@@ -572,7 +595,8 @@ fn elide_call_args<'arena>(
 ///   identifier keys + shorthand), absent when there are none;
 /// - **styles** (4th): the `style:` directives object ([`build_spread_style_object`],
 ///   a FLAT object — no `|important` partitioning), absent when there are none;
-/// - **flags** (5th): `4` (`<input>`) / `2` (custom element), else absent.
+/// - **flags** (5th): `3` (svg/mathml element — namespaced + preserve-case) /
+///   `2` (custom element) / `4` (`<input>`), in that precedence, else absent.
 ///
 /// Trailing absent arguments elide; an interior absent one becomes `void 0`. The
 /// no-op drop family (`use:`/`transition:`/…/`{@attach}`) contributes nothing but is
@@ -591,6 +615,7 @@ fn emit_spread_attributes<'arena>(
     name: &str,
     out: &mut BodyBuilder<'arena>,
     scoped: bool,
+    namespace: Namespace,
 ) -> Result<(), CompileError> {
     // The `<select>` spread trap: the oracle routes a spread on a select through
     // `$$renderer.select(...)`, a different callee than `$.attributes`. (A
@@ -656,7 +681,7 @@ fn emit_spread_attributes<'arena>(
     // element passes `env.element_scope`, a `<svelte:element>` passes
     // `env.special_element_scope`). When scoped, the hash rides the `css_hash` (2nd)
     // argument, never concatenated into the class value.
-    let object = build_element_spread_object(env, host, name)?;
+    let object = build_element_spread_object(env, host, name, namespace)?;
     let css_hash = scoped.then(|| env.b.string_literal_expr(SCOPE_HASH_CLASS));
     let classes = (!class_directives.is_empty())
         .then(|| build_spread_class_object(env, &class_directives))
@@ -667,9 +692,12 @@ fn emit_spread_attributes<'arena>(
     // A `<svelte:element>`'s name is always the literal `svelte:element`, so it is
     // never `<input>`/custom → no `flags` argument (the oracle never sets
     // `ELEMENT_IS_INPUT`/`ELEMENT_PRESERVE_ATTRIBUTE_CASE` for one, even
-    // `this="input"`).
+    // `this="input"`). The oracle WOULD set `ELEMENT_IS_NAMESPACED` when the
+    // dynamic tag resolves to svg/mathml (its ancestor-derived `metadata.svg`), but
+    // that rides the same runtime-tag namespace approximation as the rest of the
+    // `<svelte:element>` path (see `namespace::FragmentParent::DynamicElement`).
     let flags_value = match host {
-        AttrHost::Regular(element) => spread_element_flags(env, element, name),
+        AttrHost::Regular(element) => spread_element_flags(env, element, name, namespace),
         AttrHost::Dynamic(_) => 0,
     };
     let flags = match flags_value {
@@ -762,6 +790,10 @@ pub(crate) fn emit_svelte_element<'arena>(
         "svelte:element",
         &mut attrs_body,
         scoped,
+        // The `<svelte:element>` sits in the enclosing fragment's namespace. Its
+        // own tag is never svg/mathml by NAME (`svelte:element`), so this only
+        // affects a name-keyed classification that never fires for it.
+        ctx.namespace,
     )?;
     let attr_stmts = attrs_body.finish(&mut env.b, arena);
     let attrs_fn = (!attr_stmts.is_empty()).then(|| paramless_renderer_arrow(env, attr_stmts));
@@ -775,6 +807,14 @@ pub(crate) fn emit_svelte_element<'arena>(
         &[],
         false,
         ctx.preserve_whitespace,
+        // A `<svelte:element>`'s runtime tag is unknown at compile time, so its
+        // children keep the inherited namespace (the oracle reads its ancestor-
+        // derived `metadata.svg`; see `FragmentParent::DynamicElement`).
+        ChildNamespace {
+            inherited: ctx.namespace,
+            parent: FragmentParent::DynamicElement,
+            in_svg_text: ctx.in_svg_text,
+        },
         HashMap::new(),
     )?;
     let children_fn = (!child_stmts.is_empty()).then(|| paramless_renderer_arrow(env, child_stmts));
@@ -1289,7 +1329,23 @@ fn build_children_prop<'arena>(
     let arena = env.b.arena;
     let key = env.b.ident("children");
     let key_span = key.span;
-    let body = emit_child_body(env, fragment, &[], true, false, HashMap::new())?;
+    // Component children (the default-slot `children` snippet) re-infer their
+    // namespace from their own nodes (Svelte's `Component` parent — in the
+    // deep-walk special list); the inherited context is not threaded here, so the
+    // html document default is the fallback when the slot holds no elements.
+    let body = emit_child_body(
+        env,
+        fragment,
+        &[],
+        true,
+        false,
+        ChildNamespace {
+            inherited: Namespace::Html,
+            parent: FragmentParent::Special,
+            in_svg_text: false,
+        },
+        HashMap::new(),
+    )?;
     let renderer_param = Expression::Identifier(env.b.ident("$$renderer"));
     let params = std::slice::from_ref(arena.alloc(renderer_param));
     let block_span = env.b.here();

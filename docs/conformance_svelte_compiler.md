@@ -11,6 +11,15 @@ on the **canonical reprint** of both sides' JS
 (`tsv_svelte_compile::canonicalize_js`), so a divergence here is a *real code
 difference*, never formatting.
 
+**One mechanism-level, cataloged relaxation: comment position.** The parity
+comparison (`compare_canonical`) tolerates two canonical forms that differ ONLY in
+where comments sit — same code, same comment sequence, no bundler annotation. tsv
+places comments by its own philosophy (a deliberate divergence from prettier/esrap);
+in machine-consumed compiled output that position carries no correctness signal, so
+the bar is relaxed to code + comment presence + semantic-comment binding rather than
+raw bytes. This is a standing stance, not a per-fixture `_compiled_divergence` entry
+(the catalog below stays empty). Full contract: the crate `CLAUDE.md` §The Parity Bar.
+
 ### Refusing is not diverging
 
 Two different things can follow from an oracle bug, and only one of them lands

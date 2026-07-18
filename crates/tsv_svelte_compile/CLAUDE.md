@@ -136,6 +136,17 @@ project-wide conventions.
   (user-chosen names collapse to a `{placeholder}` so e.g. every event
   attribute shares one bucket). The single source of truth for the refusal
   contract.
+- `parity.rs` — **the comment-position-tolerant parity comparator**
+  (`compare_canonical` → `Parity`). The compiler's parity bar over two canonical JS
+  strings: byte-exact, or tolerated when they differ ONLY in comment *position*
+  (same code, same comment sequence, no bundler annotation). See §The Parity Bar.
+- `namespace.rs` — **the SSR namespace inference** (Svelte's `infer_namespace` /
+  `check_nodes_for_namespace` / `determine_namespace_for_children`): the `svg`/`mathml`/`html`
+  namespace of each fragment, threaded through emission so the whitespace pass removes
+  collapsed inter-node whitespace under `svg` (matching the oracle). Also the
+  ancestor-aware `element_is_svg`/`element_is_mathml` classifiers the whitespace,
+  attribute-case, and spread-flag paths share (the `<a>`/`<title>` cases are svg only
+  under an svg ancestor).
 - `erase.rs` — **TypeScript type erasure**, the compiler's `remove_typescript_nodes`:
   a tree→tree pre-pass over the instance script's `Program` producing a type-free
   statement list, run BEFORE every analysis pass and before codegen (the oracle's
@@ -647,8 +658,8 @@ and reprints it through `tsv_ts::format_canonical`, which erases newline-derived
 Two guarantees follow. **Idempotence**: canonicalizing an already-canonical string
 reproduces it. **Authoring-independence**: two programs that differ only in
 incidental whitespace reprint to the same string. Together these make a byte
-difference between two canonical forms a genuine code difference — the parity bar
-for oracle comparison.
+difference between two canonical forms either a genuine code difference or a comment
+*position* difference — the substrate the parity bar (below) refines.
 
 The output is self-validated: `canonicalize_js` reparses its own reprint before
 returning and surfaces a rejection as `CanonicalizeError::CorruptOutput` — a
@@ -658,6 +669,47 @@ Real content is *not* intent and survives verbatim: a newline inside a template
 literal, a multi-line string via line continuation, and a mapped type's source
 multi-line-ness (a deliberate un-erased residual — see the `format_canonical` seam
 notes in `tsv_ts`).
+
+## The Parity Bar (comment-position-tolerant)
+
+The compiler is measured against Svelte's `compile()` on the *canonical reprint* of
+both sides, but the bar is **not raw byte-equality** — it tolerates a comment
+**position** difference (`parity::compare_canonical` → `Parity::{Exact,
+CommentPosition, Divergent}`, re-exported as `compare_canonical`/`Parity`). Two
+canonical forms count as parity when they differ ONLY in where comments sit — **same
+code, same comment sequence, no bundler annotation involved**. Everything else (a
+code difference, a dropped / doubled / reordered / content-changed comment) stays
+`Divergent` = a MISMATCH = a bug.
+
+Why: tsv preserves the author's comment placement (its comment philosophy — a
+deliberate, cataloged divergence from prettier), while Svelte's printer (esrap)
+relocates comments across operator/conditional boundaries the way prettier does. The
+two then place the *same* comment on *different* AST nodes — genuinely different
+bytes, but not a difference in the compiled **code**. Comment position in
+machine-consumed compiled output carries no correctness signal, so pinning it would
+flag cosmetic differences as bugs (and force refusing every comment tsv places its
+own way). The relaxation aligns the bar with what matters — code + comment presence
++ semantic-comment binding.
+
+The comparison (only on the byte-inequality failure path — the common case stays a
+fast `==`):
+
+1. **Same code** — clear `program.comments` on both parses and byte-compare the
+   comment-free reprints (a comment-forced break vanishes with its comment, so
+   same-code programs reprint identically). Soundness reduces to canonicalizer
+   injectivity-on-code, which `canonicalize:audit` gates independently.
+2. **Same comments** — the comment *sequence* (output order, exact content) must
+   match, so a drop / double-print / reorder / content change is `Divergent`.
+3. **Annotation guard** — a bundler annotation (`/* @__PURE__ */`, `@__NO_SIDE_EFFECTS__`,
+   webpack/vite magic comments) is NOT position-neutral (moving it changes
+   tree-shaking), so its presence falls back to strict byte-equality. JSDoc casts
+   are safe — erasure unwraps every `JsdocCast` to a plain comment.
+
+The relaxation is confined to the JS leg: CSS parity stays byte-exact, and the
+fixture validator's oracle-freshness / expected-idempotence checks stay strict (a
+comment-position-divergent fixture records the *oracle's* placement in
+`expected_server.js`; ours is tolerated). The corpus runner surfaces the tolerated
+count in a separate `comment_position` bucket so the tolerance is never silent.
 
 ## See Also
 

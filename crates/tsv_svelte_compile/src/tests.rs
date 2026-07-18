@@ -4285,7 +4285,10 @@ fn compile_store_script_reads_and_writes() {
     let write = compile_js(
         "<script>\n\timport { count } from './s';\n\tfunction f() { $count = 5; }\n</script>\n<button onclick={f}>{$count}</button>",
     );
-    assert!(write.contains("$.store_set(count, 5)"), "store write: {write}");
+    assert!(
+        write.contains("$.store_set(count, 5)"),
+        "store write: {write}"
+    );
     let update = compile_js(
         "<script>\n\timport { count } from './s';\n\tfunction f() { $count++; }\n</script>\n<button onclick={f}>{$count}</button>",
     );

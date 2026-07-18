@@ -190,7 +190,10 @@ fn store_read_exemption(ctx: &WalkCtx<'_>, name: &str) -> Option<Result<(), Comp
     if !store_names.contains(base) {
         return None;
     }
-    if ctx.store_shadowed.is_some_and(|shadowed| shadowed.contains(base)) {
+    if ctx
+        .store_shadowed
+        .is_some_and(|shadowed| shadowed.contains(base))
+    {
         return Some(Err(CompileError::Unsupported(
             Refusal::StoreScopedSubscription,
         )));

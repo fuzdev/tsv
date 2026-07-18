@@ -4,7 +4,9 @@ use crate::diff::{DiffOptions, diff_to_string};
 use argh::FromArgs;
 use tsv_cli::cli::input::{InputArgs, ParserType};
 use tsv_cli::json_utils::to_json_with_tabs;
-use tsv_svelte_compile::{CompileError, CompileOptions, Generate, canonicalize_js, compile};
+use tsv_svelte_compile::{
+    CompileError, CompileOptions, Generate, Parity, canonicalize_js, compare_canonical, compile,
+};
 
 /// Compare tsv's Svelte compile output against the canonical Svelte compiler.
 ///
@@ -41,11 +43,15 @@ pub struct CompileCompareCommand {
 struct CompareReport {
     /// The compile target ("server" | "client").
     target: &'static str,
-    /// Whether the two canonical forms match.
+    /// Whether the two canonical forms match (byte-exact OR comment-position-tolerated).
     parity: bool,
+    /// True when parity was reached only by tolerating a comment-position difference
+    /// (`compare_canonical` → `CommentPosition`), not byte-exactness.
+    comment_position_tolerated: bool,
     /// The tsv side's outcome ("ok" | "unsupported").
     ours_status: &'static str,
-    /// The unified diff of the two canonical forms, when both sides exist and differ.
+    /// The unified diff of the two canonical forms, when both sides exist and differ
+    /// (present for a tolerated position difference too, to show what moved).
     hunks: Option<String>,
 }
 
@@ -131,26 +137,36 @@ fn report_both(
     oracle: &str,
     json: bool,
 ) -> Result<(), CliError> {
-    let parity = ours == oracle;
+    // The parity bar tolerates comment-POSITION differences (tsv's comment placement
+    // vs the oracle's esrap). A byte diff still displays — for a tolerated position
+    // difference it shows what moved. See `compare_canonical`.
+    let verdict = compare_canonical(ours, oracle);
+    let parity = verdict.is_parity();
+    let tolerated = verdict == Parity::CommentPosition;
+    let differs = ours != oracle;
     if json {
-        let hunks = if parity {
-            None
-        } else {
-            Some(diff_to_string(
-                ours,
-                oracle,
-                &DiffOptions::compile_compare(),
-            ))
-        };
+        let hunks = differs.then(|| diff_to_string(ours, oracle, &DiffOptions::compile_compare()));
         let report = CompareReport {
             target: target_name(target),
             parity,
+            comment_position_tolerated: tolerated,
             ours_status: "ok",
             hunks,
         };
         print_json(&report)?;
     } else if parity {
-        println!("compile_compare [{}] parity", target_name(target));
+        let note = if tolerated {
+            " (comment-position tolerated)"
+        } else {
+            ""
+        };
+        println!("compile_compare [{}] parity{note}", target_name(target));
+        if tolerated {
+            print!(
+                "{}",
+                diff_to_string(ours, oracle, &DiffOptions::compile_compare())
+            );
+        }
     } else {
         println!(
             "compile_compare [{}] canonical outputs differ",
@@ -180,6 +196,7 @@ fn report_unsupported(
         let report = CompareReport {
             target: target_name(target),
             parity: false,
+            comment_position_tolerated: false,
             ours_status: "unsupported",
             hunks: None,
         };

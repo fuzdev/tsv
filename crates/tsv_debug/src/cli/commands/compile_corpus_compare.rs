@@ -8,7 +8,8 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use tsv_cli::json_utils::to_json_with_tabs;
 use tsv_svelte_compile::{
-    CompileError, CompileOptions, canonicalize_js, census, census_detected_buckets, compile,
+    CompileError, CompileOptions, Parity, canonicalize_js, census, census_detected_buckets,
+    compare_canonical, compile,
 };
 
 /// Run the Svelte compile-parity pipeline over corpora of `.svelte` files.
@@ -72,8 +73,10 @@ pub struct CompileCorpusCompareCommand {
 
 /// One file's classification.
 enum Bucket {
-    /// Both sides compiled and the canonical forms matched.
-    Parity,
+    /// Both sides compiled and the canonical forms matched. `tolerated` records
+    /// that JS parity was reached only by tolerating a comment-POSITION difference
+    /// (`compare_canonical` → [`Parity::CommentPosition`]), not byte-exactness.
+    Parity { tolerated: bool },
     /// tsv refused (`Unsupported`), keyed on the refusal's stable
     /// [`Refusal::bucket_key`](tsv_svelte_compile::Refusal::bucket_key).
     Refused(String),
@@ -301,16 +304,22 @@ async fn classify(source: &str) -> Bucket {
         Err(e) => return Bucket::Error("canonicalize-ours", e.to_string()),
     };
 
-    let js_match = ours_canon == oracle_canon;
+    // The parity bar tolerates comment-POSITION differences (tsv's comment
+    // philosophy vs the oracle's esrap placement) — same code, same comment
+    // sequence, no bundler annotation. A dropped/doubled/reordered/content-changed
+    // comment, or any code difference, stays a MISMATCH. See `compare_canonical`.
+    let js_parity = compare_canonical(&ours_canon, &oracle_canon);
     let ours_css = ours.css.as_deref().map(with_trailing_newline);
     let oracle_css = oracle.css.as_deref().map(with_trailing_newline);
     let css_match = ours_css == oracle_css;
-    if js_match && css_match {
-        return Bucket::Parity;
+    if js_parity.is_parity() && css_match {
+        return Bucket::Parity {
+            tolerated: js_parity == Parity::CommentPosition,
+        };
     }
 
     let mut diff = String::new();
-    if !js_match {
+    if !js_parity.is_parity() {
         diff.push_str(&bounded_diff(&ours_canon, &oracle_canon));
     }
     if !css_match {
@@ -455,6 +464,9 @@ fn is_svelte_file(path: &Path) -> bool {
 struct Stats {
     files: usize,
     parity: usize,
+    /// Subset of `parity` reached by tolerating a comment-position difference
+    /// (not byte-exact). Surfaced so the tolerance is never silent.
+    comment_position: usize,
     refused: usize,
     oracle_rejected: usize,
     mismatch: usize,
@@ -514,6 +526,10 @@ struct Report {
     oracle_rejected_reasons: Vec<ReasonCount>,
     over_acceptance: Vec<ReasonCount>,
     mismatches: Vec<MismatchEntry>,
+    /// Files that reached parity only by tolerating a comment-position difference
+    /// — `(group, path)`. Not a bug (tsv's comment placement), but surfaced so the
+    /// tolerance is visible.
+    comment_position: Vec<(String, String)>,
     errors: Vec<ErrorEntry>,
     errors_truncated: usize,
 }
@@ -534,6 +550,7 @@ impl Report {
         let mut oracle_rej: BTreeMap<String, ReasonAgg> = BTreeMap::new();
         let mut over_accept: BTreeMap<String, ReasonAgg> = BTreeMap::new();
         let mut mismatches = Vec::new();
+        let mut comment_position: Vec<(String, String)> = Vec::new();
         let mut errors = Vec::new();
         let mut errors_truncated = 0;
 
@@ -543,9 +560,14 @@ impl Report {
             let gs = &mut group_stats[o.group];
             let path = o.path.display().to_string();
             match &o.bucket {
-                Bucket::Parity => {
+                Bucket::Parity { tolerated } => {
                     totals.parity += 1;
                     gs.parity += 1;
+                    if *tolerated {
+                        totals.comment_position += 1;
+                        gs.comment_position += 1;
+                        comment_position.push((root_of(o.group), path));
+                    }
                 }
                 Bucket::Refused(reason) => {
                     totals.refused += 1;
@@ -589,8 +611,9 @@ impl Report {
             }
         }
 
-        // Deterministic order: mismatches/errors by path.
+        // Deterministic order: mismatches/errors/tolerated by path.
         mismatches.sort_by(|a, b| a.path.cmp(&b.path));
+        comment_position.sort_by(|a, b| a.1.cmp(&b.1));
         errors.sort_by(|a, b| a.path.cmp(&b.path));
 
         Report {
@@ -604,6 +627,7 @@ impl Report {
             oracle_rejected_reasons: sort_reasons(oracle_rej),
             over_acceptance: sort_reasons(over_accept),
             mismatches,
+            comment_position,
             errors,
             errors_truncated,
         }
@@ -637,6 +661,16 @@ impl Report {
                 "\nOVER-ACCEPTANCE ({total}) — oracle-rejected but tsv compiles; each is a refusal-contract gap:"
             );
             print_reasons("By oracle code", &self.over_acceptance, usize::MAX);
+        }
+
+        if !self.comment_position.is_empty() {
+            println!(
+                "\nComment-position tolerated ({}) — parity by tsv's comment placement, not a bug:",
+                self.comment_position.len()
+            );
+            for (group, path) in &self.comment_position {
+                println!("  [{group}] {path}");
+            }
         }
 
         if !self.mismatches.is_empty() {
@@ -681,6 +715,7 @@ impl Report {
             oracle_rejected_reasons: &'a [ReasonCount],
             over_acceptance: &'a [ReasonCount],
             mismatches: &'a [MismatchEntry],
+            comment_position: &'a [(String, String)],
             errors: &'a [ErrorEntry],
             errors_truncated: usize,
         }
@@ -695,6 +730,7 @@ impl Report {
             oracle_rejected_reasons: &self.oracle_rejected_reasons,
             over_acceptance: &self.over_acceptance,
             mismatches: &self.mismatches,
+            comment_position: &self.comment_position,
             errors: &self.errors,
             errors_truncated: self.errors_truncated,
         };
@@ -725,11 +761,13 @@ fn sort_reasons(map: BTreeMap<String, ReasonAgg>) -> Vec<ReasonCount> {
     v
 }
 
-/// A one-line bucket summary.
+/// A one-line bucket summary. `comment_pos` is a subset of `parity` (tolerated
+/// comment-position differences), shown in parentheses so it never inflates the
+/// bucket totals.
 fn stats_line(s: &Stats) -> String {
     format!(
-        "files={} parity={} refused={} oracle_rejected={} mismatch={} error={}",
-        s.files, s.parity, s.refused, s.oracle_rejected, s.mismatch, s.error
+        "files={} parity={} (comment_pos={}) refused={} oracle_rejected={} mismatch={} error={}",
+        s.files, s.parity, s.comment_position, s.refused, s.oracle_rejected, s.mismatch, s.error
     )
 }
 

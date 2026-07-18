@@ -33,7 +33,9 @@ pub use census::{census, census_detected_buckets};
 /// compiler actually enforces, rather than a hand-rolled copy of it.
 pub use erase::next_token_pos;
 mod fragment;
+mod namespace;
 mod needs_context;
+mod parity;
 mod refusal;
 mod rune_guard;
 mod script_rewrite;
@@ -42,6 +44,7 @@ mod snippet_emit;
 mod store_rewrite;
 mod transform_server;
 
+pub use parity::{Parity, compare_canonical};
 pub use refusal::Refusal;
 
 use tsv_ts::Goal;

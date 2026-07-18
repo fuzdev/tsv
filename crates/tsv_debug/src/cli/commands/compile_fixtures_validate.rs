@@ -9,7 +9,7 @@ use argh::FromArgs;
 use futures_util::StreamExt;
 use std::path::Path;
 use tsv_cli::json_utils::to_json_with_tabs;
-use tsv_svelte_compile::{CompileOptions, canonicalize_js, compile};
+use tsv_svelte_compile::{CompileOptions, canonicalize_js, compare_canonical, compile};
 
 /// Validate compile fixtures against the canonical Svelte compiler.
 ///
@@ -267,7 +267,10 @@ async fn validate_fixture(fixture: &CompileFixture) -> FixtureReport {
     let ours_status = match compile(&input, &CompileOptions::default()) {
         Ok(ours) => match canonicalize_js(&ours.js) {
             Ok(canonical) => {
-                let js_parity = canonical == expected_js;
+                // Parity tolerates a comment-POSITION difference (tsv's placement vs
+                // the oracle's, recorded in expected_server.js) — same code, same
+                // comment sequence, no bundler annotation. See `compare_canonical`.
+                let js_parity = compare_canonical(&canonical, &expected_js).is_parity();
                 if !js_parity {
                     errors.push("ours differs from expected_server.js".to_string());
                     errors.push(diff_to_string(

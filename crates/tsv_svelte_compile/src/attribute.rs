@@ -16,6 +16,7 @@ use crate::analyze::{evaluate, stringify_value};
 use crate::build::escape_template_text;
 use crate::css_scope::SCOPE_HASH_CLASS;
 use crate::fragment::{BodyBuilder, escape_html_attr, guard_dropped, wrap_value_expr};
+use crate::namespace::{Namespace, element_is_mathml, element_is_svg};
 use crate::script_rewrite::plain_identifier_name;
 use crate::transform_server::{EmitEnv, unsupported};
 use crate::{CompileError, Refusal};
@@ -125,10 +126,15 @@ pub(crate) fn emit_attribute<'arena>(
     element_name: &str,
     out: &mut BodyBuilder<'arena>,
     element_scoped: bool,
+    namespace: Namespace,
 ) -> Result<(), CompileError> {
-    // The oracle lowercases attribute names outside foreign namespaces (svg
-    // refuses above) — at EMISSION only. The event-handler decision below tests
-    // the RAW authored name, so both are kept.
+    // The oracle lowercases attribute names outside foreign namespaces
+    // (`get_attribute_name`, server `element.js`) — at EMISSION only. The
+    // event-handler decision below tests the RAW authored name, so both are kept;
+    // `name` (lowercased) drives the `value`/`class`/`style` special-key checks
+    // (those keys are lowercase by definition), while `emit_name` is what actually
+    // reaches the output — case-preserved on an svg/mathml element (`viewBox`,
+    // `preserveAspectRatio`, …).
     let raw_name = env
         .b
         .interner
@@ -136,6 +142,11 @@ pub(crate) fn emit_attribute<'arena>(
         .resolve_infallible(attr.name)
         .to_string();
     let name = raw_name.to_ascii_lowercase();
+    let emit_name: &str = if element_is_foreign(element_name, namespace) {
+        &raw_name
+    } else {
+        &name
+    };
 
     // `value` on <textarea> becomes child content, on <select> it is omitted
     // with select_value bookkeeping — neither shape is implemented.
@@ -147,7 +158,7 @@ pub(crate) fn emit_attribute<'arena>(
 
     let Some(values) = attr.value else {
         // Boolean attribute: the oracle emits `name=""`.
-        out.push_text(&escape_template_text(&format!(" {name}=\"\"")));
+        out.push_text(&escape_template_text(&format!(" {emit_name}=\"\"")));
         return Ok(());
     };
 
@@ -181,7 +192,7 @@ pub(crate) fn emit_attribute<'arena>(
                 return Ok(());
             }
             out.push_text(&escape_template_text(&format!(
-                " {name}=\"{}\"",
+                " {emit_name}=\"{}\"",
                 escape_html_attr(&value)
             )));
             Ok(())
@@ -215,7 +226,7 @@ pub(crate) fn emit_attribute<'arena>(
             // as a plain ExpressionTag (the wire writer's `preceded_by_quote`
             // discriminant) — the split the class `$.clsx` rule keys on.
             let quoted = preceded_by_quote(env.source, tag.span.start);
-            emit_dynamic_attribute(env, &name, &tag.expression, quoted, out)
+            emit_dynamic_attribute(env, emit_name, &tag.expression, quoted, out)
         }
         _ => {
             // A mixed-value attribute whose RAW name starts with `on` is an
@@ -226,9 +237,17 @@ pub(crate) fn emit_attribute<'arena>(
             if raw_name.starts_with("on") {
                 return Err(unsupported(Refusal::EventAttribute { name }));
             }
-            emit_mixed_attribute(env, &name, values, out)
+            emit_mixed_attribute(env, emit_name, values, out)
         }
     }
+}
+
+/// The oracle's `get_attribute_name` namespace test: an svg/mathml element
+/// preserves its attribute-name case; every other element lowercases. `inherited`
+/// is the namespace the element sits in — the ancestor signal for the svg
+/// `<a>`/`<title>` rule (`namespace::element_is_svg`).
+fn element_is_foreign(element_name: &str, inherited: Namespace) -> bool {
+    element_is_svg(element_name, inherited) || element_is_mathml(element_name)
 }
 
 /// Whether the byte before `pos` is a quote — the same discriminant the wire
@@ -562,6 +581,7 @@ pub(crate) fn build_spread_object_property<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     attr: &'arena Attribute<'arena>,
     element_name: &str,
+    inherited: Namespace,
 ) -> Result<Option<Property<'arena>>, CompileError> {
     let raw_name = env
         .b
@@ -599,18 +619,27 @@ pub(crate) fn build_spread_object_property<'arena>(
     }
 
     let value = build_attribute_value_expr(env, &name, attr.value)?;
-    let key_is_ident = is_js_identifier(&name);
-    let key = if key_is_ident {
-        Expression::Identifier(env.b.ident(&name))
+    // The object key is the emitted attribute name — case-preserved on an
+    // svg/mathml element (`get_attribute_name`), lowercased otherwise. The value
+    // builder above still keys the `class` → `$.clsx` decision on the lowercased
+    // `name` (`class` is lowercase by definition).
+    let emit_name: &str = if element_is_foreign(element_name, inherited) {
+        &raw_name
     } else {
-        env.b.string_literal_expr(&name)
+        &name
+    };
+    let key_is_ident = is_js_identifier(emit_name);
+    let key = if key_is_ident {
+        Expression::Identifier(env.b.ident(emit_name))
+    } else {
+        env.b.string_literal_expr(emit_name)
     };
     let key_span = key.span();
     // Object shorthand `{ hidden }`: an identifier key whose value is the plain
-    // identifier of the same (lowercased) name (`hidden={hidden}`, `value={value}`).
+    // identifier of the same (emitted) name (`hidden={hidden}`, `viewBox={viewBox}`).
     let shorthand = key_is_ident
         && matches!(&value, Expression::Identifier(id)
-            if plain_identifier_name(id, env.source).as_deref() == Some(name.as_str()));
+            if plain_identifier_name(id, env.source).as_deref() == Some(emit_name));
     Ok(Some(Property {
         key,
         value,

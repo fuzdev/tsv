@@ -589,12 +589,6 @@ pub enum Refusal {
     },
 
     // ── Elements ───────────────────────────────────────────────────────────
-    /// A foreign-namespace element (SVG/MathML).
-    #[error("<{name}> (foreign namespace)")]
-    ForeignNamespace {
-        /// The element name.
-        name: String,
-    },
     /// A populated `<select>`/`<optgroup>` (the oracle emits a `<!>` anchor).
     #[error("<{name}> with children (oracle emits a `<!>` anchor)")]
     ElementWithChildren {
@@ -765,7 +759,6 @@ impl Refusal {
                 Cow::Borrowed("bind: directive on <{name}> component")
             }
             Self::ComponentDirective { .. } => Cow::Borrowed("directive on <{name}> component"),
-            Self::ForeignNamespace { .. } => Cow::Borrowed("<{name}> (foreign namespace)"),
             Self::ElementWithChildren { .. } => Cow::Borrowed("<{name}> with children"),
             Self::TemplateLevelElement { .. } => Cow::Borrowed("template-level <{name}>"),
             Self::VoidElementChildren { .. } => Cow::Borrowed("children on void element <{name}>"),
