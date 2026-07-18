@@ -200,6 +200,37 @@ pub async fn parse_svelte(source: &str) -> Result<Value, DenoError> {
     call_tool("svelte-parse", source, None).await
 }
 
+/// The browser-visible render key of Svelte source — the authoritative
+/// render-equivalence oracle behind the fixture render-equivalence check.
+///
+/// Svelte 5 bakes render-time whitespace trimming into the server template at
+/// *compile* time but leaves inter-node whitespace runs for the *browser* to
+/// collapse, so two authorings that render identically can compile to server JS
+/// that differs only in collapsible whitespace. The key reduces the compiled
+/// output to its browser-visible render (baked template text, holes for `${…}`,
+/// HTML comments stripped, whitespace runs collapsed), so equal keys prove equal
+/// renders — and a `<script>`/`<style>` reformatting that leaves the template
+/// unchanged yields the same key. See the sidecar's `svelteRenderKey`.
+///
+/// `compile` runs the full semantic ANALYZER, so it is far stricter than
+/// [`parse_svelte`]: it rejects inputs the parser accepts — a TS feature needing a
+/// preprocessor, experimental `await`, an illegal default export, a `bind:` to an
+/// undeclared or non-assignable target, invalid node placement. Those errors are
+/// unrelated to rendering (and `runes: false` does not avoid them). Such a
+/// rejection returns [`DenoError::ToolError`]; the render-equivalence check treats
+/// it as "compile unavailable" and falls back to the template-only
+/// `render_normalize` model.
+///
+/// # Errors
+/// Returns an error if Deno is not available or the compiler rejects the input.
+pub async fn svelte_render_key(source: &str) -> Result<String, DenoError> {
+    let result = call_tool("svelte-render-key", source, None).await?;
+    result
+        .as_str()
+        .map(ToString::to_string)
+        .ok_or(DenoError::MissingOutput)
+}
+
 /// Parse TypeScript source code using acorn with TypeScript plugin
 ///
 /// # Arguments
@@ -350,6 +381,43 @@ mod tests {
         assert_eq!(
             ast.get("type").and_then(|v| v.as_str()),
             Some("StyleSheetFile")
+        );
+
+        // Test svelte-render-key — the render-equivalence oracle. The key is the
+        // browser-visible render, so render-equivalent authorings share a key
+        // while a real content difference does not.
+        let flowed = svelte_render_key("<small>a b</small>").await;
+        assert!(flowed.is_ok(), "svelte-render-key failed: {flowed:?}");
+        let flowed = flowed.unwrap();
+        assert!(!flowed.is_empty(), "svelte-render-key produced no output");
+        // Block-style boundary whitespace (Svelte trims it at compile) AND a
+        // collapsed inter-node run (the browser collapses `a    b` → `a b`) are
+        // both render-equivalent to the flowed form.
+        let block = svelte_render_key("<small>\n\ta    b\n</small>")
+            .await
+            .unwrap();
+        assert_eq!(
+            block, flowed,
+            "boundary + collapsible whitespace must share a render key (render-equivalent)"
+        );
+        // A `<script>` reformatting that leaves the template unchanged shares the key
+        // (the key is template-only; script logic is not collected).
+        let scripted_a =
+            svelte_render_key("<script>\n\tlet x = \"a\";\n</script>\n<small>a b</small>")
+                .await
+                .unwrap();
+        let scripted_b = svelte_render_key("<script>let x = 'a'</script>\n<small>a b</small>")
+            .await
+            .unwrap();
+        assert_eq!(
+            scripted_a, scripted_b,
+            "a script-only reformatting must not change the render key"
+        );
+        // A rendered-content difference (`a b` vs `ab`) is NOT render-equivalent.
+        let glued = svelte_render_key("<small>ab</small>").await.unwrap();
+        assert_ne!(
+            glued, flowed,
+            "a rendered-content difference must produce a different render key"
         );
 
         // Pool heal: kill the pooled actor's event loop, then verify the next

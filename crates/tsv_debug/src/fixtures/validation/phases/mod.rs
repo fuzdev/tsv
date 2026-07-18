@@ -6,6 +6,7 @@
 mod formatter;
 mod normalization;
 mod parser;
+mod render_equivalence;
 
 pub(super) use parser::{
     validate_invalid_syntax, validate_parser_external, validate_parser_ours,
@@ -18,3 +19,5 @@ pub(super) use formatter::{
 };
 
 pub(super) use normalization::{validate_normalization_ours, validate_normalization_prettier};
+
+pub(super) use render_equivalence::{stale_benign_entries, validate_render_equivalence};

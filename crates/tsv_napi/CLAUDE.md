@@ -15,7 +15,7 @@ Build/usage commands live in [../../CLAUDE.md §JS Bindings](../../CLAUDE.md#js-
 ## Two-stage rollout
 
 - **(3a) measurement binding — done.** A single-platform local build (`deno task build:napi` → `cargo build -p tsv_napi --release`) drives the **Node** benchmark runner (`benches/js/lib/napi.ts` loads the built cdylib directly via `process.dlopen` — no `.node` rename). **No CI, no cross-platform matrix, no npm publish.**
-- **(3b) publish matrix — not yet.** The cross-platform prebuilt `.node` artifacts (per-platform `optionalDependencies` under a thin `@fuzdev/tsv_napi` loader) + release CI are deferred, targeted for the 0.2 release. Do **not** bolt N-API onto the single-machine `deno task publish`.
+- **(3b) publish matrix — a fast-follow, decoupled from 0.2.** The cross-platform prebuilt `.node` artifacts (per-platform `optionalDependencies` under a thin `@fuzdev/tsv_napi` loader) + release CI are deferred. They need GitHub release infrastructure (tagged releases hosting the per-platform binaries) that the WASM/npm path doesn't — so N-API publish **must not block** the WASM package publish or the VS Code extension. It's queued immediately after 0.2 (landing as 0.3 if the GitHub setup slips), and is expected to eventually **subsume** the WASM path as tsv's primary native distribution. Do **not** bolt N-API onto the single-machine `deno task publish`.
 
 ## Features
 

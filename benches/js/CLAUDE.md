@@ -24,6 +24,7 @@ Uses [@fuzdev/fuz_util](https://github.com/fuzdev/fuz_util) benchmarking library
 | **`deno task bench` / `bench:conformance`** | perf throughput ×3 runtimes + compose; parse-coverage report | **`perf`** view (~3,200; 100%-coverage invariant) / **`conformance`** view (fixtures + wpt/test262 harvests; coverage-only + node-only) | dev / release cadence; feeds tsv.fuz.dev |
 | **`deno task idempotency:sweep`** | `tsv_debug fuzz --iterations 0` over the corpus dirs — F1 (`format(format(x)) == format(x)`) + no-panic + structural reparse on every file **as authored** | **`perf`** view (real code; absent checkouts skipped with a warning) | after a printer change; conformance cadence |
 | **`deno task audit:corpus`** | the pure-Rust content-loss / robustness suite over **real code**: `roundtrip_audit --gate` · `comment_audit` · `binding_audit --gate` (real code gating; prettier suites report-only) · `authoring_audit` · `fuzz --iterations 0` (the idempotency:sweep leg) | **`perf`** view + the pinned `../prettier` format suites (absent dev repos skipped with a warning; floor = `../svelte` src) | release; `scripts/publish.ts` **Step 3c**; conformance cadence |
+| **`deno task render:audit <paths>`** | `render_audit --gate` — per `.svelte` file, does `tsv format` change what it RENDERS? Compares the browser-visible render key of the source vs of `format(source)`. The corpus-scale arm of the fixture **R** rules (which gate only the curated `tests/fixtures`). **Needs the Deno sidecar** (`svelte compile`), so it is deliberately NOT a leg of the pure-Rust `audit:corpus` | any `.svelte` corpus, given explicitly (e.g. `../svelte/packages/svelte/tests`, the dev repos) | after a printer change; conformance cadence |
 
 **JS parser (test262) IS release-gated** via `conformance:test262` (pure Rust,
 `tsv_debug test262 --gate`), folded into `conformance:all` which `publish.ts` Step
@@ -888,6 +889,33 @@ Things the published numbers measure that aren't quite what they look like:
   WASM-vs-WASM (`tsv_wasm` vs `biome-wasm` vs `dprint-wasm` vs `oxc-parser-wasm`) and
   native-vs-native (`tsv` vs `oxfmt`/`oxc-parser`); compare within a tier before
   attributing a gap to the formatter rather than the runtime.
+- **PGO native flagship (forthcoming — policy; no such row ships today).** The
+  standalone native flagship (the bare `@fuzdev/tsv` binary) is planned to ship
+  with profile-guided optimization (PGO) — native-only, a measured ~17–19%
+  wall-time win, **byte-identical** output. PGO lands **Linux-only first**, on
+  that single-target standalone build; the cross-platform prebuilt `.node`
+  binaries built on GitHub (the N-API matrix) stay standard-release until matrix
+  PGO is a later step — so the PGO row represents the Linux standalone flagship,
+  not what a cross-platform npm/N-API consumer gets yet. When that row lands the
+  policy is: **(1) both rows** — a standard-release native row *and* a PGO native
+  row, never PGO silently folded into the single native number, so the win stays
+  legible; **(2) measure what ships** — publish PGO numbers only once a shipped
+  native artifact actually carries the PGO recipe, and label which one (the Linux
+  standalone flagship for now); until then the standard-release row is the honest
+  native number; **(3)
+  disjoint training corpus** — the PGO profile is trained on a corpus disjoint
+  from the benchmark measurement corpus, so a published number is never
+  train-on-test (the profile generalizes to held-out code, so disjointness costs
+  nothing); **(4) byte-identical** — PGO changes only code layout, not output, so
+  it touches neither correctness nor the output-shape caveat above. Fairness
+  framing: PGO is a standard toolchain optimization. Against the JS reference
+  tools (`prettier`, `svelte/compiler`) it partly *closes a gap* — V8's JIT
+  already does profile-guided runtime optimization for them for free. Against the
+  native AOT competitors (`oxc-parser`, `oxfmt`, `biome`), which ship standard
+  release builds, PGO is a build-config advantage they don't take in their
+  published artifacts — fair to report as "what tsv ships vs what they ship," but
+  disclosed here so a native-vs-native read isn't mistaken for same-build-config.
+  Never mix a PGO or instrumented binary into a regression anchor series.
 - **Self-corpus / representativeness.** The perf corpus is real-world code
   only (the fixture suites live in the `gates`/`conformance` views — see
   [Corpus](#corpus)), but it's still dominated by the author's own fuz

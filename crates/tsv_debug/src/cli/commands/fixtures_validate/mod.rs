@@ -61,6 +61,7 @@ impl FixturesValidateCommand {
         // Check for cross-fixture duplicates (only when not filtering)
         if self.filters.is_empty() {
             summary.detect_cross_fixture_duplicates();
+            summary.detect_stale_benign_render_equiv();
         }
 
         // Print results with verbose mode
