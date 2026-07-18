@@ -1,0 +1,651 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 499,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 97,
+				"data": " An empty branch keeps its own line: marker and close each on a line, blank body between. "
+			},
+			{
+				"type": "Text",
+				"start": 97,
+				"end": 99,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 99,
+				"end": 126,
+				"data": " {#if}: empty :else "
+			},
+			{
+				"type": "Text",
+				"start": 126,
+				"end": 127,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 127,
+				"end": 162,
+				"test": {
+					"type": "Identifier",
+					"start": 132,
+					"end": 136,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 5
+						},
+						"end": {
+							"line": 4,
+							"column": 9
+						}
+					},
+					"name": "cond"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 137,
+							"end": 139,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 139,
+							"end": 147,
+							"name": "p",
+							"name_loc": {
+								"start": {
+									"line": 5,
+									"column": 2,
+									"character": 140
+								},
+								"end": {
+									"line": 5,
+									"column": 3,
+									"character": 141
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 142,
+										"end": 143,
+										"raw": "a",
+										"data": "a"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 147,
+							"end": 148,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"alternate": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 155,
+							"end": 157,
+							"raw": "\n\n",
+							"data": "\n\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 162,
+				"end": 164,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 164,
+				"end": 196,
+				"data": " {#if}: empty consequent "
+			},
+			{
+				"type": "Text",
+				"start": 196,
+				"end": 197,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 197,
+				"end": 232,
+				"test": {
+					"type": "Identifier",
+					"start": 202,
+					"end": 206,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 5
+						},
+						"end": {
+							"line": 11,
+							"column": 9
+						}
+					},
+					"name": "cond"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 207,
+							"end": 209,
+							"raw": "\n\n",
+							"data": "\n\n"
+						}
+					]
+				},
+				"alternate": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 216,
+							"end": 218,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 218,
+							"end": 226,
+							"name": "p",
+							"name_loc": {
+								"start": {
+									"line": 14,
+									"column": 2,
+									"character": 219
+								},
+								"end": {
+									"line": 14,
+									"column": 3,
+									"character": 220
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 221,
+										"end": 222,
+										"raw": "a",
+										"data": "a"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 226,
+							"end": 227,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 232,
+				"end": 234,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 234,
+				"end": 267,
+				"data": " {:else if}: empty branch "
+			},
+			{
+				"type": "Text",
+				"start": 267,
+				"end": 268,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 268,
+				"end": 330,
+				"test": {
+					"type": "Identifier",
+					"start": 273,
+					"end": 277,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 5
+						},
+						"end": {
+							"line": 18,
+							"column": 9
+						}
+					},
+					"name": "cond"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 278,
+							"end": 280,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 280,
+							"end": 288,
+							"name": "p",
+							"name_loc": {
+								"start": {
+									"line": 19,
+									"column": 2,
+									"character": 281
+								},
+								"end": {
+									"line": 19,
+									"column": 3,
+									"character": 282
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 283,
+										"end": 284,
+										"raw": "a",
+										"data": "a"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 288,
+							"end": 289,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"alternate": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"start": 289,
+							"end": 330,
+							"type": "IfBlock",
+							"elseif": true,
+							"test": {
+								"type": "Identifier",
+								"start": 299,
+								"end": 304,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 10
+									},
+									"end": {
+										"line": 20,
+										"column": 15
+									}
+								},
+								"name": "other"
+							},
+							"consequent": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 305,
+										"end": 307,
+										"raw": "\n\n",
+										"data": "\n\n"
+									}
+								]
+							},
+							"alternate": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 314,
+										"end": 316,
+										"raw": "\n\t",
+										"data": "\n\t"
+									},
+									{
+										"type": "RegularElement",
+										"start": 316,
+										"end": 324,
+										"name": "p",
+										"name_loc": {
+											"start": {
+												"line": 23,
+												"column": 2,
+												"character": 317
+											},
+											"end": {
+												"line": 23,
+												"column": 3,
+												"character": 318
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 319,
+													"end": 320,
+													"raw": "b",
+													"data": "b"
+												}
+											]
+										}
+									},
+									{
+										"type": "Text",
+										"start": 324,
+										"end": 325,
+										"raw": "\n",
+										"data": "\n"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 330,
+				"end": 332,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 332,
+				"end": 370,
+				"data": " {#each}: empty :else fallback "
+			},
+			{
+				"type": "Text",
+				"start": 370,
+				"end": 371,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 371,
+				"end": 419,
+				"expression": {
+					"type": "Identifier",
+					"start": 378,
+					"end": 383,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 7
+						},
+						"end": {
+							"line": 27,
+							"column": 12
+						}
+					},
+					"name": "items"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 392,
+							"end": 394,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 394,
+							"end": 402,
+							"name": "p",
+							"name_loc": {
+								"start": {
+									"line": 28,
+									"column": 2,
+									"character": 395
+								},
+								"end": {
+									"line": 28,
+									"column": 3,
+									"character": 396
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 397,
+										"end": 398,
+										"raw": "a",
+										"data": "a"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 402,
+							"end": 403,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 387,
+					"end": 391,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 16,
+							"character": 387
+						},
+						"end": {
+							"line": 27,
+							"column": 20,
+							"character": 391
+						}
+					}
+				},
+				"fallback": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 410,
+							"end": 412,
+							"raw": "\n\n",
+							"data": "\n\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 419,
+				"end": 421,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 421,
+				"end": 449,
+				"data": " {#each}: empty body "
+			},
+			{
+				"type": "Text",
+				"start": 449,
+				"end": 450,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 450,
+				"end": 498,
+				"expression": {
+					"type": "Identifier",
+					"start": 457,
+					"end": 462,
+					"loc": {
+						"start": {
+							"line": 34,
+							"column": 7
+						},
+						"end": {
+							"line": 34,
+							"column": 12
+						}
+					},
+					"name": "items"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 471,
+							"end": 473,
+							"raw": "\n\n",
+							"data": "\n\n"
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 466,
+					"end": 470,
+					"loc": {
+						"start": {
+							"line": 34,
+							"column": 16,
+							"character": 466
+						},
+						"end": {
+							"line": 34,
+							"column": 20,
+							"character": 470
+						}
+					}
+				},
+				"fallback": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 480,
+							"end": 482,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 482,
+							"end": 490,
+							"name": "p",
+							"name_loc": {
+								"start": {
+									"line": 37,
+									"column": 2,
+									"character": 483
+								},
+								"end": {
+									"line": 37,
+									"column": 3,
+									"character": 484
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 485,
+										"end": 486,
+										"raw": "a",
+										"data": "a"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 490,
+							"end": 491,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

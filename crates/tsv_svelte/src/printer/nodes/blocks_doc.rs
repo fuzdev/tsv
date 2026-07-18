@@ -68,13 +68,37 @@ fn build_await_section_body(printer: &Printer<'_>, fragment: &Fragment<'_>, expa
     indent_body(printer, body_doc, expand)
 }
 
-/// Build `indent([line, body_doc])` for space-only await blocks.
+/// Whether a fragment carries **printable content** — any node that is not whitespace-only
+/// text. An empty (or whitespace-only) section has no content, so it has no authored
+/// boundary whitespace worth preserving: its separators are `softline`s, which glue it
+/// inline and open it to a blank line once the construct breaks.
+fn fragment_has_printable(fragment: &Fragment<'_>) -> bool {
+    fragment.nodes.iter().any(|n| !n.is_whitespace_only_text())
+}
+
+/// The space-only await boundary separator — the **one rule** both a body's leading edge
+/// (`indent_body_soft`) and the separator before the following marker / `{/await}` follow:
+/// a `line` (a space inline, a newline on break) when the boundary was **authored with
+/// whitespace**, else a `softline` (glued inline, still a newline on break).
 ///
-/// In flat mode (fits): ` body_doc` (space + content)
-/// In break mode (exceeds print width): newline + indent + body_doc
-fn indent_body_soft(printer: &Printer<'_>, body_doc: DocId) -> DocId {
-    let line = printer.d().line();
-    let inner = printer.d().concat(&[line, body_doc]);
+/// Preserving the authored boundary — instead of always synthesizing a space — keeps a
+/// glued content body glued (`}x{`) and a spaced one spaced (`} x {`), matching prettier and
+/// killing the cross-section authoring-dependence (a render-free space in one section no
+/// longer re-spaces another section's body — the boundary is render-free, see
+/// `Printer::body_boundaries_break`). Either way both forms become a newline on break, so
+/// the whole construct still expands as a unit.
+fn boundary_sep(printer: &Printer<'_>, authored_ws: bool) -> DocId {
+    let d = printer.d();
+    if authored_ws { d.line() } else { d.softline() }
+}
+
+/// Build `indent([<sep>, body_doc])` for a space-only await section body, where `<sep>` is
+/// [`boundary_sep`] keyed on the body's authored **leading** boundary whitespace: a space
+/// (fits) / newline (break) when authored with leading whitespace, glued (fits) / newline
+/// (break) when authored glued.
+fn indent_body_soft(printer: &Printer<'_>, body_doc: DocId, leading_ws: bool) -> DocId {
+    let sep = boundary_sep(printer, leading_ws);
+    let inner = printer.d().concat(&[sep, body_doc]);
     printer.d().indent(inner)
 }
 
@@ -1123,22 +1147,30 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    /// Push a space-only section's body to `parts` when it carries printable content, and
-    /// **report whether it did**. A whitespace-only section (`build_nodes_doc_multiline`
-    /// drops its whitespace-only nodes, so its body is empty) contributes nothing; the caller
-    /// emits a separator `line` only after a section that returned `true`, so an empty section
-    /// **collapses** — its surrounding markers glue (`{#await p}{:then v}{/await}`), exactly
-    /// as every other empty construct does. A content section keeps its `indent_body_soft`,
-    /// whose leading `line` is the space *before* the content; the returned `true` gates the
-    /// space *after* it.
+    /// Push a space-only section's body to `parts` and **report its authored trailing boundary
+    /// whitespace**, which the caller uses to pick the separator *after* it ([`boundary_sep`]).
+    ///
+    /// Every section pushes — there is no empty-section special case. A content section keeps
+    /// its own authored boundary (leading via `indent_body_soft`, trailing via the return), so
+    /// a body authored glued stays glued and a spaced one keeps its space. A section with no
+    /// printable content has nothing to preserve, so it takes `softline`s on both sides and
+    /// returns `false`: inline they collapse and its markers glue
+    /// (`{#await p}{:then v}{/await}`), and once the construct breaks they become newlines,
+    /// leaving the empty section its own blank line — the same shape the newline-authored tail
+    /// produces, so the two paths agree.
     fn push_await_space_only_body(&self, parts: &mut DocBuf, fragment: &Fragment<'_>) -> bool {
-        if fragment.nodes.iter().any(|n| !n.is_whitespace_only_text()) {
-            let body = self.build_nodes_doc_multiline(fragment.nodes);
-            parts.push(indent_body_soft(self, body));
-            true
-        } else {
-            false
+        if !fragment_has_printable(fragment) {
+            // Empty section: no content, so nothing to preserve — a `softline` on each side.
+            // Inline both collapse and the markers glue (`{:catch e}{/await}`); once the
+            // construct breaks they become newlines, leaving the section its blank line.
+            parts.push(indent_body_soft(self, self.d().empty(), false));
+            return false;
         }
+        let leading_ws = self.fragment_has_any_leading_ws(fragment);
+        let trailing_ws = self.fragment_has_any_trailing_ws(fragment);
+        let body = self.build_nodes_doc_multiline(fragment.nodes);
+        parts.push(indent_body_soft(self, body, leading_ws));
+        trailing_ws
     }
 
     /// Build the await tail for the **space-only** layout. A content-bearing section body
@@ -1155,35 +1187,31 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let (is_then_shorthand, is_catch_shorthand) = Self::await_shorthand_flags(block);
         let mut parts: DocBuf = DocBuf::new();
-        // Whether the section immediately before the next marker carried content — gates that
-        // marker's leading separator `line`, so an empty section's markers glue.
-        let mut prev_had_content = false;
+        // The authored trailing boundary whitespace of the section just emitted — picks the
+        // separator before the next marker / close (`line` when the author wrote whitespace
+        // there, else `softline`). An empty section reports `false`, so its markers glue
+        // inline and open to a blank line when the construct breaks.
+        let mut prev_trailing_ws = false;
         if let Some(pending) = &block.pending {
-            prev_had_content = self.push_await_space_only_body(&mut parts, pending);
+            prev_trailing_ws = self.push_await_space_only_body(&mut parts, pending);
         }
         if !is_then_shorthand && let Some(kw) = self.await_then_keyword(block) {
-            if prev_had_content {
-                parts.push(d.line());
-            }
+            parts.push(boundary_sep(self, prev_trailing_ws));
             parts.push(kw);
-            prev_had_content = false;
+            prev_trailing_ws = false;
         }
         if let Some(then_block) = &block.then {
-            prev_had_content = self.push_await_space_only_body(&mut parts, then_block);
+            prev_trailing_ws = self.push_await_space_only_body(&mut parts, then_block);
         }
         if !is_catch_shorthand && let Some(kw) = self.await_catch_keyword(block) {
-            if prev_had_content {
-                parts.push(d.line());
-            }
+            parts.push(boundary_sep(self, prev_trailing_ws));
             parts.push(kw);
-            prev_had_content = false;
+            prev_trailing_ws = false;
         }
         if let Some(catch_block) = &block.catch {
-            prev_had_content = self.push_await_space_only_body(&mut parts, catch_block);
+            prev_trailing_ws = self.push_await_space_only_body(&mut parts, catch_block);
         }
-        if prev_had_content {
-            parts.push(d.line());
-        }
+        parts.push(boundary_sep(self, prev_trailing_ws));
         parts.push(d.text("{/await}"));
         d.concat(&parts)
     }
