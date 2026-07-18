@@ -805,3 +805,65 @@ pub fn debug_token_stream(source: &str) -> String {
     }
     out
 }
+
+/// The **reserved** control-flow and declaration keywords the lexer recognizes —
+/// the 38 words that head a statement or declaration, as distinct from the
+/// type-name and literal keywords the lexer also lexes. Behind the `debug_lex`
+/// feature (off in production builds), like `debug_token_stream`.
+///
+/// This is the independent oracle for `tsv_debug`'s `SHAPE_KEYWORDS` drift guard.
+/// A shape key keeps a keyword verbatim but abstracts an ordinary identifier to
+/// `IDENT`, so `return⟨⟩` and `IDENT⟨⟩` name different bugs. A reserved word that
+/// is missing from `SHAPE_KEYWORDS` degrades to `IDENT` and silently merges its
+/// bug into the generic-identifier entry — a quiet failure nothing else notices.
+/// The guard test asserts every word returned here is present in that table.
+///
+/// The set is the lexer's full keyword table (52 words) minus the 14 that are
+/// *not* control-flow/declaration reserved words: the 4 literals
+/// (`true`/`false`/`null`/`undefined`), the 9 primitive type-name keywords
+/// (`number`/`string`/`boolean`/`any`/`never`/`unknown`/`object`/`symbol`/`bigint`),
+/// and `debugger`. `void` stays in the set — it is the `void` unary operator, not
+/// a type name.
+#[cfg(feature = "debug_lex")]
+pub fn reserved_words() -> &'static [&'static str] {
+    &[
+        "const",
+        "let",
+        "var",
+        "void",
+        "new",
+        "instanceof",
+        "in",
+        "return",
+        "if",
+        "else",
+        "for",
+        "while",
+        "do",
+        "switch",
+        "case",
+        "default",
+        "break",
+        "continue",
+        "try",
+        "catch",
+        "finally",
+        "throw",
+        "function",
+        "class",
+        "enum",
+        "typeof",
+        "delete",
+        "async",
+        "await",
+        "this",
+        "super",
+        "extends",
+        "export",
+        "import",
+        "from",
+        "as",
+        "satisfies",
+        "yield",
+    ]
+}

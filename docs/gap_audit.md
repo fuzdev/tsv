@@ -25,7 +25,7 @@ deno task gaps:audit           # the gate: tests/fixtures, ~17 s
 deno task gaps:audit:update    # regenerate the snapshot after fixing a shape
 
 # Directly, against a real codebase — where the real yield is:
-cargo run --profile corpus -p tsv_debug --features comment_check gap_audit ~/dev/zzz/src
+cargo run --profile corpus -p tsv_debug --features audits gap_audit ~/dev/zzz/src
 ```
 
 Build with **`--profile corpus`** (release + `panic = "unwind"`). Plain `--release` is
@@ -38,7 +38,8 @@ reported as the finding it is.
 | `--jobs N` | worker threads (default: available parallelism) |
 | `--limit N` | cap the seed files |
 | `--payload <one>` | `block` \| `line` \| `jsdoc_cast` \| `annotation` \| `multiline` |
-| `--all-bytes` | also inject strictly inside words — a diagnostic, not a stricter mode |
+| `--all-bytes` | also inject strictly inside words — a diagnostic, not a stricter mode (comment interiors stay excluded) |
+| `--by-node` | also print the coarse by-`(node, edge)` rollup after the run (report-only; see [Reading a finding](#reading-a-finding)) |
 | `--update` | rewrite the committed snapshot |
 
 ### Full runs vs narrowed runs
@@ -53,8 +54,8 @@ what the snapshot means, so:
 - **the ratchet is skipped**, with an explicit `○ ratchet SKIPPED` note. A narrowed run
   reports; it does not grade, and a green one is *not* a passing gate.
 
-`--json` and `--jobs` change how a run is reported and scheduled, never which sites it
-reaches, so they don't narrow it.
+`--json`, `--jobs`, and `--by-node` change how a run is reported and scheduled, never which
+sites it reaches, so they don't narrow it.
 
 Off the default corpus (an explicit path) the snapshot doesn't apply at all — every finding
 is news, and any finding exits 1.
@@ -116,25 +117,78 @@ next fixture edit.
   union at that offset need not fire, or even parse.
 - **`(N of M hits knock out a bystander)`** is the scarier half: the offending comment is one
   the author already had, knocked out by an injection *elsewhere*. An existing comment
-  vanishing because someone added another one nearby.
-- **`⚠ UNCONFIRMED`** — see below.
+  vanishing because someone added another one nearby. A bystander finding is **keyed and
+  reported at the victim's own site** — the emitter that dropped the comment — not at the
+  perturbation site the payload went in at (the finding's span, in the formatted input's
+  coordinates, is mapped back across the splice to the seed). Its example reads
+  `e.g. inject <payload> at <path>:<injection> → drops the comment at :<attribution>`: the
+  injection offset reproduces the drop, and `<attribution>` (with the snippet) is where the
+  victim comment lived, which is what the shape keys on.
+- **`⚠ UNCONFIRMED (0/5 confirmed)` / `⚠ PARTIAL (2/5 confirmed)`** — see below.
 
-### `UNCONFIRMED`
+### The by-node rollup (`--by-node`)
 
-Each shape's example is **self-verified in-run**, because an instrument that only ever agrees
-with itself is not evidence. The ledger is made to predict something falsifiable: if it says
-this format drops `d` comments and double-prints `p`, the output must reparse to exactly
-`parsed - d + p` comments. Counting via reparse rather than matching the comment's *text* is
-what makes it sound — a printer may legitimately re-indent a multi-line comment, so text
-matching false-alarms.
+`--by-node` prints a second, **coarser** view after the run: the finding shapes rolled up onto
+their structural key `(node_type, edge)` — the enclosing AST node and the child-role edge each
+site's gap sits in (`(CallExpression, arguments→$)`, `(VariableDeclarator, id→init)`), read off
+the wire tree. Where the site shape keys a finding by its raw adjacent tokens (the fine ratchet
+key), this keys it by the **emitter**: the ~700 shapes fold into a few dozen `(node, edge)`
+clusters — each roughly one printer function — ranked worst-first, the burn-down work-list. The
+comment-attachment fields the wire mirrors from acorn (`leadingComments` / `trailingComments`)
+are **not** treated as structural children, so a gap keys to its emitter edge regardless of
+whether a comment happens to sit beside it. A **bystander** finding keys on its victim's site
+(the attribution offset), so it rolls up onto the emitter that dropped the comment — not the one
+whose gap the payload perturbed.
 
-A shape whose prediction fails is reported `UNCONFIRMED`, not silently dropped. The output
-holds as many comments as its input, so something printed it without recording the emit — or
-printed a **mangled** rebuild (`/* a⏎b */` → `/* ab */`, one comment either way). **Real
-either way, but not the plain drop it is filed as**, so it wants different triage.
+Each finding is keyed to its own site's `(node, edge)` **at record time** — one wire parse per
+seed file, one `node_edge_key` walk per hit — so the per-cluster totals are **exact per-site
+tallies**, not an approximation: a generic shape occurring in several structural contexts is
+split across its clusters per hit, never attributed wholesale to one. Keying runs only when a
+rollup consumer is present (`--by-node` / `--json`), so a plain graded gate run pays nothing for
+it. The one residual caveat is the `UNRESOLVED` tail — a finding whose offset keys to no node
+(out of range, or a node with no `type`), reported alongside the clusters; over `tests/fixtures`
+that tail is empty.
 
-`UNCONFIRMED` is triage information, not a gate signal: it is a property of the shape's one
-sampled example, not of the shape, so it is deliberately not part of the ratchet key.
+It is **report-only** — it never changes the ratchet grade or the exit code.
+
+`--json` carries the ranked work-list as one additive top-level section, `by_node` — one
+`{node, edge, hits, shapes, share, example_shape}` per cluster, hits-descending, what per-slice
+tooling reads to ask "did my fix move the cluster?" — plus a top-level `by_node_unresolved`, the
+count in the `UNRESOLVED` tail.
+
+### `UNCONFIRMED` / `PARTIAL`
+
+Each shape's kept examples are **self-verified in-run**, because an instrument that only ever
+agrees with itself is not evidence. The ledger's finding is checked against something
+falsifiable: the multiset of comment **contents** in the injected input vs the format's
+output. Each content is whitespace-normalized first (split on newlines, trim each line, rejoin)
+so a legitimate re-indent of a multi-line comment (`/* a⏎   b */` → `/* a⏎b */`) normalizes
+equal and is *not* a false alarm — while a **mangle** that collapses the newline
+(`/* a⏎b */` → `/* ab */`) yields fewer lines, normalizes different, and *is* caught. This
+supersedes the earlier `parsed - dropped + double` count comparison, closing both of the
+count's blind spots: a balancing drop+duplicate (equal count, unequal contents) and a mangle
+(equal count, unequal content).
+
+A shape keeps up to five examples (the smallest by `(path, attribution_offset)` — the
+victim's own site for a bystander, the injection site otherwise — so the set is
+`--jobs`-independent), and each is re-checked. The ratio is what separates two very different
+findings: **`UNCONFIRMED (0/N)`** — *no* example reproduced, so the shape is uniformly an
+instrument artifact — versus **`PARTIAL (k/N)`** — some reproduced and some didn't, a *mixed*
+real drop. An unlabelled shape confirmed on every example.
+
+Where a finding does *not* reproduce, the output holds the same comment **contents** as its
+input, so something printed the comment without recording the emit — a genuine instrument gap,
+not the content loss it is filed as. (A mangled rebuild — which the old count read as
+UNCONFIRMED, since a mangle keeps the comment *count* — now normalizes different and reproduces
+as **CONFIRMED**, the real corruption it is.) The residual, far narrower than the count's: a
+multiset can still balance if the *same* content is dropped in one place and duplicated in
+another; no corpus example does this.
+
+The ratio is triage information, not a gate signal: it is a property of the shape's sampled
+examples, not of the shape, so it is deliberately not part of the ratchet key (and `--update`
+regenerates a byte-identical snapshot regardless of it). `--update` still reports the tallies —
+how many shapes are fully `UNCONFIRMED` and how many `PARTIAL` — since pinning ~700 claims is
+the moment worth naming the ones the audit couldn't reproduce.
 
 ## Triaging and fixing a shape
 

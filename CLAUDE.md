@@ -200,6 +200,8 @@ deno task fuzz:audit                 # seeded mutational fuzzer over tests/fixtu
 deno task comments:audit             # print-once comment ledger: every comment a document PARSES must be EMITTED exactly once (pure Rust, no sidecar; gated in `deno task check`) — reports DROPPED (silent content loss) and DOUBLE-PRINTED; the structural guard on the detached comment model, tsv's `ensureAllCommentsPrinted`; see Debug Tooling
 deno task gaps:audit                 # gap-injection audit: inject a comment into EVERY gap (five payloads, one per ownership path) and re-run the ledger — the discovery arm `comments:audit` can't be, since it only formats each file AS AUTHORED and no fixture covers most positions (eight such drops were found BY HAND, all green on every gate). Pure Rust, no sidecar; gated in `deno task check` as a RATCHET over a generated shape snapshot (`gap_audit_known.txt`): every line is a known bug and the file shrinking is the goal, so a shape not on the list, one on it that no longer fires, or any PANIC, FAILS. ~17 s. Full reference: ./docs/gap_audit.md
 deno task gaps:audit:update          # regenerate that snapshot after fixing a shape (or when a new fixture merely REACHES a pre-existing one); refuses a narrowed run
+deno task blanks:audit               # blank-line injection audit: inject a blank line into EVERY code gap and grade six policy-free invariants — no panic, F1 idempotency, structural reparse, leaf conservation, ledger-clean, and blank-run ≤ 1. Mechanizes the blank-line handling class (the specifier-list / array-pattern bugs). Pure Rust, no sidecar; gated in `deno task check` as a RATCHET over `blank_audit_known.txt` (like gaps:audit): a graded shape not on the list, one that no longer fires, or any PANIC, FAILS. STRUCTURAL-DIVERGENCE is held REPORT-ONLY (fuzz-soft parity: reported but never gated, filtered out of the ratchet); every other policy kind IS pinned. A fast path (a blank the formatter ABSORBS reproduces the proven-clean pristine output, so nothing is checked) keeps it near gaps:audit's cost. ~24 s. Full reference: ./docs/blank_audit.md
+deno task blanks:audit:update        # regenerate that snapshot after fixing a shape; refuses a narrowed run
 deno task idempotency:sweep          # F1 (idempotency) sweep over the real-code corpus (the `perf` view — sibling dev repos + upstream framework source). NOT in `deno task check`: machine-dependent corpus, minutes not seconds. Run at conformance cadence or after a printer change; see Debug Tooling
 ```
 
@@ -950,13 +952,15 @@ deno task metrics                          # shorthand
 # any `//` line comment followed by content on the same output line (silent
 # content loss). Pure Rust, no Deno. Defaults to tests/fixtures; pass dirs/files
 # to audit real code. Exits 1 on any finding.
-cargo run -p tsv_debug --features swallow_check swallow_audit                 # audit all fixtures
-cargo run -p tsv_debug --features swallow_check swallow_audit ~/dev/zzz/src   # audit a real codebase
+cargo run -p tsv_debug --features audits swallow_audit                 # audit all fixtures
+cargo run -p tsv_debug --features audits swallow_audit ~/dev/zzz/src   # audit a real codebase
 # Also: --json. The check lives in tsv_lang::doc::swallow behind the `swallow_check`
 # cargo feature — off by default, so it's compiled out of prod wasm/cli/ffi AND
 # default tsv_debug builds (profile/perf sessions measure production-shaped render
-# code); only the `swallow:audit` deno task needs the feature. Gated in
-# `deno task check` (via `swallow:audit`) over tests/fixtures.
+# code). The `swallow:audit` deno task builds it via the `audits` umbrella feature
+# (swallow_check + comment_check), so it shares one binary with comments:audit,
+# gaps:audit, and blanks:audit; `--features swallow_check` alone still works for a targeted run. Gated
+# in `deno task check` (via `swallow:audit`) over tests/fixtures.
 #
 # Coverage is every render that appends to the output buffer — the main loop AND
 # its sub-renders (fill segments, the line-suffix flush), all driving one
@@ -976,12 +980,14 @@ cargo run -p tsv_debug --features swallow_check swallow_audit ~/dev/zzz/src   # 
 # structural guard on the detached comment model: nothing else forces a comment that the
 # parser produced to actually reach the output. Pure Rust, no Deno. Defaults to
 # tests/fixtures; pass dirs/files to audit real code. Exits 1 on any finding.
-cargo run -p tsv_debug --features comment_check comment_audit                 # audit all fixtures
-cargo run -p tsv_debug --features comment_check comment_audit ~/dev/zzz/src   # audit a real codebase
+cargo run -p tsv_debug --features audits comment_audit                 # audit all fixtures
+cargo run -p tsv_debug --features audits comment_audit ~/dev/zzz/src   # audit a real codebase
 # Also: --json. The ledger lives in tsv_lang::comment_ledger behind the `comment_check`
 # cargo feature — off by default, so it's compiled out of prod wasm/cli/ffi AND default
-# tsv_debug builds (profile/perf sessions measure production-shaped code); only the
-# `comments:audit` deno task needs the feature. Gated in `deno task check` (via
+# tsv_debug builds (profile/perf sessions measure production-shaped code). The
+# `comments:audit` deno task builds it via the `audits` umbrella feature (swallow_check +
+# comment_check), sharing one binary with swallow:audit, gaps:audit, and blanks:audit; `--features
+# comment_check` alone still works for a targeted run. Gated in `deno task check` (via
 # `comments:audit`) over tests/fixtures.
 #
 # Model. A format entry point (`tsv_ts::format_in`, `tsv_css`'s `format_css*`,
@@ -997,12 +1003,15 @@ cargo run -p tsv_debug --features comment_check comment_audit ~/dev/zzz/src   # 
 # records a VERBATIM RANGE that counts as one emit per comment it covers; keep those
 # ranges tight, a too-wide carve-out silently re-opens the hole.
 #
-# Scope. Only the DETACHED comments (the flat `Vec<Comment>` on the language root). A
-# comment modeled as an AST node — a Svelte `<!-- … -->`, a CSS in-block
-# `CssBlockChild::Comment` — is carried by the tree and can't be lost the same way; its
-# emits land in the report's `out-of-scope emits` count, not in a finding. CSS
-# declaration-VALUE comments are never lexed as `Comment`s at all (re-derived from
-# source), so they are outside the model by construction.
+# Scope. Both comment carriers are registered and guarded: the DETACHED comments (the flat
+# `Vec<Comment>` on the language root) and the AST-NODE comments — a Svelte `<!-- … -->`
+# (`FragmentNode::Comment`) and a CSS in-block `CssBlockChild::Comment`. The latter are
+# carried by the tree rather than by the positional model, but a printer can still drop or
+# double-print one, so each format entry walks its tree and registers their spans; with that,
+# `unregistered emits` is a pure registration-gap signal (0 over clean fixtures) — a nonzero
+# count means the walk missed a container. CSS declaration-VALUE comments remain outside the
+# model by construction — never lexed as `Comment`s at all (re-derived from source), so there
+# is nothing to register.
 ```
 
 **Gap-Injection Audit (dropped-comment discovery):**
@@ -1012,8 +1021,8 @@ cargo run -p tsv_debug --features comment_check comment_audit ~/dev/zzz/src   # 
 # DISCOVERY arm `comments:audit` can't be: the ledger only ever sees a document AS
 # AUTHORED, so a gap no fixture puts a comment in is one it never checks (eight such
 # drops were found BY HAND, all green on every gate). Pure Rust, no sidecar.
-cargo run --profile corpus -p tsv_debug --features comment_check gap_audit   # tests/fixtures
-cargo run --profile corpus -p tsv_debug --features comment_check gap_audit ~/dev/zzz/src
+cargo run --profile corpus -p tsv_debug --features audits gap_audit   # tests/fixtures
+cargo run --profile corpus -p tsv_debug --features audits gap_audit ~/dev/zzz/src
 # Also: --json, --jobs N, --limit N, --payload <one>, --all-bytes, --update.
 # Build with `--profile corpus` (release + panic=unwind): plain `--release` is
 # panic=abort, so a formatter panic kills the process instead of being caught + reported.
@@ -1028,6 +1037,41 @@ cargo run --profile corpus -p tsv_debug --features comment_check gap_audit ~/dev
 Full reference — flags, the ratchet, reading a finding, triage + re-pin workflow,
 scope: ./docs/gap_audit.md. Design rationale (why byte offsets and not tokens, why the
 ledger is the oracle, why five payloads) lives in the `gap_audit` module docs.
+
+**Blank-Line Injection Audit (blank-line handling discovery):**
+
+```bash
+# blank_audit - inject a blank line into EVERY code gap and grade six policy-free
+# invariants on the result: (1) no panic, (2) F1 idempotency (pass 2 is a fixed
+# point), (3) structural reparse, (4) leaf conservation, (5) ledger-clean (no
+# dropped/double-printed comment), (6) blank-run ≤ 1 (no 2+ blank run outside a
+# template quasi / <pre> / <textarea> / format-ignore region). Mechanizes the
+# blank-line handling class — the specifier-list / array-pattern bugs. Invariants
+# 1-4 are the shared `f1_check` (also driving `fuzz`); 5 is the print-once ledger;
+# 6 is a region-scoped output scan. Pure Rust, no sidecar.
+cargo run --profile corpus -p tsv_debug --features audits blank_audit   # tests/fixtures
+cargo run --profile corpus -p tsv_debug --features audits blank_audit ~/dev/zzz/src
+# Also: --json, --report, --jobs N, --limit N, --update. Build with `--profile
+# corpus` (release + panic=unwind) so a formatter panic is caught + reported.
+#
+# GATED as a RATCHET (like gap_audit): `blank_audit_known.txt` is a machine-generated
+# snapshot of the known-bug shapes, every line a bug, the file shrinking is the goal.
+# A graded shape not on the list, one that no longer fires, or any PANIC, FAILS. Unlike
+# fuzz/roundtrip, NON-IDEMPOTENT and every policy kind ARE pinned (born red over a live
+# bug family); PANIC stays absolute; and STRUCTURAL-DIVERGENCE is held REPORT-ONLY
+# (fuzz-soft parity — reported but never gated, filtered out of the ratchet, `"gated":
+# false` in --json). A FAST PATH — a blank the formatter ABSORBS reproduces the file's
+# proven-clean pristine output byte-for-byte, so nothing is checked — keeps it near
+# gap_audit's one-format-per-site cost; only a KEPT blank pays the full battery (~19%
+# of injections over tests/fixtures). ~24 s.
+# Scope: TS + Svelte body; CSS deferred; string/template interiors excluded (a raw
+# newline there is lexed as content, not a gap); only format fixed points injected.
+```
+
+Full reference — flags, the ratchet, reading a finding, the six invariants, scope:
+./docs/blank_audit.md. Design rationale (the fast path, why a blank is graded against
+the injected input not the pristine, the string-interior exclusion) lives in the
+`blank_audit` module docs.
 
 **Build-Fanout Audit (exponential-rebuild regression guard):**
 
@@ -1171,6 +1215,26 @@ cargo run -p tsv_debug binding_audit --gate                          # the check
 # --gate over tests/fixtures is a cheap tripwire (fixtures are format-stable); the
 # real yield is external corpora, where JSDoc casts + annotations are dense.
 cargo run -p tsv_debug binding_audit --verbose ../svelte/packages/svelte/src
+```
+
+**Layout-Neutrality Audit (ownership-blind-gate probe):**
+
+```bash
+# neutrality_audit - does a comment's OWNERSHIP ever change tsv's layout? An owned
+# comment must occupy exactly the page space a same-width ordinary comment does — a
+# layout gate that instead SKIPS owned comments (asks the to-emit question where it
+# should ask on-page) goes blind, and the comment silently changes the layout it
+# should have forced. At each glued block-comment position, format the file with the
+# comment made OWNED (annotation-shaped) and made ORDINARY (plain filler) at the SAME
+# width — only ownership varies, so any layout difference is a gate reading ownership.
+# Pure Rust, no sidecar. A development / characterization tool, NOT a `deno task
+# check` gate: it needs an owned/ordinary CONTRAST to detect anything, and under the
+# "every glued block comment is owned" rule a run passes vacuously — its moment is
+# BEFORE any future ownership-rule change (run it then, over external corpora).
+# TS-family files only; defaults to tests/fixtures.
+cargo run -p tsv_debug neutrality_audit ../svelte/packages/svelte/src
+# Also: --gate (exit 1 on findings; dev-loop convenience), --verbose (the
+# owned-vs-ordinary output diff per finding), --limit N, --json.
 ```
 
 **Seeded Mutational Fuzzer (panic / idempotency / structural-reparse safety):**

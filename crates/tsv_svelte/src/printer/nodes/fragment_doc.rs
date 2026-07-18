@@ -1442,11 +1442,18 @@ impl<'a> Printer<'a> {
     /// Build a doc for an HTML comment
     pub(crate) fn build_html_comment_doc(&self, comment: &internal::HtmlComment) -> DocId {
         let d = self.d();
-        d.concat(&[
+        let doc = d.concat(&[
             d.text("<!--"),
             d.source_span(comment.content_span, self.source),
             d.text("-->"),
-        ])
+        ]);
+        // The renderer records the emit when it reaches the node — see
+        // `tsv_lang::comment_ledger`. `<!-- -->` comments register by span in
+        // `format_svelte_in`; this is the template (doc) emit path, `print_comment` the
+        // hoisted-section (direct-write) one.
+        #[cfg(feature = "comment_check")]
+        d.tag_comment_doc(doc, comment.span, self.source);
+        doc
     }
 
     //
