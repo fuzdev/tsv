@@ -697,8 +697,8 @@ pub(crate) fn emit_child_body<'arena>(
 }
 
 /// Prepare a single borrowed value expression for a read position (`{#if}` test,
-/// `{#each}` collection, `{#await}` promise): a bare derived read becomes `d()`,
-/// everything else is guarded and passed through borrowed.
+/// `{#each}` collection, `{#await}` promise): a derived read (bare or nested)
+/// becomes `d()`, everything else is guarded and passed through borrowed.
 pub(crate) fn wrap_single<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     expr: &'arena Expression<'arena>,
@@ -717,9 +717,9 @@ pub(crate) fn wrap_single<'arena>(
 /// error there).
 ///
 /// But the derived-read rule is switched **off** — the empty `derived_names` set.
-/// It is an emission *rewrite* (a bare read becomes `d()`; `wrap_value_expr`
-/// applies it before the guard runs, so `walk_expression_guarded` refuses every
-/// derived read that reaches it), not a validity rule: the oracle happily accepts
+/// It is an emission *rewrite* (a derived read, bare or nested, becomes `d()`;
+/// `wrap_value_expr` applies it before the guard runs, so `walk_expression_guarded`
+/// refuses every derived read that reaches it), not a validity rule: the oracle happily accepts
 /// a derived read it never emits. Enforcing it in a dropped region would refuse
 /// `{#key d}` and `{:catch e}<p>{d}</p>`, which the oracle compiles.
 pub(crate) fn guard_dropped<'arena>(
@@ -824,8 +824,9 @@ fn emit_expression_tag<'arena>(
     // The template borrow point: erase TypeScript ONCE, then feed the erased node
     // to the guard AND the fold gate below (see `EmitEnv::erase`).
     let expr = env.erase(expr)?;
-    // Guard FIRST (stray runes, non-bare derived reads, template mutations
-    // refuse) — the evaluator must never fold an oracle-invalid expression.
+    // Rewrite + guard FIRST (a derived read → `d()`, `$state.snapshot` →
+    // `$.snapshot`; stray runes, a template mutation, and top-level await refuse) —
+    // the evaluator must never fold an oracle-invalid expression.
     let wrapped = wrap_value_expr(env, expr)?;
 
     // The fold gate: a known evaluation folds into the static text.

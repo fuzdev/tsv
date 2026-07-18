@@ -21,9 +21,11 @@
 //!   top-level name can't be trusted by this shadow-naive mutation collection,
 //!   so the binding goes `Opaque` and refuses if it reaches an evaluated spine),
 //!
-//! and refuses **reads of derived bindings** (`derived_names`) — those must
-//! become `d()` calls, which only the emitter's bare-expression positions can
-//! express over borrowed code.
+//! and refuses **reads of derived bindings** (`derived_names`) — those become
+//! `d()` calls in the emitter's template value positions (bare or nested, via the
+//! value-walk in `fragment.rs`); a read the walk does not reach — a pattern
+//! default, a script-position read, an unsupported-wrapper or escaped-identifier
+//! read — refuses here.
 //!
 //! The matches are exhaustive on purpose — a new `Statement`/`Expression`
 //! variant fails compilation here instead of silently skipping the guard.
@@ -460,8 +462,9 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
 
         // A bare `$`-prefixed identifier reference (`let x = $state;`, a
         // `$store` subscription) is oracle-rejected input — refuse. A derived
-        // binding read outside the emitter's bare positions must become `d()`,
-        // which borrowed code can't express — refuse. Name-only positions
+        // binding read the template value-walk does not rewrite to `d()` (a
+        // pattern default, a script position, an unsupported wrapper, or an
+        // escaped-identifier read) refuses here. Name-only positions
         // (non-computed member properties / object keys) are never walked.
         Expression::Identifier(id) => {
             if let Some(name) = dollar_identifier_name(id, ctx.source) {
