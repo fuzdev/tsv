@@ -1,3 +1,4 @@
+mod audit;
 mod cli;
 mod deno;
 mod diff;

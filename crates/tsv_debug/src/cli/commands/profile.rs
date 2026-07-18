@@ -518,13 +518,19 @@ pub(crate) fn resolve_profile_files(
         return Err(CliError::Failed);
     }
     let total = files.len();
-    files.retain(|p| {
-        !p.file_name()
-            .and_then(|n| n.to_str())
-            .is_some_and(|n| n.starts_with("input_invalid"))
-    });
+    files.retain(|p| !is_input_invalid_fixture(p));
     let skipped = total - files.len();
     Ok((files, skipped))
+}
+
+/// Whether a fixture file is an intentionally-invalid `input_invalid_*` fixture — one that must
+/// fail to parse, so every corpus-walking audit skips it (it never reaches the property under
+/// test). The single definition of the check the audits share, so a policy change (a renamed
+/// prefix, a stricter match) is made once rather than at every command that walks the tree.
+pub(crate) fn is_input_invalid_fixture(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(|n| n.starts_with("input_invalid"))
 }
 
 /// Resolve paths to files, expanding directories

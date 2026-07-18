@@ -339,13 +339,62 @@ pub(crate) fn format_svelte_in(
 ) -> String {
     // The print-once comment ledger's expectation for this document (diagnostic; see
     // `tsv_lang::comment_ledger`). `Root.comments` is the `<script>` + template-expression
-    // comments; the `<style>` island registers its own through `tsv_css`.
+    // JS comments; the `<style>` island registers its own through `tsv_css`. The template's
+    // `<!-- -->` (`FragmentNode::Comment`) comments are AST nodes rather than detached, so
+    // they register by span through a recursive fragment walk — hoisted section comments
+    // included, since they still live in `Root.fragment.nodes` (see `print_root`).
     #[cfg(feature = "comment_check")]
-    tsv_lang::comment_ledger::register_parsed(source, &root.comments);
+    {
+        tsv_lang::comment_ledger::register_parsed(source, &root.comments);
+        let mut html_comment_spans = Vec::new();
+        collect_html_comment_spans(&root.fragment, &mut html_comment_spans);
+        tsv_lang::comment_ledger::register_parsed_spans(source, html_comment_spans);
+    }
 
     let mut printer = Printer::new(arena, source, Rc::clone(&root.interner), &root.comments);
     printer.print_root(root);
     printer.into_string()
+}
+
+/// Collect the spans of every `<!-- -->` (`FragmentNode::Comment`) in a fragment, recursing
+/// into every nested fragment (elements, special elements, and the `{#if}` / `{#each}` /
+/// `{#await}` / `{#key}` / `{#snippet}` block bodies). The print-once comment ledger reads
+/// only the span, so no `HtmlComment` need be manufactured into a `Comment`.
+#[cfg(feature = "comment_check")]
+fn collect_html_comment_spans(fragment: &internal::Fragment<'_>, out: &mut Vec<Span>) {
+    for node in fragment.nodes {
+        match node {
+            FragmentNode::Comment(comment) => out.push(comment.span),
+            FragmentNode::Element(el) => collect_html_comment_spans(&el.fragment, out),
+            FragmentNode::SpecialElement(el) => collect_html_comment_spans(&el.fragment, out),
+            FragmentNode::IfBlock(block) => {
+                collect_html_comment_spans(&block.consequent, out);
+                if let Some(alternate) = &block.alternate {
+                    collect_html_comment_spans(alternate, out);
+                }
+            }
+            FragmentNode::EachBlock(block) => {
+                collect_html_comment_spans(&block.body, out);
+                if let Some(fallback) = &block.fallback {
+                    collect_html_comment_spans(fallback, out);
+                }
+            }
+            FragmentNode::AwaitBlock(block) => {
+                if let Some(pending) = &block.pending {
+                    collect_html_comment_spans(pending, out);
+                }
+                if let Some(then) = &block.then {
+                    collect_html_comment_spans(then, out);
+                }
+                if let Some(catch) = &block.catch {
+                    collect_html_comment_spans(catch, out);
+                }
+            }
+            FragmentNode::KeyBlock(block) => collect_html_comment_spans(&block.fragment, out),
+            FragmentNode::SnippetBlock(block) => collect_html_comment_spans(&block.body, out),
+            _ => {}
+        }
+    }
 }
 
 impl<'a> Printer<'a> {
@@ -868,6 +917,13 @@ impl<'a> Printer<'a> {
 
     /// Format an HTML comment: <!-- content -->
     fn print_comment(&mut self, comment: &internal::HtmlComment) {
+        // The hoisted-section (direct-write) emit path for a `<!-- -->` comment, recorded at
+        // the write like `tsv_css`'s `print_css_comment`; the template path is the doc-tagged
+        // `build_html_comment_doc`. Registered by span in `format_svelte_in`. See
+        // `tsv_lang::comment_ledger`.
+        #[cfg(feature = "comment_check")]
+        tsv_lang::comment_ledger::record_emitted(self.source, comment.span);
+
         self.write("<!--");
         self.write(comment.content(self.source));
         self.write("-->");

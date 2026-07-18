@@ -1012,6 +1012,42 @@ impl DocArena {
         Some((span, key))
     }
 
+    /// Carry `old`'s comment-doc tag (if any) onto the freshly-allocated `new`.
+    ///
+    /// A doc-tree *transform* — [`Self::remove_lines`] / [`Self::flatten_all_lines`] — allocates
+    /// a new [`DocId`] for every non-leaf node it rebuilds, including a multi-line block
+    /// comment's `Concat` (and, when dropping hard lines, a `MultilineText`). The renderer
+    /// records a comment's emit when it reaches the *tagged* node, so a re-allocated comment
+    /// doc whose tag stayed on the discarded original would read as **DROPPED** even though it
+    /// prints verbatim (the instrument false-positive [`tag_comment_doc`] can't see, because
+    /// nothing walks the transform). This copies the tag across the rebuild.
+    ///
+    /// Sound for the binary-search invariant: the only nodes ever tagged are comment doc roots
+    /// (a `SourceSpan` text — left untouched by the transform, so it never reaches here — a
+    /// `MultilineText`, or a multi-child `Concat`), and both re-allocated kinds are replaced by
+    /// a **fresh** allocation, never an interned/short-circuited id — so whenever this pushes,
+    /// `new` is the highest id so far and `comment_docs` stays sorted ascending (see the field
+    /// doc + [`tag_comment_doc`]). Safe against double-counting: the transform returns the new
+    /// tree and discards the old, and the renderer only records emits for nodes it actually
+    /// reaches (a discarded/losing subtree never does), so the old tag left in place never
+    /// fires. A no-op unless the ledger is enabled and `old` was tagged; compiled out entirely
+    /// without the `comment_check` feature. See [`crate::comment_ledger`].
+    #[cfg(feature = "comment_check")]
+    #[inline]
+    pub(crate) fn retag_comment_doc(&self, new: DocId, old: DocId) {
+        if !comment_check_enabled() {
+            return;
+        }
+        if let Some((span, key)) = self.comment_doc_tag(old) {
+            let mut tags = self.comment_docs.borrow_mut();
+            debug_assert!(
+                tags.last().is_none_or(|&(last, ..)| new.0 > last),
+                "retag_comment_doc must keep comment_docs sorted ascending on the node id"
+            );
+            tags.push((new.0, span, key));
+        }
+    }
+
     /// Return the per-document interned node held in `cell`, allocating it on
     /// first use within the current document.
     ///
@@ -1670,7 +1706,7 @@ impl DocArena {
             }
         }; // nodes borrow dropped here
 
-        match info {
+        let new_id = match info {
             Info::Keep => id,
             Info::FlattenedMultilineText(flat) => self.text_pooled(&flat),
             Info::Line(kind) => match kind {
@@ -1759,7 +1795,19 @@ impl DocArena {
                 self.line_suffix(new_inner)
             }
             Info::BreakParent => self.empty(),
+        };
+
+        // Rebuilding the tree strands a comment doc's ledger tag on the discarded original
+        // (a re-allocated node gets a fresh `DocId`), so the renderer never records the emit
+        // and the — verbatim-printed — comment reads as DROPPED. Carry the tag onto each
+        // rebuilt node. Every recursion routes through here, so a tagged comment anywhere in
+        // the subtree is covered. `comment_check`-only — production output is byte-identical.
+        #[cfg(feature = "comment_check")]
+        if new_id != id {
+            self.retag_comment_doc(new_id, id);
         }
+
+        new_id
     }
 
     //

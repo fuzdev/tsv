@@ -25,6 +25,13 @@ comment_check = [
 	"tsv_css/comment_check",
 	"tsv_svelte/comment_check",
 ]
+# Umbrella that compiles both diagnostic seams into one binary and enables both
+# the `swallow_audit` and `comment_audit` subcommands. The `swallow:audit`,
+# `comments:audit`, and `gaps:audit` deno tasks all pass `--features audits`, so
+# they share a single `debug+audits` (and `corpus+audits`) build instead of one
+# per seam. Forwards to each member's fan-out (no need to also name
+# `tsv_lang/audits` — `swallow_check`+`comment_check` already cover its members).
+audits = ["swallow_check", "comment_check"]
 
 [dependencies]
 tsv_cli = { path = "../tsv_cli" }

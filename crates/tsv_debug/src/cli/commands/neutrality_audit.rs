@@ -38,7 +38,7 @@ use tsv_cli::cli::input::ParserType;
 
 use crate::cli::CliError;
 
-use super::profile::resolve_files;
+use super::profile::{is_input_invalid_fixture, resolve_files};
 
 /// Audit whether a comment's *ownership* ever changes tsv's layout (a gate reading
 /// ownership where it should be blind to it).
@@ -96,7 +96,7 @@ impl NeutralityAuditCommand {
                 return Err(CliError::Failed);
             }
         };
-        files.retain(|p| is_ts_family(p) && !is_invalid_input(p));
+        files.retain(|p| is_ts_family(p) && !is_input_invalid_fixture(p));
         if self.limit > 0 {
             files.truncate(self.limit);
         }
@@ -315,12 +315,6 @@ fn is_ts_family(path: &Path) -> bool {
         path.extension().and_then(|e| e.to_str()),
         Some("ts" | "js" | "mts" | "cts" | "mjs" | "cjs")
     )
-}
-
-fn is_invalid_input(path: &Path) -> bool {
-    path.file_name()
-        .and_then(|n| n.to_str())
-        .is_some_and(|n| n.starts_with("input_invalid"))
 }
 
 #[cfg(test)]

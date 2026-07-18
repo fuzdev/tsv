@@ -21,10 +21,14 @@
 //! 2. **Idempotency.** For any input tsv accepts, `format` is a fixed point:
 //!    `format(format(x)) == format(x)` (the fixture F1 invariant, here on inputs
 //!    no fixture covers).
-//! 3. **Structural reparse.** `format(x)` must reparse to the *same document*
-//!    (the [`roundtrip_audit`](super::roundtrip_audit) contract — output that
-//!    mis-delimits but loses no characters is invisible to the char-frequency
-//!    SAFETY check), reusing that command's structural-skeleton comparison.
+//! 3. **Structural reparse + leaf conservation.** `format(x)` must reparse to the
+//!    *same document* (the [`roundtrip_audit`](super::roundtrip_audit) contract —
+//!    output that mis-delimits but loses no characters is invisible to the
+//!    char-frequency SAFETY check), reusing that command's structural-skeleton
+//!    comparison, **plus** the complementary
+//!    [`leaf_conservation_diff`](crate::audit::properties::leaf_conservation_diff)
+//!    check — a still-parses value change (a mis-decoded string, a miscanonicalized
+//!    number) the skeleton erases and so cannot see.
 //!
 //! ## Design
 //!
@@ -57,11 +61,10 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 
 use super::profile::resolve_files;
-use super::roundtrip_audit::{structurally_equivalent, tsv_parse_to_value};
+use crate::audit::properties::{F1Outcome, f1_check};
 use crate::cli::CliError;
 
 /// Seeded mutational fuzzer: mutate corpus bytes and assert the parser never
@@ -343,6 +346,11 @@ enum Outcome {
     FormatError,
     /// `format`'s output does not reparse (tsv rejects its own output).
     Unreparseable,
+    /// Output reparses with an **equal skeleton** but a decode-invariant leaf value
+    /// changed (a mis-decoded string, a miscanonicalized number, a mangled
+    /// comment) — the skeleton-blind class (a shape change is instead the soft
+    /// `structural_divergence`). A hard finding.
+    LeafValueCorruption,
     /// Output reparses but the document structure changed (delimiter/structure
     /// corruption).
     StructuralDivergence,
@@ -354,12 +362,18 @@ impl Outcome {
     /// A **reliable, dep-free** finding — always a real bug, so it fails the run
     /// (exit 1). A panic breaks DoS-safety; `format_error`/`unreparseable` mean
     /// tsv can't round-trip its own output; `non_idempotent` breaks the F1 fixed
-    /// point. `structural_divergence` is deliberately excluded — it's the soft,
-    /// canonical-confirmation-needing bucket (see [`FuzzCommand::strict`]).
+    /// point; `leaf_value_corruption` is a still-parses value change (invisible to
+    /// the structural skeleton). `structural_divergence` is deliberately excluded —
+    /// it's the soft, canonical-confirmation-needing bucket (see
+    /// [`FuzzCommand::strict`]).
     fn is_hard(self) -> bool {
         matches!(
             self,
-            Self::Panic | Self::FormatError | Self::Unreparseable | Self::NonIdempotent
+            Self::Panic
+                | Self::FormatError
+                | Self::Unreparseable
+                | Self::LeafValueCorruption
+                | Self::NonIdempotent
         )
     }
 
@@ -370,6 +384,7 @@ impl Outcome {
             Self::Panic => "panic",
             Self::FormatError => "format_error",
             Self::Unreparseable => "unreparseable",
+            Self::LeafValueCorruption => "leaf_value_corruption",
             Self::StructuralDivergence => "structural_divergence",
             Self::NonIdempotent => "non_idempotent",
         }
@@ -379,29 +394,20 @@ impl Outcome {
 /// Run the three invariant checks on one (already valid-UTF-8) mutant. Any panic
 /// is caught by [`attempt`]'s [`catch_unwind`](std::panic::catch_unwind); this
 /// returns the non-panic outcome.
+///
+/// A thin map over the shared [`f1_check`] — the six-step sequence lives in
+/// [`audit::properties`](crate::audit::properties) so `blank_audit` shares it. The mapping is
+/// 1:1 and total, so the fuzzer's behavior is byte-for-byte what the inline version produced;
+/// [`Outcome`] keeps `Panic` (which [`attempt`] supplies) plus fuzz's own labels.
 fn check(src: &str, parser: ParserType, render: bool) -> Outcome {
-    // 1. Parse. A clean rejection is the common, expected case for garbage.
-    let Some(wire_in) = tsv_parse_to_value(src, parser) else {
-        return Outcome::Rejected;
-    };
-    // 2. Format (parses internally — an error here means parse/format disagree).
-    let Ok(f1) = format_source(src, parser) else {
-        return Outcome::FormatError;
-    };
-    // 3. Reparse the output.
-    let Some(wire_out) = tsv_parse_to_value(&f1, parser) else {
-        return Outcome::Unreparseable;
-    };
-    // 4. Same document?
-    let (equal, _) = structurally_equivalent(wire_in, wire_out, render, false);
-    if !equal {
-        return Outcome::StructuralDivergence;
-    }
-    // 5. Idempotent fixed point.
-    match format_source(&f1, parser) {
-        Ok(f2) if f2 == f1 => Outcome::Ok,
-        Ok(_) => Outcome::NonIdempotent,
-        Err(_) => Outcome::FormatError,
+    match f1_check(src, parser, render) {
+        F1Outcome::Rejected => Outcome::Rejected,
+        F1Outcome::Ok => Outcome::Ok,
+        F1Outcome::FormatError => Outcome::FormatError,
+        F1Outcome::Unreparseable => Outcome::Unreparseable,
+        F1Outcome::LeafValueCorruption => Outcome::LeafValueCorruption,
+        F1Outcome::StructuralDivergence => Outcome::StructuralDivergence,
+        F1Outcome::NonIdempotent => Outcome::NonIdempotent,
     }
 }
 

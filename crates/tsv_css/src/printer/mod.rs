@@ -642,8 +642,9 @@ impl<'a> Printer<'a> {
     pub(crate) fn print_css_comment(&mut self, comment: &Comment) {
         // One of the crate's two comment-emission seams (the other is
         // `comment_blocks_in_range`). Also prints the *AST-node* comments — a
-        // `CssBlockChild::Comment` — which are outside the detached model and so aren't
-        // in the ledger's registered set; those land in `unregistered_emits`.
+        // `CssBlockChild::Comment` — whose span is now registered too (by
+        // `register_stylesheet_comments` at the format entry), so this emit matches a
+        // registered entry and this seam records it, same as for a detached comment.
         #[cfg(feature = "comment_check")]
         tsv_lang::comment_ledger::record_emitted(self.source, comment.span);
 
@@ -887,6 +888,54 @@ impl<'a> Printer<'a> {
     }
 }
 
+/// Register a stylesheet's comments with the print-once ledger: the **detached** comments on
+/// `CssStyleSheet.comments`, plus every in-block `CssBlockChild::Comment` AST node (the CSS
+/// analog of a Svelte `<!-- -->`), collected by recursing into nested rules and at-rule
+/// blocks. Both `print_css_comment` seams already record the emits, so registering the
+/// in-block comments here is what turns a dropped/double-printed one into a ledger finding
+/// instead of a silent, unregistered emit. A declaration's *value* comments are never lexed
+/// as `Comment`s, so they stay out of scope by construction.
+#[cfg(feature = "comment_check")]
+fn register_stylesheet_comments(stylesheet: &CssStyleSheet<'_>, source: &str) {
+    tsv_lang::comment_ledger::register_parsed(source, &stylesheet.comments);
+    let mut block_comment_spans = Vec::new();
+    collect_block_comment_spans(stylesheet.nodes, &mut block_comment_spans);
+    tsv_lang::comment_ledger::register_parsed_spans(source, block_comment_spans);
+}
+
+/// Collect the spans of every in-block `CssBlockChild::Comment` under the top-level nodes.
+#[cfg(feature = "comment_check")]
+fn collect_block_comment_spans(nodes: &[CssNode<'_>], out: &mut Vec<Span>) {
+    for node in nodes {
+        match node {
+            CssNode::Rule(rule) => collect_block_child_comment_spans(rule.declarations, out),
+            CssNode::Atrule(atrule) => {
+                if let Some(block) = &atrule.block {
+                    collect_block_child_comment_spans(block.children, out);
+                }
+            }
+        }
+    }
+}
+
+/// Recurse a block's children, collecting `Comment` spans and descending into nested rules
+/// and at-rule blocks.
+#[cfg(feature = "comment_check")]
+fn collect_block_child_comment_spans(children: &[CssBlockChild<'_>], out: &mut Vec<Span>) {
+    for child in children {
+        match child {
+            CssBlockChild::Comment(comment) => out.push(comment.span),
+            CssBlockChild::Rule(rule) => collect_block_child_comment_spans(rule.declarations, out),
+            CssBlockChild::Atrule(atrule) => {
+                if let Some(block) = &atrule.block {
+                    collect_block_child_comment_spans(block.children, out);
+                }
+            }
+            CssBlockChild::Declaration(_) => {}
+        }
+    }
+}
+
 /// Format CSS stylesheet to a string
 /// Requires source for blank line preservation and raw value extraction
 pub(crate) fn format_css(stylesheet: &CssStyleSheet<'_>, source: &str) -> String {
@@ -900,10 +949,11 @@ pub(crate) fn format_css_in(
     source: &str,
     arena: &DocArena,
 ) -> String {
-    // The print-once comment ledger's expectation for this stylesheet (diagnostic; see
+    // The print-once comment ledger's expectation for this stylesheet — detached comments
+    // plus in-block `CssBlockChild::Comment` AST nodes (diagnostic; see
     // `tsv_lang::comment_ledger`).
     #[cfg(feature = "comment_check")]
-    tsv_lang::comment_ledger::register_parsed(source, &stylesheet.comments);
+    register_stylesheet_comments(stylesheet, source);
 
     // Fill the arena-parked line-break table (one warm table across a
     // multi-file driver's files instead of a fresh Vec per file).
@@ -958,11 +1008,12 @@ pub(crate) fn format_css_embedded_in(
     // same as standalone, matching prettier. This retires the Svelte host's
     // post-hoc line re-indenter, which compounded a preserved newline one indent
     // level per format pass (an F1 non-idempotency; see script_style.rs).
-    // The print-once comment ledger's expectation for this stylesheet (diagnostic; see
-    // `tsv_lang::comment_ledger`). The Svelte host's `Root.comments` deliberately
-    // excludes `<style>` comments, so this is their only registration.
+    // The print-once comment ledger's expectation for this stylesheet — detached comments
+    // plus in-block `CssBlockChild::Comment` AST nodes (diagnostic; see
+    // `tsv_lang::comment_ledger`). The Svelte host's `Root.comments` deliberately excludes
+    // `<style>` comments, so this is their only registration.
     #[cfg(feature = "comment_check")]
-    tsv_lang::comment_ledger::register_parsed(source, &stylesheet.comments);
+    register_stylesheet_comments(stylesheet, source);
 
     let base = embed.base_indent_offset;
     let embed = EmbedContext {
