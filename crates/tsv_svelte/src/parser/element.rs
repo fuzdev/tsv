@@ -636,9 +636,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     self.error_msg_at(&format!("Unterminated <{tag_name}> element"), element_start)
                 })?;
 
-        // Reposition the lexer to the closing tag. We resume at `<`, which lexes to
-        // `LeftAngle` in either mode; `inside_tag` is `false` here (after the opening
-        // tag's `>`), which `advance_to_position` preserves.
+        // Reposition the lexer to the closing tag. We resume AT the `<`, which lexes to
+        // `LeftAngle` in either mode, so the (stale, content-dependent) `inside_tag` here
+        // doesn't matter — `parse_closing_tag` consumes the close and its `>` returns the
+        // lexer to template mode. Contrast `parse_rcdata_content`, which resumes PAST the
+        // close's `>` and so must force template mode itself.
         self.advance_to_position(content_end)?;
 
         // Create a Text node (Svelte always emits one, even if empty)
@@ -708,6 +710,15 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         };
 
         let end = close_gt + 1;
+        // After `</textarea>` we're back in template mode, but `inside_tag` is stale: the
+        // manual scan above jumped the cursor forward, so it still reflects the token the
+        // lexer stopped on when the opening `>` was consumed — the close's `<` for
+        // empty/`<`-first content, which set tag mode (`{`-first content leaves it false,
+        // so the pre-fix bug was content-dependent). Left as-is, `advance_to_position`
+        // preserves that stale tag mode and a bare-text sibling (`</textarea>x`) lexes `x`
+        // as an Identifier the markup loop rejects (`{expr}`/`<el>` siblings survive —
+        // `{`/`<` are special in both modes). Force template mode before resuming.
+        self.lexer.inside_tag = false;
         self.advance_to_position(end)?;
         Ok((nodes, end as u32))
     }
