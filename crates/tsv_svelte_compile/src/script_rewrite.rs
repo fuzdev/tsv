@@ -21,6 +21,7 @@ use crate::analyze::{
 };
 use crate::attr_refs::{TemplateItem, each_template_item};
 use crate::build::Builder;
+use crate::fragment::is_bare_derived_read;
 use crate::rune_guard::{WalkCtx, walk_expression_guarded, walk_statement_guarded};
 use crate::transform_server::unsupported;
 use crate::{CompileError, Refusal, erase};
@@ -184,6 +185,28 @@ fn unthunk_callee<'arena>(expr: &Expression<'arena>) -> Option<&'arena Expressio
         return None;
     }
     matches!(call.callee, Expression::Identifier(_)).then_some(call.callee)
+}
+
+/// Refuse a `$derived(…)` whose WHOLE argument is a bare `$derived` read
+/// (`$derived(d)` where `d` is another derived). The oracle unthunk-collapses it
+/// to `$.derived(d)` (the derived function passed straight through, not read), a
+/// form the script rewrite can't reproduce — the store rewrite would turn the
+/// argument into `d()`, giving `$.derived(() => d())`. A safe over-refusal (the
+/// read refused before this slice too). NOT applied to `$derived.by(d)`, whose
+/// oracle output IS `$.derived(d())` — reproduced by the rewrite (`.by` runs no
+/// `unthunk`), so it compiles.
+fn refuse_bare_derived_arg(
+    expr: &Expression<'_>,
+    source: &str,
+    derived_names: &NameSet,
+) -> Result<(), CompileError> {
+    if let Expression::Identifier(id) = expr
+        && is_bare_derived_read(source, derived_names, expr)
+        && let Some(name) = plain_identifier_name(id, source)
+    {
+        return Err(unsupported(Refusal::DerivedBindingRead { name }));
+    }
+    Ok(())
 }
 
 /// Assert no TypeScript-only node survived into the emitted program.
@@ -777,10 +800,13 @@ pub(crate) fn rewrite_script_statement<'arena>(
             derived_names,
             std::rc::Rc::clone(&b.interner),
         )
-        // Exempt valid `$name` store reads from the guard's `$`-prefixed refusal:
-        // the store rewrite handles them after the loop. The shadow refusal is
-        // deferred there too (it needs the full nested-scope set), so pass `None`.
-        .allow_store_reads(store_names, None);
+        // Exempt valid `$name` store reads from the guard's `$`-prefixed refusal
+        // and `$derived` reads from the derived-read refusal: the store rewrite
+        // turns both into `$.store_get(…)` / `d()` after the loop. Both shadow
+        // refusals are deferred (the store's needs the full nested-scope set, so
+        // pass `None`; the derived's is a whole-compile check in `compile_server`).
+        .allow_store_reads(store_names, None)
+        .allow_derived_reads();
         walk_expression_guarded(callback, &mut ctx)?;
         return Ok(None);
     }
@@ -804,10 +830,13 @@ pub(crate) fn rewrite_script_statement<'arena>(
             derived_names,
             std::rc::Rc::clone(&b.interner),
         )
-        // Exempt valid `$name` store reads from the guard's `$`-prefixed refusal:
-        // the store rewrite handles them after the loop. The shadow refusal is
-        // deferred there too (it needs the full nested-scope set), so pass `None`.
-        .allow_store_reads(store_names, None);
+        // Exempt valid `$name` store reads from the guard's `$`-prefixed refusal
+        // and `$derived` reads from the derived-read refusal: the store rewrite
+        // turns both into `$.store_get(…)` / `d()` after the loop. Both shadow
+        // refusals are deferred (the store's needs the full nested-scope set, so
+        // pass `None`; the derived's is a whole-compile check in `compile_server`).
+        .allow_store_reads(store_names, None)
+        .allow_derived_reads();
         for expr in guarded {
             walk_expression_guarded(expr, &mut ctx)?;
         }
@@ -822,10 +851,13 @@ pub(crate) fn rewrite_script_statement<'arena>(
             derived_names,
             std::rc::Rc::clone(&b.interner),
         )
-        // Exempt valid `$name` store reads from the guard's `$`-prefixed refusal:
-        // the store rewrite handles them after the loop. The shadow refusal is
-        // deferred there too (it needs the full nested-scope set), so pass `None`.
-        .allow_store_reads(store_names, None);
+        // Exempt valid `$name` store reads from the guard's `$`-prefixed refusal
+        // and `$derived` reads from the derived-read refusal: the store rewrite
+        // turns both into `$.store_get(…)` / `d()` after the loop. Both shadow
+        // refusals are deferred (the store's needs the full nested-scope set, so
+        // pass `None`; the derived's is a whole-compile check in `compile_server`).
+        .allow_store_reads(store_names, None)
+        .allow_derived_reads();
         walk_statement_guarded(stmt, &mut ctx, 0)?;
         return Ok(Some(stmt.clone()));
     };
@@ -843,10 +875,13 @@ pub(crate) fn rewrite_script_statement<'arena>(
             derived_names,
             std::rc::Rc::clone(&b.interner),
         )
-        // Exempt valid `$name` store reads from the guard's `$`-prefixed refusal:
-        // the store rewrite handles them after the loop. The shadow refusal is
-        // deferred there too (it needs the full nested-scope set), so pass `None`.
-        .allow_store_reads(store_names, None);
+        // Exempt valid `$name` store reads from the guard's `$`-prefixed refusal
+        // and `$derived` reads from the derived-read refusal: the store rewrite
+        // turns both into `$.store_get(…)` / `d()` after the loop. Both shadow
+        // refusals are deferred (the store's needs the full nested-scope set, so
+        // pass `None`; the derived's is a whole-compile check in `compile_server`).
+        .allow_store_reads(store_names, None)
+        .allow_derived_reads();
         walk_statement_guarded(stmt, &mut ctx, 0)?;
         return Ok(Some(stmt.clone()));
     }
@@ -860,10 +895,13 @@ pub(crate) fn rewrite_script_statement<'arena>(
             derived_names,
             std::rc::Rc::clone(&b.interner),
         )
-        // Exempt valid `$name` store reads from the guard's `$`-prefixed refusal:
-        // the store rewrite handles them after the loop. The shadow refusal is
-        // deferred there too (it needs the full nested-scope set), so pass `None`.
-        .allow_store_reads(store_names, None);
+        // Exempt valid `$name` store reads from the guard's `$`-prefixed refusal
+        // and `$derived` reads from the derived-read refusal: the store rewrite
+        // turns both into `$.store_get(…)` / `d()` after the loop. Both shadow
+        // refusals are deferred (the store's needs the full nested-scope set, so
+        // pass `None`; the derived's is a whole-compile check in `compile_server`).
+        .allow_store_reads(store_names, None)
+        .allow_derived_reads();
         let rune = declarator
             .init
             .as_ref()
@@ -972,6 +1010,14 @@ pub(crate) fn rewrite_script_statement<'arena>(
                 Some(arg.clone())
             }
             Some(RuneInit::Derived(expr)) => {
+                // `$derived(d)` whose WHOLE body is a bare `$derived` read: the
+                // oracle rewrites the read to `d()`, then `unthunk` collapses
+                // `() => d()` to `d`, emitting `$.derived(d)` — the derived
+                // function passed directly, never read. The script rewrite can't
+                // reproduce that collapse (its store-rewrite pass would turn the
+                // argument into `d()`, giving `$.derived(() => d())`), so refuse —
+                // a safe over-refusal (the read refused before this slice too).
+                refuse_bare_derived_arg(expr, source, derived_names)?;
                 walk_expression_guarded(expr, &mut ctx)?;
                 // The oracle wraps the value with `b.thunk`, which is
                 // `unthunk(arrow([], value))` — and `unthunk` COLLAPSES the arrow
@@ -999,6 +1045,12 @@ pub(crate) fn rewrite_script_statement<'arena>(
                 Some(b.derived_call(anchor, argument))
             }
             Some(RuneInit::DerivedBy(f)) => {
+                // `$derived.by(d)` passes `d` straight through as the compute
+                // function → `$.derived(d)` (`.by` runs no `unthunk`), and the
+                // store-rewrite pass then lowers the bare `d` read to `d()` →
+                // `$.derived(d())`, exactly the oracle's output — so no refusal is
+                // needed (unlike the `$derived(d)` arm, whose `() => d()` the oracle
+                // collapses to `$.derived(d)`, a form the rewrite can't reproduce).
                 walk_expression_guarded(f, &mut ctx)?;
                 let anchor = declarator
                     .init

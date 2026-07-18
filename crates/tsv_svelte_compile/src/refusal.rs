@@ -234,13 +234,25 @@ pub enum Refusal {
         /// The `$`-prefixed identifier.
         name: String,
     },
-    /// A `$derived` binding read in a position the template value-walk does not
-    /// rewrite to `d()` — a pattern default, a script-position read, a read under
-    /// an unsupported wrapper, or an escaped-identifier read whose decoded name is
-    /// a `$derived` binding.
+    /// A `$derived` binding read in a position the value-walk does not rewrite to
+    /// `d()` — a pattern default, a read under an unsupported wrapper, an
+    /// escaped-identifier read whose decoded name is a `$derived` binding, or a
+    /// write to the derived binding itself (`d = v` / `d++`, which the oracle
+    /// lowers to `d(v)` / `$.update_derived(d)` — not implemented).
     #[error("read of derived binding {name} (unsupported read position)")]
     DerivedBindingRead {
         /// The derived binding name.
+        name: String,
+    },
+    /// A `$derived` binding whose name is also declared in a nested scope of the
+    /// emitted script (a parameter or nested local). The script-position derived
+    /// read rewrite is name-based, so it can't tell a read of the derived from a
+    /// read of the shadowing binding — rewriting the latter to `d()` would
+    /// MISMATCH. Shadowing a derived is legal (unlike a store), so this is a
+    /// tsv-side over-refusal, kept narrow (checks `nested_declared`) and rare.
+    #[error("read of derived binding {name} shadowed in a nested scope")]
+    DerivedReadShadowed {
+        /// The shadowed derived binding name.
         name: String,
     },
     /// A top-level `await` (async component output is not implemented).
@@ -762,6 +774,9 @@ impl Refusal {
             Self::Rune { .. } => Cow::Borrowed("rune {name}"),
             Self::DollarPrefixedIdentifier { .. } => Cow::Borrowed("$-prefixed identifier {name}"),
             Self::DerivedBindingRead { .. } => Cow::Borrowed("read of derived binding {name}"),
+            Self::DerivedReadShadowed { .. } => {
+                Cow::Borrowed("read of derived binding {name} shadowed in a nested scope")
+            }
             Self::MemberCallAmbiguousRoot { .. } => Cow::Borrowed(
                 "member/call rooted at prop/import {name} also bound in a nested scope",
             ),

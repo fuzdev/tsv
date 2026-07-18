@@ -21,11 +21,14 @@
 //!   top-level name can't be trusted by this shadow-naive mutation collection,
 //!   so the binding goes `Opaque` and refuses if it reaches an evaluated spine),
 //!
-//! and refuses **reads of derived bindings** (`derived_names`) — those become
-//! `d()` calls in the emitter's template value positions (bare or nested, via the
-//! value-walk in `fragment.rs`); a read the walk does not reach — a pattern
-//! default, a script-position read, an unsupported-wrapper or escaped-identifier
-//! read — refuses here.
+//! and refuses **reads of derived bindings** (`derived_names`) that no rewrite
+//! turns into `d()`. A template value position (bare or nested, via the
+//! value-walk in `fragment.rs`) and a **script position** (when the caller opts
+//! in via `allow_derived_reads`, the script-body guards — the read is rewritten
+//! by the [store rewrite](crate::store_rewrite)) are exempt; a read the rewrites
+//! do not reach — a pattern default, an unsupported-wrapper or escaped-identifier
+//! read — refuses here, as does a **write** to a derived binding (`d = v` /
+//! `d++`, out of scope).
 //!
 //! The matches are exhaustive on purpose — a new `Statement`/`Expression`
 //! variant fails compilation here instead of silently skipping the guard.
@@ -69,6 +72,15 @@ pub(crate) struct WalkCtx<'a> {
     /// refusal for its region); the script guard passes `None` and defers the
     /// shadow refusal to the store rewrite, which has the full shadow set.
     store_shadowed: Option<&'a HashSet<String>>,
+    /// Exempt a plain-name read of a `$derived` binding from the refusal: the
+    /// script-position rewrite ([store rewrite](crate::store_rewrite)) turns it
+    /// into `d()`. `true` on the SCRIPT-body guards; `false` on the pattern and
+    /// template-value guards, where a derived read reaching the guard is an
+    /// unsupported position (a safe over-refusal). A **write** to the derived
+    /// (`d = v` / `d++`) refuses regardless — it is out of scope on every path.
+    /// The escaped-identifier read also refuses regardless (classification not
+    /// ported).
+    allow_derived_reads: bool,
     /// Current function-nesting depth (0 = the statement being walked).
     fn_depth: usize,
 }
@@ -89,6 +101,7 @@ impl<'a> WalkCtx<'a> {
             interner,
             store_names: None,
             store_shadowed: None,
+            allow_derived_reads: false,
             fn_depth: 0,
         }
     }
@@ -104,6 +117,15 @@ impl<'a> WalkCtx<'a> {
     ) -> Self {
         self.store_names = Some(store_names);
         self.store_shadowed = store_shadowed;
+        self
+    }
+
+    /// Exempt a plain-name read of a `$derived` binding from the refusal (the
+    /// script-position [store rewrite](crate::store_rewrite) turns it into `d()`).
+    /// Set on the SCRIPT-body guards; a **write** to a derived binding still
+    /// refuses, as does an escaped-identifier read.
+    pub(crate) fn allow_derived_reads(mut self) -> Self {
+        self.allow_derived_reads = true;
         self
     }
 }
@@ -249,6 +271,74 @@ pub(crate) fn assign_target_roots(target: &Expression<'_>, source: &str, out: &m
         Expression::RestElement(r) => assign_target_roots(r.argument, source, out),
         _ => {}
     }
+}
+
+/// Refuse a write to a `$derived` binding ITSELF — a **binding-leaf** target: a
+/// bare identifier (`d = v`, `d++`) or a destructuring-pattern leaf
+/// (`[d] = …`, `({ d } = …)`, `[z, d] = …`). The oracle lowers each to `d(v)` /
+/// `$.update_derived(d)` / an `$.to_array` IIFE, none of which this slice emits.
+///
+/// The recursion is deliberately NARROWER than the store path's
+/// [`assign_target_roots`]/`pattern_targets_store`: it **stops at a member/index**
+/// target (`d.x = v`, `x[d] = v`), which merely READS the derived (its object /
+/// computed index) and is left for the read rewrite to lower (`d().x = v` /
+/// `x[d()] = v`). Only a bare-name binding leaf is a write; a default's value
+/// (`[d = 1] = …` → the `1`) is a read, so only the `left` of an
+/// [`AssignmentPattern`](Expression::AssignmentPattern) is a binding.
+///
+/// Keyed on `derived_names`, so in a dropped region (an empty set) it never fires
+/// — a dropped-handler derived write compiles, unchanged.
+fn refuse_derived_write_target(
+    target: &Expression<'_>,
+    ctx: &WalkCtx<'_>,
+) -> Result<(), CompileError> {
+    match target {
+        // A bare-identifier binding target — a write to the derived itself.
+        Expression::Identifier(id) => {
+            if let Some(name) = identifier_name(id, ctx.source)
+                && ctx.derived_names.contains(name)
+            {
+                return Err(CompileError::Unsupported(Refusal::DerivedBindingRead {
+                    name: name.to_string(),
+                }));
+            }
+        }
+        // A member/index target READS the derived, never binds it — STOP here so
+        // `d.x = v` / `x[d] = v` compile via the read rewrite.
+        Expression::MemberExpression(_) => {}
+        // Destructuring-pattern targets: every slot is itself an assignment target,
+        // so recurse into each binding-leaf position.
+        Expression::ArrayPattern(pattern) => {
+            for element in pattern.elements.iter().flatten() {
+                refuse_derived_write_target(element, ctx)?;
+            }
+        }
+        Expression::ObjectPattern(pattern) => {
+            for prop in pattern.properties {
+                match prop {
+                    ObjectPatternProperty::Property(p) => {
+                        refuse_derived_write_target(&p.value, ctx)?;
+                    }
+                    ObjectPatternProperty::RestElement(rest) => {
+                        refuse_derived_write_target(rest.argument, ctx)?;
+                    }
+                }
+            }
+        }
+        // A default (`[d = 1] = …`): `left` is the binding, `right` the default
+        // (a read the read rewrite / guard handles). Only the binding refuses.
+        Expression::AssignmentPattern(pattern) => {
+            refuse_derived_write_target(pattern.left, ctx)?;
+        }
+        Expression::RestElement(rest) => {
+            refuse_derived_write_target(rest.argument, ctx)?;
+        }
+        Expression::ParenthesizedExpression(paren) => {
+            refuse_derived_write_target(paren.expression, ctx)?;
+        }
+        _ => {}
+    }
+    Ok(())
 }
 
 /// Record the names a declaration pattern declares into `nested_declared`
@@ -441,6 +531,12 @@ fn walk_for_left(
         }
         ForInOfLeft::Pattern(pattern) => {
             assign_target_roots(pattern, ctx.source, ctx.updated);
+            // A `$derived` binding-leaf loop target (`for ([d] of …)`) is a derived
+            // write the oracle lowers to an unimplemented shape — refuse. (A bare
+            // `for (d of …)` target refuses here too; the oracle itself emits
+            // invalid JS there, so a clean refusal only improves on it. A member
+            // target `for (d.x of …)` reads the derived and compiles.)
+            refuse_derived_write_target(pattern, ctx)?;
             walk_expression(pattern, ctx)
         }
     }
@@ -562,7 +658,14 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
                     };
                 }
             }
-            if let Some(name) = identifier_name(id, ctx.source)
+            // A plain-name read of a `$derived` binding refuses UNLESS the caller
+            // opts in (`allow_derived_reads`, the script-body guards): when
+            // allowed, the read passes and the script-position rewrite
+            // (`store_rewrite`) turns it into `d()`, exactly as the template value
+            // walk does. A WRITE to the derived is handled at the assignment/update
+            // arms (out of scope on every path); this arm only sees reads.
+            if !ctx.allow_derived_reads
+                && let Some(name) = identifier_name(id, ctx.source)
                 && ctx.derived_names.contains(name)
             {
                 return Err(CompileError::Unsupported(Refusal::DerivedBindingRead {
@@ -617,6 +720,7 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
         Expression::UnaryExpression(u) => walk_expression(u.argument, ctx),
         Expression::UpdateExpression(u) => {
             assign_target_roots(u.argument, ctx.source, ctx.updated);
+            refuse_derived_write_target(u.argument, ctx)?;
             walk_expression(u.argument, ctx)
         }
         Expression::BinaryExpression(b) => {
@@ -668,6 +772,7 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
         Expression::SequenceExpression(s) => walk_expressions(s.expressions, ctx),
         Expression::AssignmentExpression(a) => {
             assign_target_roots(a.left, ctx.source, ctx.updated);
+            refuse_derived_write_target(a.left, ctx)?;
             walk_expression(a.left, ctx)?;
             walk_expression(a.right, ctx)
         }

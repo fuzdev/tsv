@@ -958,7 +958,11 @@ pub(crate) fn wrap_value_expr<'arena>(
 /// Whether `expr` is a bare read of a `$derived` binding — a plain (non-escaped)
 /// identifier whose name is in `derived_names`. Such a read rewrites to the
 /// derived-thunk call `d()` at every value position, at any depth.
-fn is_bare_derived_read(source: &str, derived_names: &NameSet, expr: &Expression<'_>) -> bool {
+pub(crate) fn is_bare_derived_read(
+    source: &str,
+    derived_names: &NameSet,
+    expr: &Expression<'_>,
+) -> bool {
     if let Expression::Identifier(id) = expr
         && id.escaped_name.is_none()
     {

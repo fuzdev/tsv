@@ -224,9 +224,13 @@ project-wide conventions.
   dropped-region position (`store_invalid_scoped_subscription`), and a
   `$name` whose base is not a binding (the oracle's `global_reference_invalid`) —
   refuses a derived-binding
-  read the template value-walk does not rewrite to `d()` (a pattern default, a
-  script-position read, a read under an unsupported wrapper, or an escaped-identifier
-  read whose decoded name is a `$derived` binding) and top-level `await`, and collects
+  read no rewrite turns into `d()` — a pattern default, a read under an
+  unsupported wrapper, or an escaped-identifier read whose decoded name is a
+  `$derived` binding; a **script-position** read is EXEMPT when the caller opts in
+  (`allow_derived_reads`, the script-body guards — the read is rewritten by
+  `store_rewrite`), while a **write** to a derived binding (`d = v` / `d++`, out of
+  scope — the oracle lowers it to `d(v)` / `$.update_derived(d)`) refuses on every
+  path. Also refuses top-level `await`, and collects
   assignment/update roots (`updated`) and nested-scope declarations (shadow
   candidates) for the evaluator. Exhaustive matches on purpose — new AST
   variants fail compilation here instead of silently skipping the guard.
@@ -246,7 +250,8 @@ project-wide conventions.
   write, emitted or dropped — an event handler, `{:catch}`) sets it, so the
   `var $$store_subs;` / `$.unsubscribe_stores(…)` injection fires for a store used
   only in a dropped handler too. It is decided here, NOT at emission time.
-- `store_rewrite.rs` — **store-access rewriting** for the instance script (the
+- `store_rewrite.rs` — **store-access (and script-position `$derived` read)
+  rewriting** for the instance script (the
   script analog of `fragment.rs`'s template value walk). A tree→tree pass over the
   FINAL synthetic body (after erasure + rune rewrites, so a read inside a
   `$.derived(() => …)` thunk is reached) with `erase.rs`'s `Option<T>`
@@ -255,13 +260,20 @@ project-wide conventions.
   v)` and a compound `$name += v` → `$.store_set(name, $.store_get(…) + v)`
   (reconstructing the binary the oracle's `build_assignment_value` produces); an
   **update** `$name++`/`++$name`/`$name--`/`--$name` → `$.update_store[_pre]((…),
-  '$name', name[, -1])`. Refuses a member write (`$obj.x = 5`), a destructuring
-  write (`[$count] = …`), and a shadowed base (`store_invalid_scoped_subscription`,
+  '$name', name[, -1])`. It also rewrites a plain **`$derived` read** → `d()` (the
+  script analog of the template value walk's bare-derived rewrite — a top-level
+  initializer, a function body, a `$.derived(() => …)` thunk; the minted `d()`
+  takes the callee's **tight** span so it never sweeps a carried script comment). A
+  binding-position id (`let d = …`) is skipped, and a **write** to a derived
+  (`d = v` / `d++`) and a *shadowed* derived name are refused upstream (the rune
+  guard and `compile_server`), so they never reach the pass. Refuses a store member
+  write (`$obj.x = 5`), a store destructuring
+  write (`[$count] = …`), and a shadowed store base (`store_invalid_scoped_subscription`,
   `store_shadowed` = `nested_declared` ∪ `component.fn_declared`). Respects
   **name-only positions** (a non-computed member property / object-or-class key is
   a name, never a read) — the one place it diverges from `erase.rs`. Builders live
   in `build.rs` (`store_set`, `update_store`, sharing `store_subs_assign`/
-  `store_base_value` with `store_get`).
+  `store_base_value` with `store_get`; `call_expr` for the `d()` read).
 - `snippet.rs` — the `{#snippet}` hoist analysis (name-based port of Svelte's
   `can_hoist_snippet`): which top-level snippets go to true module scope. Collects
   each snippet's free references (a flat scope-tracking walk) minus its bound
@@ -428,9 +440,10 @@ project-wide conventions.
   (a `contains_rewrite_target` fast-path keeps target-free subtrees on the unchanged
   guarded path, byte-identical, and `contains_rewrite_target`/`rebuild_value` stay in
   lockstep on one node set). A derived read or snapshot under a node kind the walk
-  does not descend (an object literal, an arrow, a tagged template), a pattern
-  default, or a script-position read is left for the guard, which refuses it (a safe
-  over-refusal).
+  does not descend (an object literal, an arrow, a tagged template) or a pattern
+  default is left for the guard, which refuses it (a safe over-refusal); a
+  **script-position** derived read is instead rewritten to `d()` by `store_rewrite`
+  (not refused).
 - `blocks.rs` — **control-flow blocks** split the single template into
   multiple `$$renderer.push(…)` statements, each block emitting its own
   statements between flushes and merging its closer/opener into the adjacent

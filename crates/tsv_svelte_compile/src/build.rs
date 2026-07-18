@@ -243,20 +243,26 @@ impl<'arena> Builder<'arena> {
         })
     }
 
-    /// A call on a borrowed callee expression (`d()`): the callee keeps its
-    /// host span, the `()` is minted.
+    /// A call on a borrowed callee expression (`d()`): the callee keeps its host
+    /// span, the `()` is minted for the appendix but the CallExpression node takes
+    /// the callee's **tight** span. The printer prints `()` structurally, so the
+    /// tight span is output-neutral — but it keeps the empty-arg comment window
+    /// (`[callee.end, call.span.end]`, `calls/call_formatting.rs`) EMPTY. Without
+    /// it, an appendix-end span would sweep every host comment after the callee
+    /// into the minted parens (`full_path(/* c */)`), double-printing a carried
+    /// script comment when this lowers a script-position `$derived` read.
     pub fn call_expr(
         &mut self,
         callee: &'arena Expression<'arena>,
         arguments: &'arena [Expression<'arena>],
     ) -> Expression<'arena> {
-        let end = self.mint("()").end;
+        self.mint("()");
         Expression::CallExpression(CallExpression {
             callee,
             type_arguments: None,
             arguments,
             optional: false,
-            span: Span::new(callee.span().start, end),
+            span: callee.span(),
         })
     }
 

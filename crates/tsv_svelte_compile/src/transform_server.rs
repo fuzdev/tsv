@@ -741,6 +741,24 @@ pub(crate) fn compile_server<'arena>(
     let mut store_shadowed = nested_declared.clone();
     store_shadowed.extend(component.fn_declared.iter().cloned());
 
+    // A `$derived` name shadowed by a NESTED-scope binding of the emitted script
+    // (a parameter or nested local) can't be rewritten safely: the read rewrite
+    // below is name-based, so a read of the shadowing binding would become `d()`
+    // where the oracle keeps the bare binding — a MISMATCH. Shadowing a derived is
+    // LEGAL (unlike a store, which the oracle rejects), so refusing is a tsv-side
+    // over-refusal; keep it as narrow as the risk by checking `nested_declared`
+    // (the emitted-script nested scopes this rewrite descends), NOT the wider
+    // `store_shadowed` (which also folds in template-handler locals the store/
+    // derived rewrite never touches). A safe over-refusal, rare.
+    if let Some(name) = derived_names
+        .iter()
+        .find(|name| nested_declared.contains(*name))
+    {
+        return Err(unsupported(Refusal::DerivedReadShadowed {
+            name: name.clone(),
+        }));
+    }
+
     // Rewrite script-position store reads and writes over the FINAL synthetic body
     // (after erasure + rune rewrites), so a read inside a `$.derived(() => …)`
     // thunk is reached too: `$name` → `$.store_get(…)`, `$name = v` →

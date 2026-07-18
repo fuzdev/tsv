@@ -1,5 +1,6 @@
-//! Store subscription rewriting for the instance script — the script-position
-//! analog of the template value walk (`fragment::rewrite_template_value`).
+//! Store subscription (and script-position `$derived` read) rewriting for the
+//! instance script — the script-position analog of the template value walk
+//! (`fragment::rewrite_template_value`).
 //!
 //! A tree→tree pass over the (already type-erased and rune-rewritten) instance
 //! body that rewrites every `$name` store access the oracle's SSR transform
@@ -14,6 +15,16 @@
 //!   (`AssignmentExpression.js`);
 //! - an **update** `$count++` / `++$count` / `$count--` / `--$count` →
 //!   `$.update_store[_pre]((…), '$count', count[, -1])` (`UpdateExpression.js`).
+//!
+//! It also rewrites a plain **`$derived` read** in a script position (a function
+//! body, a top-level initializer, a `$.derived(() => …)` thunk) to the
+//! derived-thunk call `d()` — the same lowering the template value walk applies,
+//! extended to the script. A read is rewritten only in a genuine value position:
+//! a name-only position (member property / object key) is never descended and a
+//! binding-position id is skipped, so `let d = …` / `{ d: 1 }` / `o.d` stay
+//! verbatim. A **write** to a derived (`d = v` / `d++`) and a *shadowed* derived
+//! name are refused upstream (the rune guard and `compile_server`), so they never
+//! reach this pass.
 //!
 //! **Structural sharing.** Like [`crate::erase`], every entry point returns
 //! `Option<T>`: `None` means *unchanged*, so a subtree with no store access is
@@ -54,8 +65,11 @@ use crate::build::Builder;
 use crate::refusal::Refusal;
 use crate::rune_guard::assign_target_roots;
 
-/// Rewrite every store access in `stmts`, returning `None` when nothing changed
-/// (the caller keeps the original slice). See the [module docs](self).
+/// Rewrite every store access (and script-position `$derived` read) in `stmts`,
+/// returning `None` when nothing changed (the caller keeps the original slice).
+/// See the [module docs](self). The minted `d()` reads take the callee's tight
+/// span ([`Builder::call_expr`]), so they never sweep a carried script comment —
+/// no comment gate is needed here.
 pub(crate) fn rewrite_store_accesses<'arena>(
     b: &mut Builder<'arena>,
     source: &str,
@@ -176,6 +190,21 @@ impl<'arena> StoreRewriter<'_, 'arena> {
         let name = &self.source[start..start + id.name_len as usize];
         let base = store_read_base(name)?;
         self.store_names.contains(base).then(|| base.to_string())
+    }
+
+    /// Whether `id` is a plain (non-escaped) read of a `$derived` binding — the
+    /// script analog of `fragment::is_bare_derived_read`. Such a read rewrites to
+    /// the derived-thunk call `d()`. An escaped derived read is refused by the
+    /// rune guard before this pass, and a *shadowed* derived name is refused by
+    /// the whole-compile check in `compile_server`, so any read reaching here that
+    /// this returns `true` for is the derived binding itself.
+    fn derived_read(&self, id: &Identifier<'_>) -> bool {
+        if id.escaped_name.is_some() {
+            return false;
+        }
+        let start = id.span.start as usize;
+        let name = &self.source[start..start + id.name_len as usize];
+        self.derived_names.contains(name)
     }
 
     /// Whether any assignment-target root inside `left` is a store base — used to
@@ -510,10 +539,19 @@ impl<'arena> StoreRewriter<'_, 'arena> {
         &mut self,
         declarator: &tsv_ts::ast::internal::VariableDeclarator<'arena>,
     ) -> Result<Option<tsv_ts::ast::internal::VariableDeclarator<'arena>>, CompileError> {
-        // The `id` is a binding pattern — its binding names are not reads, but a
-        // default (`let { a = $count } = …`) is, so recurse it. `expr` never
-        // rewrites a bare name in binding position (only a `$name` reference).
-        let id = self.expr(&declarator.id)?;
+        // The `id` is a binding pattern — its binding NAMES are not reads, but a
+        // default (`let { a = $count } = …`) is, so recurse a pattern for its
+        // defaults. A plain-identifier binding (`let d = …`) has no read
+        // sub-position and MUST be left alone: a top-level `$derived` name in
+        // binding position would otherwise be rewritten to `d()`. (Nested /
+        // shadowing binding names are refused by the derived-shadow check in
+        // `compile_server`, so the only binding-position derived name reaching here
+        // is a top-level declarator id.) A `$name` never appears in binding
+        // position, so this is a no-op for the store rewrite.
+        let id = match &declarator.id {
+            Expression::Identifier(_) => None,
+            other => self.expr(other)?,
+        };
         let init = match &declarator.init {
             Some(init) => self.expr(init)?.map(Some),
             None => None,
@@ -687,7 +725,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
     ) -> Result<Option<Expression<'arena>>, CompileError> {
         use tsv_ts::ast::internal as ast;
         Ok(match expr {
-            // ── The store leaves ───────────────────────────────────────────
+            // ── The store / derived leaves ─────────────────────────────────
             Expression::Identifier(id) => match self.store_base(id) {
                 Some(base) => {
                     if self.store_shadowed.contains(&base) {
@@ -695,6 +733,17 @@ impl<'arena> StoreRewriter<'_, 'arena> {
                     }
                     let is_derived = self.derived_names.contains(&base);
                     Some(self.b.store_get(&base, is_derived))
+                }
+                // A plain read of a `$derived` binding → `d()` (the script analog
+                // of the template value walk). Name-only positions (a non-computed
+                // member property / object-or-class key) never reach here — their
+                // callers don't descend them — and binding-position ids are skipped
+                // by `variable_declarator`.
+                None if self.derived_read(id) => {
+                    let arena = self.b.arena;
+                    let callee: &'arena Expression<'arena> =
+                        arena.alloc(Expression::Identifier(id.clone()));
+                    Some(self.b.call_expr(callee, &[]))
                 }
                 None => None,
             },
