@@ -1,4 +1,4 @@
-<!-- An empty {:catch} is a rejection handler, so tsv keeps it (prettier deletes it). In the block (multiline) form the {:catch error} marker sits on its own line and {/await} on the next — no blank line between them, whether the block was authored across lines or reached that layout by breaking. -->
+<!-- An empty {:catch} is a rejection handler, so tsv keeps it (prettier deletes it). The empty section still COLLAPSES: its marker glues to the close ({:catch error}{/await}), the same way prettier collapses an empty {:else} to {:else}{/if}. -->
 
 <!-- empty :catch after a multi-node pending body -->
 {#await promise}<p>a</p>
