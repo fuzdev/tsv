@@ -111,8 +111,10 @@ fn svelte_only_regions(source: &str) -> Vec<(usize, usize)> {
         }
     }
 
-    /// A span taken as-is (a bare expression already bounded by its delimiters).
-    fn span_of(span: tsv_lang::Span, out: &mut Vec<(usize, usize)>) {
+    /// Push a span as-is (a bare expression already bounded by its delimiters). Named
+    /// distinctly from the module-level `span_of` (which reads a wire node's span) — this one
+    /// takes an internal-AST [`tsv_lang::Span`] and appends it.
+    fn push_span(span: tsv_lang::Span, out: &mut Vec<(usize, usize)>) {
         if span.end > span.start {
             out.push((span.start as usize, span.end as usize));
         }
@@ -203,9 +205,9 @@ fn svelte_only_regions(source: &str) -> Vec<(usize, usize)> {
                     // unprobed **silently**, which is the exact failure this walk exists to
                     // fix. Let it break the build instead.
                     match &e.kind {
-                        SpecialElementKind::SvelteElement { tag } => span_of(tag.span(), out),
+                        SpecialElementKind::SvelteElement { tag } => push_span(tag.span(), out),
                         SpecialElementKind::SvelteComponent { expression } => {
-                            span_of(expression.expression.span(), out);
+                            push_span(expression.expression.span(), out);
                         }
                         SpecialElementKind::SvelteHead
                         | SpecialElementKind::SvelteWindow
@@ -581,6 +583,14 @@ fn punct_after(source: &str, start: usize) -> String {
 /// `.⟨⟩IDENT`. Whitespace is elided rather than represented, since a gap's *width* is not
 /// what distinguishes the position.
 pub(crate) fn site_shape(source: &str, offset: usize) -> String {
+    // `word_before` / `punct_before` slice `source[..offset]` directly; every caller passes an
+    // injection-site or victim-site offset, both provably char boundaries. Assert it (debug
+    // builds only) so a future caller with a raw offset trips here rather than panicking
+    // mid-slice — the invariant `snippet` states by searching for a boundary instead.
+    debug_assert!(
+        source.is_char_boundary(offset),
+        "site_shape offset {offset} must be a char boundary"
+    );
     let before = word_before(source, offset).map_or_else(
         || {
             let p = punct_before(source, offset);

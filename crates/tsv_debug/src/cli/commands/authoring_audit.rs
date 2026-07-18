@@ -67,7 +67,7 @@ use tsv_svelte::ast::internal::FragmentNode;
 use crate::cli::CliError;
 use crate::deno::{PrettierParser, run_prettier};
 
-use super::profile::resolve_files;
+use super::profile::{is_input_invalid_fixture, resolve_files};
 
 /// Audit Svelte boundary-whitespace authoring-independence.
 ///
@@ -683,11 +683,7 @@ impl AuthoringAuditCommand {
     /// Format the file, gate on parse / base-idempotency, and enumerate sites.
     fn prepare_file(&self, path: &Path, report: &mut Report) -> Option<(String, Vec<Site>)> {
         // Skip fixtures expected to fail parsing.
-        if path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .is_some_and(|n| n.starts_with("input_invalid"))
-        {
+        if is_input_invalid_fixture(path) {
             return None;
         }
         let source = std::fs::read_to_string(path).ok()?;

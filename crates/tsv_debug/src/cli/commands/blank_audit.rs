@@ -110,7 +110,7 @@ use crate::audit::sites::{
 };
 use crate::cli::CliError;
 
-use super::profile::resolve_files;
+use super::profile::{is_input_invalid_fixture, resolve_files};
 
 /// Inject a blank line into every gap and assert format stays a well-behaved fixed point.
 ///
@@ -470,6 +470,12 @@ impl Tally {
 /// and Svelte `<pre>` / `<textarea>` (whitespace-preserving elements), in byte space via `map`.
 /// A format-ignore region is NOT found here (locating its range from the output is fragile) — a
 /// format-ignore-bearing file is exempted whole (see [`source_has_format_ignore`]).
+///
+/// A multi-line **string literal** is deliberately NOT a skip region here, even though it too can
+/// hold a verbatim blank run: that omission is safe because a base file already carrying such a run
+/// fails the pristine blank-run check and is skipped (never injected into), and an injected blank
+/// never lands in a string interior (`string_and_template_spans` excludes those sites) — so the
+/// only strings this scan meets are pristine-clean, and none can produce a false finding.
 fn collect_blank_skip(node: &Value, map: &Utf16ToByte, out: &mut Vec<(usize, usize)>) {
     match node {
         Value::Object(obj) => {
@@ -563,11 +569,7 @@ fn blank_run_violation(output: &str, wire: &Value, skip: bool) -> Option<usize> 
 fn audit_file(path: &std::path::Path, render: bool, tally: &mut Tally) {
     let display = path.to_string_lossy().into_owned();
     // Intentionally-invalid fixtures don't parse — nothing to inject into.
-    if path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .is_some_and(|n| n.starts_with("input_invalid"))
-    {
+    if is_input_invalid_fixture(path) {
         return;
     }
     let Ok(source) = std::fs::read_to_string(path) else {

@@ -91,7 +91,7 @@ use crate::audit::properties::{
 use crate::cli::CliError;
 use crate::deno;
 
-use super::profile::resolve_files;
+use super::profile::{is_input_invalid_fixture, resolve_files};
 
 /// Audit whether every file's formatted output reparses to the same document.
 ///
@@ -342,11 +342,7 @@ impl RoundtripAuditCommand {
             }
         };
         // Intentionally-invalid fixture inputs aren't round-trip subjects.
-        files.retain(|p| {
-            !p.file_name()
-                .and_then(|n| n.to_str())
-                .is_some_and(|n| n.starts_with("input_invalid"))
-        });
+        files.retain(|p| !is_input_invalid_fixture(p));
         if self.limit > 0 {
             files.truncate(self.limit);
         }

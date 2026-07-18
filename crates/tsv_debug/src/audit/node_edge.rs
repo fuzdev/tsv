@@ -64,6 +64,11 @@ struct WireChild<'a> {
 /// *strictly contains* an offset the descent would enter, and it carries no span-bearing
 /// descendant — so this only relabels a mislabeled `leadingComments→X` / `X→trailingComments`
 /// back to the structural `^→X` / `X→$`, leaving node selection and descent unchanged.
+///
+/// `name_loc` / `metadata` are non-structural too but need no entry here: they carry no
+/// `start`/`end`, so [`collect_child`] sees through them and finds nothing — which holds only
+/// while those sub-objects stay spanless. A wire revision that gave one a span would silently
+/// promote it to a child (the CSS `Rule.metadata` walker test guards exactly that boundary).
 fn is_non_structural_key(key: &str) -> bool {
     matches!(
         key,

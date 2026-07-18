@@ -127,7 +127,7 @@ use crate::cli::CliError;
 use tsv_cli::cli::input::ParserType;
 use tsv_lang::comment_ledger::{self, CommentFindingKind};
 
-use super::profile::resolve_files;
+use super::profile::{is_input_invalid_fixture, resolve_files};
 
 /// Inject a comment into every gap and assert the print-once ledger still holds.
 ///
@@ -577,11 +577,7 @@ fn audit_file(
 ) {
     let display = path.to_string_lossy().into_owned();
     // Intentionally-invalid fixtures don't parse — nothing to inject into.
-    if path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .is_some_and(|n| n.starts_with("input_invalid"))
-    {
+    if is_input_invalid_fixture(path) {
         return;
     }
     let Ok(source) = std::fs::read_to_string(path) else {
