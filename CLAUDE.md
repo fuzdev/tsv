@@ -196,7 +196,7 @@ deno task fanout:audit               # guard against super-linear doc-node fanou
 deno task roundtrip:audit            # cheap tripwire that format(tests/fixtures) reparses (pure-Rust phase 1, no *_unreparseable output; gated in `deno task check`) — real yield is external corpora; see Debug Tooling
 deno task binding:audit              # comment↔token binding audit: does format re-bind a forward-binding glued block comment (a plain comment, a bundler annotation, or a JSDoc cast — all owned) to a different subtree — the class invisible to ast_diff/roundtrip/SAFETY because the characters only MOVE (pure Rust, no sidecar; gated in `deno task check`) — HARD (a parser-owned glued comment) fails the gate, SOFT (an unowned glued block comment, now rare) is informational; TS-family files only; real yield on external corpora; see Debug Tooling
 deno task authoring:audit            # authoring-independence over Svelte boundary whitespace: every render-equivalent authoring of one document (hug ↔ space ↔ newline at a tag's content boundary; space ↔ newline between siblings) must reach ONE tsv fixed point (pure Rust, no sidecar; gated in `deno task check`) — exits 1 on any non-idempotency, site-level or a base-non-idempotent FILE; see Debug Tooling
-deno task fuzz:audit                 # seeded mutational fuzzer over tests/fixtures (fixed --seed 0 --iterations 5000; pure Rust, no sidecar; gated in `deno task check`) — asserts no-panic + idempotency + structural-reparse, on every seed file AS AUTHORED and then on mutated input; see Debug Tooling
+deno task fuzz:audit                 # seeded mutational fuzzer over tests/fixtures (fixed --seed 0 --iterations 5000; pure Rust, no sidecar; gated in `deno task check`) — asserts no-panic + idempotency + structural-reparse, on every seed file AS AUTHORED and then on mutated input. Corpus-add-stable: mutants come from per-file path-keyed PRNG streams, so a fixture add/rename changes only that file's mutants; see Debug Tooling
 deno task comments:audit             # print-once comment ledger: every comment a document PARSES must be EMITTED exactly once (pure Rust, no sidecar; gated in `deno task check`) — reports DROPPED (silent content loss) and DOUBLE-PRINTED; the structural guard on the detached comment model, tsv's `ensureAllCommentsPrinted`; see Debug Tooling
 deno task gaps:audit                 # gap-injection audit: inject a comment into EVERY gap (five payloads, one per ownership path) and re-run the ledger — the discovery arm `comments:audit` can't be, since it only formats each file AS AUTHORED and no fixture covers most positions (eight such drops were found BY HAND, all green on every gate). Pure Rust, no sidecar; gated in `deno task check` as a RATCHET over a generated shape snapshot (`gap_audit_known.txt`): every line is a known bug and the file shrinking is the goal, so a shape not on the list, one on it that no longer fires, or any PANIC, FAILS. ~17 s. Full reference: ./docs/gap_audit.md
 deno task gaps:audit:update          # regenerate that snapshot after fixing a shape (or when a new fixture merely REACHES a pre-existing one); refuses a narrowed run
@@ -1177,16 +1177,28 @@ cargo run -p tsv_debug binding_audit --verbose ../svelte/packages/svelte/src
 
 ```bash
 # fuzz - dep-free seeded mutational fuzzer (the coverage-trifecta fuzzing leg). A
-# SplitMix64 PRNG + byte-level mutation operators over a seed corpus (default
-# tests/fixtures); every valid-UTF-8 mutant is driven through parse+format+reparse
-# under catch_unwind. Asserts three properties nothing else guards on ARBITRARY
-# input: (1) no panic — the parser must never crash (prod WASM is panic=abort → a
-# panic is a DoS; the corpus profile only catches panics on real code); (2) format
-# idempotency (the F1 fixed point); (3) structural reparse (reusing roundtrip_audit's
-# skeleton compare). Deterministic per --seed + corpus, so a finding reproduces
-# exactly. Pure Rust, no sidecar. Not the differential (tsv-vs-canonical) leg.
+# SplitMix64 PRNG + byte-level mutation operators (plus multi-byte inserts: a
+# unicode span/width stress set — NBSP/zero-width/BOM/combining/CJK/emoji/CRLF —
+# and a structure-bearing token dictionary aimed at the parser's ACCEPT paths)
+# over a seed corpus (default tests/fixtures); every valid-UTF-8 mutant is driven
+# through parse+format+reparse under catch_unwind. Asserts three properties
+# nothing else guards on ARBITRARY input: (1) no panic — the parser must never
+# crash (prod WASM is panic=abort → a panic is a DoS; the corpus profile only
+# catches panics on real code); (2) format idempotency (the F1 fixed point);
+# (3) structural reparse (reusing roundtrip_audit's skeleton compare).
+# Deterministic per --seed + corpus — and CORPUS-ADD-STABLE: each seed file draws
+# mutants from its own path-keyed PRNG stream, scheduled round-robin, so a
+# fixture add/remove/rename changes only that file's mutants (every other stream
+# is byte-identical; a shrunken per-file budget trims a stream's tail, never
+# rewrites it). Pure Rust, no sidecar. Not the differential (tsv-vs-canonical) leg.
 # The `fuzz:audit` deno task (fixed --seed 0 --iterations 5000 over tests/fixtures) is
 # gated in `deno task check` — a cheap standing tripwire for the three invariants.
+#
+# Hangs can't be caught in-process (the exponential-rebuild class), so two
+# tripwires: every attempt's input is written to a last-input repro file BEFORE
+# the attempt (path printed at startup; removed on a clean exit — a killed hung
+# run leaves its exact input on disk), and attempts over --slow-budget-ms
+# (default 2000) are reported, never fatally.
 #
 # TWO passes. Pass 1 drives every seed file AS AUTHORED (unmutated), pass 2 the
 # mutants. The pristine pass matters because the corpus is the richest source of
@@ -1199,14 +1211,21 @@ cargo run -p tsv_debug binding_audit --verbose ../svelte/packages/svelte/src
 # no such files, so each wants triage, and the seed path is itself the repro (an
 # unmutated file on disk), so it is listed rather than dumped. HARD verdicts fail.
 cargo run -p tsv_debug fuzz                                    # 2000 iters over tests/fixtures
-cargo run -p tsv_debug fuzz --seed 7 --iterations 20000 --dump-dir /tmp/fz  # discovery
+cargo run -p tsv_debug fuzz --seed 7 --iterations 20000 --evolve --minimize --dump-dir /tmp/fz  # discovery
 cargo run -p tsv_debug fuzz --iterations 0 ~/dev/zzz/src       # pristine pass only = an F1 sweep
 # HARD findings (exit 1): panic / unreparseable / non_idempotent / format_error —
 # always real bugs. SOFT findings (reported, non-fatal): structural_divergence — the
 # render-model-noisy bucket that needs canonical confirmation (roundtrip_audit
 # --canonical-all), like roundtrip_audit --gate. --strict fails on soft too.
+#
+# Discovery aids (both opt-in, off in the gate): --evolve feeds every mutant that
+# passes all invariants back into the seed pool (bounded at 2× the initial corpus)
+# so later mutants walk deeper into the ACCEPTED-input space — the formatter's
+# coverage, since a mutant must parse before F1/reparse grade anything; --minimize
+# ddmin-shrinks each stored HARD finding (greedy chunk removal while the same
+# outcome reproduces, bounded probes) into a consumable repro before report/dump.
 # Also: --parser not applicable (per-file extension), --max-mutations N, --limit N,
-# --max-findings N (HARD only), --json.
+# --max-findings N (HARD only), --slow-budget-ms N, --json.
 ```
 
 **F1 Idempotency Sweep (real-code corpus):**
