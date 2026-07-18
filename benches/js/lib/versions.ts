@@ -27,11 +27,20 @@ export interface BiomeVersions {
 	wasm: string;
 }
 
+/** dprint implementation versions (the engine `deno fmt` runs — see lib/dprint.ts) */
+export interface DprintVersions {
+	/** The Wasm plugin host (`@dprint/formatter`) */
+	formatter: string;
+	/** The TS/JS plugin itself (`@dprint/typescript`) — the version worth citing */
+	typescript: string;
+}
+
 /** All implementation versions */
 export interface AllVersions {
 	canonical: CanonicalVersions;
 	oxc: OxcVersions;
 	biome: BiomeVersions;
+	dprint: DprintVersions;
 }
 
 /** Default versions when loading fails */
@@ -50,6 +59,10 @@ const DEFAULT_VERSIONS: AllVersions = {
 	biome: {
 		js_api: 'unknown',
 		wasm: 'unknown',
+	},
+	dprint: {
+		formatter: 'unknown',
+		typescript: 'unknown',
 	},
 };
 
@@ -88,6 +101,10 @@ export async function load_all_versions(): Promise<AllVersions> {
 			biome: {
 				js_api: clean_version(deps['@biomejs/js-api']),
 				wasm: clean_version(deps['@biomejs/wasm-bundler']),
+			},
+			dprint: {
+				formatter: clean_version(deps['@dprint/formatter']),
+				typescript: clean_version(deps['@dprint/typescript']),
 			},
 		};
 	} catch {
