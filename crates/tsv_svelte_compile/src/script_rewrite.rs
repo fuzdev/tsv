@@ -10,9 +10,10 @@ use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{InfallibleResolve, Span};
 use tsv_svelte::ast::internal::{AttributeNode, AttributeValue, FragmentNode, Root};
 use tsv_ts::ast::internal::{
-    AssignmentPattern, Expression, ImportDeclaration, ImportSpecifier, LiteralValue,
-    ModuleExportName, ObjectPattern, ObjectPatternProperty, Property, PropertyKind, RestElement,
-    Statement, VariableDeclaration, VariableDeclarator,
+    AssignmentPattern, ClassBody, ClassDeclaration, ClassMember, Expression, ImportDeclaration,
+    ImportSpecifier, LiteralValue, ModuleExportName, ObjectPattern, ObjectPatternProperty,
+    Property, PropertyDefinition, PropertyKind, RestElement, Statement, VariableDeclaration,
+    VariableDeclarator,
 };
 
 use crate::analyze::{
@@ -22,7 +23,9 @@ use crate::analyze::{
 use crate::attr_refs::{TemplateItem, each_template_item};
 use crate::build::Builder;
 use crate::fragment::is_bare_derived_read;
-use crate::rune_guard::{WalkCtx, walk_expression_guarded, walk_statement_guarded};
+use crate::rune_guard::{
+    WalkCtx, walk_class_member_guarded, walk_expression_guarded, walk_statement_guarded,
+};
 use crate::transform_server::unsupported;
 use crate::{CompileError, Refusal, erase};
 
@@ -843,6 +846,26 @@ pub(crate) fn rewrite_script_statement<'arena>(
         return Ok(None);
     }
 
+    // A top-level class declaration may carry `$state`/`$state.raw` fields, which
+    // the server unwraps exactly like a top-level `$state` declarator. Every other
+    // member — a `$derived` field, a static/computed rune field, a method body, a
+    // nested class — takes the normal refusing guard walk, so the guard-exempt set
+    // equals the unwrap set: reach-matched by construction (see
+    // `rewrite_class_state_fields`).
+    if let Statement::ClassDeclaration(class) = stmt {
+        return rewrite_class_state_fields(
+            b,
+            class,
+            source,
+            derived_names,
+            store_names,
+            updated,
+            nested_declared,
+            dropped_regions,
+        )
+        .map(Some);
+    }
+
     let Statement::VariableDeclaration(decl) = stmt else {
         let mut ctx = WalkCtx::new(
             source,
@@ -1083,6 +1106,149 @@ pub(crate) fn rewrite_script_statement<'arena>(
         declare: decl.declare,
         span: decl.span,
     })))
+}
+
+/// Rewrite a top-level class declaration for the server module: unwrap each
+/// **direct** `$state(v)` / `$state.raw(v)` class field to its argument (exactly
+/// like a top-level `$state` declarator init), and guard-walk every other member
+/// through the normal refusing path.
+///
+/// The unwrap set is deliberately narrow — a non-static, non-computed field whose
+/// init [`classify_rune_init`] recognizes as [`RuneInit::State`] — and it EXACTLY
+/// equals the set the guard exempts, because every member that is not that shape
+/// (a `$derived` field, a `static`/computed rune field, a method body, a nested
+/// class or class expression inside one) flows through
+/// [`walk_class_member_guarded`], the same refusing walk a class in any other
+/// position takes. So a member is exempted from refusal iff it is unwrapped here:
+/// there is no reach gap where the guard would pass a `$state` field the transform
+/// leaves referencing an undefined `$state` (a MISMATCH). The reach is structural
+/// — only a top-level `Statement::ClassDeclaration` reaches this function.
+///
+/// Oracle shape: `field = $state(v)` → `field = v`; a no-arg `field = $state()` →
+/// a BARE field `field;` (the value dropped, NOT `void 0` — the divergence from the
+/// top-level no-arg declarator, which mints `void 0`); a `static`/computed field is
+/// oracle-rejected placement and refuses here. Non-rune members clone through in
+/// source order (the class member order is preserved). Only the call syntax around
+/// the kept argument is dropped, recorded in `dropped_regions` so a comment inside
+/// refuses.
+#[allow(clippy::too_many_arguments)]
+fn rewrite_class_state_fields<'arena>(
+    b: &Builder<'arena>,
+    class: &'arena ClassDeclaration<'arena>,
+    source: &str,
+    derived_names: &NameSet,
+    store_names: &NameSet,
+    updated: &mut NameSet,
+    nested_declared: &mut NameSet,
+    dropped_regions: &mut Vec<Span>,
+) -> Result<Statement<'arena>, CompileError> {
+    let mut ctx = WalkCtx::new(
+        source,
+        updated,
+        nested_declared,
+        derived_names,
+        std::rc::Rc::clone(&b.interner),
+    )
+    // Same exemptions as the surrounding script guard: a `$name` store read / a
+    // `$derived` read inside a method body is rewritten later, not refused here.
+    .allow_store_reads(store_names, None)
+    .allow_derived_reads();
+
+    let mut members: BumpVec<'arena, ClassMember<'arena>> = BumpVec::new_in(b.arena);
+    let mut changed = false;
+    for member in class.body.body {
+        // The one exempt shape — a DIRECT top-level `$state`/`$state.raw` field.
+        // `!is_static && !computed` keeps static/computed rune fields (which the
+        // oracle rejects as `state_invalid_placement`) on the refusing path.
+        if let ClassMember::PropertyDefinition(p) = member
+            && !p.is_static
+            && !p.computed
+            && let Some(value) = &p.value
+            && let Some(RuneInit::State(arg)) = classify_rune_init(value, source)
+        {
+            let init_span = value.span();
+            let new_value = match arg {
+                // `field = $state(v)` → `field = v`: guard-walk the borrowed
+                // argument, drop the call syntax around it.
+                Some(arg) => {
+                    // A LONE reactive-binding argument (`$state($count)` /
+                    // `$state(d)`) refuses: the oracle keeps such a lone store /
+                    // `$derived` read BARE in the unwrapped field, but tsv's store
+                    // rewrite descends into class bodies and would rewrite the kept
+                    // argument to `$.store_get(…)` / `d()` — a MISMATCH. A compound
+                    // (`$state($count + 1)`) or a plain-variable argument is fine —
+                    // the inner read there IS rewritten at parity.
+                    if is_lone_reactive_binding(arg, source, derived_names, store_names) {
+                        return Err(unsupported(Refusal::ClassFieldStateReactiveArg));
+                    }
+                    walk_expression_guarded(arg, &mut ctx)?;
+                    let arg_span = arg.span();
+                    dropped_regions.push(Span::new(init_span.start, arg_span.start));
+                    dropped_regions.push(Span::new(arg_span.end, init_span.end));
+                    Some(arg.clone())
+                }
+                // `field = $state()` → a bare field `field;` (value dropped, no
+                // `void 0`). The whole call is a dropped region.
+                None => {
+                    dropped_regions.push(init_span);
+                    None
+                }
+            };
+            members.push(ClassMember::PropertyDefinition(PropertyDefinition {
+                value: new_value,
+                ..p.clone()
+            }));
+            changed = true;
+            continue;
+        }
+        // Every other member — the normal refusing guard walk, cloned through.
+        walk_class_member_guarded(member, &mut ctx)?;
+        members.push(member.clone());
+    }
+
+    if !changed {
+        // No `$state` field — the guard walk above already ran (its refusals are
+        // the point), so clone the whole class through unchanged.
+        return Ok(Statement::ClassDeclaration(class.clone()));
+    }
+    Ok(Statement::ClassDeclaration(ClassDeclaration {
+        body: ClassBody {
+            body: members.into_bump_slice(),
+            span: class.body.span,
+        },
+        ..class.clone()
+    }))
+}
+
+/// Whether `arg` — the WHOLE argument of a class-field `$state(…)` /
+/// `$state.raw(…)` — is a lone reactive-binding identifier the store rewrite
+/// would otherwise rewrite: a **store read** (a plain `$name` whose `$`-stripped
+/// base is a store binding and not a rune) or a **`$derived` binding** read.
+///
+/// Mirrors `store_rewrite`'s `store_base` / `derived_read` decision (both skip
+/// escaped identifiers via `plain_identifier_name` — so an escaped lone argument
+/// is not caught here, matching the store rewrite, which would not rewrite it
+/// either; an escaped derived read is separately refused by the guard). The
+/// discriminant is exactly "would the store rewrite touch this lone identifier?",
+/// so the refusal covers precisely the shapes the oracle keeps bare and nothing
+/// wider — a compound argument (`$state($count + 1)` → `$.store_get(…) + 1`) or a
+/// plain-variable argument stays compiling.
+fn is_lone_reactive_binding(
+    arg: &Expression<'_>,
+    source: &str,
+    derived_names: &NameSet,
+    store_names: &NameSet,
+) -> bool {
+    let Expression::Identifier(id) = arg else {
+        return false;
+    };
+    let Some(name) = plain_identifier_name(id, source) else {
+        return false;
+    };
+    if derived_names.contains(&name) {
+        return true;
+    }
+    crate::analyze::store_read_base(&name).is_some_and(|base| store_names.contains(base))
 }
 
 /// A bindable prop the transform must list in the trailing

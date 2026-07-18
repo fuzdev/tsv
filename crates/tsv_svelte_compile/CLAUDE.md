@@ -389,6 +389,20 @@ project-wide conventions.
   wrapper; duplicate / non-identifier target / carried comment refuse) — a
   `$state.snapshot(x)` declarator UNWRAPPED to its argument `x` (like `$state`;
   both via `classify_rune_init`, which refuses an optional-chained init) — a
+  **top-level class declaration** rewritten by `rewrite_class_state_fields`: each
+  DIRECT non-static, non-computed `$state(v)`/`$state.raw(v)` field UNWRAPPED to `v`
+  (a no-arg `field = $state()` → a BARE field, value dropped, NOT `void 0` — the
+  divergence from the argless declarator), every other member (a `$derived`/static/
+  computed rune field, a method body, a nested class/class expression) taking the
+  normal refusing guard walk (`walk_class_member_guarded`) so the guard-exempt set
+  equals the unwrap set — reach-matched by construction, no undefined-`$state` MISMATCH;
+  a field whose WHOLE argument is a LONE reactive-binding identifier
+  (`$state($count)` / `$state(d)`) REFUSES (`ClassFieldStateReactiveArg`,
+  `is_lone_reactive_binding`) — the oracle keeps that lone store/`$derived` read BARE
+  in the field, but the store rewrite descends into class bodies unconditionally and
+  would rewrite the kept argument to `$.store_get(…)`/`d()`, so a compound
+  (`$state($count + 1)`) or plain-var argument compiles while the lone case is a safe
+  over-refusal — a
   multi-declarator top-level declaration
   splitting into one declaration per declarator, source order (the oracle's
   shape; nested declarations and for-heads stay joined; comments alongside a

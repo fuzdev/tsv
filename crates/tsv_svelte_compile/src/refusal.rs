@@ -220,6 +220,18 @@ pub enum Refusal {
     /// A second `$props.id()` in the component (the oracle's `props_duplicate`).
     #[error("$props.id() used more than once")]
     DuplicatePropsId,
+    /// A class-field `$state(…)` / `$state.raw(…)` whose **whole** argument is a
+    /// lone reactive-binding identifier — a store read (`$state($count)`) or a
+    /// `$derived` binding (`$state(d)`). The oracle keeps such a lone reactive read
+    /// **bare** in the unwrapped field (`x = $count` / `x = d`), NOT feeding it
+    /// through the store-subscription / derived-call pass — unlike a top-level
+    /// `let` declarator, a plain field, or a compound argument (`$state($count +
+    /// 1)`), where the read IS rewritten. tsv's store rewrite descends into class
+    /// bodies unconditionally, so it would rewrite the kept argument
+    /// (`$.store_get(…)` / `d()`) — a MISMATCH. Refused: a narrow, safe
+    /// over-refusal (a compound or plain-variable argument still compiles).
+    #[error("class-field $state with a lone store/$derived argument (the oracle keeps it bare)")]
+    ClassFieldStateReactiveArg,
 
     // ── Runes ──────────────────────────────────────────────────────────────
     /// A non-sanctioned rune call (or a rune in a non-sanctioned position).
@@ -865,6 +877,9 @@ impl Refusal {
                 Cow::Borrowed("$props.id() outside a plain top-level variable declaration")
             }
             Self::DuplicatePropsId => Cow::Borrowed("$props.id() used more than once"),
+            Self::ClassFieldStateReactiveArg => Cow::Borrowed(
+                "class-field $state with a lone store/$derived argument (the oracle keeps it bare)",
+            ),
             Self::TopLevelAwait => {
                 Cow::Borrowed("top-level await (async component output not implemented)")
             }

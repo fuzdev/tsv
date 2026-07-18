@@ -149,6 +149,20 @@ pub(crate) fn walk_expression_guarded(
     walk_expression(expr, ctx)
 }
 
+/// Walk one class member with the normal refusing rules — a method body, a
+/// property init, a static block. Exposed so the class-field `$state` rewrite
+/// ([`crate::script_rewrite`]) can guard EVERY member it does not unwrap through
+/// the exact same path a class in any other position takes, keeping the
+/// guard-exempt set (the unwrapped `$state` fields) equal to the transform set —
+/// reach-matched by construction, so no member can be exempted without a matching
+/// unwrap (which would emit an undefined `$state` reference — a MISMATCH).
+pub(crate) fn walk_class_member_guarded(
+    member: &ClassMember<'_>,
+    ctx: &mut WalkCtx<'_>,
+) -> Result<(), CompileError> {
+    walk_class_member(member, ctx)
+}
+
 /// The `$`-prefixed name of a plain identifier, or `None`. Parsed identifiers
 /// are span-identity (`escaped: None`); an interned (escaped) name is synthetic
 /// (`$$renderer`, `$$props`, …) and never refused.
@@ -573,27 +587,32 @@ fn walk_function_expression(
 
 fn walk_class_body(body: &ClassBody<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), CompileError> {
     for member in body.body {
-        match member {
-            ClassMember::MethodDefinition(m) => {
-                if m.computed {
-                    walk_expression(&m.key, ctx)?;
-                }
-                walk_function_expression(&m.value, ctx)?;
+        walk_class_member(member, ctx)?;
+    }
+    Ok(())
+}
+
+fn walk_class_member(member: &ClassMember<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), CompileError> {
+    match member {
+        ClassMember::MethodDefinition(m) => {
+            if m.computed {
+                walk_expression(&m.key, ctx)?;
             }
-            ClassMember::PropertyDefinition(p) => {
-                if p.computed {
-                    walk_expression(&p.key, ctx)?;
-                }
-                walk_opt(p.value.as_ref(), ctx)?;
-            }
-            ClassMember::StaticBlock(b) => {
-                ctx.fn_depth += 1;
-                let result = walk_statements(b.body, ctx, 1);
-                ctx.fn_depth -= 1;
-                result?;
-            }
-            ClassMember::IndexSignature(_) => {}
+            walk_function_expression(&m.value, ctx)?;
         }
+        ClassMember::PropertyDefinition(p) => {
+            if p.computed {
+                walk_expression(&p.key, ctx)?;
+            }
+            walk_opt(p.value.as_ref(), ctx)?;
+        }
+        ClassMember::StaticBlock(b) => {
+            ctx.fn_depth += 1;
+            let result = walk_statements(b.body, ctx, 1);
+            ctx.fn_depth -= 1;
+            result?;
+        }
+        ClassMember::IndexSignature(_) => {}
     }
     Ok(())
 }
