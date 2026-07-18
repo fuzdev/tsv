@@ -202,6 +202,7 @@ deno task gaps:audit                 # gap-injection audit: inject a comment int
 deno task gaps:audit:update          # regenerate that snapshot after fixing a shape (or when a new fixture merely REACHES a pre-existing one); refuses a narrowed run
 deno task blanks:audit               # blank-line injection audit: inject a blank line into EVERY code gap and grade six policy-free invariants — no panic, F1 idempotency, structural reparse, leaf conservation, ledger-clean, and blank-run ≤ 1. Mechanizes the blank-line handling class (the specifier-list / array-pattern bugs). Pure Rust, no sidecar; gated in `deno task check` as a RATCHET over `blank_audit_known.txt` (like gaps:audit): a graded shape not on the list, one that no longer fires, or any PANIC, FAILS. STRUCTURAL-DIVERGENCE is held REPORT-ONLY (fuzz-soft parity: reported but never gated, filtered out of the ratchet); every other policy kind IS pinned. A fast path (a blank the formatter ABSORBS reproduces the proven-clean pristine output, so nothing is checked) keeps it near gaps:audit's cost. ~24 s. Full reference: ./docs/blank_audit.md
 deno task blanks:audit:update        # regenerate that snapshot after fixing a shape; refuses a narrowed run
+deno task render:audit <paths>       # render-equivalence over REAL code: does `tsv format` change what a Svelte component RENDERS? Per `.svelte` file, compares the browser-visible render key (`svelte compile --generate server`, reduced) of the source vs of format(source). The corpus-scale arm of the fixture R rules — those gate a CURATED corpus (hand-authored render-equivalent variants), so they are a regression guard, not discovery; real code is the exposure. Catches what no other gate sees: corpus:compare:format's SAFETY is char-frequency (blind — the characters only MOVE), roundtrip_audit's skeleton erases the whitespace that carries the meaning, and authoring_audit asks about CONVERGENCE, never whether the fixed point renders like the input. Needs the Deno sidecar, so NOT in `deno task check` (and not in the pure-Rust `audit:corpus`); run at conformance cadence or after a printer change. Files whose format is a no-op are skipped; files Svelte's ANALYZER rejects are counted compile-blind. `--gate` exits 1 on findings; also `--json`, `--limit N`. See [Debug Tooling](#debug-tooling)
 deno task idempotency:sweep          # F1 (idempotency) sweep over the real-code corpus (the `perf` view — sibling dev repos + upstream framework source). NOT in `deno task check`: machine-dependent corpus, minutes not seconds. Run at conformance cadence or after a printer change; see Debug Tooling
 deno task audit:corpus               # the standing content-loss / robustness gate over REAL code (the extension-robustness bar `deno task check`'s fixture-only scope is structurally blind to): roundtrip_audit --gate + comment_audit + binding_audit --gate (real gating; prettier suites report-only) + authoring_audit + fuzz --iterations 0, over the `perf` view + the pinned prettier suites. Pure Rust; absent dev repos warn-skip (floor = ../svelte src). NOT in `deno task check` (machine-dependent corpus, minutes); wired into publish Step 3c alongside conformance:all's SAFETY. Run at conformance/release cadence or after a printer change; see benches/js/CLAUDE.md §Gate map
 ```
@@ -224,7 +225,7 @@ Three binding crates for different use cases:
 
 - `tsv_ffi` (C ABI) — target: Any FFI (Deno, Python, etc.); output: `libtsv_ffi.so` / `.dylib` / `.dll`
 - `tsv_wasm` (wasm-bindgen) — target: Browser, Deno, Node; output: `.wasm` module (format / parse / all variants via cargo features)
-- `tsv_napi` (napi-rs) — target: Node.js / Bun native addon; output: `libtsv_napi.{so,dylib,dll}` (loaded via `process.dlopen`). Currently a **measurement-only** binding for the Node benchmark runner (single-platform local build: `deno task build:napi`; boundary tests: `deno task test:napi`); the cross-platform publish matrix as `@fuzdev/tsv_napi` is targeted for 0.2. See ./crates/tsv_napi/CLAUDE.md.
+- `tsv_napi` (napi-rs) — target: Node.js / Bun native addon; output: `libtsv_napi.{so,dylib,dll}` (loaded via `process.dlopen`). Currently a **measurement-only** binding for the Node benchmark runner (single-platform local build: `deno task build:napi`; boundary tests: `deno task test:napi`); the cross-platform publish matrix as `@fuzdev/tsv_napi` is a fast-follow after 0.2 — it needs GitHub release infrastructure, so it doesn't block WASM/VS Code publishing (may land as 0.3), and is expected to eventually subsume the WASM native path. See ./crates/tsv_napi/CLAUDE.md.
 
 `tsv_wasm` produces three npm packages from one crate via the `format` + `parse` cargo features (default = both): `@fuzdev/tsv_format_wasm` (format only), `@fuzdev/tsv_parse_wasm` (parse only), and `@fuzdev/tsv_wasm` (everything + the `tsv` CLI). Each variant has its own output directory.
 
@@ -499,7 +500,7 @@ tsv/
 │   ├── tsv_debug/   # Dev utilities (binary: tsv_debug) - uses Deno
 │   ├── tsv_ffi/     # C FFI bindings (Deno's native path)
 │   ├── tsv_wasm/    # WebAssembly bindings (published as @fuzdev/tsv_format_wasm + @fuzdev/tsv_parse_wasm + @fuzdev/tsv_wasm; bundles hand-maintained types/tsv_ast.d.ts + npm/locations.js no-loc reconstruction helper; npm/cli.js is the tsv bin)
-│   └── tsv_napi/    # N-API bindings (Node/Bun native path; measurement-only for the Node bench, 0.2 publish target)
+│   └── tsv_napi/    # N-API bindings (Node/Bun native path; measurement-only for the Node bench, publish is a fast-follow after 0.2)
 ├── scripts/         # Publish orchestrator, npm package patcher, Node artifact + N-API addon tests, AST type drift check
 ├── tests/           # Integration tests (parser, formatter, CLI)
 │   ├── fixtures/    # Test fixtures organized by language/feature
@@ -639,7 +640,7 @@ tests/fixtures/example_fixture/
 
 **Other file types** (same structure): `.ts`/`.svelte.ts` use acorn-typescript for parsing; `.css` uses Svelte's `parseCss`. All use prettier for formatting.
 
-**Unformatted variant rules:** Same content structure as input, only whitespace differs. Both formatters must normalize to exactly match input.
+**Unformatted variant rules:** Same content structure as input, only whitespace differs. Both formatters must normalize to exactly match input. For `.svelte` fixtures this is **enforced**, not just convention: the render-equivalence check (R rules, see ./docs/fixture_overview.md) asserts the variant and `input` produce the same browser-visible render via `svelte compile` — so a formatter bug that changed the render *and* happened to land on `input` can no longer pass green.
 
 **Invalid syntax rules (`input_invalid_*`):** Must fail BOTH parsers. One syntax error per file.
 
@@ -1222,6 +1223,38 @@ cargo run -p tsv_debug binding_audit --gate                          # the check
 # --gate over tests/fixtures is a cheap tripwire (fixtures are format-stable); the
 # real yield is external corpora, where JSDoc casts + annotations are dense.
 cargo run -p tsv_debug binding_audit --verbose ../svelte/packages/svelte/src
+```
+
+**Render-Equivalence Audit (does formatting change what renders?):**
+
+```bash
+# render_audit - corpus-scale "does `tsv format` change what a Svelte component
+# RENDERS?". Per .svelte file: compare the browser-visible RENDER KEY of the source
+# against the render key of format(source). The key is `svelte compile --generate
+# server` reduced to its visible render (baked template text, `${…}` holed out,
+# <script>/<style>/comments stripped, whitespace collapsed with block-boundary
+# whitespace dropped) — equal keys prove equal renders, and a <script>/<style>
+# reformatting that leaves the template alone is correctly ignored.
+#
+# This is the CORPUS-SCALE arm of the fixture render-equivalence check (the R rules
+# in `fixtures:validate`). Those gate a CURATED corpus whose whitespace variants are
+# hand-authored to be render-equivalent — a regression guard, close to the least
+# likely place for a render change to hide. Real code is the exposure, the same gap
+# `audit:corpus` exists to close for the content-loss class.
+#
+# Invisible to every other gate: corpus:compare:format's SAFETY is char-frequency
+# (blind — the characters only MOVE), roundtrip_audit's structural skeleton erases
+# the very whitespace that carries the meaning, and authoring_audit asks the
+# CONVERGENCE question (do two authorings reach one fixed point), never whether that
+# fixed point renders like the input.
+cargo run --profile corpus -p tsv_debug --quiet render_audit ~/dev/zzz/src
+deno task render:audit ../svelte/packages/svelte/tests   # (--gate baked in)
+# Also: --gate (exit 1 on findings), --json, --limit N. Needs the Deno sidecar, so
+# NOT in `deno task check` — and not in the pure-Rust `audit:corpus` either; run at
+# conformance cadence or after a printer change. Files whose format is a no-op are
+# skipped (trivially render-equal); files Svelte's semantic ANALYZER rejects are
+# counted as compile-blind (that arm cannot speak there). The in-repo, any-corpus
+# form of ../test-svelte-prettier-whitespace/whitespace-safety-check.mjs.
 ```
 
 **Layout-Neutrality Audit (ownership-blind-gate probe):**

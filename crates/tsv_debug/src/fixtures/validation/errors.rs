@@ -212,6 +212,24 @@ pub enum ValidationError {
     )]
     UndocumentedPrettierOutput(String),
 
+    // Render-equivalence (compile arm, authoritative): a whitespace variant
+    // (unformatted_* / unformatted_ours_*) renders DIFFERENTLY from input. The
+    // formatter normalized it to input while changing the render — a real bug, or
+    // a fixture asserting a bad normalization.
+    #[error(
+        "render-equivalence: {0} renders differently from input (svelte compile render-key) — the formatter changed the rendered output while normalizing this variant to input"
+    )]
+    RenderEquivalenceMismatch(String),
+
+    // Render-equivalence (fallback arm): the fixture is not analyzable by `svelte
+    // compile`, and the weaker template-only model flags a difference that is not on
+    // the hand-verified benign allow-list. Either a real render change, or a new
+    // artifact of the fallback's model that must be verified and pinned.
+    #[error(
+        "render-equivalence: {0} diverges from input under the template-only fallback model and is not on the benign allow-list — triage it (the fixture is not `svelte compile`-analyzable, so the authoritative arm could not run)"
+    )]
+    RenderEquivalenceFallbackDivergence(String),
+
     // Duplicates (within fixture)
     #[error("Duplicate unformatted files: {}", .0.join(", "))]
     DuplicateUnformattedWithinFixture(Vec<String>),
@@ -452,6 +470,12 @@ impl ValidationError {
             Self::FileReadError(_) => {
                 "Check filesystem permissions/encoding — the directory scan listed this file but it could not be read"
             }
+            Self::RenderEquivalenceMismatch(_) => {
+                "This variant is NOT render-equivalent to input — formatting it changed the rendered output. Fix the formatter (or the fixture, if the variant was mis-authored). Confirm: `svelte compile --generate server` on the variant and on input."
+            }
+            Self::RenderEquivalenceFallbackDivergence(_) => {
+                "Verify authoritatively, then act: compile BOTH sides with the fixture's `bind:` targets declared as `$state` (the same transform on each) and compare the server output. Identical ⇒ an oracle artifact: add it to BENIGN_FALLBACK_DIVERGENCES with a rationale. Different ⇒ a real render change: fix the formatter."
+            }
         }
     }
 
@@ -512,6 +536,10 @@ impl ValidationError {
             | Self::NormalizationPrettierIntermediateToVariantMissingSource(_)
             | Self::NormalizationPrettierIntermediateToVariantNoVariantTarget(_)
             | Self::UndocumentedPrettierOutput(_) => "Normalization",
+
+            Self::RenderEquivalenceMismatch(_) | Self::RenderEquivalenceFallbackDivergence(_) => {
+                "Render-equivalence"
+            }
 
             Self::DuplicateUnformattedWithinFixture(_)
             | Self::DuplicatePrettierVariantWithinFixture(_)
