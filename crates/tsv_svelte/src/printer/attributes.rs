@@ -90,6 +90,32 @@ impl<'a> Printer<'a> {
     // JS Comment Doc builders
     //
 
+    /// Push the leading-comment run for a `{…}` expression value — a directive value
+    /// (`bind:`/`class:`/…) or an expression tag (`{expr}`, and the `style:` value Svelte
+    /// models as one — the two `build_expression_*` sites share this so they cannot drift.
+    ///
+    /// A **multi-line block** comment routes through tsv_ts's comment builder — the *same*
+    /// rendering the owned path uses (`prepend_owned_leading_comment`) — so it reindents to
+    /// context and propagates its break via a `MultilineText`, forcing the value's
+    /// block/attribute to expand; a space follows before the expression. This matters when
+    /// the comment is **not** owned: the bare authoring glues it to its operand (owned, so
+    /// tsv_ts prints it and forces the break), but stripping redundant grouping parens
+    /// leaves it positional (a discarded `(` owns nothing), and the plain gap emitter below
+    /// renders a block comment inline as a verbatim source span with no break — so a
+    /// paren-stripped value stayed inline on pass 1 and expanded only on pass 2 (an F1
+    /// non-idempotency). A single-line block / line comment keeps the inline gap emitter.
+    fn push_expr_value_leading_comments(&self, from: u32, to: u32, out: &mut DocBuf) {
+        for comment in comments_to_emit_in_range(self.comments, from, to) {
+            if comment.is_block && comment.multiline {
+                let d = self.d();
+                out.push(tsv_ts::build_comment_doc(d, comment, &self.ts_inputs()));
+                out.push(d.text(" "));
+            } else {
+                out.push(self.build_leading_js_comment_doc(comment));
+            }
+        }
+    }
+
     /// Build a Doc for a leading JS comment (before content)
     ///
     /// Block comments: `/*content*/ ` (with trailing space)
@@ -657,10 +683,11 @@ impl<'a> Printer<'a> {
         // Collect leading comments
         let mut leading_comments: DocBuf = DocBuf::new();
         if let Some(span) = tag_span {
-            let expr_start = expr.span().start;
-            for comment in comments_to_emit_in_range(self.comments, span.start + 1, expr_start) {
-                leading_comments.push(self.build_leading_js_comment_doc(comment));
-            }
+            self.push_expr_value_leading_comments(
+                span.start + 1,
+                expr.span().start,
+                &mut leading_comments,
+            );
         }
 
         let expr_doc = self.build_expression_doc_for_attribute(expr);
@@ -909,11 +936,13 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts: DocBuf = smallvec![d.text("{")];
 
-        // Add leading comments between { and expression (block inline, line + hardline)
-        let expr_start = tag.expression.span().start;
-        for comment in comments_to_emit_in_range(self.comments, tag.span.start + 1, expr_start) {
-            parts.push(self.build_leading_js_comment_doc(comment));
-        }
+        // Add leading comments between { and expression (block inline, line + hardline;
+        // a multi-line block reindents + forces the break — see the helper).
+        self.push_expr_value_leading_comments(
+            tag.span.start + 1,
+            tag.expression.span().start,
+            &mut parts,
+        );
 
         parts.push(self.build_expression_doc_for_attribute(&tag.expression));
 
