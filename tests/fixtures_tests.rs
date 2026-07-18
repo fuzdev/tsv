@@ -73,6 +73,10 @@ async fn test_all_fixtures() {
     // Check for cross-fixture duplicates
     summary.detect_cross_fixture_duplicates();
 
+    // Ratchet the render-equivalence benign allow-list (unfiltered run, so every
+    // pinned entry must still fire — a stale one means the oracle improved)
+    summary.detect_stale_benign_render_equiv();
+
     // Detect Deno sidecar crash pattern (many "deno actor shut down" errors)
     let sidecar_failures = summary.count_sidecar_failures();
     assert!(
