@@ -271,30 +271,41 @@ impl<'a> Printer<'a> {
         let (left_span, right_span) = (left.span(), right.span());
         // Compare spans, not values: `{a}` has one span, `{a as a}` has two.
         if left_span != right_span {
-            // Split comments at the `as` keyword: before-as and after-as. The ` as ` is
-            // static text, so the keyword scan exists only to bound those two ranges — a
-            // comment-free `{a as b}` neither scans nor pushes an empty child.
+            // The `left`→`as` and `as`→binding gaps route through the shared header-gap
+            // helpers: a *line* comment in either stays where the author wrote it and
+            // continues the tail one indent level — so a `//` can't swallow the `as` or
+            // the renamed binding — while a block comment trails inline. This is the same
+            // preserve-in-place rule as the namespace `*`→`as` gap
+            // (`append_namespace_as_binding`); prettier instead relocates before-`as`
+            // comments to lead the whole specifier. See conformance_prettier.md
+            // §Uniform Forced-Continuation Indent and §Comment relocation. A comment-free
+            // `{a as b}` skips both scans and emits `a as b` unchanged.
             if !self.has_comments_to_emit_between(left_span.end, right_span.start) {
                 parts.push(d.text(" as "));
-            } else if let Some(as_pos) =
-                self.find_keyword_in_range(left_span.end, right_span.start, "as")
-            {
-                if let Some(before) =
-                    self.build_inline_comments_between_doc_opt(left_span.end, as_pos)
-                {
-                    parts.push(before);
-                }
-                parts.push(d.text(" as "));
-                let as_end = as_pos + "as".len() as u32;
-                if let Some(after) = self
-                    .build_inline_comments_between_doc_trailing_space_opt(as_end, right_span.start)
-                {
-                    parts.push(after);
-                }
+                parts.push(self.build_module_export_name_doc(right));
             } else {
-                parts.push(d.text(" as "));
+                let right_start = right_span.start;
+                let as_pos = self.find_keyword_in_range(left_span.end, right_start, "as");
+                let as_end = as_pos.map_or(right_start, |p| p + "as".len() as u32);
+                // ` as ` + the `as`→binding gap (line comment indents the binding, block
+                // trails inline) + the renamed binding. The `as ` supplies the trailing
+                // space; the leading space before the `left`→`as` gap comes from
+                // `gap_comment_indented_continuation`.
+                let as_clause = d.concat(&[
+                    d.text("as "),
+                    self.gap_comment_continuation_tail(
+                        as_end,
+                        right_start,
+                        self.build_module_export_name_doc(right),
+                    ),
+                ]);
+                let gap_end = as_pos.unwrap_or(right_start);
+                parts.push(self.gap_comment_indented_continuation(
+                    left_span.end,
+                    gap_end,
+                    as_clause,
+                ));
             }
-            parts.push(self.build_module_export_name_doc(right));
         }
         d.concat(&parts)
     }
