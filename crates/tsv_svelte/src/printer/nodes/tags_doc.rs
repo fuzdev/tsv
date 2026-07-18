@@ -167,9 +167,7 @@ impl<'a> Printer<'a> {
         let expr_start = expr.span().start;
         let expr_end = expr.span().end;
 
-        let leading_docs: DocBuf = comments_to_emit_in_range(self.comments, span_start, expr_start)
-            .map(|c| self.build_leading_js_comment_doc(c))
-            .collect();
+        let leading_docs = self.leading_comment_docs(span_start, expr_start);
 
         // mode defaults to Standalone: binary chains use Grouped style, not ContinuationIndent
         let embed = tsv_lang::EmbedContext {

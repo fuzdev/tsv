@@ -90,19 +90,6 @@ impl<'a> Printer<'a> {
     // JS Comment Doc builders
     //
 
-    /// Push the leading-comment run for a `{…}` expression value — a directive value
-    /// (`bind:`/`class:`/…) or an expression tag (`{expr}`, and the `style:` value Svelte
-    /// models as one — the two `build_expression_*` sites share this so they cannot drift.
-    ///
-    /// A plain `build_leading_js_comment_doc` run; that builder handles the multi-line
-    /// block reindent+break (see its docs) so every `{…}`-value context settles on the
-    /// same fixed point the bare/owned authoring takes.
-    fn push_expr_value_leading_comments(&self, from: u32, to: u32, out: &mut DocBuf) {
-        for comment in comments_to_emit_in_range(self.comments, from, to) {
-            out.push(self.build_leading_js_comment_doc(comment));
-        }
-    }
-
     /// Build a Doc for a leading JS comment (before content)
     ///
     /// Multi-line block comments: routed through tsv_ts's comment builder — the *same*
@@ -406,9 +393,7 @@ impl<'a> Printer<'a> {
 
         // Leading comments (between prefix and expression)
         let expr_start = expr.span().start;
-        for comment in comments_to_emit_in_range(self.comments, comment_start, expr_start) {
-            parts.push(self.build_leading_js_comment_doc(comment));
-        }
+        parts.extend(self.leading_comment_docs(comment_start, expr_start));
 
         // Expression doc with any nested comments
         parts.push(self.build_ts_expression_doc(expr));
@@ -684,14 +669,10 @@ impl<'a> Printer<'a> {
         tag_span: Option<Span>,
     ) -> DocBuf {
         // Collect leading comments
-        let mut leading_comments: DocBuf = DocBuf::new();
-        if let Some(span) = tag_span {
-            self.push_expr_value_leading_comments(
-                span.start + 1,
-                expr.span().start,
-                &mut leading_comments,
-            );
-        }
+        let leading_comments: DocBuf = match tag_span {
+            Some(span) => self.leading_comment_docs(span.start + 1, expr.span().start),
+            None => DocBuf::new(),
+        };
 
         let expr_doc = self.build_expression_doc_for_attribute(expr);
 
@@ -935,12 +916,8 @@ impl<'a> Printer<'a> {
         let mut parts: DocBuf = smallvec![d.text("{")];
 
         // Add leading comments between { and expression (block inline, line + hardline;
-        // a multi-line block reindents + forces the break — see the helper).
-        self.push_expr_value_leading_comments(
-            tag.span.start + 1,
-            tag.expression.span().start,
-            &mut parts,
-        );
+        // a multi-line block reindents + forces the break — see `build_leading_js_comment_doc`).
+        parts.extend(self.leading_comment_docs(tag.span.start + 1, tag.expression.span().start));
 
         parts.push(self.build_expression_doc_for_attribute(&tag.expression));
 
