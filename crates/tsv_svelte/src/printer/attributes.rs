@@ -94,34 +94,37 @@ impl<'a> Printer<'a> {
     /// (`bind:`/`class:`/…) or an expression tag (`{expr}`, and the `style:` value Svelte
     /// models as one — the two `build_expression_*` sites share this so they cannot drift.
     ///
-    /// A **multi-line block** comment routes through tsv_ts's comment builder — the *same*
-    /// rendering the owned path uses (`prepend_owned_leading_comment`) — so it reindents to
-    /// context and propagates its break via a `MultilineText`, forcing the value's
-    /// block/attribute to expand; a space follows before the expression. This matters when
-    /// the comment is **not** owned: the bare authoring glues it to its operand (owned, so
-    /// tsv_ts prints it and forces the break), but stripping redundant grouping parens
-    /// leaves it positional (a discarded `(` owns nothing), and the plain gap emitter below
-    /// renders a block comment inline as a verbatim source span with no break — so a
-    /// paren-stripped value stayed inline on pass 1 and expanded only on pass 2 (an F1
-    /// non-idempotency). A single-line block / line comment keeps the inline gap emitter.
+    /// A plain `build_leading_js_comment_doc` run; that builder handles the multi-line
+    /// block reindent+break (see its docs) so every `{…}`-value context settles on the
+    /// same fixed point the bare/owned authoring takes.
     fn push_expr_value_leading_comments(&self, from: u32, to: u32, out: &mut DocBuf) {
         for comment in comments_to_emit_in_range(self.comments, from, to) {
-            if comment.is_block && comment.multiline {
-                let d = self.d();
-                out.push(tsv_ts::build_comment_doc(d, comment, &self.ts_inputs()));
-                out.push(d.text(" "));
-            } else {
-                out.push(self.build_leading_js_comment_doc(comment));
-            }
+            out.push(self.build_leading_js_comment_doc(comment));
         }
     }
 
     /// Build a Doc for a leading JS comment (before content)
     ///
-    /// Block comments: `/*content*/ ` (with trailing space)
-    /// Line comments: `// content\n` (with hardline)
+    /// Multi-line block comments: routed through tsv_ts's comment builder — the *same*
+    /// rendering the owned path uses (`prepend_owned_leading_comment`) — so they reindent
+    /// to context and propagate their break via a `MultilineText`, forcing the surrounding
+    /// value/head/attribute to expand; a trailing space matches the single-line block form.
+    /// This is what keeps a **non-owned** leading multi-line block idempotent: the bare
+    /// authoring glues it to its operand (owned, so tsv_ts prints it and forces the break),
+    /// but stripping a redundant grouping paren leaves it positional (a discarded `(` owns
+    /// nothing) — and a verbatim source span emits it inline with no break, so a
+    /// paren-stripped value stayed inline on pass 1 and expanded only on pass 2 (an F1
+    /// non-idempotency). `build_comment_doc` already tags the print-once ledger, so this
+    /// branch must **not** tag again.
+    ///
+    /// Single-line block comments: `/*content*/ ` (with trailing space).
+    /// Line comments: `// content\n` (with hardline).
     pub(super) fn build_leading_js_comment_doc(&self, comment: &tsv_lang::Comment) -> DocId {
         let d = self.d();
+        if comment.is_block && comment.multiline {
+            let doc = tsv_ts::build_comment_doc(d, comment, &self.ts_inputs());
+            return d.concat(&[doc, d.text(" ")]);
+        }
         let doc = if comment.is_block {
             d.concat(&[
                 d.text("/*"),
@@ -838,17 +841,12 @@ impl<'a> Printer<'a> {
         let first_start = seq.expressions[0].span().start;
         for comment in comments_to_emit_in_range(self.comments, tag_span.start + 1, first_start) {
             if comment.is_block && comment.multiline {
-                // Multi-line block: own line(s), forcing the broken layout. Emitted
-                // without the inline trailing space so the line ends at `*/` — the one
-                // comment emission in this crate that doesn't route through the shared
-                // leading/trailing builders, so it tags its own ledger node.
-                let body = d.source_span(comment.content_span, self.source);
-                #[cfg(feature = "comment_check")]
-                d.tag_comment_doc(body, comment.span, self.source);
-
-                content.push(d.text("/*"));
-                content.push(body);
-                content.push(d.text("*/"));
+                // Multi-line block: reindent-to-context through the shared comment
+                // builder (matching `build_leading_js_comment_doc`), then a hardline
+                // instead of the inline trailing space — the sequence's first operand
+                // starts a fresh line, forcing the broken layout. `build_comment_doc`
+                // tags the ledger itself.
+                content.push(tsv_ts::build_comment_doc(d, comment, &self.ts_inputs()));
                 content.push(d.hardline());
             } else {
                 // Single-line block: `/*…*/ ` inline. Line comment: `//…` + hardline.
