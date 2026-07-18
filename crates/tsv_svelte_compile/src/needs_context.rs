@@ -287,8 +287,15 @@ fn check_root(access: &Expression<'_>, nc: &mut Nc<'_>) {
     match root_of(access) {
         Expression::Identifier(id) => match plain_name(id, nc.source) {
             Some(name) => {
-                if nc.context_roots.contains(name) {
-                    nc.member_roots.insert(name.to_string());
+                // A `$name` store read roots at its base binding `name` (the
+                // subscription reads `store`), so a member/call on a store whose
+                // base is a prop/import is unsafe exactly as `store.foo` would be.
+                // A rune callee (`$props()`, `$state.raw()`) is NOT a store read —
+                // `store_read_base` returns `None`, so it keeps its `$name` form and
+                // never matches a context root (as before this change).
+                let root_name = crate::analyze::store_read_base(name).unwrap_or(name);
+                if nc.context_roots.contains(root_name) {
+                    nc.member_roots.insert(root_name.to_string());
                 }
             }
             None => {

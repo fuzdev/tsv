@@ -863,6 +863,27 @@ fn is_bare_derived_read(source: &str, derived_names: &NameSet, expr: &Expression
     false
 }
 
+/// Whether `expr` is a bare read of a store binding — a plain (non-escaped)
+/// `$`-prefixed identifier whose `$`-stripped base is a top-level binding
+/// (`store_names`). Such a read rewrites to
+/// `$.store_get(($$store_subs ??= {}), '$name', name)` at every value position,
+/// at any depth. Returns the base store name (the `$`-stripped variable). A
+/// `$name` whose base is NOT a binding is the oracle's `global_reference_invalid`
+/// error, so it is left for the guard to refuse (a safe over-refusal); an escaped
+/// `$`-identifier is likewise left refused (its decoded base can't be read here).
+fn bare_store_read(source: &str, store_names: &NameSet, expr: &Expression<'_>) -> Option<String> {
+    let Expression::Identifier(id) = expr else {
+        return None;
+    };
+    if id.escaped_name.is_some() {
+        return None;
+    }
+    let start = id.span.start as usize;
+    let name = &source[start..start + id.name_len as usize];
+    let base = crate::analyze::store_read_base(name)?;
+    store_names.contains(base).then(|| base.to_string())
+}
+
 /// The recursive core of [`wrap_value_expr`]: rewrite one value expression,
 /// returning the borrowed input unchanged when nothing needs rewriting (after
 /// guarding it).
@@ -873,6 +894,23 @@ fn rewrite_template_value<'arena>(
     // A bare read of a derived binding becomes `d()`.
     if is_bare_derived_read(env.source, &env.derived_names, expr) {
         let call = env.b.call_expr(expr, &[]);
+        return Ok(env.b.arena.alloc(call));
+    }
+    // A bare read of a store binding becomes
+    // `$.store_get(($$store_subs ??= {}), '$name', name)` and flags the component
+    // for the `var $$store_subs` / `$.unsubscribe_stores` injection. A store base
+    // shadowed by a block-local (an `{#each}`/`{#await}`/snippet binding) is NOT the
+    // top-level store — the oracle errors `store_invalid_scoped_subscription`, so it
+    // is left for the guard to refuse (a safe refusal). A `$derived` base reads
+    // `d()` (the store the derived currently holds).
+    if let Some(base) = bare_store_read(env.source, &env.store_names, expr)
+        && !env
+            .overlays
+            .iter()
+            .any(|overlay| overlay.contains_key(&base))
+    {
+        env.uses_stores = true;
+        let call = env.b.store_get(&base, env.derived_names.contains(&base));
         return Ok(env.b.arena.alloc(call));
     }
     // A `$state.snapshot(x)` call → `$.snapshot(<processed x>)`.
@@ -886,7 +924,7 @@ fn rewrite_template_value<'arena>(
     // No rewrite target in this subtree: guard it whole and pass through borrowed
     // — the guarded fast path, so every target-free template expression keeps its
     // exact behavior (and does no extra allocation).
-    if !contains_rewrite_target(env.source, &env.derived_names, expr) {
+    if !contains_rewrite_target(env.source, &env.derived_names, &env.store_names, expr) {
         guard_template_value(env, expr)?;
         return Ok(expr);
     }
@@ -937,63 +975,47 @@ fn snapshot_call_arg<'arena>(
     call.arguments.first()
 }
 
-/// Whether `expr` contains a rewrite target — a bare `$derived` read (→ `d()`)
-/// or a `$state.snapshot(...)` call (→ `$.snapshot(...)`) — anywhere this walk
-/// descends. A false negative is safe: the target then reaches the rune guard,
-/// which refuses it (a safe over-refusal). Descends exactly the wrapper node kinds
-/// [`rebuild_value`] rebuilds — the two stay in lockstep on one node set.
-fn contains_rewrite_target(source: &str, derived_names: &NameSet, expr: &Expression<'_>) -> bool {
+/// Whether `expr` contains a rewrite target — a bare `$derived` read (→ `d()`),
+/// a bare store read (→ `$.store_get(...)`), or a `$state.snapshot(...)` call
+/// (→ `$.snapshot(...)`) — anywhere this walk descends. A false negative is safe:
+/// the target then reaches the rune guard, which refuses it (a safe
+/// over-refusal). Descends exactly the wrapper node kinds [`rebuild_value`]
+/// rebuilds — the two stay in lockstep on one node set.
+fn contains_rewrite_target(
+    source: &str,
+    derived_names: &NameSet,
+    store_names: &NameSet,
+    expr: &Expression<'_>,
+) -> bool {
     if is_bare_derived_read(source, derived_names, expr) {
+        return true;
+    }
+    if bare_store_read(source, store_names, expr).is_some() {
         return true;
     }
     if snapshot_call_arg(source, expr).is_some() {
         return true;
     }
+    let contains =
+        |e: &Expression<'_>| contains_rewrite_target(source, derived_names, store_names, e);
     match expr {
-        Expression::CallExpression(c) => {
-            contains_rewrite_target(source, derived_names, c.callee)
-                || c.arguments
-                    .iter()
-                    .any(|a| contains_rewrite_target(source, derived_names, a))
-        }
-        Expression::NewExpression(n) => {
-            contains_rewrite_target(source, derived_names, n.callee)
-                || n.arguments
-                    .iter()
-                    .any(|a| contains_rewrite_target(source, derived_names, a))
-        }
-        Expression::BinaryExpression(b) => {
-            contains_rewrite_target(source, derived_names, b.left)
-                || contains_rewrite_target(source, derived_names, b.right)
-        }
+        Expression::CallExpression(c) => contains(c.callee) || c.arguments.iter().any(&contains),
+        Expression::NewExpression(n) => contains(n.callee) || n.arguments.iter().any(&contains),
+        Expression::BinaryExpression(b) => contains(b.left) || contains(b.right),
         Expression::MemberExpression(m) => {
-            contains_rewrite_target(source, derived_names, m.object)
-                || (m.computed && contains_rewrite_target(source, derived_names, m.property))
+            contains(m.object) || (m.computed && contains(m.property))
         }
         Expression::ConditionalExpression(c) => {
-            contains_rewrite_target(source, derived_names, c.test)
-                || contains_rewrite_target(source, derived_names, c.consequent)
-                || contains_rewrite_target(source, derived_names, c.alternate)
+            contains(c.test) || contains(c.consequent) || contains(c.alternate)
         }
-        Expression::UnaryExpression(u) => {
-            contains_rewrite_target(source, derived_names, u.argument)
+        Expression::UnaryExpression(u) => contains(u.argument),
+        Expression::ParenthesizedExpression(p) => contains(p.expression),
+        Expression::SequenceExpression(s) => s.expressions.iter().any(&contains),
+        Expression::SpreadElement(s) => contains(s.argument),
+        Expression::ArrayExpression(a) => {
+            a.elements.iter().any(|e| e.as_ref().is_some_and(&contains))
         }
-        Expression::ParenthesizedExpression(p) => {
-            contains_rewrite_target(source, derived_names, p.expression)
-        }
-        Expression::SequenceExpression(s) => s
-            .expressions
-            .iter()
-            .any(|e| contains_rewrite_target(source, derived_names, e)),
-        Expression::SpreadElement(s) => contains_rewrite_target(source, derived_names, s.argument),
-        Expression::ArrayExpression(a) => a.elements.iter().any(|e| {
-            e.as_ref()
-                .is_some_and(|e| contains_rewrite_target(source, derived_names, e))
-        }),
-        Expression::TemplateLiteral(t) => t
-            .expressions
-            .iter()
-            .any(|e| contains_rewrite_target(source, derived_names, e)),
+        Expression::TemplateLiteral(t) => t.expressions.iter().any(&contains),
         _ => false,
     }
 }

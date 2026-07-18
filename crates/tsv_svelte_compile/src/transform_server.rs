@@ -89,6 +89,14 @@ pub(crate) struct EmitEnv<'arena, 's> {
     /// `binding.kind` is `state` (non-`normal`), so a component whose name is a
     /// `$state` binding is dynamic — this set recovers that distinction.
     pub(crate) state_names: NameSet,
+    /// Top-level binding names, for recognizing a `$name` store auto-subscription
+    /// (`$name` where the `$`-stripped base is a binding → `$.store_get`). Read by
+    /// the template value walk ([`fragment::wrap_value_expr`]).
+    pub(crate) store_names: NameSet,
+    /// Set when any store read was rewritten in the template — forces the
+    /// `var $$store_subs;` / `if ($$store_subs) $.unsubscribe_stores($$store_subs);`
+    /// component-body injection.
+    pub(crate) uses_stores: bool,
     /// The finished CSS scoping — selector→element matching ran upfront over the
     /// [element census](crate::element_census) in [`analyze`], so emission only
     /// *reads* it (`element_scope` is a span lookup, `unused_selectors` the
@@ -640,12 +648,19 @@ pub(crate) fn compile_server<'arena>(
         }
     }
 
+    // Every top-level binding name is a candidate store base: `$name` is a store
+    // auto-subscription iff `name` is a binding (the oracle's rule — an unbound
+    // `$name` is a `global_reference_invalid` error).
+    let store_names: NameSet = bindings.names().map(str::to_string).collect();
+
     let mut env = EmitEnv {
         b,
         source,
         bindings,
         derived_names,
         state_names,
+        store_names,
+        uses_stores: false,
         scope,
         overlays: Vec::new(),
         in_each: false,
@@ -700,6 +715,13 @@ pub(crate) fn compile_server<'arena>(
             parent_name: None,
         },
     )?;
+    // `if ($$store_subs) $.unsubscribe_stores($$store_subs);` is the store-cleanup
+    // statement — the component body's last statement, but BEFORE any
+    // `$.bind_props` (the oracle's order).
+    if env.uses_stores {
+        let stmt = env.b.unsubscribe_stores_stmt();
+        out.push_statement(&mut env.b, arena, stmt);
+    }
     // `$.bind_props($$props, { … })` is the component body's LAST statement (after
     // every template flush, inside the `needs_context` wrapper forced above),
     // listing the bindable props in source order — shorthand when the prop key and
@@ -709,6 +731,21 @@ pub(crate) fn compile_server<'arena>(
         out.push_statement(&mut env.b, arena, stmt);
     }
     let body = out.finish(&mut env.b, arena);
+
+    // `var $$store_subs;` is prepended when any store read compiled — BEFORE the
+    // `$props.id()` hoist prepend below, so the final order is
+    // `const id = $.props_id(…)` then `var $$store_subs;` (the oracle's order).
+    // Prepended here (before the `needs_context` wrapper) so it lands INSIDE the
+    // wrapper when there is one, at the component-body top.
+    let body = if env.uses_stores {
+        let decl = env.b.store_subs_var();
+        let mut with_subs: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
+        with_subs.push(decl);
+        with_subs.extend_from_slice(body);
+        with_subs.into_bump_slice()
+    } else {
+        body
+    };
 
     // A `$props.id()` declarator hoists `const <name> = $.props_id($$renderer)` to
     // the FIRST statement of the component body (the oracle's

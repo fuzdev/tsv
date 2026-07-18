@@ -42,11 +42,13 @@
 use bumpalo::Bump;
 use tsv_lang::{SharedInterner, Span};
 use tsv_ts::ast::internal::{
-    ArrowFunctionBody, ArrowFunctionExpression, BinaryExpression, BinaryOperator, BlockStatement,
-    CallExpression, Expression, ExpressionStatement, FunctionDeclaration, IdentName, Identifier,
+    ArrowFunctionBody, ArrowFunctionExpression, AssignmentExpression, AssignmentOperator,
+    BinaryExpression, BinaryOperator, BlockStatement, CallExpression, Expression,
+    ExpressionStatement, FunctionDeclaration, IdentName, Identifier, IfStatement,
     ImportDeclaration, ImportKind, ImportNamespaceSpecifier, ImportPhase, ImportSpecifier, Literal,
-    LiteralValue, MemberExpression, Statement, StringCooked, TemplateCooked, TemplateElement,
-    TemplateLiteral, UnaryExpression, UnaryOperator, UpdateExpression, UpdateOperator,
+    LiteralValue, MemberExpression, ObjectExpression, Statement, StringCooked, TemplateCooked,
+    TemplateElement, TemplateLiteral, UnaryExpression, UnaryOperator, UpdateExpression,
+    UpdateOperator, VariableDeclaration, VariableDeclarationKind, VariableDeclarator,
 };
 
 /// The appendix-buffer bookkeeping plus interner access — everything node
@@ -455,6 +457,89 @@ impl<'arena> Builder<'arena> {
     /// A single-quoted string literal expression.
     pub fn string_literal_expr(&mut self, content: &str) -> Expression<'arena> {
         Expression::Literal(self.string_literal(content))
+    }
+
+    /// `$.store_get(($$store_subs ??= {}), '$<base>', <base>)` — the oracle's SSR
+    /// store auto-subscription read (`Identifier.js` → `serialize_get_binding` for a
+    /// `store_sub` binding). `base` is the `$`-stripped store name; the string key
+    /// keeps the leading `$` (`'$count'`). The printer parenthesizes the `??=`
+    /// assignment argument to match the canonical form.
+    pub fn store_get(&mut self, base: &str, base_is_derived: bool) -> Expression<'arena> {
+        // `$$store_subs ??= {}`
+        let subs_left = self.ident_expr("$$store_subs");
+        self.mint(" ??= ");
+        let obj_span = self.mint("{}");
+        let obj = self
+            .arena
+            .alloc(Expression::ObjectExpression(ObjectExpression {
+                properties: &[],
+                spread_trailing_comma: false,
+                span: obj_span,
+            }));
+        let assign = Expression::AssignmentExpression(AssignmentExpression {
+            left: subs_left,
+            operator: AssignmentOperator::NullishAssign,
+            right: obj,
+            span: Span::new(subs_left.span().start, obj_span.end),
+        });
+        let name_lit = self.string_literal_expr(&format!("${base}"));
+        // The store base is read like any binding: a `$derived` base reads `d()`.
+        let base_value = if base_is_derived {
+            let callee = self.ident_expr(base);
+            self.call_expr(callee, &[])
+        } else {
+            Expression::Identifier(self.ident(base))
+        };
+        let mut args: bumpalo::collections::Vec<'arena, Expression<'arena>> =
+            bumpalo::collections::Vec::new_in(self.arena);
+        args.push(assign);
+        args.push(name_lit);
+        args.push(base_value);
+        self.member_call("$", "store_get", args.into_bump_slice())
+    }
+
+    /// `var $$store_subs;` — the store-subscription accumulator, injected as a
+    /// component-body statement when any store read compiled.
+    pub fn store_subs_var(&mut self) -> Statement<'arena> {
+        let id = Expression::Identifier(self.ident("$$store_subs"));
+        let span = id.span();
+        let declarator = VariableDeclarator {
+            id,
+            init: None,
+            definite: false,
+            span,
+        };
+        let decls = std::slice::from_ref(self.arena.alloc(declarator));
+        Statement::VariableDeclaration(VariableDeclaration {
+            kind: VariableDeclarationKind::Var,
+            declarations: decls,
+            declare: false,
+            span,
+        })
+    }
+
+    /// `if ($$store_subs) $.unsubscribe_stores($$store_subs);` — the store
+    /// cleanup, injected as the component body's last statement (before any
+    /// `$.bind_props`).
+    pub fn unsubscribe_stores_stmt(&mut self) -> Statement<'arena> {
+        let test = Expression::Identifier(self.ident("$$store_subs"));
+        let test_start = test.span().start;
+        let subs_arg = self.ident_expr("$$store_subs");
+        let call = self.member_call("$", "unsubscribe_stores", std::slice::from_ref(subs_arg));
+        let call_span = call.span();
+        let consequent = self
+            .arena
+            .alloc(Statement::ExpressionStatement(ExpressionStatement {
+                expression: call,
+                span: call_span,
+                is_directive: false,
+            }));
+        Statement::IfStatement(IfStatement {
+            test,
+            consequent,
+            alternate: None,
+            span: Span::new(test_start, call_span.end),
+        })
     }
 
     /// `function <name>(<params>) { <body> }` — a named function declaration

@@ -4222,3 +4222,126 @@ fn compile_allows_valid_animate_placement() {
     assert_compiles("{#each xs as x (x)}<!--c-->\n<div animate:flip></div>{/each}");
     assert_compiles("{#each xs as x (x)}{@const y = 1}<div animate:flip></div>{/each}");
 }
+
+#[test]
+fn compile_store_read_subscribes() {
+    // A template `$name` read where `name` is a binding is a store
+    // auto-subscription: `$.store_get(($$store_subs ??= {}), '$name', name)`, plus
+    // the `var $$store_subs;` header and the `$.unsubscribe_stores` cleanup,
+    // injected at the component-body level (no wrapper forced on its own).
+    let out = compile(
+        "<script>\n\timport { count } from './s';\n</script>\n<p>{$count}</p>",
+        &CompileOptions::default(),
+    )
+    .unwrap();
+    assert!(
+        out.js
+            .contains("$.store_get(($$store_subs ??= {}), '$count', count)"),
+        "store read: {}",
+        out.js
+    );
+    assert!(out.js.contains("var $$store_subs;"), "subs var: {}", out.js);
+    assert!(
+        out.js
+            .contains("if ($$store_subs) $.unsubscribe_stores($$store_subs);"),
+        "unsubscribe: {}",
+        out.js
+    );
+    assert!(
+        !out.js.contains("$$renderer.component"),
+        "a bare store read must not force the wrapper: {}",
+        out.js
+    );
+}
+
+#[test]
+fn compile_store_read_refuses_deferred_positions() {
+    // First slice = template-position reads only. A script-position read, a store
+    // assignment (`$.store_set`), and a store update (`$.update_store`) are all
+    // deferred — the rune guard refuses the `$`-prefixed reference (safe
+    // over-refusals; the oracle compiles them).
+    assert_unsupported(
+        "<script>\n\timport { count } from './s';\n\tconst d = $count * 2;\n</script>\n<p>{d}</p>",
+        "$count",
+    );
+    assert_unsupported(
+        "<script>\n\timport { count } from './s';\n\tfunction f() { $count = 5; }\n</script>\n<button onclick={f}>{$count}</button>",
+        "$count",
+    );
+    assert_unsupported(
+        "<script>\n\timport { count } from './s';\n\tfunction f() { $count++; }\n</script>\n<button onclick={f}>{$count}</button>",
+        "$count",
+    );
+}
+
+#[test]
+fn compile_dollar_rune_is_not_a_store_read() {
+    // A rune callee (`$props()`) is NOT a store read even when its base name
+    // coincides with a binding (`const props = $props()`): stripping `$props` to
+    // `props` and treating it as a store on the props object would spuriously force
+    // the `$$renderer.component` wrapper. Regression guard for `store_read_base`.
+    let out = compile(
+        "<script>\n\tconst props = $props();\n</script>\n<p>text</p>",
+        &CompileOptions::default(),
+    )
+    .unwrap();
+    assert!(
+        !out.js.contains("$$store_subs"),
+        "$props() must not mint store subscriptions: {}",
+        out.js
+    );
+}
+
+#[test]
+fn compile_store_read_in_snippet_stays_nested() {
+    // A top-level `{#snippet}` whose only hoist-blocking reference is a store read
+    // must NOT hoist to module scope — its body reads the component-local
+    // `$$store_subs`. (Regression: the free-var collector recorded `$count`, which
+    // is not a binding name, so the store read failed to block hoisting.)
+    let out = compile(
+        "<script>\n\timport { count } from './s';\n</script>\n{#snippet foo()}{$count}{/snippet}{@render foo()}",
+        &CompileOptions::default(),
+    )
+    .unwrap();
+    // The snippet function nests inside the component (after `var $$store_subs;`),
+    // never as a module-scope sibling of the import.
+    let subs = out.js.find("var $$store_subs;").expect("subs var");
+    let foo = out.js.find("function foo").expect("snippet fn");
+    assert!(
+        foo > subs,
+        "snippet must stay nested (after $$store_subs), got:\n{}",
+        out.js
+    );
+}
+
+#[test]
+fn compile_derived_store_reads_call() {
+    // A store whose base is a `$derived` binding reads `d()` as the store value —
+    // a `$derived` read is a call at every position.
+    let out = compile(
+        "<script>\n\tlet d = $derived(0);\n</script>\n<p>{$d}</p>",
+        &CompileOptions::default(),
+    )
+    .unwrap();
+    assert!(
+        out.js
+            .contains("$.store_get(($$store_subs ??= {}), '$d', d())"),
+        "derived-base store must read d(): {}",
+        out.js
+    );
+}
+
+#[test]
+fn compile_shadowed_store_base_refuses() {
+    // A store base shadowed by a block-local (`{#each}`/`{#await}`/snippet param) is
+    // not a top-level store — the oracle errors `store_invalid_scoped_subscription`,
+    // so tsv refuses rather than subscribe to the block-local.
+    assert_unsupported(
+        "<script>\n\timport { count } from './s';\n</script>\n{#each xs as count}{$count}{/each}",
+        "$count",
+    );
+    assert_unsupported(
+        "<script>\n\timport { count } from './s';\n</script>\n{#snippet foo(count)}{$count}{/snippet}{@render foo(1)}",
+        "$count",
+    );
+}

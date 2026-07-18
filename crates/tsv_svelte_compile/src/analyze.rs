@@ -257,6 +257,27 @@ fn stringify_number(n: f64) -> Result<String, Gray> {
     gray(format!("non-integer numeric fold ({n})"))
 }
 
+/// The rune base names (`$state` → `state`, …). A `$name` whose base is a rune is
+/// the rune keyword itself (always reserved by Svelte), never a store
+/// auto-subscription — so it must not be stripped to its base and treated as a
+/// store read (`$props`'s base `props` may coincide with a `let props = $props()`).
+pub(crate) const RUNE_BASES: &[&str] = &[
+    "state", "derived", "props", "bindable", "inspect", "effect", "host",
+];
+
+/// The store base of a `$name` reference — its `$`-stripped name — when `$name` is
+/// a candidate store auto-subscription: a single leading `$` (`$$props` etc. are
+/// compiler-internal) and a base that is not a rune keyword. `None` for a
+/// non-`$`-prefixed name or a rune. The caller decides whether the base actually
+/// resolves to a binding (only then is it a real store read).
+pub(crate) fn store_read_base(name: &str) -> Option<&str> {
+    let base = name.strip_prefix('$')?;
+    if base.is_empty() || base.starts_with('$') || RUNE_BASES.contains(&base) {
+        return None;
+    }
+    Some(base)
+}
+
 /// Evaluate `expr` against the binding table — the ported `scope.evaluate`.
 pub(crate) fn evaluate(
     expr: &Expression<'_>,
@@ -584,10 +605,17 @@ fn global_keypath(expr: &Expression<'_>, scope: &Scope<'_, '_>, source: &str) ->
             let start = id.span.start as usize;
             let name = &source[start..start + id.name_len as usize];
             if scope.is_local(name) {
-                None
-            } else {
-                Some(name.to_string())
+                return None;
             }
+            // A `$name` store read (base is a binding) is a dynamic store value,
+            // not a global — its member reads never fold, so it is not a global
+            // keypath (the walk has already rewritten it to `$.store_get(...)`).
+            if let Some(base) = store_read_base(name)
+                && scope.is_local(base)
+            {
+                return None;
+            }
+            Some(name.to_string())
         }
         Expression::MemberExpression(member) if !member.computed => {
             let object = global_keypath(member.object, scope, source)?;

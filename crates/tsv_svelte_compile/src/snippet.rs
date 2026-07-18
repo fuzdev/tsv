@@ -144,6 +144,16 @@ pub(crate) fn analyze_snippets(
             if c.params.contains(r) {
                 continue; // a parameter shadows the whole body — safe
             }
+            // A store read (`$name` whose base is a top-level binding) reads the
+            // component-local `$$store_subs` accumulator, so it can never hoist to
+            // module scope — even when the base is an import (the subscription state
+            // is still component-local). Blocks hoisting.
+            if crate::analyze::store_read_base(r)
+                .is_some_and(|base| instance_bindings.contains(base))
+            {
+                ok = false;
+                continue;
+            }
             let is_instance = instance_bindings.contains(r) && !import_names.contains(r);
             if c.locals.contains(r) {
                 if is_instance {
