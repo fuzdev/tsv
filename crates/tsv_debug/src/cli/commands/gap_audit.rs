@@ -64,19 +64,20 @@
 //!
 //! Two limits compose, and neither is visible in a `✓`.
 //!
-//! The audit inherits **the ledger's scope** exactly: only the **detached** comments a
-//! format entry registers. A Svelte `<!-- … -->` and a CSS in-block comment are AST nodes
-//! carried by the tree, and a CSS declaration's *value* comments are never lexed as
-//! `Comment`s at all — all outside the model by construction (see [`comment_ledger`]'s
-//! module docs). So this speaks for the detached-comment model — the class that bit us
-//! eight times — and not for CSS values. CSS also has no line comments, so the `line`
-//! payload is inert in a `.css` file (harmless: it simply never registers).
+//! The audit inherits **the ledger's scope** exactly. That scope now covers both the
+//! **detached** comments a format entry registers AND the **AST-node** comments — a Svelte
+//! `<!-- … -->` and a CSS in-block `CssBlockChild::Comment`, which the ledger registers by
+//! span (see [`comment_ledger`]'s module docs). A CSS declaration's *value* comments are
+//! still never lexed as `Comment`s at all — outside the model by construction. So this
+//! speaks for both comment models — the detached class that bit us eight times and the
+//! tree-carried AST-node one — but not for CSS values. CSS also has no line comments, so the
+//! `line` payload is inert in a `.css` file (harmless: it simply never registers).
 //!
 //! It also inherits **[`code_regions`](crate::audit::sites::code_regions)' reach**: a gap
 //! the region walk doesn't name is a gap never probed. Today that means a `.svelte` file's
 //! `<style>` content is unprobed, so a Svelte file containing only a `<style>` block yields
-//! **zero sites** — see that function's TODO for why the ledger's scope, not difficulty, is
-//! what holds it back.
+//! **zero sites** — now a yield/cost call rather than a scope one (the ledger guards CSS
+//! in-block comments), see that function's TODO.
 //!
 //! ## Structure
 //!
@@ -86,6 +87,19 @@
 //! ratchet in [`audit::ratchet`](crate::audit::ratchet), and the reporting envelope +
 //! printers in [`audit::report`](crate::audit::report). This module owns the command, the
 //! per-file inject loop, the finding aggregation, and the gate/exit decision.
+//!
+//! ## Attribution — where a bystander finding is filed
+//!
+//! Every injection perturbs one gap, but the ledger reports each finding by its comment's span
+//! in the **formatted input**. When the finding IS the injected comment (`injected`), that span
+//! starts at the injection offset and the two coincide. When it is a **bystander** — a
+//! pre-existing seed comment the injection knocked out — its span is somewhere else entirely,
+//! and after a width flip can be lines away. So a hit carries two seed offsets: the **injection
+//! offset** (what [`verify_example`] re-splices to reproduce the drop) and the **attribution
+//! offset** (the victim comment's own seed site, [`victim_seed_offset`]-mapped back across the
+//! splice). The shape, snippet, canonical sort, and `--by-node` emitter edge all key on the
+//! attribution offset — so a dropped bystander points at the emitter that dropped it, not at the
+//! perturbation site the payload went in at.
 
 use argh::FromArgs;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -93,7 +107,7 @@ use std::path::PathBuf;
 
 use crate::audit::properties::{
     Formatted, Pristine, Verdict, VerifyOutcome, VerifySummary, ledger_format,
-    predict_comment_count, pristine_format, tsv_parse_to_value,
+    ledger_format_with_comments, pristine_format, tsv_parse_to_value,
 };
 use crate::audit::ratchet::{GateDiff, Ratchet, SnapshotKey};
 use crate::audit::report::{
@@ -389,7 +403,16 @@ struct Example {
     /// this offset need not fire, or even parse.
     payload: &'static str,
     path: String,
-    offset: usize,
+    /// The byte offset in the seed the payload was **injected** at — the splice
+    /// [`verify_example`] must reproduce. Equals [`Self::attribution_offset`] for an injected
+    /// hit; for a bystander it is the perturbation site, a different position.
+    injection_offset: usize,
+    /// The byte offset the finding is **attributed** to: the victim comment's own site for a
+    /// bystander (mapped back across the splice by [`victim_seed_offset`]), the injection site
+    /// for the injected comment. The shape, snippet, by-node edge, and canonical sort all key
+    /// on this — so a dropped bystander points at the emitter that dropped it, not at wherever
+    /// the payload happened to go in.
+    attribution_offset: usize,
     snippet: String,
     /// The offending comment's text — the injected payload only when [`Self::injected`].
     text: String,
@@ -402,10 +425,16 @@ impl Example {
     /// The tie-break that makes the chosen example **thread-count independent**.
     ///
     /// Threads take files by stride, so which one first sees a shape depends on `--jobs`;
-    /// picking the smallest `(path, offset)` instead of "whoever merged first" keeps a
-    /// report (and any diff of one) stable across `--jobs 1` and `--jobs 12`.
+    /// picking the smallest `(path, attribution_offset)` instead of "whoever merged first"
+    /// keeps a report (and any diff of one) stable across `--jobs 1` and `--jobs 12`. The
+    /// **attribution** offset (not the injection offset) is the sort key so the canonical
+    /// example is the finding's own smallest *victim* site — the meaningful, shape-consistent
+    /// locus. Two examples can now tie on `(path, attribution_offset)` while differing in
+    /// injection offset (two injections dropping the same victim); ties only ever arise within
+    /// one file (one worker), so [`ShapeAgg::offer_example`]'s first-seen tie-break stays
+    /// deterministic across `--jobs`.
     fn sort_key(&self) -> (&str, usize) {
-        (&self.path, self.offset)
+        (&self.path, self.attribution_offset)
     }
 }
 
@@ -486,6 +515,11 @@ struct Tally {
     accepted: usize,
     files_done: usize,
     parse_skipped: usize,
+    /// Bystander findings whose victim span could not be mapped back to seed coordinates
+    /// across the splice (out of range / mid-`char`) — keyed on the injection offset as a
+    /// fallback. Expected to be zero; a nonzero count means a reflow the linear span-shift
+    /// can't place (see [`victim_seed_offset`]), surfaced rather than silently mis-keyed.
+    victim_map_fallbacks: usize,
     /// Files already non-clean before injection — reported, never injected into (see
     /// [`audit_file`]).
     dirty_files: Vec<String>,
@@ -499,7 +533,13 @@ struct Hit<'a> {
     /// The seed source — the shape and snippet are derived from it, so the caller never
     /// computes them for a site that turns out not to fire.
     source: &'a str,
-    offset: usize,
+    /// The byte offset in `source` the payload was **injected** at — the splice the verify
+    /// pass reproduces.
+    injection_offset: usize,
+    /// The byte offset in `source` the finding is **attributed** to: the victim's own site for
+    /// a bystander (mapped back across the splice), the injection site for the injected
+    /// comment. The shape and snippet key on this.
+    attribution_offset: usize,
     /// The offending comment's text, which is the *injected* payload only when
     /// [`Self::injected`] holds.
     text: String,
@@ -509,12 +549,16 @@ struct Hit<'a> {
 
 impl Tally {
     fn record(&mut self, hit: Hit<'_>) {
-        let shape = site_shape(hit.source, hit.offset);
+        // Both the shape and the snippet key on the ATTRIBUTION offset — the victim's own site
+        // for a bystander — so a bystander drop is filed under the emitter that dropped it,
+        // never the perturbation site the payload went in at.
+        let shape = site_shape(hit.source, hit.attribution_offset);
         let candidate = Example {
             payload: hit.payload.label(),
             path: hit.path.to_string(),
-            offset: hit.offset,
-            snippet: snippet(hit.source, hit.offset),
+            injection_offset: hit.injection_offset,
+            attribution_offset: hit.attribution_offset,
+            snippet: snippet(hit.source, hit.attribution_offset),
             text: hit.text,
             injected: hit.injected,
         };
@@ -544,6 +588,7 @@ impl Tally {
         self.accepted += other.accepted;
         self.files_done += other.files_done;
         self.parse_skipped += other.parse_skipped;
+        self.victim_map_fallbacks += other.victim_map_fallbacks;
         self.dirty_files.extend(other.dirty_files);
         for (k, v) in other.shapes {
             match self.shapes.get_mut(&k) {
@@ -581,17 +626,25 @@ impl Tally {
 /// per-example verdicts into a [`VerifyOutcome`] ratio: all-confirmed is clean, all-unconfirmed
 /// is a uniform instrument gap, and a split is a mixed real drop.
 ///
-/// Counting via a reparse rather than by matching the comment's text is what makes this
-/// sound: a printer may legitimately re-indent a multi-line comment, so text matching
-/// produces false alarms, while the count is exact. It is also what leaves the
-/// [`Verdict::Unconfirmed`] bucket meaningful — a *mangled* rebuild is still one comment, so
-/// it shows up as "the ledger says dropped but nothing is missing", which is precisely the
-/// signal wanted.
+/// Deciding via the multiset of comment **contents** rather than a count is what makes this
+/// both sound and decisive. A printer may legitimately re-indent a multi-line comment, which
+/// a raw text match would false-alarm on — so each content is whitespace-normalized
+/// ([`normalize_comment_text`]) before it becomes a multiset element: a re-indent
+/// (`/* a⏎   b */` → `/* a⏎b */`) keeps the newline and normalizes equal, while a **mangle**
+/// (`/* a⏎b */` → `/* ab */`) drops the newline and normalizes different. And unlike the
+/// earlier `parsed - dropped + double` count, the multiset closes that count's two blind
+/// spots: a balancing drop+duplicate nets zero (equal count, unequal multiset), and a
+/// mangle is count-invariant (equal count, unequal content).
 ///
-/// The residual blind spot, named rather than hidden: counts can balance. A format that
-/// drops one comment and duplicates another nets to zero and reads as confirmed-ish. No
-/// example in the corpus does this today, and the kept examples are a sample of the shape's
-/// hits, never a proof about all of them.
+/// So: the injected source's comment contents vs the output's. Equal ⇒ every comment is
+/// content-conserved, so a ledger finding here is contradicted by the output — a genuine
+/// **instrument gap** ([`Verdict::Unconfirmed`], now provably so). Unequal ⇒ a content is
+/// missing, mangled, or duplicated — real loss/corruption ([`Verdict::Confirmed`]).
+///
+/// The residual blind spot, named rather than hidden and far narrower than the count's: a
+/// multiset can still balance if the SAME content is dropped in one place and duplicated in
+/// another. No example in the corpus does this, and the kept examples are a sample of the
+/// shape's hits, never a proof about all of them.
 fn verify_example(example: &Example, kind: Kind, parser: ParserType) -> Verdict {
     // A panic is self-evident: it either happens or it doesn't, and it was caught to get here.
     if kind == Kind::Panic {
@@ -603,7 +656,9 @@ fn verify_example(example: &Example, kind: Kind, parser: ParserType) -> Verdict 
     let Some(payload) = Payload::from_label(example.payload) else {
         return Verdict::Unconfirmed;
     };
-    let offset = example.offset;
+    // Re-create the finding by re-splicing at the INJECTION offset (never the attribution one)
+    // — a bystander drop only reproduces from the perturbation that caused it.
+    let offset = example.injection_offset;
     if offset > source.len() || !source.is_char_boundary(offset) {
         return Verdict::Unconfirmed;
     }
@@ -614,9 +669,9 @@ fn verify_example(example: &Example, kind: Kind, parser: ParserType) -> Verdict 
 
     let Formatted::Ok {
         findings,
-        parsed,
+        comments: input_comments,
         output,
-    } = ledger_format(&injected, parser)
+    } = ledger_format_with_comments(&injected, parser)
     else {
         return Verdict::Unconfirmed;
     };
@@ -625,18 +680,79 @@ fn verify_example(example: &Example, kind: Kind, parser: ParserType) -> Verdict 
         return Verdict::Unconfirmed;
     }
     let Formatted::Ok {
-        parsed: reparsed, ..
-    } = ledger_format(&output, parser)
+        comments: output_comments,
+        ..
+    } = ledger_format_with_comments(&output, parser)
     else {
         // The formatter's own output doesn't parse. A real bug, but `roundtrip_audit`'s.
         return Verdict::Unconfirmed;
     };
 
-    if reparsed == predict_comment_count(parsed, &findings) {
-        Verdict::Confirmed
-    } else {
+    if comment_content_multiset(&input_comments) == comment_content_multiset(&output_comments) {
+        // Content conserved: the ledger's drop/double-print claim is not observable in the
+        // output — an instrument gap, not the content loss it is filed as.
         Verdict::Unconfirmed
+    } else {
+        // A content is missing, mangled, or duplicated — the ledger's claim is real.
+        Verdict::Confirmed
     }
+}
+
+/// The multiset of comment **contents**, each whitespace-normalized so a legitimate re-indent
+/// reads as conserved while a mangle reads as changed (see [`verify_example`]).
+fn comment_content_multiset(texts: &[String]) -> BTreeMap<String, usize> {
+    let mut ms: BTreeMap<String, usize> = BTreeMap::new();
+    for text in texts {
+        *ms.entry(normalize_comment_text(text)).or_insert(0) += 1;
+    }
+    ms
+}
+
+/// Split a comment's text on newlines, trim each line, and rejoin with `\n`. A re-indent of a
+/// multi-line block comment changes per-line leading/trailing whitespace but keeps the
+/// newline count, so it normalizes equal; a mangle that collapses the newlines yields fewer
+/// lines and normalizes different. `trim` also drops a `\r`, so `\r\n` vs `\n` line endings
+/// normalize alike.
+fn normalize_comment_text(text: &str) -> String {
+    text.split('\n')
+        .map(str::trim)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Map a bystander victim's span-start from the injected source's coordinates back to the
+/// seed's, across the single-payload splice.
+///
+/// The inject loop builds `injected = seed[..injection_offset] + payload + seed[injection_offset..]`,
+/// so `payload_len` bytes were inserted at `injection_offset`. A **bystander** finding's
+/// comment — never the injected one — therefore sits either wholly *before* the splice (its
+/// start unchanged) or wholly *at or after* it (its start shifted right by `payload_len`). Its
+/// start never lands in `[injection_offset, injection_offset + payload_len)`: that range is the
+/// injected comment, which the caller classifies `injected` and never routes here.
+///
+/// Returns the seed-space offset, or `None` — **checked, never a panic** — when the mapped
+/// offset is out of the seed's range or lands mid-`char`-boundary (a reflow the linear
+/// span-shift can't place, e.g. a multi-line comment re-indented across the splice). The caller
+/// then falls back to injection-offset keying and counts it, so a stray victim is
+/// mis-attributed rather than crashing the audit. This arithmetic is the "corpus can't grade
+/// it" class — an off-by-one leaves every ASCII file byte-identical — so it is unit-tested
+/// directly.
+fn victim_seed_offset(
+    seed: &str,
+    injection_offset: usize,
+    payload_len: usize,
+    victim_start: usize,
+) -> Option<usize> {
+    let seed_offset = if victim_start < injection_offset {
+        victim_start
+    } else if victim_start >= injection_offset + payload_len {
+        victim_start - payload_len
+    } else {
+        // Inside the injected payload — impossible for a bystander (that range IS the injected
+        // comment). Refuse rather than fabricate an offset.
+        return None;
+    };
+    (seed_offset <= seed.len() && seed.is_char_boundary(seed_offset)).then_some(seed_offset)
 }
 
 /// Audit one file: verify it is clean **as authored**, then inject at every site.
@@ -695,7 +811,8 @@ fn audit_file(path: &std::path::Path, payloads: &[Payload], all_bytes: bool, tal
                         payload,
                         path: &display,
                         source: &source,
-                        offset,
+                        injection_offset: offset,
+                        attribution_offset: offset,
                         text: text.to_string(),
                         injected: true,
                     });
@@ -707,6 +824,36 @@ fn audit_file(path: &std::path::Path, payloads: &[Payload], all_bytes: bool, tal
             };
             tally.accepted += 1;
             for f in findings {
+                // The injected comment starts exactly at the injection point; anything else is
+                // a bystander the injection knocked out. A bystander's finding span is in the
+                // INJECTED source's coordinates, so map it back across the splice to the seed —
+                // that seed offset is where the victim comment actually lived, and is what the
+                // shape / snippet / by-node must key on (not the perturbation site).
+                let victim_start = f.span.start as usize;
+                let injected = victim_start == offset;
+                let attribution_offset = if injected {
+                    offset
+                } else {
+                    // TODO: island-relative-span hazard. This maps `f.span` back as if it were
+                    // host-absolute over `source`, but a finding's span is in the coordinate space
+                    // of the DOCUMENT it was registered against. A nested <script>/<style> ELEMENT
+                    // is re-parsed against its own extracted content string, so an island finding's
+                    // span is ISLAND-relative — mapping it across the splice would yield a bogus
+                    // seed offset with `victim_map_fallbacks` staying 0, a SILENT mis-attribution.
+                    // Safe TODAY only because `code_regions` injects host-only, so no island
+                    // finding can arise. Naming <style>/nested-element raw content in
+                    // `code_regions` (see `audit::sites::code_regions`'s TODO) opens the hole and
+                    // MUST fix this first: thread the finding's `DocumentKey` (host source
+                    // identity) through `CommentFinding` so the mapping can scope to the host key —
+                    // as `comment_ledger::parsed_comment_spans` already does — or fall back.
+                    match victim_seed_offset(&source, offset, text.len(), victim_start) {
+                        Some(seed_offset) => seed_offset,
+                        None => {
+                            tally.victim_map_fallbacks += 1;
+                            offset
+                        }
+                    }
+                };
                 tally.record(Hit {
                     kind: match f.kind {
                         CommentFindingKind::Dropped => Kind::Dropped,
@@ -715,11 +862,10 @@ fn audit_file(path: &std::path::Path, payloads: &[Payload], all_bytes: bool, tal
                     payload,
                     path: &display,
                     source: &source,
-                    offset,
+                    injection_offset: offset,
+                    attribution_offset,
                     text: f.text,
-                    // The injected comment starts exactly at the injection point; anything
-                    // else is a bystander the injection knocked out.
-                    injected: f.span.start as usize == offset,
+                    injected,
                 });
             }
         }
@@ -851,6 +997,18 @@ impl GapAuditCommand {
                 }
             }
         });
+
+        // A bystander whose victim span couldn't be placed back in seed coordinates was keyed
+        // on its injection offset instead — expected to be zero, so surface it rather than let
+        // it silently pollute a shape.
+        if total.victim_map_fallbacks > 0 {
+            eprintln!(
+                "warning: {} bystander finding(s) could not map a victim span back across the \
+                 splice and fell back to injection-offset keying — a reflow the linear \
+                 span-shift can't place (see `victim_seed_offset`). Expected zero.",
+                total.victim_map_fallbacks
+            );
+        }
 
         // Self-verify each shape's kept examples against the output (cheap: up to
         // `VERIFY_EXAMPLES` per shape, not per site — a few thousand formats against
@@ -1002,9 +1160,11 @@ impl GapAuditCommand {
             );
             for ((_, shape), agg) in panics.iter().take(40) {
                 let ex = agg.canonical();
+                // A panic hit is always the injected comment (injection == attribution), so this
+                // "inject … at" line names the injection offset that reproduces the crash.
                 eprintln!(
                     "    {shape:<20} e.g. inject {} at {}:{}",
-                    ex.payload, ex.path, ex.offset
+                    ex.payload, ex.path, ex.injection_offset
                 );
             }
             if panics.len() > 40 {
@@ -1116,7 +1276,8 @@ fn build_report(total: &Tally, payloads: &[Payload]) -> (RunSummary, Vec<Finding
                 example: ReportExample {
                     payload: ex.payload,
                     path: ex.path.clone(),
-                    offset: ex.offset,
+                    injection_offset: ex.injection_offset,
+                    attribution_offset: ex.attribution_offset,
                     snippet: ex.snippet.clone(),
                     text: ex.text.clone(),
                     injected: ex.injected,
@@ -1198,7 +1359,7 @@ fn report_by_node(total: &Tally, json: bool) {
         });
         match seed
             .as_ref()
-            .and_then(|s| node_edge_key(&s.wire, &s.source, ex.offset))
+            .and_then(|s| node_edge_key(&s.wire, &s.source, ex.attribution_offset))
         {
             Some(k) => {
                 let c = clusters.entry(k).or_insert_with(|| NodeCluster {
@@ -1272,6 +1433,42 @@ fn report_by_node(total: &Tally, json: bool) {
 mod tests {
     use super::*;
 
+    /// The verify decision: a re-indented multi-line comment normalizes EQUAL (not a
+    /// finding), while a mangle that eats the newline normalizes DIFFERENT (a finding). This
+    /// is the property the count-based verify was blind to, so no corpus run grades it.
+    #[test]
+    fn comment_content_multiset_normalizes_reindent_but_not_mangle() {
+        // Re-indent: leading whitespace before `b` changes, newline kept ⇒ conserved.
+        let injected = vec!["/* a\n   b */".to_string()];
+        let reindented = vec!["/* a\nb */".to_string()];
+        assert_eq!(
+            comment_content_multiset(&injected),
+            comment_content_multiset(&reindented),
+            "a re-indent must not read as a change"
+        );
+        // Mangle: the newline is gone, so the line count drops ⇒ NOT conserved.
+        let mangled = vec!["/* ab */".to_string()];
+        assert_ne!(
+            comment_content_multiset(&injected),
+            comment_content_multiset(&mangled),
+            "a mangle that collapses the newline must read as a change"
+        );
+        // A plain drop: the content is simply absent from the output multiset.
+        assert_ne!(
+            comment_content_multiset(&injected),
+            comment_content_multiset(&[]),
+            "a dropped comment must read as a change"
+        );
+        // A duplicate: the same content twice is a distinct multiset from once.
+        let once = vec!["/* c */".to_string()];
+        let twice = vec!["/* c */".to_string(), "/* c */".to_string()];
+        assert_ne!(
+            comment_content_multiset(&once),
+            comment_content_multiset(&twice),
+            "a double-print must read as a change"
+        );
+    }
+
     /// A minimal shape carrying `payloads` — only the snapshot columns matter here, so the
     /// example is filler.
     fn mk_agg(payloads: &[&'static str]) -> ShapeAgg {
@@ -1283,7 +1480,8 @@ mod tests {
             examples: vec![Example {
                 payload: "block",
                 path: "p.svelte".to_string(),
-                offset: 0,
+                injection_offset: 0,
+                attribution_offset: 0,
                 snippet: String::new(),
                 text: "/* c */".to_string(),
                 injected: true,
@@ -1485,7 +1683,8 @@ mod tests {
         Example {
             payload: "block",
             path: path.to_string(),
-            offset,
+            injection_offset: offset,
+            attribution_offset: offset,
             snippet: String::new(),
             text: "/* c */".to_string(),
             injected: true,
@@ -1512,9 +1711,13 @@ mod tests {
         for off in [9, 3, 7, 1, 5, 8, 2, 6, 0, 4] {
             agg.offer_example(mk_example("a.svelte", off));
         }
-        let offsets: Vec<usize> = agg.examples.iter().map(|e| e.offset).collect();
+        let offsets: Vec<usize> = agg.examples.iter().map(|e| e.attribution_offset).collect();
         assert_eq!(offsets, (0..VERIFY_EXAMPLES).collect::<Vec<_>>());
-        assert_eq!(agg.canonical().offset, 0, "canonical is the smallest");
+        assert_eq!(
+            agg.canonical().attribution_offset,
+            0,
+            "canonical is the smallest"
+        );
     }
 
     /// A later candidate that TIES an existing one on `sort_key` (same path + offset,
@@ -1569,7 +1772,7 @@ mod tests {
         let got: Vec<(&str, usize)> = a.shapes[&key]
             .examples
             .iter()
-            .map(|e| (e.path.as_str(), e.offset))
+            .map(|e| (e.path.as_str(), e.attribution_offset))
             .collect();
         assert_eq!(
             got,
@@ -1580,6 +1783,109 @@ mod tests {
                 ("a.svelte", 6),
                 ("a.svelte", 8),
             ]
+        );
+    }
+
+    /// The splice-mapping arithmetic — the "corpus can't grade it" class (an offset error
+    /// leaves every ASCII file byte-identical, so no corpus run grades it; only this does).
+    /// A victim BEFORE the injection maps unchanged; one AT-OR-AFTER `injection + payload_len`
+    /// maps back by `payload_len`; an offset inside the payload range, out of range, or
+    /// mid-`char` falls back to `None` (the caller's injection-offset keying).
+    #[test]
+    fn victim_seed_offset_maps_across_the_splice() {
+        // 8 ASCII bytes, every offset a char boundary. Injecting a 4-byte payload at offset 3
+        // yields `injected = "abc" + PPPP + "defgh"` (length 12).
+        let seed = "abcdefgh";
+        let inj = 3;
+        let plen = 4;
+
+        // Before the splice: unchanged (injected 0..3 == seed 0..3).
+        assert_eq!(victim_seed_offset(seed, inj, plen, 0), Some(0));
+        assert_eq!(victim_seed_offset(seed, inj, plen, 2), Some(2));
+
+        // At or after the splice: shift back by payload_len. Seed `d` sits at injected 7
+        // (3 + 4) and maps back to 3; seed `h` at injected 11 → 7; the seed's end (injected
+        // 12) → seed.len() 8.
+        assert_eq!(victim_seed_offset(seed, inj, plen, 7), Some(3));
+        assert_eq!(victim_seed_offset(seed, inj, plen, 11), Some(7));
+        assert_eq!(victim_seed_offset(seed, inj, plen, 12), Some(8));
+
+        // Inside the payload range [3, 7): impossible for a bystander ⇒ None (fallback). The
+        // low end (== injection) is the injected comment, already classified `injected`.
+        assert_eq!(victim_seed_offset(seed, inj, plen, 3), None);
+        assert_eq!(victim_seed_offset(seed, inj, plen, 6), None);
+
+        // Out of range past the seed's end ⇒ None (13 - 4 = 9 > 8).
+        assert_eq!(victim_seed_offset(seed, inj, plen, 13), None);
+
+        // Multibyte: a mapped offset that lands mid-`char` falls back to None. `é` is two
+        // bytes at seed [1, 3). Injecting a 2-byte payload at 0 → `injected = "PP" + "aébc"`.
+        let seed2 = "aébc";
+        // Injected 3 → seed 1 (the start of `é`, a boundary) ⇒ mapped.
+        assert_eq!(victim_seed_offset(seed2, 0, 2, 3), Some(1));
+        // Injected 4 → seed 2, which is mid-`é` ⇒ None.
+        assert_eq!(victim_seed_offset(seed2, 0, 2, 4), None);
+    }
+
+    /// A bystander hit keys on the VICTIM's site, not the perturbation site. Record two hits
+    /// from one injection over `import.x = y.z`: the injected comment (attribution == injection
+    /// at the `import.` dot) and a bystander whose victim sits at the `y.z` dot — a DIFFERENT
+    /// shape. The bystander must be filed under the victim site's shape, carrying its own
+    /// attribution offset while the injection offset survives for reproduction. The corpus
+    /// can't grade this: a `record` that keyed on `injection_offset` would land the bystander
+    /// under `import⟨⟩.` and the gate would still be green (a shape it already pins).
+    #[test]
+    fn record_keys_a_bystander_on_the_victim_site() {
+        let src = "import.x = y.z";
+        let import_dot = src.find(".x").expect("first dot"); // offset 6
+        let member_dot = src.rfind(".z").expect("second dot"); // offset 12
+        assert_eq!(site_shape(src, import_dot), "import⟨⟩.");
+        assert_eq!(site_shape(src, member_dot), "IDENT⟨⟩.");
+
+        let mut tally = Tally::default();
+        // The injected comment: attribution == injection at the `import.` dot.
+        tally.record(Hit {
+            kind: Kind::Dropped,
+            payload: Payload::Block,
+            path: "p.ts",
+            source: src,
+            injection_offset: import_dot,
+            attribution_offset: import_dot,
+            text: "/* c */".to_string(),
+            injected: true,
+        });
+        // A bystander the SAME injection knocked out, whose victim lived at the `y.z` dot.
+        tally.record(Hit {
+            kind: Kind::Dropped,
+            payload: Payload::Block,
+            path: "p.ts",
+            source: src,
+            injection_offset: import_dot,
+            attribution_offset: member_dot,
+            text: "/* pre-existing */".to_string(),
+            injected: false,
+        });
+
+        assert!(
+            tally
+                .shapes
+                .contains_key(&(Kind::Dropped, "import⟨⟩.".to_string())),
+            "the injected hit keys on the injection site"
+        );
+        let victim = tally
+            .shapes
+            .get(&(Kind::Dropped, "IDENT⟨⟩.".to_string()))
+            .expect("the bystander keys on the VICTIM site, not the injection site");
+        assert_eq!(victim.bystander_hits, 1, "recorded as a bystander");
+        assert_eq!(
+            victim.canonical().attribution_offset,
+            member_dot,
+            "the attribution offset is the victim's own site"
+        );
+        assert_eq!(
+            victim.canonical().injection_offset,
+            import_dot,
+            "the injection offset survives for reproduction"
         );
     }
 }

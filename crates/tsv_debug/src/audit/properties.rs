@@ -4,12 +4,15 @@
 //! This is the shared home for the **input → property** layer that every audit
 //! in the [`audit`](crate::audit) substrate builds on:
 //!
-//! - **reparse** — [`tsv_parse_to_value`] (parse to the wire `Value`) and
-//!   [`structurally_equivalent`] (the structural-skeleton compare), the
-//!   round-trip primitives the `roundtrip_audit` / `fuzz` commands share.
+//! - **reparse** — [`tsv_parse_to_value`] (parse to the wire `Value`),
+//!   [`structurally_equivalent`] (the structural-skeleton compare), and
+//!   [`leaf_conservation_diff`] / [`leaf_value_multiset`] (the complementary
+//!   decode-invariant leaf-value check that the skeleton, erasing every scalar,
+//!   is blind to) — the round-trip primitives the `roundtrip_audit` / `fuzz`
+//!   commands share.
 //! - **ledger** (behind the `comment_check` feature) — [`ledger_format`] /
-//!   [`pristine_format`] drive `format_source` with the print-once comment
-//!   ledger armed, and [`predict_comment_count`] plus the [`Verdict`] /
+//!   [`ledger_format_with_comments`] / [`pristine_format`] drive `format_source`
+//!   with the print-once comment ledger armed, and the [`Verdict`] /
 //!   [`VerifyOutcome`] / [`VerifySummary`] verdict types turn a ledger claim
 //!   into a falsifiable, self-verified outcome. `gap_audit` is the only consumer
 //!   today.
@@ -18,6 +21,8 @@
 //! no-panic guard, the F1 idempotency fixed point, the reparse-skeleton compare,
 //! and the ledger-clean check — as the other audits (roundtrip / fuzz / F1 sweep)
 //! migrate onto the substrate.
+
+use std::collections::BTreeMap;
 
 use serde_json::Value;
 
@@ -59,7 +64,12 @@ pub(crate) fn tsv_parse_to_value(source: &str, parser: ParserType) -> Option<Val
 /// re-typed node still does (see `structural_skeleton` for what the skeleton
 /// keeps vs erases). Char-dropping *value* corruption stays covered by the
 /// complementary `corpus:compare:format` SAFETY (differential char-frequency),
-/// which this deliberately does not duplicate.
+/// which this deliberately does not duplicate. A **value** change that neither drops
+/// characters nor changes the shape (a mis-decoded string, a miscanonicalized number,
+/// a mangled multi-line comment) is invisible to both this skeleton and the SAFETY
+/// frequency check — that class is [`leaf_conservation_diff`]'s, which the same two
+/// commands run as a refinement **when this returns equal** (a shape change is already
+/// a divergence; a shape-equal leaf change is the skeleton-blind corruption).
 ///
 /// Returns `(structurally_equal, diff)` — the diff (only with `verbose`) shows the
 /// full location-stripped values, not the skeleton, so it's readable for triage.
@@ -89,6 +99,311 @@ pub(crate) fn structurally_equivalent(
     (false, diff)
 }
 
+/// The multiset of **decode-invariant leaf values** in a wire AST — the semantically
+/// conserved scalars a legitimate reformat must never change, keyed so that an equal multiset
+/// means every such leaf survived the format.
+///
+/// [`structural_skeleton`] erases *every* scalar leaf to `Null`, so a format that still
+/// parses but corrupts a leaf value — a mis-decoded string, a number canonicalized to a
+/// *different* value, a mangled multi-line comment — reparses to an equal skeleton and slips
+/// past [`structurally_equivalent`]. This is the complementary check: conserve the leaves
+/// whose value carries meaning, ignore the ones a formatter legitimately rewrites.
+///
+/// ## Invariant table — conserve vs ignore
+///
+/// | wire field | verdict | key | why |
+/// | --- | --- | --- | --- |
+/// | `Literal.value` — string | **conserve** | `s:` | the decoded text; `raw` reformats, the value must not. Shares the `s:` tag with `Identifier.name` (see below) |
+/// | `Literal.value` — number / bool / null | **conserve** | `v:` | the decoded value; distinct tag so a string `"1"` and a number `1` never cancel |
+/// | `Literal.bigint` | **conserve** | `bigint:` | the bigint digits (`value` is null / lossy in JSON) |
+/// | `Literal.regex.pattern` | **conserve** | `re.pattern:` | the regex body is opaque, must survive verbatim |
+/// | `Literal.regex.flags` | **conserve** (order-free) | `re.flags:` | a set — tsv/prettier canonicalize the order, so flags are sorted before comparing; an add/remove still differs |
+/// | `Identifier.name` / `PrivateIdentifier.name` | **conserve** | `s:` | the decoded identifier; **shares `s:` with a string `value`** so a quote-props key flip (`{"a": 1}` ↔ `{a: 1}`, Literal ↔ Identifier, same text) conserves |
+/// | `TemplateElement.value.cooked` | **conserve** | `cooked:` | the decoded chunk (`raw` reformats) |
+/// | every `raw` | **ignore** | — | the source spelling — quotes, digit separators, escapes are the formatter's to rewrite |
+/// | `loc` / `start` / `end` | **ignore** | — | positions move under formatting |
+/// | `extra` | **ignore** | — | acorn's source-metadata bag (trailing-comma / `parenthesized`), whose key presence itself flips |
+/// | whitespace / `Text` `data` / formatting | **ignore** | — | reflow is the point |
+///
+/// The **string-value/name conflation** is deliberate: a value ↔ name *node-type* flip is a
+/// **shape** change, which the structural skeleton owns, so the leaf check conserves the text
+/// across it rather than double-reporting a legitimate quote-props rewrite as gate-fatal. It
+/// stays precise on its own mandate — a **same-shape** scalar change keeps a Literal a Literal
+/// and an Identifier an Identifier, so a mis-decoded string, a renamed identifier, and a
+/// miscanonicalized number are all still caught.
+///
+/// Walks **generically** on the `type` discriminator plus field names — it does not enumerate
+/// a full node set. An **unrecognized** node contributes nothing, so the check is a graceful
+/// no-op over a wire shape with none of these nodes (CSS: no `Literal` / `Identifier` /
+/// `TemplateElement`). CSS-value leaf conservation is a documented future extension, out of
+/// scope today.
+///
+/// Shared by the `roundtrip_audit` and `fuzz` commands, compared input-parse vs output-parse
+/// under the same parser (both tsv, or both canonical) so a leaf's representation is
+/// consistent across the pair.
+pub(crate) fn leaf_value_multiset(wire: &Value) -> BTreeMap<String, usize> {
+    let mut leaves: Vec<String> = Vec::new();
+    collect_conserved_leaves(wire, &mut leaves);
+    let mut ms: BTreeMap<String, usize> = BTreeMap::new();
+    for leaf in leaves {
+        *ms.entry(leaf).or_insert(0) += 1;
+    }
+    ms
+}
+
+/// Walk `v`, pushing one role-tagged key per conserved leaf. The explicit extraction handles
+/// each recognized node's scalar leaf; the generic recursion visits child *nodes*, so every
+/// `Identifier` / `Literal` / `TemplateElement` in the tree contributes exactly once (a
+/// scalar leaf recursed into yields nothing, so there is no double-count).
+fn collect_conserved_leaves(v: &Value, out: &mut Vec<String>) {
+    match v {
+        Value::Object(map) => {
+            match map.get("type").and_then(Value::as_str) {
+                Some("Literal") => {
+                    // A regex / bigint literal carries its value elsewhere than `value`
+                    // (which is `{}` / null), so branch before falling back to `value`.
+                    if let Some(regex) = map.get("regex").and_then(Value::as_object) {
+                        if let Some(pattern) = regex.get("pattern") {
+                            out.push(format!("re.pattern:{}", scalar_key(pattern)));
+                        }
+                        if let Some(flags) = regex.get("flags") {
+                            out.push(format!("re.flags:{}", sorted_flags(flags)));
+                        }
+                    } else if let Some(bigint) = map.get("bigint") {
+                        out.push(format!("bigint:{}", scalar_key(bigint)));
+                    } else if let Some(value) = map.get("value") {
+                        out.push(literal_value_key(value));
+                    }
+                }
+                Some("Identifier" | "PrivateIdentifier") => {
+                    if let Some(name) = map.get("name") {
+                        out.push(format!("s:{}", scalar_key(name)));
+                    }
+                }
+                Some("TemplateElement") => {
+                    if let Some(cooked) = map.get("value").and_then(|value| value.get("cooked")) {
+                        out.push(format!("cooked:{}", scalar_key(cooked)));
+                    }
+                }
+                _ => {}
+            }
+            // Recurse into child nodes. `extra` / `loc` are metadata / position bags with no
+            // conserved leaves — skipping them avoids walking their scalars for nothing.
+            for (k, child) in map {
+                if k == "extra" || k == "loc" {
+                    continue;
+                }
+                collect_conserved_leaves(child, out);
+            }
+        }
+        Value::Array(arr) => {
+            for child in arr {
+                collect_conserved_leaves(child, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// A canonical, type-tagged key for a scalar leaf — its exact JSON serialization, so a string
+/// `"1"` and a number `1` never collide and two equal values always match.
+fn scalar_key(v: &Value) -> String {
+    v.to_string()
+}
+
+/// A `Literal.value`'s multiset key. A **string** value shares the `s:` tag with an
+/// `Identifier` name, because a property key legitimately flips between a string Literal and a
+/// bare Identifier under quote normalization (`{"a": 1}` ↔ `{a: 1}`) — same text, different
+/// node. That node-type flip is a *shape* change, which the structural skeleton owns; the leaf
+/// check conserves the text and so must not read the flip as corruption. A **non-string**
+/// value (number / bool / null) keeps a distinct `v:` tag, so a string `"1"` and a number `1`
+/// never cancel.
+fn literal_value_key(value: &Value) -> String {
+    if value.is_string() {
+        format!("s:{}", scalar_key(value))
+    } else {
+        format!("v:{}", scalar_key(value))
+    }
+}
+
+/// Regex flags are an unordered set — tsv (like prettier) canonicalizes their order, so the
+/// leaf check compares them **order-independently**: a pure reorder (`mgi` → `gim`) conserves,
+/// while an added or removed flag still differs.
+fn sorted_flags(flags: &Value) -> String {
+    match flags.as_str() {
+        Some(s) => {
+            let mut chars: Vec<char> = s.chars().collect();
+            chars.sort_unstable();
+            chars.into_iter().collect()
+        }
+        // A non-string flags field is unexpected; fall back to the raw scalar key rather than
+        // silently dropping the leaf.
+        None => scalar_key(flags),
+    }
+}
+
+/// `None` when every conserved leaf survives `input` → `output`; otherwise a compact
+/// description of the divergence (leaves lost from the input, leaves gained in the output — a
+/// *mangle* shows as both). The gate-fatal signal `roundtrip_audit` / `fuzz` file as a
+/// leaf-value-corruption finding, distinct from the render-noisy structural-divergence bucket.
+pub(crate) fn leaf_conservation_diff(input: &Value, output: &Value) -> Option<String> {
+    let before = leaf_value_multiset(input);
+    let after = leaf_value_multiset(output);
+    if before == after {
+        return None;
+    }
+    let mut lost: Vec<String> = Vec::new();
+    for (k, &n_before) in &before {
+        let n_after = after.get(k).copied().unwrap_or(0);
+        if n_before > n_after {
+            lost.push(format!("{k} (-{})", n_before - n_after));
+        }
+    }
+    let mut gained: Vec<String> = Vec::new();
+    for (k, &n_after) in &after {
+        let n_before = before.get(k).copied().unwrap_or(0);
+        if n_after > n_before {
+            gained.push(format!("{k} (+{})", n_after - n_before));
+        }
+    }
+    Some(format!(
+        "leaf-value not conserved — lost [{}] gained [{}]",
+        lost.join(", "),
+        gained.join(", ")
+    ))
+}
+
+#[cfg(test)]
+mod leaf_tests {
+    use super::*;
+    use serde_json::json;
+
+    fn str_literal(value: &str, raw: &str) -> Value {
+        json!({"type": "Literal", "value": value, "raw": raw})
+    }
+
+    /// A re-quote changes `raw` but not the decoded `value` — the conserved leaf survives.
+    #[test]
+    fn requote_conserves_the_decoded_value() {
+        let before = str_literal("a", "\"a\"");
+        let after = str_literal("a", "'a'");
+        assert_eq!(leaf_conservation_diff(&before, &after), None);
+    }
+
+    /// A changed decoded value is the corruption class the skeleton is blind to.
+    #[test]
+    fn a_changed_value_is_a_finding() {
+        let before = str_literal("a", "'a'");
+        let after = str_literal("b", "'b'");
+        assert!(leaf_conservation_diff(&before, &after).is_some());
+    }
+
+    /// A number reformatted (`1_000` → `1000`) keeps its numeric value; a miscanonicalized
+    /// one (a *different* value) is caught.
+    #[test]
+    fn number_value_conserved_but_miscanonicalization_caught() {
+        let a = json!({"type": "Literal", "value": 1000, "raw": "1_000"});
+        let b = json!({"type": "Literal", "value": 1000, "raw": "1000"});
+        assert_eq!(leaf_conservation_diff(&a, &b), None);
+        let c = json!({"type": "Literal", "value": 100, "raw": "100"});
+        assert!(leaf_conservation_diff(&a, &c).is_some());
+    }
+
+    /// Regex body + flags are opaque and conserved; identifier names too.
+    #[test]
+    fn regex_and_identifier_leaves_are_conserved() {
+        let re = |p: &str, f: &str| json!({"type": "Literal", "regex": {"pattern": p, "flags": f}, "raw": "/x/"});
+        assert_eq!(
+            leaf_conservation_diff(&re("foo", "g"), &re("foo", "g")),
+            None
+        );
+        // A pure flag REORDER conserves (tsv/prettier canonicalize order) …
+        assert_eq!(
+            leaf_conservation_diff(&re("foo", "mgi"), &re("foo", "gim")),
+            None
+        );
+        // … but an added/removed flag or a changed pattern is a real change.
+        assert!(leaf_conservation_diff(&re("foo", "g"), &re("foo", "gi")).is_some());
+        assert!(leaf_conservation_diff(&re("foo", "g"), &re("bar", "g")).is_some());
+        let id = |n: &str| json!({"type": "Identifier", "name": n});
+        assert_eq!(leaf_conservation_diff(&id("x"), &id("x")), None);
+        assert!(leaf_conservation_diff(&id("x"), &id("y")).is_some());
+    }
+
+    /// The quote-props false positive that the corpus probe surfaced: a property key
+    /// legitimately flips between a string Literal (`{"a": 1}`) and a bare Identifier
+    /// (`{a: 1}`) under quote normalization. Same text, different node — the shape change is
+    /// the skeleton's to judge, so the leaf check must **conserve** (string value and
+    /// identifier name share the `s:` tag). A genuine text change is still caught.
+    #[test]
+    fn quote_props_key_flip_is_conserved() {
+        let str_key = json!({"type": "Literal", "value": "a", "raw": "\"a\""});
+        let id_key = json!({"type": "Identifier", "name": "a"});
+        assert_eq!(leaf_conservation_diff(&str_key, &id_key), None);
+        // But a key whose text changed is a real finding.
+        let id_other = json!({"type": "Identifier", "name": "b"});
+        assert!(leaf_conservation_diff(&str_key, &id_other).is_some());
+        // A string value and a NUMBER never cancel (distinct tags).
+        let num = json!({"type": "Literal", "value": 1, "raw": "1"});
+        let str_one = json!({"type": "Literal", "value": "1", "raw": "\"1\""});
+        assert!(leaf_conservation_diff(&num, &str_one).is_some());
+    }
+
+    /// `value.cooked` (not `raw`) is the conserved template chunk.
+    #[test]
+    fn template_element_conserves_cooked_not_raw() {
+        let te = |cooked: &str, raw: &str| json!({"type": "TemplateElement", "value": {"cooked": cooked, "raw": raw}});
+        assert_eq!(
+            leaf_conservation_diff(&te("a", "a"), &te("a", "a\\n")),
+            None
+        );
+        assert!(leaf_conservation_diff(&te("a", "a"), &te("b", "a")).is_some());
+    }
+
+    /// A wire shape with none of the recognized nodes (CSS-like) yields an empty multiset, so
+    /// the check is a graceful no-op — never a false finding.
+    #[test]
+    fn unrecognized_nodes_yield_no_leaves() {
+        let css_like = json!({
+            "type": "Declaration",
+            "property": "color",
+            "value": "red",
+            "children": [{"type": "Rule", "prelude": ".x"}]
+        });
+        assert!(leaf_value_multiset(&css_like).is_empty());
+        // And two differently-"formatted" CSS-like trees compare conserved (nothing to lose).
+        let other = json!({"type": "Declaration", "property": "color", "value": "#f00"});
+        assert_eq!(leaf_conservation_diff(&css_like, &other), None);
+    }
+
+    /// The same value appearing twice is a multiset of two — a drop of one copy is caught
+    /// even though the other survives.
+    #[test]
+    fn multiset_counts_duplicate_values() {
+        let two = json!([str_literal("a", "'a'"), str_literal("a", "'a'")]);
+        let one = json!([str_literal("a", "'a'")]);
+        assert_eq!(leaf_value_multiset(&two).get("s:\"a\""), Some(&2));
+        assert!(leaf_conservation_diff(&two, &one).is_some());
+    }
+
+    /// A nested `Identifier` inside a `Literal`'s recursion path is not double-counted, and
+    /// child nodes are reached generically.
+    #[test]
+    fn nested_nodes_counted_once_each() {
+        let tree = json!({
+            "type": "Program",
+            "body": [
+                {"type": "Identifier", "name": "x"},
+                {"type": "Literal", "value": "s", "raw": "'s'"}
+            ]
+        });
+        let ms = leaf_value_multiset(&tree);
+        assert_eq!(ms.get("s:\"x\""), Some(&1));
+        assert_eq!(ms.get("s:\"s\""), Some(&1));
+        assert_eq!(ms.len(), 2);
+    }
+}
+
 // The ledger-driven property layer is only reachable through the `comment_check`
 // feature (it arms `tsv_lang::comment_ledger`), so production and default
 // `tsv_debug` builds compile it out entirely — the same gate the audits that
@@ -100,7 +415,7 @@ pub(crate) use ledger::*;
 mod ledger {
     use tsv_cli::cli::format_source::format_source;
     use tsv_cli::cli::input::ParserType;
-    use tsv_lang::comment_ledger::{self, CommentFinding, CommentFindingKind};
+    use tsv_lang::comment_ledger::{self, CommentFinding};
 
     /// What one ledger-armed format did.
     pub(crate) enum Formatted {
@@ -114,22 +429,35 @@ mod ledger {
         Ok {
             /// The ledger's findings — normally empty.
             findings: Vec<CommentFinding>,
-            /// How many comments the document registered. Doubles as a needle-free "how many
-            /// comments are in this text" measure: `ledger_format(text).parsed` counts them
-            /// with the real lexer, so `verify_example` never has to string-match a comment
-            /// whose text the printer may legitimately re-indent.
-            parsed: usize,
+            /// The source text of every comment the document registered — the `verify_example`
+            /// content oracle. Populated only by [`ledger_format_with_comments`] (empty under
+            /// the hot-path [`ledger_format`], which never reads it), so the per-injection loop
+            /// pays nothing to clone comment texts it doesn't use.
+            comments: Vec<String>,
             /// The formatted text, already built by `format_source` — free to carry.
             output: String,
         },
     }
 
-    /// Format `src` with the ledger armed and drain it.
-    ///
-    /// Drains on every path, including the failing ones: the ledger is thread-local and keyed
-    /// on source identity, so a straggler left by a rejected parse could otherwise be attributed
-    /// to the next injection.
+    /// Format `src` with the ledger armed and drain it — **without** collecting comment texts
+    /// (the per-injection hot path, which reads only `findings`). See
+    /// [`ledger_format_with_comments`] for the verify path.
     pub(crate) fn ledger_format(src: &str, parser: ParserType) -> Formatted {
+        ledger_format_inner(src, parser, false)
+    }
+
+    /// [`ledger_format`], but also reads back the registered comment texts into
+    /// [`Formatted::Ok::comments`]. Used by `gap_audit`'s self-verify, which decides a
+    /// finding by the multiset of comment *contents* in the input vs the output. Reads the
+    /// texts (via [`comment_ledger::parsed_comment_texts`]) **before** the drain discards them.
+    pub(crate) fn ledger_format_with_comments(src: &str, parser: ParserType) -> Formatted {
+        ledger_format_inner(src, parser, true)
+    }
+
+    /// The shared body. Drains on every path, including the failing ones: the ledger is
+    /// thread-local and keyed on source identity, so a straggler left by a rejected parse could
+    /// otherwise be attributed to the next injection.
+    fn ledger_format_inner(src: &str, parser: ParserType, collect_comments: bool) -> Formatted {
         let _ = comment_ledger::take_comment_ledger();
         let result =
             std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| format_source(src, parser)));
@@ -143,10 +471,16 @@ mod ledger {
                 Formatted::Rejected
             }
             Ok(Ok(output)) => {
+                // Read the texts before the drain — `take_comment_ledger` discards them.
+                let comments = if collect_comments {
+                    comment_ledger::parsed_comment_texts()
+                } else {
+                    Vec::new()
+                };
                 let ledger = comment_ledger::take_comment_ledger();
                 Formatted::Ok {
                     findings: ledger.findings,
-                    parsed: ledger.parsed,
+                    comments,
                     output,
                 }
             }
@@ -200,42 +534,23 @@ mod ledger {
         }
     }
 
-    /// How many comments the output must hold, if the ledger's account of `findings` is true.
-    ///
-    /// Each dropped comment removes one. Each double-printed one adds `emitted - 1` — **not**
-    /// one: `CommentFinding::emitted` is documented as `>= 2`, so a comment printed three times
-    /// adds two, and assuming "double" means exactly twice would mispredict it as
-    /// [`Verdict::Unconfirmed`].
-    ///
-    /// Split out and unit-tested because it is arithmetic: an off-by-one here changes a verdict
-    /// and nothing else, and no corpus run would show it — the audit would simply file a
-    /// confirmed finding under the wrong bucket.
-    pub(crate) fn predict_comment_count(parsed: usize, findings: &[CommentFinding]) -> usize {
-        let dropped = findings
-            .iter()
-            .filter(|f| f.kind == CommentFindingKind::Dropped)
-            .count();
-        let extra: usize = findings
-            .iter()
-            .filter(|f| f.kind == CommentFindingKind::DoublePrinted)
-            .map(|f| f.emitted.saturating_sub(1))
-            .sum();
-        // `dropped` counts registered comments, so it can never exceed `parsed`; saturate
-        // rather than risk a panic on a ledger that ever breaks that invariant.
-        parsed.saturating_sub(dropped) + extra
-    }
-
     /// Whether ONE of a shape's examples survives an **observational** re-check, independent of
     /// the ledger that reported it.
+    ///
+    /// The decision is the multiset of comment *contents* in the injected input vs the format's
+    /// output (see `gap_audit::verify_example`), which supersedes the earlier
+    /// `parsed - dropped + double` count comparison — the count had two named blind spots
+    /// (a balancing drop+dup nets zero, and a *mangled* rebuild is count-invariant), both of
+    /// which the content multiset closes.
     #[derive(Clone, Copy, PartialEq, Eq, Debug)]
     pub(crate) enum Verdict {
-        /// Re-formatting really does lose (or duplicate) a comment. The ledger's claim is
-        /// visible in the output.
+        /// Re-formatting really does lose, mangle, or duplicate a comment — the content
+        /// multiset of the output differs from the input's.
         Confirmed,
-        /// The ledger says a comment was never emitted, yet the output holds just as many
-        /// comments as its input. Something printed it without recording the emit — or printed
-        /// a *mangled* rebuild of it (`/* a⏎b */` → `/* ab */`, one comment either way). Real
-        /// either way, but not the plain drop it is filed as.
+        /// The output holds the same comment *contents* as its input, yet the ledger filed a
+        /// finding. Something printed the comment without recording the emit (an instrument
+        /// gap) — real that the ledger's account is off, but not the content loss it is filed
+        /// as.
         Unconfirmed,
     }
 
@@ -287,57 +602,6 @@ mod ledger {
     #[cfg(test)]
     mod tests {
         use super::*;
-        use tsv_lang::comment_ledger::{CommentFinding, CommentFindingKind};
-
-        /// The ledger's falsifiable prediction. Arithmetic, so the corpus cannot grade it.
-        #[test]
-        fn predicted_comment_count_accounts_for_each_finding() {
-            let f = |kind, emitted| CommentFinding {
-                kind,
-                text: "/* c */".to_string(),
-                span: tsv_lang::Span { start: 0, end: 7 },
-                emitted,
-            };
-            // No findings ⇒ the output keeps every comment.
-            assert_eq!(predict_comment_count(5, &[]), 5);
-            // A drop removes exactly one.
-            assert_eq!(
-                predict_comment_count(5, &[f(CommentFindingKind::Dropped, 0)]),
-                4
-            );
-            // A comment printed TWICE adds one — but one printed THREE times adds two. This is
-            // the case a "double means 2" reading gets wrong.
-            assert_eq!(
-                predict_comment_count(5, &[f(CommentFindingKind::DoublePrinted, 2)]),
-                6
-            );
-            assert_eq!(
-                predict_comment_count(5, &[f(CommentFindingKind::DoublePrinted, 3)]),
-                7
-            );
-            // Mixed findings compose.
-            assert_eq!(
-                predict_comment_count(
-                    5,
-                    &[
-                        f(CommentFindingKind::Dropped, 0),
-                        f(CommentFindingKind::DoublePrinted, 2)
-                    ]
-                ),
-                5
-            );
-            // A ledger that broke its own invariant must not panic the audit.
-            assert_eq!(
-                predict_comment_count(
-                    0,
-                    &[
-                        f(CommentFindingKind::Dropped, 0),
-                        f(CommentFindingKind::Dropped, 0)
-                    ]
-                ),
-                0
-            );
-        }
 
         /// The verify ratio's three-way split, and the labels that carry it. Arithmetic, so no
         /// corpus run grades it.

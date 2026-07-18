@@ -117,7 +117,13 @@ next fixture edit.
   union at that offset need not fire, or even parse.
 - **`(N of M hits knock out a bystander)`** is the scarier half: the offending comment is one
   the author already had, knocked out by an injection *elsewhere*. An existing comment
-  vanishing because someone added another one nearby.
+  vanishing because someone added another one nearby. A bystander finding is **keyed and
+  reported at the victim's own site** — the emitter that dropped the comment — not at the
+  perturbation site the payload went in at (the finding's span, in the formatted input's
+  coordinates, is mapped back across the splice to the seed). Its example reads
+  `e.g. inject <payload> at <path>:<injection> → drops the comment at :<attribution>`: the
+  injection offset reproduces the drop, and `<attribution>` (with the snippet) is where the
+  victim comment lived, which is what the shape keys on.
 - **`⚠ UNCONFIRMED (0/5 confirmed)` / `⚠ PARTIAL (2/5 confirmed)`** — see below.
 
 ### The by-node rollup (`--by-node`)
@@ -131,7 +137,9 @@ clusters — each roughly one printer function — ranked worst-first, the burn-
 shape whose example no longer reads/parses, or whose offset keys to no node, lands in an
 `UNRESOLVED` tail. The comment-attachment fields the wire mirrors from acorn (`leadingComments` /
 `trailingComments`) are **not** treated as structural children, so a gap keys to its emitter
-edge regardless of whether a comment happens to sit beside it.
+edge regardless of whether a comment happens to sit beside it. A **bystander** finding keys on
+its victim's site (the attribution offset), so it rolls up onto the emitter that dropped the
+comment — not the one whose gap the payload perturbed.
 
 It is **report-only** — it never changes the ratchet grade or the exit code. The per-cluster
 totals are a worst-first **approximation**: each shape's whole count is attributed to its one
@@ -141,22 +149,30 @@ lands wholly in one, rather than being split per site.
 ### `UNCONFIRMED` / `PARTIAL`
 
 Each shape's kept examples are **self-verified in-run**, because an instrument that only ever
-agrees with itself is not evidence. The ledger is made to predict something falsifiable: if it
-says this format drops `d` comments and double-prints `p`, the output must reparse to exactly
-`parsed - d + p` comments. Counting via reparse rather than matching the comment's *text* is
-what makes it sound — a printer may legitimately re-indent a multi-line comment, so text
-matching false-alarms.
+agrees with itself is not evidence. The ledger's finding is checked against something
+falsifiable: the multiset of comment **contents** in the injected input vs the format's
+output. Each content is whitespace-normalized first (split on newlines, trim each line, rejoin)
+so a legitimate re-indent of a multi-line comment (`/* a⏎   b */` → `/* a⏎b */`) normalizes
+equal and is *not* a false alarm — while a **mangle** that collapses the newline
+(`/* a⏎b */` → `/* ab */`) yields fewer lines, normalizes different, and *is* caught. This
+supersedes the earlier `parsed - dropped + double` count comparison, closing both of the
+count's blind spots: a balancing drop+duplicate (equal count, unequal contents) and a mangle
+(equal count, unequal content).
 
-A shape keeps up to five examples (the smallest by `(path, offset)`, so the set is
+A shape keeps up to five examples (the smallest by `(path, attribution_offset)` — the
+victim's own site for a bystander, the injection site otherwise — so the set is
 `--jobs`-independent), and each is re-checked. The ratio is what separates two very different
 findings: **`UNCONFIRMED (0/N)`** — *no* example reproduced, so the shape is uniformly an
 instrument artifact — versus **`PARTIAL (k/N)`** — some reproduced and some didn't, a *mixed*
 real drop. An unlabelled shape confirmed on every example.
 
-Where a prediction fails, the output holds as many comments as its input, so something printed
-the comment without recording the emit — or printed a **mangled** rebuild (`/* a⏎b */` →
-`/* ab */`, one comment either way). **Real either way, but not the plain drop it is filed
-as**, so it wants different triage.
+Where a finding does *not* reproduce, the output holds the same comment **contents** as its
+input, so something printed the comment without recording the emit — a genuine instrument gap,
+not the content loss it is filed as. (A mangled rebuild — which the old count read as
+UNCONFIRMED, since a mangle keeps the comment *count* — now normalizes different and reproduces
+as **CONFIRMED**, the real corruption it is.) The residual, far narrower than the count's: a
+multiset can still balance if the *same* content is dropped in one place and duplicated in
+another; no corpus example does this.
 
 The ratio is triage information, not a gate signal: it is a property of the shape's sampled
 examples, not of the shape, so it is deliberately not part of the ratchet key (and `--update`

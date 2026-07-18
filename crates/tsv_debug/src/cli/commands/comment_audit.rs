@@ -40,7 +40,7 @@ struct Violation {
 /// check` must not fail per added fixture); shrinkage/collapse fails. Re-pin to current
 /// when it trips. Same ritual as `swallow_audit`'s `FORMATTED_MIN` and
 /// `benches/js/lib/gate_counts.ts`.
-const REGISTERED_MIN: usize = 19_971;
+const REGISTERED_MIN: usize = 24_042;
 
 impl CommentAuditCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
@@ -168,7 +168,7 @@ fn print_report(violations: &[Violation], stats: &Stats) {
     if violations.is_empty() {
         println!(
             "✓ every comment printed exactly once — {registered} comments across {formatted} \
-             files ({parse_errors} parse-skipped, {unregistered_emits} out-of-scope emits)"
+             files ({parse_errors} parse-skipped, {unregistered_emits} unregistered emits)"
         );
         return;
     }
@@ -180,7 +180,7 @@ fn print_report(violations: &[Violation], stats: &Stats) {
     println!(
         "✗ {} finding(s) across {} file(s) — {dropped} dropped, {} double-printed \
          ({registered} comments, {formatted} formatted, {parse_errors} parse-skipped, \
-         {unregistered_emits} out-of-scope emits)\n",
+         {unregistered_emits} unregistered emits)\n",
         violations.len(),
         violations
             .iter()

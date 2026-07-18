@@ -15,10 +15,14 @@
 //! 2. **Idempotency.** For any input tsv accepts, `format` is a fixed point:
 //!    `format(format(x)) == format(x)` (the fixture F1 invariant, here on inputs
 //!    no fixture covers).
-//! 3. **Structural reparse.** `format(x)` must reparse to the *same document*
-//!    (the [`roundtrip_audit`](super::roundtrip_audit) contract — output that
-//!    mis-delimits but loses no characters is invisible to the char-frequency
-//!    SAFETY check), reusing that command's structural-skeleton comparison.
+//! 3. **Structural reparse + leaf conservation.** `format(x)` must reparse to the
+//!    *same document* (the [`roundtrip_audit`](super::roundtrip_audit) contract —
+//!    output that mis-delimits but loses no characters is invisible to the
+//!    char-frequency SAFETY check), reusing that command's structural-skeleton
+//!    comparison, **plus** the complementary
+//!    [`leaf_conservation_diff`](crate::audit::properties::leaf_conservation_diff)
+//!    check — a still-parses value change (a mis-decoded string, a miscanonicalized
+//!    number) the skeleton erases and so cannot see.
 //!
 //! ## Design
 //!
@@ -40,7 +44,9 @@ use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 
 use super::profile::resolve_files;
-use crate::audit::properties::{structurally_equivalent, tsv_parse_to_value};
+use crate::audit::properties::{
+    leaf_conservation_diff, structurally_equivalent, tsv_parse_to_value,
+};
 use crate::cli::CliError;
 
 /// Seeded mutational fuzzer: mutate corpus bytes and assert the parser never
@@ -217,6 +223,11 @@ enum Outcome {
     FormatError,
     /// `format`'s output does not reparse (tsv rejects its own output).
     Unreparseable,
+    /// Output reparses with an **equal skeleton** but a decode-invariant leaf value
+    /// changed (a mis-decoded string, a miscanonicalized number, a mangled
+    /// comment) — the skeleton-blind class (a shape change is instead the soft
+    /// `structural_divergence`). A hard finding.
+    LeafValueCorruption,
     /// Output reparses but the document structure changed (delimiter/structure
     /// corruption).
     StructuralDivergence,
@@ -228,12 +239,18 @@ impl Outcome {
     /// A **reliable, dep-free** finding — always a real bug, so it fails the run
     /// (exit 1). A panic breaks DoS-safety; `format_error`/`unreparseable` mean
     /// tsv can't round-trip its own output; `non_idempotent` breaks the F1 fixed
-    /// point. `structural_divergence` is deliberately excluded — it's the soft,
-    /// canonical-confirmation-needing bucket (see [`FuzzCommand::strict`]).
+    /// point; `leaf_value_corruption` is a still-parses value change (invisible to
+    /// the structural skeleton). `structural_divergence` is deliberately excluded —
+    /// it's the soft, canonical-confirmation-needing bucket (see
+    /// [`FuzzCommand::strict`]).
     fn is_hard(self) -> bool {
         matches!(
             self,
-            Self::Panic | Self::FormatError | Self::Unreparseable | Self::NonIdempotent
+            Self::Panic
+                | Self::FormatError
+                | Self::Unreparseable
+                | Self::LeafValueCorruption
+                | Self::NonIdempotent
         )
     }
 
@@ -244,6 +261,7 @@ impl Outcome {
             Self::Panic => "panic",
             Self::FormatError => "format_error",
             Self::Unreparseable => "unreparseable",
+            Self::LeafValueCorruption => "leaf_value_corruption",
             Self::StructuralDivergence => "structural_divergence",
             Self::NonIdempotent => "non_idempotent",
         }
@@ -266,12 +284,19 @@ fn check(src: &str, parser: ParserType, render: bool) -> Outcome {
     let Some(wire_out) = tsv_parse_to_value(&f1, parser) else {
         return Outcome::Unreparseable;
     };
-    // 4. Same document?
+    // 4. Same document (structure)? A shape change is the soft structural-divergence bucket.
+    //    Compute the leaf diff first, before the move-consuming structural compare.
+    let leaf_changed = leaf_conservation_diff(&wire_in, &wire_out).is_some();
     let (equal, _) = structurally_equivalent(wire_in, wire_out, render, false);
     if !equal {
         return Outcome::StructuralDivergence;
     }
-    // 5. Idempotent fixed point.
+    // 5. Same shape, but a decode-invariant leaf value changed (a mis-decoded string, a
+    //    miscanonicalized number) — the skeleton-blind class it erases. A hard finding.
+    if leaf_changed {
+        return Outcome::LeafValueCorruption;
+    }
+    // 6. Idempotent fixed point.
     match format_source(&f1, parser) {
         Ok(f2) if f2 == f1 => Outcome::Ok,
         Ok(_) => Outcome::NonIdempotent,

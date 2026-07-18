@@ -879,12 +879,15 @@ cargo run -p tsv_debug --features comment_check comment_audit ~/dev/zzz/src   # 
 # records a VERBATIM RANGE that counts as one emit per comment it covers; keep those
 # ranges tight, a too-wide carve-out silently re-opens the hole.
 #
-# Scope. Only the DETACHED comments (the flat `Vec<Comment>` on the language root). A
-# comment modeled as an AST node — a Svelte `<!-- … -->`, a CSS in-block
-# `CssBlockChild::Comment` — is carried by the tree and can't be lost the same way; its
-# emits land in the report's `out-of-scope emits` count, not in a finding. CSS
-# declaration-VALUE comments are never lexed as `Comment`s at all (re-derived from
-# source), so they are outside the model by construction.
+# Scope. Both comment carriers are registered and guarded: the DETACHED comments (the flat
+# `Vec<Comment>` on the language root) and the AST-NODE comments — a Svelte `<!-- … -->`
+# (`FragmentNode::Comment`) and a CSS in-block `CssBlockChild::Comment`. The latter are
+# carried by the tree rather than by the positional model, but a printer can still drop or
+# double-print one, so each format entry walks its tree and registers their spans; with that,
+# `unregistered emits` is a pure registration-gap signal (0 over clean fixtures) — a nonzero
+# count means the walk missed a container. CSS declaration-VALUE comments remain outside the
+# model by construction — never lexed as `Comment`s at all (re-derived from source), so there
+# is nothing to register.
 ```
 
 **Gap-Injection Audit (dropped-comment discovery):**

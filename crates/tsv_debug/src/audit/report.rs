@@ -108,7 +108,12 @@ pub(crate) enum Confidence {
 pub(crate) struct ReportExample {
     pub(crate) payload: &'static str,
     pub(crate) path: String,
-    pub(crate) offset: usize,
+    /// The byte offset the payload was **injected** at — the splice that reproduces the
+    /// finding. Equals `attribution_offset` for an injected hit.
+    pub(crate) injection_offset: usize,
+    /// The byte offset the finding is **attributed** to: the victim comment's own site for a
+    /// bystander, the injection site for the injected comment. Keys the shape + snippet.
+    pub(crate) attribution_offset: usize,
     pub(crate) snippet: String,
     pub(crate) text: String,
     pub(crate) injected: bool,
@@ -266,10 +271,21 @@ pub(crate) fn print_report(s: &RunSummary, findings: &[Finding]) {
             }
         );
         let ex = &f.example;
-        println!(
-            "            e.g. inject {} at {}:{}  {}",
-            ex.payload, ex.path, ex.offset, ex.snippet
-        );
+        if ex.injected {
+            // Injection site and victim site coincide — one offset reproduces and locates it.
+            println!(
+                "            e.g. inject {} at {}:{}  {}",
+                ex.payload, ex.path, ex.injection_offset, ex.snippet
+            );
+        } else {
+            // A bystander: injecting at one site drops a DIFFERENT comment. Show both — the
+            // injection offset reproduces the drop, the attribution offset (and the snippet)
+            // is where the victim comment lived, which is what the shape keys on.
+            println!(
+                "            e.g. inject {} at {}:{} → drops the comment at :{}  {}",
+                ex.payload, ex.path, ex.injection_offset, ex.attribution_offset, ex.snippet
+            );
+        }
         println!("            comment: {:?}", ex.text);
         println!();
     }
@@ -312,7 +328,11 @@ pub(crate) fn print_json(s: &RunSummary, findings: &[Finding]) {
                 "verify_total": d.verify_total,
                 "example_payload": ex.payload,
                 "example_path": ex.path,
-                "example_offset": ex.offset,
+                // Two offsets: the injection site (reproduces the drop) and the attribution
+                // site (the victim's own location for a bystander; == injection when injected).
+                // The shape/snippet key on the attribution offset.
+                "example_injection_offset": ex.injection_offset,
+                "example_attribution_offset": ex.attribution_offset,
                 "example_snippet": ex.snippet,
                 "example_text": ex.text,
                 "example_injected": ex.injected,

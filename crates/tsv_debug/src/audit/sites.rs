@@ -100,14 +100,14 @@ impl Utf16ToByte {
 ///   expression alone, so the head is not derivable from either without a scan.
 ///
 /// TODO: `<style>` content is still unnamed, so no comment is probed there. `Style` carries
-/// a `content_span` that names it in one line — the reason to hold off is **yield**, not
-/// difficulty: measured over `tests/fixtures` it is +154k sites (+20% gate runtime) for 3
-/// finding shapes, all `@import`-prelude double-prints. That thinness is structural, not
-/// incidental: the ledger only registers **detached** comments, while a CSS in-block comment
-/// is a `CssBlockChild::Comment` AST node and a declaration-VALUE comment is never lexed as
-/// a `Comment` at all. Probing `<style>` mostly tests the registration gap, so the honest
-/// prerequisite is extending the ledger to AST-node comments (see `comment_ledger`'s own
-/// TODO) — after which this region earns its cost.
+/// a `content_span` that names it in one line, and the prerequisite is now met — the ledger
+/// registers CSS in-block `CssBlockChild::Comment` AST nodes (a declaration-VALUE comment is
+/// still never lexed as a `Comment`, so it stays outside the model by construction), so
+/// probing `<style>` now exercises a genuinely guarded surface rather than mostly a
+/// registration gap. What remains is a **yield / cost** call: naming this region measured
+/// +154k sites (+20% gate runtime) over `tests/fixtures` under the old scope, and its finding
+/// surface wants re-measuring against the extended ledger before it earns that cost. `<style>`
+/// probing stays a follow-up.
 pub(crate) fn code_regions(source: &str, parser: ParserType) -> Vec<(usize, usize)> {
     match parser {
         ParserType::TypeScript | ParserType::Css => vec![(0, source.len())],

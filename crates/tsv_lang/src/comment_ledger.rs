@@ -44,18 +44,22 @@
 //!
 //! ## Scope
 //!
-//! Only the **detached** comments a format entry registers are in scope. A comment
-//! modeled as an *AST node* — a Svelte `<!-- … -->` (`FragmentNode::Comment`), a CSS
-//! in-block `CssBlockChild::Comment` — is carried by the tree, not by the positional
-//! model, and cannot be lost the same way; emits of those land in
-//! [`CommentLedger::unregistered_emits`] rather than in a finding.
+//! Two comment carriers are in scope, both registered by the format entry points:
 //!
-//! TODO: extend the registered set to the AST-node comments (Svelte's
-//! `FragmentNode::Comment`, CSS's `CssBlockChild::Comment`) so `unregistered_emits`
-//! collapses to a genuine registration-gap signal instead of a mixed count. A CSS
-//! declaration's *value* comments are a separate case — the parser never lexes them as
-//! `Comment`s at all (they are re-derived from source), so they are outside the model by
-//! construction, not merely unregistered.
+//! - the **detached** comments — the flat `Vec<Comment>` on each language root, registered
+//!   via [`register_parsed`].
+//! - the **AST-node** comments — a Svelte `<!-- … -->` (`FragmentNode::Comment`) and a CSS
+//!   in-block `CssBlockChild::Comment`. These are carried by the tree rather than by the
+//!   positional model, but a printer can still drop one (a walk that misses a fragment, a
+//!   builder that reassembles) or double-print it, so each format entry walks its tree and
+//!   registers their spans via [`register_parsed_spans`].
+//!
+//! With both registered, [`CommentLedger::unregistered_emits`] is a pure registration-gap
+//! signal — an emit for a span no entry declared — which over a clean corpus is zero.
+//!
+//! A CSS declaration's *value* comments remain out of scope **by construction**: the parser
+//! never lexes them as `Comment`s at all (they are re-derived from source), so there is
+//! nothing to register and nothing to record.
 //!
 //! State is keyed on the **source text's identity** (address + length), not a push/pop
 //! scope. A Svelte host and its embedded `<script>`/`<style>` islands all carry
@@ -75,8 +79,9 @@ static ENABLED: AtomicBool = AtomicBool::new(false);
 
 thread_local! {
     static DOCS: RefCell<Vec<DocLedger>> = const { RefCell::new(Vec::new()) };
-    /// Emits for a span no [`register_parsed`] declared — an AST-node comment (out of
-    /// scope, see the module docs) or a registration gap. Counted, never a finding.
+    /// Emits for a span no [`register_parsed`] / [`register_parsed_spans`] declared — a
+    /// genuine registration gap (an emitter running over a comment the walk missed). Counted,
+    /// never a finding; over a clean corpus it is zero.
     static UNREGISTERED: RefCell<usize> = const { RefCell::new(0) };
 }
 
@@ -162,22 +167,36 @@ pub fn comment_check_enabled() -> bool {
 /// `<script>` case work, where the island's `Program.comments` and the `Root.comments`
 /// clones of them are two `Comment` values over one span.
 pub fn register_parsed(source: &str, comments: &[Comment]) {
+    register_parsed_spans(source, comments.iter().map(|c| c.span));
+}
+
+/// Declare a set of comment **spans** a format entry point is about to print — the
+/// span-based twin of [`register_parsed`], for the AST-node comment kinds whose carrier is
+/// not a [`Comment`]. A Svelte `<!-- … -->` (`HtmlComment`) holds only spans; a CSS in-block
+/// `CssBlockChild::Comment` holds a real [`Comment`] and may use either. The ledger reads
+/// only the span — it keys on it and stores `span.extract(source)` as the text — so a caller
+/// with just the spans loses nothing by not manufacturing a `Comment` with fields the ledger
+/// never reads.
+///
+/// Idempotent per span, exactly like [`register_parsed`]: a span already registered (by
+/// another list or a second call) does not double the expectation.
+pub fn register_parsed_spans(source: &str, spans: impl IntoIterator<Item = Span>) {
     if !comment_check_enabled() {
         return;
     }
     DOCS.with(|docs| {
         let mut docs = docs.borrow_mut();
         let doc = doc_for(&mut docs, source);
-        for c in comments {
+        for span in spans {
             if let Err(idx) = doc
                 .entries
-                .binary_search_by_key(&(c.span.start, c.span.end), |e| (e.span.start, e.span.end))
+                .binary_search_by_key(&(span.start, span.end), |e| (e.span.start, e.span.end))
             {
                 doc.entries.insert(
                     idx,
                     Entry {
-                        span: c.span,
-                        text: c.span.extract(source).to_string(),
+                        span,
+                        text: span.extract(source).to_string(),
                         emitted: 0,
                     },
                 );
@@ -250,6 +269,35 @@ pub fn parsed_comment_spans(source: &str) -> Vec<Span> {
             .iter()
             .filter(|d| d.key == key)
             .flat_map(|d| d.entries.iter().map(|e| e.span))
+            .collect()
+    })
+}
+
+/// The full source text of every comment registered on this thread's ledger, read **without
+/// draining** it — the content twin of [`parsed_comment_spans`].
+///
+/// Unlike the span accessor this is deliberately **not** scoped to a document key: a text
+/// carries no offset, so the collision the span scoping guards against (an island-relative
+/// offset mistaken for a host one) cannot arise, and returning every document's comments is
+/// what lets a caller compare the whole comment *content* of one format against another — a
+/// drop or a mangle in *any* island (the host `<script>`, a nested `<style>` element) then
+/// shows up in the difference. The gap-injection audit's self-verify uses exactly that: the
+/// multiset of contents in a format's input vs its output decides whether a ledger finding is
+/// a real loss or an instrument gap. Read before [`take_comment_ledger`], which discards the
+/// entries.
+///
+/// A comment registered under two lists over one span (the Svelte `<script>` island's
+/// `Program.comments` and the `Root.comments` clone of it) is deduped within its document by
+/// [`register_parsed_spans`], so it is returned once, not twice.
+#[must_use]
+pub fn parsed_comment_texts() -> Vec<String> {
+    if !comment_check_enabled() {
+        return Vec::new();
+    }
+    DOCS.with(|docs| {
+        docs.borrow()
+            .iter()
+            .flat_map(|d| d.entries.iter().map(|e| e.text.clone()))
             .collect()
     })
 }
@@ -417,12 +465,43 @@ mod tests {
     }
 
     #[test]
-    fn an_unregistered_emit_is_counted_not_a_finding() {
-        // An AST-node comment (Svelte `<!-- -->`, a CSS block child) is out of scope.
+    fn an_emit_for_an_unregistered_span_is_a_registration_gap() {
+        // No `register_parsed` / `register_parsed_spans` ever declared this span, yet an
+        // emitter ran over it — a genuine registration gap (the walk missed a comment). It is
+        // counted, never a finding: the ledger can only assert print-once for spans it was
+        // told to expect.
         let source = "// a\nx;\n";
         let ((), ledger) = with_check(|| record_emitted(source, Span::new(0, 4)));
         assert!(ledger.findings.is_empty());
         assert_eq!(ledger.unregistered_emits, 1);
+    }
+
+    #[test]
+    fn a_registered_span_emitted_once_is_clean() {
+        // The AST-node registration path (`register_parsed_spans`): a Svelte `<!-- -->` or a
+        // CSS in-block comment registers by span, then its printer records the single emit.
+        let source = "<!-- a -->\n";
+        let ((), ledger) = with_check(|| {
+            register_parsed_spans(source, [Span::new(0, 10)]);
+            record_emitted(source, Span::new(0, 10));
+        });
+        assert!(ledger.findings.is_empty(), "{:?}", ledger.findings);
+        assert_eq!(ledger.parsed, 1);
+        assert_eq!(
+            ledger.unregistered_emits, 0,
+            "the emit matched a registered span"
+        );
+    }
+
+    #[test]
+    fn a_registered_span_never_emitted_is_dropped() {
+        // Registered by span but the printer dropped it — the AST-node analog of a dropped
+        // detached comment, now a real Dropped finding rather than a silent, out-of-scope loss.
+        let source = "<!-- a -->\n";
+        let ((), ledger) = with_check(|| register_parsed_spans(source, [Span::new(0, 10)]));
+        assert_eq!(ledger.findings.len(), 1);
+        assert_eq!(ledger.findings[0].kind, CommentFindingKind::Dropped);
+        assert_eq!(ledger.findings[0].text, "<!-- a -->");
     }
 
     #[test]
@@ -460,6 +539,40 @@ mod tests {
         // The read did not drain — `take_comment_ledger` (inside `with_check`) still counted
         // the two entries, reporting them as dropped (nothing was emitted).
         assert_eq!(ledger.parsed, 2, "the peek left the ledger intact");
+    }
+
+    #[test]
+    fn parsed_comment_texts_reads_all_documents_without_draining() {
+        // The text accessor is NOT key-scoped (unlike the span one): a comment in the host
+        // AND a comment registered under a separate island key both come back, so a content
+        // compare can see a drop in any island. Read before drain leaves the ledger intact.
+        let host = String::from("// a\nx;\n");
+        let island = String::from("// b\ny;\n");
+        let host_comments = [line_comment(0, 4)];
+        let island_comments = [line_comment(0, 4)];
+        let (texts, ledger) = with_check(|| {
+            register_parsed(&host, &host_comments);
+            register_parsed(&island, &island_comments);
+            let mut t = parsed_comment_texts();
+            t.sort();
+            t
+        });
+        assert_eq!(
+            texts,
+            vec!["// a".to_string(), "// b".to_string()],
+            "both documents' comment texts, across keys"
+        );
+        assert_eq!(ledger.parsed, 2, "the peek left the ledger intact");
+    }
+
+    #[test]
+    fn parsed_comment_texts_is_empty_when_disabled() {
+        let _guard = LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        set_comment_check(false);
+        let _ = take_comment_ledger();
+        assert!(parsed_comment_texts().is_empty());
     }
 
     #[test]
