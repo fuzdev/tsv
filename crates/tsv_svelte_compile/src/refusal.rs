@@ -35,9 +35,30 @@ pub enum Refusal {
     DevMode,
 
     // ── Script shell / module scaffold ─────────────────────────────────────
-    /// A `<script context="module">` block.
+    /// Reserved for a genuinely-unhandled `<script context="module">` construct.
+    /// Plain module scripts now compile (imports + declarations + non-default
+    /// exports, emitted between the hoisted snippets and the component function);
+    /// `export default` refuses via [`Self::ModuleDefaultExport`], and
+    /// module-scope runes / store reads / top-level `await` via the rune guard —
+    /// so this is currently unconstructed, held only as a fall-through slot.
     #[error("module <script context=\"module\">")]
     ModuleScript,
+    /// An `export default` in a `<script module>`. The oracle errors
+    /// `module_illegal_default_export` (a component cannot have a default
+    /// export), so refusing is never an over-acceptance.
+    #[error("default export in <script module> (the oracle rejects it)")]
+    ModuleDefaultExport,
+    /// A top-level binding name declared in BOTH the module and instance scripts.
+    /// The oracle resolves a template `{name}` read to the instance (inner-scope)
+    /// binding, but the name-based binding table would overwrite it with the
+    /// module binding and fold the module value — a real MISMATCH. The port can't
+    /// disambiguate which scope a reference resolves to (a hoisted module-scope
+    /// snippet may legitimately reference the module binding), so refuse.
+    #[error("binding {name} declared in both the module and instance scripts")]
+    ModuleInstanceNameCollision {
+        /// The colliding binding name.
+        name: String,
+    },
     /// A `<svelte:options>` element.
     #[error("<svelte:options>")]
     SvelteOptions,
@@ -62,15 +83,15 @@ pub enum Refusal {
         /// The offending imported name.
         name: String,
     },
-    /// A `generics` attribute on the instance script (an open type-parameter
-    /// binding, not annotation erasure — a separate slice).
-    #[error("generics attribute on instance script (implies TypeScript)")]
+    /// A `generics` attribute on a `<script>` (an open type-parameter binding,
+    /// not annotation erasure — a separate slice). Refused on either script.
+    #[error("generics attribute on <script> (implies TypeScript)")]
     GenericsAttribute,
-    /// An instance script with a `lang` other than `ts`/`js`/empty. The oracle's
-    /// TypeScript flag tests `lang === 'ts'` **exactly**, so `lang="typescript"`
-    /// and `lang="TS"` are not TypeScript to it; rather than compile them as
-    /// plain JS on a guess, tsv refuses.
-    #[error("lang=\"{lang}\" instance script (only ts/js supported)")]
+    /// A `<script>` with a `lang` other than `ts`/`js`/empty (instance or module).
+    /// The oracle's TypeScript flag tests `lang === 'ts'` **exactly**, so
+    /// `lang="typescript"` and `lang="TS"` are not TypeScript to it; rather than
+    /// compile them as plain JS on a guess, tsv refuses.
+    #[error("lang=\"{lang}\" script (only ts/js supported)")]
     LangInstanceScript {
         /// The declared `lang` attribute value.
         lang: String,
@@ -734,7 +755,7 @@ impl Refusal {
                 Cow::Owned(self.to_string())
             }
             // Parameterized reasons — the user-chosen value collapses away.
-            Self::LangInstanceScript { .. } => Cow::Borrowed("lang=\"{lang}\" instance script"),
+            Self::LangInstanceScript { .. } => Cow::Borrowed("lang=\"{lang}\" script"),
             Self::GeneratedNameCollision { .. } => {
                 Cow::Borrowed("generated name {name} collides with a user binding")
             }
@@ -781,6 +802,12 @@ impl Refusal {
             Self::ClientGeneration => Cow::Borrowed("client generation"),
             Self::DevMode => Cow::Borrowed("dev mode output"),
             Self::ModuleScript => Cow::Borrowed("module <script context=\"module\">"),
+            Self::ModuleDefaultExport => {
+                Cow::Borrowed("default export in <script module> (the oracle rejects it)")
+            }
+            Self::ModuleInstanceNameCollision { .. } => {
+                Cow::Borrowed("binding {name} declared in both the module and instance scripts")
+            }
             Self::SvelteOptions => Cow::Borrowed("<svelte:options>"),
             Self::InstanceScriptExport => Cow::Borrowed(
                 "instance-script export (component exports / $.bind_props not implemented)",
@@ -793,7 +820,7 @@ impl Refusal {
                 Cow::Borrowed("runes-invalid import of {name} from svelte")
             }
             Self::GenericsAttribute => {
-                Cow::Borrowed("generics attribute on instance script (implies TypeScript)")
+                Cow::Borrowed("generics attribute on <script> (implies TypeScript)")
             }
             // TypeScript — closed-set discriminants, the message is the bucket.
             Self::TypeScriptWithoutLangTs
@@ -1007,7 +1034,7 @@ mod tests {
                 lang: "typescript".to_string()
             }
             .to_string(),
-            "lang=\"typescript\" instance script (only ts/js supported)"
+            "lang=\"typescript\" script (only ts/js supported)"
         );
         assert_eq!(
             Refusal::DynamicComponent {

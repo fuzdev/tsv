@@ -130,17 +130,22 @@ pub(crate) struct ComponentContext {
 /// anywhere in the component — including inside dropped event handlers, which
 /// the server transform needs so a mutated binding is not statically folded.
 ///
-/// `instance_body` is the **type-erased** instance-script statement list (see
-/// `erase`), not `root.instance.content.body` — the un-erased tree still carries
-/// TypeScript nodes the walk must never see.
+/// `instance_body` and `module_body` are the **type-erased** instance- and
+/// module-script statement lists (see `erase`), not the un-erased
+/// `root.{instance,module}.content.body` — those still carry TypeScript nodes the
+/// walk must never see. The oracle's phase-2 analysis spans the module body too: a
+/// module import member/call, or a module-body `new`, fires the wrapper, and a
+/// module `let` reassigned anywhere stays dynamic.
 pub(crate) fn analyze_component(
     root: &Root<'_>,
     source: &str,
     instance_body: &[Statement<'_>],
+    module_body: &[Statement<'_>],
     store_names: &NameSet,
 ) -> Result<ComponentContext, CompileError> {
     let mut context_roots = NameSet::default();
     collect_context_roots(instance_body, source, &mut context_roots);
+    collect_context_roots(module_body, source, &mut context_roots);
 
     let mut nc = Nc {
         source,
@@ -159,6 +164,9 @@ pub(crate) fn analyze_component(
     };
 
     for stmt in instance_body {
+        walk_stmt(stmt, &mut nc, false);
+    }
+    for stmt in module_body {
         walk_stmt(stmt, &mut nc, false);
     }
     walk_fragment(&root.fragment, &mut nc);

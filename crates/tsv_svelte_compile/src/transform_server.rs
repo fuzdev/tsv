@@ -67,8 +67,8 @@ use crate::fragment::{BodyBuilder, FragmentCtx, emit_fragment};
 use crate::namespace::{FragmentParent, Namespace, infer_namespace};
 use crate::needs_context::{ComponentContext, analyze_component};
 use crate::script_rewrite::{
-    BindableEntry, analyze_script, collect_script_comments, document_ts_flag,
-    identifier_binding_name, plain_identifier_name, refuse_runes_invalid_import,
+    BindableEntry, analyze_module_script, analyze_script, collect_script_comments,
+    document_ts_flag, identifier_binding_name, plain_identifier_name, refuse_runes_invalid_import,
     refuse_template_typescript, rewrite_script_statement, self_check_no_typescript,
 };
 use crate::snippet::{SnippetAnalysis, analyze_snippets};
@@ -293,6 +293,12 @@ pub(crate) struct Analysis<'arena> {
     /// iterates it. (NOTHING may read `root.instance.content.body`: the un-erased
     /// tree still carries TypeScript.)
     pub(crate) instance_body: &'arena [Statement<'arena>],
+    /// The type-erased module-script statement list (imports + declarations +
+    /// non-default exports, source order), emitted **verbatim** as a comment-free
+    /// module-scope program between the hoisted snippets and the component
+    /// function. Empty when there is no module script. (NOTHING may read
+    /// `root.module.content.body`: the un-erased tree still carries TypeScript.)
+    pub(crate) module_body: &'arena [Statement<'arena>],
     /// Carried instance-script comments (threaded into the export program).
     pub(crate) script_comments: Vec<Comment>,
     /// Comment-refusal windows of the regions erased from the **script**. (The
@@ -328,9 +334,6 @@ fn analyze<'arena>(
     source: &str,
     arena: &'arena bumpalo::Bump,
 ) -> Result<Analysis<'arena>, CompileError> {
-    if root.module.is_some() {
-        return Err(unsupported(Refusal::ModuleScript));
-    }
     if root.options.is_some() {
         return Err(unsupported(Refusal::SvelteOptions));
     }
@@ -338,7 +341,9 @@ fn analyze<'arena>(
     // BEFORE every analysis pass (`analyze_script`, `analyze_snippets`,
     // `needs_context`) and before the codegen loop. `instance_body` is the
     // type-free statement list from here on; NOTHING below may read
-    // `root.instance.content.body` (the un-erased tree still carries TS).
+    // `root.instance.content.body` (the un-erased tree still carries TS). The
+    // document `ts` flag is decided from the first lang-bearing script in source
+    // order — the module can set it (`document_ts_flag`).
     let ts_document = document_ts_flag(root, source)?;
     let (instance_body, erased_windows) = match root.instance {
         Some(script) => {
@@ -356,6 +361,11 @@ fn analyze<'arena>(
         }
         None => (&[][..], Vec::new()),
     };
+    // The module `<script>` half: erase + validate (plain modules only — runes,
+    // store reads, top-level await, and `export default` refuse). Its type-free
+    // body emits verbatim at module scope. Runs before every analysis so the
+    // module bindings feed the same passes the instance bindings do.
+    let module_body = analyze_module_script(root, source, arena, ts_document)?;
     // The template half of the same document-wide gate. The borrow points
     // (`EmitEnv::erase`) already erase every template expression that reaches
     // output, so this sweep exists for the ones that DON'T — see
@@ -387,16 +397,56 @@ fn analyze<'arena>(
     let has_comments = !script_comments.is_empty();
 
     // Script analysis pass: the top-level binding table (evaluator input) and
-    // the derived-name set (read rewriting / refusal).
+    // the derived-name set (read rewriting / refusal). The instance script fills
+    // the table first.
     let mut bindings = Bindings::empty();
     let mut derived_names = NameSet::default();
     analyze_script(instance_body, source, &mut bindings, &mut derived_names)?;
 
+    // The snippet-hoist BLOCKER set is INSTANCE bindings only. A module binding
+    // is module-scope (accessible from a hoisted, module-scope snippet, like an
+    // import), so it must NOT block hoisting — freeze the set here, before the
+    // module bindings join the table.
+    let instance_binding_names: NameSet = bindings.names().map(str::to_string).collect();
+
+    // A module↔instance top-level binding-name COLLISION is a real MISMATCH: the
+    // shared table below overwrites (module analyzed second), so a template
+    // `{name}` read would fold the module value where the oracle resolves the
+    // instance (inner-scope) binding. The name-based port can't tell which scope a
+    // reference resolves to (a hoisted module-scope snippet may legitimately
+    // reference the module binding), so a plain analyze-order swap can't fix it —
+    // refuse the collision (zero corpus yield; the corpus has none). Detected on a
+    // throwaway table so the check runs before the shared table is mutated.
+    if !module_body.is_empty() {
+        let mut module_bindings = Bindings::empty();
+        let mut module_derived = NameSet::default();
+        analyze_script(
+            module_body,
+            source,
+            &mut module_bindings,
+            &mut module_derived,
+        )?;
+        for name in module_bindings.names() {
+            if instance_binding_names.contains(name) {
+                return Err(unsupported(Refusal::ModuleInstanceNameCollision {
+                    name: name.to_string(),
+                }));
+            }
+        }
+    }
+
+    // Module bindings join the shared table: they feed the evaluator (a module
+    // `const K = 5` folds `{K}`), the store-base set (a template `$c` on a module
+    // store), and `needs_context` (a module import member/call).
+    analyze_script(module_body, source, &mut bindings, &mut derived_names)?;
+
     // Snippet hoist analysis: which top-level `{#snippet}`s go to module scope.
-    // Imports don't disqualify hoisting, so the instance-binding set the analysis
-    // subtracts is the binding table minus the import locals.
+    // Import locals don't disqualify hoisting — instance AND module imports — so
+    // the blocker set the analysis subtracts is the instance-binding table minus
+    // every import local.
     let import_names: NameSet = instance_body
         .iter()
+        .chain(module_body.iter())
         .filter_map(|stmt| match stmt {
             Statement::ImportDeclaration(import) => Some(import),
             _ => None,
@@ -412,24 +462,24 @@ fn analyze<'arena>(
             plain_identifier_name(local, source)
         })
         .collect();
-    let instance_binding_names: NameSet = bindings.names().map(str::to_string).collect();
     let snippets = analyze_snippets(root, source, &instance_binding_names, &import_names)?;
 
-    // Every top-level binding name is a candidate store base — a `$name` reference
-    // is a store auto-subscription iff `name` is a binding. The binding NAME set is
-    // frozen here (the later `mark_updated`/`mark_opaque` patch changes kinds, not
-    // names), so it serves `analyze_component`'s store-injection gate (the same set
-    // is recomputed in `compile_server` for the script guard / store rewrite /
-    // template walk). Reuses the already-collected snippet-analysis input.
-    let store_names: NameSet = instance_binding_names;
+    // Every top-level binding name — instance AND module — is a candidate store
+    // base: a `$name` reference is a store auto-subscription iff `name` is a
+    // binding. The binding NAME set is frozen here (the later
+    // `mark_updated`/`mark_opaque` patch changes kinds, not names), so it serves
+    // `analyze_component`'s store-injection gate (the same set is recomputed in
+    // `compile_server` for the script guard / store rewrite / template walk).
+    let store_names: NameSet = bindings.names().map(str::to_string).collect();
 
-    // The whole-component analysis. Computed here because the script rewrite
-    // needs its `uses_slots` (the `$props()` rest injection renames its
-    // destructured `$$slots` to `$$slots_` when the injected sanitize_slots
-    // binding exists — a duplicate `$$slots` lexical declaration would be invalid
-    // JS). Its error is deliberately left UNRESOLVED (see `Analysis::component`):
-    // the script-loop refusals must keep winning for inputs that trip both.
-    let component = analyze_component(root, source, instance_body, &store_names);
+    // The whole-component analysis, over instance + module + template. Computed
+    // here because the script rewrite needs its `uses_slots` (the `$props()` rest
+    // injection renames its destructured `$$slots` to `$$slots_` when the injected
+    // sanitize_slots binding exists — a duplicate `$$slots` lexical declaration
+    // would be invalid JS). Its error is deliberately left UNRESOLVED (see
+    // `Analysis::component`): the script-loop refusals must keep winning for
+    // inputs that trip both.
+    let component = analyze_component(root, source, instance_body, module_body, &store_names);
 
     // Top-level `$state`/`$state.raw` binding names — a component named after one
     // is dynamic (see `component_dynamic`). Order-independent (reads only
@@ -461,6 +511,7 @@ fn analyze<'arena>(
         snippets,
         component,
         instance_body,
+        module_body,
         script_comments,
         erased_windows,
     })
@@ -483,6 +534,7 @@ pub(crate) fn compile_server<'arena>(
         snippets,
         component,
         instance_body,
+        module_body,
         script_comments,
         erased_windows,
     } = analyze(root, source, arena)?;
@@ -970,6 +1022,22 @@ pub(crate) fn compile_server<'arena>(
         }
     });
 
+    // The module `<script>` body prints as its own comment-free module-scope
+    // program (imports + declarations + non-default exports, source order),
+    // between the hoisted snippets and the component function — the oracle's
+    // placement (the whole module block follows the hoisted snippets, NOT merged
+    // into the instance import group). Empty when there is no module script.
+    // Comment-free: the oracle drops module-script comments, so `comments:
+    // Vec::new()` reproduces the drop (`format_canonical` prints from the program's
+    // comment list, not by positional source lookup — the import program's model).
+    let module_program = (!module_body.is_empty()).then(|| tsv_ts::ast::internal::Program {
+        body: module_body,
+        comments: Vec::new(),
+        span: Span::new(0, env.b.buffer.len() as u32),
+        interner: std::rc::Rc::clone(&root.interner),
+        goal: tsv_ts::Goal::Module,
+    });
+
     let mut export_body: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
     export_body.push(Statement::ExportDefaultDeclaration(export));
     let export_program = tsv_ts::ast::internal::Program {
@@ -995,6 +1063,7 @@ pub(crate) fn compile_server<'arena>(
         &[
             import_program.body,
             hoisted_program.as_ref().map_or(&[][..], |p| p.body),
+            module_program.as_ref().map_or(&[][..], |p| p.body),
             export_program.body,
         ],
     )?;
@@ -1010,6 +1079,13 @@ pub(crate) fn compile_server<'arena>(
     if let Some(hoisted_program) = &hoisted_program {
         js.push_str(&tsv_ts::format_canonical_in(
             hoisted_program,
+            &env.b.buffer,
+            &doc_arena,
+        ));
+    }
+    if let Some(module_program) = &module_program {
+        js.push_str(&tsv_ts::format_canonical_in(
+            module_program,
             &env.b.buffer,
             &doc_arena,
         ));

@@ -156,13 +156,23 @@ Instance-script statements are borrowed verbatim (with the rune rewrites applied
 - **Supported**: declarations, functions, classes, expression statements, control flow — any statement shape the guard walk covers, with comments carried through losslessly (host-absolute spans).
 - **Supported**: `lang="js"` and `lang=""` (compile exactly like no `lang` attribute).
 - **Refused**: `instance-script export (component exports / $.bind_props not implemented)` — every export form: the oracle compiles `export const`/`function`/`{ a }` via `$.bind_props`, rejects `export default`/`export let` (runes mode), and drops `export * from`; a verbatim passthrough would nest an `export` inside the component function. A **type-only** export (`export type { X }`, `export interface X {}`, `export declare const x`) erases away before this refusal and compiles.
-- **Refused**: `module <script context="module">`
 - **Refused**: `` legacy reactive statement `$:` (invalid in runes mode) `` — a **top-level** `$`-labeled statement (the oracle rejects it in runes mode; cloning it through would emit a dead label with no reactivity). A `$` label inside a function, and plain labels anywhere, are ordinary JS the oracle clones through — supported. An escaped top-level label name refuses conservatively (can't be classified from its raw span).
 - **Refused**: `import from svelte/internal (forbidden)` — any import whose source starts with `svelte/internal` (the oracle's runes-mode rule; private runtime code)
 - **Refused**: `runes-invalid import of {name} from svelte` — a named `beforeUpdate`/`afterUpdate` import from `svelte` (the oracle rejects them in runes mode); an escaped imported name from `svelte` refuses conservatively. A string-literal imported name is skipped exactly as the oracle skips it (its check matches identifier names only).
-- **Refused**: `lang="{lang}" instance script (only ts/js supported)` — any `lang` other than `ts`/`js`/empty. The oracle's TypeScript flag tests `lang === 'ts'` **exactly** (case-sensitive), so `lang="typescript"` / `lang="TS"` are plain JS to it; rather than compile them as JS on a guess, tsv refuses.
-- **Refused**: `generics attribute on instance script (implies TypeScript)` — an open type-parameter *binding*, not annotation erasure (a separate slice).
+- **Refused**: `lang="{lang}" script (only ts/js supported)` — any `lang` other than `ts`/`js`/empty (on the instance **or** module script). The oracle's TypeScript flag tests `lang === 'ts'` **exactly** (case-sensitive), so `lang="typescript"` / `lang="TS"` are plain JS to it; rather than compile them as JS on a guess, tsv refuses.
+- **Refused**: `generics attribute on <script> (implies TypeScript)` — an open type-parameter *binding*, not annotation erasure (a separate slice).
 - **Refused**: `generated name {name} collides with a user binding` — a user binding named `each_array`/`$$index`-family
+
+### Module Scripts (`<script module>` / `<script context="module">`) — Supported (plain)
+
+A **plain** (rune-free) module script compiles. Its type-free body — imports, `const`/`let`/`var`/`function`/`class` declarations, non-default exports (`export const`/`function`/`class`/`{ x }`/`{ x } from`/`* from`), and plain statements — emits **verbatim** (post-erase) as its own comment-free module-scope program, placed **between the hoisted snippets and the component function** (the oracle's placement: the whole module block follows the hoisted snippets, NOT merged into the instance import group; module imports stay inline within it). Module bindings join the shared table, so a module `const K = 5` folds `{K}`, a module store feeds a template `{$c}` subscription, a module import member/call fires the `$$renderer.component(…)` wrapper, and a module `let` reassigned anywhere stays dynamic.
+
+- **Supported**: TypeScript erasure under the document `lang="ts"` flag — which a `lang="ts"` **module** can set (the flag is the first lang-bearing script in source order, module or instance).
+- **Refused**: `default export in <script module> (the oracle rejects it)` — the oracle's `module_illegal_default_export`.
+- **Refused**: any module-scope **rune** (`$state`/`$derived`/…) via the rune guard — v1 defers the oracle's module rune rewrites (the corpus is module-rune-free, so this is a lossless over-refusal); v2 reclaims.
+- **Refused**: a module-scope `$name` **store read** (the oracle's `store_invalid_subscription`) and a module top-level `await`, both via the rune guard.
+- **Refused**: `binding {name} declared in both the module and instance scripts` — the oracle resolves a template `{name}` read to the instance (inner-scope) binding, but the name-based table would overwrite it with the module binding and fold the module value; the port can't disambiguate which scope a reference resolves to, so refuse rather than MISMATCH.
+- **Dropped (parity)**: module-script **comments** — the oracle drops every module comment, so the module body emits comment-free.
 
 ### TypeScript — Supported
 

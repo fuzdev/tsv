@@ -8,7 +8,7 @@
 
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{InfallibleResolve, Span};
-use tsv_svelte::ast::internal::{AttributeNode, AttributeValue, Root};
+use tsv_svelte::ast::internal::{AttributeNode, AttributeValue, FragmentNode, Root};
 use tsv_ts::ast::internal::{
     AssignmentPattern, Expression, ImportDeclaration, ImportSpecifier, LiteralValue,
     ModuleExportName, ObjectPattern, ObjectPatternProperty, Property, PropertyKind, RestElement,
@@ -35,6 +35,10 @@ use crate::{CompileError, Refusal, erase};
 ///   `$.escape`/`$.html` wrapper windows would sweep script comments;
 /// - format-ignore directives — they'd switch the printer to raw-source
 ///   emission of synthetic spans.
+///
+/// A comment inside the **module** script's content span is DROPPED (skipped, not
+/// carried and not refused): the oracle drops every module-script comment, so
+/// emitting the module body comment-free reproduces the drop as parity.
 pub(crate) fn collect_script_comments(
     root: &Root<'_>,
     source: &str,
@@ -43,8 +47,21 @@ pub(crate) fn collect_script_comments(
     if root.comments.is_empty() {
         return Ok(Vec::new());
     }
+    // The oracle drops module-script comments — a comment fully within the module
+    // content span never carries and never refuses.
+    let module_content = root.module.map(|module| module.content.span);
+    let in_module = |comment: &tsv_lang::Comment| {
+        module_content.is_some_and(|m| comment.span.start >= m.start && comment.span.end <= m.end)
+    };
     let Some(script) = root.instance else {
-        return Err(unsupported(Refusal::TemplateComments));
+        // No instance script to carry into: any comment that is not a (dropped)
+        // module comment is a template comment we don't thread — refuse.
+        for comment in &root.comments {
+            if !in_module(comment) {
+                return Err(unsupported(Refusal::TemplateComments));
+            }
+        }
+        return Ok(Vec::new());
     };
     let content = script.content.span;
     // A carried comment is placed as a leading comment of a *surviving body*
@@ -83,6 +100,11 @@ pub(crate) fn collect_script_comments(
         .map_or(content.end, |stmt| stmt.span().start);
     let mut comments = Vec::with_capacity(root.comments.len());
     for comment in &root.comments {
+        // Module-script comments drop (the oracle drops them); the module body
+        // emits comment-free, so skipping here reproduces the drop as parity.
+        if in_module(comment) {
+            continue;
+        }
         if comment.span.start < content.start || comment.span.end > content.end {
             return Err(unsupported(Refusal::TemplateComments));
         }
@@ -120,6 +142,18 @@ pub(crate) fn collect_script_comments(
         comments.push(comment);
     }
     for node in root.fragment.nodes {
+        // A whitespace-only text node — e.g. the run between a module `</script>`
+        // and the instance `<script>`, or leading/trailing template whitespace —
+        // is not real markup, so it doesn't force the refusal. Any genuine
+        // element / expression / comment / block before the instance script's end
+        // still refuses (its emitter's comment window would sweep the carried
+        // script comments). A Unicode-whitespace-only text (`is_ascii_ws_only ==
+        // false`) is content and correctly still refuses.
+        if let FragmentNode::Text(text) = node
+            && text.is_ascii_ws_only
+        {
+            continue;
+        }
         if node.span().start < content.end {
             return Err(unsupported(Refusal::CommentsWithTemplateBeforeScript));
         }
@@ -193,54 +227,138 @@ pub(crate) fn self_check_no_typescript<'arena>(
 /// **every** `<script>` *and* every template mustache, block pattern, and snippet
 /// `<T>` clause. So the decision belongs to the document, not to a `<script>` tag.
 ///
-/// A module `<script>` is refused before this runs, so the instance script is the
-/// only lang-bearing script here. `generics` is refused outright (an open
-/// type-parameter *binding*, not annotation erasure), as is any `lang` other than
-/// `ts`/`js`/empty.
+/// **Both** top-level scripts are considered, in source order (a `<script
+/// module>` can set the flag exactly as an instance script does), mirroring
+/// Svelte's single component-wide `this.ts` decision. The FIRST lang-bearing
+/// script decides — a later one's `lang` is ignored, so an expression-valued
+/// `lang` on it does not refuse. `generics` on *either* script is refused
+/// outright (an open type-parameter *binding*, not annotation erasure), as is a
+/// deciding `lang` other than `ts`/`js`/empty.
 pub(crate) fn document_ts_flag(root: &Root<'_>, source: &str) -> Result<bool, CompileError> {
-    let Some(script) = root.instance else {
-        return Ok(false);
-    };
+    // Both scripts in source order — the first lang-bearing one decides.
+    let mut scripts = [root.module, root.instance];
+    scripts.sort_by_key(|s| s.map_or(u32::MAX, |script| script.span.start));
     let mut ts = false;
-    for attr_node in script.attributes {
-        let AttributeNode::Attribute(attr) = attr_node else {
-            continue;
-        };
-        let name = {
-            let interner = script.content.interner.borrow();
-            interner.resolve_infallible(attr.name).to_string()
-        };
-        match name.as_str() {
-            "lang" => match attr.value {
-                // A bare `lang` (no value) never matches the oracle's regex —
-                // plain JS, like no attribute at all.
-                Some([]) | None => {}
-                Some([AttributeValue::Text(text)]) => {
-                    let lang = text.data(source);
-                    match lang.as_ref() {
-                        "ts" => ts = true,
-                        "js" | "" => {}
+    let mut decided = false;
+    for script in scripts.into_iter().flatten() {
+        for attr_node in script.attributes {
+            let AttributeNode::Attribute(attr) = attr_node else {
+                continue;
+            };
+            let name = {
+                let interner = script.content.interner.borrow();
+                interner.resolve_infallible(attr.name).to_string()
+            };
+            match name.as_str() {
+                "lang" => {
+                    // Only the first lang-bearing script decides; a later `lang`
+                    // (including an unclassifiable expression-valued one) is
+                    // ignored exactly as Svelte's first-match regex ignores it.
+                    if decided {
+                        continue;
+                    }
+                    match attr.value {
+                        // A bare `lang` (no value) never matches the oracle's
+                        // regex — plain JS, like no attribute at all, and it does
+                        // NOT count as the deciding script.
+                        Some([]) | None => {}
+                        Some([AttributeValue::Text(text)]) => {
+                            let lang = text.data(source);
+                            match lang.as_ref() {
+                                "ts" => {
+                                    ts = true;
+                                    decided = true;
+                                }
+                                "js" | "" => decided = true,
+                                _ => {
+                                    return Err(unsupported(Refusal::LangInstanceScript {
+                                        lang: lang.into_owned(),
+                                    }));
+                                }
+                            }
+                        }
+                        // An expression-valued `lang` on the deciding script can't
+                        // be classified.
                         _ => {
                             return Err(unsupported(Refusal::LangInstanceScript {
-                                lang: lang.into_owned(),
+                                lang: String::new(),
                             }));
                         }
                     }
                 }
-                // An expression-valued `lang` can't be classified.
-                _ => {
-                    return Err(unsupported(Refusal::LangInstanceScript {
-                        lang: String::new(),
-                    }));
+                "generics" => {
+                    return Err(unsupported(Refusal::GenericsAttribute));
                 }
-            },
-            "generics" => {
-                return Err(unsupported(Refusal::GenericsAttribute));
+                _ => {}
             }
-            _ => {}
         }
     }
     Ok(ts)
+}
+
+/// Erase and validate a plain module `<script module>` / `<script
+/// context="module">`, returning its type-free statement list (imports +
+/// declarations + non-default exports, source order) for module-scope emission.
+///
+/// v1 supports **plain** module scripts only. TypeScript erases under the
+/// document `lang="ts"` flag exactly as the instance script does. Then, per
+/// statement:
+///
+/// - `export default` refuses [`Refusal::ModuleDefaultExport`] — the oracle
+///   errors `module_illegal_default_export`;
+/// - an invalid runes-mode import (`svelte/internal*`,
+///   `beforeUpdate`/`afterUpdate`) refuses via [`refuse_runes_invalid_import`];
+/// - the statement is guard-walked **without** a store exemption, so a
+///   module-scope rune, a `$name` store read (the oracle's
+///   `store_invalid_subscription`), or a top-level `await` refuses — v1 defers
+///   the oracle's module `$state`→`v` / `$derived`→`$.derived(…)` rewrites (the
+///   corpus is rune-free, so this is a lossless over-refusal).
+///
+/// A supported module body emits **verbatim** (post-erase): the oracle's
+/// module-body reassignment/needs_context effects flow through the shared
+/// whole-component analysis ([`crate::needs_context::analyze_component`]) and the
+/// binding table ([`analyze_script`]), not through any module-only rewrite.
+pub(crate) fn analyze_module_script<'arena>(
+    root: &Root<'arena>,
+    source: &str,
+    arena: &'arena bumpalo::Bump,
+    ts_document: bool,
+) -> Result<&'arena [Statement<'arena>], CompileError> {
+    let Some(script) = root.module else {
+        return Ok(&[]);
+    };
+    let erased = erase::erase_statements(arena, source, script.content.body)?;
+    // The same document-wide TypeScript gate the instance body pays: without the
+    // flag, a `: T` / `as T` / `x!` in the module is a plain-JS parse error in the
+    // oracle, so a permissive accept here would be an over-acceptance.
+    if erased.typescript && !ts_document {
+        return Err(unsupported(Refusal::TypeScriptWithoutLangTs));
+    }
+    // Scratch collection sinks — the guard walk's reassignment/shadow collection is
+    // redundant here (the whole-component `analyze_component` covers module scope),
+    // so only its REFUSAL is wanted. Derived reads are impossible in a module (no
+    // module `$derived` survives the guard), so an empty derived set avoids a false
+    // `DerivedBindingRead` on a name that merely coincides with an instance derived.
+    let mut updated = NameSet::default();
+    let mut nested = NameSet::default();
+    let derived = NameSet::default();
+    for stmt in erased.body {
+        if matches!(stmt, Statement::ExportDefaultDeclaration(_)) {
+            return Err(unsupported(Refusal::ModuleDefaultExport));
+        }
+        if let Statement::ImportDeclaration(import) = stmt {
+            refuse_runes_invalid_import(import, source)?;
+        }
+        let mut ctx = WalkCtx::new(
+            source,
+            &mut updated,
+            &mut nested,
+            &derived,
+            std::rc::Rc::clone(&root.interner),
+        );
+        walk_statement_guarded(stmt, &mut ctx, 0)?;
+    }
+    Ok(erased.body)
 }
 
 /// The **template** half of the document-wide TypeScript gate: refuse any
@@ -358,6 +476,17 @@ pub(crate) fn analyze_script<'arena>(
                             updated: false,
                         },
                     );
+                }
+            }
+            // A module `export const`/`function`/`class`/`let`/`var` binds a
+            // module-scope name the evaluator must see (an `export const a = 'ok'`
+            // folds a template `{a}`), so recurse into the exported declaration.
+            // (`export { a }` / `export … from` carry no `declaration` and bind no
+            // new name.) The instance script refuses every export before this
+            // analysis is consumed, so this only ever fires for the module.
+            Statement::ExportNamedDeclaration(export) => {
+                if let Some(decl) = export.declaration {
+                    analyze_script(std::slice::from_ref(decl), source, bindings, derived_names)?;
                 }
             }
             _ => {}

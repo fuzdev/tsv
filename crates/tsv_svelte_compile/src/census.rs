@@ -143,7 +143,8 @@ pub fn census_detected_buckets() -> Vec<Cow<'static, str>> {
         // Options + structural top-level.
         Refusal::ClientGeneration,
         Refusal::DevMode,
-        Refusal::ModuleScript,
+        Refusal::ModuleDefaultExport,
+        Refusal::ModuleInstanceNameCollision { name: s() },
         Refusal::SvelteOptions,
         // Document TypeScript gate.
         Refusal::LangInstanceScript { lang: s() },
@@ -232,9 +233,19 @@ fn collect<'arena>(
 ) {
     // Structural top-level guards. These are field-presence facts, not rules with
     // hidden state — reproduced directly (a shared extraction would only wrap a
-    // `.is_some()`), matching `compile_server`'s first two bails.
-    if root.module.is_some() {
-        found.push(Refusal::ModuleScript);
+    // `.is_some()`), matching `compile_server`'s bails. A plain module script now
+    // compiles, so the census flags only the cheaply-detectable module refusal:
+    // an `export default` (the oracle's `module_illegal_default_export`). The
+    // guard-based module refusals (runes / store reads / top-level `await`) are
+    // disclaimed — the corpus is module-rune-free, so they never fire in practice.
+    if let Some(module) = root.module
+        && module
+            .content
+            .body
+            .iter()
+            .any(|stmt| matches!(stmt, Statement::ExportDefaultDeclaration(_)))
+    {
+        found.push(Refusal::ModuleDefaultExport);
     }
     if root.options.is_some() {
         found.push(Refusal::SvelteOptions);
@@ -310,6 +321,27 @@ fn collect<'arena>(
     if let Err(err) = analyze_script(erased_body, source, &mut bindings, &mut derived_names) {
         push_unsupported(found, err);
     }
+    // A module↔instance top-level binding-name collision (a real MISMATCH — see
+    // `transform_server::analyze`). Best-effort over the raw module body (name
+    // collection is TypeScript-insensitive); `bindings` here is the instance-only
+    // name set.
+    if let Some(module) = root.module {
+        let mut module_bindings = Bindings::empty();
+        let mut discard = NameSet::default();
+        if analyze_script(
+            module.content.body,
+            source,
+            &mut module_bindings,
+            &mut discard,
+        )
+        .is_ok()
+            && let Some(name) = module_bindings.names().find(|n| bindings.contains(n))
+        {
+            found.push(Refusal::ModuleInstanceNameCollision {
+                name: name.to_string(),
+            });
+        }
+    }
     // The store-subscription base set (top-level binding names), mirroring
     // `compile_server`: fed to `analyze_component` (the store-injection gate) and
     // the script guard (which exempts valid `$name` store reads from refusal).
@@ -318,7 +350,10 @@ fn collect<'arena>(
     // `needs_context` member/call classification (reused verbatim). It walks the
     // raw fragment, exactly as `compile_server` does. Only `uses_slots` is read
     // out here (for the rewrite below); the MemberCall refusal is captured on Err.
-    let uses_slots = match analyze_component(root, source, erased_body, &store_names) {
+    // The module body is not erased in the census (a diagnostic imprecision: a
+    // module-triggered `needs_context` refusal isn't independently detected), so
+    // `analyze_component` receives an empty module body here.
+    let uses_slots = match analyze_component(root, source, erased_body, &[], &store_names) {
         Ok(ctx) => ctx.uses_slots,
         Err(err) => {
             push_unsupported(found, err);
@@ -502,15 +537,17 @@ mod tests {
 
     #[test]
     fn two_independent_blockers_are_both_detected() {
-        // An unsupported CSS selector (CSS analysis) AND a `<script context="module">`
-        // (structural top-level) — two independent dimensions, so the census must
-        // return BOTH, where `compile()` would bail on only the first.
-        let source = "<script context=\"module\">let x = 1;</script>\n\
+        // A module `export default` (structural top-level — the oracle rejects it)
+        // AND an unsupported CSS selector (CSS analysis) — two independent
+        // dimensions, so the census must return BOTH, where `compile()` would bail
+        // on only the first. (A PLAIN module now compiles, so it is no blocker.)
+        let source = "<script context=\"module\">export default 5;</script>\n\
                       <style>:has(.x) { color: red; }</style>\n";
         let keys = bucket_set(source);
         assert!(
-            keys.iter().any(|k| k.contains("module <script")),
-            "module script not detected: {keys:?}"
+            keys.iter()
+                .any(|k| k.contains("default export in <script module>")),
+            "module default export not detected: {keys:?}"
         );
         assert!(
             keys.iter().any(|k| k.contains("unsupported css selector")),

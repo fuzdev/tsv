@@ -984,11 +984,12 @@ fn compile_props_id_refuses_misuse() {
         "<script>\n\tconst a = $props.id();\n\tconst b = $props.id();\n</script>\n<p>{a}{b}</p>",
         "more than once",
     );
-    // In a module script (`props_id_invalid_placement` — module scope) — refused
-    // as a module script up front.
+    // In a module script (`props_id_invalid_placement` — module scope). A plain
+    // module now compiles, so the module guard refuses the stray `$props`-rooted
+    // call (a module-scope rune) rather than declining the whole module up front.
     assert_unsupported(
         "<script module>\n\tconst id = $props.id();\n</script>\n<p>text</p>",
-        "module",
+        "$props",
     );
 }
 
@@ -1881,7 +1882,7 @@ fn compile_refuses_unrecognized_lang() {
     // on a guess, refuse.
     assert_unsupported(
         "<script lang=\"typescript\">let x = 5;</script>\n<p>text</p>",
-        "lang=\"typescript\" instance script",
+        "lang=\"typescript\" script",
     );
     // `generics` is an open type-parameter binding, not annotation erasure.
     assert_unsupported(
@@ -4467,5 +4468,106 @@ fn compile_shadowed_store_base_refuses() {
     assert_unsupported(
         "<script>\n\timport { count } from './s';\n</script>\n{#snippet foo(count)}{$count}{/snippet}{@render foo(1)}",
         "$count",
+    );
+}
+
+// ── Module scripts (`<script module>`) ─────────────────────────────────────
+
+#[test]
+fn compile_module_refuses_default_export() {
+    // `export default` in a module is the oracle's `module_illegal_default_export`
+    // error — refuse rather than emit.
+    assert_unsupported(
+        "<script module>\n\texport default 5;\n</script>\n<p>hi</p>",
+        "default export in <script module>",
+    );
+}
+
+#[test]
+fn compile_module_refuses_state_rune() {
+    // v1 defers the oracle's module `$state`→v rewrite (the corpus is module-rune-
+    // free), so a module-scope rune refuses via the guard — a safe over-refusal.
+    assert_unsupported(
+        "<script module>\n\tlet count = $state(0);\n</script>\n<p>hi</p>",
+        "rune $state",
+    );
+}
+
+#[test]
+fn compile_module_refuses_store_read() {
+    // A module-scope `$name` store read is the oracle's `store_invalid_subscription`
+    // error — the guard refuses it (no store exemption in a module).
+    assert_unsupported(
+        "<script module>\n\timport { writable } from 'svelte/store';\n\tconst c = writable(0);\n\tconst v = $c;\n</script>\n<p>hi</p>",
+        "$-prefixed identifier $c",
+    );
+}
+
+#[test]
+fn compile_module_refuses_top_level_await() {
+    // Top-level `await` forces the oracle's async-component shapes (not implemented),
+    // so a module top-level await refuses — a safe over-refusal (the oracle compiles it).
+    assert_unsupported(
+        "<script module>\n\tconst x = await fetch('/');\n</script>\n<p>hi</p>",
+        "top-level await",
+    );
+}
+
+#[test]
+fn compile_module_body_follows_hoisted_snippet() {
+    // Emission order (probe-verified): the module block prints AFTER the hoisted
+    // snippets, NOT merged into the instance import group — imports, hoisted
+    // snippet, module body, then the component function.
+    let js = compile_js(
+        "<script module>\n\tconst SHARED = 5;\n</script>\n{#snippet foo()}<p>{SHARED}</p>{/snippet}\n{@render foo()}",
+    );
+    assert_eq!(
+        js,
+        "import * as $ from 'svelte/internal/server';\n\
+             function foo($$renderer) {\n\
+             \t$$renderer.push(`<p>5</p>`);\n\
+             }\n\
+             const SHARED = 5;\n\
+             export default function Input($$renderer) {\n\
+             \tfoo($$renderer);\n\
+             }\n"
+    );
+}
+
+#[test]
+fn compile_module_sets_document_ts_flag() {
+    // A `lang="ts"` module sets the document-wide TypeScript flag, so the instance
+    // script's TypeScript erases even though it carries no `lang` of its own.
+    let js = compile_js(
+        "<script module lang=\"ts\">\n\tconst K: number = 5;\n</script>\n<script>\n\tlet a: number = 1;\n</script>\n<p>{a}{K}</p>",
+    );
+    assert!(
+        !js.contains(": number"),
+        "instance TypeScript must erase under the module's lang=\"ts\": {js}"
+    );
+}
+
+#[test]
+fn compile_module_refuses_name_collision_with_instance() {
+    // A name declared in BOTH scripts: the oracle resolves `{K}` to the instance
+    // (inner-scope) binding (`$.escape(K)`), but the name-based table would fold
+    // the module `const K = 5` — a real MISMATCH, so refuse.
+    assert_unsupported(
+        "<script module>\n\tconst K = 5;\n</script>\n<script>\n\tlet { K } = $props();\n</script>\n<p>{K}</p>",
+        "declared in both the module and instance scripts",
+    );
+}
+
+#[test]
+fn compile_module_before_instance_comment_carries() {
+    // A whitespace-only text run between the module `</script>` and the instance
+    // `<script>` must NOT trip the template-before-script comment guard — the
+    // instance comment carries through (parity with the oracle).
+    let js = compile_js(
+        "<script module>\n\tconst K = 5;\n</script>\n\n<script>\n\t// instance comment\n\tlet a = 1;\n</script>\n<p>{a}{K}</p>",
+    );
+    assert!(
+        js.contains("// instance comment"),
+        "the instance comment must carry through past the module script: {js}"
     );
 }
