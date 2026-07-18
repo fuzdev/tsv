@@ -17,11 +17,11 @@ pub struct CssStyleSheet<'arena> {
     /// CSS nodes (rules, at-rules) - no longer includes Comment variant
     pub nodes: &'arena [CssNode<'arena>],
 
-    /// All comments sorted by span.start (top-level and value comments)
+    /// Top-level detached comments (between rules), sorted by span.start.
     ///
-    /// Includes:
-    /// - Top-level comments (between rules)
-    /// - Value comments (inside property values like `font-size: /* comment */ 12px;`)
+    /// Does **not** include value comments (inside property values like
+    /// `font-size: /* comment */ 12px;`): those are never lexed as `Comment`s — they're
+    /// re-derived from source at print time — so they're out of scope by construction.
     ///
     /// Use `tsv_lang::comments_to_emit_in_range()` for efficient range lookups.
     pub comments: Vec<Comment>,
@@ -362,6 +362,17 @@ pub struct CssDeclaration<'arena> {
 impl CssDeclaration<'_> {
     pub fn is_important(&self) -> bool {
         self.important_end.is_some()
+    }
+
+    /// Byte offset of the `property : value` colon **within `span.extract(source)`**
+    /// (equivalently `ctx.source[span.start..]`) — the absolute [`colon_offset`] rebased
+    /// to the declaration slice. Every source-extracting path indexes its slice by this
+    /// and finds the value at `colon_pos() + 1`; recorded at parse time, so no path
+    /// re-scans for the colon.
+    ///
+    /// [`colon_offset`]: Self::colon_offset
+    pub fn colon_pos(&self) -> usize {
+        (self.colon_offset - self.span.start) as usize
     }
 }
 

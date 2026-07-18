@@ -40,4 +40,17 @@
 	ol:where(.class8, 2n of, .class9) {
 		list-style: decimal;
 	}
+	/* a dropped forgiving item is kept verbatim except for a whitespace COLLAPSE, which
+	   must not reach inside an escape: `\<TAB>` is a valid escape whose escaped code
+	   point IS that tab (css-syntax-3 §4.3.4/§4.3.7), so the class is named `b<TAB>c`.
+	   Collapsing it to a space silently renames the class */
+	:is(.a > . > .b\	c) {
+		color: teal;
+	}
+	/* the item's OUTER trim is escape-aware too: `.b\ ` ends in an escape whose payload
+	   is that space, and trimming it strands the backslash onto the `)` that closes the
+	   pseudo — output tsv's own parser would then reject */
+	.x:is(.a > . > .b\ ) {
+		color: olive;
+	}
 </style>

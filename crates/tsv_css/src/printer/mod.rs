@@ -161,10 +161,7 @@ impl<'a> Printer<'a> {
             return false;
         }
         let decl_source = decl.span.extract(self.source);
-        // The parser recorded the `property : value` colon; rebase it to the
-        // declaration slice instead of re-scanning (see `CssDeclaration::colon_offset`).
-        let colon_pos = (decl.colon_offset - decl.span.start) as usize;
-        let value_part = &decl_source[colon_pos + 1..];
+        let value_part = &decl_source[decl.colon_pos() + 1..];
         // Fast path: no `/*` at all → no block comment possible.
         if !value_part.contains("/*") {
             return false;
@@ -187,9 +184,77 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Whether the value spanning `value_span` carries a comment at the comma
+    /// list's **top level** (paren-depth 0).
+    ///
+    /// Such a list breaks one-per-line: prettier force-breaks a comma list with a
+    /// top-level comment, and keying the break here — rather than on the
+    /// space-separated `List` the value parser builds *only* when a space happens to
+    /// follow the comment — makes every render-equivalent authoring reach the one
+    /// broken form in a single pass. The value normalizer inserts a space after a
+    /// comment's `*/`, so a glued `x,/* c */y` and a spaced `x, /* c */ y` would
+    /// otherwise flip the parse (and the break) between passes — the F1 violation the
+    /// `css-normalize-value-text-context-blind` class produces. A comment nested
+    /// inside a function argument (`var(--a, /* c */ red)`) sits at depth ≥ 1 and
+    /// does not count — prettier keeps that inline.
+    ///
+    /// Lexing (not a raw `/*` substring scan) is what keeps it honest: the lexer
+    /// consumes strings and unquoted `url(...)` whole, so a `/*` inside them is not a
+    /// comment token, and a `(` inside a comment is part of the one Comment token —
+    /// neither can miscount the depth. Callers gate on
+    /// `CssDeclaration::has_block_comment` first, so this lexes only when a comment is
+    /// actually present in the declaration.
+    pub(crate) fn comma_value_has_top_level_comment(&self, value_span: Span) -> bool {
+        let text = value_span.extract(self.source);
+        let mut lexer = Lexer::new(text);
+        let mut paren_depth: u32 = 0;
+        loop {
+            match lexer.next_token() {
+                Ok(t) if t.kind == TokenKind::Eof => return false,
+                Ok(t) if t.kind == TokenKind::Comment => {
+                    if paren_depth == 0 {
+                        return true;
+                    }
+                }
+                Ok(t) if t.kind == TokenKind::LeftParen => paren_depth += 1,
+                Ok(t) if t.kind == TokenKind::RightParen => {
+                    paren_depth = paren_depth.saturating_sub(1);
+                }
+                Ok(_) => {}
+                // A lex error (e.g. an unterminated `/* …`): don't force the break
+                // rather than guess — the value still prints, and this governs only
+                // layout, never content.
+                Err(_) => return false,
+            }
+        }
+    }
+
     /// Write a string to the buffer
     pub(crate) fn write(&mut self, s: &str) {
         self.buffer.write(s);
+    }
+
+    /// Write a block opener: `" {"` — or a bare `"{"` when the prelude already ends in
+    /// a space.
+    ///
+    /// Only one thing can leave a space there: a selector (or at-rule prelude) ending
+    /// in a CSS **escape's payload** — `.a\ ` is a class named `a `, and that space is
+    /// content, so it survives the render (see `write_arena_doc_with_suffix`). It also
+    /// already separates the prelude from the brace, so adding a second space would
+    /// emit `.a\  {` where every other formatter emits `.a\ {`. Absorbing the separator
+    /// is the fix; trimming the payload instead is not — that strands the backslash
+    /// onto the `{`, which it would then escape.
+    ///
+    /// This is the literal-escape twin of the hex-escape rule in
+    /// `selectors.rs::span_leaf_doc`: a *terminator* is dropped because the following
+    /// separator re-terminates the escape, while a *payload* is kept and the separator
+    /// is dropped instead. Either way exactly one space reaches the output.
+    pub(crate) fn write_block_open(&mut self) {
+        if self.buffer.ends_with(' ') {
+            self.write("{\n");
+        } else {
+            self.write(" {\n");
+        }
     }
 
     /// Write indentation based on current indent level
@@ -240,7 +305,7 @@ impl<'a> Printer<'a> {
         self.effective_indent() * TAB_WIDTH
     }
 
-    /// Write a DocId to the buffer, accounting for current column and indent level
+    /// Write a value DocId to the buffer, accounting for current column and indent level.
     ///
     /// This handles the common pattern of:
     /// 1. Get current column position (which already includes base_indent_offset after newlines)
@@ -249,12 +314,29 @@ impl<'a> Printer<'a> {
     ///
     /// Note: base_indent_offset is already accounted for in position tracking after newlines
     /// (see doc::render_single_doc line breaks). We should NOT add it again here.
+    ///
+    /// # Trailing whitespace is preserved
+    ///
+    /// A rendered piece's last line can end in whitespace that is **content** rather than
+    /// layout: a CSS escape's payload may be a space (`width: 50px\ ;` — css-syntax-3
+    /// §4.3.4/§4.3.7 make `\` + whitespace a valid escape whose escaped code point IS that
+    /// whitespace). The value renders as its own piece and the terminator (`;`, the
+    /// `!important` tail) is appended to the buffer *afterwards* by `write_declaration_end`,
+    /// so that escaped space sits at the very end of the piece. The default entry point's
+    /// final-line trim would strip it and strand the backslash onto the `;`, whose output no
+    /// longer parses — so this uses the preserve-whitespace entry point (the same one HTML
+    /// `<pre>`/`<textarea>` use, for the same reason).
+    ///
+    /// Interior lines are still trimmed inline by `render_line_break`; only the final-line
+    /// trim is skipped, and an ordinary value's rendered piece never ends in whitespace, so
+    /// this is a no-op everywhere else. [`Self::write_arena_doc_with_suffix`] — selectors and
+    /// at-rule preludes — does the same, for the same reason.
     pub(crate) fn write_arena_doc(&mut self, d: DocId) {
         let current_col = self.current_column();
         // Render into the arena-parked scratch: one warm buffer across the
         // file's rules instead of an alloc/free per rule.
         let mut output = self.arena.take_render_scratch();
-        doc::arena_print_doc_with_indent_resolved_into(
+        doc::arena_print_doc_with_indent_resolved_preserve_whitespace_into(
             self.arena,
             d,
             &self.embed,
@@ -275,12 +357,19 @@ impl<'a> Printer<'a> {
     /// `EmbedContext::suffix_width` (read by every group's fit check); fill-based docs
     /// additionally carry it as the fill's `trailing_reserve` (fills don't read
     /// `suffix_width`). Shared by the selector and at-rule-prelude writers.
+    ///
+    /// Preserves the rendered piece's trailing whitespace for the same reason
+    /// [`Self::write_arena_doc`] does — and the suffix is *precisely* the punctuation
+    /// that makes it matter. A selector can end in an escaped space (`.a\ `, a class
+    /// named `a `), and the `,` / ` {` the caller appends lands right after it: trim
+    /// the payload and the stranded backslash escapes that punctuation instead
+    /// (`.a\ , .b` → `.a\,`, one class named `a,` — the selector list is gone).
     pub(crate) fn write_arena_doc_with_suffix(&mut self, d: DocId, suffix_width: usize) {
         let current_col = self.current_column();
         let mut embed = self.embed;
         embed.suffix_width = suffix_width;
         let mut output = self.arena.take_render_scratch();
-        doc::arena_print_doc_with_indent_resolved_into(
+        doc::arena_print_doc_with_indent_resolved_preserve_whitespace_into(
             self.arena,
             d,
             &embed,
@@ -553,8 +642,9 @@ impl<'a> Printer<'a> {
     pub(crate) fn print_css_comment(&mut self, comment: &Comment) {
         // One of the crate's two comment-emission seams (the other is
         // `comment_blocks_in_range`). Also prints the *AST-node* comments — a
-        // `CssBlockChild::Comment` — which are outside the detached model and so aren't
-        // in the ledger's registered set; those land in `unregistered_emits`.
+        // `CssBlockChild::Comment` — whose span is now registered too (by
+        // `register_stylesheet_comments` at the format entry), so this emit matches a
+        // registered entry and this seam records it, same as for a detached comment.
         #[cfg(feature = "comment_check")]
         tsv_lang::comment_ledger::record_emitted(self.source, comment.span);
 
@@ -798,6 +888,54 @@ impl<'a> Printer<'a> {
     }
 }
 
+/// Register a stylesheet's comments with the print-once ledger: the **detached** comments on
+/// `CssStyleSheet.comments`, plus every in-block `CssBlockChild::Comment` AST node (the CSS
+/// analog of a Svelte `<!-- -->`), collected by recursing into nested rules and at-rule
+/// blocks. Both `print_css_comment` seams already record the emits, so registering the
+/// in-block comments here is what turns a dropped/double-printed one into a ledger finding
+/// instead of a silent, unregistered emit. A declaration's *value* comments are never lexed
+/// as `Comment`s, so they stay out of scope by construction.
+#[cfg(feature = "comment_check")]
+fn register_stylesheet_comments(stylesheet: &CssStyleSheet<'_>, source: &str) {
+    tsv_lang::comment_ledger::register_parsed(source, &stylesheet.comments);
+    let mut block_comment_spans = Vec::new();
+    collect_block_comment_spans(stylesheet.nodes, &mut block_comment_spans);
+    tsv_lang::comment_ledger::register_parsed_spans(source, block_comment_spans);
+}
+
+/// Collect the spans of every in-block `CssBlockChild::Comment` under the top-level nodes.
+#[cfg(feature = "comment_check")]
+fn collect_block_comment_spans(nodes: &[CssNode<'_>], out: &mut Vec<Span>) {
+    for node in nodes {
+        match node {
+            CssNode::Rule(rule) => collect_block_child_comment_spans(rule.declarations, out),
+            CssNode::Atrule(atrule) => {
+                if let Some(block) = &atrule.block {
+                    collect_block_child_comment_spans(block.children, out);
+                }
+            }
+        }
+    }
+}
+
+/// Recurse a block's children, collecting `Comment` spans and descending into nested rules
+/// and at-rule blocks.
+#[cfg(feature = "comment_check")]
+fn collect_block_child_comment_spans(children: &[CssBlockChild<'_>], out: &mut Vec<Span>) {
+    for child in children {
+        match child {
+            CssBlockChild::Comment(comment) => out.push(comment.span),
+            CssBlockChild::Rule(rule) => collect_block_child_comment_spans(rule.declarations, out),
+            CssBlockChild::Atrule(atrule) => {
+                if let Some(block) = &atrule.block {
+                    collect_block_child_comment_spans(block.children, out);
+                }
+            }
+            CssBlockChild::Declaration(_) => {}
+        }
+    }
+}
+
 /// Format CSS stylesheet to a string
 /// Requires source for blank line preservation and raw value extraction
 pub(crate) fn format_css(stylesheet: &CssStyleSheet<'_>, source: &str) -> String {
@@ -811,10 +949,11 @@ pub(crate) fn format_css_in(
     source: &str,
     arena: &DocArena,
 ) -> String {
-    // The print-once comment ledger's expectation for this stylesheet (diagnostic; see
+    // The print-once comment ledger's expectation for this stylesheet — detached comments
+    // plus in-block `CssBlockChild::Comment` AST nodes (diagnostic; see
     // `tsv_lang::comment_ledger`).
     #[cfg(feature = "comment_check")]
-    tsv_lang::comment_ledger::register_parsed(source, &stylesheet.comments);
+    register_stylesheet_comments(stylesheet, source);
 
     // Fill the arena-parked line-break table (one warm table across a
     // multi-file driver's files instead of a fresh Vec per file).
@@ -869,11 +1008,12 @@ pub(crate) fn format_css_embedded_in(
     // same as standalone, matching prettier. This retires the Svelte host's
     // post-hoc line re-indenter, which compounded a preserved newline one indent
     // level per format pass (an F1 non-idempotency; see script_style.rs).
-    // The print-once comment ledger's expectation for this stylesheet (diagnostic; see
-    // `tsv_lang::comment_ledger`). The Svelte host's `Root.comments` deliberately
-    // excludes `<style>` comments, so this is their only registration.
+    // The print-once comment ledger's expectation for this stylesheet — detached comments
+    // plus in-block `CssBlockChild::Comment` AST nodes (diagnostic; see
+    // `tsv_lang::comment_ledger`). The Svelte host's `Root.comments` deliberately excludes
+    // `<style>` comments, so this is their only registration.
     #[cfg(feature = "comment_check")]
-    tsv_lang::comment_ledger::register_parsed(source, &stylesheet.comments);
+    register_stylesheet_comments(stylesheet, source);
 
     let base = embed.base_indent_offset;
     let embed = EmbedContext {

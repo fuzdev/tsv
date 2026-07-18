@@ -3,11 +3,11 @@
 
 use super::{Printer, build_entity_name_doc, is_effectively_empty_body};
 use crate::ast::internal::{self, TSType};
-use crate::printer::layout::hang_after_operator;
+use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use crate::printer::{CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue};
 use smallvec::smallvec;
-use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::doc::{DocBuf, GroupId};
 use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{Span, comments_to_emit_in_range};
 
@@ -324,26 +324,50 @@ impl<'a> Printer<'a> {
                     parts.push(hang_after_operator(d, type_doc));
                 }
             } else if let TSType::Intersection(i) = value_type {
-                // Intersection types: first element stays inline, continuation types
-                // wrap with a hanging indent (skipped when a boundary TypeLiteral/Mapped
-                // owns its own expansion — see `intersection_hanging_with_indent`).
-                parts.push(d.text(" "));
-                parts.push(self.intersection_hanging_with_indent(i));
+                // Intersection types (prettier's `fluid`): the first member hugs the
+                // `=` line when it fits and the intersection breaks after `=` when it
+                // doesn't — continuation members then wrap with a hanging indent (the
+                // boundary TypeLiteral/Mapped that owns its own expansion opts out; see
+                // `intersection_hanging_with_indent`). The `fluid` marker's `line` is what
+                // gives the LHS `<…>` group an early `fits()` exit at the `=`, so a
+                // constrained-param header that fits stays inline instead of breaking the
+                // type-param list when the first member overflows.
+                //
+                // A comment inside the intersection forces it to break; there the marker
+                // must stay flat so the first member keeps hugging the `=` line (prettier's
+                // behavior — `type B = a & // c⏎\tb`). The over-break this arm fixes is
+                // always comment-free (a fit-driven break), so gate the marker on the
+                // absence of a forced break and glue the comment case as before.
+                let inter_doc = self.intersection_hanging_with_indent(i);
+                if d.will_break(inter_doc) {
+                    parts.push(d.text(" "));
+                    parts.push(inter_doc);
+                } else {
+                    parts.push(fluid_after_operator(d, inter_doc, GroupId::Assignment));
+                }
             } else if let TSType::Conditional(cond) = value_type {
-                // Conditional types: break after `=` only if check/extends has type parameters
+                // Conditional types: break after `=` only if check/extends has type
+                // parameters (prettier's `shouldBreakBeforeConditionalType` →
+                // break-after-operator); otherwise `fluid`, which keeps the ternary on the
+                // `=` line while its head fits and breaks after `=` once the head
+                // overflows. The `fluid` marker keeps the LHS `<…>` inline (see the
+                // intersection arm) rather than breaking the type-param list.
                 let type_doc = self.build_type_doc(value_type);
                 if should_break_before_conditional_type(cond) {
                     parts.push(hang_after_operator(d, type_doc));
                 } else {
-                    parts.push(d.text(" "));
-                    parts.push(type_doc);
+                    parts.push(fluid_after_operator(d, type_doc, GroupId::Assignment));
                 }
             } else if type_has_internal_breaking(value_type) {
-                // Types with internal breaking (braces, brackets, parens, angle brackets) stay hugged
-                // Use wrapping version so TypeReference type args break internally when too long
+                // Types with internal breaking (braces, brackets, parens, angle brackets):
+                // prettier's `fluid`. The marker hugs the `=` line when the value's first
+                // break point is reachable within the width (`= {`, `= [`, `= Foo<`) — the
+                // object/tuple/type-argument cases — and breaks after `=` when it is not
+                // (a function type whose header pushes `(` past the width). Either way the
+                // marker's `line` keeps the LHS `<…>` inline instead of breaking the
+                // type-param list.
                 let type_doc = self.build_type_doc(value_type);
-                parts.push(d.text(" "));
-                parts.push(type_doc);
+                parts.push(fluid_after_operator(d, type_doc, GroupId::Assignment));
             } else if has_complex_params {
                 // Complex type parameters: use break-lhs layout
                 // Type params break, `=` stays on same line, RHS stays inline
@@ -375,19 +399,48 @@ impl<'a> Printer<'a> {
                 // A comment-free value that doesn't `will_break` hangs (long case).
                 let type_doc = self.build_type_doc(value_type);
                 let value_span = value_type.span();
+                let value_has_comments = tsv_lang::has_comments_to_emit_in_range(
+                    self.comments,
+                    value_span.start,
+                    value_span.end,
+                );
                 let hug = self.value_owns_its_comment_break(value_type)
                     || (d.will_break(type_doc)
-                        && tsv_lang::has_comments_to_emit_in_range(
-                            self.comments,
-                            value_span.start,
-                            value_span.end,
-                        )
+                        && value_has_comments
                         && !self.comments_force_own_line_between(value_span.start, value_span.end));
                 if hug {
                     parts.push(d.text(" "));
                     parts.push(type_doc);
-                } else {
+                } else if value_has_comments
+                    || matches!(
+                        value_type,
+                        TSType::Literal(internal::TSLiteralType::TemplateLiteral(_))
+                    )
+                {
+                    // Break after `=` with a hanging indent, for two kinds:
+                    //   - a non-hugging comment-bearing value, preserving comment
+                    //     placement (e.g. a `[`→index own-line comment hangs the index —
+                    //     indexed_access_line_comment); and
+                    //   - a template-literal type, whose `${…}` printer force-breaks: on
+                    //     the `fluid` path the value would hug `= \`prefix_${` and break
+                    //     the interpolation instead of breaking after `=` first (tsv's
+                    //     template layout is already a deliberate divergence — see
+                    //     template_literal_type_long; `is_simple_type_arg` excludes them
+                    //     from atomic inlining for the same reason).
                     parts.push(hang_after_operator(d, type_doc));
+                } else {
+                    // The comment-free remainder is prettier's `fluid` default
+                    // (`chooseLayout`'s fallthrough): the value hugs the `=` line and
+                    // breaks INSIDE its own delimiter when it can, and the marker's `line`
+                    // keeps the LHS `<…>` inline instead of breaking the type-param list.
+                    // A postfix wrapper (`(cond)[]`, `(cond)[K]`), a prefix operator
+                    // (`keyof`/`readonly`/`typeof`) over a breakable operand, and an atomic
+                    // reference all route here; an unbreakable value (a bare reference, a
+                    // string-literal type) makes `fluid` and break-after-`=` render
+                    // identically. `shouldBreakAfterOperator` has no case for these kinds,
+                    // so prettier falls through to `fluid` — see
+                    // `prettier/src/language-js/print/assignment.js`.
+                    parts.push(fluid_after_operator(d, type_doc, GroupId::Assignment));
                 }
             }
         }

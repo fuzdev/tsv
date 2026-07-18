@@ -80,10 +80,13 @@ enum FastScan<'arena> {
 
 /// ASCII bytes that `str::trim` (via `char::is_whitespace`) strips: the CSS
 /// whitespace set plus U+000B (vertical tab), which `char::is_whitespace`
-/// includes and `is_css_whitespace` does not. Used only to check — from a value
-/// range's boundary bytes — whether it is already trimmed, so the fast path can
-/// skip a redundant `str::trim`; any non-ASCII boundary byte conservatively takes
-/// the trimming path instead.
+/// includes and `is_css_whitespace` does not. A conservative superset of what the
+/// boundary trims themselves strip (CSS whitespace only, via
+/// [`crate::escapes::trim_start_css`] / [`crate::escapes::trim_end_preserving_escape`],
+/// which exclude U+000B). Used only to check — from a value range's boundary bytes —
+/// whether it is already trimmed, so the fast path can skip a redundant trim; any
+/// non-ASCII boundary byte conservatively takes the trimming path instead (where a
+/// non-ASCII space is preserved, not dropped).
 const fn is_trim_boundary_ws(b: u8) -> bool {
     matches!(b, b'\t' | b'\n' | 0x0B | 0x0C | b'\r' | b' ')
 }
@@ -150,7 +153,9 @@ impl<'a> ValueParser<'a> {
 
     /// Calculate trimmed end position for a text range
     ///
-    /// Removes trailing whitespace from a range and returns the adjusted end position.
+    /// Removes trailing whitespace from a range and returns the adjusted end position —
+    /// except whitespace a CSS escape owns (`var(--a, 50px\ )`), which stays part of the
+    /// element (see `super::trim_end_preserving_escape`).
     ///
     /// # Arguments
     /// * `text` - The full text being parsed
@@ -161,8 +166,7 @@ impl<'a> ValueParser<'a> {
     /// End position after removing trailing whitespace
     fn trimmed_end(&self, text: &str, start: usize, end: usize) -> usize {
         let slice = &text[start..end];
-        let trimmed_len = slice.trim_end().len();
-        start + trimmed_len
+        start + crate::escapes::trim_end_preserving_escape(slice).len()
     }
 
     /// Main parse entry point
@@ -179,18 +183,22 @@ impl<'a> ValueParser<'a> {
     /// `ValueCursor` split is comment-*blind*, and the two deliberately disagree on
     /// a comment between value tokens, so the single-string fast pass hands such a
     /// value off unchanged. A whitespace or non-ASCII boundary byte (rare, since the
-    /// range is trimmed) also takes the two-pass path, which trims first; the value
-    /// it produces is identical either way.
+    /// range is trimmed) also takes the two-pass path, which trims first —
+    /// CSS-whitespace-only (`trim_start_css` / `trim_end_preserving_escape`), so an
+    /// ASCII-whitespace boundary comes off (identical to what the fast path would
+    /// produce) while a non-ASCII space (NBSP, em space) is kept as leaf content,
+    /// never dropped.
     pub fn parse<'arena>(&self, arena: &'arena Bump) -> CssValue<'arena> {
         let text = self.text();
         let bytes = text.as_bytes();
 
         // Fast path: confirm `text` is already trimmed straight from its boundary
-        // bytes (ASCII and non-whitespace ends ⇒ `str::trim` is a no-op) and skip
-        // the redundant `str::trim` the two-pass path runs. A whitespace boundary
+        // bytes (ASCII and non-whitespace ends ⇒ the ASCII trim is a no-op) and skip
+        // the redundant trim the two-pass path runs. An ASCII-whitespace boundary
         // (`text` is trimmed in practice, so this is rare) or a non-ASCII boundary
-        // byte (possibly a Unicode space like NBSP that `str::trim` strips) falls
-        // through to the trimming path below, which yields the same value.
+        // byte falls through to the trimming path below: an ASCII-whitespace end is
+        // trimmed there (same value), while a non-ASCII space (NBSP, em space) is
+        // kept — it is CSS value content, not whitespace.
         if let (Some(&first), Some(&last)) = (bytes.first(), bytes.last())
             && first < 0x80
             && last < 0x80
@@ -214,7 +222,8 @@ impl<'a> ValueParser<'a> {
         // Fallback (comment present, a non-ASCII/whitespace boundary, or a
         // non-trimmed range): trim, then classify comment-aware and split with the
         // comment-blind `ValueCursor` — the original behaviour.
-        let trimmed = text.trim();
+        let trimmed =
+            crate::escapes::trim_end_preserving_escape(crate::escapes::trim_start_css(text));
         if trimmed.is_empty() {
             return CssValue::Identifier {
                 span: self.absolute_span(),
@@ -275,17 +284,24 @@ impl<'a> ValueParser<'a> {
 
             // Delimiter tests use the nesting level as of *before* this byte, then
             // the byte updates the nesting — the same order `ValueCursor` uses.
-            // An escaped paren (`\(` / `\)`) is a content code point (css-syntax §4.3.7 — the
-            // char after `\` is an escaped code point), NOT a nesting delimiter, so it must not
-            // change `in_parens`: otherwise an escaped `)` inside an unquoted `url()`
-            // (`url(  a\)b  )`) drops the depth to 0, exposing the interior whitespace as a
-            // false top-level separator and mis-splitting the opaque url-token (which then
-            // gains/loses whitespace on format). Skip both bytes. Other escapes (`\,` …) fall
-            // through unchanged — they don't affect paren depth, and matching prettier's
-            // escape-blind comma/whitespace splitting there is deliberate. Kept identical in the
-            // twin `ValueCursor` / `classify_separators` trackers (the fused-pass invariant).
-            if b == b'\\' && matches!(bytes.get(i + 1), Some(b'(' | b')')) {
-                i += 2;
+            //
+            // An escape is OPAQUE: step over it whole (`crate::escapes::escape_len`), so
+            // nothing inside it reads as structure. Every byte it can hide is one this
+            // scanner would otherwise act on — an escaped paren (`url(  a\)b  )` would drop
+            // the depth to 0 and expose the interior whitespace as a false top-level
+            // separator, mis-splitting the opaque url-token); an escaped comma (`x\,y`)
+            // would split one ident in two, which the comma path then rejoins with `", "`,
+            // inserting a space *inside* the ident; an escaped space (`xxxxx\ yyyyy`) would
+            // become a wrap point, and `\` before a newline is not a valid escape (§4.3.4),
+            // so the output stops re-parsing. A hex escape's whitespace terminator is part
+            // of the escape too (`\41 2px` is ONE ident, §4.3.7).
+            //
+            // Kept identical in the twin `ValueCursor` / `classify_separators` trackers
+            // (the fused-pass invariant).
+            if b == b'\\'
+                && let Some(len) = crate::escapes::escape_len(text, i)
+            {
+                i += len;
                 continue;
             }
             let top = in_parens == 0 && !in_quote;
@@ -346,10 +362,13 @@ impl<'a> ValueParser<'a> {
         let seg = &text[seg_start..seg_end];
         // Match `split_top_level`'s asymmetric trimming exactly: leading whitespace is
         // skipped ASCII-only (like `ValueCursor::skip_whitespace`), trailing is trimmed
-        // Unicode-wide (like `trimmed_end`'s `str::trim_end`). A leading non-ASCII space
-        // (e.g. NBSP) therefore stays part of the element, as it does in the old path.
+        // CSS-whitespace-only and escape-aware (like `trimmed_end`'s
+        // `trim_end_preserving_escape`). A non-ASCII space (e.g. NBSP) on either end
+        // therefore stays part of the element — it is CSS value content, not a
+        // separator — rather than being dropped (which, for a string element, would
+        // delete the whole element).
         let after_lead = seg.trim_start_matches(|c: char| c.is_ascii_whitespace());
-        let core = after_lead.trim_end();
+        let core = crate::escapes::trim_end_preserving_escape(after_lead);
         if core.is_empty() {
             return;
         }
@@ -460,15 +479,145 @@ impl<'a> ValueParser<'a> {
     /// Parse single value (leaf node), trimming first.
     ///
     /// Used by the two-pass fallback, where the range may carry surrounding
-    /// whitespace; the fast path calls `build_leaf` directly.
+    /// whitespace; the fast path calls `build_leaf` directly. The trim is
+    /// CSS-whitespace-only and escape-aware (`trim_start_css` /
+    /// `trim_end_preserving_escape`): a non-ASCII space (NBSP, em space) at either end
+    /// is leaf content and stays, so the text handed to `build_leaf` still matches
+    /// `span` (trimming it would desync the two and drop a string element — see the
+    /// helper).
     fn parse_single<'arena>(&self, arena: &'arena Bump) -> CssValue<'arena> {
-        self.build_leaf(self.text().trim(), arena)
+        let text = self.text();
+        self.build_leaf(
+            crate::escapes::trim_end_preserving_escape(crate::escapes::trim_start_css(text)),
+            arena,
+        )
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The **fused-pass invariant**: the three top-level trackers — `fast_scan`,
+    /// `ValueCursor::consume_until`, and `classify_separators` — must agree on what is
+    /// structure and what is the interior of an escape / quote / comment / paren.
+    ///
+    /// Each carries a comment asserting they are "kept identical"; nothing enforced it, and
+    /// they had already drifted once (all three skipped only `\(` / `\)`, so an escaped
+    /// comma or space read as a separator and tore an ident in half).
+    ///
+    /// This is a **regression net, not a proof**: it pins the invariant the three now hold,
+    /// so the next edit to one of them fails here instead of silently in a corpus. It does
+    /// not demonstrate the original bug — that was fixed before this test existed.
+    #[test]
+    fn twin_trackers_agree_on_top_level_structure() {
+        // Each case pairs a shape with what the top level really contains, so a tracker
+        // that mis-reads an escape's interior disagrees with the other two.
+        let cases = [
+            // (input, has_top_level_comma, has_top_level_whitespace)
+            ("red", false, false),
+            ("red blue", false, true),
+            ("red, blue", true, true),
+            ("rgba(1, 2, 3)", false, false),
+            ("calc(1px + 2px)", false, false),
+            // Escaped separators are CONTENT, not structure.
+            (r"x\,y", false, false),
+            (r"x\ y", false, false),
+            (r"a\+b", false, false),
+            (r"a\(b", false, false),
+            (r"a\)b", false, false),
+            // A hex escape swallows one whitespace terminator — still one token.
+            (r"\41 2px", false, false),
+            (r"\41 2px 3px", false, true),
+            // An escaped backslash does NOT escape what follows it (even run).
+            (r"a\\ b", false, true),
+            (r"a\\,b", true, false),
+            // Escapes next to real structure.
+            (r"x\,y, z", true, true),
+            (r"x\ y z", false, true),
+            // Quotes, comments and parens still shield their interiors.
+            ("'a, b'", false, false),
+            ("url(a b)", false, false),
+            // An escape at end-of-input has no payload to consume — it must not run past
+            // the end or swallow a separator that is not there.
+            (r"a\", false, false),
+            (r"a\ ", false, false),
+            // A `\r` terminator on a hex escape (CSS whitespace, unlike an escape payload).
+            ("\\41\r2px", false, false),
+            ("\\41\r2px 3px", false, true),
+        ];
+
+        for (text, want_comma, want_ws) in cases {
+            let arena = Bump::new();
+            let span = Span {
+                start: 0,
+                end: text.len() as u32,
+            };
+            let parser = ValueParser::new(text, span);
+
+            // 1. `classify_separators` — the standalone classifier.
+            let classified = classify_separators(text);
+            let classify_comma = classified == ValueSeparator::Comma;
+            let classify_ws = classified == ValueSeparator::Whitespace;
+            assert_eq!(
+                classify_comma, want_comma,
+                "classify_separators comma verdict for {text:?}"
+            );
+            assert_eq!(
+                classify_ws,
+                want_ws && !want_comma,
+                "classify_separators whitespace verdict for {text:?}"
+            );
+
+            // 2. `fast_scan` — the fused single pass. Its verdict must match.
+            let fast_comma = matches!(parser.fast_scan(text, &arena), FastScan::Comma(_));
+            let fast_ws = matches!(parser.fast_scan(text, &arena), FastScan::Whitespace);
+            assert_eq!(
+                fast_comma, classify_comma,
+                "fast_scan disagrees with classify_separators on a comma in {text:?}"
+            );
+            assert_eq!(
+                fast_ws, classify_ws,
+                "fast_scan disagrees with classify_separators on whitespace in {text:?}"
+            );
+
+            // 3. `ValueCursor::consume_until` — the splitter's scanner. Stopping before
+            // EOF means it found a top-level delimiter.
+            let mut cursor = ValueCursor::new(text);
+            let (_, comma_end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP);
+            assert_eq!(
+                comma_end < text.len(),
+                want_comma,
+                "ValueCursor disagrees on a top-level comma in {text:?}"
+            );
+            let mut cursor = ValueCursor::new(text);
+            let (_, ws_end) = cursor.consume_until(is_css_whitespace, &CSS_WS_SKIP);
+            assert_eq!(
+                ws_end < text.len(),
+                want_ws,
+                "ValueCursor disagrees on top-level whitespace in {text:?}"
+            );
+        }
+
+        // A comment is the ONE place the three deliberately diverge: `ValueCursor` is
+        // comment-BLIND while `classify_separators` is comment-aware, so a `,` inside a
+        // comment would split the cursor's scan. `fast_scan` is what makes that safe — it
+        // detects the comment and bails to the comment-aware two-pass path, so the blind
+        // cursor is never asked about such a value. Pin the bail, not a false agreement.
+        for text in ["a/* , */b", "a /* , */ b", "red /* x */, blue"] {
+            let arena = Bump::new();
+            let span = Span {
+                start: 0,
+                end: text.len() as u32,
+            };
+            let parser = ValueParser::new(text, span);
+            assert!(
+                matches!(parser.fast_scan(text, &arena), FastScan::Comment),
+                "fast_scan must bail to the comment-aware path for {text:?} — the blind \
+                 `ValueCursor` may not be used on a comment-bearing value"
+            );
+        }
+    }
 
     #[test]
     fn test_new_parser() {

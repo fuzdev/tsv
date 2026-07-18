@@ -172,7 +172,11 @@ impl<'a> Printer<'a> {
                 i = new_i.min(end);
                 continue;
             }
-            if bytes[i] == b'e' && &self.source[i..i + "else".len()] == "else" {
+            // `str::get` (not `source[i..i + 4]`): `bytes[i] == b'e'` proves `i` is a char
+            // boundary, but `i + "else".len()` is not — an `e` followed within 3 bytes by a
+            // multibyte char lands the slice end mid-codepoint and panics. `get` returns
+            // `None` there, so a doomed scan over minted multibyte text simply finds no `else`.
+            if bytes[i] == b'e' && self.source.get(i..i + "else".len()) == Some("else") {
                 return Some((i + "else".len()) as u32);
             }
             i += 1;
@@ -445,5 +449,43 @@ impl<'a> Printer<'a> {
         }
 
         d.concat(&parts)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::PrinterInputs;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use string_interner::DefaultStringInterner;
+    use tsv_lang::EmbedContext;
+    use tsv_lang::doc::arena::DocArena;
+
+    /// A synthetic if/else region (as `tsv_svelte_compile` mints) can bracket arbitrary
+    /// multibyte template text. Here an `e` byte is immediately followed by a multibyte
+    /// char whose bytes straddle `i + "else".len()`, so an unchecked `source[i..i + 4]`
+    /// slice would panic on a non-char-boundary. The `str::get` form must instead find no
+    /// `else` and return `None` without panicking (prod WASM is `panic = "abort"`).
+    #[test]
+    fn find_else_keyword_end_between_multibyte_is_panic_free() {
+        // bytes: `e`, `x`, then the 3-byte em-dash `—` at 2,3,4 — so index 4 (the slice
+        // end for an `e` at index 0) falls inside the em-dash.
+        let source = "ex—";
+        let arena = DocArena::new();
+        let interner = Rc::new(RefCell::new(DefaultStringInterner::new()));
+        let inputs = PrinterInputs {
+            source,
+            interner,
+            comments: &[],
+            line_breaks: &[],
+            has_owned_comments: false,
+            has_format_ignore: false,
+        };
+        let printer = Printer::with_context(&arena, &inputs, EmbedContext::default(), 0);
+        assert_eq!(
+            printer.find_else_keyword_end_between(0, source.len() as u32),
+            None
+        );
     }
 }

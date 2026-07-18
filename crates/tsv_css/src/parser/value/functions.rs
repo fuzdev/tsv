@@ -22,9 +22,11 @@ pub fn parse_function_arguments<'arena>(
 ) -> &'arena [CssValue<'arena>] {
     // Strip leading whitespace by offset, then trailing on the remaining slice — one
     // boundary scan per side (vs a `.trim()` plus a separate `.trim_start()`/`.trim_end()`
-    // recomputing the same two boundaries).
-    let trim_start_offset = args_str.len() - args_str.trim_start().len();
-    let trimmed = args_str[trim_start_offset..].trim_end();
+    // recomputing the same two boundaries). The trailing trim stops at an escaped
+    // whitespace (`var(--a, 50px\ )`), which would otherwise strand the backslash onto
+    // the closing `)` — see `trim_end_preserving_escape`.
+    let trim_start_offset = args_str.len() - crate::escapes::trim_start_css(args_str).len();
+    let trimmed = crate::escapes::trim_end_preserving_escape(&args_str[trim_start_offset..]);
 
     if trimmed.is_empty() {
         return &[];

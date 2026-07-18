@@ -19,7 +19,7 @@ Uses [@fuzdev/fuz_util](https://github.com/fuzdev/fuz_util) benchmarking library
 
 | Gate | Composition | Corpus / oracle | Cadence |
 | --- | --- | --- | --- |
-| **`deno task check`** | `cargo fmt --check` · `pins:audit` · `typecheck` · `conformance:audit` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `authoring:audit` · `fuzz:audit` · `test:deno` · `cargo test` (incl. fixtures) · `swallow:audit` · `check:ast-types` · `clippy` | **committed tree only** — `tests/fixtures` + pure-Rust/Deno audits, no external oracle | every commit; the CI `check` job |
+| **`deno task check`** | `cargo fmt --check` · `pins:audit` · `typecheck` · `conformance:audit` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `binding:audit` · `authoring:audit` · `fuzz:audit` · `test:deno` · `cargo test` (incl. fixtures) · `swallow:audit` · `comments:audit` · `gaps:audit` · `blanks:audit` · `check:ast-types` · `clippy` | **committed tree only** — `tests/fixtures` + pure-Rust/Deno audits, no external oracle | every commit; the CI `check` job |
 | **`deno task conformance:all`** | `conformance` (one process, five FFI legs: `svelte-fixtures` · `ts-fixtures` · `ts-repo` · `corpus:compare:parse --all` · `corpus:compare:format --all`) **+** `conformance:test262` (pure Rust; JS parser vs test262 positives) | `../svelte`, `../acorn-typescript`, `../typescript` (tsc baselines), `../prettier`, `../test262`; the **`gates`** corpus view (~6,200) | release; `scripts/publish.ts` **Step 3b** |
 | **`deno task bench` / `bench:conformance`** | perf throughput ×3 runtimes + compose; parse-coverage report | **`perf`** view (~3,200; 100%-coverage invariant) / **`conformance`** view (fixtures + wpt/test262 harvests; coverage-only + node-only) | dev / release cadence; feeds tsv.fuz.dev |
 | **`deno task idempotency:sweep`** | `tsv_debug fuzz --iterations 0` over the corpus dirs — F1 (`format(format(x)) == format(x)`) + no-panic + structural reparse on every file **as authored** | **`perf`** view (real code; absent checkouts skipped with a warning) | after a printer change; conformance cadence |
@@ -507,24 +507,33 @@ every real move in a number is a deliberate, visible edit.
   are deterministic — a drop is a regression or gutted input, a rise is a suite
   refresh or behavior change; both must be re-pinned deliberately. No slack:
   slack lets small regressions creep and silently widens after every refresh.
-- **Minimums at the exact measured value** (shrink fails, growth passes — with
-  one carve-out: `SVELTE_STYLES_BLOCKS_MIN` warns on a small shrink and fails
-  only on a >10% collapse, since it counts pure input material off
-  daily-churning repos): the
-  two non-deterministic-growth cases. (1) The `corpus:compare:* --all` corpus is
-  LIVE dev repos that grow with ordinary work — re-pin to current when touching
-  the corpus (e.g. at release) so the minimum stays tight. (2) The
-  committed-fixtures audits (`fixtures_validate`, `swallow_audit`): additions
-  are ordinary reviewed diffs (a per-fixture-PR counter bump in `deno task
-  check` would be pure ceremony), while shrinkage is the discovery regression
-  the pin guards.
-- **Failure-bucket pins** (exact `!==`, but on the live corpus rather than a
-  deterministic input): the `corpus:compare:* --all` triage buckets —
-  per-language `unknown`/`partial` divergences and tsv-side parse failures. A
-  rise fails until triaged (fix it, add a divergence detector/sanction, or
-  consciously re-pin a legitimately-unsupported new corpus file); a drop also
-  fails, so a fixed divergence ratchets the pin DOWN deliberately and the win
-  stays recorded.
+- **Minimums** (shrink fails, growth passes — with one carve-out:
+  `SVELTE_STYLES_BLOCKS_MIN` warns on a small shrink and fails only on a >10%
+  collapse, since it counts pure input material off daily-churning repos). Two
+  cases, and they differ in WHY a minimum is right: (1) `CORPUS_FORMAT_MATCH_MIN`
+  is over the **reproducible** subset (pinned framework + prettier), so it's
+  really exact-on-aligned-checkouts — the minimum is there only so a fixed win
+  needn't re-pin; over pinned inputs a `match` DROP is always a real regression.
+  ⚠️ It is NOT a live-growth minimum: the old framing — "the corpus is LIVE dev
+  repos that GROW with ordinary work, so a minimum stays tight" — was the FALSE
+  premise behind the re-pin treadmill. A minimum is only sound if the metric can't
+  decrease, but `match` **shrinks** the moment a live edit adds a divergence, so
+  live-corpus `match` was never a safe minimum — which is exactly why the format
+  pins moved to the reproducible subset. (2) `CORPUS_PARSE_COMPARED_MIN` and the
+  committed-fixtures audits (`fixtures_validate`, `swallow_audit`) ARE genuine
+  growth minimums — `compared`/fixture counts only grow with reviewed additions,
+  and shrinkage is the discovery regression the pin guards.
+- **Failure-bucket pins** (exact `!==`): the `corpus:compare:* --all` triage
+  buckets. The **format** `unknown`/`partial` pins are over the **reproducible**
+  subset (deterministic on aligned checkouts — live dev-repo divergences are a
+  non-gating WARN, reported not gated); the **parse** tsv-side parse-failure pin
+  stays over the live corpus (a tsv over-rejection of real code is a regression
+  wherever it occurs). A rise fails until triaged (fix it, add a divergence
+  detector/sanction, or consciously re-pin a legitimately-unsupported new file); a
+  drop also fails, so a fixed divergence ratchets the pin DOWN deliberately.
+- **SAFETY always gates** — content loss fails `corpus:compare:format --all`
+  over EVERY file, reproducible or live. Data loss is never churn; the
+  reproducibility split is only about the layout/count pins.
 
 Pins apply only to FULL runs (default suite root, `--all`, default harvest
 source) — subtree and filtered runs legitimately grade a slice. Harvest pins
@@ -1032,10 +1041,21 @@ Things the published numbers measure that aren't quite what they look like:
 ## Corpus
 
 One tagged entry list (`lib/corpus.ts` `CORPUS_ENTRIES`, paths relative to the
-project root). Every entry carries a tier — `real`, `prettier_fixture`, or
-`suite` — and each consumer selects a **view**:
+project root). Every entry carries a tier — `real`, `framework`,
+`prettier_fixture`, or `suite` — and each consumer selects a **view**:
 
-- **`perf`** (~3,200 files) — `real` entries only: application & library
+**Reproducible vs live (the gate split).** `framework` + `prettier_fixture` are
+version-pinned checkouts (`GATE_CHECKOUT_COMMITS`, verified by `pins:audit`) — the
+loader tags their files `reproducible: true` (`REPRODUCIBLE_TIERS`). The `real` tier
+is the author's LIVE dev repos (zzz, fuz\_\*, gro, the personal sites), unversioned
+working trees. The **format count pins (match/unknown/partial) gate on the
+reproducible subset only**, so a `pins:audit`-aligned machine measures them exactly;
+live-repo divergences are a **non-gating WARN** in `corpus:compare:format --all`.
+**SAFETY (content loss) still gates over every file**, reproducible or live. This
+retired the re-pin treadmill (the old aggregate pins drifted with dev-repo churn —
+re-pinned 3× in 2 days, and the pin commit couldn't reproduce its own number).
+
+- **`perf`** (~3,200 files) — `real` + `framework` (all real code): application & library
   source (the fuz.dev repos' `src/` — zzz, the fuz ecosystem, gro,
   svelte-docinfo, tsv.fuz.dev — plus the author's public SvelteKit sites:
   ryanatkn.com, webdevladder.net) plus upstream framework source
@@ -1062,16 +1082,19 @@ project root). Every entry carries a tier — `real`, `prettier_fixture`, or
   invariant is what makes the perf/conformance split meaningful: perf is 100%
   by construction (modulo the reviewed omits), conformance is where sub-100%
   coverage is the metric.
-- **`gates`** (~6,200 files) — `real` + `prettier_fixture`, no perf prune:
-  adds Prettier's `tests/format/{typescript,js,css,html}` suites and
+- **`gates`** (~6,200 files) — `real` + `framework` + `prettier_fixture`, no perf
+  prune: adds Prettier's `tests/format/{typescript,js,css,html}` suites and
   prettier-plugin-svelte's `test/` (`.html` treated as Svelte, files with a
-  companion `options.json` skipped) — deliberately tricky edge cases.
-  Exactly the pre-split default corpus: the correctness gates
-  (`corpus:compare:*` `--all`, `skip_triage`, `wasm_json_probe`) keep this
-  scope, since their sanction lists and documented-divergence coverage were
-  reviewed against it. The `DevReposLoader` view is required at every
-  construction site — the view decides what a number or gate verdict means,
-  so there's no implicit default to inherit by accident.
+  companion `options.json` skipped) — deliberately tricky edge cases. Same file set
+  as before the framework/real split (the framework entries were just retiered out
+  of `real`); the reproducibility split is enforced downstream (the format count
+  pins gate on the reproducible subset, live `real` repos become a non-gating WARN —
+  see the "Reproducible vs live" note above), not by dropping files from the view.
+  The correctness gates (`corpus:compare:*` `--all`, `skip_triage`,
+  `wasm_json_probe`) keep this scope, since their sanction lists and
+  documented-divergence coverage were reviewed against it. The `DevReposLoader` view
+  is required at every construction site — the view decides what a number or gate
+  verdict means, so there's no implicit default to inherit by accident.
 - **`conformance`** — the hard parse cases only: the `prettier_fixture` suites +
   the parse-conformance `suite` entries — Svelte's compiler tests
   (`../svelte/packages/svelte/tests`, with the gate-aligned skips: `_`-prefixed

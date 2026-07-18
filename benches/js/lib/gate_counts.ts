@@ -13,21 +13,26 @@
  *   by `deno task pins:audit`) and ts-repo/test262/wpt (checkouts updated
  *   deliberately). Any mismatch — up or down — fails. No slack: slack lets
  *   small regressions creep and silently widens after every refresh.
- * - **Minimums** (`*_MIN`) — success counts on the live `corpus:compare:*
- *   --all` corpus (dev repos that grow with ordinary work) and the
- *   committed-fixtures audits (additions are ordinary reviewed diffs). Growth
- *   passes; any drop below the pinned current value fails — except
- *   `SVELTE_STYLES_BLOCKS_MIN`, which counts pure input material off
- *   daily-churning repos, so a small drop only warns and only a >10% collapse
- *   fails (see its comment).
- * - **Failure-bucket pins** (`*_PIN`, exact — the same two-sided `!==` as the
- *   exact pins above, but on the live corpus rather than a deterministic
- *   input): the triage buckets on `corpus:compare:* --all` (unknown/partial
- *   divergences, tsv-side parse failures). A rise fails until triaged — fix
- *   it, add a divergence detector/sanction, or consciously re-pin (a
- *   legitimately-unsupported new corpus file); a drop (bucket shrank —
- *   divergences fixed) also fails, so the pin ratchets DOWN deliberately and
- *   wins stay recorded.
+ * - **Minimums** (`*_MIN`) — success counts. Two flavors: the FORMAT `match`
+ *   minimum (`CORPUS_FORMAT_MATCH_MIN`) is over the REPRODUCIBLE subset (pinned
+ *   framework + prettier suites), so it's exact-on-aligned-checkouts — the
+ *   minimum is only there so a fixed win needn't re-pin; over pinned inputs a
+ *   drop is always a real regression. The PARSE `compared` minimum
+ *   (`CORPUS_PARSE_COMPARED_MIN`) and the committed-fixtures audits stay
+ *   genuine live-growth minimums (dev repos / reviewed fixture diffs grow, so
+ *   growth passes, a drop fails) — except `SVELTE_STYLES_BLOCKS_MIN`, which
+ *   counts pure input material off daily-churning repos, so a small drop only
+ *   warns and only a >10% collapse fails (see its comment).
+ * - **Failure-bucket pins** (`*_PIN`, exact two-sided `!==`): the triage buckets
+ *   on `corpus:compare:* --all`. The FORMAT `unknown`/`partial` pins are over
+ *   the REPRODUCIBLE subset (deterministic on aligned checkouts — the live dev
+ *   repos are a non-gating WARN); the PARSE tsv-side parse-failure pin stays over
+ *   the live corpus (a tsv over-rejection of real code is a regression wherever
+ *   it occurs). A rise fails until triaged — fix it, add a divergence
+ *   detector/sanction, or consciously re-pin (a legitimately-unsupported new
+ *   file); a drop also fails, so the pin ratchets DOWN deliberately and wins
+ *   stay recorded. **SAFETY (content loss) always gates over EVERY file,
+ *   reproducible or live — data loss is never churn.**
  *
  * Pins are enforced only on FULL runs (default suite root, `--all`, default
  * harvest source) — a subtree or filtered run legitimately grades a slice.
@@ -195,72 +200,34 @@ export const CORPUS_PARSE_TSV_ERRORS_PIN: Record<Language, number> = {
 };
 
 /**
- * corpus:compare:format --all — MINIMUM per-language exact `match` count (same
- * live-corpus semantics as `CORPUS_PARSE_COMPARED_MIN`): a shrink fails (a regression
- * or a gutted corpus), a rise passes (re-pin to keep the floor tight). Measured
- * 2026-07-12 against ../svelte 8fb7ceeba, ../kit 1b4adccf7, ../svelte.dev fb5a4e2,
- * ../prettier 1dcd0b0, oracle @sveltejs/acorn-typescript 1.0.11 (../acorn-typescript
- * 312d079); SAFETY 0. When a fix moves a file or the live corpus grows, re-pin
- * deliberately and put the why in the commit.
+ * corpus:compare:format --all — per-language MINIMUM exact-`match` count, enforced over
+ * the REPRODUCIBLE subset only: the version-pinned `framework` + `prettier_fixture` tiers
+ * (../kit, ../svelte, ../svelte.dev, ../prettier, ../prettier-plugin-svelte — the checkouts
+ * `GATE_CHECKOUT_COMMITS` tracks and `pins:audit` verifies). The live dev repos are a
+ * NON-GATING WARN (`corpus_compare_format.ts`), so their churn never shifts a pin — an
+ * aligned machine measures these EXACTLY. A shrink fails (a formatter/oracle collapse in
+ * pinned code); a rise re-pins to keep the floor tight. It stays a minimum (not exact) only
+ * so a fixed win needn't re-pin to pass — over pinned inputs a `match` DROP is always a real
+ * regression, never live-corpus growth.
  *
- * svelte 1114→1107 (re-pinned DOWN — deliberate divergences, not a regression),
- * typescript 4151→4164 (rose — re-pinned UP to keep the floor tight). Re-measured
- * 2026-07-13 against ../svelte b4d1583ae, ../kit 5c38e515d, ../svelte.dev 93a400d,
- * ../prettier 1dcd0b0, ../prettier-plugin-svelte 7809486, oracle acorn-typescript 1.0.11
- * (../acorn-typescript 312d079); SAFETY 0. Both moves are fully attributed by formatting
- * the whole `gates` corpus with the pre-change binary and with this one and diffing the
- * per-file match sets. The svelte baseline re-measures at exactly 1114 — its old pin — so
- * there is NO svelte corpus churn in this window and the entire −7 is behavior:
- *
- * - svelte −7: content-boundary whitespace no longer selects the layout. A multiline
- *   element lays out block-style (both tags intact) regardless of how the author wrote the
- *   boundary — hug, space, or newline — since Svelte 5 removes that whitespace at compile;
- *   and `svelte:*` elements run the same analysis as regular ones. Exactly 7 files flip
- *   match→divergence, all of them prettier's delimiter dangle becoming block-style: zzz
- *   `DiskfileMetrics`, fuz_blog `BlogPostFooter`, fuz_css `FontWeightControl`, tsv.fuz.dev
- *   `BenchmarksGroup`, fuz_ui `Contextmenu` and svelte.dev `routes/blog/Byline` (the two
- *   `<svelte:element>` cases), and prettier's own `tests/format/html/comments/conditional.html`.
- *   All 7 land in `known` (svelte `unknown` holds at its pin of 7, once
- *   `inline_content_block_style`'s dangled-close marker learned that a tag name can carry
- *   `:`/`.`), prettier keeps tsv's new form stable in every case, and all 7 outputs reparse
- *   and are idempotent. See conformance_prettier.md §Svelte: Inline content block-style.
- * - typescript +13 = +3 behavior, +10 corpus: the empty-paren dangling-comment fix flips
- *   3 prettier-suite files diverge→match (`js/function/dangling-comments`,
- *   `js/last-argument-expansion/dangling-comment-in-arrow-function`,
- *   `js/comments/in-list/dangling-comment-in-list`); the baseline re-measures at 4161, so
- *   the remaining +10 is the ../svelte + ../kit + ../svelte.dev checkouts moving since the
- *   2026-07-12 pin.
- *
- * css 125 unchanged (no CSS-crate change on this branch).
- *
- * svelte 1107→1101 (re-pinned DOWN — deliberate divergences, not a regression). Re-measured
- * 2026-07-13; typescript and css unchanged, SAFETY 0. Attributed the same way (format the
- * whole `gates` corpus with the pre-change binary and with this one, diff the per-file match
- * sets — a file can only flip if tsv's own output changed, so that set is a cheap strict
- * superset). The svelte baseline re-measures at exactly 1107, so there is NO corpus churn in
- * this window and the entire −6 is behavior:
- *
- * - svelte −6: the content-boundary stance now covers the language's SECOND fragment family
- *   — block bodies. A block whose body renders multiline lays out block-style (head and tail
- *   intact) however the author wrote the boundary, since Svelte 5 removes that whitespace at
- *   compile; hug is all-or-nothing across the construct's branches; and the body-expand
- *   decision is width's alone, never keyed on whether the head may wrap. Exactly 6 files flip
- *   match→divergence, all of them prettier's welded block body becoming block-style: fuz_ui
- *   `Redirect` (an `{#if}`/`{:else}` whose branches now break together) and `ApiModule`,
- *   fuz_blog `FeedItemDate` (the real-world instance of the width-driven body after a
- *   breakable sibling), prettier-plugin-svelte's `each-block-else-with-nested-if-inline-elseif-else`
- *   and its `svelte-key-block-break` input+output. All 6 land in `known` (svelte `unknown`
- *   holds at its pin of 7, once `inline_content_block_style` learned two more ours-side
- *   markers: a block head ENDING a line that has a prefix, and a branch/close tag alone on
- *   its own line), prettier keeps tsv's new form stable in every case, and all 6 outputs
- *   reparse and are idempotent. See conformance_prettier.md §Svelte: Inline content
- *   block-style.
+ * Measured 2026-07-16 over the reproducible subset at the pinned checkouts (../svelte
+ * b4d1583ae, ../kit da5b08ea7, ../svelte.dev c21c2d0f0, ../prettier 1dcd0b05d,
+ * ../prettier-plugin-svelte 7809486; oracle acorn-typescript 1.0.11; SAFETY 0). This re-pin
+ * unblocked the RED 0.2 gate: the old pins (svelte 1103 / ts 4172 / css 125) were the
+ * AGGREGATE over live+framework and drifted with dev-repo churn (re-pinned 3× in 2 days, and
+ * the pin commit couldn't reproduce its own number). Split rationale: benches/js/CLAUDE.md
+ * §Pinned gate counts.
  */
 export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
-	svelte: 1103,
-	typescript: 4172,
-	css: 125,
+	svelte: 530,
+	typescript: 2332,
+	css: 90,
 };
+// ─── SUPERSEDED HISTORY (kept for the attribution trail, NOT current guidance) ───
+// Everything below described the OLD AGGREGATE pin (over live+framework), retired by the
+// 2026-07-16 reproducible-subset split. The very churn it narrates — "both rises are
+// live-corpus CHURN", "the pre-change binary measures … on today's checkouts too" — is
+// exactly what the split removed; the current pins can't move on dev-repo churn.
 // svelte 1101→1103 + typescript 4170→4172 (2026-07-14, checkouts as in
 // CORPUS_FORMAT_UNKNOWN_PIN below; css 125 unchanged, SAFETY 0). Both rises are live-corpus
 // CHURN, zero behavior: the pre-change binary (5d0789b3, the commit these were last pinned
@@ -313,21 +280,31 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 // pre-existing binary/ternary indent divergence).
 
 /**
- * corpus:compare:format --all — EXACT per-language `unknown` + `partial`
- * divergence counts (the un-triaged surface the WARN line reports). Both directions
- * fail: a rise = a new unexplained divergence (fix it, catalog a detector in
- * `lib/divergence/patterns.ts`, or consciously re-pin a legitimately-unsupported new
- * corpus file); a drop = the backlog shrank, re-pin to record the win. A single-run
- * trip can be the FFI/sidecar heisenbug — confirm on the single repo first. Measured
- * 2026-07-08 against ../svelte 8fb7ceeba, ../kit 1b4adccf7, ../svelte.dev fb5a4e2,
- * ../prettier-plugin-svelte 7809486, oracle acorn-typescript 1.0.11; SAFETY 0. Put the
- * why for each move in the commit.
+ * corpus:compare:format --all — EXACT per-language `unknown` divergence count over the
+ * REPRODUCIBLE subset (framework + prettier suites; see `CORPUS_FORMAT_MATCH_MIN`). Both
+ * directions fail: a rise = a new unexplained divergence (fix it, catalog a detector in
+ * `lib/divergence/patterns.ts`, or consciously re-pin a legitimately-unsupported new pinned
+ * suite file); a drop = the backlog shrank, re-pin to record the win. Live dev-repo unknowns
+ * are the non-gating WARN, not here. A single-run trip can be the FFI/sidecar heisenbug —
+ * confirm on the single repo first. Measured 2026-07-17 (same checkouts + attribution as
+ * `CORPUS_FORMAT_MATCH_MIN`; SAFETY 0).
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	svelte: 7,
-	typescript: 140,
+	typescript: 133,
 	css: 22,
 };
+// typescript 136→133 (2026-07-17, ../svelte b4d1583ae, ../kit da5b08ea7, ../svelte.dev
+// c21c2d0, ../prettier 1dcd0b0; svelte 7 + css 22 unchanged, SAFETY 0). The
+// conditional/parenthesized-type body-indent fix (bug141 §Bug 2): two files move
+// unknown→match — ../kit src/types/private.d.ts (a mapped type in a conditional true-branch)
+// and ../svelte src/server/index.d.ts (a tuple in a conditional branch). Both had a
+// broken branch VALUE one indent level short of prettier's `printBranch` (`indent(branch)`
+// under useTabs); now converged. A whole-corpus pre/post per-file bucket diff confirmed
+// exactly these two left, ZERO files entered unknown, SAFETY 0. (svelte/index.d.ts, the
+// third file, was a `partial` — see CORPUS_FORMAT_PARTIAL_PIN.)
+// ─── SUPERSEDED HISTORY (attribution trail; NOT current — pre the 2026-07-16 reproducible
+// split, these were the AGGREGATE over live+framework and moved on dev-repo churn) ───
 // typescript 139→140 (2026-07-14, checkouts unchanged; svelte 7 + css 22 unchanged, SAFETY 0).
 // A rise, but not a new divergence: `js/comments/return-statement-2.js` moves `known`→`unknown`
 // because its diff SHRANK. It carried the `return`/`throw` leading-comment ASI bug — tsv broke
@@ -489,11 +466,35 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 // prettier/tests/format/typescript/union/consistent-with-flow/comment.ts, so it moved
 // partial→known. A before/after --all diff on the identical corpus confirmed exactly
 // one file moved (0 new unknowns, match/unknown unmoved, SAFETY 0). svelte/css unmoved.
+/**
+ * corpus:compare:format --all — EXACT per-language `partial` divergence count over the
+ * REPRODUCIBLE subset (same semantics as `CORPUS_FORMAT_UNKNOWN_PIN`). Measured 2026-07-17
+ * (same checkouts + attribution as `CORPUS_FORMAT_MATCH_MIN`; SAFETY 0). svelte is 0 because
+ * all 5 live svelte partials — the fuz fill-family `.svelte` pages — are in the non-gating
+ * WARN, not the gate.
+ */
 export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
-	svelte: 5,
-	typescript: 59,
+	svelte: 0,
+	typescript: 55,
 	css: 9,
 };
+// typescript 56→55 (2026-07-17, checkouts as in CORPUS_FORMAT_UNKNOWN_PIN above; svelte 0 +
+// css 9 unchanged, SAFETY 0). The postfix-operator RHS `fluid` fix: ../kit exports/public.d.ts
+// moves partial→known — `type RemoteFormFieldType<T> = { [K in keyof InputTypeMap]: … }[keyof
+// InputTypeMap]`, an indexed-access RHS whose mapped-type OBJECT was breaking after `=` instead of
+// hugging `= {` and expanding internally. Routing `TSArrayType`/`TSIndexedAccessType` through
+// prettier's `fluid` (like the bare conditional/intersection/function RHS) converged that hunk; the
+// file's remaining hunks are cataloged, so it moved to `known`. Whole-corpus pre/post per-file
+// bucket diff confirmed exactly this file left, ZERO files entered partial (known 155→156), SAFETY 0.
+// typescript 57→56 (2026-07-17, checkouts as in CORPUS_FORMAT_UNKNOWN_PIN above; svelte 0 +
+// css 9 unchanged, SAFETY 0). Same conditional/parenthesized-type body-indent fix (bug141
+// §Bug 2): ../svelte src/index.d.ts moves partial→match — a nested conditional + a
+// parenthesized constructor type as an intersection member, where tsv over-indented the
+// parenthesized member one level past prettier. The surgical intersection-member bare-paren
+// change (`build_intersection_member_type_doc`) converged it. Whole-corpus pre/post per-file
+// bucket diff confirmed exactly this file left, ZERO files entered partial, SAFETY 0.
+// ─── SUPERSEDED HISTORY (attribution trail; NOT current — pre the 2026-07-16 reproducible
+// split, these were the AGGREGATE over live+framework and moved on dev-repo churn) ───
 // typescript 60→59 (2026-07-14, checkouts unchanged; svelte 5 + css 9 unchanged, SAFETY 0). One
 // file leaves, none enter — `js/comments-closure-typecast/issue-8045.js`, `partial`→`known`, from
 // the same `return`/`throw` leading-comment fix as the unknown pin below. Its JSDoc cast is

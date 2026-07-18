@@ -181,6 +181,43 @@ impl<'a> Printer<'a> {
         ts_type: &TSType<'_>,
         needs_parens: fn(&TSType<'_>) -> bool,
     ) -> DocId {
+        self.build_type_doc_maybe_parens_impl(ts_type, needs_parens, true)
+    }
+
+    /// Intersection-member variant of `build_type_doc_maybe_parens`: the default
+    /// parenthesization emits a **bare** `("(" inner ")")` with no inner `d.indent`.
+    ///
+    /// Prettier never indents parenthesized-type content in the general
+    /// `needsParens` case (`["(", doc, ")"]`); an intersection member's level comes
+    /// entirely from `printIntersectionType`'s own `indent([" &", line, …])` wrapper
+    /// (or, for the first / object-adjacent member, none). So a parenthesized
+    /// function / constructor / conditional member sits at the member indent, not one
+    /// level deeper. tsv's shared default `d.indent` (kept for other callers) is
+    /// double-duty: it correctly renders a **union** member's per-member `align(2)`
+    /// as a whole tab, and matches the depth in a conditional check/extends paren —
+    /// but for an **intersection** member it is a spurious extra level. Hence this
+    /// dedicated entry point for the intersection member sites only. Fixes bug141
+    /// §Bug 2 case 3; guarded by `intersection_paren_constructor` /
+    /// `intersection_paren_conditional`.
+    pub(super) fn build_intersection_member_type_doc(
+        &self,
+        ts_type: &TSType<'_>,
+        needs_parens: fn(&TSType<'_>) -> bool,
+    ) -> DocId {
+        self.build_type_doc_maybe_parens_impl(ts_type, needs_parens, false)
+    }
+
+    /// Shared implementation of `build_type_doc_maybe_parens` /
+    /// `build_intersection_member_type_doc`. `indent_default_paren` gates only the
+    /// default (non-union, non-trailing-object-intersection) paren case: `true`
+    /// wraps the inner type in `d.indent` (union-member offset / conditional
+    /// check-extends depth), `false` leaves it bare (intersection members).
+    fn build_type_doc_maybe_parens_impl(
+        &self,
+        ts_type: &TSType<'_>,
+        needs_parens: fn(&TSType<'_>) -> bool,
+        indent_default_paren: bool,
+    ) -> DocId {
         let d = self.d();
         if needs_parens(ts_type) {
             // Special case: intersection with trailing object type
@@ -203,12 +240,19 @@ impl<'a> Printer<'a> {
                 return self.build_parenthesized_union_doc(union, immediate_paren(ts_type), false);
             }
 
-            // Default case: parenthesize and indent the inner type. The closing
-            // `)` sits at the base indent; the object/intersection cases above
-            // handle their own aligned (one-level-deeper) closings.
+            // Default case: parenthesize the inner type. The inner `d.indent`
+            // (union-member offset / conditional check-extends depth) is dropped
+            // for intersection members, which take their level from the
+            // intersection printer's own `& `-line indent — see
+            // `build_intersection_member_type_doc`.
+            let inner = self.build_type_doc(ts_type);
             d.concat(&[
                 d.text("("),
-                d.indent(self.build_type_doc(ts_type)),
+                if indent_default_paren {
+                    d.indent(inner)
+                } else {
+                    inner
+                },
                 d.text(")"),
             ])
         } else {
@@ -219,6 +263,27 @@ impl<'a> Printer<'a> {
             // `Outer<Inner<...>>` wraps the outer `Outer<>` instead of force-inlining
             // the single arg and breaking only the inner `Inner<>`.
             self.build_type_doc(ts_type)
+        }
+    }
+
+    /// A comment-free parenthesized union in element/object position that would
+    /// break EXPANDS its parens (`(⏎\t| A⏎\t| B⏎)`, prettier's `printUnionType`
+    /// needs-parens branch) instead of gluing the leading `|` to the `(`. Returns
+    /// `None` for any other type — the caller keeps its existing layout — and for a
+    /// *commented* union, so comment placement stays untouched. `ty` is the element /
+    /// object as authored (parens included): it is unwrapped to reach the union, and
+    /// its own span (parens and all) is the comment window. Shared by the
+    /// array-element (`build_array_type_doc`) and indexed-access-object arms; the
+    /// indexed-access *index* uses bracket delimiters, not parens, so it expands
+    /// inline rather than through here. See `type_param_fits_rhs_long`.
+    pub(super) fn build_expanded_parenthesized_union_opt(&self, ty: &TSType<'_>) -> Option<DocId> {
+        if let TSType::Union(u) = unwrap_parenthesized(ty)
+            && !self.union_prints_hugged(u)
+            && !self.has_comments_to_emit_between(ty.span().start, ty.span().end)
+        {
+            Some(self.build_parenthesized_union_doc(u, None, false))
+        } else {
+            None
         }
     }
 

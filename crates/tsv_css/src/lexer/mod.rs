@@ -44,7 +44,10 @@ pub mod token;
 
 use comments::read_comment;
 pub(crate) use identifiers::IDENT_CONTINUE_LUT;
-use identifiers::{is_ascii_identifier_start, is_identifier_start, read_identifier};
+use identifiers::{
+    is_ascii_identifier_start, is_identifier_start, is_non_ascii_identifier_codepoint,
+    read_identifier,
+};
 use numbers::read_number;
 use strings::read_string;
 pub use token::{Token, TokenKind};
@@ -145,11 +148,18 @@ impl<'a> Lexer<'a> {
                 Some(b) if is_ascii_css_whitespace(b) => self.pos += 1,
                 // Any other ASCII byte is not whitespace — stop.
                 Some(b) if b < 0x80 => break,
-                // Non-ASCII lead byte: decode to test the full Unicode whitespace rule
-                // (`char::is_whitespace`, which is true for NBSP, NEL, LS/PS, …). This is
-                // the same predicate the char loop applied — byte-identical.
+                // Non-ASCII lead byte: CSS whitespace is ASCII-only (CSS Syntax 3 §4.2).
+                // tsv follows `parseCss` in treating every code point ≥ U+00A0 (NBSP, em
+                // space, ideographic space, …) as an *identifier* code point — value/ident
+                // content, never a separator, and deliberately broader than the CSS Syntax
+                // ident set (which excludes these look-alike whitespace chars). So a
+                // whitespace run stops at one; it lexes as identifier content instead. Only
+                // the sub-U+00A0 non-ASCII whitespace (the C1 controls, e.g. NEL U+0085 —
+                // not identifier code points here) stays whitespace.
                 Some(_) => match self.current_char() {
-                    Some(ch) if ch.is_whitespace() => self.pos += ch.len_utf8(),
+                    Some(ch) if ch.is_whitespace() && !is_non_ascii_identifier_codepoint(ch) => {
+                        self.pos += ch.len_utf8();
+                    }
                     _ => break,
                 },
                 None => break,
@@ -378,12 +388,15 @@ impl<'a> Lexer<'a> {
                 self.pos,
             )),
 
-            // Non-ASCII lead byte: decode the full char and run the char tail in the
-            // former arm order — whitespace (NBSP, NEL, LS/PS, …) first, then the
-            // non-ASCII identifier code points, then the unknown-character error.
+            // Non-ASCII lead byte: decode the full char and dispatch. tsv follows
+            // `parseCss` in treating every code point ≥ U+00A0 (NBSP, em space, …) as an
+            // identifier code point — not whitespace (CSS whitespace is ASCII-only, CSS
+            // Syntax 3 §4.2), so it opens an identifier; only sub-U+00A0 non-ASCII
+            // whitespace (the C1 controls, e.g. NEL) is whitespace, then the
+            // unknown-character error.
             _ => match self.current_char() {
-                Some(ch) if ch.is_whitespace() => Ok(self.skip_whitespace()),
                 Some(ch) if is_identifier_start(ch) => self.read_identifier(),
+                Some(ch) if ch.is_whitespace() => Ok(self.skip_whitespace()),
                 Some(ch) => Err(lex_err(
                     format!("Unexpected character in CSS: '{ch}'"),
                     self.pos,

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 228,
+	"end": 430,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,9 +12,9 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " keyof operator: comment after the keyword, operand on the next line",
+			"value": " keyof operator, trailing line comment: comment after the keyword, operand on the next line",
 			"start": 20,
-			"end": 90,
+			"end": 113,
 			"loc": {
 				"start": {
 					"line": 2,
@@ -22,15 +22,15 @@
 				},
 				"end": {
 					"line": 2,
-					"column": 71
+					"column": 94
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 107,
-			"end": 111,
+			"start": 130,
+			"end": 134,
 			"loc": {
 				"start": {
 					"line": 3,
@@ -44,9 +44,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " typeof operator: comment after the keyword, operand on the next line",
-			"start": 119,
-			"end": 190,
+			"value": " typeof operator (a TypeQuery), trailing line comment",
+			"start": 142,
+			"end": 197,
 			"loc": {
 				"start": {
 					"line": 6,
@@ -54,15 +54,15 @@
 				},
 				"end": {
 					"line": 6,
-					"column": 72
+					"column": 56
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 208,
-			"end": 212,
+			"start": 215,
+			"end": 219,
 			"loc": {
 				"start": {
 					"line": 7,
@@ -73,32 +73,96 @@
 					"column": 21
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " keyof operator, own-line line comment: comment on its own line, operand on the next line",
+			"start": 227,
+			"end": 318,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 92
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 337,
+			"end": 341,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 2
+				},
+				"end": {
+					"line": 12,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " typeof operator, own-line line comment",
+			"start": 349,
+			"end": 390,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 42
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 410,
+			"end": 414,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 2
+				},
+				"end": {
+					"line": 17,
+					"column": 6
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 227,
+		"end": 429,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 218,
+			"end": 420,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 9,
+					"line": 19,
 					"column": 9
 				}
 			},
 			"body": [
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 92,
-					"end": 116,
+					"start": 115,
+					"end": 139,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -111,8 +175,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 97,
-						"end": 98,
+						"start": 120,
+						"end": 121,
 						"loc": {
 							"start": {
 								"line": 3,
@@ -127,8 +191,8 @@
 					},
 					"typeAnnotation": {
 						"type": "TSTypeOperator",
-						"start": 101,
-						"end": 115,
+						"start": 124,
+						"end": 138,
 						"loc": {
 							"start": {
 								"line": 3,
@@ -142,8 +206,8 @@
 						"operator": "keyof",
 						"typeAnnotation": {
 							"type": "TSTypeReference",
-							"start": 114,
-							"end": 115,
+							"start": 137,
+							"end": 138,
 							"loc": {
 								"start": {
 									"line": 4,
@@ -156,8 +220,8 @@
 							},
 							"typeName": {
 								"type": "Identifier",
-								"start": 114,
-								"end": 115,
+								"start": 137,
+								"end": 138,
 								"loc": {
 									"start": {
 										"line": 4,
@@ -174,8 +238,8 @@
 								{
 									"type": "Line",
 									"value": " c",
-									"start": 107,
-									"end": 111
+									"start": 130,
+									"end": 134
 								}
 							]
 						}
@@ -183,16 +247,16 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " keyof operator: comment after the keyword, operand on the next line",
+							"value": " keyof operator, trailing line comment: comment after the keyword, operand on the next line",
 							"start": 20,
-							"end": 90
+							"end": 113
 						}
 					]
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 192,
-					"end": 217,
+					"start": 199,
+					"end": 224,
 					"loc": {
 						"start": {
 							"line": 7,
@@ -205,8 +269,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 197,
-						"end": 198,
+						"start": 204,
+						"end": 205,
 						"loc": {
 							"start": {
 								"line": 7,
@@ -221,8 +285,8 @@
 					},
 					"typeAnnotation": {
 						"type": "TSTypeQuery",
-						"start": 201,
-						"end": 216,
+						"start": 208,
+						"end": 223,
 						"loc": {
 							"start": {
 								"line": 7,
@@ -235,8 +299,8 @@
 						},
 						"exprName": {
 							"type": "Identifier",
-							"start": 215,
-							"end": 216,
+							"start": 222,
+							"end": 223,
 							"loc": {
 								"start": {
 									"line": 8,
@@ -252,8 +316,8 @@
 								{
 									"type": "Line",
 									"value": " c",
-									"start": 208,
-									"end": 212
+									"start": 215,
+									"end": 219
 								}
 							]
 						}
@@ -261,9 +325,181 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " typeof operator: comment after the keyword, operand on the next line",
-							"start": 119,
-							"end": 190
+							"value": " typeof operator (a TypeQuery), trailing line comment",
+							"start": 142,
+							"end": 197
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 320,
+					"end": 346,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 325,
+						"end": 326,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 6
+							},
+							"end": {
+								"line": 11,
+								"column": 7
+							}
+						},
+						"name": "C"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeOperator",
+						"start": 329,
+						"end": 345,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 10
+							},
+							"end": {
+								"line": 13,
+								"column": 3
+							}
+						},
+						"operator": "keyof",
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 344,
+							"end": 345,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 2
+								},
+								"end": {
+									"line": 13,
+									"column": 3
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 344,
+								"end": 345,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 3
+									}
+								},
+								"name": "B"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c",
+									"start": 337,
+									"end": 341
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " keyof operator, own-line line comment: comment on its own line, operand on the next line",
+							"start": 227,
+							"end": 318
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 392,
+					"end": 419,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 397,
+						"end": 398,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 6
+							},
+							"end": {
+								"line": 16,
+								"column": 7
+							}
+						},
+						"name": "D"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeQuery",
+						"start": 401,
+						"end": 418,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 10
+							},
+							"end": {
+								"line": 18,
+								"column": 3
+							}
+						},
+						"exprName": {
+							"type": "Identifier",
+							"start": 417,
+							"end": 418,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 2
+								},
+								"end": {
+									"line": 18,
+									"column": 3
+								}
+							},
+							"name": "x",
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c",
+									"start": 410,
+									"end": 414
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " typeof operator, own-line line comment",
+							"start": 349,
+							"end": 390
 						}
 					]
 				}
