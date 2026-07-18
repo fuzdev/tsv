@@ -20,8 +20,14 @@ all-or-nothing body-expand decision (see
 Covered: `{#if}` empty `:else`, `{#if}` empty consequent, `{:else if}` empty branch, `{#each}` empty
 `:else` fallback, `{#each}` empty body. A branch that carries content is untouched.
 
-`prettier_variant_glued.svelte` authors every empty branch glued to its neighbour; prettier keeps
-that form stable, tsv normalizes it to `input.svelte`.
+The three authorings of an empty branch are each pinned:
+
+- **newline + blank** — `input.svelte` itself; both formatters keep it (F1, and prettier-stable).
+- **newline, no blank** (`{:else}⏎{/if}`) — `unformatted_newline.svelte`; **both** formatters
+  normalize it to `input.svelte`, so it is a plain `unformatted_*`, not a divergence claim.
+- **glued** (`{:else}{/if}`) — `prettier_variant_glued.svelte`; prettier keeps that form stable
+  (N1) while tsv normalizes it to `input.svelte` (N2). This is the authoring the divergence is
+  about.
 
 Note the contrast with the **inline** form: when the whole construct fits on one line the empty
 branch collapses and its markers glue ([blocks/if/empty](../if/empty/) pins

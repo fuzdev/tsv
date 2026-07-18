@@ -24,6 +24,8 @@ catch lands the same way in both:
 
 - `unformatted_ours_glued.svelte` — the empty catch authored glued to the close
   (`{:catch error}{/await}`) inside an otherwise block-form await.
+- `unformatted_ours_newline.svelte` — the empty catch authored on its own line without the blank
+  (`{:catch error}⏎{/await}`).
 - `unformatted_ours_space_only.svelte` — the same document authored **inline** (bodies glued, a
   space in the catch), which reaches the block layout by breaking.
 
