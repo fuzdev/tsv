@@ -1,0 +1,252 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 88,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 45,
+				"name": "input",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 6,
+						"character": 6
+					}
+				},
+				"attributes": [
+					{
+						"start": 8,
+						"end": 42,
+						"type": "BindDirective",
+						"name": "value",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 1,
+								"character": 8
+							},
+							"end": {
+								"line": 2,
+								"column": 11,
+								"character": 18
+							}
+						},
+						"expression": {
+							"type": "BinaryExpression",
+							"start": 34,
+							"end": 39,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 6
+								},
+								"end": {
+									"line": 4,
+									"column": 11
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 34,
+								"end": 35,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 6
+									},
+									"end": {
+										"line": 4,
+										"column": 7
+									}
+								},
+								"name": "a"
+							},
+							"operator": ">",
+							"right": {
+								"type": "Identifier",
+								"start": 38,
+								"end": 39,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 10
+									},
+									"end": {
+										"line": 4,
+										"column": 11
+									}
+								},
+								"name": "b"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c\n ",
+									"start": 23,
+									"end": 33
+								}
+							]
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 45,
+				"end": 46,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 46,
+				"end": 87,
+				"name": "input",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 47
+					},
+					"end": {
+						"line": 7,
+						"column": 6,
+						"character": 52
+					}
+				},
+				"attributes": [
+					{
+						"start": 54,
+						"end": 84,
+						"type": "ClassDirective",
+						"name": "active",
+						"name_loc": {
+							"start": {
+								"line": 8,
+								"column": 1,
+								"character": 54
+							},
+							"end": {
+								"line": 8,
+								"column": 13,
+								"character": 66
+							}
+						},
+						"expression": {
+							"type": "BinaryExpression",
+							"start": 78,
+							"end": 83,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 5
+								},
+								"end": {
+									"line": 9,
+									"column": 10
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 78,
+								"end": 79,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 5
+									},
+									"end": {
+										"line": 9,
+										"column": 6
+									}
+								},
+								"name": "a"
+							},
+							"operator": ">",
+							"right": {
+								"type": "Identifier",
+								"start": 82,
+								"end": 83,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 9
+									},
+									"end": {
+										"line": 9,
+										"column": 10
+									}
+								},
+								"name": "b"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c\n ",
+									"start": 68,
+									"end": 77
+								}
+							]
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " c\n ",
+			"start": 23,
+			"end": 33,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 4,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c\n ",
+			"start": 68,
+			"end": 77,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 15
+				},
+				"end": {
+					"line": 9,
+					"column": 4
+				}
+			}
+		}
+	]
+}
