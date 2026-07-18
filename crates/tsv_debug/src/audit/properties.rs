@@ -109,6 +109,23 @@ impl Utf16ToByte {
             Some(t) => t.get(wire).copied(),
         }
     }
+
+    /// The byte-space `[start, end)` of a wire node, or `None` when it carries no span, has a
+    /// malformed `end < start`, or an offset lands out of range. The wire's own positions are
+    /// UTF-16, so both ends are translated through the map. The one wire-node→byte-span
+    /// primitive the audit walkers share (`sites`'s region/edge collection, `node_edge`'s child
+    /// walk, `blank_audit`'s verbatim-skip walk) — all `comment_check`-gated, so the method is
+    /// too, else it reads as dead code in a default build (`Utf16ToByte` itself stays
+    /// always-compiled for `binding_audit`, which uses only `byte`).
+    #[cfg(feature = "comment_check")]
+    pub(crate) fn node_byte_span(&self, node: &Value) -> Option<(usize, usize)> {
+        let s = node.get("start")?.as_u64()? as usize;
+        let e = node.get("end")?.as_u64()? as usize;
+        if e < s {
+            return None;
+        }
+        Some((self.byte(s)?, self.byte(e)?))
+    }
 }
 
 /// Compare two ASTs for **structural** equivalence — the corruption-hunt basis.

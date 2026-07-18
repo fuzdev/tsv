@@ -6,6 +6,9 @@
 //!
 //! - [`ratchet`] — the "every line is a known bug, the file shrinking is the goal"
 //!   snapshot gate (the shape a large, churny finding set needs instead of a count).
+//! - [`node_edge`] — the wire-tree walker keying an injection offset to its
+//!   enclosing AST node + child-role edge, the coarse companion to `sites`'
+//!   file-independent shape keying.
 //! - [`sites`] — site enumeration + file-independent shape keying for the
 //!   gap-injection and blank-injection audits.
 //! - [`properties`] — the per-input property layer: the panic-safe ledger format
@@ -27,6 +30,10 @@ pub(crate) mod properties;
 // both themselves behind the `comment_check` feature (they arm
 // `tsv_lang::comment_ledger`), so gate these too — otherwise they read as dead
 // code in a default build.
+#[cfg(feature = "comment_check")]
+pub(crate) mod node_edge;
+#[cfg(feature = "comment_check")]
+pub(crate) mod parallel;
 #[cfg(feature = "comment_check")]
 pub(crate) mod ratchet;
 #[cfg(feature = "comment_check")]

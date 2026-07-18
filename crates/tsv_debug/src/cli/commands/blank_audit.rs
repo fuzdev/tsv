@@ -87,7 +87,6 @@
 
 use argh::FromArgs;
 use std::collections::{BTreeMap, BTreeSet};
-use std::num::NonZero;
 use std::panic::AssertUnwindSafe;
 use std::path::PathBuf;
 
@@ -97,6 +96,7 @@ use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 use tsv_lang::comment_ledger::{self, CommentFindingKind};
 
+use crate::audit::parallel::run_pool;
 use crate::audit::properties::{
     F1Outcome, Formatted, Pristine, Utf16ToByte, f1_check, leaf_conservation_diff, ledger_format,
     pristine_format, structurally_equivalent, tsv_parse_to_value,
@@ -466,14 +466,6 @@ impl Tally {
     }
 }
 
-/// The byte-space `[start, end)` of a wire node, translated through `map` (the wire's own
-/// positions are UTF-16). `None` when the node carries no span or an offset lands out of range.
-fn node_byte_span(node: &Value, map: &Utf16ToByte) -> Option<(usize, usize)> {
-    let s = node.get("start")?.as_u64()? as usize;
-    let e = node.get("end")?.as_u64()? as usize;
-    Some((map.byte(s)?, map.byte(e)?))
-}
-
 /// Walk `node` collecting the verbatim-blank regions — template-literal quasis (verbatim text)
 /// and Svelte `<pre>` / `<textarea>` (whitespace-preserving elements), in byte space via `map`.
 /// A format-ignore region is NOT found here (locating its range from the output is fragile) — a
@@ -484,7 +476,7 @@ fn collect_blank_skip(node: &Value, map: &Utf16ToByte, out: &mut Vec<(usize, usi
             match obj.get("type").and_then(Value::as_str) {
                 // A template quasi's text is verbatim — a blank run inside is content, not a bug.
                 Some("TemplateElement") => {
-                    if let Some(span) = node_byte_span(node, map) {
+                    if let Some(span) = map.node_byte_span(node) {
                         out.push(span);
                     }
                 }
@@ -496,7 +488,7 @@ fn collect_blank_skip(node: &Value, map: &Utf16ToByte, out: &mut Vec<(usize, usi
                         .and_then(Value::as_str)
                         .is_some_and(tsv_html::preserves_whitespace) =>
                 {
-                    if let Some(span) = node_byte_span(node, map) {
+                    if let Some(span) = map.node_byte_span(node) {
                         out.push(span);
                     }
                 }
@@ -818,37 +810,15 @@ impl BlankAuditCommand {
         let prev_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(|_| {}));
 
-        let jobs = self
-            .jobs
-            .filter(|j| *j > 0)
-            .or_else(|| std::thread::available_parallelism().ok().map(NonZero::get))
-            .unwrap_or(1)
-            .min(files.len());
-
         let render = true;
-        let mut total = Tally::default();
-        // Chunk by stride: fixture sizes cluster by directory and the work is quadratic in file
-        // size, so contiguous blocks would leave one thread holding every large file.
-        std::thread::scope(|scope| {
-            let handles: Vec<_> = (0..jobs)
-                .map(|worker| {
-                    let files = &files;
-                    scope.spawn(move || {
-                        let mut tally = Tally::default();
-                        for path in files.iter().skip(worker).step_by(jobs) {
-                            audit_file(path, render, &mut tally);
-                        }
-                        tally
-                    })
-                })
-                .collect();
-            for h in handles {
-                match h.join() {
-                    Ok(t) => total.merge(t),
-                    Err(_) => eprintln!("warning: a worker thread panicked outside the audit loop"),
-                }
-            }
-        });
+        // Stride-chunked worker pool (see `audit::parallel::run_pool`); a worker panic outside the
+        // per-injection catch fails the run rather than silently dropping a tally.
+        let total = run_pool(
+            &files,
+            self.jobs,
+            |path, tally| audit_file(path, render, tally),
+            Tally::merge,
+        )?;
 
         std::panic::set_hook(prev_hook);
         comment_ledger::set_comment_check(false);

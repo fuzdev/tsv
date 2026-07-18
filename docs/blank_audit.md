@@ -75,8 +75,9 @@ Build with **`--profile corpus`** (release + `panic = "unwind"`). Plain `--relea
 `--json`, `--jobs`, and `--report` change how a run is reported and scheduled, never which sites it
 reaches, so they don't narrow it. `--limit` and an explicit path DO: `--update` refuses a narrowed
 run (it would pin a subset and silently unpin real bugs), and the ratchet is skipped with an
-explicit `○ ratchet SKIPPED` note. Off the default corpus every finding is news, and any finding
-exits 1.
+explicit `○ ratchet SKIPPED` note. Off the default corpus every finding is news, and any **graded**
+finding exits 1 — STRUCTURAL-DIVERGENCE stays report-only there too (it is never in the graded set),
+matching how it is held soft on the default corpus.
 
 ### Cost — the fast path
 
