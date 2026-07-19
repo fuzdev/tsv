@@ -33,6 +33,13 @@ formatters break after the `=` and keep it there. Carrying the whole authoring a
 own-line) is deliberate: the two take different paths through the leading-comment run, so a
 change that only exercises the glued one can silently break the other.
 
+The **blank** authoring (`p = /* c */⏎⏎1`, `unformatted_ours_blank.svelte`) is the third point on
+that axis. The blank yields with the break — it sits inside a break already judged unforced, and
+a blank line is a property of a line break — so tsv normalizes it to input, same as the plain
+newline; prettier relocates to `variant_relocated.svelte` as it does for the newline authoring.
+See
+[conformance_prettier.md §Authored breaks in value position](../../../../../../docs/conformance_prettier.md#authored-breaks-in-value-position).
+
 ## Reason
 
 **Design choice.** The break is unforced — a block comment does not run to end-of-line, so
