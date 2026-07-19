@@ -1,5 +1,5 @@
 <ul  >
    {#each  items  as  item  }
       <li  >  { item }  </li  >
-   {/each}
+   {/each }
 </ul  >

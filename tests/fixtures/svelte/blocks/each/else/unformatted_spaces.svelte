@@ -1,5 +1,5 @@
 {#each  items  as  item  }
    <div  >  { item }  </div  >
-{:else}
+{:else  }
    <div  >  text  </div  >
-{/each}
+{/each }

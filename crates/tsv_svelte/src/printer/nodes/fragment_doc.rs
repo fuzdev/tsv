@@ -861,7 +861,7 @@ impl<'a> Printer<'a> {
     /// prettier-plugin-svelte (`isBlockElement`): an HTML block element, a block special
     /// element, or a block component. Excludes control-flow blocks (`{#if}` etc. — they
     /// separate via the whitespace-break path) and inline elements/components.
-    fn is_block_element_node(&self, node: &FragmentNode<'_>) -> bool {
+    pub(super) fn is_block_element_node(&self, node: &FragmentNode<'_>) -> bool {
         matches!(
             node,
             FragmentNode::Element(_) | FragmentNode::SpecialElement(_)

@@ -157,20 +157,6 @@ pub(crate) fn has_nested_block_flow(nodes: &[FragmentNode<'_>]) -> bool {
     })
 }
 
-/// Helper to wrap body content in indent(), with optional hardline for leading whitespace.
-///
-/// This pattern is used consistently across all block types (if, each, await, snippet, key)
-/// to ensure proper indentation of nested content when it breaks across lines.
-pub(super) fn indent_body(printer: &Printer<'_>, body_doc: DocId, has_leading_ws: bool) -> DocId {
-    if has_leading_ws {
-        let hardline = printer.d().hardline();
-        let inner = printer.d().concat(&[hardline, body_doc]);
-        printer.d().indent(inner)
-    } else {
-        printer.d().indent(body_doc)
-    }
-}
-
 impl<'a> Printer<'a> {
     /// Collect the leading-comment run in `[from, to)` — one doc per comment via
     /// [`build_leading_js_comment_doc`](Self::build_leading_js_comment_doc), so every
