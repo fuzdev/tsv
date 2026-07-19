@@ -1,1 +1,1 @@
-{#key  a  }<div  >text</div  >{/key}
+{#key  a  }<div  >text</div  >{/key }

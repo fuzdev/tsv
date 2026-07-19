@@ -1227,14 +1227,15 @@ cargo run -p tsv_debug scan_audit --list     # enumerate every scan site
 #   - At a tag's CONTENT BOUNDARY — hug↔space↔newline, i.e. the run IS created and
 #     destroyed. Svelte 5 removes start/end-of-content whitespace at compile, so all
 #     three authorings render identically. This is the family that catches a formatter
-#     letting a render-free character pick the layout (the delimiter-dangle class); it
-#     probes only elements whose content already spans lines, where layout is at stake.
-#     Note what that skips: for content that FITS on one line tsv preserves an authored
-#     boundary space (`<span> text </span>` and `<span>text</span>` are BOTH stable), so a
-#     clean run means no render-free character picks a LAYOUT — not that none survives in
-#     the output. That preservation is deliberate and prettier-matching (fixture
-#     `inline_boundary_whitespace`); see conformance_prettier.md §Svelte: Inline content
-#     block-style.
+#     letting a render-free character pick the layout (the delimiter-dangle class).
+#     Fits-inline content is probed too — tsv trims a render-free boundary run even when
+#     the content fits (`<span> text </span>` → `<span>text</span>`, the Svelte-mirror
+#     trim; fixture `inline_boundary_whitespace_prettier_divergence`, conformance_prettier.md
+#     §Svelte: Inline content block-style), so hug↔space↔newline reach ONE fixed point at
+#     every content boundary outside pre/textarea. Sanctioned residual: a BOTH-side
+#     newline-authored boundary around an ELEMENT child keeps its multiline layout
+#     (newlines are intent; text-only content glues regardless — width alone decides), so
+#     its single-boundary mutants settle glued — reported dual-stable, deliberate.
 # The element expansion a mutation may trigger is the property under test. Svelte only.
 # Gated in `deno task check` via the `authoring:audit` task — which scans tests/fixtures
 # ONLY, so point it at a real codebase too: findings live there (a non-idempotent fill

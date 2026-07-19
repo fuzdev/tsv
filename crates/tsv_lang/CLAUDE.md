@@ -95,6 +95,20 @@ arena_print_doc*()           — render doc tree to formatted string
 
 The two `resolved` variants also have `*_into(…, output: &mut String)` forms that render into a caller-provided buffer (reserving `estimated_output_capacity` themselves) — the seam behind the arena-parked render scratch the per-piece writers use; the `String`-returning forms are thin wrappers over them.
 
+**Below those entry points, the render path threads one `&RenderCtx`.** The mutually-recursive
+internals (`render_doc_iterative` → `render_doc_core` → `render_single_doc` /
+`render_fill_iterative`, plus the line-suffix flush) each need the same four invariants — the
+arena, the `RenderConfig`, the `EmbedContext`, and the resolver — so those are bundled into
+`RenderCtx` and every entry point constructs one. Each internal function destructures it back
+into locals at entry, so the render logic reads unchanged.
+
+⚠️ `RenderCtx` holds **only shared references, deliberately**. The mutable render state —
+`output`, `pos`, `should_remeasure`, and the command / line-suffix work buffers — stays as
+separate `&mut` parameters, which is why three functions still carry a
+`clippy::too_many_arguments` allow. Bundling those behind a struct pointer takes their address
+and sinks them out of registers in the hot loop; the allow is the cheaper price. Don't "finish
+the job" by folding them in without an instruction-count gate.
+
 ## How Language Crates Use tsv_lang
 
 ### Parsing

@@ -1,30 +1,30 @@
 {#each  items  as  item  }
 	{@const  a  =  item.b  }
 	{  a  }
-{/each}
+{/each }
 
 {#if  cond  }
 	{@const  a  =  b  }
 	{  a  }
-{:else}
+{:else  }
 	{@const  c  =  d  }
 	{  c  }
-{/if}
+{/if }
 
 {#snippet  fn( a )  }
 	{@const  b  =  a.c  }
 	{  b  }
-{/snippet}
+{/snippet }
 
 {#await  promise  then  value  }
 	{@const  a  =  value.b  }
 	{  a  }
-{/await}
+{/await }
 
 {#key  expr  }
 	{@const  a  =  b  }
 	{  a  }
-{/key}
+{/key }
 
 <Comp  >
 	{@const  a  =  b  }

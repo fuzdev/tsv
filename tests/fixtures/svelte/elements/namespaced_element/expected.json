@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 201,
+	"end": 173,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -108,7 +108,7 @@
 			{
 				"type": "RegularElement",
 				"start": 56,
-				"end": 81,
+				"end": 91,
 				"name": "foo:bar",
 				"name_loc": {
 					"start": {
@@ -127,58 +127,20 @@
 					"type": "Fragment",
 					"nodes": [
 						{
-							"type": "Text",
-							"start": 65,
-							"end": 71,
-							"raw": " text ",
-							"data": " text "
-						}
-					]
-				}
-			},
-			{
-				"type": "Text",
-				"start": 81,
-				"end": 82,
-				"raw": "\n",
-				"data": "\n"
-			},
-			{
-				"type": "RegularElement",
-				"start": 82,
-				"end": 117,
-				"name": "foo:bar",
-				"name_loc": {
-					"start": {
-						"line": 5,
-						"column": 1,
-						"character": 83
-					},
-					"end": {
-						"line": 5,
-						"column": 8,
-						"character": 90
-					}
-				},
-				"attributes": [],
-				"fragment": {
-					"type": "Fragment",
-					"nodes": [
-						{
 							"type": "RegularElement",
-							"start": 91,
-							"end": 107,
+							"start": 65,
+							"end": 81,
 							"name": "div",
 							"name_loc": {
 								"start": {
-									"line": 5,
+									"line": 4,
 									"column": 10,
-									"character": 92
+									"character": 66
 								},
 								"end": {
-									"line": 5,
+									"line": 4,
 									"column": 13,
-									"character": 95
+									"character": 69
 								}
 							},
 							"attributes": [],
@@ -187,8 +149,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 96,
-										"end": 101,
+										"start": 70,
+										"end": 75,
 										"raw": "block",
 										"data": "block"
 									}
@@ -200,50 +162,50 @@
 			},
 			{
 				"type": "Text",
-				"start": 117,
-				"end": 118,
+				"start": 91,
+				"end": 92,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 118,
-				"end": 162,
+				"start": 92,
+				"end": 136,
 				"name": "foo:bar",
 				"name_loc": {
 					"start": {
-						"line": 6,
+						"line": 5,
 						"column": 1,
-						"character": 119
+						"character": 93
 					},
 					"end": {
-						"line": 6,
+						"line": 5,
 						"column": 8,
-						"character": 126
+						"character": 100
 					}
 				},
 				"attributes": [
 					{
 						"type": "Attribute",
-						"start": 127,
-						"end": 140,
+						"start": 101,
+						"end": 114,
 						"name": "prop",
 						"name_loc": {
 							"start": {
-								"line": 6,
+								"line": 5,
 								"column": 9,
-								"character": 127
+								"character": 101
 							},
 							"end": {
-								"line": 6,
+								"line": 5,
 								"column": 13,
-								"character": 131
+								"character": 105
 							}
 						},
 						"value": [
 							{
-								"start": 133,
-								"end": 139,
+								"start": 107,
+								"end": 113,
 								"type": "Text",
 								"raw": "value1",
 								"data": "value1"
@@ -252,25 +214,25 @@
 					},
 					{
 						"type": "Attribute",
-						"start": 141,
-						"end": 159,
+						"start": 115,
+						"end": 133,
 						"name": "data-attr",
 						"name_loc": {
 							"start": {
-								"line": 6,
+								"line": 5,
 								"column": 23,
-								"character": 141
+								"character": 115
 							},
 							"end": {
-								"line": 6,
+								"line": 5,
 								"column": 32,
-								"character": 150
+								"character": 124
 							}
 						},
 						"value": [
 							{
-								"start": 152,
-								"end": 158,
+								"start": 126,
+								"end": 132,
 								"type": "Text",
 								"raw": "value2",
 								"data": "value2"
@@ -285,26 +247,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 162,
-				"end": 163,
+				"start": 136,
+				"end": 137,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 163,
-				"end": 174,
+				"start": 137,
+				"end": 148,
 				"name": "Foo:bar",
 				"name_loc": {
 					"start": {
-						"line": 7,
+						"line": 6,
 						"column": 1,
-						"character": 164
+						"character": 138
 					},
 					"end": {
-						"line": 7,
+						"line": 6,
 						"column": 8,
-						"character": 171
+						"character": 145
 					}
 				},
 				"attributes": [],
@@ -315,26 +277,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 174,
-				"end": 175,
+				"start": 148,
+				"end": 149,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 175,
-				"end": 200,
+				"start": 149,
+				"end": 172,
 				"name": "Foo:bar",
 				"name_loc": {
 					"start": {
-						"line": 8,
+						"line": 7,
 						"column": 1,
-						"character": 176
+						"character": 150
 					},
 					"end": {
-						"line": 8,
+						"line": 7,
 						"column": 8,
-						"character": 183
+						"character": 157
 					}
 				},
 				"attributes": [],
@@ -343,10 +305,10 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 184,
-							"end": 190,
-							"raw": " text ",
-							"data": " text "
+							"start": 158,
+							"end": 162,
+							"raw": "text",
+							"data": "text"
 						}
 					]
 				}

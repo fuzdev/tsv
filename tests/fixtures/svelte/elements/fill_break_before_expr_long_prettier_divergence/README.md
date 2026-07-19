@@ -8,8 +8,10 @@ trailing text instead.
 tsv (breaks before the tag, line ≤ 100): `... ({hhhhhh} iiii),` / `{jjjjjjjj} kkkk`
 Prettier (keeps the tag, 101 chars): `... ({hhhhhh} iiii), {jjjjjjjj}` / `kkkk`
 
-The second `<p>` is one character shorter, so the whole fill stays on a single block-style line under
-both formatters — the boundary just under the wrap.
+The second `<p>` is one character shorter. Prettier keeps its whole fill on a single block-style
+line, which reaches 105 chars; tsv breaks the trailing word off to hold the line at exactly 100. It
+is the same divergence one notch along — the break lands at the fill's *last* separator rather than
+before the tag, so the two `<p>` elements pin both ends of the same rule.
 
 `divergent_variant_overflow` is the same document authored the way Prettier settles it — the tag kept
 on the line at 101 with its trailing text dangling below. Prettier keeps that form; tsv rewrites it to

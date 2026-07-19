@@ -10,6 +10,7 @@
 
 import type { DiffHunk, DiffLine } from '../diff.ts';
 import type { Language } from '../types.ts';
+import { hunk_alters_semantic_chars } from './safety.ts';
 
 export interface DetectionContext {
 	/** Original source code */
@@ -54,6 +55,22 @@ export interface DivergencePattern {
 	conformance_sections: string[];
 	/** Fixture paths (relative to tests/fixtures/) this pattern should detect */
 	fixtures: string[];
+	/**
+	 * Whether this pattern's transformation can legitimately change semantic character
+	 * counts — adding or removing letters, digits, or brackets, as opposed to only
+	 * reflowing whitespace/quotes/commas/parens (the chars SAFETY already excludes).
+	 *
+	 * Only a pattern declaring this may vouch for a hunk that carries a SAFETY
+	 * differential (see `detect_divergences`'s `safety_vouched`). Optional and defaulting
+	 * to `false` so the gate fails CLOSED: a pattern that has not thought about the
+	 * question cannot excuse content loss, and a new pattern is safe by omission.
+	 *
+	 * Setting this `true` is a promise that the pattern's own `detect` carries a
+	 * content-preservation proof for whatever it claims — as `bom_strip` (byte-exact BOM
+	 * prefix test), `self_closing_nonvoid` (matching tag names on both sides) and
+	 * `comment_preserved` (the comment text must appear in ours) each do.
+	 */
+	may_alter_char_frequency?: boolean;
 	/** Detection function */
 	detect: (ctx: DetectionContext) => DivergenceMatch | null;
 }
@@ -80,6 +97,18 @@ export interface HunkCoverageResult {
 	unexplained_hunks: number[];
 	/** Overall classification */
 	classification: 'all_explained' | 'partial' | 'none_explained';
+	/**
+	 * Whether this coverage may excuse a file-level SAFETY differential.
+	 *
+	 * Stricter than `classification === 'all_explained'`, and deliberately a separate
+	 * question: every hunk that actually moves the semantic character count must be
+	 * claimed by a pattern declaring `may_alter_char_frequency`. Whitespace-only hunks
+	 * still need explaining for the ordinary `partial`/`unknown` bucketing, but they can
+	 * no longer prop up a SAFETY downgrade they had no part in causing.
+	 */
+	safety_vouched: boolean;
+	/** Indices of hunks whose own added/removed lines move the semantic char count */
+	char_risky_hunks: number[];
 }
 
 /**
@@ -389,6 +418,9 @@ const bom_strip: DivergencePattern = {
 	description: 'BOM (byte order mark) removed',
 	languages: ['svelte', 'typescript', 'css'],
 	conformance_sections: ['Whitespace: BOM Handling'],
+	// U+FEFF is not in FORMATTING_CHARS, so stripping it moves the semantic count. The
+	// detect below is byte-exact (source starts with the BOM, ours does not, prettier does).
+	may_alter_char_frequency: true,
 	fixtures: [
 		'svelte/syntax/whitespace/bom_prettier_divergence',
 		'css/tokens/whitespace/bom_prettier_divergence',
@@ -426,7 +458,13 @@ const self_closing_nonvoid: DivergencePattern = {
 	description: 'Non-void HTML element self-closing normalization',
 	languages: ['svelte'],
 	conformance_sections: ['Svelte/HTML'],
-	fixtures: ['svelte/elements/self_closing_nonvoid_prettier_divergence'],
+	fixtures: [
+		'svelte/elements/self_closing_nonvoid_prettier_divergence',
+		'svelte/elements/ws_sensitive_self_closing_kinds_prettier_divergence',
+	],
+	// `<i … />` → `<i …></i>` adds `<`, `/`, `>` and the tag name — real semantic chars.
+	// The detect below proves preservation by matching the tag NAME on both sides.
+	may_alter_char_frequency: true,
 	detect(ctx) {
 		if (ctx.language !== 'svelte') return null;
 
@@ -805,6 +843,10 @@ const css_scss_directive_number: DivergencePattern = {
 	languages: ['css', 'svelte'],
 	conformance_sections: ['CSS: At-Rules'],
 	fixtures: ['css/at_rules/scss_directive_number_preserved_prettier_divergence'],
+	// Re-spelling a number changes digit counts (`.5` ↔ `0.5`). The detect below carries
+	// the matching proof: identical non-numeric skeletons AND equal numeric-token counts,
+	// so a number can be re-spelled but never dropped or added.
+	may_alter_char_frequency: true,
 	detect(ctx) {
 		if (ctx.language !== 'css' && ctx.language !== 'svelte') return null;
 
@@ -1519,6 +1561,9 @@ const comment_preserved: DivergencePattern = {
 	description: 'We preserve a comment inside {…}/a tag that Prettier drops',
 	languages: ['svelte'],
 	conformance_sections: ['Svelte: Attributes', 'Svelte: Elements'],
+	// Keeping content prettier drops means ours has MORE semantic chars, by design. The
+	// detect below requires the comment text to actually appear in our output.
+	may_alter_char_frequency: true,
 	fixtures: [
 		'svelte/syntax/comments/expr_trailing_prettier_divergence',
 		'svelte/syntax/comments/expr_trailing_line_prettier_divergence',
@@ -1736,6 +1781,168 @@ const inline_content_block_style: DivergencePattern = {
 			hunk_indices: ctx.hunks.map((h) => h.index),
 			reason:
 				'inline/block content laid out block-style (tags intact, content on its own line); prettier dangles the tag delimiters',
+		};
+	},
+};
+
+/**
+ * The whitespace class `svelte_boundary_ws_trim`'s collapse-equality erases: FRAGMENT-EDGE
+ * runs only, mirroring the compiler's `clean_nodes` (which deletes every fragment-edge run
+ * at compile). Inter-sibling runs are deliberately NOT erased — Svelte collapses those to
+ * one space, they never vanish, so a formatter deleting one changes the render and must
+ * fail the equality rather than be claimed as the sanctioned trim.
+ */
+/** Void elements have no content fragment, so a run after their tag is inter-sibling. */
+const VOID_ELEMENTS = 'area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr';
+/**
+ * After a non-void, non-self-closed element/component open tag — content start. The tag
+ * body tolerates `>` inside quoted attribute values (`title="a > b"`) and inside braced
+ * expressions up to one nesting level (`onclick={() => (x = !x)}` — arrow handlers are
+ * ubiquitous in Svelte). Deeper brace nesting or a `<` in an attr fails the lookbehind
+ * and under-claims (file lands in partial/unknown → triage), never over-claims. The
+ * trailing `(?<!/>)` excludes a self-closed tag, which has no content fragment.
+ */
+const boundary_after_open_tag = new RegExp(
+	String.raw`(?<=<(?!(?:${VOID_ELEMENTS})\b)[A-Za-z][^<>"'{}]*(?:(?:"[^"]*"|'[^']*'|\{(?:[^{}]|\{[^{}]*\})*\})[^<>"'{}]*)*>)(?<!/>)[ \t\r\n]+`,
+	'gi',
+);
+/** Before a closing tag — content end. */
+const boundary_before_close_tag = /[ \t\r\n]+(?=<\/)/g;
+/**
+ * After a block open/branch tag `{#…}` / `{:…}` — branch fragment start. One brace-nesting
+ * level is admitted for destructuring (`{#each xs as {a, b}}`); deeper nesting fails the
+ * lookbehind and under-claims, never over-claims.
+ */
+const boundary_after_block_tag = /(?<=\{[#:](?:[^{}]|\{[^{}]*\})*\})[ \t\r\n]+/g;
+/** Before a block close/branch tag `{/…}` / `{:…}` — branch fragment end. */
+const boundary_before_block_tag = /[ \t\r\n]+(?=\{[:/])/g;
+const erase_fragment_edges = (s: string): string =>
+	s
+		.replace(boundary_after_open_tag, '')
+		.replace(boundary_before_close_tag, '')
+		.replace(boundary_after_block_tag, '')
+		.replace(boundary_before_block_tag, '');
+/**
+ * `<script>`/`<style>` regions. The trim is a TEMPLATE policy, so the collapse leaves
+ * these interiors VERBATIM and the per-hunk arm refuses hunks overlapping them: their
+ * whitespace is program/string bytes, and erasing tag-shaped runs inside code would let
+ * ours deleting whitespace inside a STRING (`` `a <b> c` `` template literal, a CSS
+ * `content: 'a <b> c'`) satisfy the equality — content loss SAFETY can't see, since it
+ * counts no whitespace. The non-greedy body means a `</script>` inside a string ends the
+ * region early, erring toward erasing less (under-claiming), never more.
+ */
+const raw_code_regions = /<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi;
+/** Erase fragment-edge runs OUTSIDE `<script>`/`<style>`; code regions pass through verbatim. */
+const collapse_fragment_edge_ws = (s: string): string => {
+	let out = '';
+	let last = 0;
+	for (const m of s.matchAll(raw_code_regions)) {
+		out += erase_fragment_edges(s.slice(last, m.index)) + m[0];
+		last = m.index + m[0].length;
+	}
+	return out + erase_fragment_edges(s.slice(last));
+};
+/** 0-based inclusive line ranges covered by `raw_code_regions` in `text`. */
+const raw_code_line_ranges = (text: string): Array<{ start: number; end: number }> => {
+	const count_newlines = (s: string): number => (s.match(/\n/g) ?? []).length;
+	const ranges: Array<{ start: number; end: number }> = [];
+	for (const m of text.matchAll(raw_code_regions)) {
+		const start = count_newlines(text.slice(0, m.index));
+		ranges.push({ start, end: start + count_newlines(m[0]) });
+	}
+	return ranges;
+};
+const line_range_overlaps = (
+	range: { start: number; end: number } | null,
+	regions: Array<{ start: number; end: number }>,
+): boolean => range !== null && regions.some((r) => range.start <= r.end && r.start <= range.end);
+
+const svelte_boundary_ws_trim: DivergencePattern = {
+	id: 'svelte_boundary_ws_trim',
+	description:
+		'tsv trims render-free content-boundary whitespace (the Svelte-mirror trim: the compiler removes every fragment edge run at compile); prettier keeps a boundary space or expands the construct',
+	languages: ['svelte'],
+	conformance_sections: ['Svelte: Inline content block-style', 'Svelte: Blocks'],
+	fixtures: [
+		'svelte/elements/inline_boundary_whitespace_prettier_divergence',
+		'svelte/elements/inline_boundary_whitespace_misc_prettier_divergence',
+		'svelte/elements/title_boundary_whitespace_prettier_divergence',
+		'svelte/elements/inline_empty_long_prettier_divergence',
+		'svelte/blocks/boundary_space_trim_prettier_divergence',
+		'svelte/blocks/await/boundary_space_trim_prettier_divergence',
+		'svelte/blocks/if/spaces_prettier_divergence',
+	],
+	detect(ctx) {
+		if (ctx.language !== 'svelte') return null;
+
+		// No file-level whitespace-only gate: each claim below carries its own
+		// content-preservation proof (the collapse equality over the exact text it claims),
+		// so trim hunks are claimable even in a file whose OTHER hunks carry a non-ws
+		// divergence (e.g. the self-closing expansion `self_closing_nonvoid` explains) —
+		// those other hunks stay unclaimed by this pattern.
+
+		// FAMILY SIGNATURE: the two sides are IDENTICAL once every FRAGMENT-EDGE whitespace
+		// run — the exact class the trim deletes (see `collapse_fragment_edge_ws` above) —
+		// is removed from both, and ours carries strictly LESS whitespace (the trim only
+		// removes; a diff where ours adds whitespace is some other reflow and stays
+		// unclaimed). Inter-sibling runs (after `</x>`'s `>`, around `{expr}`, next to
+		// text, after a void/self-closed tag) are render-SIGNIFICANT — Svelte collapses
+		// them to one space, they never vanish — so they survive VERBATIM on both sides:
+		// ours deleting one fails the equality and the file surfaces as unknown/partial
+		// instead of `known`. A run not touching a fragment edge (a text-fill rewrap)
+		// likewise survives on both sides and fails it.
+		//
+		// Tried WHOLE-FILE first: when the entire ours/prettier difference is this class,
+		// every hunk is claimed at once — necessary, not just convenient, because the diff
+		// often splits a trimmed line's removed/added forms into SEPARATE hunks around a
+		// shared glued context line (`<span> hi</span>` → `<span>hi</span>` where an
+		// identical glued line sits between them), leaving per-hunk pairs asymmetric.
+		// A mixed file falls back to the per-hunk pair check for the trim hunks alone.
+		const count_ws = (s: string): number => (s.match(/[ \t\r\n]/g) ?? []).length;
+		if (
+			collapse_fragment_edge_ws(ctx.prettier) === collapse_fragment_edge_ws(ctx.ours) &&
+			count_ws(ctx.ours) < count_ws(ctx.prettier)
+		) {
+			return {
+				pattern: 'svelte_boundary_ws_trim',
+				confidence: 'likely',
+				hunk_indices: ctx.hunks.map((h) => h.index),
+				reason:
+					'render-free content-boundary whitespace trimmed (Svelte-mirror trim); prettier keeps the boundary space or expands the construct',
+			};
+		}
+		// A hunk inside a <script>/<style> region can never be a template trim — its
+		// whitespace is program/string bytes — so refuse it outright. Checked per side
+		// against that side's own line ranges (the regions sit at different lines when
+		// the diff shifts them).
+		const ours_code_ranges = raw_code_line_ranges(ctx.ours);
+		const prettier_code_ranges = raw_code_line_ranges(ctx.prettier);
+		const claimed: number[] = [];
+		for (const hunk of ctx.hunks) {
+			if (
+				line_range_overlaps(hunk.ours_range, ours_code_ranges) ||
+				line_range_overlaps(hunk.prettier_range, prettier_code_ranges)
+			) {
+				continue;
+			}
+			const ours_join = hunk.added_lines.join('\n');
+			const prettier_join = hunk.removed_lines.join('\n');
+			if (
+				prettier_join !== ours_join &&
+				collapse_fragment_edge_ws(prettier_join) === collapse_fragment_edge_ws(ours_join) &&
+				count_ws(ours_join) < count_ws(prettier_join)
+			) {
+				claimed.push(hunk.index);
+			}
+		}
+		if (claimed.length === 0) return null;
+
+		return {
+			pattern: 'svelte_boundary_ws_trim',
+			confidence: 'likely',
+			hunk_indices: claimed,
+			reason:
+				'render-free content-boundary whitespace trimmed (Svelte-mirror trim); prettier keeps the boundary space or expands the construct',
 		};
 	},
 };
@@ -2439,6 +2646,7 @@ export const PATTERNS: DivergencePattern[] = [
 	menu_block,
 	inline_content_hug,
 	inline_content_block_style,
+	svelte_boundary_ws_trim,
 	fill_after_inline,
 	block_multiline_attrs_hug,
 	comment_preserved,
@@ -2456,6 +2664,9 @@ export const PATTERNS: DivergencePattern[] = [
 	fill_101_boundary,
 	comment_position,
 ];
+
+/** Pattern lookup by id, for resolving a `DivergenceMatch` back to its declaring pattern. */
+const pattern_by_id = new Map(PATTERNS.map((p) => [p.id, p]));
 
 /**
  * Detect which known divergence patterns explain the difference between
@@ -2502,11 +2713,33 @@ export function detect_divergences(ctx: DetectionContext): HunkCoverageResult {
 		classification = 'partial';
 	}
 
+	// Hunk-scoped SAFETY vouching. `all_explained` alone is too weak to excuse a
+	// character-frequency differential: it is a set-cover over hunk indices, so a pattern
+	// covering some unrelated hunk is as load-bearing as the one covering the hunk that
+	// actually carried the flagged characters. Score each hunk on its own lines, then
+	// require every char-risky one to be claimed by a pattern that has declared it can
+	// legitimately change char counts.
+	const vouching_hunks = new Set<number>();
+	for (const match of matches) {
+		const pattern = pattern_by_id.get(match.pattern);
+		if (!pattern?.may_alter_char_frequency) continue;
+		for (const idx of match.hunk_indices) vouching_hunks.add(idx);
+	}
+	const char_risky_hunks = hunks
+		.filter((h) =>
+			hunk_alters_semantic_chars(h.removed_lines.join('\n'), h.added_lines.join('\n')),
+		)
+		.map((h) => h.index);
+	const safety_vouched =
+		unexplained_hunks.length === 0 && char_risky_hunks.every((idx) => vouching_hunks.has(idx));
+
 	return {
 		hunks,
 		matches,
 		explained_hunks,
 		unexplained_hunks,
 		classification,
+		safety_vouched,
+		char_risky_hunks,
 	};
 }

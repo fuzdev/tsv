@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 1665,
+	"end": 1667,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,31 +10,31 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 728,
-				"data": " An empty block-body element inside <pre> that overflows. The wrapped attributes and close token indent off the element's nesting depth (one level per enclosing container, matching prettier), and the source close form is preserved: self-closing keeps `/>`, explicit-empty keeps its close tag. When the attributes fit within print width they stay on one line and only the close token drops to its own line; when they overflow they wrap one per line with `/>` on its own line, never hugging the last attribute. The divergence is print-width-as-hard-limit: output_prettier shows prettier full-breaking the self-closing elements' attributes even though they fit (the explicit-empty and overflowing cases now match prettier). "
+				"end": 848,
+				"data": " An empty block-body element inside <pre> that overflows. The wrapped attributes and close token indent off the element's nesting depth (one level per enclosing container, matching prettier). The close form follows the same rule as everywhere else: a component keeps an authored `/>`, a plain HTML element normalizes to its close tag (see ws_sensitive_self_closing_kinds), so the `<span>` case is explicit-empty. When the attributes fit within print width they stay on one line and only the close token drops to its own line; when they overflow they wrap one per line with `/>` on its own line, never hugging the last attribute. The divergence is print-width-as-hard-limit: output_prettier shows prettier full-breaking the self-closing elements' attributes even though they fit (the explicit-empty and overflowing cases now match prettier). "
 			},
 			{
 				"type": "Text",
-				"start": 728,
-				"end": 729,
+				"start": 848,
+				"end": 849,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 729,
-				"end": 840,
+				"start": 849,
+				"end": 960,
 				"name": "pre",
 				"name_loc": {
 					"start": {
 						"line": 2,
 						"column": 1,
-						"character": 730
+						"character": 850
 					},
 					"end": {
 						"line": 2,
 						"column": 4,
-						"character": 733
+						"character": 853
 					}
 				},
 				"attributes": [],
@@ -44,12 +44,12 @@
 						{
 							"type": "IfBlock",
 							"elseif": false,
-							"start": 734,
-							"end": 834,
+							"start": 854,
+							"end": 954,
 							"test": {
 								"type": "Identifier",
-								"start": 739,
-								"end": 743,
+								"start": 859,
+								"end": 863,
 								"loc": {
 									"start": {
 										"line": 2,
@@ -67,47 +67,47 @@
 								"nodes": [
 									{
 										"type": "Component",
-										"start": 744,
-										"end": 829,
+										"start": 864,
+										"end": 949,
 										"name": "Comp",
 										"name_loc": {
 											"start": {
 												"line": 2,
 												"column": 16,
-												"character": 745
+												"character": 865
 											},
 											"end": {
 												"line": 2,
 												"column": 20,
-												"character": 749
+												"character": 869
 											}
 										},
 										"attributes": [
 											{
 												"type": "Attribute",
-												"start": 750,
-												"end": 764,
+												"start": 870,
+												"end": 884,
 												"name": "prop1",
 												"name_loc": {
 													"start": {
 														"line": 2,
 														"column": 21,
-														"character": 750
+														"character": 870
 													},
 													"end": {
 														"line": 2,
 														"column": 26,
-														"character": 755
+														"character": 875
 													}
 												},
 												"value": {
 													"type": "ExpressionTag",
-													"start": 756,
-													"end": 764,
+													"start": 876,
+													"end": 884,
 													"expression": {
 														"type": "Identifier",
-														"start": 757,
-														"end": 763,
+														"start": 877,
+														"end": 883,
 														"loc": {
 															"start": {
 																"line": 2,
@@ -124,29 +124,29 @@
 											},
 											{
 												"type": "Attribute",
-												"start": 765,
-												"end": 779,
+												"start": 885,
+												"end": 899,
 												"name": "prop2",
 												"name_loc": {
 													"start": {
 														"line": 2,
 														"column": 36,
-														"character": 765
+														"character": 885
 													},
 													"end": {
 														"line": 2,
 														"column": 41,
-														"character": 770
+														"character": 890
 													}
 												},
 												"value": {
 													"type": "ExpressionTag",
-													"start": 771,
-													"end": 779,
+													"start": 891,
+													"end": 899,
 													"expression": {
 														"type": "Identifier",
-														"start": 772,
-														"end": 778,
+														"start": 892,
+														"end": 898,
 														"loc": {
 															"start": {
 																"line": 2,
@@ -163,29 +163,29 @@
 											},
 											{
 												"type": "Attribute",
-												"start": 780,
-												"end": 794,
+												"start": 900,
+												"end": 914,
 												"name": "prop3",
 												"name_loc": {
 													"start": {
 														"line": 2,
 														"column": 51,
-														"character": 780
+														"character": 900
 													},
 													"end": {
 														"line": 2,
 														"column": 56,
-														"character": 785
+														"character": 905
 													}
 												},
 												"value": {
 													"type": "ExpressionTag",
-													"start": 786,
-													"end": 794,
+													"start": 906,
+													"end": 914,
 													"expression": {
 														"type": "Identifier",
-														"start": 787,
-														"end": 793,
+														"start": 907,
+														"end": 913,
 														"loc": {
 															"start": {
 																"line": 2,
@@ -202,29 +202,29 @@
 											},
 											{
 												"type": "Attribute",
-												"start": 795,
-												"end": 809,
+												"start": 915,
+												"end": 929,
 												"name": "prop4",
 												"name_loc": {
 													"start": {
 														"line": 2,
 														"column": 66,
-														"character": 795
+														"character": 915
 													},
 													"end": {
 														"line": 2,
 														"column": 71,
-														"character": 800
+														"character": 920
 													}
 												},
 												"value": {
 													"type": "ExpressionTag",
-													"start": 801,
-													"end": 809,
+													"start": 921,
+													"end": 929,
 													"expression": {
 														"type": "Identifier",
-														"start": 802,
-														"end": 808,
+														"start": 922,
+														"end": 928,
 														"loc": {
 															"start": {
 																"line": 2,
@@ -241,29 +241,29 @@
 											},
 											{
 												"type": "Attribute",
-												"start": 810,
-												"end": 824,
+												"start": 930,
+												"end": 944,
 												"name": "prop5",
 												"name_loc": {
 													"start": {
 														"line": 2,
 														"column": 81,
-														"character": 810
+														"character": 930
 													},
 													"end": {
 														"line": 2,
 														"column": 86,
-														"character": 815
+														"character": 935
 													}
 												},
 												"value": {
 													"type": "ExpressionTag",
-													"start": 816,
-													"end": 824,
+													"start": 936,
+													"end": 944,
 													"expression": {
 														"type": "Identifier",
-														"start": 817,
-														"end": 823,
+														"start": 937,
+														"end": 943,
 														"loc": {
 															"start": {
 																"line": 2,
@@ -293,26 +293,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 840,
-				"end": 842,
+				"start": 960,
+				"end": 962,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 842,
-				"end": 959,
+				"start": 962,
+				"end": 1079,
 				"name": "pre",
 				"name_loc": {
 					"start": {
 						"line": 5,
 						"column": 1,
-						"character": 843
+						"character": 963
 					},
 					"end": {
 						"line": 5,
 						"column": 4,
-						"character": 846
+						"character": 966
 					}
 				},
 				"attributes": [],
@@ -322,12 +322,12 @@
 						{
 							"type": "IfBlock",
 							"elseif": false,
-							"start": 847,
-							"end": 953,
+							"start": 967,
+							"end": 1073,
 							"test": {
 								"type": "Identifier",
-								"start": 852,
-								"end": 856,
+								"start": 972,
+								"end": 976,
 								"loc": {
 									"start": {
 										"line": 5,
@@ -345,314 +345,36 @@
 								"nodes": [
 									{
 										"type": "Component",
-										"start": 857,
-										"end": 948,
+										"start": 977,
+										"end": 1068,
 										"name": "Comp",
 										"name_loc": {
 											"start": {
 												"line": 5,
 												"column": 16,
-												"character": 858
+												"character": 978
 											},
 											"end": {
 												"line": 5,
 												"column": 20,
-												"character": 862
+												"character": 982
 											}
 										},
 										"attributes": [
 											{
 												"type": "Attribute",
-												"start": 863,
-												"end": 877,
-												"name": "prop1",
-												"name_loc": {
-													"start": {
-														"line": 5,
-														"column": 21,
-														"character": 863
-													},
-													"end": {
-														"line": 5,
-														"column": 26,
-														"character": 868
-													}
-												},
-												"value": {
-													"type": "ExpressionTag",
-													"start": 869,
-													"end": 877,
-													"expression": {
-														"type": "Identifier",
-														"start": 870,
-														"end": 876,
-														"loc": {
-															"start": {
-																"line": 5,
-																"column": 28
-															},
-															"end": {
-																"line": 5,
-																"column": 34
-															}
-														},
-														"name": "value1"
-													}
-												}
-											},
-											{
-												"type": "Attribute",
-												"start": 878,
-												"end": 892,
-												"name": "prop2",
-												"name_loc": {
-													"start": {
-														"line": 5,
-														"column": 36,
-														"character": 878
-													},
-													"end": {
-														"line": 5,
-														"column": 41,
-														"character": 883
-													}
-												},
-												"value": {
-													"type": "ExpressionTag",
-													"start": 884,
-													"end": 892,
-													"expression": {
-														"type": "Identifier",
-														"start": 885,
-														"end": 891,
-														"loc": {
-															"start": {
-																"line": 5,
-																"column": 43
-															},
-															"end": {
-																"line": 5,
-																"column": 49
-															}
-														},
-														"name": "value2"
-													}
-												}
-											},
-											{
-												"type": "Attribute",
-												"start": 893,
-												"end": 907,
-												"name": "prop3",
-												"name_loc": {
-													"start": {
-														"line": 5,
-														"column": 51,
-														"character": 893
-													},
-													"end": {
-														"line": 5,
-														"column": 56,
-														"character": 898
-													}
-												},
-												"value": {
-													"type": "ExpressionTag",
-													"start": 899,
-													"end": 907,
-													"expression": {
-														"type": "Identifier",
-														"start": 900,
-														"end": 906,
-														"loc": {
-															"start": {
-																"line": 5,
-																"column": 58
-															},
-															"end": {
-																"line": 5,
-																"column": 64
-															}
-														},
-														"name": "value3"
-													}
-												}
-											},
-											{
-												"type": "Attribute",
-												"start": 908,
-												"end": 922,
-												"name": "prop4",
-												"name_loc": {
-													"start": {
-														"line": 5,
-														"column": 66,
-														"character": 908
-													},
-													"end": {
-														"line": 5,
-														"column": 71,
-														"character": 913
-													}
-												},
-												"value": {
-													"type": "ExpressionTag",
-													"start": 914,
-													"end": 922,
-													"expression": {
-														"type": "Identifier",
-														"start": 915,
-														"end": 921,
-														"loc": {
-															"start": {
-																"line": 5,
-																"column": 73
-															},
-															"end": {
-																"line": 5,
-																"column": 79
-															}
-														},
-														"name": "value4"
-													}
-												}
-											},
-											{
-												"type": "Attribute",
-												"start": 923,
-												"end": 937,
-												"name": "prop5",
-												"name_loc": {
-													"start": {
-														"line": 5,
-														"column": 81,
-														"character": 923
-													},
-													"end": {
-														"line": 5,
-														"column": 86,
-														"character": 928
-													}
-												},
-												"value": {
-													"type": "ExpressionTag",
-													"start": 929,
-													"end": 937,
-													"expression": {
-														"type": "Identifier",
-														"start": 930,
-														"end": 936,
-														"loc": {
-															"start": {
-																"line": 5,
-																"column": 88
-															},
-															"end": {
-																"line": 5,
-																"column": 94
-															}
-														},
-														"name": "value5"
-													}
-												}
-											}
-										],
-										"fragment": {
-											"type": "Fragment",
-											"nodes": []
-										}
-									}
-								]
-							},
-							"alternate": null
-						}
-					]
-				}
-			},
-			{
-				"type": "Text",
-				"start": 959,
-				"end": 961,
-				"raw": "\n\n",
-				"data": "\n\n"
-			},
-			{
-				"type": "RegularElement",
-				"start": 961,
-				"end": 1077,
-				"name": "pre",
-				"name_loc": {
-					"start": {
-						"line": 8,
-						"column": 1,
-						"character": 962
-					},
-					"end": {
-						"line": 8,
-						"column": 4,
-						"character": 965
-					}
-				},
-				"attributes": [],
-				"fragment": {
-					"type": "Fragment",
-					"nodes": [
-						{
-							"type": "IfBlock",
-							"elseif": false,
-							"start": 966,
-							"end": 1071,
-							"test": {
-								"type": "Identifier",
-								"start": 971,
-								"end": 975,
-								"loc": {
-									"start": {
-										"line": 8,
-										"column": 10
-									},
-									"end": {
-										"line": 8,
-										"column": 14
-									}
-								},
-								"name": "cond"
-							},
-							"consequent": {
-								"type": "Fragment",
-								"nodes": [
-									{
-										"type": "RegularElement",
-										"start": 976,
-										"end": 1066,
-										"name": "span",
-										"name_loc": {
-											"start": {
-												"line": 8,
-												"column": 16,
-												"character": 977
-											},
-											"end": {
-												"line": 8,
-												"column": 20,
-												"character": 981
-											}
-										},
-										"attributes": [
-											{
-												"type": "Attribute",
-												"start": 982,
+												"start": 983,
 												"end": 997,
-												"name": "data-a",
+												"name": "prop1",
 												"name_loc": {
 													"start": {
-														"line": 8,
+														"line": 5,
 														"column": 21,
-														"character": 982
+														"character": 983
 													},
 													"end": {
-														"line": 8,
-														"column": 27,
+														"line": 5,
+														"column": 26,
 														"character": 988
 													}
 												},
@@ -666,12 +388,12 @@
 														"end": 996,
 														"loc": {
 															"start": {
-																"line": 8,
-																"column": 29
+																"line": 5,
+																"column": 28
 															},
 															"end": {
-																"line": 8,
-																"column": 35
+																"line": 5,
+																"column": 34
 															}
 														},
 														"name": "value1"
@@ -681,36 +403,36 @@
 											{
 												"type": "Attribute",
 												"start": 998,
-												"end": 1013,
-												"name": "data-b",
+												"end": 1012,
+												"name": "prop2",
 												"name_loc": {
 													"start": {
-														"line": 8,
-														"column": 37,
+														"line": 5,
+														"column": 36,
 														"character": 998
 													},
 													"end": {
-														"line": 8,
-														"column": 43,
-														"character": 1004
+														"line": 5,
+														"column": 41,
+														"character": 1003
 													}
 												},
 												"value": {
 													"type": "ExpressionTag",
-													"start": 1005,
-													"end": 1013,
+													"start": 1004,
+													"end": 1012,
 													"expression": {
 														"type": "Identifier",
-														"start": 1006,
-														"end": 1012,
+														"start": 1005,
+														"end": 1011,
 														"loc": {
 															"start": {
-																"line": 8,
-																"column": 45
+																"line": 5,
+																"column": 43
 															},
 															"end": {
-																"line": 8,
-																"column": 51
+																"line": 5,
+																"column": 49
 															}
 														},
 														"name": "value2"
@@ -719,37 +441,37 @@
 											},
 											{
 												"type": "Attribute",
-												"start": 1014,
-												"end": 1029,
-												"name": "data-c",
+												"start": 1013,
+												"end": 1027,
+												"name": "prop3",
 												"name_loc": {
 													"start": {
-														"line": 8,
-														"column": 53,
-														"character": 1014
+														"line": 5,
+														"column": 51,
+														"character": 1013
 													},
 													"end": {
-														"line": 8,
-														"column": 59,
-														"character": 1020
+														"line": 5,
+														"column": 56,
+														"character": 1018
 													}
 												},
 												"value": {
 													"type": "ExpressionTag",
-													"start": 1021,
-													"end": 1029,
+													"start": 1019,
+													"end": 1027,
 													"expression": {
 														"type": "Identifier",
-														"start": 1022,
-														"end": 1028,
+														"start": 1020,
+														"end": 1026,
 														"loc": {
 															"start": {
-																"line": 8,
-																"column": 61
+																"line": 5,
+																"column": 58
 															},
 															"end": {
-																"line": 8,
-																"column": 67
+																"line": 5,
+																"column": 64
 															}
 														},
 														"name": "value3"
@@ -758,37 +480,37 @@
 											},
 											{
 												"type": "Attribute",
-												"start": 1030,
-												"end": 1045,
-												"name": "data-d",
+												"start": 1028,
+												"end": 1042,
+												"name": "prop4",
 												"name_loc": {
 													"start": {
-														"line": 8,
-														"column": 69,
-														"character": 1030
+														"line": 5,
+														"column": 66,
+														"character": 1028
 													},
 													"end": {
-														"line": 8,
-														"column": 75,
-														"character": 1036
+														"line": 5,
+														"column": 71,
+														"character": 1033
 													}
 												},
 												"value": {
 													"type": "ExpressionTag",
-													"start": 1037,
-													"end": 1045,
+													"start": 1034,
+													"end": 1042,
 													"expression": {
 														"type": "Identifier",
-														"start": 1038,
-														"end": 1044,
+														"start": 1035,
+														"end": 1041,
 														"loc": {
 															"start": {
-																"line": 8,
-																"column": 77
+																"line": 5,
+																"column": 73
 															},
 															"end": {
-																"line": 8,
-																"column": 83
+																"line": 5,
+																"column": 79
 															}
 														},
 														"name": "value4"
@@ -797,37 +519,37 @@
 											},
 											{
 												"type": "Attribute",
-												"start": 1046,
-												"end": 1061,
-												"name": "data-e",
+												"start": 1043,
+												"end": 1057,
+												"name": "prop5",
 												"name_loc": {
 													"start": {
-														"line": 8,
-														"column": 85,
-														"character": 1046
+														"line": 5,
+														"column": 81,
+														"character": 1043
 													},
 													"end": {
-														"line": 8,
-														"column": 91,
-														"character": 1052
+														"line": 5,
+														"column": 86,
+														"character": 1048
 													}
 												},
 												"value": {
 													"type": "ExpressionTag",
-													"start": 1053,
-													"end": 1061,
+													"start": 1049,
+													"end": 1057,
 													"expression": {
 														"type": "Identifier",
-														"start": 1054,
-														"end": 1060,
+														"start": 1050,
+														"end": 1056,
 														"loc": {
 															"start": {
-																"line": 8,
-																"column": 93
+																"line": 5,
+																"column": 88
 															},
 															"end": {
-																"line": 8,
-																"column": 99
+																"line": 5,
+																"column": 94
 															}
 														},
 														"name": "value5"
@@ -849,26 +571,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 1077,
-				"end": 1079,
+				"start": 1079,
+				"end": 1081,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 1079,
-				"end": 1201,
+				"start": 1081,
+				"end": 1203,
 				"name": "pre",
 				"name_loc": {
 					"start": {
-						"line": 11,
+						"line": 8,
 						"column": 1,
-						"character": 1080
+						"character": 1082
 					},
 					"end": {
-						"line": 11,
+						"line": 8,
 						"column": 4,
-						"character": 1083
+						"character": 1085
 					}
 				},
 				"attributes": [],
@@ -878,19 +600,19 @@
 						{
 							"type": "IfBlock",
 							"elseif": false,
-							"start": 1084,
-							"end": 1195,
+							"start": 1086,
+							"end": 1197,
 							"test": {
 								"type": "Identifier",
-								"start": 1089,
-								"end": 1093,
+								"start": 1091,
+								"end": 1095,
 								"loc": {
 									"start": {
-										"line": 11,
+										"line": 8,
 										"column": 10
 									},
 									"end": {
-										"line": 11,
+										"line": 8,
 										"column": 14
 									}
 								},
@@ -901,54 +623,54 @@
 								"nodes": [
 									{
 										"type": "RegularElement",
-										"start": 1094,
-										"end": 1190,
+										"start": 1096,
+										"end": 1192,
 										"name": "span",
 										"name_loc": {
 											"start": {
-												"line": 11,
+												"line": 8,
 												"column": 16,
-												"character": 1095
+												"character": 1097
 											},
 											"end": {
-												"line": 11,
+												"line": 8,
 												"column": 20,
-												"character": 1099
+												"character": 1101
 											}
 										},
 										"attributes": [
 											{
 												"type": "Attribute",
-												"start": 1100,
-												"end": 1115,
+												"start": 1102,
+												"end": 1117,
 												"name": "data-a",
 												"name_loc": {
 													"start": {
-														"line": 11,
+														"line": 8,
 														"column": 21,
-														"character": 1100
+														"character": 1102
 													},
 													"end": {
-														"line": 11,
+														"line": 8,
 														"column": 27,
-														"character": 1106
+														"character": 1108
 													}
 												},
 												"value": {
 													"type": "ExpressionTag",
-													"start": 1107,
-													"end": 1115,
+													"start": 1109,
+													"end": 1117,
 													"expression": {
 														"type": "Identifier",
-														"start": 1108,
-														"end": 1114,
+														"start": 1110,
+														"end": 1116,
 														"loc": {
 															"start": {
-																"line": 11,
+																"line": 8,
 																"column": 29
 															},
 															"end": {
-																"line": 11,
+																"line": 8,
 																"column": 35
 															}
 														},
@@ -958,36 +680,36 @@
 											},
 											{
 												"type": "Attribute",
-												"start": 1116,
-												"end": 1131,
+												"start": 1118,
+												"end": 1133,
 												"name": "data-b",
 												"name_loc": {
 													"start": {
-														"line": 11,
+														"line": 8,
 														"column": 37,
-														"character": 1116
+														"character": 1118
 													},
 													"end": {
-														"line": 11,
+														"line": 8,
 														"column": 43,
-														"character": 1122
+														"character": 1124
 													}
 												},
 												"value": {
 													"type": "ExpressionTag",
-													"start": 1123,
-													"end": 1131,
+													"start": 1125,
+													"end": 1133,
 													"expression": {
 														"type": "Identifier",
-														"start": 1124,
-														"end": 1130,
+														"start": 1126,
+														"end": 1132,
 														"loc": {
 															"start": {
-																"line": 11,
+																"line": 8,
 																"column": 45
 															},
 															"end": {
-																"line": 11,
+																"line": 8,
 																"column": 51
 															}
 														},
@@ -997,36 +719,36 @@
 											},
 											{
 												"type": "Attribute",
-												"start": 1132,
-												"end": 1147,
+												"start": 1134,
+												"end": 1149,
 												"name": "data-c",
 												"name_loc": {
 													"start": {
-														"line": 11,
+														"line": 8,
 														"column": 53,
-														"character": 1132
+														"character": 1134
 													},
 													"end": {
-														"line": 11,
+														"line": 8,
 														"column": 59,
-														"character": 1138
+														"character": 1140
 													}
 												},
 												"value": {
 													"type": "ExpressionTag",
-													"start": 1139,
-													"end": 1147,
+													"start": 1141,
+													"end": 1149,
 													"expression": {
 														"type": "Identifier",
-														"start": 1140,
-														"end": 1146,
+														"start": 1142,
+														"end": 1148,
 														"loc": {
 															"start": {
-																"line": 11,
+																"line": 8,
 																"column": 61
 															},
 															"end": {
-																"line": 11,
+																"line": 8,
 																"column": 67
 															}
 														},
@@ -1036,36 +758,36 @@
 											},
 											{
 												"type": "Attribute",
-												"start": 1148,
-												"end": 1163,
+												"start": 1150,
+												"end": 1165,
 												"name": "data-d",
 												"name_loc": {
 													"start": {
-														"line": 11,
+														"line": 8,
 														"column": 69,
-														"character": 1148
+														"character": 1150
 													},
 													"end": {
-														"line": 11,
+														"line": 8,
 														"column": 75,
-														"character": 1154
+														"character": 1156
 													}
 												},
 												"value": {
 													"type": "ExpressionTag",
-													"start": 1155,
-													"end": 1163,
+													"start": 1157,
+													"end": 1165,
 													"expression": {
 														"type": "Identifier",
-														"start": 1156,
-														"end": 1162,
+														"start": 1158,
+														"end": 1164,
 														"loc": {
 															"start": {
-																"line": 11,
+																"line": 8,
 																"column": 77
 															},
 															"end": {
-																"line": 11,
+																"line": 8,
 																"column": 83
 															}
 														},
@@ -1075,36 +797,36 @@
 											},
 											{
 												"type": "Attribute",
-												"start": 1164,
-												"end": 1179,
+												"start": 1166,
+												"end": 1181,
 												"name": "data-e",
 												"name_loc": {
 													"start": {
-														"line": 11,
+														"line": 8,
 														"column": 85,
-														"character": 1164
+														"character": 1166
 													},
 													"end": {
-														"line": 11,
+														"line": 8,
 														"column": 91,
-														"character": 1170
+														"character": 1172
 													}
 												},
 												"value": {
 													"type": "ExpressionTag",
-													"start": 1171,
-													"end": 1179,
+													"start": 1173,
+													"end": 1181,
 													"expression": {
 														"type": "Identifier",
-														"start": 1172,
-														"end": 1178,
+														"start": 1174,
+														"end": 1180,
 														"loc": {
 															"start": {
-																"line": 11,
+																"line": 8,
 																"column": 93
 															},
 															"end": {
-																"line": 11,
+																"line": 8,
 																"column": 99
 															}
 														},
@@ -1127,39 +849,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 1201,
-				"end": 1203,
+				"start": 1203,
+				"end": 1205,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 1203,
-				"end": 1370,
+				"start": 1205,
+				"end": 1372,
 				"data": " attrs too long to fit on one line: they wrap one per line, the close form is still preserved, and `/>` drops to its own line rather than hugging the last attr "
 			},
 			{
 				"type": "Text",
-				"start": 1370,
-				"end": 1371,
+				"start": 1372,
+				"end": 1373,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 1371,
-				"end": 1515,
+				"start": 1373,
+				"end": 1517,
 				"name": "pre",
 				"name_loc": {
 					"start": {
-						"line": 15,
+						"line": 12,
 						"column": 1,
-						"character": 1372
+						"character": 1374
 					},
 					"end": {
-						"line": 15,
+						"line": 12,
 						"column": 4,
-						"character": 1375
+						"character": 1377
 					}
 				},
 				"attributes": [],
@@ -1169,19 +891,19 @@
 						{
 							"type": "IfBlock",
 							"elseif": false,
-							"start": 1376,
-							"end": 1509,
+							"start": 1378,
+							"end": 1511,
 							"test": {
 								"type": "Identifier",
-								"start": 1381,
-								"end": 1385,
+								"start": 1383,
+								"end": 1387,
 								"loc": {
 									"start": {
-										"line": 15,
+										"line": 12,
 										"column": 10
 									},
 									"end": {
-										"line": 15,
+										"line": 12,
 										"column": 14
 									}
 								},
@@ -1192,43 +914,43 @@
 								"nodes": [
 									{
 										"type": "Component",
-										"start": 1386,
-										"end": 1504,
+										"start": 1388,
+										"end": 1506,
 										"name": "Comp",
 										"name_loc": {
 											"start": {
-												"line": 15,
+												"line": 12,
 												"column": 16,
-												"character": 1387
+												"character": 1389
 											},
 											"end": {
-												"line": 15,
+												"line": 12,
 												"column": 20,
-												"character": 1391
+												"character": 1393
 											}
 										},
 										"attributes": [
 											{
 												"type": "Attribute",
-												"start": 1395,
-												"end": 1463,
+												"start": 1397,
+												"end": 1465,
 												"name": "prop1",
 												"name_loc": {
 													"start": {
-														"line": 16,
+														"line": 13,
 														"column": 3,
-														"character": 1395
+														"character": 1397
 													},
 													"end": {
-														"line": 16,
+														"line": 13,
 														"column": 8,
-														"character": 1400
+														"character": 1402
 													}
 												},
 												"value": [
 													{
-														"start": 1402,
-														"end": 1462,
+														"start": 1404,
+														"end": 1464,
 														"type": "Text",
 														"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 														"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -1237,36 +959,36 @@
 											},
 											{
 												"type": "Attribute",
-												"start": 1467,
-												"end": 1481,
+												"start": 1469,
+												"end": 1483,
 												"name": "prop2",
 												"name_loc": {
 													"start": {
-														"line": 17,
+														"line": 14,
 														"column": 3,
-														"character": 1467
+														"character": 1469
 													},
 													"end": {
-														"line": 17,
+														"line": 14,
 														"column": 8,
-														"character": 1472
+														"character": 1474
 													}
 												},
 												"value": {
 													"type": "ExpressionTag",
-													"start": 1473,
-													"end": 1481,
+													"start": 1475,
+													"end": 1483,
 													"expression": {
 														"type": "Identifier",
-														"start": 1474,
-														"end": 1480,
+														"start": 1476,
+														"end": 1482,
 														"loc": {
 															"start": {
-																"line": 17,
+																"line": 14,
 																"column": 10
 															},
 															"end": {
-																"line": 17,
+																"line": 14,
 																"column": 16
 															}
 														},
@@ -1276,36 +998,36 @@
 											},
 											{
 												"type": "Attribute",
-												"start": 1485,
-												"end": 1499,
+												"start": 1487,
+												"end": 1501,
 												"name": "prop3",
 												"name_loc": {
 													"start": {
-														"line": 18,
+														"line": 15,
 														"column": 3,
-														"character": 1485
+														"character": 1487
 													},
 													"end": {
-														"line": 18,
+														"line": 15,
 														"column": 8,
-														"character": 1490
+														"character": 1492
 													}
 												},
 												"value": {
 													"type": "ExpressionTag",
-													"start": 1491,
-													"end": 1499,
+													"start": 1493,
+													"end": 1501,
 													"expression": {
 														"type": "Identifier",
-														"start": 1492,
-														"end": 1498,
+														"start": 1494,
+														"end": 1500,
 														"loc": {
 															"start": {
-																"line": 18,
+																"line": 15,
 																"column": 10
 															},
 															"end": {
-																"line": 18,
+																"line": 15,
 																"column": 16
 															}
 														},
@@ -1328,26 +1050,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 1515,
-				"end": 1517,
+				"start": 1517,
+				"end": 1519,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 1517,
-				"end": 1664,
+				"start": 1519,
+				"end": 1666,
 				"name": "pre",
 				"name_loc": {
 					"start": {
-						"line": 21,
+						"line": 18,
 						"column": 1,
-						"character": 1518
+						"character": 1520
 					},
 					"end": {
-						"line": 21,
+						"line": 18,
 						"column": 4,
-						"character": 1521
+						"character": 1523
 					}
 				},
 				"attributes": [],
@@ -1357,19 +1079,19 @@
 						{
 							"type": "IfBlock",
 							"elseif": false,
-							"start": 1522,
-							"end": 1658,
+							"start": 1524,
+							"end": 1660,
 							"test": {
 								"type": "Identifier",
-								"start": 1527,
-								"end": 1531,
+								"start": 1529,
+								"end": 1533,
 								"loc": {
 									"start": {
-										"line": 21,
+										"line": 18,
 										"column": 10
 									},
 									"end": {
-										"line": 21,
+										"line": 18,
 										"column": 14
 									}
 								},
@@ -1380,43 +1102,43 @@
 								"nodes": [
 									{
 										"type": "Component",
-										"start": 1532,
-										"end": 1653,
+										"start": 1534,
+										"end": 1655,
 										"name": "Comp",
 										"name_loc": {
 											"start": {
-												"line": 21,
+												"line": 18,
 												"column": 16,
-												"character": 1533
+												"character": 1535
 											},
 											"end": {
-												"line": 21,
+												"line": 18,
 												"column": 20,
-												"character": 1537
+												"character": 1539
 											}
 										},
 										"attributes": [
 											{
 												"type": "Attribute",
-												"start": 1541,
-												"end": 1609,
+												"start": 1543,
+												"end": 1611,
 												"name": "prop1",
 												"name_loc": {
 													"start": {
-														"line": 22,
+														"line": 19,
 														"column": 3,
-														"character": 1541
+														"character": 1543
 													},
 													"end": {
-														"line": 22,
+														"line": 19,
 														"column": 8,
-														"character": 1546
+														"character": 1548
 													}
 												},
 												"value": [
 													{
-														"start": 1548,
-														"end": 1608,
+														"start": 1550,
+														"end": 1610,
 														"type": "Text",
 														"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 														"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -1425,36 +1147,36 @@
 											},
 											{
 												"type": "Attribute",
-												"start": 1613,
-												"end": 1627,
+												"start": 1615,
+												"end": 1629,
 												"name": "prop2",
 												"name_loc": {
 													"start": {
-														"line": 23,
+														"line": 20,
 														"column": 3,
-														"character": 1613
+														"character": 1615
 													},
 													"end": {
-														"line": 23,
+														"line": 20,
 														"column": 8,
-														"character": 1618
+														"character": 1620
 													}
 												},
 												"value": {
 													"type": "ExpressionTag",
-													"start": 1619,
-													"end": 1627,
+													"start": 1621,
+													"end": 1629,
 													"expression": {
 														"type": "Identifier",
-														"start": 1620,
-														"end": 1626,
+														"start": 1622,
+														"end": 1628,
 														"loc": {
 															"start": {
-																"line": 23,
+																"line": 20,
 																"column": 10
 															},
 															"end": {
-																"line": 23,
+																"line": 20,
 																"column": 16
 															}
 														},
@@ -1464,36 +1186,36 @@
 											},
 											{
 												"type": "Attribute",
-												"start": 1631,
-												"end": 1645,
+												"start": 1633,
+												"end": 1647,
 												"name": "prop3",
 												"name_loc": {
 													"start": {
-														"line": 24,
+														"line": 21,
 														"column": 3,
-														"character": 1631
+														"character": 1633
 													},
 													"end": {
-														"line": 24,
+														"line": 21,
 														"column": 8,
-														"character": 1636
+														"character": 1638
 													}
 												},
 												"value": {
 													"type": "ExpressionTag",
-													"start": 1637,
-													"end": 1645,
+													"start": 1639,
+													"end": 1647,
 													"expression": {
 														"type": "Identifier",
-														"start": 1638,
-														"end": 1644,
+														"start": 1640,
+														"end": 1646,
 														"loc": {
 															"start": {
-																"line": 24,
+																"line": 21,
 																"column": 10
 															},
 															"end": {
-																"line": 24,
+																"line": 21,
 																"column": 16
 															}
 														},
