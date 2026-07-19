@@ -643,7 +643,7 @@ impl<'a> Printer<'a> {
 
                     // Build RHS: comments (with proper separators) + value
                     let comments_doc = self
-                        .build_rhs_comments_opt(colon_pos + 1, value_start)
+                        .build_value_gap_comments_opt(colon_pos + 1, value_start)
                         .unwrap_or_else(|| d.empty());
                     let mut value_parts: DocBuf = smallvec![comments_doc];
                     if needs_parens {

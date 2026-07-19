@@ -103,6 +103,34 @@ pub(crate) enum LeadingGlue {
     /// across a source newline — prettier's assignment/call pull-up
     /// ([`build_rhs_comments_glued_opt`](Printer::build_rhs_comments_glued_opt)).
     AdjacentGlued,
+    /// `Adjacent`, but an author **blank** line after a glued block's `*/` does not
+    /// force the comment onto its own line — it yields with the soft `line` like a
+    /// plain newline. The **value-gap** mode: the gap between a head (`=`, `:`, `as`,
+    /// a keyword) and the value it introduces.
+    ///
+    /// The distinction is which break the blank belongs to. A glued block does not run
+    /// to end-of-line, so nothing forces the value down and the break after `*/` is the
+    /// author's — which tsv reflows at every value position
+    /// ([conformance_prettier.md](../../../../docs/conformance_prettier.md) §Authored
+    /// breaks in value position). A blank line is a property of a line break: collapse
+    /// the break and there are no longer two lines for it to separate, so the blank
+    /// yields with it. `Adjacent` keeps the opposite rule because *its* blank separates
+    /// two list items, which is ordinary authoring tsv preserves (the
+    /// `arrays/end_of_line_block_comment` divergence fixture pins it).
+    ///
+    /// Without this split the two families disagreed on whitespace *quantity*: at a
+    /// value gap one newline collapsed and two hung, while ~20 peer gaps on
+    /// `AdjacentGlued` collapsed both. An author who wants the blank kept writes the
+    /// comment on its own line, where the break IS forced and it survives.
+    AdjacentValueGap,
+}
+
+impl LeadingGlue {
+    /// Whether an author blank line after a glued block's `*/` forces it onto its own
+    /// line (preserving the blank) rather than yielding with the soft `line`.
+    fn blank_forces_own_line(self) -> bool {
+        !matches!(self, Self::AdjacentValueGap)
+    }
 }
 
 impl<'a> Printer<'a> {
@@ -559,6 +587,16 @@ impl<'a> Printer<'a> {
         self.build_leading_comment_run_opt(start, end, LeadingGlue::Adjacent)
     }
 
+    /// Like `build_rhs_comments_opt`, but an author blank line after a glued block's
+    /// `*/` yields with the soft `line` instead of forcing the comment onto its own
+    /// line — [`LeadingGlue::AdjacentValueGap`], the head→value gap rule. Use at a
+    /// value gap (`=`, `:`, `as`, a keyword); a list gap stays on
+    /// [`build_rhs_comments_opt`](Self::build_rhs_comments_opt), where a blank
+    /// separates two items and is preserved.
+    pub(crate) fn build_value_gap_comments_opt(&self, start: u32, end: u32) -> Option<DocId> {
+        self.build_leading_comment_run_opt(start, end, LeadingGlue::AdjacentValueGap)
+    }
+
     /// Like `build_rhs_comments_opt`, but a single-line block comment glued to the
     /// operator (not on its own line) hugs the value with a space even when the
     /// value follows on the next source line — prettier pulls the value up in the
@@ -653,7 +691,13 @@ impl<'a> Printer<'a> {
                 comments.peek().map_or(terminal_pos, |c| c.span.start),
             );
             let hugs = match glue {
-                LeadingGlue::Adjacent => self.comment_hugs_next(comment, next),
+                // `AdjacentValueGap` differs from `Adjacent` only in the blank-line
+                // rule below, not in the hug test — the soft `line` is the point at a
+                // value gap (it lets a value too long for the comment's line break
+                // below it), so it must not become an unconditional space.
+                LeadingGlue::Adjacent | LeadingGlue::AdjacentValueGap => {
+                    self.comment_hugs_next(comment, next)
+                }
                 // A glued (not own-line) single-line block hugs across a source
                 // newline; the same-line-as-next case still hugs as in `Adjacent`.
                 LeadingGlue::AdjacentGlued => {
@@ -667,13 +711,20 @@ impl<'a> Printer<'a> {
                 parts.push(d.text(" "));
             } else if comment.is_block
                 && !self.is_own_line_comment(comment)
-                && !self.has_blank_line_between(comment.span.end, next)
+                && !(glue.blank_forces_own_line()
+                    && self.has_blank_line_between(comment.span.end, next))
             {
                 // A block with a newline *after* its `*/` but none before its `/*`:
                 // prettier's `printLeadingComment` emits a soft `line` here, so what
                 // follows pulls up onto the comment's line when the enclosing group
                 // fits and drops below when it breaks. An own-line block (newline on
                 // both sides) takes the `hardline` branch instead.
+                //
+                // Whether a **blank** line after the `*/` overrides that and forces the
+                // hardline is per-site (`LeadingGlue::blank_forces_own_line`): it does
+                // in a list, where a blank between items is ordinary authoring tsv
+                // preserves, and does not in a value gap, where the blank sits inside a
+                // break already judged unforced.
                 parts.push(d.line());
                 parts.push(continuation);
             } else {
@@ -712,18 +763,24 @@ impl<'a> Printer<'a> {
     }
 
     /// Prepend optional RHS leading comments — block comments in the gap between an
-    /// `=`/`:` and the value (`build_rhs_comments_opt`) — to an already-built
-    /// `value_doc`, returning `value_doc` unchanged when the gap carries none.
-    /// Centralizes the `match build_rhs_comments_opt { Some(c) => concat([c, v]),
-    /// None => v }` idiom shared by the initializer/property value sites (variable
-    /// declarators, class properties, enum members, object property values).
+    /// `=`/`:` and the value — to an already-built `value_doc`, returning `value_doc`
+    /// unchanged when the gap carries none. Centralizes the `match { Some(c) =>
+    /// concat([c, v]), None => v }` idiom shared by the initializer/property value
+    /// sites (variable declarators, class properties, enum members, object property
+    /// values, import-attribute values).
+    ///
+    /// Every caller is a head→value gap, so the run is built in the value-gap mode
+    /// ([`LeadingGlue::AdjacentValueGap`]) — an author blank line after a glued block
+    /// yields with the break rather than forcing the comment onto its own line. A
+    /// *list* gap must not route here; it wants
+    /// [`build_rhs_comments_opt`](Self::build_rhs_comments_opt).
     pub(crate) fn prepend_rhs_comments(
         &self,
         value_doc: DocId,
         start: u32,
         value_start: u32,
     ) -> DocId {
-        match self.build_rhs_comments_opt(start, value_start) {
+        match self.build_value_gap_comments_opt(start, value_start) {
             Some(comments_doc) => self.d().concat(&[comments_doc, value_doc]),
             None => value_doc,
         }

@@ -589,7 +589,7 @@ impl<'a> Printer<'a> {
             // Inline block comments are passed as rhs_comments so
             // choose_layout still applies (e.g., ternary with binaryish
             // test → BreakAfterOperator).
-            let rhs_comments = self.build_rhs_comments_opt(eq_pos + 1, value_start);
+            let rhs_comments = self.build_value_gap_comments_opt(eq_pos + 1, value_start);
             let left_doc = d.concat(&parts[..]);
             // An assignment value keeps its parens (`a = (this.a = b);`) —
             // built manually like object property values, since the layout

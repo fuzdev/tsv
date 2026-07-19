@@ -26,13 +26,20 @@ author put it and prettier is already at its own fixed point. So it is a `varian
 makes the round trip explicit: the authored-break form is the only unstable one, and the two
 formatters carry it to two different stable places.
 
-The **own-line** authoring (`A =⏎/* c */⏎1`) is deliberately *not* pinned as a variant here: it
-reaches a different tsv fixed point (`A =⏎/* c */⏎1` — the comment keeps its own line, the
-break-after-operator hang the shared initializer helper emits), and prettier does not converge on
-that shape at all. Prettier pulls the comment up to the `=` line, then relocates it before the `=`
-on the next pass, so there is no stable prettier form for a `variant_*` / `prettier_variant_*` file
-to record. The tsv side of it is covered by the sibling initializer fixtures, which carry the
-own-line authoring against a prettier oracle that does converge.
+The **own-line** authoring (`A =⏎/* c */⏎1`) is deliberately *not* pinned as a variant here,
+because no variant prefix fits it: **both** formatters rewrite it, to different places. tsv
+reaches `A =⏎/* c */⏎1` (the comment keeps its own line — the break-after-operator hang the
+shared initializer helper emits); prettier takes two passes to reach `A /* c */ = 1`, pulling
+the comment up to the `=` line first and relocating it before the `=` on the second. Its
+destination is the form already pinned here as `variant_relocated.svelte`. A `variant_*` means
+both formatters hold the file stable and a `prettier_variant_*` means tsv normalizes it back to
+input; neither describes a form both tools move. The tsv side is covered by the sibling
+initializer fixtures, which carry the own-line authoring.
+
+The **blank** authoring (`A = /* c */⏎⏎1`) *is* pinned, as `unformatted_ours_blank.svelte`:
+the blank yields with the break, so tsv normalizes it to input while prettier relocates to
+`variant_relocated.svelte`. See
+[conformance_prettier.md §Authored breaks in value position](../../../../../../docs/conformance_prettier.md#authored-breaks-in-value-position).
 
 ## Reason
 

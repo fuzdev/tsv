@@ -34,6 +34,14 @@ keep it there. Carrying the whole authoring axis (glued / own-line) is deliberat
 different paths through the leading-comment run, so a change that only exercises the glued one
 can silently break the other.
 
+The **blank** authoring (`k: /* c */⏎⏎1`, `unformatted_ours_blank.svelte`) is the third point on
+that axis. The blank yields with the break — it sits inside a break already judged unforced, and
+a blank line is a property of a line break — so tsv normalizes it to input, same as the plain
+newline. Prettier hoists here as it does for the newline authoring, but *keeps* the blank above
+the key, which is a fourth stable form and is pinned separately as `variant_hoisted_blank.svelte`
+(dual-stable: once the comment sits above the key with a blank, both formatters hold it). See
+[conformance_prettier.md §Authored breaks in value position](../../../../../../docs/conformance_prettier.md#authored-breaks-in-value-position).
+
 ## Reason
 
 **Design choice.** The break is unforced — a block comment does not run to end-of-line, so
