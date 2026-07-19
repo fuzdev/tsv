@@ -1,0 +1,124 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 397,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 274,
+				"data": " Tail text followed by an inline sibling: the fill carries BOTH a leading and a trailing\n     separator, so its trailing `line` lands in the last-item slot. The break must still hold\n     the line <= 100 — measuring the leading `line` alone made this non-idempotent. "
+			},
+			{
+				"type": "Text",
+				"start": 274,
+				"end": 275,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 275,
+				"end": 396,
+				"name": "li",
+				"name_loc": {
+					"start": {
+						"line": 4,
+						"column": 1,
+						"character": 276
+					},
+					"end": {
+						"line": 4,
+						"column": 3,
+						"character": 278
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 279,
+							"end": 365,
+							"raw": "\n\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ~",
+							"data": "\n\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ~"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 365,
+							"end": 377,
+							"expression": {
+								"type": "Identifier",
+								"start": 366,
+								"end": 376,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 86
+									},
+									"end": {
+										"line": 5,
+										"column": 96
+									}
+								},
+								"name": "xxxxxxxxxx"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 377,
+							"end": 382,
+							"raw": "\n\tcc ",
+							"data": "\n\tcc "
+						},
+						{
+							"type": "RegularElement",
+							"start": 382,
+							"end": 390,
+							"name": "b",
+							"name_loc": {
+								"start": {
+									"line": 6,
+									"column": 5,
+									"character": 383
+								},
+								"end": {
+									"line": 6,
+									"column": 6,
+									"character": 384
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 385,
+										"end": 386,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 390,
+							"end": 391,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

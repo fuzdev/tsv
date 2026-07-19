@@ -1,0 +1,86 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 348,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 233,
+				"data": " Whitespace-sensitive: <pre> content is preserved verbatim, so the tail after the expression\n     tag must NOT break even though the line exceeds printWidth. Print width yields to render\n     semantics. Both formatters agree. "
+			},
+			{
+				"type": "Text",
+				"start": 233,
+				"end": 234,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 234,
+				"end": 347,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 4,
+						"column": 1,
+						"character": 235
+					},
+					"end": {
+						"line": 4,
+						"column": 4,
+						"character": 238
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 239,
+							"end": 325,
+							"raw": "\n\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ~",
+							"data": "\n\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ~"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 325,
+							"end": 337,
+							"expression": {
+								"type": "Identifier",
+								"start": 326,
+								"end": 336,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 86
+									},
+									"end": {
+										"line": 5,
+										"column": 96
+									}
+								},
+								"name": "xxxxxxxxxx"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 337,
+							"end": 341,
+							"raw": " cc\n",
+							"data": " cc\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

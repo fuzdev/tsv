@@ -65,6 +65,47 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
             )
         };
 
+        // A collapsible `line` in the CONTENT slot is 1 column flat, so measuring it ALONE is
+        // meaningless — it always "fits" and could never force a break. A `line` lands there
+        // whenever the fill was built with a LEADING separator (`leading_line` — Svelte text
+        // after an expression tag), which shifts the content/separator parity by one: every
+        // `line` occupies a content slot and every word a separator.
+        //
+        // The fit that matters is the line PLUS the word it separates, so fold the separator
+        // into the measurement (top of the look-ahead stack is what comes next). Without this
+        // the pair renders flat past printWidth — print width is a hard limit in tsv — and the
+        // break lands one separator too late, which is also non-idempotent: the next pass
+        // measures from a different column and moves it.
+        //
+        // Case 1 is deliberately excluded (`offset + 1 < parts.len()`): there the `line` is the
+        // fill's last item, a boundary separator to whatever FOLLOWS the fill, and its existing
+        // `rest_commands` measurement already asks the right question.
+        let content_fits = if offset + 1 < parts.len() && arena.is_collapsible_line(content) {
+            let mut with_sep: SmallVec<[ArenaCommand; 8]> =
+                SmallVec::from_slice(if is_final_segment { rest_commands } else { &[] });
+            with_sep.push(ArenaCommand {
+                indent: indent_level,
+                mode: Mode::Flat,
+                doc: parts[offset + 1],
+            });
+            let budget = if is_final_segment && !rest_commands.is_empty() {
+                remaining
+            } else {
+                available
+            };
+            arena_fits_with_lookahead(
+                arena,
+                content,
+                Mode::Flat,
+                &with_sep,
+                budget as isize,
+                embed,
+                resolver,
+            )
+        } else {
+            content_fits
+        };
+
         // Dropped-first boundary (Svelte after-element fold of a sandwiched inline child): if the
         // first fill item rendered at the start of its line, it was pushed there by a preceding
         // break — it dropped to its own line — so break the separator after it and let the rest of
@@ -172,8 +213,20 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
 
         // Case 2: Only content + separator left
         if offset + 2 >= parts.len() {
-            if !content_fits {
-                // Unmeasured flat render (see Case 1) — poison the fits-skip.
+            // A `line` here is the parity-shifted separator between the last two items (see the
+            // `content_fits` correction above, which measured it together with its word). Render
+            // it by fit exactly as Case 1 does — Flat is the space it stands for, Break the
+            // newline — rather than unconditionally Flat, which would let the tail word overflow.
+            let content_is_line = arena.is_collapsible_line(content);
+            let content_mode = if content_is_line && !content_fits {
+                Mode::Break
+            } else {
+                Mode::Flat
+            };
+            if !content_is_line && !content_fits {
+                // Unmeasured flat render (see Case 1) — poison the fits-skip. A `line` rendered in
+                // Break mode is not an unmeasured flat render and has no nested groups to
+                // re-measure, so it does not poison (matching Case 1's guard).
                 *should_remeasure = true;
             }
             render_single_doc(
@@ -182,7 +235,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                 output,
                 pos,
                 indent_level,
-                Mode::Flat,
+                content_mode,
                 render,
                 embed,
                 resolver,
@@ -368,6 +421,48 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                         pos,
                         indent_level,
                         Mode::Break,
+                        render,
+                        embed,
+                        resolver,
+                        should_remeasure,
+                    );
+                    offset += 2;
+                    continue;
+                }
+
+                // A collapsible `line` sitting in a CONTENT slot **is** the break — so let it
+                // render itself in Break mode rather than emitting a manual newline and then
+                // rendering it Flat, which writes the space it stands for at the head of the
+                // continuation line (`~{expr}⏎\t ccccc`). The next pass reads that space as
+                // indentation and drops it, so the format has no fixed point: the
+                // fill-break-before-an-expression-tag non-idempotency Case 1 already guards
+                // for the last-item slot, reached here through the generic path instead.
+                //
+                // A `line` lands in a content slot whenever the fill was built with a LEADING
+                // separator (`leading_line` — Svelte text after an expression tag), which
+                // shifts the content/separator parity by one, making every `line` a content
+                // and every word a separator. Rendering the separator Flat is then just
+                // "write the word", the same thing every other arm does with it.
+                if arena.is_collapsible_line(content) {
+                    render_single_doc(
+                        arena,
+                        content,
+                        output,
+                        pos,
+                        indent_level,
+                        Mode::Break,
+                        render,
+                        embed,
+                        resolver,
+                        should_remeasure,
+                    );
+                    render_single_doc(
+                        arena,
+                        separator,
+                        output,
+                        pos,
+                        indent_level,
+                        Mode::Flat,
                         render,
                         embed,
                         resolver,
