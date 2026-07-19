@@ -56,18 +56,35 @@ async function main(): Promise<void> {
 		console.log(JSON.stringify(report, null, 2));
 	} else {
 		console.log(format_audit_report(report));
+		console.log('');
 
-		// Exit with error if coverage is below 100%
-		if (report.stats.total_uncovered > 0) {
-			console.log('');
-			console.log(
-				`\x1b[33mWARN: ${report.stats.total_uncovered} documented divergences have no pattern coverage\x1b[0m`,
-			);
+		// A broken listing is a hard error — it points at nothing on disk. (The
+		// gate for it is `fixture_coverage_test`, in `deno task check`; reported
+		// here too since this audit is where a listing is read.)
+		if (report.missing_pattern_fixtures.length > 0) {
+			const count = report.missing_pattern_fixtures.reduce((n, m) => n + m.fixtures.length, 0);
+			console.log(`\x1b[31mFAIL: ${count} pattern fixture listing(s) point at no directory\x1b[0m`);
 			Deno.exit(1);
-		} else {
-			console.log('');
-			console.log('\x1b[32mPASS: All documented divergences have pattern coverage\x1b[0m');
 		}
+
+		// Exit non-zero on genuine detection gaps only. Coverage is partial by
+		// design (docs/divergence_detector.md §Traceability), so this is a WARN
+		// that reports work, not a broken invariant — but it now names fixtures
+		// no detector can see, rather than fixtures nobody wrote down.
+		if (report.stats.total_undetected > 0 || report.stats.total_partial > 0) {
+			console.log(
+				`\x1b[33mWARN: ${report.stats.total_undetected} documented divergences are detected ` +
+					`by no pattern; ${report.stats.total_partial} more leave hunks unexplained\x1b[0m`,
+			);
+			if (report.stats.total_unlisted_but_explained > 0) {
+				console.log(
+					`      (${report.stats.total_unlisted_but_explained} more are fully explained but ` +
+						`unlisted in fixtures[] — bookkeeping, not a gap)`,
+				);
+			}
+			Deno.exit(1);
+		}
+		console.log('\x1b[32mPASS: every gradeable documented divergence is fully explained\x1b[0m');
 	}
 }
 
