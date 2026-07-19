@@ -156,7 +156,7 @@ impl<'a> Printer<'a> {
             || has_own_line_trailing_comment
             || self
                 .comments_on_page_between(operator_end, argument_start)
-                .any(|c| self.comment_forces_own_line(c));
+                .any(|c| self.comment_cannot_glue_to_operator(c));
 
         let argument_doc = if has_leading_comments || has_trailing_comments {
             // Comments inside grouping parens — must wrap in parens to preserve them.
@@ -865,7 +865,7 @@ impl<'a> Printer<'a> {
         // *after* (not before) is what makes this idempotent: prettier's own
         // width-broken output puts an inline-leading block at line start (newline
         // before, none after — `&&⏎/* c */ b`), which must stay inline, not re-break.
-        let forces_own_line = self.comment_forces_following_own_line(op_end, operand.span.start);
+        let forces_own_line = self.comment_hangs_binary_operand(op_end, operand.span.start);
 
         if !forces_own_line {
             // Only inline-leading block comments - place as leading on RHS operand.

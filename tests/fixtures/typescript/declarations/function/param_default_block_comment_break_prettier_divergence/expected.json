@@ -1,0 +1,237 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 229,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A block comment glued to a parameter default `=` keeps its position; the value",
+			"start": 20,
+			"end": 101,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " reflows onto the `=` line. Prettier instead relocates the comment before the `=`.",
+			"start": 103,
+			"end": 187,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 205,
+			"end": 212,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 17
+				},
+				"end": {
+					"line": 4,
+					"column": 24
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 228,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 219,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 5,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 189,
+					"end": 218,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 30
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 198,
+						"end": 200,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 10
+							},
+							"end": {
+								"line": 4,
+								"column": 12
+							}
+						},
+						"name": "fn"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "AssignmentPattern",
+							"start": 201,
+							"end": 214,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 13
+								},
+								"end": {
+									"line": 4,
+									"column": 26
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 201,
+								"end": 202,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 13
+									},
+									"end": {
+										"line": 4,
+										"column": 14
+									}
+								},
+								"name": "a"
+							},
+							"right": {
+								"type": "Literal",
+								"start": 213,
+								"end": 214,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 25
+									},
+									"end": {
+										"line": 4,
+										"column": 26
+									}
+								},
+								"value": 1,
+								"raw": "1",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 205,
+										"end": 212
+									}
+								]
+							}
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 216,
+						"end": 218,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 28
+							},
+							"end": {
+								"line": 4,
+								"column": 30
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block comment glued to a parameter default `=` keeps its position; the value",
+							"start": 20,
+							"end": 101
+						},
+						{
+							"type": "Line",
+							"value": " reflows onto the `=` line. Prettier instead relocates the comment before the `=`.",
+							"start": 103,
+							"end": 187
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

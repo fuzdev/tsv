@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 365,
+	"end": 328,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -28,9 +28,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " tsv preserves the comment trailing the keyword and the value's break. The",
+			"value": " tsv reflows the value inline, uniform with `export =` and every other",
 			"start": 89,
-			"end": 165,
+			"end": 161,
 			"loc": {
 				"start": {
 					"line": 3,
@@ -38,15 +38,15 @@
 				},
 				"end": {
 					"line": 3,
-					"column": 77
+					"column": 73
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " value indents one level (the uniform module-header indent); prettier keeps",
-			"start": 167,
-			"end": 244,
+			"value": " value-position gap. The comment keeps its authored position after the",
+			"start": 163,
+			"end": 235,
 			"loc": {
 				"start": {
 					"line": 4,
@@ -54,15 +54,15 @@
 				},
 				"end": {
 					"line": 4,
-					"column": 78
+					"column": 73
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " it at the statement's own indent. A value glued to the comment stays inline.",
-			"start": 246,
-			"end": 325,
+			"value": " keyword; only the author's line break is reflowed.",
+			"start": 237,
+			"end": 290,
 			"loc": {
 				"start": {
 					"line": 5,
@@ -70,15 +70,15 @@
 				},
 				"end": {
 					"line": 5,
-					"column": 80
+					"column": 54
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 342,
-			"end": 349,
+			"start": 307,
+			"end": 314,
 			"loc": {
 				"start": {
 					"line": 6,
@@ -94,49 +94,49 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 364,
+		"end": 327,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 355,
+			"end": 318,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 8,
+					"line": 7,
 					"column": 9
 				}
 			},
 			"body": [
 				{
 					"type": "ExportDefaultDeclaration",
-					"start": 327,
-					"end": 354,
+					"start": 292,
+					"end": 317,
 					"loc": {
 						"start": {
 							"line": 6,
 							"column": 1
 						},
 						"end": {
-							"line": 7,
-							"column": 4
+							"line": 6,
+							"column": 26
 						}
 					},
 					"declaration": {
 						"type": "Identifier",
-						"start": 352,
-						"end": 353,
+						"start": 315,
+						"end": 316,
 						"loc": {
 							"start": {
-								"line": 7,
-								"column": 2
+								"line": 6,
+								"column": 24
 							},
 							"end": {
-								"line": 7,
-								"column": 3
+								"line": 6,
+								"column": 25
 							}
 						},
 						"name": "x",
@@ -144,8 +144,8 @@
 							{
 								"type": "Block",
 								"value": " c ",
-								"start": 342,
-								"end": 349
+								"start": 307,
+								"end": 314
 							}
 						]
 					},
@@ -158,21 +158,21 @@
 						},
 						{
 							"type": "Line",
-							"value": " tsv preserves the comment trailing the keyword and the value's break. The",
+							"value": " tsv reflows the value inline, uniform with `export =` and every other",
 							"start": 89,
-							"end": 165
+							"end": 161
 						},
 						{
 							"type": "Line",
-							"value": " value indents one level (the uniform module-header indent); prettier keeps",
-							"start": 167,
-							"end": 244
+							"value": " value-position gap. The comment keeps its authored position after the",
+							"start": 163,
+							"end": 235
 						},
 						{
 							"type": "Line",
-							"value": " it at the statement's own indent. A value glued to the comment stays inline.",
-							"start": 246,
-							"end": 325
+							"value": " keyword; only the author's line break is reflowed.",
+							"start": 237,
+							"end": 290
 						}
 					]
 				}

@@ -563,8 +563,15 @@ impl<'a> Printer<'a> {
     /// operator (not on its own line) hugs the value with a space even when the
     /// value follows on the next source line — prettier pulls the value up in the
     /// assignment/call layout (`= /* c */⏎v` → `= /* c */ v`). Positions that keep
-    /// the author's line break for a glued block (decorators, `await` operands,
-    /// object property values, …) stay on the non-gluing `build_rhs_comments_opt`.
+    /// the author's line break for a glued block stay on the non-gluing
+    /// `build_rhs_comments_opt` — a decorator is the clear case (`@dec /* c */⏎class`),
+    /// since its following declaration owns its own line regardless.
+    ///
+    /// ⚠️ Don't grow an example list here without probing each entry: this comment
+    /// previously named `await` operands and object property values as keeping the
+    /// break, and **both actually collapse** (`await /* c */ x`, `k: /* c */ 1`).
+    /// The gluing/non-gluing split is a property of each call site, so the call sites
+    /// are the source of truth, not a list here.
     ///
     /// `return`/`throw` arguments pull up here too, but for a stronger reason than
     /// layout: they are restricted productions, so keeping the break would be ASI and
@@ -652,7 +659,7 @@ impl<'a> Printer<'a> {
                 LeadingGlue::AdjacentGlued => {
                     comment.is_block
                         && (self.is_same_line(comment.span.end, next)
-                            || !self.comment_forces_own_line(comment))
+                            || !self.comment_cannot_glue_to_operator(comment))
                 }
             };
             if hugs {
@@ -730,8 +737,12 @@ impl<'a> Printer<'a> {
     /// `build_value` is called only when a break is forced, so a comment-free
     /// initializer never pays to build the value doc here.
     ///
-    /// Shared by variable declarators and for-loop init clauses so both place a
-    /// comment after `=` identically:
+    /// Shared by variable declarators, for-loop init clauses, and enum members so all
+    /// three place a comment after `=` identically. That sharing is the point: the enum
+    /// member emitted its own positional run instead, and drifted twice over — it
+    /// preserved a break the others reflow, and relocated an own-line comment onto the
+    /// `=` line, which is not idempotent (the moved comment reads as glued next pass).
+    /// A new `=`→value gap should route here rather than re-derive the layout:
     ///
     /// - **Line comment** after `=`: mandatory break after `=`. A comment on the
     ///   `=`'s line trails it inline; a comment on its own line leads the value on
@@ -779,7 +790,7 @@ impl<'a> Printer<'a> {
             ]))
         } else if self
             .comments_on_page_between(eq_pos + 1, value_start)
-            .any(|c| self.comment_forces_own_line(c))
+            .any(|c| self.comment_cannot_glue_to_operator(c))
         {
             // Own-line / multiline block → break-after-operator hang.
             let comments_doc = self
