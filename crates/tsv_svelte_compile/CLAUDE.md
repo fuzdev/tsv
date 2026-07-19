@@ -359,13 +359,39 @@ project-wide conventions.
   `refuse_template_typescript` / `guard_dropped_fragment`, and the analyses'
   dropped-fragment view) — but **not** the emission refusals, and not the
   derived-read rule, which is an emission rewrite rather than a validity rule.
-  ⚠️ That coverage is by *construct*, not by *node kind*: `guard_dropped_fragment`
-  walks only `TemplateItem::Expression`, so it never asks what KIND a dropped node
-  is, and a node whose mere presence the oracle's analysis reads — a `<slot>` in a
-  `{:catch}`, which still adds `$$props` to the component signature — reaches no
-  guard at all and silently diverges. See the `// TODO:` at the `{:catch}` guard
-  call in `blocks.rs` for the known live case and the other dropped regions to
-  enumerate with it.
+  Those walks all ask what a region *references*. A fourth question — what a
+  dropped node *is* — needs its own walk over node KINDS, because the oracle also
+  keys some phase-2 facts on a node's mere **presence**, which dropping the region
+  does not suppress. `guard_dropped_fragment` therefore runs
+  `guard_dropped_presence` (`fragment.rs`) alongside the expression walk, recursing
+  through `each_child_fragment` and reaching each node's attribute list.
+  Presence-read facts run on **two axes**, and the second is the one that is easy
+  to miss:
+  - **emission** — the fact rides into the generated code. A `<slot>` in a
+    `{:catch}` records into `analysis.slot_names` and widens the component
+    signature to `($$renderer, $$props)`. Measurable one construct at a time.
+  - **validation** — the fact feeds a whole-component check that can turn an
+    otherwise-valid component into a compile *error*. A legacy `on:` in a
+    `{:catch}` sets `analysis.event_directive_node`; with an `onclick` on any
+    emitted element the oracle raises `mixed_event_handler_syntaxes`. This axis is
+    invisible to a per-construct probe — it needs a second construct elsewhere in
+    the component to fire.
+
+  The scoping rule is **"refuse where the construct can affect the result"**,
+  deliberately narrower than "a fence refuses everywhere": `<svelte:component>`,
+  `<svelte:element>`, `<svelte:boundary>`, `<svelte:self>`, `<svelte:fragment>` and
+  a `slot="…"` child are on neither axis and must keep compiling in a dropped
+  `{:catch}` (`<svelte:boundary>` is not even fenced). `let:` is also on neither
+  axis but refuses anyway, sharing `on:`'s fence bucket.
+  `dropped_presence_refusal`'s exhaustive `FragmentNode` / `SpecialElementKind` /
+  `AttributeNode` matches are what force a new variant through **both** questions.
+
+  ⚠️ Two axis-2 holes are **open**, both over-acceptances, neither
+  corpus-reachable: `{$$slots.x}` in a dropped region + an emitted `{@render}`
+  (`slot_snippet_conflict`), and a dropped `{#snippet}` + `export { … }` of it from
+  a module script (`snippet_invalid_export`). Neither construct is fenced, so
+  closing them means porting the oracle's whole-component validations rather than
+  widening the presence match — tracked in `../../docs/checklist_svelte_compiler.md`.
 - `transform_server.rs` — the SSR transform **orchestrator**: `compile_server`
   runs the phase-numbered pipeline (TypeScript erasure/gate, CSS scoping — the
   element census built and every selector chain matched against it **upfront** in

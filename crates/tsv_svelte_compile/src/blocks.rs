@@ -651,20 +651,18 @@ pub(crate) fn emit_await_block<'arena>(
     let then_arrow = env.b.arrow_block(then_params, then_stmts, then_here);
 
     // The `{:catch}` branch is dropped from SSR — the emitter never visits it. It
-    // still gets the rune guard, or a misplaced rune inside it would compile where
-    // the oracle's analysis phase rejects.
+    // still gets the dropped-fragment guard, which covers both what the branch
+    // REFERENCES (a misplaced rune inside it would otherwise compile where the
+    // oracle's analysis phase rejects) and what it IS — a construct whose mere
+    // presence the oracle's phase 2 reads, either into the emitted code (`<slot>`
+    // widens the component signature from a dropped branch) or into a
+    // whole-component validation (a legacy `on:` plus an emitted `onclick` is
+    // `mixed_event_handler_syntaxes`, so the dropped branch decides whether the
+    // component compiles at all).
     //
-    // TODO: the guard covers runes, but not every ANALYSIS-phase fact the oracle
-    // reads out of a dropped branch. A `<slot>` in a `{:catch}` is the known live
-    // case: the oracle's analysis runs before it chooses what to emit, so the slot
-    // still adds `$$props` to the component signature, while tsv fires no refusal
-    // (the emitter never reaches the node) and emits the bare signature — a
-    // MISMATCH. Not corpus-reachable today, so it is latent rather than failing;
-    // it wants its own fixtures-first slice, which should decide whether the fix
-    // is a signature fact collected in the dropped walk or a refusal here. The
-    // same shape may exist for the other dropped regions (an `{#each}` key, a
-    // `{#key}` expression, an event handler) — enumerate them in that slice.
-    // Repro: `{#await p}x{:catch e}<slot />{/await}`.
+    // `{:catch}` is the only dropped FRAGMENT. The other dropped regions — an
+    // `{#each}` key, a `{#key}` expression, an event handler's value — are single
+    // expressions, so they carry no node kind and route through `guard_dropped`.
     if let Some(catch) = &await_block.catch {
         guard_dropped_fragment(env, catch)?;
     }

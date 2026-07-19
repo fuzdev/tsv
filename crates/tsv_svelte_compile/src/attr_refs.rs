@@ -77,6 +77,11 @@ pub(crate) enum TemplateItem<'a, 'arena> {
 ///   the oracle rejects a misplaced rune in its *analysis* phase, before it decides
 ///   what to emit, so dropping the branch cannot make the component valid.
 ///
+/// Both consumers ask about a region's **expressions**. The orthogonal question —
+/// what a dropped node *is*, for the analysis facts the oracle keys on a node's
+/// mere presence — this walk cannot answer, because it yields expressions rather
+/// than nodes; `fragment.rs`'s `guard_dropped_presence` covers it.
+///
 /// The `FragmentNode` match is exhaustive on purpose — a new template shape fails
 /// compilation here instead of slipping silently past both gates.
 pub(crate) fn each_template_item<'a, 'arena>(

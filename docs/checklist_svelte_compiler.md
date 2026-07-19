@@ -311,9 +311,38 @@ The oracle's normalization (`3-transform/utils.js:126` `clean_nodes`, `escape_ht
 
 - **TypeScript** — a *parse*-phase decision (the document-wide `lang="ts"` gate above);
 - **misplaced runes** — an *analysis*-phase error (`{:catch e}{$state(1)}{/await}` is `state_invalid_placement`);
-- **references** — the oracle counts them wherever they sit, so a dropped region's references still drive `needs_context` and block a `{#snippet}`'s module hoist (`attr_refs.rs`'s dropped-fragment view; a `{:catch}` the emitter discards is the reason that view exists).
+- **references** — the oracle counts them wherever they sit, so a dropped region's references still drive `needs_context` and block a `{#snippet}`'s module hoist (`attr_refs.rs`'s dropped-fragment view; a `{:catch}` the emitter discards is the reason that view exists);
+- **presence-read constructs** — a fact the oracle's phase 2 keys on a node (or an attribute on one) *existing*, which dropping the region cannot suppress. These run on two axes, covered below.
 
-What a dropped region does **not** get is the *emission* refusals: a directive, a spread, a special element, or a `{@debug}` inside a `{:catch}` compiles, because the oracle drops it too — and neither does the derived-read rule, which is an emission rewrite (`d` → `d()`), not a validity rule. Refusing there would cost parity on shapes the oracle accepts. The `dropped_fragments_are_walked` test pins all three halves.
+What a dropped region does **not** get is the *emission* refusals: a spread or a `{@debug}` inside a `{:catch}` compiles, because the oracle drops it too — and neither does the derived-read rule, which is an emission rewrite (`d` → `d()`), not a validity rule. Refusing there would cost parity on shapes the oracle accepts.
+
+#### The two presence-read axes
+
+The line between the last two bullets is **"can it affect the result from here"**, not "is it fenced". A dropped construct can reach the result two ways, and the second is the one a per-construct probe cannot see:
+
+- **Emission** — the fact rides into the generated code. A **`<slot>`** records into `analysis.slot_names`, and `slot_names.size > 0` folds into `should_inject_props`, so a `<slot>` in a `{:catch}` widens the signature to `($$renderer, $$props)` while SSR emits nothing from the branch. It **refuses** (`template node special element <slot>`, the emitted path's own bucket — the fence firing in a second position, not a new reason). Measurable one construct at a time: compile with and without it and diff.
+- **Validation** — the fact feeds a whole-component check in `2-analyze/index.js` that can turn an otherwise-valid component into a compile *error*. A legacy **`on:`** sets `analysis.event_directive_node` (`visitors/OnDirective.js`); an `onclick`-style attribute on an emitted element sets `analysis.uses_event_attributes` (`visitors/Attribute.js`); together they raise `mixed_event_handler_syntaxes`. So `{:catch}<button on:click=…>` plus a sibling `<div onclick=…>` makes the oracle reject a component tsv would compile. It **refuses** (`legacy on: directive (runes-only fence)`).
+
+⚠️ An isolated probe answers the **emission** axis only. A construct that compiles byte-identically with and without it, measured alone, may still be on the validation axis — those checks are whole-component, so they need a *second* construct elsewhere to fire. Do not read "inert in isolation" as "inert".
+
+**Known open holes** on the validation axis — both over-acceptances (tsv compiles what the oracle rejects), neither corpus-reachable:
+
+| Dropped construct | Emitted partner | Oracle error |
+| --- | --- | --- |
+| `{$$slots.x}` | `{@render …}` | `slot_snippet_conflict` |
+| `{#snippet s()}` | `export { s }` from a module script | `snippet_invalid_export` |
+
+Neither `$$slots` nor `{#snippet}` is a fence — tsv intends to support both — so closing these means porting the oracle's whole-component validations, not widening the presence match. That is separate work from the dropped-region walk.
+
+**Everything else keeps compiling** in a dropped `{:catch}`: `<svelte:component>`, `<svelte:self>` (under an `{#if}`), `<svelte:fragment>` and a `slot="…"` component child (both as a component's children), plus the unfenced `<svelte:element>` and `<svelte:boundary>`. That set is clean on both axes — verified by reading the writers, not by probing: the whole-component fields a phase-2 validation reads (`slot_names`, `uses_slots`, `uses_render_tags`, `event_directive_node`, `uses_event_attributes`, `snippets`) are written only by `SlotElement` / an `$$slots` `Identifier` / `RenderTag` / `OnDirective` / an event `Attribute` / `SnippetBlock`, and none of those constructs is one of them. Refusing them to make the fence uniform would trade correct output for nothing. `let:` is likewise on neither axis (its only check, `let_directive_invalid_placement`, is local to its parent) but refuses anyway, to keep the fenced `on:`/`let:` pair in one census bucket. Only the placement-restricted metas (`<svelte:head>`, `<svelte:window>`, `<svelte:body>`, `<svelte:document>`) are unreachable, rejected by the oracle inside any block.
+
+`dropped_fragments_are_walked` pins the expression halves; `dropped_fragment_refuses_presence_read_nodes` pins both presence axes **and** the must-not-over-refuse set beside them.
+
+#### `analysis.elements` — presence-read, currently safe by accident
+
+`RegularElement.js` and `SvelteElement.js` push **every** element into `analysis.elements`, which drives CSS pruning (`2-analyze/index.js` → `prune(analysis.css.ast, analysis.elements)`). An element in a `{:catch}` therefore keeps a CSS rule alive in the oracle's output. tsv's element census excludes `{:catch}`, so today it **refuses** such a component (`css selector … matches no element`) — safe by containment, since tsv's element set is a subset of the oracle's and a smaller set can only over-refuse.
+
+⚠️ That safety is incidental, not designed. **The moment CSS pruning is implemented, `{:catch}` elements must enter the census** — otherwise the refusal disappears and the under-count becomes a silent CSS mismatch instead.
 
 ### Snippets and render tags
 

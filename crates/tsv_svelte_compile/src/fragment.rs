@@ -23,7 +23,7 @@ use tsv_ts::ast::internal::{
 };
 
 use crate::analyze::{NameSet, ScopeEntry, evaluate, stringify_value};
-use crate::attr_refs::{TemplateItem, each_template_item};
+use crate::attr_refs::{TemplateItem, each_child_fragment, each_template_item};
 use crate::blocks::{
     emit_await_block, emit_const_tag, emit_each_block, emit_if_block, emit_key_block,
     emit_svelte_head,
@@ -812,19 +812,218 @@ pub(crate) fn guard_pattern<'arena>(
 
 /// Guard a whole fragment the SSR output drops (the `{:catch}` branch) — the
 /// dropped-fragment analog of [`guard_dropped`], over `attr_refs`' shared
-/// traversal. Without it a rune anywhere inside a `{:catch}` compiles, which the
+/// traversals. Without it a rune anywhere inside a `{:catch}` compiles, which the
 /// oracle rejects: the M4 lesson (an emission-dropped fragment still needs
 /// refusal-equivalent walking), and the property `dropped_fragments_are_walked`
 /// pins.
+///
+/// Two walks, because a dropped region carries two kinds of fact:
+///
+/// - what it **references** — every borrowed expression, through
+///   [`each_template_item`]'s dropped-fragment view;
+/// - what it **is** — the node kinds whose mere presence the oracle's analysis
+///   reads into the output, through [`guard_dropped_presence`].
+///
+/// Nothing else covers the second: the emission refusals never fire in a region
+/// the emitter does not visit, so without this walk a presence-read node reaches
+/// no guard at all. The test `dropped_fragment_refuses_presence_read_nodes` pins
+/// it, together with the set that must keep compiling beside it.
 pub(crate) fn guard_dropped_fragment<'arena>(
     env: &EmitEnv<'arena, '_>,
     fragment: &'arena Fragment<'arena>,
 ) -> Result<(), CompileError> {
+    guard_dropped_presence(fragment)?;
     each_template_item(fragment, &mut |item| match item {
         TemplateItem::Expression(expr) => guard_dropped(env, expr),
         // A `<T>` clause holds no value reference. TypeScript in a document with
         // no `lang="ts"` is refused up front by `refuse_template_typescript`.
         TemplateItem::SnippetTypeParameters => Ok(()),
+    })
+}
+
+/// Refuse a node — or an attribute on one — in a dropped fragment whose
+/// **presence alone** the oracle reads into its compile result.
+///
+/// The scoping rule, and why it is narrower than "a fenced construct refuses
+/// everywhere": SSR dropping a region suppresses a construct's *emission*, so a
+/// construct that only ever affected the output by being emitted is genuinely
+/// inert there — both compilers drop it and the outputs agree. What dropping does
+/// **not** suppress is a phase-2 fact keyed on a node's presence, which the oracle
+/// records before it chooses what to emit. Those facts run on two axes — what gets
+/// *emitted*, and whether the component *validates* at all — and a construct on
+/// either axis has to refuse here. Refusing more would turn correct output into
+/// refusals for nothing; the per-construct membership argument, both axes, and the
+/// known open holes live on [`dropped_presence_refusal`].
+///
+/// Recursion rides [`each_child_fragment`], the shared structural seam, so a new
+/// child fragment on an existing node kind cannot hide a node from this walk.
+fn guard_dropped_presence(fragment: &Fragment<'_>) -> Result<(), CompileError> {
+    for node in fragment.nodes {
+        if let Some(reason) = dropped_presence_refusal(node) {
+            return Err(unsupported(reason));
+        }
+        let mut result = Ok(());
+        each_child_fragment(node, &mut |child| {
+            if result.is_ok() {
+                result = guard_dropped_presence(child);
+            }
+        });
+        result?;
+    }
+    Ok(())
+}
+
+/// The presence-read classification of one dropped-fragment node.
+///
+/// Exhaustive on purpose, three times over — a new [`FragmentNode`],
+/// [`SpecialElementKind`], or [`AttributeNode`] variant fails compilation here
+/// rather than silently joining the inert majority. ⚠️ The exhaustiveness forces
+/// **two** questions on whoever adds a variant, not one:
+///
+/// 1. does the oracle read this node's presence into the **emitted output** (a
+///    signature fact, a hoist decision, a scoping fact)?
+/// 2. does its presence feed a whole-component **validation** — a phase-2 check
+///    keyed on this node existing *anywhere*, which can turn a component the
+///    oracle would otherwise accept into a compile error?
+///
+/// Either one makes the node presence-read. Answering only (1) is how the second
+/// axis stayed invisible; see the open holes below.
+///
+/// Two constructs are presence-read today:
+///
+/// - **`<slot>`** (axis 1). Svelte's phase-2 `SlotElement` visitor records every
+///   slot in `analysis.slot_names`, and phase 3 folds `slot_names.size > 0` into
+///   `should_inject_props` — so a `<slot>` in a `{:catch}` widens the component
+///   signature to `($$renderer, $$props)` while SSR emits nothing from the branch.
+/// - **a legacy `on:` directive** (axis 2). `OnDirective`'s visitor sets
+///   `event_directive_node` and an `onclick`-style attribute sets
+///   `uses_event_attributes`; a component carrying both is
+///   `mixed_event_handler_syntaxes`. The check is whole-component, so an `on:` in
+///   a `{:catch}` flips a component with an emitted `onclick` from valid JS to a
+///   compile error — the fenced construct demonstrably affecting the result from a
+///   dropped position. `let:` refuses alongside it on the fence argument rather
+///   than this one; see [`dropped_presence_attribute_refusal`].
+///
+/// Both refuse under the **emitted path's own bucket label** (`<slot>`'s
+/// `TemplateNode`, the directives' [`Refusal::RunesOnlyFence`]), keeping one census
+/// bucket per construct: the fence is firing in a second position, not for a new
+/// reason.
+///
+/// Every other node is probe-verified inert **on the emission axis** — the oracle's
+/// output is byte-identical with and without it, *in isolation*. That is a claim
+/// about axis 1 only, and it is the whole claim: a construct inert on the emission
+/// axis can still feed axis 2, in which case a sibling construct elsewhere in the
+/// component makes it not inert at all. Inert-in-isolation is measured per
+/// construct; the validations are whole-component, so they are only visible in
+/// combination.
+///
+/// ⚠️ **Two known open holes on axis 2**, both pre-existing, neither
+/// corpus-reachable, both over-acceptances (tsv compiles what the oracle rejects):
+///
+/// - `{$$slots.x}` in a dropped region + an emitted `{@render}` →
+///   `slot_snippet_conflict`;
+/// - `{#snippet}` in a dropped region + `export { … }` of it from a module script →
+///   `snippet_invalid_export`.
+///
+/// Closing them means porting the oracle's whole-component validations rather than
+/// widening this match, because neither `$$slots` nor `{#snippet}` is fenced —
+/// separate work, tracked in `docs/checklist_svelte_compiler.md`.
+///
+/// The rest keep compiling in a dropped region: `<svelte:component>`,
+/// `<svelte:self>` (in a nesting the oracle allows, e.g. under an `{#if}`),
+/// `<svelte:fragment>` and a `slot="…"` component child (both as a component's
+/// children), plus the unfenced `<svelte:element>` and `<svelte:boundary>`. The
+/// placement-restricted metas (`<svelte:head>` / `<svelte:window>` /
+/// `<svelte:body>` / `<svelte:document>`) the oracle rejects inside any block, so
+/// no tsv verdict there is reachable at all.
+///
+/// Keeping `<svelte:boundary>` out of the refused set is deliberate and not
+/// merely a parity accounting choice: it is a first-class Svelte 5 feature and the
+/// next implementation target, so refusing it here would obstruct that work.
+fn dropped_presence_refusal(node: &FragmentNode<'_>) -> Option<Refusal> {
+    match node {
+        FragmentNode::SpecialElement(special) => match &special.kind {
+            SpecialElementKind::SlotElement => Some(Refusal::TemplateNode {
+                kind: SPECIAL_ELEMENT_SLOT,
+            }),
+            SpecialElementKind::SvelteComponent { .. }
+            | SpecialElementKind::SvelteSelf
+            | SpecialElementKind::SvelteFragment
+            | SpecialElementKind::SvelteBoundary
+            | SpecialElementKind::SvelteElement { .. }
+            | SpecialElementKind::SvelteHead
+            | SpecialElementKind::TitleElement
+            | SpecialElementKind::SvelteWindow
+            | SpecialElementKind::SvelteBody
+            | SpecialElementKind::SvelteDocument => {
+                dropped_presence_attribute_refusal(special.attributes)
+            }
+        },
+        // An element (regular or component) is itself inert, but its ATTRIBUTES are
+        // not: a directive hangs off the attribute list rather than off the node
+        // kind, so the presence walk has to reach into it.
+        FragmentNode::Element(element) => dropped_presence_attribute_refusal(element.attributes),
+        // Every remaining node kind is inert in a dropped region: what the oracle
+        // reads out of one is its *expressions* (references, runes, TypeScript),
+        // which the sibling expression walks already cover. Listed rather than
+        // collapsed into a `_` so a new variant lands here as a compile error and
+        // gets the presence-read judgment made for it explicitly.
+        FragmentNode::Text(_)
+        | FragmentNode::Comment(_)
+        | FragmentNode::ExpressionTag(_)
+        | FragmentNode::HtmlTag(_)
+        | FragmentNode::RenderTag(_)
+        | FragmentNode::DebugTag(_)
+        | FragmentNode::ConstTag(_)
+        | FragmentNode::DeclarationTag(_)
+        | FragmentNode::IfBlock(_)
+        | FragmentNode::EachBlock(_)
+        | FragmentNode::AwaitBlock(_)
+        | FragmentNode::KeyBlock(_)
+        | FragmentNode::SnippetBlock(_) => None,
+    }
+}
+
+/// The presence-read classification of a dropped-fragment node's attribute list.
+///
+/// The legacy `on:` and `let:` directives refuse here, under the same
+/// [`Refusal::RunesOnlyFence`] bucket the emitted paths use (`element.rs`, and the
+/// special-element path above). Their memberships rest on different arguments, and
+/// the difference is worth keeping straight:
+///
+/// - **`on:`** is *forced* — it feeds a whole-component validation from a dropped
+///   position (see [`dropped_presence_refusal`]'s axis 2). Not refusing it is an
+///   over-acceptance.
+/// - **`let:`** is *chosen*. Its only oracle check is the **local**
+///   `let_directive_invalid_placement` (`2-analyze/visitors/LetDirective.js`), which
+///   reads its parent and nothing else — it writes no whole-component analysis
+///   field, so it is genuinely inert in a dropped region on both axes. It refuses
+///   anyway because it is a permanent runes-only fence sharing `on:`'s bucket:
+///   splitting the pair by position would cost a census bucket to buy parity on a
+///   construct tsv will never support.
+///
+/// That asymmetry is the reason this is a *fence* list rather than a second
+/// presence-read list. A construct that is neither forced nor fenced does not
+/// belong here — closing an axis-2 hole for one (`$$slots`, `{#snippet}`) means
+/// porting the validation, not adding an arm.
+///
+/// Everything else is inert on both axes. A `bind:` is the closest call and stays
+/// out: the oracle's bind validations are all *local* to the binding (its target,
+/// its element), so a dropped one cannot invalidate an emitted sibling — and the
+/// expression walk beside this one already guards what it references.
+fn dropped_presence_attribute_refusal(attributes: &[AttributeNode<'_>]) -> Option<Refusal> {
+    attributes.iter().find_map(|attribute| match attribute {
+        AttributeNode::OnDirective(_) => Some(Refusal::RunesOnlyFence { directive: "on:" }),
+        AttributeNode::LetDirective(_) => Some(Refusal::RunesOnlyFence { directive: "let:" }),
+        AttributeNode::Attribute(_)
+        | AttributeNode::SpreadAttribute(_)
+        | AttributeNode::AttachTag(_)
+        | AttributeNode::BindDirective(_)
+        | AttributeNode::ClassDirective(_)
+        | AttributeNode::StyleDirective(_)
+        | AttributeNode::UseDirective(_)
+        | AttributeNode::TransitionDirective(_)
+        | AttributeNode::AnimateDirective(_) => None,
     })
 }
 
