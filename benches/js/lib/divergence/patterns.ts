@@ -4,8 +4,14 @@
  * Each pattern corresponds to a documented divergence in conformance_prettier.md.
  * These are NOT bugs - they are design choices.
  *
- * Patterns are ordered from most specific to most broad. This ensures hunks get
- * the most precise explanation possible. Multiple patterns CAN claim the same hunk.
+ * Patterns are ordered from most specific to most broad, but that ordering is
+ * PRESENTATIONAL, not semantic: `detect_divergences` runs every pattern and
+ * records every match — it does not stop at the first, and no pattern suppresses
+ * another. Multiple patterns CAN claim the same hunk, and each computed field
+ * (`explained_hunks`, `unexplained_hunks`, `classification`, `safety_vouched`)
+ * is set-based, so a reordering yields byte-identical results. What the order
+ * buys is that the most specific pattern is named FIRST where matches are joined
+ * for display, which is the useful thing when triaging a file with several.
  */
 
 import type { DiffHunk, DiffLine } from '../diff.ts';
@@ -28,9 +34,9 @@ export interface DetectionContext {
 	/** Pre-computed by enrich_detection_context — patterns use these instead of splitting */
 	ours_lines?: string[];
 	prettier_lines?: string[];
-	/** Pre-computed <style> block line ranges for Svelte files */
-	ours_style_boundaries?: Array<{ start: number; end: number }>;
-	prettier_style_boundaries?: Array<{ start: number; end: number }>;
+	/** Pre-computed <script>/<style> regions for Svelte files (char + line spans) */
+	ours_code_regions?: CodeRegion[];
+	prettier_code_regions?: CodeRegion[];
 }
 
 export interface DivergenceMatch {
@@ -77,8 +83,12 @@ export interface DivergencePattern {
 
 /**
  * Calculate visual width of a line (tabs = 2 spaces).
+ *
+ * Exported so the tests measure width the same way the detectors do — a second
+ * copy there would let the two drift, and every width-keyed pattern is judged
+ * against it.
  */
-function visual_width(line: string): number {
+export function visual_width(line: string): number {
 	let width = 0;
 	for (const char of line) {
 		width += char === '\t' ? 2 : 1;
@@ -166,36 +176,76 @@ function long_line_rewrapped(
 }
 
 /**
- * Compute <style> block line ranges from an array of lines.
- * Returns an array of { start, end } (inclusive line indices).
+ * A `<script>` or `<style>` region — the two places in a Svelte file whose
+ * bytes are program/string content rather than template markup.
+ *
+ * Carries both coordinate systems because its two consumers need different
+ * ones: the boundary-whitespace collapse splices the raw text by CHAR offset,
+ * while the hunk-level checks compare LINE ranges. Both are computed in the
+ * same pass (see `compute_code_regions`) and cached per side, so neither
+ * consumer rescans.
+ *
+ * The non-greedy body means a `</script>` inside a string ends the region
+ * early, erring toward a SMALLER region — which under-claims rather than
+ * over-claims for every consumer.
  */
-function compute_style_boundaries(lines: string[]): Array<{ start: number; end: number }> {
-	const boundaries: Array<{ start: number; end: number }> = [];
-	let style_start = -1;
-
-	for (let i = 0; i < lines.length; i++) {
-		if (/<style[\s>]/.test(lines[i]) && style_start === -1) {
-			style_start = i;
-		} else if (/<\/style>/.test(lines[i]) && style_start !== -1) {
-			boundaries.push({ start: style_start, end: i });
-			style_start = -1;
-		}
-	}
-
-	return boundaries;
+interface CodeRegion {
+	kind: 'script' | 'style';
+	/** Char offsets into the side's full text, `[start, end)`. */
+	start: number;
+	end: number;
+	/** 0-based INCLUSIVE line range the region spans. */
+	line_start: number;
+	line_end: number;
 }
 
+const raw_code_regions = /<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi;
+
 /**
- * Check if a line index falls within any style block boundary.
+ * The `<script>`/`<style>` regions of `text`, in source order.
+ *
+ * One linear pass: `matchAll` yields non-overlapping matches in increasing
+ * index order, so the newline counter only ever moves forward and the char →
+ * line conversion costs one scan of the text total, not one per region.
  */
-function is_line_in_style_block(
-	line: number,
-	boundaries: Array<{ start: number; end: number }>,
-): boolean {
-	for (const b of boundaries) {
-		if (line >= b.start && line <= b.end) return true;
+function compute_code_regions(text: string): CodeRegion[] {
+	const regions: CodeRegion[] = [];
+	let scanned = 0;
+	let line = 0;
+	const line_at = (offset: number): number => {
+		for (let i = scanned; i < offset; i++) {
+			if (text.charCodeAt(i) === 10) line++;
+		}
+		scanned = offset;
+		return line;
+	};
+	for (const m of text.matchAll(raw_code_regions)) {
+		const start = m.index;
+		const end = start + m[0].length;
+		regions.push({
+			kind: m[1].toLowerCase() as CodeRegion['kind'],
+			start,
+			end,
+			line_start: line_at(start),
+			line_end: line_at(end),
+		});
 	}
-	return false;
+	return regions;
+}
+
+/** Whether a line index falls inside any `<style>` region. */
+function is_line_in_style_block(line: number, regions: CodeRegion[]): boolean {
+	return regions.some((r) => r.kind === 'style' && line >= r.line_start && line <= r.line_end);
+}
+
+/** Whether a hunk's line range overlaps any code region (either kind). */
+function overlaps_code_region(
+	range: { start: number; end: number } | null,
+	regions: CodeRegion[],
+): boolean {
+	return (
+		range !== null && regions.some((r) => range.start <= r.line_end && r.line_start <= range.end)
+	);
 }
 
 /**
@@ -206,30 +256,30 @@ export function enrich_detection_context(ctx: DetectionContext): void {
 	ctx.ours_lines = ctx.ours.split('\n');
 	ctx.prettier_lines = ctx.prettier.split('\n');
 	if (ctx.language === 'svelte') {
-		ctx.ours_style_boundaries = compute_style_boundaries(ctx.ours_lines);
-		ctx.prettier_style_boundaries = compute_style_boundaries(ctx.prettier_lines);
+		ctx.ours_code_regions = compute_code_regions(ctx.ours);
+		ctx.prettier_code_regions = compute_code_regions(ctx.prettier);
 	} else {
-		ctx.ours_style_boundaries = [];
-		ctx.prettier_style_boundaries = [];
+		ctx.ours_code_regions = [];
+		ctx.prettier_code_regions = [];
 	}
 }
 
 /**
  * Check if a hunk's context is within a CSS context.
- * For Svelte files, uses pre-computed style boundaries.
- * For removal-only hunks, checks prettier's boundaries (not ours).
+ * For Svelte files, uses the pre-computed `<style>` regions.
+ * For removal-only hunks, checks prettier's regions (not ours).
  */
 function is_in_css_context(hunk: DiffHunk, ctx: DetectionContext): boolean {
 	if (ctx.language === 'css') return true;
 	if (ctx.language !== 'svelte') return false;
 
 	// Use ours range when available; for removal-only hunks, use prettier range
-	// against prettier's style boundaries (fixes line index mismatch)
+	// against prettier's regions (fixes line index mismatch)
 	if (hunk.ours_range) {
-		return is_line_in_style_block(hunk.ours_range.start, ctx.ours_style_boundaries ?? []);
+		return is_line_in_style_block(hunk.ours_range.start, ctx.ours_code_regions ?? []);
 	}
 	if (hunk.prettier_range) {
-		return is_line_in_style_block(hunk.prettier_range.start, ctx.prettier_style_boundaries ?? []);
+		return is_line_in_style_block(hunk.prettier_range.start, ctx.prettier_code_regions ?? []);
 	}
 	return false;
 }
@@ -594,7 +644,13 @@ const empty_statement_removal: DivergencePattern = {
 	description: 'Standalone empty statement (;) removed',
 	languages: ['typescript', 'svelte'],
 	conformance_sections: ['TypeScript'],
-	fixtures: ['typescript/statements/empty_standalone_prettier_divergence'],
+	// No fixture, and no pattern claims one. `empty_standalone` was listed here but
+	// pins the BLANK LINES left behind — both formatters drop the `;`, so the
+	// removed-standalone-`;` test below can never fire on it. It stays honestly
+	// uncovered in `divergence:audit` rather than forced into an allowlist; a
+	// blank-line-collapse detector would be the real fix. The pattern itself is
+	// LIVE (3 corpus files via `--audit-patterns`), so it earns its keep regardless.
+	fixtures: [],
 	detect(ctx) {
 		// Look for hunks where removed lines contain standalone semicolons
 		// (not part of for(;;) or other syntax)
@@ -812,11 +868,15 @@ const css_atrule_stable_quirk: DivergencePattern = {
 				if (removed_extra_spaces && added_normalized) return true;
 			}
 
-			// @scope with spacing quirks (spaces inside parens, double spaces around to)
+			// @scope with spacing quirks (spaces inside parens, double spaces around
+			// to, or a comma/combinator the author wrote tight)
 			if (/@scope/.test(removed_joined) || /@scope/.test(added_joined)) {
 				// Prettier adds spaces inside scope parens: ( .class ) vs (.class)
 				const removed_has_quirk = hunk.removed_lines.some((l) =>
-					/@scope/.test(l) && (/\( /.test(l) || / \)/.test(l) || /\s{2,}to\s{2,}/.test(l))
+					/@scope/.test(l) &&
+					(/\( /.test(l) || / \)/.test(l) || /\s{2,}to\s{2,}/.test(l) ||
+						// tight comma / combinator preserved: (.x,.y), (a>b), (.x)to(.y)
+						/,\S/.test(l) || /\S[>+~]\S/.test(l) || /\)to\(/.test(l))
 				);
 				const added_is_normal = hunk.added_lines.some((l) => /@scope/.test(l));
 				if (removed_has_quirk && added_is_normal) return true;
@@ -1046,14 +1106,13 @@ const template_literal_width: DivergencePattern = {
 	languages: ['typescript', 'svelte'],
 	conformance_sections: ['TypeScript: Template Literals'],
 	fixtures: [
-		'typescript/expressions/literals/template/long_prettier_divergence',
-		'typescript/expressions/literals/template/interpolation_expression_long_prettier_divergence',
-		'typescript/expressions/literals/template/interpolation_multiline_indent_long_prettier_divergence',
 		'typescript/expressions/literals/template/interpolation_nested_template_prettier_divergence',
 		'typescript/types/template_literal_type_long_prettier_divergence',
-		'typescript/types/template_literal_type_conditional_long_prettier_divergence',
-		'typescript/expressions/ternary/template_consequent_long_prettier_divergence',
-		'typescript/expressions/logical/template_operand_long_prettier_divergence',
+		// TODO: `template_literal_type_conditional_long` was listed here but the
+		// break markers below (`${` at EOL, `}\`` at line start) don't describe its
+		// shape — the conditional type breaks at `?`/`:` INSIDE the interpolation.
+		// `fill_101_boundary` claims it today; a marker for that shape would be the
+		// real fix, but it must not swallow ordinary ternary breaks.
 	],
 	detect(ctx) {
 		// Template literal break patterns — we break inside ${...} to respect print width.
@@ -1159,9 +1218,10 @@ const block_expression_logical: DivergencePattern = {
 	description: 'Block expression logical operators wrap to respect print width',
 	languages: ['svelte'],
 	conformance_sections: ['Svelte: Blocks'],
-	fixtures: [
-		'svelte/blocks/if/last_block_prettier_divergence',
-	],
+	// TODO: no fixture. `last_block` moved to `svelte_boundary_ws_trim`, which is
+	// the divergence it actually pins (block-boundary space glue); this pattern
+	// keys on a leading `&&`/`||`, which that fixture has none of.
+	fixtures: [],
 	detect(ctx) {
 		if (ctx.language !== 'svelte') return null;
 
@@ -1420,7 +1480,11 @@ const inline_content_hug: DivergencePattern = {
 	description: 'Expression breaks internally vs bracket breaks',
 	languages: ['svelte'],
 	conformance_sections: ['Svelte/HTML'],
-	fixtures: ['svelte/elements/inline_content_hug_long_prettier_divergence'],
+	// No fixture: `inline_content_hug_long` moved to `inline_content_block_style` —
+	// inline content now lays out block-style, so that fixture records prettier
+	// dangling the delimiter, not us hugging. The pattern itself is still LIVE —
+	// `--audit-patterns` puts it at 31 corpus files — so only the listing was stale.
+	fixtures: [],
 	detect(ctx) {
 		if (ctx.language !== 'svelte') return null;
 
@@ -1627,7 +1691,7 @@ const short_expr_100: DivergencePattern = {
 		'svelte/blocks/await/long_prettier_divergence',
 		'svelte/blocks/key/long_prettier_divergence',
 		'svelte/blocks/if/long_prettier_divergence',
-		'svelte/blocks/if/in_inline_element_long_prettier_divergence',
+		'svelte/blocks/if/inline_element_long_prettier_divergence',
 	],
 	detect(ctx) {
 		if (ctx.language !== 'svelte') return null;
@@ -1707,6 +1771,7 @@ const inline_content_block_style: DivergencePattern = {
 		'svelte/elements/block_body_drop_nested_siblings_prettier_divergence',
 		'svelte/elements/block_multiline_attrs_content_hug_prettier_divergence',
 		'svelte/elements/inline_if_sibling_fill_long_prettier_divergence',
+		'svelte/elements/inline_content_hug_long_prettier_divergence',
 	],
 	detect(ctx) {
 		if (ctx.language !== 'svelte') return null;
@@ -1792,8 +1857,19 @@ const inline_content_block_style: DivergencePattern = {
  * one space, they never vanish, so a formatter deleting one changes the render and must
  * fail the equality rather than be claimed as the sanctioned trim.
  */
-/** Void elements have no content fragment, so a run after their tag is inter-sibling. */
-const VOID_ELEMENTS = 'area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr';
+/**
+ * Void elements have no content fragment, so a run after their tag is inter-sibling.
+ *
+ * The authority is the Rust list — `VOID_ELEMENTS` in `crates/tsv_html/src/elements.rs`
+ * (mirroring Svelte's `VOID_ELEMENT_NAMES`), which the formatter itself classifies
+ * against; this is a hand-copy of it and must track it. `command` and `keygen` are
+ * obsolete in the HTML spec but ARE void there, so they belong here too: omitting one
+ * would make the lookbehind treat a run after its tag as a content boundary and erase
+ * it, which OVER-claims (the dangerous direction). `!doctype` is excluded — it is the
+ * one case-insensitive member, and it opens no content fragment either way.
+ */
+const VOID_ELEMENTS =
+	'area|base|br|col|command|embed|hr|img|input|keygen|link|meta|param|source|track|wbr';
 /**
  * After a non-void, non-self-closed element/component open tag — content start. The tag
  * body tolerates `>` inside quoted attribute values (`title="a > b"`) and inside braced
@@ -1823,39 +1899,32 @@ const erase_fragment_edges = (s: string): string =>
 		.replace(boundary_after_block_tag, '')
 		.replace(boundary_before_block_tag, '');
 /**
- * `<script>`/`<style>` regions. The trim is a TEMPLATE policy, so the collapse leaves
- * these interiors VERBATIM and the per-hunk arm refuses hunks overlapping them: their
- * whitespace is program/string bytes, and erasing tag-shaped runs inside code would let
- * ours deleting whitespace inside a STRING (`` `a <b> c` `` template literal, a CSS
+ * Erase fragment-edge runs OUTSIDE `<script>`/`<style>`; code regions pass through
+ * verbatim.
+ *
+ * The trim is a TEMPLATE policy, so the collapse leaves code interiors alone and the
+ * per-hunk arm refuses hunks overlapping them (see `CodeRegion`): their whitespace is
+ * program/string bytes, and erasing tag-shaped runs inside code would let ours deleting
+ * whitespace inside a STRING (`` `a <b> c` `` template literal, a CSS
  * `content: 'a <b> c'`) satisfy the equality — content loss SAFETY can't see, since it
- * counts no whitespace. The non-greedy body means a `</script>` inside a string ends the
- * region early, erring toward erasing less (under-claiming), never more.
+ * counts no whitespace.
+ *
+ * `regions` defaults to a fresh scan so the function works on any string; callers that
+ * already hold the cached regions for `s` (the whole-file arm, via
+ * `enrich_detection_context`) pass them to skip the rescan.
  */
-const raw_code_regions = /<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi;
-/** Erase fragment-edge runs OUTSIDE `<script>`/`<style>`; code regions pass through verbatim. */
-const collapse_fragment_edge_ws = (s: string): string => {
+const collapse_fragment_edge_ws = (
+	s: string,
+	regions: CodeRegion[] = compute_code_regions(s),
+): string => {
 	let out = '';
 	let last = 0;
-	for (const m of s.matchAll(raw_code_regions)) {
-		out += erase_fragment_edges(s.slice(last, m.index)) + m[0];
-		last = m.index + m[0].length;
+	for (const r of regions) {
+		out += erase_fragment_edges(s.slice(last, r.start)) + s.slice(r.start, r.end);
+		last = r.end;
 	}
 	return out + erase_fragment_edges(s.slice(last));
 };
-/** 0-based inclusive line ranges covered by `raw_code_regions` in `text`. */
-const raw_code_line_ranges = (text: string): Array<{ start: number; end: number }> => {
-	const count_newlines = (s: string): number => (s.match(/\n/g) ?? []).length;
-	const ranges: Array<{ start: number; end: number }> = [];
-	for (const m of text.matchAll(raw_code_regions)) {
-		const start = count_newlines(text.slice(0, m.index));
-		ranges.push({ start, end: start + count_newlines(m[0]) });
-	}
-	return ranges;
-};
-const line_range_overlaps = (
-	range: { start: number; end: number } | null,
-	regions: Array<{ start: number; end: number }>,
-): boolean => range !== null && regions.some((r) => range.start <= r.end && r.start <= range.end);
 
 const svelte_boundary_ws_trim: DivergencePattern = {
 	id: 'svelte_boundary_ws_trim',
@@ -1871,6 +1940,7 @@ const svelte_boundary_ws_trim: DivergencePattern = {
 		'svelte/blocks/boundary_space_trim_prettier_divergence',
 		'svelte/blocks/await/boundary_space_trim_prettier_divergence',
 		'svelte/blocks/if/spaces_prettier_divergence',
+		'svelte/blocks/if/last_block_prettier_divergence',
 	],
 	detect(ctx) {
 		if (ctx.language !== 'svelte') return null;
@@ -1899,8 +1969,11 @@ const svelte_boundary_ws_trim: DivergencePattern = {
 		// identical glued line sits between them), leaving per-hunk pairs asymmetric.
 		// A mixed file falls back to the per-hunk pair check for the trim hunks alone.
 		const count_ws = (s: string): number => (s.match(/[ \t\r\n]/g) ?? []).length;
+		const ours_regions = ctx.ours_code_regions ?? [];
+		const prettier_regions = ctx.prettier_code_regions ?? [];
 		if (
-			collapse_fragment_edge_ws(ctx.prettier) === collapse_fragment_edge_ws(ctx.ours) &&
+			collapse_fragment_edge_ws(ctx.prettier, prettier_regions) ===
+				collapse_fragment_edge_ws(ctx.ours, ours_regions) &&
 			count_ws(ctx.ours) < count_ws(ctx.prettier)
 		) {
 			return {
@@ -1915,13 +1988,11 @@ const svelte_boundary_ws_trim: DivergencePattern = {
 		// whitespace is program/string bytes — so refuse it outright. Checked per side
 		// against that side's own line ranges (the regions sit at different lines when
 		// the diff shifts them).
-		const ours_code_ranges = raw_code_line_ranges(ctx.ours);
-		const prettier_code_ranges = raw_code_line_ranges(ctx.prettier);
 		const claimed: number[] = [];
 		for (const hunk of ctx.hunks) {
 			if (
-				line_range_overlaps(hunk.ours_range, ours_code_ranges) ||
-				line_range_overlaps(hunk.prettier_range, prettier_code_ranges)
+				overlaps_code_region(hunk.ours_range, ours_regions) ||
+				overlaps_code_region(hunk.prettier_range, prettier_regions)
 			) {
 				continue;
 			}
@@ -2117,7 +2188,6 @@ const comment_position: DivergencePattern = {
 		'typescript/statements/do_while/line_before_while_comment_prettier_divergence',
 		// TypeScript chain comments
 		'typescript/expressions/calls/chained/trailing_member_comment_prettier_divergence',
-		'typescript/expressions/calls/chained/trailing_member_computed_comment_prettier_divergence',
 		// Call open paren `(` trailing comment kept on the `(` line
 		'typescript/expressions/calls/open_paren_comment_prettier_divergence',
 		'typescript/expressions/calls/chain_open_paren_comment_prettier_divergence',
@@ -2175,7 +2245,6 @@ const comment_position: DivergencePattern = {
 		// (call context matches prettier's fixed point; statement context keeps the
 		// trailing comment before `;`)
 		'typescript/expressions/sequence/operand_edge_comment_prettier_divergence',
-		'typescript/expressions/sequence/operand_edge_comment_stmt_prettier_divergence',
 		// NOTE: the Svelte `expr_trailing` / `debug_comment` fixtures are NOT
 		// claimed here. Prettier DROPS those comments, so they fail this pattern's
 		// "comment exists as a whole line in BOTH outputs" content guard by design
@@ -2678,7 +2747,7 @@ const pattern_by_id = new Map(PATTERNS.map((p) => [p.id, p]));
  * @returns Hunk coverage result with classification
  */
 export function detect_divergences(ctx: DetectionContext): HunkCoverageResult {
-	// Pre-compute cached fields (line arrays, style boundaries)
+	// Pre-compute cached fields (line arrays, code regions)
 	if (!ctx.ours_lines) enrich_detection_context(ctx);
 
 	const matches: DivergenceMatch[] = [];
