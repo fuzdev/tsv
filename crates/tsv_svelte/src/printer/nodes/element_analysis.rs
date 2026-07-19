@@ -135,8 +135,12 @@ impl<'a> Printer<'a> {
 
     /// Check if element content has source breaks (newlines) that should trigger multiline.
     ///
+    /// Only reached for content with a non-text child — the caller
+    /// (`compute_needs_multiline`) skips it for text-only content, where newlines are word
+    /// separators and width alone decides layout (`<p>\ntext\n</p>` glues when it fits).
+    ///
     /// The logic differs by element type:
-    /// - **Blocks**: Leading boundary break triggers multiline (preserves `<p>\ntext\n</p>`)
+    /// - **Blocks**: Leading boundary break triggers multiline (preserves `<div>\n<span>x</span>\n</div>`)
     /// - **Components**: Require BOTH leading AND trailing break (expressions hug when only leading)
     /// - **Inline**: Exclude boundary whitespace newlines (they normalize to spaces)
     fn has_source_breaks_in_content(

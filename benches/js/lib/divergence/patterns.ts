@@ -1865,6 +1865,8 @@ const svelte_boundary_ws_trim: DivergencePattern = {
 	conformance_sections: ['Svelte: Inline content block-style', 'Svelte: Blocks'],
 	fixtures: [
 		'svelte/elements/inline_boundary_whitespace_prettier_divergence',
+		'svelte/elements/inline_boundary_whitespace_misc_prettier_divergence',
+		'svelte/elements/title_boundary_whitespace_prettier_divergence',
 		'svelte/elements/inline_empty_long_prettier_divergence',
 		'svelte/blocks/boundary_space_trim_prettier_divergence',
 		'svelte/blocks/await/boundary_space_trim_prettier_divergence',
