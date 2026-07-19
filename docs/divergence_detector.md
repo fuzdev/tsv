@@ -153,9 +153,21 @@ The audit's report **is** the work-list — these numbers move as detectors are 
 so read them live (`deno task divergence:audit`) rather than trusting the counts here.
 Four buckets, in rough priority order:
 
-1. **Undetected (~64)** — a documented divergence pinning a prettier form that no
-   pattern explains at all. The headline gap. Some are deliberate and will stay
-   (see the two families named above); the rest want a detector or a reassignment.
+1. **Undetected (~51)** — a documented divergence pinning a prettier form that no
+   pattern explains at all. The headline gap.
+
+   A triage of this bucket found **none of it uncovered by design**: the two
+   deliberate exclusions named above don't reach it (the `chain-expression` files
+   are prettier's own suite, so they land in the corpus `unknown` bucket, not here;
+   the preserve-a-dropped-comment family is `comment_preserved`'s). Every entry is a
+   real gap. What remains clusters as: ~8 "prettier drops content tsv keeps"
+   (dropped directive modifiers, a dropped `catch error`, a dropped `a:` destructure
+   rename — several are prettier *correctness* bugs worth a look on their own terms),
+   which need `may_alter_char_frequency` and so carry a much higher bar; ~6 CSS
+   escape-opacity cases (prettier inserts a space after a `\`), detectable but risky
+   because escape opacity is a recurring **tsv** bug class and a detector there could
+   mask the next one; and a long tail of one-off CSS value/at-rule forms, width
+   cases, and comment-relocation residue.
 2. **Partial (~25)** — a pattern explains the divergence but leaves an adjacent hunk
    unclaimed. Not a mystery, and quieter than it sounds: typically the diff splits one
    logical change across hunk boundaries (a dangling `) {` line), or the detector claims
