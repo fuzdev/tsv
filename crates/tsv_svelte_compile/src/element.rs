@@ -414,8 +414,11 @@ fn emit_plain_attributes<'arena>(
             // Svelte-4 syntax; migrate to `onclick={fn}` / the runes event attribute).
             // (`class:`/`style:`/`bind:` alongside one of these still refuses here,
             // via the sibling.)
-            AttributeNode::OnDirective(_) | AttributeNode::LetDirective(_) => {
-                return Err(unsupported(Refusal::NonPlainAttribute));
+            AttributeNode::OnDirective(_) => {
+                return Err(unsupported(Refusal::RunesOnlyFence { directive: "on:" }));
+            }
+            AttributeNode::LetDirective(_) => {
+                return Err(unsupported(Refusal::RunesOnlyFence { directive: "let:" }));
             }
             // Unreachable: an element carrying a `{...spread}` routed to the spread
             // path (`has_spread` in `emit_host_attributes`), so this per-attribute
@@ -671,8 +674,11 @@ fn emit_spread_attributes<'arena>(
             // fence matching the non-spread path (the oracle drops them in SSR, but
             // tsv declines: deprecated syntax, migrate to `onclick` / the runes event
             // attribute).
-            AttributeNode::OnDirective(_) | AttributeNode::LetDirective(_) => {
-                return Err(unsupported(Refusal::NonPlainAttribute));
+            AttributeNode::OnDirective(_) => {
+                return Err(unsupported(Refusal::RunesOnlyFence { directive: "on:" }));
+            }
+            AttributeNode::LetDirective(_) => {
+                return Err(unsupported(Refusal::RunesOnlyFence { directive: "let:" }));
             }
         }
     }
@@ -944,10 +950,11 @@ impl ChildrenPlan<'_> {
 }
 
 /// Plan a component's children: build the `{#snippet}` prop functions (in source
-/// order) and the synthetic prop shape, refusing the deferred cases — a `slot="…"`
-/// child (named slot) or a `children` prop alongside default children (the
-/// oracle's `$$slots.default` divergence). A `{#snippet}` child named `children`
-/// keeps the `children` prop name but a `default` slot key (the oracle's rename).
+/// order) and the synthetic prop shape, refusing two cases — a `slot="…"` child
+/// (a named slot: the permanent runes-only fence, not a deferral) and a `children`
+/// prop alongside default children (the oracle's `$$slots.default` divergence, a
+/// genuine deferred gap). A `{#snippet}` child named `children` keeps the
+/// `children` prop name but a `default` slot key (the oracle's rename).
 fn plan_component_children<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     element: &'arena Element<'arena>,
@@ -982,9 +989,11 @@ fn plan_component_children<'arena>(
             }
             // A `<svelte:element slot="x">` as a component child routes to a NAMED
             // slot in the oracle, but tsv's named-slot detection above is
-            // `FragmentNode::Element`-only, so this arm would fall through to
-            // `has_default` and MISROUTE it into the default `children` — refuse it
-            // (safe) until named-slot support is generalized to special elements. A
+            // `FragmentNode::Element`-only — without this arm the node would fall
+            // through to `has_default` and MISROUTE into the default `children`.
+            // Named slots are a permanent runes-only fence, never a deferral
+            // (`Refusal::is_deliberate_fence`), so this arm IS the fence's
+            // special-element half rather than a placeholder for future support. A
             // slot-less `<svelte:element>` is ordinary default content (`_` below).
             FragmentNode::SpecialElement(child)
                 if matches!(child.kind, SpecialElementKind::SvelteElement { .. })
@@ -1030,12 +1039,23 @@ fn plan_component_children<'arena>(
 
 /// Whether a component child element carries a `slot="…"` attribute (a named
 /// slot).
+///
+/// Case-**sensitive**, mirroring its oracle site: the server component visitor
+/// matches `node.name === 'slot'` (`server/visitors/shared/component.js:50`).
+/// ⚠️ Do NOT unify this with `element_census.rs`'s `has_slot_attribute`, which is
+/// case-**insensitive** because CSS pruning lowercases
+/// (`css-prune.js:1015`) — the oracle is split, so the two predicates are
+/// deliberately different, and merging them would break CSS-prune parity.
 fn child_slot_attribute(env: &EmitEnv<'_, '_>, element: &Element<'_>) -> bool {
     component_has_named_attribute(env, element, "slot")
 }
 
 /// Whether a special element carries a plain `slot="…"` attribute (case-sensitive) —
 /// the named-slot marker on a `<svelte:element>` component child.
+///
+/// The case-sensitivity matches `child_slot_attribute` and the same oracle site
+/// (`server/visitors/shared/component.js:50`); see that function for why it must
+/// NOT be unified with the census's case-insensitive `has_slot_attribute`.
 fn special_element_slot_attribute(env: &EmitEnv<'_, '_>, se: &SpecialElement<'_>) -> bool {
     se.attributes.iter().any(|attr_node| {
         let AttributeNode::Attribute(attr) = attr_node else {

@@ -292,64 +292,88 @@ pub(crate) fn emit_fragment<'arena>(
     let mut seen_inert: Vec<&'static str> = Vec::new();
     for node in nodes {
         match node {
-            // Every special-element kind is dispatched here (exhaustive `match` on
-            // `se.kind`, so a new `SpecialElementKind` variant fails compilation
-            // rather than silently falling through to a refusal or a drop).
-            FragmentNode::SpecialElement(se) => match &se.kind {
-                SpecialElementKind::SvelteHead => head_nodes.push(se),
-                // `<title>` (only classified as a `TitleElement` inside
-                // `<svelte:head>`) hoists like a head node, emitting a
-                // `$$renderer.title(($$renderer) => …)` statement.
-                SpecialElementKind::TitleElement => title_nodes.push(se),
-                // The SSR-inert special elements: `<svelte:window>`/`<svelte:body>`/
-                // `<svelte:document>` compile to NOTHING (their events/binds are
-                // client-only, so the oracle emits no template output for them).
-                // They are still validated: the oracle runs its phase-2 analysis
-                // over placement, children, and every attribute — tsv's parser is
-                // permissive where the oracle rejects, so those checks live in
-                // `guard_inert_special_element` (children, illegal attributes,
-                // invalid binds, legacy directives) plus the placement/duplicate
-                // guards here. A NESTED one (legal only at the component root —
-                // `svelte_meta_invalid_placement`) and a DUPLICATE of the same kind
-                // (`svelte_meta_duplicate`) refuse.
-                kind @ (SpecialElementKind::SvelteWindow
-                | SpecialElementKind::SvelteBody
-                | SpecialElementKind::SvelteDocument) => {
-                    let tag = se.kind.tag_name();
-                    if !ctx.is_component_root {
-                        return Err(unsupported(Refusal::SpecialElementInvalidPlacement {
-                            name: tag.to_string(),
-                        }));
+            // Every special-element kind is dispatched here. The kinds the transform
+            // does not emit refuse FIRST, keyed per variant by the shared
+            // `special_element_refusal_kind` mapping the census reads too — so the
+            // refusal set has one home. The dispatch below then stays an exhaustive
+            // `match` on `se.kind` (a new variant fails compilation both there and in
+            // the mapping, rather than silently falling through to a drop).
+            FragmentNode::SpecialElement(se) => {
+                if let Some(kind) = special_element_refusal_kind(&se.kind) {
+                    return Err(unsupported(Refusal::TemplateNode { kind }));
+                }
+                match &se.kind {
+                    SpecialElementKind::SvelteHead => head_nodes.push(se),
+                    // `<title>` (only classified as a `TitleElement` inside
+                    // `<svelte:head>`) hoists like a head node, emitting a
+                    // `$$renderer.title(($$renderer) => …)` statement.
+                    SpecialElementKind::TitleElement => title_nodes.push(se),
+                    // The SSR-inert special elements: `<svelte:window>`/`<svelte:body>`/
+                    // `<svelte:document>` compile to NOTHING (their events/binds are
+                    // client-only, so the oracle emits no template output for them).
+                    // They are still validated: the oracle runs its phase-2 analysis
+                    // over placement, children, and every attribute — tsv's parser is
+                    // permissive where the oracle rejects, so those checks live in
+                    // `guard_inert_special_element` (children, illegal attributes,
+                    // invalid binds, legacy directives) plus the placement/duplicate
+                    // guards here. A NESTED one (legal only at the component root —
+                    // `svelte_meta_invalid_placement`) and a DUPLICATE of the same kind
+                    // (`svelte_meta_duplicate`) refuse.
+                    kind @ (SpecialElementKind::SvelteWindow
+                    | SpecialElementKind::SvelteBody
+                    | SpecialElementKind::SvelteDocument) => {
+                        let tag = se.kind.tag_name();
+                        if !ctx.is_component_root {
+                            return Err(unsupported(Refusal::SpecialElementInvalidPlacement {
+                                name: tag.to_string(),
+                            }));
+                        }
+                        if seen_inert.contains(&tag) {
+                            return Err(unsupported(Refusal::DuplicateSpecialElement {
+                                name: tag.to_string(),
+                            }));
+                        }
+                        seen_inert.push(tag);
+                        guard_inert_special_element(env, se, kind, tag)?;
                     }
-                    if seen_inert.contains(&tag) {
-                        return Err(unsupported(Refusal::DuplicateSpecialElement {
-                            name: tag.to_string(),
-                        }));
+                    // `<svelte:element this={…}>` compiles to a statement-level
+                    // `$.element(…)` call — routed to the emit list like a component. The
+                    // `this` tag is captured here (the one place the kind is
+                    // destructured) so emission needs no impossible fallback.
+                    SpecialElementKind::SvelteElement { tag } => {
+                        list.push(CleanNode::SvelteElement(se, tag));
                     }
-                    seen_inert.push(tag);
-                    guard_inert_special_element(env, se, kind, tag)?;
+                    // Every other special element (`<svelte:component>`, `<svelte:self>`,
+                    // `<slot>`, `<svelte:fragment>`, `<svelte:boundary>`) already refused
+                    // above via the shared mapping. They are listed rather than folded
+                    // into a catch-all so this dispatch stays exhaustive too — and the
+                    // arm PANICS rather than falling through: if the mapping ever
+                    // returned `None` for one of them, a silent `{}` would DROP the node
+                    // from the output, which is content loss. Better a loud bug.
+                    //
+                    // KNOWN STATIC-SAFETY DEBT, consciously taken: routing the refusal
+                    // through the shared mapping split ONE exhaustive match into two
+                    // that must agree on which kinds are handled, so a disagreement the
+                    // old single match made unrepresentable is now merely a runtime
+                    // panic. The trade bought a single home for the refusal set (the
+                    // census read a hand-mirrored copy before, and the two had already
+                    // drifted); panicking rather than dropping keeps the worst case
+                    // loud. Closing it statically would mean generating this dispatch's
+                    // handled arms from the same table, which their per-kind bodies do
+                    // not fit — not attempted.
+                    SpecialElementKind::SvelteComponent { .. }
+                    | SpecialElementKind::SvelteSelf
+                    | SpecialElementKind::SlotElement
+                    | SpecialElementKind::SvelteFragment
+                    | SpecialElementKind::SvelteBoundary => {
+                        // A silent `{}` here would DROP the node from the output.
+                        #[allow(clippy::unreachable)] // the mapping refused these above
+                        {
+                            unreachable!("refused above via special_element_refusal_kind")
+                        }
+                    }
                 }
-                // `<svelte:element this={…}>` compiles to a statement-level
-                // `$.element(…)` call — routed to the emit list like a component. The
-                // `this` tag is captured here (the one place the kind is
-                // destructured) so emission needs no impossible fallback.
-                SpecialElementKind::SvelteElement { tag } => {
-                    list.push(CleanNode::SvelteElement(se, tag));
-                }
-                // Every other special element refuses (`<svelte:component>`,
-                // `<svelte:self>`, `<slot>`, `<svelte:fragment>`,
-                // `<svelte:boundary>`) — not emitted yet. The bucket key matches
-                // `fragment_node_kind`'s "special element".
-                SpecialElementKind::SvelteComponent { .. }
-                | SpecialElementKind::SvelteSelf
-                | SpecialElementKind::SlotElement
-                | SpecialElementKind::SvelteFragment
-                | SpecialElementKind::SvelteBoundary => {
-                    return Err(unsupported(Refusal::TemplateNode {
-                        kind: "special element",
-                    }));
-                }
-            },
+            }
             FragmentNode::Text(text) => {
                 list.push(CleanNode::Text(text.data(source).into_owned()));
             }
@@ -573,8 +597,11 @@ fn guard_inert_special_element<'arena>(
             }
             // Legacy `on:` event directive and `let:` — runes-only fence: refuse,
             // matching the regular-element path (`element.rs`).
-            AttributeNode::OnDirective(_) | AttributeNode::LetDirective(_) => {
-                return Err(unsupported(Refusal::NonPlainAttribute));
+            AttributeNode::OnDirective(_) => {
+                return Err(unsupported(Refusal::RunesOnlyFence { directive: "on:" }));
+            }
+            AttributeNode::LetDirective(_) => {
+                return Err(unsupported(Refusal::RunesOnlyFence { directive: "let:" }));
             }
             // The no-op drop family: guard-and-drop each expression, like a regular
             // element (the oracle accepts them on these elements and drops them).
@@ -1349,6 +1376,111 @@ fn normalize_whitespace(
     let mut keep = drop_flags.iter();
     list.retain(|_| !*keep.next().unwrap_or(&false));
 }
+
+/// Declares the special-element handled-or-refused table ONCE, expanding it into
+/// the three things that must agree: a label constant per refused kind, the
+/// [`SPECIAL_ELEMENT_REFUSAL_KINDS`] list of every such label, and the
+/// [`special_element_refusal_kind`] mapping itself.
+///
+/// One source, so completeness is STATIC rather than reviewed. A new
+/// [`SpecialElementKind`] variant fails compilation in the generated match (which
+/// is exhaustive), and the only way to satisfy it is a new table row — which then
+/// mints the constant and extends the list on its own. A hand-written list beside
+/// the mapping could not do this: a `[&str; 5]` keeps compiling when a sixth kind
+/// appears, silently dropping that kind's key from the census's declared buckets
+/// and quietly skewing its exposure accounting.
+///
+/// Each row pairs its pattern with its label directly, so there is no index into a
+/// separate array that a reorder could silently re-point.
+macro_rules! special_element_kind_table {
+    (
+        $( handled $handled:pat, )+
+        $( $(#[$label_doc:meta])* refused $refused:pat => $label_const:ident = $label:literal, )+
+    ) => {
+        $(
+            $(#[$label_doc])*
+            pub(crate) const $label_const: &str = $label;
+        )+
+
+        /// Every label [`special_element_refusal_kind`] can return.
+        ///
+        /// The labels live here so the census's detected-bucket declaration
+        /// ([`census_detected_buckets`](crate::census_detected_buckets)) can
+        /// enumerate them without hand-copying a string — and, because both this
+        /// list and the mapping expand from one table, without the two drifting.
+        pub(crate) const SPECIAL_ELEMENT_REFUSAL_KINDS: &[&str] = &[$($label_const),+];
+
+        /// The single enum→key mapping for special elements: `Some(kind)` is the
+        /// [`Refusal::TemplateNode`] label of a kind the SSR transform does not
+        /// emit, `None` a kind it handles.
+        ///
+        /// Both consumers read it, so the refusal set and its detection can never
+        /// drift: `clean_nodes` (which refuses) and the census's
+        /// `collect_template_nodes` (which detects the same shape as a co-blocker)
+        /// used to hand-mirror the allow-list. The key is per variant rather than a
+        /// flat `"special element"`, so the corpus census can break the bucket down
+        /// without a hand-run per-tag cross-reference.
+        ///
+        /// Exhaustive by design — a new [`SpecialElementKind`] variant fails
+        /// compilation here, forcing a conscious emitted-or-refused choice in one
+        /// place.
+        pub(crate) fn special_element_refusal_kind(
+            kind: &SpecialElementKind<'_>,
+        ) -> Option<&'static str> {
+            match kind {
+                $( $handled => None, )+
+                $( $refused => Some($label_const), )+
+            }
+        }
+    };
+}
+
+special_element_kind_table! {
+    // Handled: emitted, hoisted, or SSR-inert-but-validated.
+    handled SpecialElementKind::SvelteHead,
+    handled SpecialElementKind::TitleElement,
+    handled SpecialElementKind::SvelteWindow,
+    handled SpecialElementKind::SvelteBody,
+    handled SpecialElementKind::SvelteDocument,
+    handled SpecialElementKind::SvelteElement { .. },
+
+    // Not emitted — one bucket each.
+    /// `<svelte:component>` — a **fenced** legacy tag ([`SPECIAL_ELEMENT_FENCED_KINDS`]).
+    refused SpecialElementKind::SvelteComponent { .. }
+        => SPECIAL_ELEMENT_SVELTE_COMPONENT = "special element <svelte:component>",
+    /// `<svelte:self>` — a **fenced** legacy tag ([`SPECIAL_ELEMENT_FENCED_KINDS`]).
+    refused SpecialElementKind::SvelteSelf
+        => SPECIAL_ELEMENT_SVELTE_SELF = "special element <svelte:self>",
+    /// `<slot>` — a **fenced** legacy tag ([`SPECIAL_ELEMENT_FENCED_KINDS`]).
+    refused SpecialElementKind::SlotElement
+        => SPECIAL_ELEMENT_SLOT = "special element <slot>",
+    /// `<svelte:fragment>` — a **fenced** legacy tag ([`SPECIAL_ELEMENT_FENCED_KINDS`]).
+    refused SpecialElementKind::SvelteFragment
+        => SPECIAL_ELEMENT_SVELTE_FRAGMENT = "special element <svelte:fragment>",
+    /// `<svelte:boundary>` — **not** fenced: a first-class Svelte 5 feature, and the
+    /// next implementation target.
+    refused SpecialElementKind::SvelteBoundary
+        => SPECIAL_ELEMENT_SVELTE_BOUNDARY = "special element <svelte:boundary>",
+}
+
+/// The subset of [`SPECIAL_ELEMENT_REFUSAL_KINDS`] that are **deliberate runes-only
+/// fences** rather than unimplemented features — the set
+/// [`Refusal::is_deliberate_fence`](crate::Refusal::is_deliberate_fence) reads.
+///
+/// Each is deprecation-warned or superseded by the oracle in Svelte 5: `<slot>` and
+/// `<svelte:fragment>` by snippets (which this compiler already emits),
+/// `<svelte:component>` by a plain dynamic component reference, `<svelte:self>` by
+/// importing the module itself. A runes-only compiler will not implement them, so
+/// booking the files that use them as future work books work that will never be done.
+///
+/// `<svelte:boundary>` is deliberately absent — a first-class Svelte 5 feature and a
+/// real gap.
+pub(crate) const SPECIAL_ELEMENT_FENCED_KINDS: [&str; 4] = [
+    SPECIAL_ELEMENT_SVELTE_COMPONENT,
+    SPECIAL_ELEMENT_SVELTE_SELF,
+    SPECIAL_ELEMENT_SLOT,
+    SPECIAL_ELEMENT_SVELTE_FRAGMENT,
+];
 
 pub(crate) fn fragment_node_kind(node: &FragmentNode<'_>) -> &'static str {
     match node {

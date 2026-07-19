@@ -20,6 +20,8 @@
 
 use std::borrow::Cow;
 
+use crate::fragment::SPECIAL_ELEMENT_FENCED_KINDS;
+
 /// A component shape the Svelte-to-JS compiler declines to emit, with a stable
 /// corpus bucket key.
 ///
@@ -35,14 +37,6 @@ pub enum Refusal {
     DevMode,
 
     // ── Script shell / module scaffold ─────────────────────────────────────
-    /// Reserved for a genuinely-unhandled `<script context="module">` construct.
-    /// Plain module scripts now compile (imports + declarations + non-default
-    /// exports, emitted between the hoisted snippets and the component function);
-    /// `export default` refuses via [`Self::ModuleDefaultExport`], and
-    /// module-scope runes / store reads / top-level `await` via the rune guard —
-    /// so this is currently unconstructed, held only as a fall-through slot.
-    #[error("module <script context=\"module\">")]
-    ModuleScript,
     /// An `export default` in a `<script module>`. The oracle errors
     /// `module_illegal_default_export` (a component cannot have a default
     /// export), so refusing is never an over-acceptance.
@@ -509,8 +503,15 @@ pub enum Refusal {
          keyed {{#each}} — the oracle rejects it)"
     )]
     AnimateDirectiveInvalid,
-    /// A directive the transform does not yet emit — a legacy `on:` event
-    /// directive or `let:`. The no-op drop family
+    /// A **deliberate runes-only fence**, not a gap: a legacy `on:` event
+    /// directive or `let:`. The oracle still compiles both in runes mode, but they
+    /// are deprecated Svelte-4 syntax and tsv's compiler is runes-only by product
+    /// choice — migrate to `onclick={fn}` / the runes event attribute, and to
+    /// `{#snippet}`. Because it is a choice rather than an unimplemented feature,
+    /// it is [`is_deliberate_fence`](Refusal::is_deliberate_fence) and belongs
+    /// OUTSIDE the achievable-parity denominator.
+    ///
+    /// Everything else on an element is handled: the no-op drop family
     /// (`use:`/`transition:`/`in:`/`out:`/`animate:`/`{@attach}`) is dropped, not
     /// refused, on a regular element; `class:`/`style:` on a regular element are
     /// emitted (`$.attr_class`/`$.attr_style`), `bind:` is handled by
@@ -520,8 +521,12 @@ pub enum Refusal {
     /// `styles` arguments and `bind:` folds into the object, so a spread co-present
     /// with those compiles; a legacy `on:`/`let:` alongside a spread still refuses
     /// here.
-    #[error("non-plain attribute (directive)")]
-    NonPlainAttribute,
+    #[error("legacy {directive} directive (runes-only fence)")]
+    RunesOnlyFence {
+        /// The fenced directive prefix as authored — `on:` or `let:`. A closed
+        /// set, so each keeps its own bucket key.
+        directive: &'static str,
+    },
     /// An element `{...spread}` on a `<select>`. The oracle routes a spread (or a
     /// bind) on a select through `$$renderer.select(object, ($$renderer) => …)`, a
     /// different callee than `$.attributes` — not implemented, so refuse.
@@ -764,7 +769,8 @@ impl Refusal {
     /// User-chosen identifiers collapse to a `{placeholder}` so many concrete
     /// refusals share one bucket; closed-set feature discriminants
     /// ([`TemplateNode`](Refusal::TemplateNode),
-    /// [`BindingPatternShape`](Refusal::BindingPatternShape)) keep their full
+    /// [`BindingPatternShape`](Refusal::BindingPatternShape),
+    /// [`RunesOnlyFence`](Refusal::RunesOnlyFence)) keep their full
     /// message. The key is intentionally decoupled from
     /// [`Display`](std::fmt::Display) so a message can be reworded without
     /// shifting corpus buckets.
@@ -775,9 +781,9 @@ impl Refusal {
     pub fn bucket_key(&self) -> Cow<'static, str> {
         match self {
             // Closed-set feature discriminants — the key is the full message.
-            Self::TemplateNode { .. } | Self::BindingPatternShape { .. } => {
-                Cow::Owned(self.to_string())
-            }
+            Self::TemplateNode { .. }
+            | Self::BindingPatternShape { .. }
+            | Self::RunesOnlyFence { .. } => Cow::Owned(self.to_string()),
             // Parameterized reasons — the user-chosen value collapses away.
             Self::LangInstanceScript { .. } => Cow::Borrowed("lang=\"{lang}\" script"),
             Self::GeneratedNameCollision { .. } => {
@@ -828,7 +834,6 @@ impl Refusal {
             // Static reasons — the message is already the bucket.
             Self::ClientGeneration => Cow::Borrowed("client generation"),
             Self::DevMode => Cow::Borrowed("dev mode output"),
-            Self::ModuleScript => Cow::Borrowed("module <script context=\"module\">"),
             Self::ModuleDefaultExport => {
                 Cow::Borrowed("default export in <script module> (the oracle rejects it)")
             }
@@ -975,7 +980,6 @@ impl Refusal {
             Self::AnimateDirectiveInvalid => Cow::Borrowed(
                 "invalid animate: directive (one per element, only on the sole child of a keyed {#each} — the oracle rejects it)",
             ),
-            Self::NonPlainAttribute => Cow::Borrowed("non-plain attribute (directive)"),
             Self::SpreadOnSelect => {
                 Cow::Borrowed("{...spread} on <select> (the oracle routes to $$renderer.select)")
             }
@@ -1042,6 +1046,46 @@ impl Refusal {
             Self::CssCaseInsensitiveNonAscii => Cow::Borrowed(
                 "css case-insensitive match with a non-ASCII operand (Unicode case-fold not ported)",
             ),
+        }
+    }
+
+    /// Whether this refusal is a **deliberate product fence** rather than an
+    /// unimplemented feature.
+    ///
+    /// tsv's Svelte compiler is runes-only by choice, so the legacy authoring
+    /// syntax it declines will never be implemented — it is not a gap, and a file
+    /// containing one is not an achievable parity target. Measurement uses this to
+    /// keep the fenced population out of the parity denominator; every other
+    /// refusal is a "not yet" that counts against it.
+    ///
+    /// The fenced set is the legacy **slot system** and the legacy **directive
+    /// syntax**, both superseded in Svelte 5:
+    ///
+    /// - [`RunesOnlyFence`](Refusal::RunesOnlyFence) — a legacy `on:` event
+    ///   directive and `let:`, on a regular or special element;
+    /// - the legacy special-element tags
+    ///   ([`SPECIAL_ELEMENT_FENCED_KINDS`](crate::fragment::SPECIAL_ELEMENT_FENCED_KINDS))
+    ///   — `<slot>`, `<svelte:fragment>`, `<svelte:component>`, `<svelte:self>`; and
+    /// - [`ComponentNamedSlot`](Refusal::ComponentNamedSlot) — a `slot="…"` on a
+    ///   component's child, the *consumer* half of the same slot system whose
+    ///   `<slot>` / `<svelte:fragment>` *declaration* half is fenced above.
+    ///   Snippets supersede it, and this compiler already emits them.
+    ///
+    /// Each is deprecation-warned or superseded by the oracle in Svelte 5, so
+    /// counting them as future work books work that will never be done.
+    ///
+    /// Deliberately **outside** the set: `<svelte:boundary>` (a first-class Svelte 5
+    /// feature and a real gap), and
+    /// [`ComponentDirective`](Refusal::ComponentDirective) — which a legacy `on:` /
+    /// `let:` on a *component* raises instead of `RunesOnlyFence`, but whose bucket
+    /// mixes those with unimplemented `class:` / `use:` / `transition:` directives,
+    /// so it cannot be fenced wholesale.
+    #[must_use]
+    pub fn is_deliberate_fence(&self) -> bool {
+        match self {
+            Self::RunesOnlyFence { .. } | Self::ComponentNamedSlot { .. } => true,
+            Self::TemplateNode { kind } => SPECIAL_ELEMENT_FENCED_KINDS.contains(kind),
+            _ => false,
         }
     }
 }
@@ -1143,8 +1187,65 @@ mod tests {
             "instance-script export (component exports / $.bind_props not implemented)"
         );
         assert_eq!(
-            Refusal::ModuleScript.bucket_key(),
-            "module <script context=\"module\">"
+            Refusal::ModuleDefaultExport.bucket_key(),
+            "default export in <script module> (the oracle rejects it)"
         );
+    }
+
+    /// The fenced set is a product decision, so it is pinned by name rather than
+    /// left to whatever the label table happens to contain.
+    #[test]
+    fn deliberate_fences_are_the_legacy_syntax_only() {
+        use crate::fragment::{
+            SPECIAL_ELEMENT_SLOT, SPECIAL_ELEMENT_SVELTE_BOUNDARY,
+            SPECIAL_ELEMENT_SVELTE_COMPONENT, SPECIAL_ELEMENT_SVELTE_FRAGMENT,
+            SPECIAL_ELEMENT_SVELTE_SELF,
+        };
+
+        // Legacy directives.
+        assert!(Refusal::RunesOnlyFence { directive: "on:" }.is_deliberate_fence());
+        assert!(Refusal::RunesOnlyFence { directive: "let:" }.is_deliberate_fence());
+        // The consumer half of the legacy slot system — `<div slot="header">` on a
+        // component child, superseded by snippets like the `<slot>` half below.
+        assert!(
+            Refusal::ComponentNamedSlot {
+                name: "Foo".to_string()
+            }
+            .is_deliberate_fence()
+        );
+        // Legacy special-element tags — superseded by snippets / plain references.
+        for kind in [
+            SPECIAL_ELEMENT_SLOT,
+            SPECIAL_ELEMENT_SVELTE_FRAGMENT,
+            SPECIAL_ELEMENT_SVELTE_COMPONENT,
+            SPECIAL_ELEMENT_SVELTE_SELF,
+        ] {
+            assert!(
+                Refusal::TemplateNode { kind }.is_deliberate_fence(),
+                "{kind} is a runes-only fence"
+            );
+        }
+        // `<svelte:boundary>` is a first-class Svelte 5 feature — a real gap that
+        // MUST stay inside the achievable-parity denominator.
+        assert!(
+            !Refusal::TemplateNode {
+                kind: SPECIAL_ELEMENT_SVELTE_BOUNDARY
+            }
+            .is_deliberate_fence()
+        );
+        // Neither is any other template node, or an ordinary "not yet".
+        assert!(
+            !Refusal::TemplateNode {
+                kind: "{@debug} tag"
+            }
+            .is_deliberate_fence()
+        );
+        assert!(
+            !Refusal::ComponentDirective {
+                name: "Foo".to_string()
+            }
+            .is_deliberate_fence()
+        );
+        assert!(!Refusal::CssAtRule.is_deliberate_fence());
     }
 }

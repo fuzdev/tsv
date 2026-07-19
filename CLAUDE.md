@@ -755,14 +755,28 @@ cargo run -p tsv_debug compile_fixtures_validate [pattern...]
 # with the canonical compiler (oracle) AND tsv, comparing the canonical reprints of both sides.
 # Buckets per file: parity (byte-exact OR comment-POSITION-tolerated — tsv's comment placement vs the
 # oracle's; not a bug, surfaced in a separate comment_position sub-count) / refused (sub-bucketed by
-# refusal reason — a clean "not yet", never a bug) / oracle-rejected (legacy mode, invalid syntax; out
+# refusal reason — a clean "not yet" UNLESS the reason is a deliberate runes-only fence
+# (`Refusal::is_deliberate_fence`: the legacy directive syntax — a legacy `on:`/`let:` — and the legacy
+# slot system — a `<slot>` / `<svelte:fragment>` / `<svelte:component>` / `<svelte:self>` tag, or a
+# named `slot="…"` on a component child — each superseded by the oracle in Svelte 5), which is
+# never a gap; those files are counted as `fenced` and SUBTRACTED from the achievable-parity
+# denominator. NOT fenced: `<svelte:boundary>` (a first-class Svelte 5 feature and a real gap)) /
+# oracle-rejected (legacy mode, invalid syntax; out
 # of scope) / MISMATCH (both compiled, canonical CODE differs — always a bug by the refusal contract) /
 # error (harness failure).
-# Every oracle-rejected file is also probed with tsv's compile(): a success is reported in a loud
-# OVER-ACCEPTANCE section (nothing invalid in runes mode may compile — a refusal-contract gap),
-# without affecting the exit code.
-# Exit codes: 0 clean, 1 mismatch, 2 harness error. Sidecar-dependent — kept out of `deno task
-# check`; the `compile:corpus:compare` deno task points it at the real-repo corpus + Svelte suites.
+# Every oracle-rejected file is also probed with tsv's compile(): a success is an OVER-ACCEPTANCE —
+# nothing invalid in runes mode may compile, so it is a refusal-contract BUG, reported in a loud
+# section and GATED like a mismatch.
+# The TARGET SET line prints the subtraction mechanically: oracle_accepted − fenced = achievable, plus
+# parity as a % of it. `fenced` counts FIRST refusals, so it is a FLOOR — a file whose fence sits
+# behind an earlier refusal is equally unreachable but uncounted (no sound cheap detector: a node walk
+# over-counts component `on:`/`let:` and SSR-dropped `{:catch}` regions, a regex over-counts comments),
+# leaving `achievable` too large and the parity rate a conservative UNDER-estimate.
+# Exit codes: 0 clean, 1 FAILURE (mismatch or over-acceptance), 2 harness error. Sidecar-dependent —
+# kept out of `deno task check`; the `compile:corpus:compare` deno task points it at the real-repo
+# corpus + Svelte suites. `--json` carries the full per-file path list per refusal / oracle-reject /
+# over-acceptance bucket plus the `target_set` object, so a bucket's population (and a slice's parity
+# estimate) is checkable.
 cargo run -p tsv_debug compile_corpus_compare <paths...>
 # Also: --list, --json.
 

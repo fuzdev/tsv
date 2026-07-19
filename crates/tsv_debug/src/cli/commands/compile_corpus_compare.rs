@@ -20,20 +20,29 @@ use tsv_svelte_compile::{
 ///
 /// - **parity** — both compiled and the canonical forms match.
 /// - **refused** — tsv returned `Unsupported` (sub-bucketed by reason). A clean
-///   "not yet," never a bug.
+///   "not yet," never a bug — except when the reason is a deliberate runes-only
+///   **fence** (`Refusal::is_deliberate_fence`), which is not even a "not yet": it
+///   is a permanent product choice, counted separately as `fenced` and subtracted
+///   from the achievable-parity denominator. See [`TargetSet`].
 /// - **oracle-rejected** — the oracle rejected the source (legacy mode, invalid
 ///   syntax, TypeScript in a plain script). Out of scope for parity. Each such
-///   file is also probed with tsv's `compile()`: a success is reported in the
-///   OVER-ACCEPTANCE section (a refusal-contract gap — nothing invalid in
-///   runes mode may compile), without affecting the exit code.
+///   file is also probed with tsv's `compile()`: a success is an OVER-ACCEPTANCE
+///   — by the refusal contract always a bug, since nothing invalid in runes mode
+///   may compile — reported in its own section and gated like a mismatch.
 /// - **mismatch** — both compiled but the canonical forms differ. By the refusal
 ///   contract this is always a bug.
 /// - **error** — a harness failure (sidecar, canonicalize, tsv parse rejection,
 ///   unreadable file).
 ///
-/// Exit codes: 0 = clean (mismatch = 0, error = 0), 1 = a mismatch (a bug),
-/// 2 = a harness error. Sidecar-dependent — kept out of `deno task check`; point
-/// it at real repos and the Svelte test suites on demand.
+/// Exit codes: 0 = clean (mismatch = 0, over-acceptance = 0, error = 0), 1 = a
+/// FAILURE (a mismatch or an over-acceptance — either is a compiler bug), 2 = a
+/// harness error. Sidecar-dependent — kept out of `deno task check`; point it at
+/// real repos and the Svelte test suites on demand.
+///
+/// `--json` carries the full per-file path list for every refusal, oracle-reject,
+/// and over-acceptance bucket, so a bucket's population can be enumerated (and a
+/// slice's parity estimate checked) without a second run, plus the `target_set`
+/// object the human report's TARGET SET line prints.
 ///
 /// # `--census` (the sole-blocker refusal census)
 ///
@@ -79,12 +88,18 @@ enum Bucket {
     Parity { tolerated: bool },
     /// tsv refused (`Unsupported`), keyed on the refusal's stable
     /// [`Refusal::bucket_key`](tsv_svelte_compile::Refusal::bucket_key).
-    Refused(String),
+    ///
+    /// `fenced` is the refusal's own
+    /// [`is_deliberate_fence`](tsv_svelte_compile::Refusal::is_deliberate_fence)
+    /// verdict — a permanent runes-only product fence rather than a "not yet". It is
+    /// read from the classifier, never re-derived from the reason string, so the
+    /// measurement and the contract cannot drift.
+    Refused { reason: String, fenced: bool },
     /// The oracle rejected the source, keyed on the Svelte error code (or the
     /// error's first line when no code is present). `tsv_over_accepts` records
-    /// whether tsv's `compile()` nevertheless succeeded on it — always a gap
-    /// (nothing invalid in runes mode may compile), reported loudly, though
-    /// the bucket itself stays out of the exit gate.
+    /// whether tsv's `compile()` nevertheless succeeded on it — always a bug
+    /// (nothing invalid in runes mode may compile), so it is reported loudly AND
+    /// fails the run, even though the `oracle_rejected` bucket itself does not.
     OracleRejected {
         code: String,
         tsv_over_accepts: bool,
@@ -213,15 +228,28 @@ impl CompileCorpusCompareCommand {
             report.print_human();
         }
 
-        // Mismatch is the headline finding (a compiler bug); a harness error
-        // means some file got no verdict. Either is a non-zero exit.
-        if report.totals.mismatch > 0 {
-            Err(CliError::Failed)
-        } else if report.totals.error > 0 {
-            Err(CliError::Errored)
-        } else {
-            Ok(())
-        }
+        exit_verdict(&report)
+    }
+}
+
+/// The run's exit verdict, as a pure function of the report.
+///
+/// Mismatch is the headline finding (a compiler bug), and an over-acceptance is the
+/// same severity by the refusal contract — tsv compiling something the oracle
+/// rejects is never acceptable, so it gates as a FAILURE rather than being merely
+/// reported. A harness error means some file got no verdict.
+///
+/// Extracted from [`run_async`](CompileCorpusCompareCommand::run_async) so it is
+/// TESTABLE: `run_async` is async and needs a live sidecar pool, so a test that can
+/// only reach the report's accessors would pass no matter what the gate actually
+/// reads. Every condition below is exercised by `exit_verdict_gates_*`.
+fn exit_verdict(report: &Report) -> Result<(), CliError> {
+    if report.totals.mismatch > 0 || report.over_acceptance_total() > 0 {
+        Err(CliError::Failed)
+    } else if report.totals.error > 0 {
+        Err(CliError::Errored)
+    } else {
+        Ok(())
     }
 }
 
@@ -273,7 +301,10 @@ async fn classify(source: &str) -> Bucket {
     let ours = match compile(source, &CompileOptions::default()) {
         Ok(o) => o,
         Err(CompileError::Unsupported(reason)) => {
-            return Bucket::Refused(reason.bucket_key().into_owned());
+            return Bucket::Refused {
+                fenced: reason.is_deliberate_fence(),
+                reason: reason.bucket_key().into_owned(),
+            };
         }
         Err(CompileError::Parse(e)) => return Bucket::Error("tsv-parse", e.to_string()),
         Err(CompileError::CorruptOutput(e)) => {
@@ -468,17 +499,78 @@ struct Stats {
     /// (not byte-exact). Surfaced so the tolerance is never silent.
     comment_position: usize,
     refused: usize,
+    /// Subset of `refused` whose refusal is a deliberate runes-only fence
+    /// (`Refusal::is_deliberate_fence`) rather than an unimplemented feature — the
+    /// files no amount of future work makes reachable. See
+    /// [`Report::target_set`].
+    fenced: usize,
     oracle_rejected: usize,
     mismatch: usize,
     error: usize,
 }
 
-/// A reason with its count and a few example paths (capped).
+/// The achievable-parity denominator and the numbers behind it.
+///
+/// # Why the denominator is not just "oracle-accepted files"
+///
+/// tsv's compiler is runes-only *by product choice*. A file whose only blocker is a
+/// legacy `on:` / `let:` directive, or a `<slot>` / `<svelte:fragment>` /
+/// `<svelte:component>` / `<svelte:self>` tag, will never compile here — measuring
+/// parity against a denominator that includes it books work that will never be done.
+///
+/// # What `fenced` counts, and why it is a FLOOR
+///
+/// `fenced` counts files whose **actual first refusal** was a fence. That is
+/// directly observed and exact — no inference.
+///
+/// The *conceptually right* population is larger: since the fence is permanent,
+/// EVERY file containing a fenced construct is unreachable, including one where some
+/// other refusal happens to fire first. That containment population is not reported,
+/// because no cheap detector for it is sound:
+///
+/// - an AST walk for `OnDirective`/`LetDirective` over-counts — on a **component**
+///   those raise `ComponentDirective`, a bucket that also holds unimplemented
+///   `class:` / `use:` / `transition:` directives and so is not fenced;
+/// - any whole-tree walk over-counts a fenced construct sitting in an SSR-dropped
+///   region (a `{:catch}` branch), which never reaches a refusal at all;
+/// - a regex over source over-counts constructs inside comments and is not a proof
+///   in any case.
+///
+/// So the reported denominator is too LARGE and the parity rate too LOW. Under-
+/// claiming is the safe direction: the real achievable-parity rate is at least the
+/// one printed.
+#[derive(Clone, serde::Serialize)]
+struct TargetSet {
+    /// Files the oracle compiled — `files - oracle_rejected - error`.
+    ///
+    /// `error` subtracts because a harness failure (sidecar, canonicalize, tsv
+    /// parse rejection, unreadable file) means the file got NO verdict: the oracle
+    /// accepted nothing there, so booking it as oracle-accepted would inflate the
+    /// denominator. `error` is 0 on a healthy run, which makes the term invisible
+    /// in practice — it is here so the number stays exact when a run is not
+    /// healthy, rather than quietly under-reporting parity in exactly the runs
+    /// least worth trusting.
+    oracle_accepted: usize,
+    /// Files blocked by a permanent fence (first-refusal; a floor — see above).
+    fenced: usize,
+    /// `oracle_accepted - fenced`: the files a finished runes-only compiler could
+    /// reach.
+    achievable: usize,
+    /// `parity` as a percentage of `achievable`, or `None` when `achievable` is 0.
+    parity_pct: Option<f64>,
+}
+
+/// A reason with its count and the **complete** path list of the files in it.
+///
+/// The paths are the point: with only a capped example list, a bucket's real
+/// population could not be enumerated, so every slice's "this class is worth N
+/// parity files" estimate had to be trusted rather than checked. JSON-only — the
+/// human report still prints just the histogram.
 #[derive(serde::Serialize)]
 struct ReasonCount {
     reason: String,
     count: usize,
-    examples: Vec<String>,
+    paths: Vec<String>,
 }
 
 /// A mismatch — always a bug; carried in full.
@@ -498,20 +590,16 @@ struct ErrorEntry {
     detail: String,
 }
 
-/// Accumulator for one reason's count + capped example paths.
+/// Accumulator for one reason's paths. The count is `paths.len()` — kept
+/// derived so the two can never disagree.
 #[derive(Default)]
 struct ReasonAgg {
-    count: usize,
-    examples: Vec<String>,
+    paths: Vec<String>,
 }
 
 impl ReasonAgg {
-    const EXAMPLE_CAP: usize = 3;
     fn add(&mut self, path: &str) {
-        self.count += 1;
-        if self.examples.len() < Self::EXAMPLE_CAP {
-            self.examples.push(path.to_string());
-        }
+        self.paths.push(path.to_string());
     }
 }
 
@@ -529,12 +617,44 @@ struct Report {
     /// Files that reached parity only by tolerating a comment-position difference
     /// — `(group, path)`. Not a bug (tsv's comment placement), but surfaced so the
     /// tolerance is visible.
-    comment_position: Vec<(String, String)>,
+    ///
+    /// The `_paths` suffix is load-bearing: [`Stats`] is `#[serde(flatten)]`ed into
+    /// the JSON report and already carries a `comment_position` **count**, so a bare
+    /// name here would emit two objects under one key and a JSON parser would keep
+    /// only the later of the two — silently hiding the count.
+    comment_position_paths: Vec<(String, String)>,
     errors: Vec<ErrorEntry>,
     errors_truncated: usize,
 }
 
 impl Report {
+    /// Total over-accepting files — oracle-rejected sources tsv compiled anyway.
+    /// Always a refusal-contract bug, so it gates the exit code.
+    fn over_acceptance_total(&self) -> usize {
+        self.over_acceptance.iter().map(|r| r.count).sum()
+    }
+
+    /// The achievable-parity denominator — see [`TargetSet`] for what `fenced`
+    /// counts and why it is a floor.
+    fn target_set(&self) -> TargetSet {
+        let t = &self.totals;
+        let oracle_accepted = t
+            .files
+            .saturating_sub(t.oracle_rejected)
+            .saturating_sub(t.error);
+        let achievable = oracle_accepted.saturating_sub(t.fenced);
+        TargetSet {
+            oracle_accepted,
+            fenced: t.fenced,
+            achievable,
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "corpus counts are far below f64's exact-integer range"
+            )]
+            parity_pct: (achievable > 0).then(|| t.parity as f64 * 100.0 / achievable as f64),
+        }
+    }
+
     fn build(groups: &[GroupInfo], outcomes: &[FileOutcome]) -> Self {
         let mut totals = Stats::default();
         let mut group_stats: Vec<Stats> = groups
@@ -550,7 +670,7 @@ impl Report {
         let mut oracle_rej: BTreeMap<String, ReasonAgg> = BTreeMap::new();
         let mut over_accept: BTreeMap<String, ReasonAgg> = BTreeMap::new();
         let mut mismatches = Vec::new();
-        let mut comment_position: Vec<(String, String)> = Vec::new();
+        let mut comment_position_paths: Vec<(String, String)> = Vec::new();
         let mut errors = Vec::new();
         let mut errors_truncated = 0;
 
@@ -566,12 +686,16 @@ impl Report {
                     if *tolerated {
                         totals.comment_position += 1;
                         gs.comment_position += 1;
-                        comment_position.push((root_of(o.group), path));
+                        comment_position_paths.push((root_of(o.group), path));
                     }
                 }
-                Bucket::Refused(reason) => {
+                Bucket::Refused { reason, fenced } => {
                     totals.refused += 1;
                     gs.refused += 1;
+                    if *fenced {
+                        totals.fenced += 1;
+                        gs.fenced += 1;
+                    }
                     refusal.entry(reason.clone()).or_default().add(&path);
                 }
                 Bucket::OracleRejected {
@@ -613,7 +737,7 @@ impl Report {
 
         // Deterministic order: mismatches/errors/tolerated by path.
         mismatches.sort_by(|a, b| a.path.cmp(&b.path));
-        comment_position.sort_by(|a, b| a.1.cmp(&b.1));
+        comment_position_paths.sort_by(|a, b| a.1.cmp(&b.1));
         errors.sort_by(|a, b| a.path.cmp(&b.path));
 
         Report {
@@ -627,7 +751,7 @@ impl Report {
             oracle_rejected_reasons: sort_reasons(oracle_rej),
             over_acceptance: sort_reasons(over_accept),
             mismatches,
-            comment_position,
+            comment_position_paths,
             errors,
             errors_truncated,
         }
@@ -649,6 +773,25 @@ impl Report {
         }
         println!("Totals: {}", stats_line(&self.totals));
 
+        let t = self.target_set();
+        println!(
+            "\nTARGET SET — {} oracle-accepted − {} fenced = {} achievable{}",
+            t.oracle_accepted,
+            t.fenced,
+            t.achievable,
+            t.parity_pct
+                .map_or_else(String::new, |pct| format!("; parity {pct:.1}%")),
+        );
+        println!(
+            "  fenced = a permanent runes-only product fence (legacy on:/let:, \
+             <slot>/<svelte:fragment>/<svelte:component>/<svelte:self>), never a gap."
+        );
+        println!(
+            "  It counts FIRST refusals only, so it is a FLOOR — a file blocked by a fence \
+             behind an earlier refusal is not counted, making `achievable` too large and the \
+             parity rate a conservative under-estimate."
+        );
+
         print_reasons("Top refusal reasons", &self.refusal_reasons, 15);
         print_reasons(
             "Oracle-rejected reasons",
@@ -656,19 +799,25 @@ impl Report {
             usize::MAX,
         );
         if !self.over_acceptance.is_empty() {
-            let total: usize = self.over_acceptance.iter().map(|r| r.count).sum();
             println!(
-                "\nOVER-ACCEPTANCE ({total}) — oracle-rejected but tsv compiles; each is a refusal-contract gap:"
+                "\nOVER-ACCEPTANCE ({}) — oracle-rejected but tsv compiles; each is a \
+                 refusal-contract bug:",
+                self.over_acceptance_total()
             );
             print_reasons("By oracle code", &self.over_acceptance, usize::MAX);
+            for r in &self.over_acceptance {
+                for path in &r.paths {
+                    println!("  [{}] {path}", r.reason);
+                }
+            }
         }
 
-        if !self.comment_position.is_empty() {
+        if !self.comment_position_paths.is_empty() {
             println!(
                 "\nComment-position tolerated ({}) — parity by tsv's comment placement, not a bug:",
-                self.comment_position.len()
+                self.comment_position_paths.len()
             );
-            for (group, path) in &self.comment_position {
+            for (group, path) in &self.comment_position_paths {
                 println!("  [{group}] {path}");
             }
         }
@@ -700,41 +849,7 @@ impl Report {
     }
 
     fn print_json(&self) -> Result<(), CliError> {
-        #[derive(serde::Serialize)]
-        struct GroupJson<'a> {
-            root: &'a str,
-            #[serde(flatten)]
-            stats: &'a Stats,
-        }
-        #[derive(serde::Serialize)]
-        struct JsonReport<'a> {
-            #[serde(flatten)]
-            totals: &'a Stats,
-            groups: Vec<GroupJson<'a>>,
-            refusal_reasons: &'a [ReasonCount],
-            oracle_rejected_reasons: &'a [ReasonCount],
-            over_acceptance: &'a [ReasonCount],
-            mismatches: &'a [MismatchEntry],
-            comment_position: &'a [(String, String)],
-            errors: &'a [ErrorEntry],
-            errors_truncated: usize,
-        }
-        let report = JsonReport {
-            totals: &self.totals,
-            groups: self
-                .groups
-                .iter()
-                .map(|(root, stats)| GroupJson { root, stats })
-                .collect(),
-            refusal_reasons: &self.refusal_reasons,
-            oracle_rejected_reasons: &self.oracle_rejected_reasons,
-            over_acceptance: &self.over_acceptance,
-            mismatches: &self.mismatches,
-            comment_position: &self.comment_position,
-            errors: &self.errors,
-            errors_truncated: self.errors_truncated,
-        };
-        match to_json_with_tabs(&report) {
+        match self.to_json() {
             Ok(json) => {
                 println!("{json}");
                 Ok(())
@@ -745,16 +860,71 @@ impl Report {
             }
         }
     }
+
+    /// The `--json` payload, as a string.
+    ///
+    /// Split out from [`print_json`](Self::print_json) so it is TESTABLE: the
+    /// `#[serde(flatten)]` of [`Stats`] means a key collision is invisible at
+    /// compile time and only observable in the serialized bytes, so the guard
+    /// (`json_keys_do_not_collide_with_flattened_stats`) has to read them.
+    fn to_json(&self) -> Result<String, serde_json::Error> {
+        #[derive(serde::Serialize)]
+        struct GroupJson<'a> {
+            root: &'a str,
+            #[serde(flatten)]
+            stats: &'a Stats,
+        }
+        /// ⚠️ `totals` is flattened, so every [`Stats`] field name becomes a
+        /// top-level key here. A field below that collides with one of them
+        /// serializes twice under the same key and a JSON parser keeps only the
+        /// later — the earlier value becomes unreachable, with no compile error and
+        /// no serde warning. Check any new field against `Stats`'s names.
+        #[derive(serde::Serialize)]
+        struct JsonReport<'a> {
+            #[serde(flatten)]
+            totals: &'a Stats,
+            target_set: TargetSet,
+            groups: Vec<GroupJson<'a>>,
+            refusal_reasons: &'a [ReasonCount],
+            oracle_rejected_reasons: &'a [ReasonCount],
+            over_acceptance: &'a [ReasonCount],
+            mismatches: &'a [MismatchEntry],
+            comment_position_paths: &'a [(String, String)],
+            errors: &'a [ErrorEntry],
+            errors_truncated: usize,
+        }
+        let report = JsonReport {
+            totals: &self.totals,
+            target_set: self.target_set(),
+            groups: self
+                .groups
+                .iter()
+                .map(|(root, stats)| GroupJson { root, stats })
+                .collect(),
+            refusal_reasons: &self.refusal_reasons,
+            oracle_rejected_reasons: &self.oracle_rejected_reasons,
+            over_acceptance: &self.over_acceptance,
+            mismatches: &self.mismatches,
+            comment_position_paths: &self.comment_position_paths,
+            errors: &self.errors,
+            errors_truncated: self.errors_truncated,
+        };
+        to_json_with_tabs(&report)
+    }
 }
 
-/// Sort a reason map into a count-descending (then reason-ascending) list.
+/// Sort a reason map into a count-descending (then reason-ascending) list, each
+/// row's paths sorted so a report diffs cleanly across runs.
 fn sort_reasons(map: BTreeMap<String, ReasonAgg>) -> Vec<ReasonCount> {
     let mut v: Vec<ReasonCount> = map
         .into_iter()
-        .map(|(reason, agg)| ReasonCount {
-            reason,
-            count: agg.count,
-            examples: agg.examples,
+        .map(|(reason, mut agg)| {
+            agg.paths.sort();
+            ReasonCount {
+                reason,
+                count: agg.paths.len(),
+                paths: agg.paths,
+            }
         })
         .collect();
     v.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.reason.cmp(&b.reason)));
@@ -762,12 +932,21 @@ fn sort_reasons(map: BTreeMap<String, ReasonAgg>) -> Vec<ReasonCount> {
 }
 
 /// A one-line bucket summary. `comment_pos` is a subset of `parity` (tolerated
-/// comment-position differences), shown in parentheses so it never inflates the
+/// comment-position differences) and `fenced` a subset of `refused` (permanent
+/// runes-only fences); both are shown in parentheses so they never inflate the
 /// bucket totals.
 fn stats_line(s: &Stats) -> String {
     format!(
-        "files={} parity={} (comment_pos={}) refused={} oracle_rejected={} mismatch={} error={}",
-        s.files, s.parity, s.comment_position, s.refused, s.oracle_rejected, s.mismatch, s.error
+        "files={} parity={} (comment_pos={}) refused={} (fenced={}) oracle_rejected={} \
+         mismatch={} error={}",
+        s.files,
+        s.parity,
+        s.comment_position,
+        s.refused,
+        s.fenced,
+        s.oracle_rejected,
+        s.mismatch,
+        s.error
     )
 }
 
@@ -1132,6 +1311,264 @@ mod tests {
         assert_eq!(report.disclaimed.len(), 1);
         assert_eq!(report.disclaimed[0].bucket, dual);
         assert_eq!(report.disclaimed[0].count, 1);
+    }
+
+    /// One group holding `n` files, for the report-building tests below.
+    fn one_group(n: usize) -> [GroupInfo; 1] {
+        [GroupInfo {
+            root: "r".to_string(),
+            file_count: n,
+        }]
+    }
+
+    fn oracle_rejected(path: &str, tsv_over_accepts: bool) -> FileOutcome {
+        FileOutcome {
+            group: 0,
+            path: PathBuf::from(path),
+            bucket: Bucket::OracleRejected {
+                code: "legacy_export_invalid".to_string(),
+                tsv_over_accepts,
+            },
+        }
+    }
+
+    fn refused(path: &str, reason: &str, fenced: bool) -> FileOutcome {
+        FileOutcome {
+            group: 0,
+            path: PathBuf::from(path),
+            bucket: Bucket::Refused {
+                reason: reason.to_string(),
+                fenced,
+            },
+        }
+    }
+
+    #[test]
+    fn exit_verdict_gates_an_over_acceptance_like_a_mismatch() {
+        // The gate is asserted through `exit_verdict` — the same function
+        // `run_async` calls — so dropping the over-acceptance term from it REDS this
+        // test. Asserting only on `over_acceptance_total()` would not: the helper
+        // would still return 1 while the gate ignored it.
+        let groups = one_group(2);
+
+        let clean = Report::build(&groups, &[oracle_rejected("a.svelte", false)]);
+        assert_eq!(clean.totals.oracle_rejected, 1);
+        assert_eq!(clean.over_acceptance_total(), 0);
+        assert!(
+            exit_verdict(&clean).is_ok(),
+            "a plain oracle rejection is not a failure"
+        );
+
+        let dirty = Report::build(
+            &groups,
+            &[
+                oracle_rejected("a.svelte", false),
+                oracle_rejected("b.svelte", true),
+            ],
+        );
+        assert_eq!(dirty.totals.oracle_rejected, 2);
+        assert_eq!(
+            dirty.totals.mismatch, 0,
+            "the gate must fire without any mismatch"
+        );
+        assert_eq!(dirty.over_acceptance_total(), 1);
+        assert!(
+            matches!(exit_verdict(&dirty), Err(CliError::Failed)),
+            "an over-acceptance must FAIL the run"
+        );
+        // The over-accepting file is enumerable, not just counted.
+        assert_eq!(dirty.over_acceptance[0].paths, vec!["b.svelte".to_string()]);
+    }
+
+    #[test]
+    fn exit_verdict_ranks_mismatch_over_error_over_clean() {
+        let groups = one_group(1);
+        let outcome = |bucket| FileOutcome {
+            group: 0,
+            path: PathBuf::from("a.svelte"),
+            bucket,
+        };
+
+        let clean = Report::build(&groups, &[outcome(Bucket::Parity { tolerated: false })]);
+        assert!(exit_verdict(&clean).is_ok());
+
+        let mismatch = Report::build(&groups, &[outcome(Bucket::Mismatch("diff".to_string()))]);
+        assert!(matches!(exit_verdict(&mismatch), Err(CliError::Failed)));
+
+        let error = Report::build(&groups, &[outcome(Bucket::Error("read", String::new()))]);
+        assert!(matches!(exit_verdict(&error), Err(CliError::Errored)));
+
+        // A refusal — fenced or not — is never a failure.
+        let refusals = Report::build(
+            &groups,
+            &[
+                refused("a.svelte", "legacy on: directive (runes-only fence)", true),
+                refused("b.svelte", "css at-rule in <style>", false),
+            ],
+        );
+        assert!(exit_verdict(&refusals).is_ok());
+    }
+
+    #[test]
+    fn reason_rows_carry_every_path_sorted() {
+        // A bucket's full population must be enumerable from the report, so a
+        // slice's parity estimate can be checked rather than trusted.
+        let groups = one_group(3);
+        let fence = |path| refused(path, "legacy on: directive (runes-only fence)", true);
+        let report = Report::build(
+            &groups,
+            &[fence("c.svelte"), fence("a.svelte"), fence("b.svelte")],
+        );
+        let row = &report.refusal_reasons[0];
+        assert_eq!(row.count, 3);
+        assert_eq!(row.paths, vec!["a.svelte", "b.svelte", "c.svelte"]);
+    }
+
+    #[test]
+    fn target_set_subtracts_only_the_fenced_refusals() {
+        // 6 files: 2 parity, 1 fenced refusal, 2 ordinary refusals, 1 oracle-rejected.
+        // Achievable = (6 − 1 oracle-rejected) − 1 fenced = 4, parity 2 ⇒ 50%.
+        let groups = one_group(6);
+        let report = Report::build(
+            &groups,
+            &[
+                FileOutcome {
+                    group: 0,
+                    path: PathBuf::from("p1.svelte"),
+                    bucket: Bucket::Parity { tolerated: false },
+                },
+                FileOutcome {
+                    group: 0,
+                    path: PathBuf::from("p2.svelte"),
+                    bucket: Bucket::Parity { tolerated: true },
+                },
+                refused("f.svelte", "template node special element <slot>", true),
+                refused("r1.svelte", "css at-rule in <style>", false),
+                refused(
+                    "r2.svelte",
+                    "template node special element <svelte:boundary>",
+                    false,
+                ),
+                oracle_rejected("o.svelte", false),
+            ],
+        );
+
+        assert_eq!(report.totals.refused, 3);
+        assert_eq!(report.totals.fenced, 1, "only the fenced refusal counts");
+
+        let t = report.target_set();
+        assert_eq!(t.oracle_accepted, 5);
+        assert_eq!(t.fenced, 1);
+        assert_eq!(t.achievable, 4);
+        assert!((t.parity_pct.unwrap() - 50.0).abs() < f64::EPSILON);
+
+        // The per-group stats carry the same split.
+        assert_eq!(report.groups[0].1.fenced, 1);
+    }
+
+    #[test]
+    fn target_set_excludes_harness_errors_from_oracle_accepted() {
+        // A harness error means the file got no verdict — the oracle accepted
+        // nothing there, so it must not sit in the denominator. Dropping the
+        // `error` term would make `oracle_accepted` 3 and parity 33.3%.
+        let groups = one_group(3);
+        let report = Report::build(
+            &groups,
+            &[
+                FileOutcome {
+                    group: 0,
+                    path: PathBuf::from("p.svelte"),
+                    bucket: Bucket::Parity { tolerated: false },
+                },
+                refused("r.svelte", "css at-rule in <style>", false),
+                FileOutcome {
+                    group: 0,
+                    path: PathBuf::from("e.svelte"),
+                    bucket: Bucket::Error("sidecar", "boom".to_string()),
+                },
+            ],
+        );
+
+        assert_eq!(report.totals.error, 1);
+        let t = report.target_set();
+        assert_eq!(
+            t.oracle_accepted, 2,
+            "the errored file got no oracle verdict"
+        );
+        assert_eq!(t.achievable, 2);
+        assert!((t.parity_pct.unwrap() - 50.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn target_set_is_defined_when_nothing_is_achievable() {
+        // Every file oracle-rejected: no denominator, so no percentage — and
+        // certainly no divide-by-zero.
+        let groups = one_group(1);
+        let report = Report::build(&groups, &[oracle_rejected("a.svelte", false)]);
+        let t = report.target_set();
+        assert_eq!(t.oracle_accepted, 0);
+        assert_eq!(t.achievable, 0);
+        assert!(t.parity_pct.is_none());
+    }
+
+    #[test]
+    fn json_keys_do_not_collide_with_flattened_stats() {
+        // `Stats` is `#[serde(flatten)]`ed into the report, so its field names ARE
+        // top-level JSON keys. A sibling field sharing one of those names compiles
+        // fine, serializes twice under the one key, and a JSON parser keeps only the
+        // later — so the count silently vanishes. That is exactly what a bare
+        // `comment_position` path list did. Reading the parsed object is the only
+        // way to see it; asserting on the Rust structs cannot.
+        let groups = one_group(2);
+        let report = Report::build(
+            &groups,
+            &[
+                FileOutcome {
+                    group: 0,
+                    path: PathBuf::from("tolerated.svelte"),
+                    bucket: Bucket::Parity { tolerated: true },
+                },
+                refused("r.svelte", "css at-rule in <style>", false),
+            ],
+        );
+
+        let json = report.to_json().expect("report serializes");
+        let value: serde_json::Value = serde_json::from_str(&json).expect("report reparses");
+        let obj = value.as_object().expect("report is an object");
+
+        // Both survive the round trip, as distinct keys of distinct shapes.
+        assert_eq!(
+            obj.get("comment_position")
+                .and_then(serde_json::Value::as_u64),
+            Some(1),
+            "the flattened Stats count must be reachable"
+        );
+        assert_eq!(
+            obj.get("comment_position_paths")
+                .and_then(serde_json::Value::as_array)
+                .map(Vec::len),
+            Some(1),
+            "the path list must be reachable under its own key"
+        );
+
+        // The general invariant, so a FUTURE sibling field cannot re-open this.
+        // `Stats`'s own keys are read off a serialized `Stats` rather than
+        // hardcoded, so adding a field there keeps the guard honest for free.
+        //
+        // The assertion compares VALUES, not just presence: an overwriting sibling
+        // leaves the key perfectly present, holding its own value, so a
+        // `contains_key` check would pass over the very bug this guards.
+        let stats_json = serde_json::to_value(&report.totals).expect("Stats serializes");
+        let stats_obj = stats_json.as_object().expect("Stats is an object");
+        assert!(!stats_obj.is_empty(), "Stats must contribute keys");
+        for (key, stats_value) in stats_obj {
+            assert_eq!(
+                obj.get(key),
+                Some(stats_value),
+                "flattened Stats key `{key}` does not carry its Stats value in the \
+                 report — a sibling field of the same name overwrote it"
+            );
+        }
     }
 
     #[test]

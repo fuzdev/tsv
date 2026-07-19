@@ -1962,11 +1962,11 @@ fn compile_element_spread_refuses_invalid_directives() {
     // oracle drops them, but tsv declines to reproduce that).
     assert_unsupported(
         "<script>let props = $state({});</script>\n<div on:click={() => {}} {...props}></div>",
-        "non-plain attribute (directive)",
+        "legacy on: directive (runes-only fence)",
     );
     assert_unsupported(
         "<script>let props = $state({});</script>\n<div let:x {...props}></div>",
-        "non-plain attribute (directive)",
+        "legacy let: directive (runes-only fence)",
     );
 }
 
@@ -2752,14 +2752,43 @@ fn compile_refuses_invalid_ssr_inert_special_elements() {
     );
 
     // LEGACY DIRECTIVES: a legacy `on:` event directive and `let:` refuse
-    // (`NonPlainAttribute`) — the runes-only fence, matching the regular-element
+    // (`RunesOnlyFence`) — the runes-only fence, matching the regular-element
     // path. The oracle ACCEPTS `on:` here, so this is a deliberate safe
     // over-refusal, not an oracle-parity claim.
     assert_unsupported(
         "<svelte:window on:click={() => {}} />",
-        "non-plain attribute",
+        "legacy on: directive (runes-only fence)",
     );
-    assert_unsupported("<svelte:body let:x />", "non-plain attribute");
+    assert_unsupported(
+        "<svelte:body let:x />",
+        "legacy let: directive (runes-only fence)",
+    );
+}
+
+/// Pin every refused special-element kind to its OWN bucket label.
+///
+/// `special_element_kind_table!` expands one row set into the mapping and
+/// `SPECIAL_ELEMENT_REFUSAL_KINDS` together, so a NEW kind cannot reach either
+/// without the other, and pairing each pattern with its label in the row rules out
+/// an index that a reorder could re-point. What none of that catches is a row
+/// written with the WRONG label — which would silently relabel one tag as another.
+/// That matters beyond cosmetics: `Refusal::is_deliberate_fence` keys the runes-only
+/// fence set on these labels, so a swap would move a tag in or out of the
+/// achievable-parity denominator.
+#[test]
+fn refused_special_elements_carry_their_own_bucket_label() {
+    for (source, tag) in [
+        (
+            "<script>\n\tconst Foo = null;\n</script>\n<svelte:component this={Foo} />",
+            "<svelte:component>",
+        ),
+        ("<svelte:self />", "<svelte:self>"),
+        ("<slot />", "<slot>"),
+        ("<svelte:fragment />", "<svelte:fragment>"),
+        ("<svelte:boundary />", "<svelte:boundary>"),
+    ] {
+        assert_unsupported(source, &format!("template node special element {tag}"));
+    }
 }
 
 #[test]

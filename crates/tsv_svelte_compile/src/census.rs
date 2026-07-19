@@ -75,14 +75,16 @@
 use std::borrow::Cow;
 use std::collections::HashSet;
 
-use tsv_svelte::ast::internal::{Fragment, FragmentNode, Root, SpecialElementKind};
+use tsv_svelte::ast::internal::{Fragment, FragmentNode, Root};
 use tsv_ts::ast::internal::Statement;
 
 use crate::analyze::{Bindings, NameSet};
 use crate::attr_refs::each_child_fragment;
 use crate::build::Builder;
 use crate::css_scope::analyze_style;
-use crate::fragment::fragment_node_kind;
+use crate::fragment::{
+    SPECIAL_ELEMENT_REFUSAL_KINDS, fragment_node_kind, special_element_refusal_kind,
+};
 use crate::needs_context::analyze_component;
 use crate::script_rewrite::{
     analyze_script, collect_script_comments, document_ts_flag, plain_identifier_name,
@@ -203,11 +205,8 @@ pub fn census_detected_buckets() -> Vec<Cow<'static, str>> {
         Refusal::MultilineBlockComment,
         Refusal::FormatIgnoreComment,
         Refusal::CommentsWithTemplateBeforeScript,
-        // Template nodes the shared fragment seam detects (the `other =>` refusal
-        // arm). Each kind is its own bucket key, so all detected kinds are listed.
-        Refusal::TemplateNode {
-            kind: "special element",
-        },
+        // The two tag kinds the fragment walk detects. Each kind is its own bucket
+        // key, so all detected kinds are listed.
         Refusal::TemplateNode {
             kind: "{@debug} tag",
         },
@@ -217,6 +216,14 @@ pub fn census_detected_buckets() -> Vec<Cow<'static, str>> {
     ]
     .iter()
     .map(Refusal::bucket_key)
+    // Plus the per-variant special-element keys, enumerated from the shared
+    // mapping's own table — which expands the label list and the mapping from one
+    // source, so neither a relabelled NOR a newly added kind can drift this list.
+    .chain(
+        SPECIAL_ELEMENT_REFUSAL_KINDS
+            .iter()
+            .map(|kind| Refusal::TemplateNode { kind }.bucket_key()),
+    )
     .collect()
 }
 
@@ -467,34 +474,43 @@ fn import_local_names(body: &[Statement<'_>], source: &str) -> NameSet {
 /// never refuses it there; walking every child fragment can therefore
 /// over-detect in that doubly-rare position — a special element AND only in a
 /// `{:catch}` — accepted as a diagnostic imprecision. Likewise a window/body/
-/// document that compiles-refuses only for an INVALID-INPUT reason — nested or
-/// duplicate placement (`SpecialElementInvalidPlacement`/`DuplicateSpecialElement`),
-/// children (`SpecialElementChildren`), an illegal/non-event attribute or spread
-/// (`SpecialElementIllegalAttribute`), an out-of-whitelist bind
-/// (`Refusal::BindDirective`), or a legacy `on:`/`let:` directive
-/// (`NonPlainAttribute`) — is not re-detected here; all of that is oracle-rejected
-/// input, so it is never a parity candidate. The same acknowledged imprecision as
-/// the placement/duplicate cases: the census reports SUPPORTED-shape co-blockers,
-/// not the reasons oracle-invalid input would fail.)
+/// document that the emitter refuses for a reason this walk cannot see. The walk
+/// tests one thing, a node's KIND, so two whole classes of refusal are out of
+/// reach: the node-level facts it does not model — where a node sits
+/// (`SpecialElementInvalidPlacement`), how many of it there are
+/// (`DuplicateSpecialElement`), what its fragment holds
+/// (`SpecialElementChildren`) — and every ATTRIBUTE-level one, which it never
+/// inspects at all: an illegal/non-event attribute or spread
+/// (`SpecialElementIllegalAttribute`), an out-of-whitelist or invalid-target bind
+/// (`Refusal::BindDirective`), and a legacy `on:`/`let:` directive
+/// (`RunesOnlyFence`).
+///
+/// Their parity relevance differs, which is why the fenced count is not taken from
+/// here. The first four name a Svelte error code apiece — the oracle REJECTS that
+/// input, so it is never a parity candidate either way and missing it costs
+/// nothing. The other two are not oracle-invalid. `BindDirective` is mixed: some
+/// names and targets the oracle does reject, but `bind:focused`, the `omit_in_ssr`
+/// dimension family, and prop / plain-`let` targets are deliberate safe
+/// over-refusals of input the oracle accepts. And `RunesOnlyFence` is wholly
+/// oracle-accepted — the oracle compiles a legacy `on:` in runes mode, so such a
+/// file lands in `refused`, never in `oracle_rejected`. Since that one is also a
+/// deliberate FENCE, a fenced-population count taken from this census would be a
+/// FLOOR; the corpus runner's `fenced` instead reads each file's real first
+/// refusal. See `compile_corpus_compare`'s TARGET SET section.)
 fn collect_template_nodes(fragment: &Fragment<'_>, found: &mut Vec<Refusal>) {
     for node in fragment.nodes {
-        let refused = match node {
-            FragmentNode::SpecialElement(se) => !matches!(
-                se.kind,
-                SpecialElementKind::SvelteHead
-                    | SpecialElementKind::SvelteWindow
-                    | SpecialElementKind::SvelteBody
-                    | SpecialElementKind::SvelteDocument
-                    | SpecialElementKind::SvelteElement { .. }
-                    | SpecialElementKind::TitleElement
-            ),
-            FragmentNode::DebugTag(_) | FragmentNode::DeclarationTag(_) => true,
-            _ => false,
+        // A special element's refused-or-handled verdict AND its per-variant bucket
+        // key both come from the shared `special_element_refusal_kind` mapping, so
+        // this detection can never drift from the emitter's actual refusal set.
+        let refused_kind = match node {
+            FragmentNode::SpecialElement(se) => special_element_refusal_kind(&se.kind),
+            FragmentNode::DebugTag(_) | FragmentNode::DeclarationTag(_) => {
+                Some(fragment_node_kind(node))
+            }
+            _ => None,
         };
-        if refused {
-            found.push(Refusal::TemplateNode {
-                kind: fragment_node_kind(node),
-            });
+        if let Some(kind) = refused_kind {
+            found.push(Refusal::TemplateNode { kind });
         }
         each_child_fragment(node, &mut |child| collect_template_nodes(child, found));
     }

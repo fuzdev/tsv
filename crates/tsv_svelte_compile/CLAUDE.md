@@ -70,7 +70,7 @@ project-wide conventions.
     `$.attr_style` array — `attribute::build_spread_style_object`), and `<input>`
     / a custom element set the `flags` argument
     (trailing absent args elide, interior ones become `void 0`); a spread
-    co-present with a legacy `on:`/`let:` refuses (`Refusal::NonPlainAttribute`),
+    co-present with a legacy `on:`/`let:` refuses (`Refusal::RunesOnlyFence`),
     and a spread on a `<select>` (the `$$renderer.select`
     trap) or on a load-error element refuses (`SpreadOnSelect` /
     `SpreadOnLoadErrorElement`) — a `class:` / `style:`
@@ -135,7 +135,33 @@ project-wide conventions.
   quotes) and a stable `bucket_key` the corpus runner groups by directly
   (user-chosen names collapse to a `{placeholder}` so e.g. every event
   attribute shares one bucket). The single source of truth for the refusal
-  contract.
+  contract. `Refusal::is_deliberate_fence` splits that catalog in two: a
+  **deliberate product fence**, which a runes-only compiler will never implement,
+  versus an ordinary "not yet". The fenced set is the legacy **directive syntax**
+  and the legacy **slot system**: `RunesOnlyFence` (a legacy `on:` event directive
+  and `let:`), the legacy special-element tags `<slot>`, `<svelte:fragment>`,
+  `<svelte:component>`, and `<svelte:self>`
+  (`fragment::SPECIAL_ELEMENT_FENCED_KINDS`), and `ComponentNamedSlot` (a `slot="…"`
+  on a component's child — the *consumer* half of the same slot system those first
+  two tags *declare*). Each is deprecation-warned or superseded by the oracle in
+  Svelte 5, the slot system by the snippets this compiler already emits.
+  **`<svelte:boundary>` is deliberately outside the set**: a first-class Svelte 5
+  feature and a real gap. So is `ComponentDirective` — what a legacy `on:`/`let:` on
+  a *component* raises instead of `RunesOnlyFence` — because that bucket also holds
+  unimplemented `class:` / `use:` / `transition:` directives and cannot be fenced
+  wholesale.
+
+  Only the unfenced half counts against the achievable-parity denominator.
+  `compile_corpus_compare` reads the classifier directly and prints the
+  subtraction as its TARGET SET line (`oracle_accepted − fenced = achievable`),
+  so the headline is mechanical rather than hand-derived. That `fenced` count is
+  a **floor**: it counts a file whose FIRST refusal is a fence, while the
+  conceptually right population is every file *containing* a fenced construct
+  (the fence is permanent, so a fence behind an earlier refusal is equally
+  unreachable). No cheap detector for containment is sound — a node-kind walk
+  over-counts component `on:`/`let:` and constructs in SSR-dropped `{:catch}`
+  regions, and a source regex over-counts comments — so the denominator stays
+  deliberately too large and the parity rate a conservative under-estimate.
 - `parity.rs` — **the comment-position-tolerant parity comparator**
   (`compare_canonical` → `Parity`). The compiler's parity bar over two canonical JS
   strings: byte-exact, or tolerated when they differ ONLY in comment *position*
@@ -333,6 +359,13 @@ project-wide conventions.
   `refuse_template_typescript` / `guard_dropped_fragment`, and the analyses'
   dropped-fragment view) — but **not** the emission refusals, and not the
   derived-read rule, which is an emission rewrite rather than a validity rule.
+  ⚠️ That coverage is by *construct*, not by *node kind*: `guard_dropped_fragment`
+  walks only `TemplateItem::Expression`, so it never asks what KIND a dropped node
+  is, and a node whose mere presence the oracle's analysis reads — a `<slot>` in a
+  `{:catch}`, which still adds `$$props` to the component signature — reaches no
+  guard at all and silently diverges. See the `// TODO:` at the `{:catch}` guard
+  call in `blocks.rs` for the known live case and the other dropped regions to
+  enumerate with it.
 - `transform_server.rs` — the SSR transform **orchestrator**: `compile_server`
   runs the phase-numbered pipeline (TypeScript erasure/gate, CSS scoping — the
   element census built and every selector chain matched against it **upfront** in
@@ -554,10 +587,13 @@ project-wide conventions.
   scoping `<style>` is **CSS-scoped** like a regular element: the element census
   holds it as a leaf and owner, a type/universal selector matches it unconditionally,
   and `emit_svelte_element` synthesizes the hash class into its attributes closure
-  (`env.special_element_scope`). Deferred as safe refusals: a `slot="…"` on a
-  `<svelte:element>` component child (would MISROUTE the `FragmentNode::Element`-only
-  named-slot detection), a legacy `on:`/`let:` (the runes-only fence), and
-  `bind:focused`/the `omit_in_ssr` family.
+  (`env.special_element_scope`). Its refusals split two ways, and the split is
+  permanent-vs-temporary. **Fenced** (runes-only product scope, never to be
+  implemented — `Refusal::is_deliberate_fence`, so outside the achievable-parity
+  denominator): a `slot="…"` on a `<svelte:element>` component child, the
+  special-element half of the named-slot fence, and a legacy `on:`/`let:`.
+  **Deferred** (a real gap, safely refused meanwhile): `bind:focused` and the
+  `omit_in_ssr` family.
 - `attribute.rs` — attribute emission: dynamic and mixed attributes →
   `$.attr(name, expr[, true])` / `$.attr_class` / `$.attr_style` with
   `$.stringify` interpolations (a mixed attribute whose every part folds

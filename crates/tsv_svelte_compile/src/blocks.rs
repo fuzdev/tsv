@@ -653,6 +653,18 @@ pub(crate) fn emit_await_block<'arena>(
     // The `{:catch}` branch is dropped from SSR — the emitter never visits it. It
     // still gets the rune guard, or a misplaced rune inside it would compile where
     // the oracle's analysis phase rejects.
+    //
+    // TODO: the guard covers runes, but not every ANALYSIS-phase fact the oracle
+    // reads out of a dropped branch. A `<slot>` in a `{:catch}` is the known live
+    // case: the oracle's analysis runs before it chooses what to emit, so the slot
+    // still adds `$$props` to the component signature, while tsv fires no refusal
+    // (the emitter never reaches the node) and emits the bare signature — a
+    // MISMATCH. Not corpus-reachable today, so it is latent rather than failing;
+    // it wants its own fixtures-first slice, which should decide whether the fix
+    // is a signature fact collected in the dropped walk or a refusal here. The
+    // same shape may exist for the other dropped regions (an `{#each}` key, a
+    // `{#key}` expression, an event handler) — enumerate them in that slice.
+    // Repro: `{#await p}x{:catch e}<slot />{/await}`.
     if let Some(catch) = &await_block.catch {
         guard_dropped_fragment(env, catch)?;
     }
