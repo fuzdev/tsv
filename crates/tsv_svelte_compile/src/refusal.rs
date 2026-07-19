@@ -245,6 +245,16 @@ pub enum Refusal {
         /// The `$`-prefixed identifier.
         name: String,
     },
+    /// A `$`-prefixed **binding** name — the oracle's `dollar_prefix_invalid`
+    /// (`phases/2-analyze/visitors/shared/utils.js:278`). Distinct from
+    /// [`Self::DollarPrefixedIdentifier`], which is a *read*: the oracle accepts
+    /// a `$$slots` read and rejects a `$$slots` declaration, so the two
+    /// positions cannot share one verdict.
+    #[error("$-prefixed binding {name}")]
+    DollarPrefixedBinding {
+        /// The `$`-prefixed binding name.
+        name: String,
+    },
     /// A `$derived` binding read in a position the value-walk does not rewrite to
     /// `d()` — a pattern default, a read under an unsupported wrapper, an
     /// escaped-identifier read whose decoded name is a `$derived` binding, or a
@@ -823,6 +833,7 @@ impl Refusal {
             }
             Self::Rune { .. } => Cow::Borrowed("rune {name}"),
             Self::DollarPrefixedIdentifier { .. } => Cow::Borrowed("$-prefixed identifier {name}"),
+            Self::DollarPrefixedBinding { .. } => Cow::Borrowed("$-prefixed binding {name}"),
             Self::DerivedBindingRead { .. } => Cow::Borrowed("read of derived binding {name}"),
             Self::DerivedReadShadowed { .. } => {
                 Cow::Borrowed("read of derived binding {name} shadowed in a nested scope")
@@ -1183,6 +1194,9 @@ impl Refusal {
                 name: "{name}".to_string(),
             },
             Self::DollarPrefixedIdentifier {
+                name: "{name}".to_string(),
+            },
+            Self::DollarPrefixedBinding {
                 name: "{name}".to_string(),
             },
             Self::DerivedBindingRead {

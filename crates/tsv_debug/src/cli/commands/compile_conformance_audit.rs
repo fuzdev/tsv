@@ -260,7 +260,7 @@ mod tests {
         // rather than whichever variants happen to be constructed elsewhere.
         assert_eq!(
             tsv_svelte_compile::Refusal::every_variant().len(),
-            126,
+            127,
             "add the new Refusal variant to `every_variant` (it is not compiler-enforced)"
         );
     }

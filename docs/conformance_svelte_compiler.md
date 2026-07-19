@@ -100,3 +100,44 @@ comment-position tolerance does not cover this — the comment crosses into an u
 subtree, which is a comment *presence* difference in that subtree, not a position one.
 No fixture is proposed: the shape is an oracle print artifact, and pinning it would pin
 esrap's offset behavior rather than anything about tsv.
+
+### `$`-prefixed class-expression id compiles to invalid JS
+
+A class **expression** id is the one `$`-prefixed binding name the oracle accepts — it
+declares no binding for it, so `dollar_prefix_invalid`
+(`phases/2-analyze/visitors/shared/utils.js:278`) never fires. Its later passes then
+treat the id as an ordinary name, and both of them get it wrong. Verified against the
+pinned compiler:
+
+```svelte
+<script>
+	const C = class $Foo {};
+</script>
+```
+
+```js
+const C = class $.store_get($$store_subs ??= {}, '$Foo', Foo) {};
+```
+
+The store rewrite reaches the id as if it were a `$`-prefixed store read, emitting a
+member expression where the grammar requires a binding identifier — **invalid JS**, and
+a shape no bundler or runtime will accept. The sibling name `$$slots` fails the other
+way: the oracle's reference analysis is name-based and counts the id as a *read*, so
+`const C = class $$slots {}` prepends `const $$slots = $.sanitize_slots($$props);` to
+the component body for a name that is never referenced.
+
+tsv **refuses** both (`Refusal::DollarPrefixedBinding`, raised at the class-expression
+arm in `rune_guard.rs` and pinned by
+`compile_refuses_dollar_prefixed_class_expression_id`) — but only in their *unescaped*
+spelling: an **escaped** id (`const C = class \u0024Foo {};`) reaches the refusal
+through `dollar_identifier_name` → `identifier_name`, which returns `None` whenever
+`escaped_name` is set, so tsv **compiles** it while the oracle emits the same
+ungrammatical `class $.store_get(…) {}` (probe-verified). That is not one of the six
+escaped over-acceptances tracked as the crate's escaped-identifier residual — the
+oracle *accepts* a class-expression id, so slipping past the refusal is parity on the
+rule — it lands on this oracle defect instead. Refusing the unescaped spelling is a
+deliberate over-refusal — the oracle compiles these, so refusing costs achievable parity — but the
+alternative is reproducing invalid output in one case and a phantom injection in the
+other. No fixture is proposed: a fixture would pin the oracle's defect as expected
+output, which is exactly what the catalog above exists to avoid. The shape appears in no
+real component.

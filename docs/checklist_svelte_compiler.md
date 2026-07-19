@@ -95,9 +95,23 @@ Sanctioned rewrites (all Supported, at parity):
 
 A never-updated `$state`/plain binding is statically known and its template reads **fold** into the emitted text (the oracle's evaluator behavior, ported in `analyze.rs`); a template read of a non-foldable `$derived` binding — bare (`{d}`) or nested at any depth (`{d + 1}`, `{obj[d]}`, `{f(d)}`, `{d.x}`, `{!d}`) — becomes a call (`d()`), via the template value-walk (`fragment.rs::rewrite_template_value`, which rebuilds only the spine down to each derived read). The fold gate runs on the un-rewritten expression, so a foldable nested read (`{d + 1}` where `d`'s inputs are all static) still folds to text rather than emitting `d()`. A `$derived` read in a **script position** — a function body, a top-level or `$props()`-destructure-default initializer, a `$.derived(() => …)` thunk — likewise becomes `d()`, via the script rewrite (`store_rewrite.rs`, over the final synthetic body), but **never folds** (only template text folds). Writing a derived is refused where the oracle lowers it (a bare `d = v` / `d++`, or a destructuring leaf `[d] = …` / `({ d } = …)` — the oracle emits `d(v)` / an `$.to_array` IIFE, unimplemented); a **member/index** write is a read of the derived and compiles (`d.x = v` → `d().x = v`).
 
-**`$$slots` — Supported.** A `$$slots` reference (the oracle's `uses_slots`, detected in the `needs_context` walk) injects `const $$slots = $.sanitize_slots($$props)` as the component function's first statement — before any wrapper — and forces the `$$props` parameter (`transform-server.js:300`). It reads through the rune guard's `$`-prefix refusal by a carve-out; the `$props()` rest injection deconflicts by renaming its destructured prop to `$$slots_` (see the rest-injection section). Component-wide reassignment collection also rides that walk, so a binding mutated inside a dropped event handler is still marked updated (and not folded) — and a name *declared* inside any function-like subtree (a handler param or local) marks the same-named component binding `Opaque`, whose reads refuse (`static evaluation not portable: binding {name} is not statically modeled`): the mutation target may resolve to the shadowing local, so neither folding nor escaping is provable — the script side's exact shadow envelope.
+**`$$slots` — Supported.** A `$$slots` reference (the oracle's `uses_slots`, detected in the `needs_context` walk) injects `const $$slots = $.sanitize_slots($$props)` as the component function's first statement — before any wrapper — and forces the `$$props` parameter (`transform-server.js:300`). It reads through the rune guard's `$`-prefix refusal by a carve-out — one scoped to a **reference**, since a `$$slots` *binding* is oracle-rejected (see the binding rule below); the `$props()` rest injection deconflicts by renaming its destructured prop to `$$slots_` (see the rest-injection section). Component-wide reassignment collection also rides that walk, so a binding mutated inside a dropped event handler is still marked updated (and not folded) — and a name *declared* inside any function-like subtree (a handler param or local) marks the same-named component binding `Opaque`, whose reads refuse (`static evaluation not portable: binding {name} is not statically modeled`): the mutation target may resolve to the shadowing local, so neither folding nor escaping is provable — the script side's exact shadow envelope.
 
 - **Refused**: `comments in a script with a $$slots reference (injected sanitize_slots)` — the injected first statement would sweep the carried-comment windows.
+
+**`$`-prefixed bindings — Refused.** The oracle's `dollar_prefix_invalid` (`phases/2-analyze/visitors/shared/utils.js:278`, literally `node.name.startsWith('$')` on a `Binding`) is a Svelte reserved-prefix rule on a **binding**, not on a reference — which is exactly what makes the `$$slots` reference carve-out above sound, and what the carve-out must not swallow. The oracle reaches `validate_identifier_name` from **four** sites, and only two pass `function_depth` — so "oracle-rejected" is not one answer across the guarded positions. Checked against every call path, and probe-verified against the pinned compiler:
+
+| call path | passes `function_depth`? | verdict |
+| --- | --- | --- |
+| `VariableDeclarator.js:25`, `FunctionDeclaration.js:12`, `ClassDeclaration.js:12` | **no** — `!function_depth` short-circuits, so the gate never applies | a declarator's binding leaves (any declaration kind, any depth, destructured included), a function-declaration id, a class-declaration id: **always rejected** |
+| `scope.js:695` (`Scope::declare`) | **yes** — `function_depth <= 1` applies | a function-expression id and a catch-clause parameter: rejected **only at the top level**. An import specifier's local also declares here but is **always rejected**, by a different mechanism — `scope.js:680` re-delegates `declaration_kind === 'import'` to the parent scope, so an import binding always lands at depth 0 |
+
+The oracle **accepts** a `$`-prefixed name at a function / arrow / snippet parameter (`declaration_kind` `param`/`rest_param` is exempt), at a template binding — `{@const}`, `{#each … as}`, an `{#each}` index, an `{#await}` `then`/`catch` value — and, inside any function body, at a function-expression id or a catch-clause parameter.
+
+- **Refused**: `$-prefixed binding {name}` — every rejected position above.
+- **Deliberate over-refusal**: a **function-expression id** and a **catch-clause parameter** are refused at *every* depth, though the oracle accepts them inside a function body (probe-verified both directions: `const g = function $$slots() {}` and `catch ($$slots)` reject at top level and accept inside `function f() { … }`; `catch ($x)` with `x` imported likewise). An over-refusal is never a refusal-contract bug, and narrowing is not portable: `WalkCtx::fn_depth` counts function *nodes*, while the oracle's non-porous increment happens at a function's **`BlockStatement`** (`scope.js:1174-1188` — a `FunctionExpression`/`ArrowFunctionExpression` scope is itself porous). So an expression-bodied arrow increments tsv's depth and not the oracle's, and a `fn_depth == 0` gate would compile the oracle-**rejected** `const h = () => function $$slots() {}` — an OVER-ACCEPTANCE, strictly worse. Buying those shapes back needs a second, oracle-shaped depth counter, for shapes no real component writes.
+- **Deliberate over-refusal**: a class-**expression** id, though the oracle accepts it: the oracle's reference analysis is name-based and counts the id as a read, so `class $$slots {}` injects `$.sanitize_slots` (a mismatch), and `class $Foo {}` drives its store rewrite to emit `class $.store_get(…) {}` — invalid JS. Declining a shape no real component writes beats reproducing either. The **escaped** spelling slips through and compiles — see [conformance_svelte_compiler.md](conformance_svelte_compiler.md#-prefixed-class-expression-id-compiles-to-invalid-js).
+- **Open**: an **escaped** binding name (`let $x = 1`) decodes to a name the oracle rejects, and every guarded position skips it — so **all six** are over-acceptances, probe-verified: a declarator leaf, a function-declaration id, a class-declaration id, a function-expression id, an import specifier's local, and a catch-clause parameter. Two independent mechanisms, not one: `pattern_binding_names` skips an escaped leaf (the declarator and catch-param positions), while `refuse_dollar_binding_name` reaches the other four through `dollar_identifier_name` → `identifier_name`, which returns `None` whenever `escaped_name` is set (`rune_guard.rs`). Closing the rule for escaped names means fixing both. This is an instance of the crate's standing escaped-identifier residual — its own item, not a gap specific to this rule.
 
 **`$bindable` — Supported.** A `$bindable(fallback?)` default at a **top-level `$props()` property with a plain-identifier key and destructure value** compiles: the default is rewritten to its fallback (`void 0` when argument-less — `let { value = $bindable(42) }` → `let { value = 42 } = $$props`), the prop forces the `$$renderer.component(…)` wrapper (the oracle's `CallExpression.js:55` `needs_context`), and the component body's last statement becomes `$.bind_props($$props, { key: local, … })` — the bindable props in source order, shorthand `{ value }` when key equals local and `key: local` when renamed (`3-transform/server/visitors/CallExpression.js`, `transform-server.js`). Composes with the rest injection and with an already-firing wrapper trigger.
 
@@ -356,7 +370,6 @@ standalone repro, none of them dropped-region-specific:
 
 | Repro | Oracle error |
 | --- | --- |
-| `<script>let $$slots = 1;</script><p>x</p>` | `dollar_prefix_invalid` |
 | `<h1><h1>t</h1></h1>` | `node_invalid_placement` |
 | `<script>let b = 1;</script>{#each [0] as b}<button onclick={() => { b++; }}>x</button>{/each}` | `each_item_invalid_assignment` |
 | `<Foo><p>c</p>{#snippet children()}<p>d</p>{/snippet}</Foo>` | `snippet_conflict` |
@@ -364,8 +377,11 @@ standalone repro, none of them dropped-region-specific:
 
 Together with `attribute_duplicate`, `declaration_duplicate`, `snippet_invalid_export`,
 `slot_snippet_conflict`, `svelte_meta_invalid_placement`, and `svelte_meta_duplicate`,
-that is **eleven** distinct oracle rules tsv does not enforce — so the shape of this
+that is **ten** distinct oracle rules tsv does not enforce — so the shape of this
 work is porting `2-analyze`'s whole-component checks, not patching rules one at a time.
+(`dollar_prefix_invalid` was the eleventh and is now **enforced** — see the
+`$`-prefixed bindings rule above. It came out one rule at a time because it is a
+*local* rule on a single binding node, unlike the whole-component checks below.)
 
 ⚠️ **These are Svelte *analysis-phase* rules, not deferred JS early errors** — do not
 file them under the parser's [deliberate early-error deferral](conformance_svelte.md).
@@ -373,13 +389,12 @@ Each is implemented in phase 2 over the Svelte AST, in Svelte-domain terms:
 
 | Rule | Site in `packages/svelte/src/compiler` |
 | --- | --- |
-| `dollar_prefix_invalid` | `phases/2-analyze/visitors/shared/utils.js:278` |
 | `node_invalid_placement` | `phases/2-analyze/visitors/RegularElement.js:185` |
 | `each_item_invalid_assignment` | `phases/2-analyze/visitors/shared/utils.js:33` |
 | `snippet_conflict` | `phases/2-analyze/visitors/SnippetBlock.js:77` |
 | `component_invalid_directive` | `phases/2-analyze/visitors/shared/component.js:81` |
 
-`dollar_prefix_invalid` is the clearest case: it is literally
+The clearest case is the one now closed, `dollar_prefix_invalid`: it is literally
 `node.name.startsWith('$')` on a binding — a **reserved-prefix** rule Svelte owns, not
 a JS one. `let $$slots = 1;` is valid JavaScript, and tsc — [this repo's oracle for
 what is really an error](../CLAUDE.md#strict-mode-only) — accepts it under `--strict`.
@@ -388,30 +403,56 @@ octal escapes, `delete` of a plain name) reaches any of these rules.
 
 The single genuine overlap is `declaration_duplicate`, and Svelte says so itself at
 `phases/scope.js:689` ("declaring function twice is also caught by acorn in the parse
-phase"). That one row — and only that one — is arguably not tsv's to fix. The other ten
+phase"). That one row — and only that one — is arguably not tsv's to fix. The other nine
 are analysis tsv has not ported.
 
-#### `dollar_prefix_invalid` is one sharp bug, not a surface
+#### `dollar_prefix_invalid` — closed, and wider than one carve-out
 
-It is the largest bucket under mutation (209 of 647 over-acceptances at `--seed 0
---iterations 20000`), but it is **not** a broad hole in the existing `$`-prefixed
-identifier refusal. All 209 are the same shape — an instance-script `let $$slots = 1;`
-— and nothing else: `$$props`, `$$payload`, `$0`, a bare `$foo`, and the block-scoped
-`{@const $$slots = 1}` form all refuse correctly.
+**Closed.** The rule is enforced by the `$`-prefixed binding refusal above
+(`Refusal::DollarPrefixedBinding`, `rune_guard.rs`), and the fuzzer's largest
+over-acceptance bucket with it: at `--seed 0 --iterations 20000` the fuzzer went from
+647 over-acceptances across eleven oracle codes to **435 across nine**, with
+`dollar_prefix_invalid` at zero. Mismatches (26) and panics (0) are unchanged.
 
-The root cause is a single carve-out in `rune_guard.rs`
-(`walk_expression`'s `Expression::Identifier` arm):
+It is worth recording what the *diagnosis* got wrong, because the shape of the error
+recurs. Every one of those 209 mutants was the same instance-script `let $$slots = 1;`,
+so the bug read as a single name-keyed carve-out in `walk_expression`'s
+`Expression::Identifier` arm — an exemption whose own comment justified it only for a
+**reference**, silently licensing a **declaration**. That much was true. The inference
+drawn from it — that `$$props`, `$$payload`, `$0` and a bare `$foo` "all refuse
+correctly", so the hole was `$$slots`-specific — was **false**, and it was false because
+the sample only ever exercised the *declarator* position. Direct probing of the other
+binding positions found the same over-acceptance for **every** `$`-prefixed name at a
+class-declaration id and an import specifier's local (and at a function-declaration id
+whose name is never referenced): those positions had no `$`-prefix check at all, because
+the pre-existing refusal fires from the *reference* walk and nothing routed a binding
+name through it.
 
-```rust
-// `$$slots` is a real runtime reference (the transform injects
-// `const $$slots = $.sanitize_slots($$props)`), not a rune.
-if name != "$$slots" {
-```
+The general lesson: a mutation corpus reports the shapes it *generates*, and a bucket
+that is 209-for-209 one shape is evidence about the generator, not about the size of the
+hole. Enumerate the rule's positions from the oracle's own visitors and probe each one.
 
-The exemption is keyed on the **name**, but its own comment justifies it only for a
-**reference**. A `let $$slots = 1` *declaration* takes the same exemption and sails
-through. The fix is to gate the carve-out on reference-vs-binding position rather than
-on the name — a compiler change, so it wants its own fixtures-first slice.
+That lesson then recurred **one level up**, which is why the rule needed a second pass.
+A post-fix fuzzer run showing `dollar_prefix_invalid = 0` across 20 000 mutants was read
+as proof of closure. It was not: a fuzz **zero** is a statement about the generator in
+exactly the same way a fuzz **concentration** is, and this generator never crosses
+store-name × rune-init × dollar-declarator. Direct probing found the rule still open on
+the whole *transform* path — `script_rewrite::rewrite_declaration`, which rewrites a
+top-level instance-script declaration rather than guard-walking it. Two halves:
+
+- a declarator whose own init is **not** a rune, when a sibling declarator in the same
+  statement **is** (`let a = $state(1), $x = 2;`) — the id went through
+  `walk_expression_guarded` under a `WalkCtx` with store reads enabled, so a `$x` whose
+  base `x` is any binding (a plain `import { x }` suffices — `svelte/store` is not
+  required) took the *store-read* exemption;
+- a declarator whose init **is** a rune (`let $x = $state(1);`, `$state.raw`,
+  `$derived`) — the id was not walked at all, so no name, bound base or not, was ever
+  checked.
+
+The fix moves the rule to the loop's own chokepoint, ahead of the rune dispatch, exactly
+where the oracle's `VariableDeclarator` visitor runs `validate_identifier_name` over
+every `extract_paths` leaf — so both halves close for every name at once. Confirmation
+is by direct probe of both shapes and their boundary variants, not by a fuzz count.
 
 ### Mismatch classes under mutation
 

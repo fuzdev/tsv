@@ -814,7 +814,7 @@ cargo run -p tsv_debug compile_corpus_compare <paths...>
 # `compile_compare` uses.
 #
 # ⚠️ THE GATE IS CURRENTLY RED, BY DESIGN OF THE FINDINGS, NOT AS AN ORDINARY GREEN GATE.
-# A `--seed 0 --iterations 20000` run reports ~647 over-acceptances (11 distinct oracle
+# A `--seed 0 --iterations 20000` run reports ~435 over-acceptances (9 distinct oracle
 # error codes) and 26 mismatches, so it ALWAYS exits 1 today. It is a discovery tool with
 # an open work list, not a regression gate — which is also why it is on demand rather
 # than in `deno task check`. The findings are cataloged in

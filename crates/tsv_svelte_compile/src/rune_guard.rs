@@ -39,7 +39,7 @@ use std::collections::HashSet;
 use tsv_lang::{InfallibleResolve, SharedInterner};
 use tsv_ts::ast::internal::{
     ArrowFunctionBody, ClassBody, ClassMember, ExportDefaultValue, Expression, ForInOfLeft,
-    ForInit, FunctionExpression, ObjectPatternProperty, ObjectProperty, Statement,
+    ForInit, FunctionExpression, ImportSpecifier, ObjectPatternProperty, ObjectProperty, Statement,
 };
 
 use crate::analyze::{NameSet, pattern_binding_names};
@@ -366,6 +366,163 @@ fn collect_nested_declared(pattern: &Expression<'_>, ctx: &mut WalkCtx<'_>) {
     }
 }
 
+/// Refuse a `$`-prefixed **binding name** — the oracle's `dollar_prefix_invalid`
+/// (`phases/2-analyze/visitors/shared/utils.js:278`, literally
+/// `node.name.startsWith('$')` on a `Binding`).
+///
+/// This is the rule that separates the two `$$slots` positions, and it is the
+/// only thing that makes the reference carve-out in `walk_expression`'s
+/// `Expression::Identifier` arm sound: a `$$slots` *reference* is the real
+/// runtime value the transform injects, while a `$$slots` *declaration* is a
+/// compile error. The rule is Svelte-domain, not a JS early error — `let $$slots
+/// = 1` is valid JavaScript.
+///
+/// **The oracle reaches `validate_identifier_name` from FOUR sites, and only two
+/// of them pass `function_depth`** — so "oracle-rejected" is not one answer for
+/// the six guarded positions. Checked against every call path:
+///
+/// | call path | passes `function_depth`? | positions |
+/// | --- | --- | --- |
+/// | `VariableDeclarator.js:25`, `FunctionDeclaration.js:12`, `ClassDeclaration.js:12` | **no** — so `!function_depth` short-circuits and the gate never applies | a declarator's binding leaves (any depth, any declaration kind, destructured or not), a function-declaration id, a class-declaration id |
+/// | `scope.js:695` (`Scope::declare`) | **yes** — the `function_depth <= 1` gate DOES apply | a function-expression id, a catch-clause parameter, an import specifier's local |
+///
+/// **Unconditionally oracle-rejected** (probe-verified against the pinned
+/// compiler): the three no-depth positions above, plus an **import specifier's
+/// local** — which goes through the depth-passing path but is safe by a
+/// different mechanism, `scope.js:680` re-delegating `declaration_kind ===
+/// 'import'` to the parent scope, so an import binding always lands at
+/// `function_depth` 0 however deeply it is written.
+///
+/// ⚠️ **Two positions are oracle-rejected only at the top level, and tsv refuses
+/// them unconditionally — a deliberate over-refusal.** A **function-expression
+/// id** and a **catch-clause parameter** both declare through `scope.js:695`,
+/// and the instance script's top-level scope sits at `function_depth` 1, so the
+/// oracle rejects them there and *accepts* them inside any function body
+/// (probe-verified both directions: `const g = function $$slots() {}` and `catch
+/// ($$slots)` reject at top level, accept inside a `function f() { … }`; `catch
+/// ($x)` with `x` imported likewise). tsv refuses both regardless of depth.
+///
+/// Narrowing them would need the oracle's depth, which tsv does not have:
+/// [`WalkCtx::fn_depth`] counts function *nodes*, while the oracle's
+/// non-porous increment happens at a function's **`BlockStatement`**
+/// (`scope.js:1174-1188`) — a `FunctionExpression` / `ArrowFunctionExpression`
+/// scope is itself `child(true)`, porous. So an expression-bodied arrow does not
+/// increment the oracle's depth and does increment tsv's: `const h = () =>
+/// function $$slots() {}` is oracle-**rejected**, and a `fn_depth == 0` gate here
+/// would compile it — turning a contract-safe over-refusal into an
+/// OVER-ACCEPTANCE, which is a refusal-contract bug. Closing the gap faithfully
+/// means a second, oracle-shaped depth counter; the shapes it would buy back (a
+/// `$`-prefixed catch param or named function expression, inside a function) do
+/// not occur in real components, so the over-refusal stands.
+///
+/// ⚠️ A declarator's leaves are guarded on **two** paths, and both are needed:
+/// [`walk_variable_declaration`] here, for a declaration the guard walk owns,
+/// and `script_rewrite::rewrite_declaration`'s per-declarator loop, for a
+/// top-level instance-script declaration the transform rewrites instead of
+/// walking. The transform path does not reach this rule through the walk at
+/// all — a rune declarator's id is never walked, and a non-rune one is walked
+/// as an *expression* under a store-read exemption. Each path calls this at its
+/// own chokepoint, ahead of any rune dispatch, the way the oracle's
+/// `VariableDeclarator` visitor does.
+///
+/// **Deliberately NOT guarded**, because the oracle *accepts* these: a
+/// function / arrow / snippet parameter (`declaration_kind` `param` /
+/// `rest_param` is exempt), a template binding (`{@const}`, `{#each … as}`, an
+/// `{#each}` index, an `{#await}` `then`/`catch` value — declared in scopes
+/// past the `function_depth <= 1` gate).
+///
+/// A class-EXPRESSION id is the one position the oracle accepts that is routed
+/// here anyway — a deliberate over-refusal for reasons unrelated to this rule,
+/// stated at that call site.
+///
+/// Scope: plain (unescaped) binding names. An ESCAPED one (`let $x = 1`)
+/// decodes to a name the oracle rejects, but every guarded position above skips
+/// it, so all six stay over-acceptances (probe-verified): a declarator leaf, a
+/// function-declaration id, a class-declaration id, a function-expression id, an
+/// import specifier's local, and a catch-clause parameter. Two independent
+/// mechanisms produce that, not one — this function's `pattern_binding_names`
+/// skips an escaped leaf (the declarator and catch-param positions), while
+/// [`refuse_dollar_binding_name`] reaches the other four through
+/// `dollar_identifier_name` → `identifier_name`, which returns `None` whenever
+/// `escaped_name` is set. Closing the rule for escaped names means fixing both.
+/// This is the crate's standing escaped-identifier residual, tracked in the
+/// checklist, and is its own item — do not read the absence of a check as a
+/// claim that the shape is legal.
+pub(crate) fn refuse_dollar_binding_pattern(
+    pattern: &Expression<'_>,
+    source: &str,
+) -> Result<(), CompileError> {
+    let mut names = Vec::new();
+    pattern_binding_names(pattern, source, &mut names)?;
+    for name in names {
+        if name.starts_with('$') {
+            return Err(CompileError::Unsupported(Refusal::DollarPrefixedBinding {
+                name,
+            }));
+        }
+    }
+    Ok(())
+}
+
+/// [`refuse_dollar_binding_pattern`] for a binding position that is always a
+/// bare identifier (a function / class id, an import specifier's local).
+///
+/// Takes the source rather than a [`WalkCtx`], because two binding positions are
+/// validated OUTSIDE the guard walk that owns one: a top-level class
+/// declaration's id (`script_rewrite::rewrite_class_state_fields` intercepts the
+/// statement before `walk_statement` sees it) and an import specifier's local
+/// (`script_rewrite::refuse_runes_invalid_import`, the oracle's own import
+/// visitor's analog). A new interception point must call this too.
+pub(crate) fn refuse_dollar_binding_name(
+    id: &tsv_ts::ast::internal::Identifier<'_>,
+    source: &str,
+) -> Result<(), CompileError> {
+    match dollar_identifier_name(id, source) {
+        Some(name) => Err(CompileError::Unsupported(Refusal::DollarPrefixedBinding {
+            name: name.to_string(),
+        })),
+        None => Ok(()),
+    }
+}
+
+/// [`refuse_dollar_binding_name`] over every local of an import declaration.
+///
+/// An import's local IS a binding (`declaration_kind: 'import'`), and the
+/// oracle's message names it too ("cannot be used for variables and imports").
+/// Unlike the other `scope.js:695` positions it is depth-INDEPENDENT:
+/// `scope.js:680` re-delegates an `import` declaration to the parent scope, so
+/// the binding always lands at `function_depth` 0 and the `function_depth <= 1`
+/// gate always passes.
+///
+/// ⚠️ The oracle EXEMPTS a type-only import from the rule (`utils.js:270-276`:
+/// an `importKind === 'type'` binding is skipped), and this does not — it
+/// refuses every local unconditionally. tsv still reaches parity on
+/// `import type { $T }` and `import { type $T }` (probe-verified) for a reason
+/// this rule does not state: TYPE ERASURE runs first and strips both forms
+/// before any import arrives here, so the exempt case is unreachable rather than
+/// handled. That is a pass-ordering fact, not a property of this check — if
+/// erasure ever stopped removing a type-only import (or a non-`lang="ts"` path
+/// grew one), this would over-refuse it and the exemption would have to be
+/// implemented for real.
+///
+/// Two callers, because imports are validated on two paths: [`walk_statement`]
+/// here, and `script_rewrite::refuse_runes_invalid_import`, for the imports the
+/// transform hoists out of the statement stream before the guard walk runs.
+pub(crate) fn refuse_dollar_import_locals(
+    specifiers: &[ImportSpecifier<'_>],
+    source: &str,
+) -> Result<(), CompileError> {
+    for specifier in specifiers {
+        let local = match specifier {
+            ImportSpecifier::Default(d) => &d.local,
+            ImportSpecifier::Named(n) => &n.local,
+            ImportSpecifier::Namespace(n) => &n.local,
+        };
+        refuse_dollar_binding_name(local, source)?;
+    }
+    Ok(())
+}
+
 fn enter_function(params: &[Expression<'_>], ctx: &mut WalkCtx<'_>) -> Result<(), CompileError> {
     ctx.fn_depth += 1;
     for param in params {
@@ -397,6 +554,9 @@ fn walk_statement(
         Statement::ReturnStatement(s) => walk_opt(s.argument.as_ref(), ctx),
         Statement::BlockStatement(s) => walk_statements(s.body, ctx, depth + 1),
         Statement::FunctionDeclaration(s) => {
+            if let Some(id) = &s.id {
+                refuse_dollar_binding_name(id, ctx.source)?;
+            }
             if (depth > 0 || ctx.fn_depth > 0)
                 && let Some(id) = &s.id
                 && let Some(name) = identifier_name(id, ctx.source)
@@ -408,7 +568,15 @@ fn walk_statement(
             ctx.fn_depth -= 1;
             result
         }
-        Statement::ClassDeclaration(s) => walk_class_body(&s.body, ctx),
+        // Nothing else here is walkable — the source is a literal and the
+        // imported name is a name-only position.
+        Statement::ImportDeclaration(s) => refuse_dollar_import_locals(s.specifiers, ctx.source),
+        Statement::ClassDeclaration(s) => {
+            if let Some(id) = &s.id {
+                refuse_dollar_binding_name(id, ctx.source)?;
+            }
+            walk_class_body(&s.body, ctx)
+        }
         Statement::ExportNamedDeclaration(s) => match &s.declaration {
             Some(decl) => walk_statement(decl, ctx, depth),
             None => Ok(()),
@@ -416,12 +584,20 @@ fn walk_statement(
         Statement::ExportDefaultDeclaration(s) => match &s.declaration {
             ExportDefaultValue::Expression(e) => walk_expression(e, ctx),
             ExportDefaultValue::FunctionDeclaration(f) => {
+                if let Some(id) = &f.id {
+                    refuse_dollar_binding_name(id, ctx.source)?;
+                }
                 enter_function(f.params, ctx)?;
                 let result = walk_statements(f.body.body, ctx, depth + 1);
                 ctx.fn_depth -= 1;
                 result
             }
-            ExportDefaultValue::ClassDeclaration(c) => walk_class_body(&c.body, ctx),
+            ExportDefaultValue::ClassDeclaration(c) => {
+                if let Some(id) = &c.id {
+                    refuse_dollar_binding_name(id, ctx.source)?;
+                }
+                walk_class_body(&c.body, ctx)
+            }
             ExportDefaultValue::TSDeclareFunction(_)
             | ExportDefaultValue::TSInterfaceDeclaration(_) => Ok(()),
         },
@@ -481,6 +657,10 @@ fn walk_statement(
             if let Some(handler) = &s.handler {
                 if let Some(param) = &handler.param {
                     collect_nested_declared(param, ctx);
+                    // A catch parameter IS a binding (`declaration_kind: 'let'`
+                    // in a porous scope), so the `$$slots` reference carve-out
+                    // must not reach it.
+                    refuse_dollar_binding_pattern(param, ctx.source)?;
                     walk_expression(param, ctx)?;
                 }
                 walk_statements(handler.body.body, ctx, depth + 1)?;
@@ -497,7 +677,6 @@ fn walk_statement(
         | Statement::ContinueStatement(_)
         | Statement::EmptyStatement(_)
         | Statement::DebuggerStatement(_)
-        | Statement::ImportDeclaration(_)
         | Statement::ExportAllDeclaration(_)
         | Statement::TSNamespaceExportDeclaration(_)
         | Statement::TSImportEqualsDeclaration(_)
@@ -525,6 +704,7 @@ fn walk_variable_declaration(
         if depth > 0 || ctx.fn_depth > 0 {
             collect_nested_declared(&declarator.id, ctx);
         }
+        refuse_dollar_binding_pattern(&declarator.id, ctx.source)?;
         walk_expression(&declarator.id, ctx)?;
         walk_opt(declarator.init.as_ref(), ctx)?;
     }
@@ -574,10 +754,11 @@ fn walk_function_expression(
     f: &FunctionExpression<'_>,
     ctx: &mut WalkCtx<'_>,
 ) -> Result<(), CompileError> {
-    if let Some(id) = &f.id
-        && let Some(name) = identifier_name(id, ctx.source)
-    {
-        ctx.nested_declared.insert(name.to_string());
+    if let Some(id) = &f.id {
+        refuse_dollar_binding_name(id, ctx.source)?;
+        if let Some(name) = identifier_name(id, ctx.source) {
+            ctx.nested_declared.insert(name.to_string());
+        }
     }
     enter_function(f.params, ctx)?;
     let result = walk_statements(f.body.body, ctx, 1);
@@ -658,8 +839,38 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
         // (non-computed member properties / object keys) are never walked.
         Expression::Identifier(id) => {
             if let Some(name) = dollar_identifier_name(id, ctx.source) {
-                // `$$slots` is a real runtime reference (the transform injects
-                // `const $$slots = $.sanitize_slots($$props)`), not a rune.
+                // `$$slots` READ in a value position is a real runtime reference
+                // (the transform injects `const $$slots = $.sanitize_slots(
+                // $$props)`), not a rune — so it is exempt HERE and only here.
+                // ⚠️ This test reads the NAME, not the position — the arm cannot
+                // tell a reference from a binding, so it exempts both. Binding
+                // positions DO reach it (a declarator id, a catch param, a
+                // template `{#each … as}` pattern, a function parameter), and
+                // this arm is not what makes them safe. The oracle's
+                // `dollar_prefix_invalid` rejects a `$$slots` *declaration*
+                // while accepting the reference, so a binding position the
+                // oracle rejects must be refused UPSTREAM, before its pattern is
+                // walked as an expression: `refuse_dollar_binding_pattern` /
+                // `refuse_dollar_binding_name` at each such site (see the former
+                // for the two declarator paths, which is where this was missed
+                // twice). The positions the oracle genuinely EXEMPTS — a
+                // function / arrow / snippet parameter, a template binding, and
+                // (inside any function body only) a function-expression id or a
+                // catch-clause parameter — deliberately have no upstream refusal
+                // and land here. ⚠️ The dichotomy is not clean for those last
+                // two: the oracle's exemption is depth-conditional, and tsv
+                // refuses them upstream at EVERY depth, a deliberate
+                // over-refusal. See `refuse_dollar_binding_pattern` for the
+                // four oracle call paths and why the depth is not portable.
+                //
+                // So the standing obligation is on the caller, not on this arm:
+                // a new site that walks a binding pattern through
+                // `walk_expression_guarded` inherits the exemption and must
+                // refuse first if the oracle rejects that position. One known
+                // gap already sits on that seam — an ESCAPED `$` leaf
+                // (`let $x = 1`) is skipped by both upstream refusals and
+                // reaches here, an over-acceptance tracked as the crate's
+                // escaped-identifier residual.
                 if name != "$$slots" {
                     // A valid `$name` store read is exempt when the caller opts in
                     // (the script guard / the dropped-region guard): it is rewritten
@@ -768,7 +979,21 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
             result
         }
         Expression::FunctionExpression(f) => walk_function_expression(f, ctx),
-        Expression::ClassExpression(c) => walk_class_body(&c.body, ctx),
+        // A class EXPRESSION id is the one `$`-prefixed binding name the oracle
+        // ACCEPTS (it declares no binding for it, so `dollar_prefix_invalid`
+        // never fires) — this refusal is a deliberate over-refusal, not the
+        // binding rule. Two reasons, both verified against the pinned compiler:
+        // the oracle's reference analysis is name-based and counts the id as a
+        // READ, so `class $$slots {}` injects `$.sanitize_slots` (a MISMATCH tsv
+        // would otherwise produce), and `class $Foo {}` makes its store rewrite
+        // emit `class $.store_get(…) {}` — invalid JS. Reproducing either is
+        // worse than declining a shape no real component writes.
+        Expression::ClassExpression(c) => {
+            if let Some(id) = &c.id {
+                refuse_dollar_binding_name(id, ctx.source)?;
+            }
+            walk_class_body(&c.body, ctx)
+        }
         Expression::SpreadElement(s) => walk_expression(s.argument, ctx),
         Expression::TemplateLiteral(t) => walk_expressions(t.expressions, ctx),
         Expression::TaggedTemplateExpression(t) => {

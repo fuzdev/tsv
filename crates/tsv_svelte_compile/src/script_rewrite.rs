@@ -24,7 +24,9 @@ use crate::attr_refs::{TemplateItem, each_template_item};
 use crate::build::Builder;
 use crate::fragment::is_bare_derived_read;
 use crate::rune_guard::{
-    WalkCtx, walk_class_member_guarded, walk_expression_guarded, walk_statement_guarded,
+    WalkCtx, refuse_dollar_binding_name, refuse_dollar_binding_pattern,
+    refuse_dollar_import_locals, walk_class_member_guarded, walk_expression_guarded,
+    walk_statement_guarded,
 };
 use crate::transform_server::unsupported;
 use crate::{CompileError, Refusal, erase};
@@ -649,6 +651,11 @@ pub(crate) fn refuse_runes_invalid_import(
     import: &ImportDeclaration<'_>,
     source: &str,
 ) -> Result<(), CompileError> {
+    // Checked here rather than in the guard walk because the transform hoists
+    // imports out of the statement stream before `walk_statement` runs. The rule
+    // — including the type-only-import caveat — lives at
+    // `refuse_dollar_import_locals`.
+    refuse_dollar_import_locals(import.specifiers, source)?;
     let LiteralValue::String(cooked) = &import.source.value else {
         return Ok(());
     };
@@ -1051,6 +1058,17 @@ pub(crate) fn rewrite_script_statement<'arena>(
         // pass `None`; the derived's is a whole-compile check in `compile_server`).
         .allow_store_reads(store_names, None)
         .allow_derived_reads();
+        // The `$`-prefixed BINDING rule, at the one point every declarator on
+        // this path passes — before the rune dispatch below, mirroring the
+        // oracle's own `VariableDeclarator` visitor, which runs
+        // `validate_identifier_name` over every `extract_paths` leaf ahead of
+        // its rune branch (`2-analyze/visitors/VariableDeclarator.js:24-26`).
+        // It cannot ride the guard walk: none of the three arms below reaches
+        // the binding leaves with the rule applied — a rune declarator's id is
+        // not walked at all, and the two that are walked go through
+        // `walk_expression_guarded`, which sees a pattern as an expression and
+        // takes the store-read exemption this `WalkCtx` enables.
+        refuse_dollar_binding_pattern(&declarator.id, source)?;
         let rune = declarator
             .init
             .as_ref()
@@ -1277,6 +1295,11 @@ fn rewrite_class_state_fields<'arena>(
     dropped_regions: &mut Vec<Span>,
 ) -> Result<Statement<'arena>, CompileError> {
     let arena = b.arena;
+    // This path intercepts the statement before the guard walk's
+    // `ClassDeclaration` arm, so it owns the class id's binding check.
+    if let Some(id) = &class.id {
+        refuse_dollar_binding_name(id, source)?;
+    }
     let mut ctx = WalkCtx::new(
         source,
         updated,
