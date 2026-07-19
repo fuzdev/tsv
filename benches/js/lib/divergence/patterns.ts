@@ -308,16 +308,39 @@ function leading_ws(line: string): string {
 }
 
 /**
- * Whether a pure-re-indent hunk moves every line exactly ONE indent level deeper
- * on our side — one tab, the only indent tsv emits.
+ * Whether our side places a pure-re-indent hunk exactly ONE indent level below
+ * the construct head above it — one tab, the only indent tsv emits.
  *
- * §Uniform Forced-Continuation Indent states the rule as "indented one level", so
- * a different delta, or the opposite direction, is a different layout difference
- * and must stay unclaimed rather than ride along.
+ * Measured against the HEAD, not against prettier's leading whitespace, because
+ * that is how §Uniform Forced-Continuation Indent states the rule: the
+ * continuation is indented one level so it "reads as part of its construct". What
+ * prettier chose to emit is the divergence, so it cannot also be the baseline —
+ * keying on it made the gate reject a continuation tsv had placed correctly
+ * merely because prettier's own line was oddly indented (`\t {};`, a tab plus a
+ * stray space).
+ *
+ * @param hunk - The pure-re-indent hunk under test
+ * @param head - Our line immediately above it (the construct the comment split)
  */
-function is_one_level_deeper(hunk: DiffHunk): boolean {
-	for (let i = 0; i < hunk.removed_lines.length; i++) {
-		if (leading_ws(hunk.added_lines[i]) !== leading_ws(hunk.removed_lines[i]) + '\t') return false;
+function indents_one_level_below(hunk: DiffHunk, head: string): boolean {
+	const added = hunk.added_lines;
+	const removed = hunk.removed_lines;
+	if (added.length === 0) return false;
+
+	// The continuation's FIRST line lands exactly one level below the head.
+	const base = leading_ws(head) + '\t';
+	if (leading_ws(added[0]) !== base) return false;
+
+	// Every following line is re-rooted onto that base keeping its OWN relative
+	// depth. A continuation can be multi-line with internal structure — an
+	// intersection hangs its members a further level in — and tsv shifts the whole
+	// block, so requiring every line at `base` would reject the very case the
+	// pattern was originally written for.
+	const removed_base = leading_ws(removed[0]);
+	for (let i = 1; i < added.length; i++) {
+		const removed_ws = leading_ws(removed[i]);
+		if (!removed_ws.startsWith(removed_base)) return false;
+		if (leading_ws(added[i]) !== base + removed_ws.slice(removed_base.length)) return false;
 	}
 	return true;
 }
@@ -516,6 +539,75 @@ function lines_begin_same_element(a: string, b: string): boolean {
 function strip_all_ws(s: string): string {
 	return s.replace(/\s+/g, '');
 }
+
+/**
+ * Line indices in `lines` carrying a tsv-native `format-ignore` directive.
+ *
+ * Deliberately NOT the `prettier-ignore` family. Both spellings suppress
+ * formatting in tsv, but prettier honors only its own — so a `prettier-ignore`d
+ * construct is preserved by BOTH tools and produces no divergence at all. Only
+ * the tsv-native spelling explains one, which is what keeps this keyed on the
+ * actual cause rather than on "an ignore-ish comment is nearby".
+ */
+function format_ignore_directive_lines(lines: string[]): number[] {
+	// The trimmed-content match mirrors `tsv_lang::is_format_ignore_directive` and
+	// its two range siblings — the Rust side is the source of truth for the set.
+	const directive = /(?:\/\/|\/\*|<!--)\s*format-ignore(?:-start|-end)?\s*(?:\*\/|-->)?\s*$/;
+	const found: number[] = [];
+	for (let i = 0; i < lines.length; i++) if (directive.test(lines[i])) found.push(i);
+	return found;
+}
+
+const format_ignore_preserved: DivergencePattern = {
+	id: 'format_ignore_preserved',
+	description:
+		'tsv honors a `format-ignore` directive and emits the construct verbatim; prettier does not recognize it and reformats',
+	languages: ['typescript', 'css', 'svelte'],
+	conformance_sections: ['Format-ignore directive'],
+	fixtures: [
+		'typescript/syntax/comments/format_ignore_prettier_divergence',
+		'css/syntax/comments/format_ignore_prettier_divergence',
+		'svelte/syntax/format_ignore/basic_prettier_divergence',
+		'svelte/syntax/format_ignore/js_css_prettier_divergence',
+		'svelte/syntax/format_ignore/css_nested_prettier_divergence',
+		'svelte/syntax/format_ignore/css_atrule_decl_prettier_divergence',
+		'svelte/syntax/format_ignore/range_prettier_divergence',
+	],
+	detect(ctx) {
+		const ours_lines = ctx.ours_lines!;
+
+		// SAFETY GATE — the entire ours/prettier difference is whitespace-only, so no
+		// content can be lost: suppressing formatting provably only preserves the
+		// author's layout. A single non-whitespace difference anywhere (a dropped
+		// comment, a normalized quote, a real content change) fails the gate and
+		// disables the detector, so it can never mask a content loss. This is also
+		// what makes claiming a whole region sound rather than merely plausible — the
+		// same proof `inline_content_block_style` rests on.
+		if (strip_all_ws(ctx.ours) !== strip_all_ws(ctx.prettier)) return null;
+
+		// FAMILY SIGNATURE — an actual tsv-native directive, in our output.
+		const directives = format_ignore_directive_lines(ours_lines);
+		if (directives.length === 0) return null;
+
+		// Claim only hunks at or below the first directive. A divergence ABOVE every
+		// directive cannot have been caused by one, and leaving it unclaimed keeps the
+		// file `partial` — which is the honest verdict — instead of quietly absorbing
+		// an unrelated layout difference into `known`.
+		const first = directives[0];
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
+			const start = hunk.ours_range?.start;
+			return start != null && start >= first;
+		});
+
+		if (hunk_indices.length === 0) return null;
+		return {
+			pattern: 'format_ignore_preserved',
+			confidence: 'certain',
+			hunk_indices,
+			reason: 'construct preserved verbatim under a `format-ignore` directive prettier does not honor',
+		};
+	},
+};
 
 // ─── Pattern Detectors ──────────────────────────────────────────────────────
 //
@@ -1640,6 +1732,13 @@ const comment_preserved: DivergencePattern = {
 		'svelte/syntax/comments/expr_trailing_line_prettier_divergence',
 		'svelte/tags/debug/debug_comment_prettier_divergence',
 		'svelte/tags/debug/debug_comma_comment_prettier_divergence',
+		// Multi-line block comments — the shape the per-line pass cannot see, so these
+		// pin the joined path specifically.
+		'svelte/tags/debug/debug_multiline_comment_prettier_divergence',
+		'svelte/expression_tag/paren_multiline_comment_prettier_divergence',
+		'svelte/tags/html_render_paren_multiline_comment_prettier_divergence',
+		'svelte/directives/value_paren_multiline_comment_prettier_divergence',
+		'svelte/attributes/attach_spread_paren_multiline_comment_prettier_divergence',
 	],
 	// The "we preserve / Prettier DROPS a comment" family (◆content_preservation).
 	// `comment_position` deliberately can't claim these — its content guard requires
@@ -1673,7 +1772,31 @@ const comment_preserved: DivergencePattern = {
 				const a_joined = a_code + (i + 1 < added.length ? strip_code(added[i + 1]) : '');
 				if (removed_code.some((p) => p === a_code || p === a_joined)) return true;
 			}
-			return false;
+
+			// A comment prettier dropped may span SEVERAL of our lines, and then no
+			// single line carries a strippable `/* … */` at all — the opener sits on
+			// one line and the closer on the next, so the per-line pass above sees
+			// `{@debug /* c` and ` */ x}`, neither of which strips to anything. Join
+			// the whole hunk per side and compare once: the comment is then complete
+			// and strips cleanly.
+			//
+			// Prettier's side must carry NO comment, which is what makes this a DROP
+			// rather than a relocation — the per-line pass gets that guard for free by
+			// filtering commented lines out of `removed_code`, and joining loses it.
+			// Without it the joined compare also matches a comment prettier MOVED (both
+			// sides hold it, so the stripped code is equal either way) — e.g. an indexed
+			// access where prettier hoists the comment out of the brackets. That is a
+			// relocation for `comment_position` to claim, and claiming it here would be
+			// doubly wrong: this pattern declares `may_alter_char_frequency`, so a
+			// mis-claim can vouch a SAFETY differential, yet a relocation moves no chars
+			// at all and the "ours has MORE semantic chars" justification does not hold.
+			const removed_text = hunk.removed_lines.join('\n');
+			if (has_comment(removed_text)) return false;
+			const added_text = added.join('\n');
+			if (!has_comment(added_text)) return false;
+			const added_code = strip_code(added_text);
+			if (added_code === '') return false;
+			return added_code === strip_code(removed_text);
 		});
 
 		if (hunk_indices.length > 0) {
@@ -1795,6 +1918,7 @@ const forced_continuation_indent: DivergencePattern = {
 		'typescript/types/comments/annotation_continuation_indent_prettier_divergence',
 		'typescript/modules/imports/source_line_comment_prettier_divergence',
 		'typescript/modules/exports/source_line_comment_prettier_divergence',
+		'typescript/modules/exports/empty_no_from_line_comment_prettier_divergence',
 		'typescript/types/infer/keyword_line_comment_prettier_divergence',
 		'typescript/types/type_operator_keyword_line_comment_prettier_divergence',
 		'typescript/types/type_members/index_signature_key_colon_line_comment_prettier_divergence',
@@ -1812,12 +1936,13 @@ const forced_continuation_indent: DivergencePattern = {
 			// Indentation-only by construction, so claiming the hunk can never mask a
 			// content change — the whole basis for this detector being safe to widen.
 			if (!is_pure_reindent(hunk)) return false;
-			// "one level", as the rule states it: a different delta or the other
-			// direction is some other layout difference and stays unclaimed.
-			if (!is_one_level_deeper(hunk)) return false;
 			const start = hunk.ours_range?.start;
 			if (start == null || start === 0) return false;
-			const site = forced_continuation_site(ours_lines[start - 1] ?? '', hunk.added_lines[0]);
+			const head = ours_lines[start - 1] ?? '';
+			// "one level" below the head, as the rule states it: any other depth is a
+			// different layout difference and stays unclaimed.
+			if (!indents_one_level_below(hunk, head)) return false;
+			const site = forced_continuation_site(head, hunk.added_lines[0]);
 			if (site === null) return false;
 			sites.add(site);
 			return true;
@@ -2783,6 +2908,10 @@ export const PATTERNS: DivergencePattern[] = [
 	css_scss_directive_number,
 	css_selector_divergence,
 	css_comment_stable_quirk,
+
+	// Directive-driven suppression — the most specific signal there is (an explicit
+	// author directive), so it precedes every layout heuristic.
+	format_ignore_preserved,
 
 	// 3. Feature-specific patterns
 	template_literal_width,

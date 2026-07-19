@@ -486,9 +486,22 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
  */
 export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	svelte: 1,
-	typescript: 53,
+	typescript: 52,
 	css: 9,
 };
+// typescript 53→52 (2026-07-19, ../svelte b4d1583ae, ../kit da5b08ea7, ../svelte.dev c21c2d0,
+// ../prettier 1dcd0b0; svelte 1 + css 9 unchanged, SAFETY 0). `comment_preserved` now joins a
+// hunk's lines before stripping comments, so it sees a block comment prettier DROPPED that
+// spans several of our lines — per line, neither `{@debug /* c` nor ` */ x}` carries a
+// complete `/* … */` to strip. prettier/tests/format/js/comments/export.js moves
+// partial→known on exactly that shape. A whole-corpus before/after per-file bucket diff on
+// identical checkouts confirms one file moved: `unknown` byte-identical at 162 (nothing
+// masked), errors and SAFETY unchanged. The joined compare additionally requires prettier's
+// side of the hunk to carry NO comment — without that guard it also matched a comment
+// prettier merely RELOCATED, which moves no characters and would have let a pattern
+// declaring `may_alter_char_frequency` vouch a SAFETY differential it has no business
+// vouching (caught by the same bucket diff; `indexed_access_own_line_multiline_block_comment`
+// was the witness).
 // typescript 54→53 (2026-07-19, ../svelte b4d1583ae, ../kit da5b08ea7, ../svelte.dev c21c2d0,
 // ../prettier 1dcd0b0; svelte 1 + css 9 unchanged, SAFETY 0). `comment_position` now splits
 // the MERGED trailing-line-comment form prettier produces (`a // c1 // c2`), so

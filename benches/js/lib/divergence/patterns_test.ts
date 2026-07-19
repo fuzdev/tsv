@@ -1169,8 +1169,8 @@ Deno.test('forced_continuation_indent: negative - pure re-indent with no comment
 	assertEquals(match, null);
 });
 
-Deno.test('forced_continuation_indent: negative - indent delta is two levels, not one', () => {
-	// The rule indents "one level". A larger jump under an otherwise-matching header
+Deno.test('forced_continuation_indent: negative - our continuation is two levels below the head', () => {
+	// The rule indents "one level" below the construct head. A deeper continuation
 	// is some other layout difference and must not ride along.
 	const prettier = "import // c\n'a';";
 	const ours = "import // c\n\t\t'a';";
@@ -1179,13 +1179,27 @@ Deno.test('forced_continuation_indent: negative - indent delta is two levels, no
 	assertEquals(match, null);
 });
 
-Deno.test('forced_continuation_indent: negative - ours is shallower than prettier', () => {
-	// Opposite direction: prettier indents and tsv flattens. Not this rule.
-	const prettier = "import // c\n\t\t'a';";
-	const ours = "import // c\n\t'a';";
+Deno.test('forced_continuation_indent: positive - multi-line continuation shifts as a block', () => {
+	// An intersection hangs its members a further level in, so the continuation is
+	// multi-line with internal structure. tsv re-roots the whole block one level
+	// below the head; a rule demanding every line sit AT head+1 would reject the
+	// case the pattern was originally written for (and did, on real corpus files).
+	const prettier = 'elements: // c\n[string] &\n\t[string, B] &\n\t[string, B, C];';
+	const ours = 'elements: // c\n\t[string] &\n\t\t[string, B] &\n\t\t[string, B, C];';
 	const ctx = make_context(ours, prettier, 'typescript');
 	const match = run_pattern('forced_continuation_indent', ctx);
-	assertEquals(match, null);
+	assertNotEquals(match, null);
+});
+
+Deno.test('forced_continuation_indent: positive - depth is judged against the head, not prettier', () => {
+	// Prettier's own line is the DIVERGENCE, so it cannot also be the baseline. Here
+	// prettier emits a tab-plus-stray-space and ours sits exactly one level below the
+	// `export` head — the rule is satisfied, whatever prettier chose.
+	const prettier = 'export // c\n {};';
+	const ours = 'export // c\n\t{};';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertNotEquals(match, null);
 });
 
 Deno.test('forced_continuation_indent: negative - own-line comment above an unrelated re-indent', () => {
@@ -1208,6 +1222,75 @@ Deno.test('forced_continuation_indent: negative - content changed, not a pure re
 	const ours = 'type A = keyof // c\n\tC;';
 	const ctx = make_context(ours, prettier, 'typescript');
 	const match = run_pattern('forced_continuation_indent', ctx);
+	assertEquals(match, null);
+});
+
+// ─── format_ignore_preserved ────────────────────────────────────────────────
+
+Deno.test('format_ignore_preserved: positive - tsv keeps the ignored construct verbatim', () => {
+	const prettier = '// format-ignore\nconst a = { b: 1, c: 2 };';
+	const ours = '// format-ignore\nconst   a = {b:   1,   c:   2};';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('format_ignore_preserved', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('format_ignore_preserved: negative - `prettier-ignore` alone explains nothing', () => {
+	// Prettier honors its OWN directive, so a `prettier-ignore`d construct is
+	// preserved by both tools and cannot be the cause of a divergence. Claiming on
+	// any ignore-ish comment would excuse a real layout bug sitting next to one.
+	const prettier = '// prettier-ignore\nconst a = { b: 1, c: 2 };';
+	const ours = '// prettier-ignore\nconst   a = {b:   1,   c:   2};';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('format_ignore_preserved', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('format_ignore_preserved: negative - a real content change fails the safety gate', () => {
+	// Suppressing formatting can only preserve layout. A token that actually differs
+	// means something other than the directive is at work, and the whole-file
+	// whitespace-only proof is what refuses to claim it.
+	const prettier = '// format-ignore\nconst a = { b: 1 };';
+	const ours = '// format-ignore\nconst   a = {b:   2};';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('format_ignore_preserved', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('format_ignore_preserved: negative - divergence ABOVE every directive', () => {
+	// A hunk before the first directive cannot have been caused by one; leaving it
+	// unclaimed keeps the file honestly `partial`.
+	const prettier = 'const z = [1, 2];\n// format-ignore\nconst a = 1;';
+	const ours = 'const   z = [1,   2];\n// format-ignore\nconst a = 1;';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('format_ignore_preserved', ctx);
+	assertEquals(match, null);
+});
+
+// ─── comment_preserved ──────────────────────────────────────────────────────
+
+Deno.test('comment_preserved: positive - prettier drops a MULTI-LINE block comment', () => {
+	// The comment spans two of our lines, so neither carries a complete `/* … */`
+	// and the per-line pass sees nothing strippable. The joined compare is what
+	// claims it.
+	const prettier = '{@debug x}';
+	const ours = '{@debug /* c\n */ x}';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('comment_preserved', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('comment_preserved: negative - prettier RELOCATES the comment (not a drop)', () => {
+	// Both sides carry the comment — prettier hoisted it out of the brackets rather
+	// than dropping it. Stripping comments makes the two sides equal either way, so
+	// the joined compare would claim it without the "prettier's side has no comment"
+	// guard. It must not: this is a relocation for `comment_position`, it moves no
+	// characters, and `comment_preserved` declares `may_alter_char_frequency` — so a
+	// mis-claim here could vouch a SAFETY differential it has no business vouching.
+	const prettier = 'type X = A /* c\n\td */[K];';
+	const ours = 'type X =\n\tA[/* c\n\td */\n\tK];';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('comment_preserved', ctx);
 	assertEquals(match, null);
 });
 
