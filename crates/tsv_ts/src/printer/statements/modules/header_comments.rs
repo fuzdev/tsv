@@ -102,10 +102,13 @@ impl<'a> Printer<'a> {
     /// leading space — for callers whose preceding token already ends in a space
     /// (`import `, `export `, `type `). A *line* comment in `[start, end)` ends
     /// with a hardline, so the continuation is wrapped in `indent` to read as a
-    /// statement continuation rather than a second statement; a block comment
-    /// trails inline (` /* c */ `); an empty range yields the continuation
-    /// unchanged. The forced hardline is the only thing the `indent` shifts —
-    /// the comment itself stays on the preceding token's line.
+    /// statement continuation rather than a second statement; a *multiline* block
+    /// keeps the author's layout; a *single-line* block trails inline
+    /// (` /* c */ `) from **any** authored position — glued, trailing the head, or
+    /// on its own line — because nothing forces it off the line, so the author's
+    /// break is ordinary layout and is reflowed. An empty range yields the
+    /// continuation unchanged. The forced hardline is the only thing the `indent`
+    /// shifts — the comment itself stays on the preceding token's line.
     ///
     /// Used for the keyword→`{`, `type`→`{`, keyword→`type`, `*`→`as`, and
     /// keyword→empty-`{}` header gaps (whose continuation rides the space already
@@ -118,12 +121,41 @@ impl<'a> Printer<'a> {
         continuation: DocId,
     ) -> DocId {
         let d = self.d();
-        match self.build_rhs_comments_opt(start, end) {
-            // Line comment: it ends with a hardline, so indent the continuation.
-            Some(c) if self.has_line_comments_between(start, end) => {
-                d.indent(d.concat(&[c, continuation]))
-            }
-            // Block comment: trails inline (its own trailing space), no break.
+        // Line comment: it ends with a hardline, so indent the continuation.
+        if self.has_line_comments_between(start, end) {
+            return match self.build_rhs_comments_opt(start, end) {
+                Some(c) => d.indent(d.concat(&[c, continuation])),
+                None => continuation,
+            };
+        }
+        // A multiline block breaks here rather than staying inline — this gap's
+        // deliberate difference from its `build_keyword_to_name_continuation` twin.
+        // The author broke after it and reflowing would swallow the `*/` line into
+        // the header, so the break is forced; the continuation is therefore indented
+        // one level, exactly as the line-comment branch above does and as every value
+        // gap does for a multiline block (`const x =⏎\t/* x⏎y */⏎\t1;`). See
+        // conformance_prettier.md §Uniform Forced-Continuation Indent. The comment's
+        // own interior lines stay flush — a comment body is never re-indented.
+        if self.has_multiline_block_comments_on_page_between(start, end) {
+            return match self.build_rhs_comments_opt(start, end) {
+                Some(c) => d.indent(d.concat(&[c, continuation])),
+                None => continuation,
+            };
+        }
+        // A single-line block, in ANY authored position — glued, trailing the head,
+        // or on its own line. Nothing forces it off the line, so it trails inline and
+        // the author's break is reflowed: the shared keyword→value rule
+        // (`comment_hangs_next`), which a module header gap follows like its
+        // `export default` / `export =` siblings. See conformance_prettier.md
+        // §Authored breaks in value position.
+        //
+        // ⚠️ Emitting this through `build_rhs_comments_opt` instead reads as the
+        // obvious code and is the bug it replaced: that builder picks each separator
+        // from the comment's AUTHORED position, so an own-line comment kept a
+        // hardline while the concat glued it to the head token. The result — comment
+        // pulled up, break kept — is the glued authoring, which reflows inline on the
+        // next pass, so the format was not idempotent on its own output.
+        match self.build_inline_comments_between_doc_trailing_space_opt(start, end) {
             Some(c) => d.concat(&[c, continuation]),
             None => continuation,
         }

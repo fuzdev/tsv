@@ -1,0 +1,443 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 294,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " specifiers→from gap: block comment reflows inline",
+			"start": 20,
+			"end": 72,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 53
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 87,
+			"end": 94,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 14
+				},
+				"end": {
+					"line": 3,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " keyword→brace gap: block comment reflows inline",
+			"start": 109,
+			"end": 159,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 168,
+			"end": 175,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 8
+				},
+				"end": {
+					"line": 6,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " default binding→from gap: block comment reflows inline",
+			"start": 196,
+			"end": 253,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 58
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 264,
+			"end": 271,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 10
+				},
+				"end": {
+					"line": 9,
+					"column": 17
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 293,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 284,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 10,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ImportDeclaration",
+					"start": 74,
+					"end": 106,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 33
+						}
+					},
+					"importKind": "value",
+					"specifiers": [
+						{
+							"type": "ImportSpecifier",
+							"start": 83,
+							"end": 84,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 10
+								},
+								"end": {
+									"line": 3,
+									"column": 11
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 83,
+								"end": 84,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 10
+									},
+									"end": {
+										"line": 3,
+										"column": 11
+									}
+								},
+								"name": "a"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 83,
+								"end": 84,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 10
+									},
+									"end": {
+										"line": 3,
+										"column": 11
+									}
+								},
+								"name": "a"
+							},
+							"importKind": "value"
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 100,
+						"end": 105,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 27
+							},
+							"end": {
+								"line": 3,
+								"column": 32
+							}
+						},
+						"value": "./a",
+						"raw": "'./a'",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 87,
+								"end": 94
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " specifiers→from gap: block comment reflows inline",
+							"start": 20,
+							"end": 72
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 161,
+					"end": 193,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 33
+						}
+					},
+					"importKind": "value",
+					"specifiers": [
+						{
+							"type": "ImportSpecifier",
+							"start": 178,
+							"end": 179,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 18
+								},
+								"end": {
+									"line": 6,
+									"column": 19
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 178,
+								"end": 179,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 18
+									},
+									"end": {
+										"line": 6,
+										"column": 19
+									}
+								},
+								"name": "b"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 178,
+								"end": 179,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 18
+									},
+									"end": {
+										"line": 6,
+										"column": 19
+									}
+								},
+								"name": "b"
+							},
+							"importKind": "value",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 168,
+									"end": 175
+								}
+							]
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 187,
+						"end": 192,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 27
+							},
+							"end": {
+								"line": 6,
+								"column": 32
+							}
+						},
+						"value": "./b",
+						"raw": "'./b'"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " keyword→brace gap: block comment reflows inline",
+							"start": 109,
+							"end": 159
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 255,
+					"end": 283,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 29
+						}
+					},
+					"importKind": "value",
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 262,
+							"end": 263,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 8
+								},
+								"end": {
+									"line": 9,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 262,
+								"end": 263,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 8
+									},
+									"end": {
+										"line": 9,
+										"column": 9
+									}
+								},
+								"name": "c"
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 264,
+									"end": 271
+								}
+							]
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 277,
+						"end": 282,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 23
+							},
+							"end": {
+								"line": 9,
+								"column": 28
+							}
+						},
+						"value": "./c",
+						"raw": "'./c'"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " default binding→from gap: block comment reflows inline",
+							"start": 196,
+							"end": 253
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
