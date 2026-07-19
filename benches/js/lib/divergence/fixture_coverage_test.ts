@@ -1,47 +1,17 @@
 /**
  * Behavioral fixture-coverage audit for divergence patterns.
  *
- * `validation.ts` only cross-references each pattern's hand-maintained
- * `fixtures: []` array against `conformance_prettier.md` — it never runs
- * `detect()` against the real fixtures. A pattern that silently stopped
- * matching its claimed fixture keeps that static audit green. This test closes
- * that drift gap by exercising every detector against its own committed
+ * `validation.ts`'s bookkeeping half cross-references each pattern's
+ * hand-maintained `fixtures: []` array against `conformance_prettier.md` — it
+ * never runs `detect()` for THAT question. A pattern that silently stopped
+ * matching its claimed fixture keeps that cross-reference green. This test
+ * closes the drift gap by exercising every detector against its own committed
  * fixtures.
  *
- * Key insight: for a `_prettier_divergence` fixture the committed `input.*`
- * file IS our formatter's output (our formatter is idempotent — input formats
- * to itself). So whenever a committed file pins what *prettier* produces, the
- * pair (ours = input, prettier = that file) is a real divergence the detector
- * must claim — and we can drive it from the committed files alone, with no
- * build and no sidecar.
- *
- * Three committed files can pin a prettier form. They are a PRECEDENCE chain,
- * not a union (see `build_cases`) — each rung is used only when the rung above
- * it is absent:
- *
- * 1. `output_prettier.*` — prettier's output on `input` directly. The canonical
- *    witness, and the only one whose diff against `input` isolates the
- *    fixture's own divergence.
- * 2. every `prettier_variant_*` — a form prettier keeps stable (validator rule
- *    N1) and ours maps to `input` (N2). Prettier's output for THAT authoring,
- *    so the pair is real — but the authoring carries its own quirks (an
- *    intentionally space-mangled variant diffs against `input` on whitespace as
- *    well as on the divergence), which is why these stand in only when there is
- *    no `output_prettier.*` to ask instead.
- * 3. every `prettier_intermediate_*` — prettier's FIRST-pass output on an
- *    `unformatted_ours_*` authoring. It is unstable (a second prettier pass
- *    moves it), but the corpus comparison runs prettier exactly once, so this
- *    is precisely the prettier side a corpus divergence is computed from.
- * 4. every `divergent_variant_*` — a form prettier keeps stable that ours
- *    rewrites to a distinct third form. Prettier's output on the fixture's
- *    `unformatted_ours_*` authoring, stated outright rather than inferred.
- * 5. the N10 fallback, when none of the above exists: a fixture with
- *    `unformatted_ours_*` files and exactly ONE documented stable form
- *    (`variant_*`). N6 pins `prettier(unformatted_ours_X) != input` and N10
- *    pins it to one of the fixture's documented stable forms — with exactly
- *    one such form, that IS prettier's output, so (ours = input,
- *    prettier = the variant) is pinned. Ambiguous with 2+ stable forms, so
- *    those fixtures yield no case rather than a guessed one.
+ * The machinery — how a fixture's committed files pin a (ours, prettier) pair,
+ * and the precedence chain among them — lives in `fixture_cases.ts`, shared
+ * with the audit's empirical coverage pass. This file is the per-pattern
+ * assertion built on it, plus the unit tests pinning that machinery.
  *
  * The assertion is COVERAGE, not per-witness exhaustiveness: a fixture passes
  * when at least one of its cases is claimed. Requiring every case would assert
@@ -57,15 +27,14 @@
  */
 
 import { ok as assert } from 'node:assert';
-import { diff_lines, extract_hunks } from '../diff.ts';
-import { type DetectionContext, enrich_detection_context, PATTERNS } from './patterns.ts';
-import { fixture_dir_exists } from './validation.ts';
-import type { Language } from '../types.ts';
-
-const FIXTURES_ROOT = new URL('../../../../tests/fixtures/', import.meta.url);
-
-/** Candidate input filenames, in resolution order. */
-const INPUT_NAMES = ['input.svelte', 'input.svelte.ts', 'input.ts', 'input.css'];
+import { detect_divergences, PATTERNS } from './patterns.ts';
+import {
+	build_cases,
+	build_context,
+	fixture_dir_exists,
+	type FixtureIo,
+	select_witnesses,
+} from './fixture_cases.ts';
 
 /**
  * Acknowledged ratchet exceptions: (pattern, fixture) pairs where the detector
@@ -86,21 +55,6 @@ const INPUT_NAMES = ['input.svelte', 'input.svelte.ts', 'input.ts', 'input.css']
 const PRE_EXISTING_DRIFT = new Set<string>([]);
 
 /**
- * Read a file, returning null only when it genuinely does not exist. Any other
- * error (notably a permission error) re-throws — a denied read must never be
- * mistaken for a missing fixture file, which would silently hollow out the
- * audit. The suite gates on read permission up front (see `has_read_access`).
- */
-async function read_if_exists(url: URL): Promise<string | null> {
-	try {
-		return await Deno.readTextFile(url);
-	} catch (err) {
-		if (err instanceof Deno.errors.NotFound) return null;
-		throw err;
-	}
-}
-
-/**
  * Whether the runner granted `--allow-read`. The wired `test:deno` task grants it,
  * so the audit runs. If you invoke `deno test` manually without `--allow-read`,
  * every test announces (loudly) that it was skipped for lack of read access rather
@@ -110,225 +64,6 @@ async function read_if_exists(url: URL): Promise<string | null> {
 async function has_read_access(): Promise<boolean> {
 	const status = await Deno.permissions.query({ name: 'read' });
 	return status.state === 'granted';
-}
-
-function language_of(input_name: string): Language {
-	if (input_name.endsWith('.css')) return 'css';
-	if (input_name.endsWith('.svelte.ts')) return 'typescript';
-	if (input_name.endsWith('.ts')) return 'typescript';
-	return 'svelte';
-}
-
-/**
- * The extension an input filename carries, as the variant files in the same
- * fixture spell it. Matched with a full-suffix `endsWith`, so `.svelte` and
- * `.svelte.ts` fixtures never claim each other's variants.
- */
-function extension_of(input_name: string): string {
-	return input_name.slice('input'.length);
-}
-
-/** One (ours, prettier) pairing a fixture pins, and the file that pins it. */
-interface DetectionCase {
-	/** The committed file this pairing came from — named in failure messages. */
-	label: string;
-	source: string;
-	ours: string;
-	prettier: string;
-	language: Language;
-}
-
-/**
- * The filesystem surface case assembly needs.
- *
- * Injected rather than called directly so the assembly — which witness content
- * lands in `source` vs `ours` vs `prettier` — is testable from an in-memory
- * fixture. The suite runs `--allow-read` only (deliberately: it must never be
- * able to mutate the tree it audits), so a temp-directory fixture is not an
- * option, and coupling the test to real fixture directories would make it
- * brittle against exactly the renames this audit exists to catch.
- */
-interface FixtureIo {
-	/** Filenames directly inside the fixture directory; empty when it is absent. */
-	list: (fixture_path: string) => Promise<string[]>;
-	/** File content, or null when the file does not exist. */
-	read: (fixture_path: string, name: string) => Promise<string | null>;
-}
-
-/** The real filesystem, rooted at `tests/fixtures/`. */
-const disk_io: FixtureIo = {
-	list: async (fixture_path) => {
-		const names: string[] = [];
-		try {
-			for await (const entry of Deno.readDir(new URL(fixture_path + '/', FIXTURES_ROOT))) {
-				if (entry.isFile) names.push(entry.name);
-			}
-		} catch (err) {
-			if (err instanceof Deno.errors.NotFound) return names;
-			throw err;
-		}
-		return names.sort();
-	},
-	read: (fixture_path, name) => read_if_exists(new URL(name, new URL(fixture_path + '/', FIXTURES_ROOT))),
-};
-
-/** Which rung of the precedence chain supplied a fixture's witnesses. */
-type WitnessRung =
-	| 'output_prettier'
-	| 'prettier_variant'
-	| 'prettier_intermediate'
-	| 'divergent_variant'
-	| 'n10'
-	| 'none';
-
-/** One witness: the file holding prettier's output, and the authoring it came from. */
-interface Witness {
-	/** File whose CONTENT is prettier's output. */
-	prettier_file: string;
-	/**
-	 * File whose content is the `source` of the pairing. `null` means `input`
-	 * itself; `prettier_variant` uses the variant (prettier's own fixed point),
-	 * and the N10 rung uses the `unformatted_ours_*` authoring being normalized.
-	 */
-	source_file: string | null;
-	/** Label for failure messages. */
-	label: string;
-}
-
-/**
- * Pick a fixture's prettier witnesses from its directory listing — the whole
- * precedence chain, as a pure function of the filenames.
- *
- * Split out from the IO so the rung selection is directly testable; the reading
- * of the chosen files is the caller's job. See the module doc for why the rungs
- * are a precedence chain rather than a union.
- */
-export function select_witnesses(
-	names: string[],
-	ext: string,
-): { rung: WitnessRung; witnesses: Witness[] } {
-	const matching = (prefix: string): string[] =>
-		names.filter((n) => n.startsWith(prefix) && n.endsWith(ext)).sort();
-
-	// Rung 1 — prettier's output on `input` itself.
-	const canonical = matching('output_prettier');
-	if (canonical.length > 0) {
-		return {
-			rung: 'output_prettier',
-			witnesses: canonical.map((n) => ({ prettier_file: n, source_file: null, label: n })),
-		};
-	}
-
-	// Rung 2 — every authoring prettier keeps stable and ours maps to `input`.
-	// The variant is its OWN source: prettier's fixed point for that authoring.
-	const variants = matching('prettier_variant_');
-	if (variants.length > 0) {
-		return {
-			rung: 'prettier_variant',
-			witnesses: variants.map((n) => ({ prettier_file: n, source_file: n, label: n })),
-		};
-	}
-
-	// Rung 3 — prettier's first-pass output, which is what the single-pass
-	// corpus comparison sees even though a second pass would move it.
-	const intermediates = matching('prettier_intermediate_');
-	if (intermediates.length > 0) {
-		return {
-			rung: 'prettier_intermediate',
-			witnesses: intermediates.map((n) => ({ prettier_file: n, source_file: null, label: n })),
-		};
-	}
-
-	// Rung 4 — a form prettier keeps stable that ours rewrites to a third form.
-	// Prettier's output on the fixture's `unformatted_ours_*` authoring stated
-	// outright, so it outranks the inference below.
-	const divergent = matching('divergent_variant_');
-	if (divergent.length > 0) {
-		return {
-			rung: 'divergent_variant',
-			witnesses: divergent.map((n) => ({ prettier_file: n, source_file: null, label: n })),
-		};
-	}
-
-	// Rung 5 — the N10 inference. Only sound with exactly ONE documented stable
-	// form: N6 pins prettier's output off `input`, N10 pins it INTO the fixture's
-	// stable-form set, so a single-element set identifies it. Two or more and the
-	// pairing would be a guess, so the fixture yields nothing instead.
-	// `divergent_variant_*` is deliberately excluded from `variant_` here — the
-	// `startsWith` prefix does not match it, and rung 4 already claimed it.
-	const stable = matching('variant_');
-	const unformatted_ours = matching('unformatted_ours_');
-	if (stable.length === 1 && unformatted_ours.length > 0) {
-		return {
-			rung: 'n10',
-			witnesses: [
-				{
-					prettier_file: stable[0],
-					source_file: unformatted_ours[0],
-					label: `${stable[0]} (via ${unformatted_ours[0]}, N10)`,
-				},
-			],
-		};
-	}
-
-	return { rung: 'none', witnesses: [] };
-}
-
-/**
- * The detection cases a fixture pins. Returns `'no_input'` when the directory
- * holds no `input.*` at all.
- */
-export async function build_cases(
-	fixture_path: string,
-	io: FixtureIo = disk_io,
-): Promise<DetectionCase[] | 'no_input'> {
-	let input_name: string | null = null;
-	let input: string | null = null;
-	for (const name of INPUT_NAMES) {
-		const content = await io.read(fixture_path, name);
-		if (content !== null) {
-			input_name = name;
-			input = content;
-			break;
-		}
-	}
-	if (input_name === null || input === null) return 'no_input';
-
-	const language = language_of(input_name);
-	const read = async (name: string): Promise<string> => {
-		const content = await io.read(fixture_path, name);
-		assert(content !== null, `${fixture_path}/${name} vanished between listing and read`);
-		return content;
-	};
-
-	const { witnesses } = select_witnesses(await io.list(fixture_path), extension_of(input_name));
-	const cases: DetectionCase[] = [];
-	for (const w of witnesses) {
-		cases.push({
-			label: w.label,
-			source: w.source_file === null ? input : await read(w.source_file),
-			ours: input,
-			prettier: await read(w.prettier_file),
-			language,
-		});
-	}
-	return cases;
-}
-
-/** Build the detection context the way `make_context` does. */
-function build_context(detection_case: DetectionCase): DetectionContext {
-	const diff = diff_lines(detection_case.prettier, detection_case.ours);
-	const hunks = extract_hunks(diff);
-	const ctx: DetectionContext = {
-		source: detection_case.source,
-		ours: detection_case.ours,
-		prettier: detection_case.prettier,
-		diff,
-		hunks,
-		language: detection_case.language,
-	};
-	enrich_detection_context(ctx);
-	return ctx;
 }
 
 // ── Witness selection (pure; no fixtures on disk involved) ──────────────────
@@ -530,6 +265,118 @@ Deno.test('assembly: input resolution order prefers .svelte over .svelte.ts', as
 		}),
 	);
 	assert(cases !== 'no_input' && cases[0].ours === 'SVELTE');
+});
+
+/**
+ * Listed fixtures whose hunks the pattern set explains only PARTLY, with the
+ * hunk count left over and what the shortfall is.
+ *
+ * A ratchet, in this repo's usual shape: every entry is a known gap, the file
+ * shrinking is the goal, and it mirrors the live set exactly — a listed fixture
+ * that goes partial without an entry FAILS, and an entry that no longer fires
+ * FAILS too (delete it; the detector was widened).
+ *
+ * These are not mystery divergences. In every case a pattern DOES explain the
+ * fixture's divergence and leaves an adjacent hunk unclaimed — the diff splits
+ * one logical change across hunk boundaries (a dangling `) {` line), or the
+ * detector claims some instances of a repeated divergence but not all (the CSS
+ * `||` fixture pins four identical combinators; the pattern claims three).
+ * They matter because the corpus classifies by the same rule: such a file lands
+ * in the pinned `partial` bucket rather than `known`, so closing one of these
+ * is a real corpus-triage win. See `docs/divergence_detector.md` §Pending work.
+ */
+const KNOWN_PARTIAL: Record<string, string> = {
+	// detector claims 3 of 4 identical `||` combinator hunks; misses the compound-selector one
+	'css/selectors/combinators/column_prettier_divergence': '1 hunk',
+	'css/at_rules/container_spacing_prettier_divergence': '2 hunks',
+	// the `{#…}` head reflow splits across hunks; short_expr_100/fill_101_boundary claim the heads
+	'svelte/blocks/await/long_prettier_divergence': '2 hunks',
+	'svelte/blocks/each/long_prettier_divergence': '2 hunks',
+	'svelte/blocks/if/long_prettier_divergence': '3 hunks',
+	'svelte/blocks/key/long_prettier_divergence': '2 hunks',
+	'svelte/syntax/comments/expr_trailing_line_prettier_divergence': '1 hunk',
+	// comment_position claims the comment hunk, not the reflow tail it sits in
+	'typescript/expressions/calls/chained/trailing_member_comment_prettier_divergence': '2 hunks',
+	'typescript/modules/exports/all_namespace_keyword_comment_prettier_divergence': '1 hunk',
+	'typescript/modules/imports/default_keyword_comment_prettier_divergence': '2 hunks',
+	'typescript/modules/imports/namespace_keyword_comment_prettier_divergence': '2 hunks',
+	'typescript/statements/switch/case_block_comment_prettier_divergence': '1 hunk',
+	'typescript/statements/switch/discriminant_trailing_comment_prettier_divergence': '1 hunk',
+	'typescript/statements/switch/empty_comment_prettier_divergence': '1 hunk',
+};
+
+/**
+ * Every listed fixture must be FULLY explained by the pattern set.
+ *
+ * Separate from the per-pattern tests above, and necessarily so: `all_explained`
+ * is a set-cover across ALL patterns (two patterns may jointly explain one
+ * fixture), so it cannot be asserted per pattern without distorting the
+ * per-pattern question, which is only "does this detector still claim its own
+ * fixture?".
+ *
+ * Why this is a stronger bar than that per-pattern one: "claims a hunk" cannot
+ * see a hunk left over. Fourteen listed fixtures were partial when this gate was
+ * added, sitting inside the curated assertions undetected — the same masking the
+ * hunk-aware classifier exists to prevent (a file with one explained and one
+ * unexplained hunk is `partial`, not `known`), one level up.
+ */
+Deno.test('fixture coverage: every listed fixture is FULLY explained', async () => {
+	if (!(await has_read_access())) {
+		console.warn('[fixture coverage] SKIPPED full-coverage check: no --allow-read');
+		return;
+	}
+
+	const listed = new Set<string>();
+	for (const pattern of PATTERNS) for (const f of pattern.fixtures ?? []) listed.add(f);
+
+	const newly_partial: string[] = [];
+	const still_partial = new Set<string>();
+	for (const fixture_path of [...listed].sort()) {
+		const cases = await build_cases(fixture_path);
+		// A path with no directory / no input, or one pinning no prettier form, is
+		// the other tests' business — silence here rather than double-reporting.
+		if (cases === 'no_input' || cases.length === 0) continue;
+
+		// Coverage across witnesses: the best classification wins, since sibling
+		// variants exercise different authorings and a variant's own quirks can add
+		// hunks the fixture's divergence never meant to pin.
+		let best = 'none_explained';
+		let unexplained = 0;
+		for (const detection_case of cases) {
+			const result = detect_divergences(build_context(detection_case));
+			if (result.classification === 'all_explained') {
+				best = 'all_explained';
+				break;
+			}
+			if (result.classification === 'partial' && best === 'none_explained') {
+				best = 'partial';
+				unexplained = result.unexplained_hunks.length;
+			}
+		}
+		if (best === 'all_explained') continue;
+
+		if (fixture_path in KNOWN_PARTIAL) still_partial.add(fixture_path);
+		else if (best === 'partial') {
+			newly_partial.push(`${fixture_path}  (${unexplained} hunk(s) unexplained)`);
+		}
+		// `none_explained` is the per-pattern tests' failure to report, not this one's.
+	}
+
+	assert(
+		newly_partial.length === 0,
+		`${newly_partial.length} listed fixture(s) went PARTIAL — a pattern claims some hunks ` +
+			`and leaves others unexplained, which the per-pattern "claims a hunk" bar cannot see. ` +
+			`Widen the detector, or add a KNOWN_PARTIAL entry with the reason:\n  ` +
+			newly_partial.join('\n  '),
+	);
+
+	const stale = Object.keys(KNOWN_PARTIAL).filter((f) => !still_partial.has(f));
+	assert(
+		stale.length === 0,
+		`${stale.length} KNOWN_PARTIAL entr(ies) no longer fire — the fixture is now fully ` +
+			`explained (or no longer listed). Delete them; the ratchet must mirror the live set:\n  ` +
+			stale.join('\n  '),
+	);
 });
 
 /**
