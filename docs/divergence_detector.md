@@ -36,11 +36,37 @@ This prevents masking: if a file has two hunks and only one is explained by a kn
 - **`partial`** → `partial_divergence`: Some hunks explained, some not (needs investigation)
 - **`none_explained`** → `unknown_diff`: No hunks explained by any pattern
 
-When a file also has a **safety violation** (real data loss vs prettier), it is only
-reclassified to `known_divergence` if every hunk is explained — and the patterns that
-explain it carry their own content guards (e.g. `comment_position` requires the comment
-to exist as a whole line in both outputs), so a dropped-content hunk cannot be silently
-absorbed. See `corpus_compare_format.ts` and the safety section below.
+When a file also has a **safety violation** (real data loss vs prettier), reclassification
+to `known_divergence` requires **`safety_vouched`**, which is stricter than
+`all_explained`:
+
+1. every hunk is explained (as above), **and**
+2. every **char-risky** hunk — one whose own added/removed lines move the semantic
+   character count (`hunk_alters_semantic_chars`, using the same folding/exclusion rules
+   as the whole-file check) — is claimed by a pattern that declares
+   `may_alter_char_frequency`.
+
+The second condition exists because `all_explained` is a *set-cover over hunk indices*: it
+cannot distinguish the hunk that carried the flagged characters from one that merely sits
+in the same file. On `prettier/tests/format/html/tags/tags.html` the entire char delta comes
+from three `<i … />` → `<i …></i>` expansions in one hunk, yet two unrelated
+boundary-whitespace hunks were equally load-bearing for the downgrade — a change to the
+pattern claiming *those* would have flipped the file into the gated `safety_violation`
+bucket with no formatter change at all. Scoring each hunk on its own lines restores the
+causal link: a whitespace-only hunk is never char-risky, so it can neither vouch nor, by
+regressing, collapse the verdict.
+
+`may_alter_char_frequency` is opt-in and defaults to `false`, so the gate **fails closed** —
+a pattern that has not answered the question cannot excuse content loss, and a new pattern
+is safe by omission. Declaring it is a promise that the pattern's own `detect` carries a
+content-preservation proof; the current set is `bom_strip` (byte-exact BOM prefix test),
+`self_closing_nonvoid` (matching tag names on both sides), `comment_preserved` (the comment
+text must appear in ours), and `css_scss_directive_number` (identical non-numeric skeleton
+*plus* equal numeric-token counts, so a number may be re-spelled but never dropped). A
+pattern that legitimately changes char counts without declaring it surfaces loudly as a
+SAFETY failure the first time it fires — which is the intended way to discover one.
+
+See `corpus_compare_format.ts` and the safety section below.
 
 ### DiffHunk Type
 

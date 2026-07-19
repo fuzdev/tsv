@@ -123,6 +123,11 @@ Native builds will be published with v0.2, for v0.1 only WASM builds are publish
     and there are no config files or CLI options for formatting style;
     i.e. `tsv format` is opinionated like `gofmt`, `zig fmt`, and Python's Black,
     see [CLAUDE.md § Configuration](CLAUDE.md#configuration)
+  - `<svelte:options preserveWhitespace />` is not detected: whitespace handling
+    is uniform (only `<pre>`/`<textarea>` content is whitespace-sensitive), any
+    reformatting under that option is already render-visible, and prettier
+    behaves the same — see
+    [docs/conformance_svelte.md § Template Whitespace](docs/conformance_svelte.md#template-whitespace-clean_nodes)
   - pushes complexity and mess to the printer and JSON conversion,
     out of the parser and internal AST,
     keeping the model clean for the other planned tools

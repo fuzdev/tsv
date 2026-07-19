@@ -1,18 +1,18 @@
 {#snippet  fn1(  a  =  'default'  )  }
 	<span  >{  a  }</span>
-{/snippet}
+{/snippet }
 
 {#snippet  fn2(  { a ,  b }  )  }
 	<span  >{  a  }  {  b  }</span>
-{/snippet}
+{/snippet }
 
 {#snippet  fn3(  [ a ,  b ]  )  }
 	<span  >{  a  }  {  b  }</span>
-{/snippet}
+{/snippet }
 
 {#snippet  fn4(  { a  =  1 }  )  }
 	<span  >{  a  }</span>
-{/snippet}
+{/snippet }
 
 {@render  fn1(  )  }
 {@render  fn2(  { a :  1 ,  b :  2 }  )  }

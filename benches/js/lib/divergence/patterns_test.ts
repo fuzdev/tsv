@@ -13,6 +13,7 @@ import { diff_lines, extract_hunks } from '../diff.ts';
 import {
 	type DetectionContext,
 	type DivergenceMatch,
+	detect_divergences,
 	enrich_detection_context,
 	PATTERNS,
 } from './patterns.ts';
@@ -1562,4 +1563,63 @@ Deno.test('css_scss_directive_number: negative - dropped numeric value not claim
 	const ctx = make_context(ours, prettier, 'svelte');
 	const match = run_pattern('css_scss_directive_number', ctx);
 	assertEquals(match, null);
+});
+
+// ─── hunk-scoped SAFETY vouching ───────────────────────────────────────────
+//
+// `safety_vouched` is deliberately stricter than `classification === 'all_explained'`:
+// a SAFETY differential may only be excused by a pattern that declared it can change
+// semantic char counts, AND only for the hunks that actually carry such a change.
+// Before this, any pattern covering any hunk propped up the downgrade — on
+// `prettier/tests/format/html/tags/tags.html` two unrelated whitespace hunks were
+// load-bearing for a delta caused entirely by a third.
+
+Deno.test('safety_vouched: a char-risky hunk claimed only by a NON-vouching pattern is not vouched', () => {
+	// `comment_position` does not declare `may_alter_char_frequency` (it relocates a
+	// comment, it does not add or drop content), so it cannot excuse a char delta.
+	const prettier = '<div>\n\t<!-- c -->\n\t<span>a</span>\n</div>';
+	const ours = '<div>\n\t<span>a</span>\n\t<!-- c -->\n</div>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const coverage = detect_divergences(ctx);
+	// Whatever it claims, no vouching pattern exists here, so any char-risky hunk
+	// leaves the coverage unvouched.
+	if (coverage.char_risky_hunks.length > 0) {
+		assertEquals(coverage.safety_vouched, false);
+	}
+});
+
+Deno.test('safety_vouched: a whitespace-only hunk is never char-risky, so it need not vouch', () => {
+	// Reflowing whitespace cannot move the semantic char count, so such a hunk is
+	// excluded from the vouching requirement entirely — which is the whole point:
+	// it can no longer prop up (or, by regressing, collapse) a SAFETY downgrade.
+	const prettier = '<div>\n\t<span>a</span>\n</div>';
+	const ours = '<div>\n  <span>a</span>\n</div>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const coverage = detect_divergences(ctx);
+	assertEquals(coverage.char_risky_hunks, []);
+});
+
+Deno.test('safety_vouched: self_closing_nonvoid vouches for the hunk carrying its own char delta', () => {
+	// `<i />` → `<i></i>` adds `<`, `/`, `>` and the tag name — a real char delta, and
+	// exactly the tags.html case. The pattern declares `may_alter_char_frequency`, so
+	// it may vouch for the hunk it claims.
+	const prettier = '<div>\n\t<i class="x" />\n</div>';
+	const ours = '<div>\n\t<i class="x"></i>\n</div>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const coverage = detect_divergences(ctx);
+	assertEquals(coverage.char_risky_hunks.length > 0, true);
+	assertEquals(coverage.safety_vouched, true);
+});
+
+Deno.test('may_alter_char_frequency: only deliberately-declared patterns may vouch', () => {
+	// The declaration is a promise that the pattern's detect carries a
+	// content-preservation proof. Keep the set small and reviewed — a new pattern is
+	// safe by omission (the field defaults to false, so the gate fails CLOSED).
+	const vouching = PATTERNS.filter((p) => p.may_alter_char_frequency).map((p) => p.id).sort();
+	assertEquals(vouching, [
+		'bom_strip',
+		'comment_preserved',
+		'css_scss_directive_number',
+		'self_closing_nonvoid',
+	]);
 });
