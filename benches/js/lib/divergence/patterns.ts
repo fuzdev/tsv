@@ -1785,6 +1785,78 @@ const inline_content_block_style: DivergencePattern = {
 	},
 };
 
+/**
+ * The whitespace class `svelte_boundary_ws_trim`'s collapse-equality erases: FRAGMENT-EDGE
+ * runs only, mirroring the compiler's `clean_nodes` (which deletes every fragment-edge run
+ * at compile). Inter-sibling runs are deliberately NOT erased — Svelte collapses those to
+ * one space, they never vanish, so a formatter deleting one changes the render and must
+ * fail the equality rather than be claimed as the sanctioned trim.
+ */
+/** Void elements have no content fragment, so a run after their tag is inter-sibling. */
+const VOID_ELEMENTS = 'area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr';
+/**
+ * After a non-void, non-self-closed element/component open tag — content start. The tag
+ * body tolerates `>` inside quoted attribute values (`title="a > b"`) and inside braced
+ * expressions up to one nesting level (`onclick={() => (x = !x)}` — arrow handlers are
+ * ubiquitous in Svelte). Deeper brace nesting or a `<` in an attr fails the lookbehind
+ * and under-claims (file lands in partial/unknown → triage), never over-claims. The
+ * trailing `(?<!/>)` excludes a self-closed tag, which has no content fragment.
+ */
+const boundary_after_open_tag = new RegExp(
+	String.raw`(?<=<(?!(?:${VOID_ELEMENTS})\b)[A-Za-z][^<>"'{}]*(?:(?:"[^"]*"|'[^']*'|\{(?:[^{}]|\{[^{}]*\})*\})[^<>"'{}]*)*>)(?<!/>)[ \t\r\n]+`,
+	'gi',
+);
+/** Before a closing tag — content end. */
+const boundary_before_close_tag = /[ \t\r\n]+(?=<\/)/g;
+/**
+ * After a block open/branch tag `{#…}` / `{:…}` — branch fragment start. One brace-nesting
+ * level is admitted for destructuring (`{#each xs as {a, b}}`); deeper nesting fails the
+ * lookbehind and under-claims, never over-claims.
+ */
+const boundary_after_block_tag = /(?<=\{[#:](?:[^{}]|\{[^{}]*\})*\})[ \t\r\n]+/g;
+/** Before a block close/branch tag `{/…}` / `{:…}` — branch fragment end. */
+const boundary_before_block_tag = /[ \t\r\n]+(?=\{[:/])/g;
+const erase_fragment_edges = (s: string): string =>
+	s
+		.replace(boundary_after_open_tag, '')
+		.replace(boundary_before_close_tag, '')
+		.replace(boundary_after_block_tag, '')
+		.replace(boundary_before_block_tag, '');
+/**
+ * `<script>`/`<style>` regions. The trim is a TEMPLATE policy, so the collapse leaves
+ * these interiors VERBATIM and the per-hunk arm refuses hunks overlapping them: their
+ * whitespace is program/string bytes, and erasing tag-shaped runs inside code would let
+ * ours deleting whitespace inside a STRING (`` `a <b> c` `` template literal, a CSS
+ * `content: 'a <b> c'`) satisfy the equality — content loss SAFETY can't see, since it
+ * counts no whitespace. The non-greedy body means a `</script>` inside a string ends the
+ * region early, erring toward erasing less (under-claiming), never more.
+ */
+const raw_code_regions = /<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi;
+/** Erase fragment-edge runs OUTSIDE `<script>`/`<style>`; code regions pass through verbatim. */
+const collapse_fragment_edge_ws = (s: string): string => {
+	let out = '';
+	let last = 0;
+	for (const m of s.matchAll(raw_code_regions)) {
+		out += erase_fragment_edges(s.slice(last, m.index)) + m[0];
+		last = m.index + m[0].length;
+	}
+	return out + erase_fragment_edges(s.slice(last));
+};
+/** 0-based inclusive line ranges covered by `raw_code_regions` in `text`. */
+const raw_code_line_ranges = (text: string): Array<{ start: number; end: number }> => {
+	const count_newlines = (s: string): number => (s.match(/\n/g) ?? []).length;
+	const ranges: Array<{ start: number; end: number }> = [];
+	for (const m of text.matchAll(raw_code_regions)) {
+		const start = count_newlines(text.slice(0, m.index));
+		ranges.push({ start, end: start + count_newlines(m[0]) });
+	}
+	return ranges;
+};
+const line_range_overlaps = (
+	range: { start: number; end: number } | null,
+	regions: Array<{ start: number; end: number }>,
+): boolean => range !== null && regions.some((r) => range.start <= r.end && r.start <= range.end);
+
 const svelte_boundary_ws_trim: DivergencePattern = {
 	id: 'svelte_boundary_ws_trim',
 	description:
@@ -1807,14 +1879,16 @@ const svelte_boundary_ws_trim: DivergencePattern = {
 		// divergence (e.g. the self-closing expansion `self_closing_nonvoid` explains) —
 		// those other hunks stay unclaimed by this pattern.
 
-		// FAMILY SIGNATURE: the two sides are IDENTICAL once whitespace runs adjacent to a
-		// tag/section-boundary character (`>`/`}` on the left, `<`/`{` on the right) are
-		// removed from both — the exact class the trim deletes — and ours carries strictly
-		// LESS whitespace (the trim only removes; a diff where ours adds whitespace is some
-		// other reflow and stays unclaimed). Boundary-adjacent runs both sides keep (an
-		// inter-sibling space) collapse identically on both, so they can't defeat the
-		// equality; a run not touching a boundary character (a text-fill rewrap) survives on
-		// both sides and fails it.
+		// FAMILY SIGNATURE: the two sides are IDENTICAL once every FRAGMENT-EDGE whitespace
+		// run — the exact class the trim deletes (see `collapse_fragment_edge_ws` above) —
+		// is removed from both, and ours carries strictly LESS whitespace (the trim only
+		// removes; a diff where ours adds whitespace is some other reflow and stays
+		// unclaimed). Inter-sibling runs (after `</x>`'s `>`, around `{expr}`, next to
+		// text, after a void/self-closed tag) are render-SIGNIFICANT — Svelte collapses
+		// them to one space, they never vanish — so they survive VERBATIM on both sides:
+		// ours deleting one fails the equality and the file surfaces as unknown/partial
+		// instead of `known`. A run not touching a fragment edge (a text-fill rewrap)
+		// likewise survives on both sides and fails it.
 		//
 		// Tried WHOLE-FILE first: when the entire ours/prettier difference is this class,
 		// every hunk is claimed at once — necessary, not just convenient, because the diff
@@ -1822,11 +1896,9 @@ const svelte_boundary_ws_trim: DivergencePattern = {
 		// shared glued context line (`<span> hi</span>` → `<span>hi</span>` where an
 		// identical glued line sits between them), leaving per-hunk pairs asymmetric.
 		// A mixed file falls back to the per-hunk pair check for the trim hunks alone.
-		const collapse_boundary_ws = (s: string): string =>
-			s.replace(/[ \t\r\n]+(?=[<{])|(?<=[>}])[ \t\r\n]+/g, '');
 		const count_ws = (s: string): number => (s.match(/[ \t\r\n]/g) ?? []).length;
 		if (
-			collapse_boundary_ws(ctx.prettier) === collapse_boundary_ws(ctx.ours) &&
+			collapse_fragment_edge_ws(ctx.prettier) === collapse_fragment_edge_ws(ctx.ours) &&
 			count_ws(ctx.ours) < count_ws(ctx.prettier)
 		) {
 			return {
@@ -1837,13 +1909,25 @@ const svelte_boundary_ws_trim: DivergencePattern = {
 					'render-free content-boundary whitespace trimmed (Svelte-mirror trim); prettier keeps the boundary space or expands the construct',
 			};
 		}
+		// A hunk inside a <script>/<style> region can never be a template trim — its
+		// whitespace is program/string bytes — so refuse it outright. Checked per side
+		// against that side's own line ranges (the regions sit at different lines when
+		// the diff shifts them).
+		const ours_code_ranges = raw_code_line_ranges(ctx.ours);
+		const prettier_code_ranges = raw_code_line_ranges(ctx.prettier);
 		const claimed: number[] = [];
 		for (const hunk of ctx.hunks) {
+			if (
+				line_range_overlaps(hunk.ours_range, ours_code_ranges) ||
+				line_range_overlaps(hunk.prettier_range, prettier_code_ranges)
+			) {
+				continue;
+			}
 			const ours_join = hunk.added_lines.join('\n');
 			const prettier_join = hunk.removed_lines.join('\n');
 			if (
 				prettier_join !== ours_join &&
-				collapse_boundary_ws(prettier_join) === collapse_boundary_ws(ours_join) &&
+				collapse_fragment_edge_ws(prettier_join) === collapse_fragment_edge_ws(ours_join) &&
 				count_ws(ours_join) < count_ws(prettier_join)
 			) {
 				claimed.push(hunk.index);
