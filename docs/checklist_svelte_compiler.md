@@ -464,6 +464,30 @@ where the oracle's `VariableDeclarator` visitor runs `validate_identifier_name` 
 every `extract_paths` leaf — so both halves close for every name at once. Confirmation
 is by direct probe of both shapes and their boundary variants, not by a fuzz count.
 
+### A CSS ident code point the two parsers disagree on
+
+`U+0085` (`<NEL>`) after a selector name — `.foo\u{0085} { … }` — is an
+over-acceptance, and it belongs to a different family from every row above: it is
+a **parser** disagreement in `tsv_css`, not a missing analysis-phase rule. Svelte's
+CSS parser raises `css_expected_identifier`; tsv's accepts it as an ident
+continuation and compiles the component.
+
+The rule tsv implements is the historical one — every code point at or above
+`U+0080` is a CSS ident code point. Probing the oracle across the separator family
+(`U+00A0`, `U+1680`, `U+2000`, `U+202F`, `U+205F`, `U+3000`, `U+180E`, `U+FEFF`)
+shows it accepts all of them and rejects only `U+0085`, so the disagreement is
+exactly one code point wide today. Note that css-syntax-3's current
+*non-ASCII ident code point* definition is narrower still than either — it
+enumerates ranges that deliberately exclude the whitespace-looking separators
+(`U+00A0`, `U+2000`–`U+200A`, `U+202F`, `U+205F`, and `U+3000` are all outside it)
+— so the oracle is not spec-current here either, and matching the oracle is the
+compiler's contract regardless.
+
+Found by `compile_fuzz`'s `exotic_whitespace` operator, which is why the operator
+exists: the mutant is `.z\u{0085} + .z` grown out of an ordinary scoping fixture,
+and no gate, no fixture, and no corpus file reached it. The fix is in `tsv_css`'s
+lexer, so it lands on the parser side rather than in this crate.
+
 ### Mismatch classes under mutation
 
 `compile_fuzz --seed 0 --iterations 20000` produces **26 mismatches in four classes**
@@ -484,6 +508,46 @@ tsv emits `$.head(…)` *before* the hoisted snippet function where the oracle e
 after — is a real, hand-confirmed bug. No `--seed 0` mutant contains `<svelte:head>` at
 all, so it is tracked separately and must not be counted against a `compile_fuzz` run's
 mismatch total.
+
+#### C5 — trailing template whitespace: the source `trimEnd` class
+
+A **sixth** class, produced by `compile_fuzz`'s `exotic_whitespace` operator and
+confirmed by hand. A document whose last character is `U+FEFF` or `U+0085` mismatches,
+and the two mismatch in **opposite directions**:
+
+| Document | tsv emits | oracle emits |
+| --- | --- | --- |
+| `<p>a b</p>\u{FEFF}` | `` `<p>a b</p>\u{FEFF}` `` | `` `<p>a b</p>` `` |
+| `<p>a b</p>\u{0085}` | `` `<p>a b</p>` `` | `` `<p>a b</p>\u{0085}` `` |
+
+Both directions are one root cause. Svelte's parser opens with
+`this.template = template.trimEnd()` (`phases/1-parse/index.js:95`) — JavaScript's
+`trimEnd`, i.e. ECMAScript `WhiteSpace` ∪ `LineTerminator`, which **contains** `U+FEFF`
+and **excludes** `U+0085`. tsv's counterpart is `trailing_text.trim_end()`
+(`crates/tsv_svelte/src/parser/mod.rs:156`) — Rust's `str::trim_end`, i.e. Unicode
+`White_Space`, whose disagreement with the JS class is exactly those two code points, one
+each way. So the divergence is not a coincidence of two bugs; it is the single
+host-vs-target whitespace-class defect this operator exists to find, seen from both sides.
+
+**Scope**, established by probe: **trailing position only** — a leading or mid-document
+occurrence is parity, and so is any position *inside* an element (`<p>a\u{FEFF}b</p>`),
+which no `trimEnd` reaches. And **only** those two code points: `U+00A0`, `U+2000`,
+`U+202F`, `U+3000`, `U+180E`, and `U+200B` are parity in both directions, because they
+are either in both classes or in neither.
+
+⚠️ **This is a parser divergence, not a compiler one**, and it is therefore **out of lane
+for this branch**. The differing trim is in `tsv_svelte`'s parser and is already visible
+in the parse AST — tsv's `Root.fragment` carries a trailing `Text` node for the `U+FEFF`
+document and none for the `U+0085` one, and the canonical parser's does the reverse — so
+the compiler is faithfully compiling the fragment it is handed. Nothing in
+`tsv_svelte_compile` can close it, and `text_class::js_trim` is not the fix: it is
+`pub(crate)` to this crate, and the dependency runs `tsv_svelte_compile → tsv_svelte`,
+never back. The fix belongs on **main**, in `tsv_svelte`, as a parser-conformance change
+graded by a `_svelte_divergence`-class fixture; tracked in
+[conformance_svelte.md](conformance_svelte.md).
+
+Repro (either direction): `printf '<p>a b</p>\u{FEFF}' > t.svelte && cargo run -p
+tsv_debug compile_compare t.svelte`.
 
 ### Snippets and render tags
 

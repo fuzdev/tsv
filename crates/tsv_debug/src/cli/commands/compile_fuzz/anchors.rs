@@ -29,8 +29,49 @@
 //!   So the declared side scans statement text after a `let`/`const`/`var`/
 //!   `function`/`class` keyword, and the read side takes identifier-shaped tokens out
 //!   of expression spans.
+//!
+//! ## The exotic-whitespace anchors
+//!
+//! [`Anchors::script_ws`], [`Anchors::attr_value_edges`], and
+//! [`Anchors::css_ident_ends`] serve `Operator::ExoticWhitespace`
+//! (`super::operators`), and each is chosen so that the *insertion itself* cannot
+//! break well-formedness — the property the whole design rests on (see that
+//! operator's docs for the argument).
+//!
+//! - **`script_ws`** — both edges of every ASCII-whitespace RUN inside a script's
+//!   content. A source scan, and deliberately **not** trivia-aware: it makes no
+//!   claim that a run is inter-token trivia rather than string / template / comment
+//!   / regex interior, because it *nearly* does not have to. Every context that
+//!   admits the run's existing whitespace character admits one more character of
+//!   the same class, so the mutant stays parseable either way — it is merely a
+//!   *content* mutation instead of a *trivia* mutation, and both compilers see the
+//!   same bytes. Both edges are recorded so a keyword-adjacent run reaches
+//!   `static\u{FEFF} {` **and** `static \u{FEFF}{`.
+//!
+//!   ⚠️ **The one context where that argument fails**, and the reason the scan is
+//!   not fully position-blind: a string literal's **`LineContinuation`**. In
+//!   `"a\<LF>b"` the run's first character is the `<LF>` of a `\<LF>` pair, and the
+//!   pair is what makes the literal legal — inserting **any** whitespace between
+//!   the `\` and the `<LF>` re-reads the `\` as a `NonEscapeCharacter` escape and
+//!   leaves a RAW `<LF>` inside the string, which ECMA-262 §12.9.4.1 forbids
+//!   (`DoubleStringCharacter :: SourceCharacter but not one of " or \ or
+//!   LineTerminator`). So the run's **START** edge is skipped when the preceding
+//!   byte is `\` and the run opens with a line terminator; the **END** edge stays,
+//!   since a character appended after the terminator is ordinary string content and
+//!   the continuation is already complete. The hazard is character-INDEPENDENT —
+//!   every code point in the insertion set breaks it identically — which is exactly
+//!   why scoping it to `U+2028`/`U+2029` (as an earlier rationale did) was wrong.
+//! - **`attr_value_edges`** — the inner edges of a QUOTED attribute value's text,
+//!   on **every** attribute-bearing node: a regular element, a `<svelte:*>` special
+//!   element, and `<svelte:options>`. Quoting is checked against the byte before the
+//!   span, so the value's extent is delimiter-defined and any inserted character is
+//!   content by construction.
+//! - **`css_ident_ends`** — the end of an ASCII ident run introduced by `:`, `::`,
+//!   `.`, or `#` inside `<style>`. A source scan over the CSS content span.
 
-use tsv_svelte::ast::internal::{Fragment, FragmentNode, Root, ScriptContext, SpecialElementKind};
+use tsv_svelte::ast::internal::{
+    AttributeNode, AttributeValue, Fragment, FragmentNode, Root, ScriptContext, SpecialElementKind,
+};
 
 /// A script's splice slot: where a statement can be inserted, and whether the
 /// script is TypeScript (the erasure axis wants to know).
@@ -89,6 +130,13 @@ pub struct Anchors {
     pub module_exported: Vec<String>,
     /// Brace interiors of `{expression}` tags — a block comment is legal there.
     pub expr_interiors: Vec<u32>,
+    /// Both edges of every ASCII-whitespace run inside a script's content — the
+    /// JS token boundaries (see module docs).
+    pub script_ws: Vec<u32>,
+    /// The inner edges of quoted attribute values' text (see module docs).
+    pub attr_value_edges: Vec<u32>,
+    /// The end of each `:` / `::` / `.` / `#`-introduced ident run in `<style>`.
+    pub css_ident_ends: Vec<u32>,
 }
 
 impl Anchors {
@@ -108,6 +156,17 @@ impl Anchors {
             let text = script.content.span.extract(source);
             anchors.module_declared = declared_names(text);
             anchors.module_exported = exported_names(text);
+        }
+        for script in [root.instance, root.module].into_iter().flatten() {
+            push_whitespace_runs(&mut anchors.script_ws, source, script.content.span);
+        }
+        if let Some(style) = root.css {
+            push_css_ident_ends(&mut anchors.css_ident_ends, source, style.content_span);
+        }
+        // `<svelte:options>` hangs off the root rather than the fragment, so the
+        // node walk never reaches it.
+        if let Some(options) = root.options {
+            anchors.push_attr_value_edges(options.attributes, source);
         }
         for names in [
             &mut anchors.template_reads,
@@ -145,6 +204,7 @@ impl Anchors {
             FragmentNode::Element(element) => {
                 self.wrappable.push((element.span.start, element.span.end));
                 self.attr_slots.push(element.name_span.end);
+                self.push_attr_value_edges(element.attributes, source);
                 // TODO: attribute VALUES are not scanned for reads, so a name used only
                 // in `<Foo {...r} />` or `attr={x}` is missing from `template_reads`.
                 // That list is the donor graft's collision guard, so the gap lets a
@@ -158,6 +218,7 @@ impl Anchors {
                 // dropped on the server; its default content is not. The snippet
                 // blocks below carry that through, so only mark the boundary itself.
                 let boundary = matches!(element.kind, SpecialElementKind::SvelteBoundary);
+                self.push_attr_value_edges(element.attributes, source);
                 self.walk_fragment(&element.fragment, source, dropped || boundary);
             }
             FragmentNode::ExpressionTag(tag) => {
@@ -224,10 +285,135 @@ impl Anchors {
         }
     }
 
+    /// Record the inner edges of each QUOTED plain attribute's text value.
+    ///
+    /// The quote check is what makes an inserted character content by
+    /// construction: an unquoted value's extent is decided by the parser's
+    /// whitespace notion, which is the very thing under test, so injecting there
+    /// would be reasoning in a circle.
+    fn push_attr_value_edges(&mut self, attributes: &[AttributeNode<'_>], source: &str) {
+        for attribute in attributes {
+            let AttributeNode::Attribute(attribute) = attribute else {
+                continue;
+            };
+            let Some(values) = attribute.value else {
+                continue;
+            };
+            for value in values {
+                let AttributeValue::Text(text) = value else {
+                    continue;
+                };
+                let start = text.raw_span.start as usize;
+                if !matches!(
+                    source.as_bytes().get(start.wrapping_sub(1)),
+                    Some(b'"' | b'\'')
+                ) {
+                    continue;
+                }
+                self.attr_value_edges.push(text.raw_span.start);
+                if text.raw_span.end > text.raw_span.start {
+                    self.attr_value_edges.push(text.raw_span.end);
+                }
+            }
+        }
+    }
+
     /// Record the identifier-shaped tokens of an expression's source text.
     fn push_reads(&mut self, text: &str) {
         for name in identifier_tokens(text) {
             self.template_reads.push(name);
+        }
+    }
+}
+
+/// The ASCII members of ECMAScript `WhiteSpace` ∪ `LineTerminator` (ECMA-262
+/// §12.2 table 34 + §12.3 table 35): TAB, VT, FF, SP, LF, CR.
+///
+/// Deliberately **not** `u8::is_ascii_whitespace`, which omits `<VT>` (`U+000B`).
+/// `<VT>` is in the operator's insertion set, so a Rust-notion scan would leave a
+/// VT-only run unanchored — the host-vs-target whitespace-class mismatch this whole
+/// operator exists to hunt, reproduced inside the hunter.
+const fn is_js_ascii_whitespace(b: u8) -> bool {
+    matches!(b, b'\t' | 0x0B | 0x0C | b' ' | b'\n' | b'\r')
+}
+
+/// Record both edges of every ASCII-whitespace run inside `span`.
+///
+/// Host-absolute offsets. ASCII-only, so every recorded offset is a UTF-8
+/// character boundary by construction. See the module docs for why this scan is
+/// deliberately not trivia-aware — and for the single position where that is not
+/// enough, the string-literal `LineContinuation` guarded below.
+fn push_whitespace_runs(out: &mut Vec<u32>, source: &str, span: tsv_lang::Span) {
+    let base = span.start as usize;
+    let bytes = span.extract(source).as_bytes();
+    let mut i = 0usize;
+    while i < bytes.len() {
+        if !is_js_ascii_whitespace(bytes[i]) {
+            i += 1;
+            continue;
+        }
+        let start = i;
+        while i < bytes.len() && is_js_ascii_whitespace(bytes[i]) {
+            i += 1;
+        }
+        // A `\` immediately before a run that OPENS with a line terminator is a
+        // `LineContinuation`: splitting the pair strands a raw line terminator in
+        // the string literal, which no insertion character survives. The end edge
+        // is past the terminator, so the pair is already complete there.
+        let continuation = matches!(bytes[start], b'\n' | b'\r')
+            && source.as_bytes().get((base + start).wrapping_sub(1)) == Some(&b'\\');
+        #[allow(clippy::cast_possible_truncation)]
+        {
+            if !continuation {
+                out.push((base + start) as u32);
+            }
+            out.push((base + i) as u32);
+        }
+    }
+}
+
+/// Record the end offset of each ASCII ident run introduced by `:` / `::` / `.` /
+/// `#` in `span` — the CSS pseudo-class, class, and id NAME positions.
+///
+/// Appending there is where the CSS side of this bug family lives: a code point a
+/// host-language trim would strip is a CSS *ident* code point, so `:global\u{A0}`
+/// is genuinely a different pseudo-class. A character that is NOT an ident code
+/// point makes the oracle's CSS parser reject the mutant, which is a perfectly
+/// good grade too (tsv must then refuse, or it is an over-acceptance).
+///
+/// ⚠️ The scan is **not trivia-aware**, so "an ident run introduced by `:`/`.`/`#`"
+/// over-reports: it also fires inside CSS strings and comments, on a declaration
+/// value (`color:red` records after `red`), on a hex color (`#fff`), and in an
+/// at-rule prelude. That costs *budget*, never soundness — at each of those
+/// positions an appended code point is still either ident content or an oracle
+/// rejection, exactly as at a real selector name, so the grade stays honest and a
+/// finding there would be a real one rather than a harness artifact. It is stated
+/// here rather than fixed so the fn's reach is not read as narrower than it is.
+fn push_css_ident_ends(out: &mut Vec<u32>, source: &str, span: tsv_lang::Span) {
+    let base = span.start as usize;
+    let bytes = span.extract(source).as_bytes();
+    let mut i = 0usize;
+    while i < bytes.len() {
+        match bytes[i] {
+            // `::before` as well as `:global` — consume the whole introducer.
+            b':' => {
+                while i < bytes.len() && bytes[i] == b':' {
+                    i += 1;
+                }
+            }
+            b'.' | b'#' => i += 1,
+            _ => {
+                i += 1;
+                continue;
+            }
+        }
+        let start = i;
+        while i < bytes.len() && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'-') {
+            i += 1;
+        }
+        if i > start {
+            #[allow(clippy::cast_possible_truncation)]
+            out.push((base + i) as u32);
         }
     }
 }

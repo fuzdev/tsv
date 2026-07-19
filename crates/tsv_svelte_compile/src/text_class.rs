@@ -94,11 +94,20 @@ pub(crate) fn js_char_at(source: &str, pos: usize) -> Option<JsChar> {
 /// preprocessing folds into it). A **strictly ASCII** class.
 ///
 /// Not interchangeable with [`is_js_whitespace`], and the difference is not
-/// cosmetic: every code point at or above `U+0080` is a CSS *ident* code point
-/// (§4.2), so `U+00A0` CONTINUES a CSS identifier where JS would end one.
-/// Trimming a CSS name with a Unicode-whitespace notion therefore silently
-/// renames it — `:global\u{00A0}` reads as `:global` and scopes an element the
-/// oracle leaves alone (a MISMATCH, oracle-verified).
+/// cosmetic: `U+00A0` CONTINUES a CSS identifier where JS would end one, so
+/// trimming a CSS name with a Unicode-whitespace notion silently renames it —
+/// `:global\u{00A0}` reads as `:global` and scopes an element the oracle leaves
+/// alone (a MISMATCH, oracle-verified).
+///
+/// That behavior is the **historical** ident rule — "every code point at or above
+/// `U+0080` is an ident code point" — which tsv and Svelte both implement, and
+/// which the oracle-matching contract makes the one that counts here. Current
+/// css-syntax-3 is **narrower**: its *non-ASCII ident code point* is an explicit
+/// enumeration (`U+00B7`, `U+00C0`–`U+00D6`, … , ≥`U+10000`) that, by its own note,
+/// "excludes a number of characters that appear as whitespace". `U+00A0` falls in
+/// the gap before the first range and is therefore **not** a spec-current ident
+/// code point — so neither tsv nor the oracle is spec-current here, and the
+/// example above is a statement about the two implementations, not about the spec.
 pub(crate) fn is_css_whitespace(c: char) -> bool {
     matches!(
         c,

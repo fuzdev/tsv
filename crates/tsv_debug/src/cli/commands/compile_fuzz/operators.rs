@@ -30,6 +30,7 @@
 //! | [`Operator::InjectComment`] | comment × the span-minting rewrite it lands in |
 //! | [`Operator::DuplicateSubtree`] | generated-name ordering × visit-vs-emission order |
 //! | [`Operator::AddDirective`] | spread × co-present directives on one element |
+//! | [`Operator::ExoticWhitespace`] | one code point × the four languages that disagree about it |
 //!
 //! ## Why splices and not byte edits
 //!
@@ -37,6 +38,74 @@
 //! inserts a whole well-formed construct at an offset [`Anchors`] proved is
 //! structurally valid. The mutant is re-anchored (re-parsed) between operators, so
 //! operator *N+1* always sees the real post-*N* document rather than stale offsets.
+//!
+//! ## Where [`Operator::ExoticWhitespace`] sits against that rule
+//!
+//! It inserts a single code point, which *looks* like the byte-level mutation the
+//! rule forbids. It is not, and the distinction is the rule's own reason rather
+//! than its letter: the rule exists so a mutant stays **oracle-compilable**, and
+//! the enumerated construct is one way — not the only way — to get there. This
+//! operator gets there by a stronger route. Its positions are read off tsv's own
+//! parse exactly as every other operator's are, and at each of them the insertion
+//! is well-formedness-preserving **by construction**:
+//!
+//! - inside a script, into an existing whitespace RUN. Every context that admits
+//!   the run's whitespace character admits one more of the same class — if the run
+//!   is trivia the insert is trivia, and if it is string / template / comment /
+//!   regex interior the insert is content. So the scan does not need to know which
+//!   it is, with **one** guarded exception: a string literal's `LineContinuation`,
+//!   where the run's leading line terminator is bound to the `\` before it and
+//!   splitting the pair strands a raw line terminator in the literal. That is a
+//!   property of the *position*, not of the character, so the run's start edge is
+//!   simply not an anchor there (see [`Anchors::script_ws`]);
+//! - inside a QUOTED attribute value or in template text, where the extent is
+//!   delimiter- or tag-defined, so any code point is content;
+//! - after a CSS ident, where a non-ASCII code point either continues the ident or
+//!   makes the oracle's CSS parser reject — and an oracle rejection grades the
+//!   refusal contract perfectly well.
+//!
+//! **Why it is worth an operator.** Three live compiler defects and one panic had
+//! exactly one shape: *a scan whose whitespace notion was the HOST language's
+//! rather than the TARGET language's*. Rust's `char::is_whitespace` is Unicode
+//! `White_Space`, which agrees with neither ECMAScript `WhiteSpace` (which adds
+//! `U+FEFF` and drops `U+0085`) nor CSS `white-space` (strictly ASCII, with
+//! everything at or above `U+0080` an ident code point). Every one of the four was
+//! invisible to the whole gate suite and to a ~2996-file corpus, and each was found
+//! by hand. `tsv_svelte_compile::text_class` now states the classes once; this
+//! operator is the mechanized search for the scans that still do not read it.
+//!
+//! **The character sets are position-specific**, because an illegal code point
+//! merely burns a round trip in the harness buckets:
+//!
+//! - a **script token boundary** admits only ECMAScript `WhiteSpace`. `U+0085`
+//!   (`<NEL>`) and `U+180E` are *not* ECMAScript whitespace — a script-position
+//!   `U+0085` is a parse error — so they appear only in the content families,
+//!   where they are the sharpest probes precisely because Rust's `trim` strips
+//!   `U+0085` and JS's does not;
+//! - `U+2028` / `U+2029` are `LineTerminator`s. They are excluded from the script
+//!   family outright rather than weighted down, for two reasons that are genuinely
+//!   specific to them: inserting one can flip **ASI** (a semantic change both sides
+//!   see identically, so it grades fairly but attributes a finding to the wrong
+//!   cause), and one is illegal raw inside a regex body. They stay in the content
+//!   families, where they are inert.
+//!
+//!   ⚠️ A third reason used to be listed here — "illegal raw after a string's
+//!   line-continuation backslash" — and it was **misscoped**. That hazard is
+//!   character-INDEPENDENT: *every* code point in [`JS_WHITESPACE_CHARS`] breaks a
+//!   `\<LF>` pair identically, by turning the `\` into a `NonEscapeCharacter`
+//!   escape and stranding the `<LF>`. Excluding two characters could never have
+//!   addressed it; the anchor scan skips the position instead
+//!   ([`Anchors::script_ws`]). The exclusion decision was right, its stated
+//!   reasoning was one-third wrong, and that misscoping is precisely what left the
+//!   general case unhandled;
+//! - **CSS** wants code points at or above `U+0080` — there they are *ident*
+//!   characters, not whitespace, which is the whole of the third bug.
+//!
+//! The set is aligned with the formatter fuzzer's `INTERESTING_SEQUENCES`
+//! (`super::super::fuzz`) — same NBSP / zero-width / BOM / CJK stress family —
+//! and extended with the code points on which the three whitespace classes
+//! actually disagree, which is what makes it a differential probe rather than a
+//! width-math one.
 
 use super::super::fuzz::Rng;
 use super::anchors::Anchors;
@@ -122,6 +191,7 @@ pub enum Operator {
     InjectComment,
     DuplicateSubtree,
     AddDirective,
+    ExoticWhitespace,
 }
 
 impl Operator {
@@ -136,6 +206,7 @@ impl Operator {
         Self::InjectComment,
         Self::DuplicateSubtree,
         Self::AddDirective,
+        Self::ExoticWhitespace,
     ];
 
     pub fn label(self) -> &'static str {
@@ -150,6 +221,7 @@ impl Operator {
             Self::InjectComment => "inject_comment",
             Self::DuplicateSubtree => "duplicate_subtree",
             Self::AddDirective => "add_directive",
+            Self::ExoticWhitespace => "exotic_whitespace",
         }
     }
 }
@@ -202,6 +274,64 @@ const DIRECTIVES: &[&str] = &[
     " onclick={() => {}}",
 ];
 
+/// A **12-of-21 SUBSET** of ECMAScript `WhiteSpace` minus the `LineTerminator`s —
+/// the only class legal at a JS token boundary that also leaves ASI alone
+/// (ECMA-262 §12.2, table 34).
+///
+/// A subset, not the set, and deliberately: the full class holds all 11 code points
+/// of the `Zs` run `U+2000`..=`U+200A`, which are indistinguishable to every scan
+/// this operator probes (all `Zs`, all non-ASCII, all ECMAScript whitespace, none
+/// Unicode-`White_Space`-divergent). Carrying the 9 interior ones would add no
+/// discriminating power and would dilute each draw toward that one redundant
+/// family, so the run is represented by its two endpoints `U+2000` and `U+200A`.
+/// The omission is exactly `U+2001`..=`U+2009` and nothing else, which the unit
+/// test below pins in both directions.
+///
+/// `\u{0009}` / `\u{0020}` are here for a reason beyond completeness: an ordinary
+/// tab or space is the CONTROL. A finding that reproduces with one of these is a
+/// plain whitespace-handling bug, not a character-class bug, and reading the two
+/// apart is the first triage step.
+///
+/// ⚠️ `U+0085` (`<NEL>`) and `U+180E` are deliberately ABSENT: `U+0085` carries the
+/// Unicode `White_Space` property but is not ECMAScript `WhiteSpace`, and `U+180E`
+/// is neither, so a script-position insert of either is a parse error rather than
+/// a probe. They live in [`CONTENT_CHARS`], where that mismatch is the point.
+const JS_WHITESPACE_CHARS: &[&str] = &[
+    "\u{0009}", // <TAB> — the ASCII control
+    "\u{0020}", // <SP> — the ASCII control
+    "\u{000B}", // <VT>, which `u8::is_ascii_whitespace` does not count
+    "\u{000C}", // <FF>
+    "\u{00A0}", // <NBSP>
+    "\u{1680}", "\u{2000}", "\u{200A}", "\u{202F}", "\u{205F}", "\u{3000}",
+    "\u{FEFF}", // <ZWNBSP> — ECMAScript whitespace, NOT Unicode `White_Space`
+];
+
+/// Code points for the CONTENT positions (attribute values, template text), where
+/// every code point is legal and the question is only which scans mis-classify it.
+///
+/// This is the wider set on purpose. It carries the two ECMAScript-illegal
+/// separators [`JS_WHITESPACE_CHARS`] must exclude — `U+0085`, which Rust's `trim`
+/// strips and JavaScript's `.trim()` keeps, and `U+180E`, which neither counts but
+/// many hand-rolled scans do — plus the two `LineTerminator`s, inert here, plus the
+/// zero-width and wide characters the formatter fuzzer's `INTERESTING_SEQUENCES`
+/// stresses span math with.
+const CONTENT_CHARS: &[&str] = &[
+    "\u{00A0}", "\u{0085}", // <NEL>: Unicode `White_Space`, but NOT ECMAScript whitespace
+    "\u{180E}", // neither class counts it; hand-rolled scans often do
+    "\u{2028}", // <LS>
+    "\u{2029}", // <PS>
+    "\u{202F}", "\u{3000}", "\u{200B}", // zero-width space
+    "\u{FEFF}", "\u{4E2D}", // a wide CJK character — width math, not class
+];
+
+/// Code points appended to a CSS ident. Every one of these is at or above
+/// `U+0080`, which is where CSS and the host language disagree hardest: a scan
+/// that trims one of these off a selector name silently RENAMES it, which is how
+/// `:global\u{00A0}` came to scope an element the oracle prunes.
+const CSS_IDENT_CHARS: &[&str] = &[
+    "\u{00A0}", "\u{0085}", "\u{180E}", "\u{2000}", "\u{202F}", "\u{205F}", "\u{3000}", "\u{FEFF}",
+];
+
 /// Comment payloads, one per ownership path (matching the gap audit's reasoning:
 /// a line comment is never owned, a glued block comment always is, a JSDoc cast
 /// binds its parenthesized operand, and an HTML comment is an AST node).
@@ -242,6 +372,7 @@ pub fn apply(
         Operator::InjectComment => inject_comment(source, anchors, rng),
         Operator::DuplicateSubtree => duplicate_subtree(source, anchors, rng),
         Operator::AddDirective => add_directive(source, anchors, rng),
+        Operator::ExoticWhitespace => exotic_whitespace(source, anchors, rng),
     }
 }
 
@@ -500,6 +631,45 @@ fn add_directive(source: &str, anchors: &Anchors, rng: &mut Rng) -> Option<Strin
     Some(splice(source, at, directive))
 }
 
+/// Insert one exotic code point at a position whose language decides which code
+/// points are legal there. The whitespace-class cross-product: one character ×
+/// the four languages (JS, CSS, HTML attribute, Svelte template text) that
+/// disagree about whether it is whitespace, an ident character, or content.
+///
+/// Draws a POSITION FAMILY first and the character from that family's set, rather
+/// than the reverse — a character drawn first would have to be rejected at most
+/// positions, which biases the mix toward whichever family happens to accept the
+/// widest set. A family the document has no anchor for yields `None`, spending the
+/// turn exactly as every other operator does.
+fn exotic_whitespace(source: &str, anchors: &Anchors, rng: &mut Rng) -> Option<String> {
+    let (at, text) = match rng.below(4) {
+        // A JS token boundary — the static-block fence's home, and the type
+        // annotation's (`let x:\u{A0}T`, where the erased region begins).
+        0 => (
+            *pick(rng, &anchors.script_ws)?,
+            *pick(rng, JS_WHITESPACE_CHARS)?,
+        ),
+        // A quoted attribute value's edge — where the oracle's NARROW ASCII
+        // collapse and its WIDE JS trim disagree, which was seven live mismatches.
+        1 => (
+            *pick(rng, &anchors.attr_value_edges)?,
+            *pick(rng, CONTENT_CHARS)?,
+        ),
+        // A CSS selector name's tail.
+        2 => (
+            *pick(rng, &anchors.css_ident_ends)?,
+            *pick(rng, CSS_IDENT_CHARS)?,
+        ),
+        // Template text at a node boundary — Svelte's own whitespace collapse,
+        // which is ASCII-only (`Text::is_ascii_ws_only`).
+        _ => (
+            *pick(rng, &anchors.template_gaps)?,
+            *pick(rng, CONTENT_CHARS)?,
+        ),
+    };
+    Some(splice(source, at, text))
+}
+
 /// Replace `source[start..end]` with `text`.
 fn replace_range(source: &str, start: u32, end: u32, text: &str) -> String {
     let (start, end) = (start as usize, end as usize);
@@ -610,6 +780,198 @@ mod tests {
         let out = add_directive(SEED, &anchors_of(SEED), &mut rng).expect("has an element");
         assert!(out.contains("<p "), "{out}");
         assert!(Anchors::collect(&out).is_some(), "mutant reparses: {out}");
+    }
+
+    /// The whole design rests on every script-position character being ECMAScript
+    /// `WhiteSpace`: one that is not is a parse error, so it grades nothing and
+    /// merely burns an oracle round trip. `U+0085` and `U+180E` are the two that
+    /// look like they belong and do not.
+    #[test]
+    fn script_chars_are_all_ecmascript_whitespace() {
+        for text in JS_WHITESPACE_CHARS {
+            let c = text.chars().next().expect("one char");
+            assert_eq!(text.chars().count(), 1, "{c:?} must be a single code point");
+            // `eval`-free restatement of ECMA-262 §12.2 table 34, minus the
+            // LineTerminators (deliberately excluded — see the module docs).
+            let is_js_ws = matches!(
+                c,
+                '\u{0009}'
+                    | '\u{000B}'
+                    | '\u{000C}'
+                    | '\u{0020}'
+                    | '\u{00A0}'
+                    | '\u{1680}'
+                    | '\u{2000}'
+                    ..='\u{200A}' | '\u{202F}' | '\u{205F}' | '\u{3000}' | '\u{FEFF}'
+            );
+            assert!(is_js_ws, "{c:?} is not ECMAScript WhiteSpace");
+        }
+        for absent in ['\u{0085}', '\u{180E}', '\u{2028}', '\u{2029}'] {
+            let s = absent.to_string();
+            assert!(
+                !JS_WHITESPACE_CHARS.contains(&s.as_str()),
+                "{absent:?} must not reach a script token boundary"
+            );
+        }
+    }
+
+    /// The doc claims a 12-of-21 subset whose only omission is the `Zs` interior
+    /// `U+2001`..=`U+2009`. A ⊆ check alone would let the set silently shrink and
+    /// leave the doc asserting more than the code does, so pin both directions.
+    #[test]
+    fn script_chars_are_the_documented_subset() {
+        const FULL: &[char] = &[
+            '\u{0009}', '\u{000B}', '\u{000C}', '\u{0020}', '\u{00A0}', '\u{1680}', '\u{2000}',
+            '\u{2001}', '\u{2002}', '\u{2003}', '\u{2004}', '\u{2005}', '\u{2006}', '\u{2007}',
+            '\u{2008}', '\u{2009}', '\u{200A}', '\u{202F}', '\u{205F}', '\u{3000}', '\u{FEFF}',
+        ];
+        assert_eq!(
+            FULL.len(),
+            21,
+            "ECMAScript WhiteSpace minus LineTerminators"
+        );
+        assert_eq!(JS_WHITESPACE_CHARS.len(), 12, "the documented subset size");
+
+        let present: Vec<char> = JS_WHITESPACE_CHARS
+            .iter()
+            .map(|s| s.chars().next().expect("one char"))
+            .collect();
+        let omitted: Vec<char> = FULL
+            .iter()
+            .copied()
+            .filter(|c| !present.contains(c))
+            .collect();
+        let expected: Vec<char> = ('\u{2001}'..='\u{2009}').collect();
+        assert_eq!(omitted, expected, "the omission is exactly the Zs interior");
+    }
+
+    #[test]
+    fn exotic_whitespace_reaches_every_position_family() {
+        const SOURCE: &str = "<script>\n\tlet count = 0;\n</script>\n\n\
+             <p class=\"box\">{count}</p>\n\n<style>\n\t:global(.box) {\n\t\tcolor: red;\n\t}\n</style>\n";
+        let anchors = anchors_of(SOURCE);
+        assert!(!anchors.script_ws.is_empty(), "script whitespace runs");
+        assert!(!anchors.attr_value_edges.is_empty(), "attribute edges");
+        assert!(!anchors.css_ident_ends.is_empty(), "css ident ends");
+
+        // Every draw must still be a document tsv's parser accepts — the
+        // well-formedness-by-construction claim, exercised rather than asserted.
+        let mut seen = std::collections::BTreeSet::new();
+        for seed in 0..200u64 {
+            let mut rng = Rng::new(seed);
+            let Some(out) = exotic_whitespace(SOURCE, &anchors, &mut rng) else {
+                continue;
+            };
+            assert_ne!(out, SOURCE, "an insert always changes the document");
+            assert!(Anchors::collect(&out).is_some(), "mutant reparses: {out:?}");
+            for c in out.chars().filter(|c| !c.is_ascii()) {
+                seen.insert(c);
+            }
+        }
+        assert!(
+            seen.len() >= 4,
+            "several distinct code points reached: {seen:?}"
+        );
+    }
+
+    /// A string literal's `LineContinuation` is the one script position where the
+    /// by-construction argument fails: `"a\<LF>b"` is legal only while the `\` and
+    /// the `<LF>` stay adjacent, so inserting ANY whitespace at the run's start
+    /// re-reads the `\` as a `NonEscapeCharacter` escape and strands a raw
+    /// `<LF>` in the literal (ECMA-262 §12.9.4.1) — an oracle `js_parse_error`,
+    /// which tsv's permissive frontend then compiles into a false OVER-ACCEPTANCE.
+    /// The start edge must not be anchored; the end edge must still be.
+    #[test]
+    fn line_continuation_start_edge_is_not_anchored() {
+        const SOURCE: &str = "<script>\n\tlet s = \"a\\\n b\";\n</script>\n\n<p>{s}</p>\n";
+        let backslash = SOURCE.find('\\').expect("the continuation backslash");
+        let run_start = backslash + 1;
+        assert_eq!(SOURCE.as_bytes()[run_start], b'\n', "the run opens with LF");
+
+        let anchors = anchors_of(SOURCE);
+        #[allow(clippy::cast_possible_truncation)]
+        let run_start = run_start as u32;
+        assert!(
+            !anchors.script_ws.contains(&run_start),
+            "the continuation's start edge must not be an anchor: {:?}",
+            anchors.script_ws
+        );
+        // The end edge is past the terminator — the pair is already complete, so
+        // an appended character is ordinary string content.
+        #[allow(clippy::cast_possible_truncation)]
+        let run_end = (backslash + 3) as u32; // `\` + LF + ' '
+        assert!(
+            anchors.script_ws.contains(&run_end),
+            "the run's end edge stays anchored: {:?}",
+            anchors.script_ws
+        );
+
+        // An ordinary run in the same script keeps BOTH edges — the guard is
+        // scoped to the continuation, not a blanket start-edge drop.
+        let plain = anchors_of("<script>\n\tlet s = 1;\n</script>\n\n<p>{s}</p>\n");
+        assert!(plain.script_ws.len() > 4, "{:?}", plain.script_ws);
+    }
+
+    /// `<svelte:*>` special elements and `<svelte:options>` carry attributes too,
+    /// and neither is reached by the regular-element arm of the node walk.
+    #[test]
+    fn special_element_attribute_values_are_anchored() {
+        let dynamic = anchors_of("<svelte:element this=\"div\" class=\"x\">y</svelte:element>\n");
+        assert!(
+            !dynamic.attr_value_edges.is_empty(),
+            "a <svelte:element>'s quoted attribute values anchor"
+        );
+        let options = anchors_of("<svelte:options namespace=\"svg\" />\n<p>x</p>\n");
+        assert!(
+            !options.attr_value_edges.is_empty(),
+            "a <svelte:options> attribute value anchors"
+        );
+    }
+
+    /// `u8::is_ascii_whitespace` omits `<VT>`, which IS in the insertion set — the
+    /// scan must use the JS ASCII class or a VT-only run goes unanchored.
+    #[test]
+    fn vertical_tab_runs_are_anchored() {
+        let anchors =
+            anchors_of("<script>\n\tlet a = 1;\u{000B}let b = 2;\n</script>\n<p>{a}{b}</p>\n");
+        let vt = "<script>\n\tlet a = 1;".len();
+        #[allow(clippy::cast_possible_truncation)]
+        let vt = vt as u32;
+        assert!(
+            anchors.script_ws.contains(&vt),
+            "a VT-only run anchors: {:?}",
+            anchors.script_ws
+        );
+    }
+
+    /// The attribute anchor's quote guard: an UNQUOTED value's extent is decided
+    /// by the parser's own whitespace notion, which is the thing under test.
+    #[test]
+    fn unquoted_attribute_values_are_not_anchored() {
+        let quoted = anchors_of("<p class=\"box\">x</p>\n");
+        assert!(!quoted.attr_value_edges.is_empty());
+        let unquoted = anchors_of("<p class=box>x</p>\n");
+        assert!(unquoted.attr_value_edges.is_empty());
+    }
+
+    #[test]
+    fn css_ident_ends_land_after_the_name() {
+        const SOURCE: &str = "<p class=\"a\">x</p>\n<style>\n\t:global(.a)::before {\n\t\tcolor: red;\n\t}\n</style>\n";
+        let anchors = anchors_of(SOURCE);
+        let names: Vec<&str> = anchors
+            .css_ident_ends
+            .iter()
+            .map(|&end| {
+                let end = end as usize;
+                let start = SOURCE[..end]
+                    .rfind([':', '.', '#'])
+                    .expect("an introducer precedes the name");
+                &SOURCE[start + 1..end]
+            })
+            .collect();
+        assert!(names.contains(&"global"), "{names:?}");
+        assert!(names.contains(&"a"), "{names:?}");
+        assert!(names.contains(&"before"), "{names:?}");
     }
 
     #[test]

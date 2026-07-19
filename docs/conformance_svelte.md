@@ -688,6 +688,28 @@ The **formatter** mirrors this: in inline layout tsv deletes exactly the render-
 
 **Reference**: `svelte/packages/svelte/src/compiler/phases/3-transform/utils.js` (`clean_nodes`), `phases/patterns.js` (the whitespace regexes)
 
+#### Source `trimEnd` — a known parse-time divergence
+
+One whitespace decision *is* made at parse time, and tsv currently gets its character
+class wrong. Svelte's parser opens with `this.template = template.trimEnd()`
+(`phases/1-parse/index.js`) — JavaScript's `trimEnd`, i.e. ECMAScript
+`WhiteSpace` ∪ `LineTerminator`. tsv's counterpart (`parser/mod.rs`, the trailing-text
+capture) uses Rust's `str::trim_end`, i.e. the Unicode `White_Space` property. The two
+classes differ at exactly two code points, one in each direction:
+
+| Trailing code point | JS `trimEnd` | Rust `trim_end` | Effect |
+| --- | --- | --- | --- |
+| `U+FEFF` (`<ZWNBSP>`) | strips | keeps | tsv emits a trailing `Text` node Svelte does not |
+| `U+0085` (`<NEL>`) | keeps | strips | Svelte emits a trailing `Text` node tsv does not |
+
+Every other separator (`U+00A0`, `U+2000`, `U+202F`, `U+3000`, `U+180E`, `U+200B`) is in
+both classes or in neither, so it round-trips. The divergence is trailing-position-only —
+a leading or interior occurrence, and any occurrence inside an element, is unaffected.
+
+This is a **bug, not a sanctioned divergence**: it changes the drop-in parse AST and
+propagates into compiled output. The fix is to match the JS class rather than Rust's, and
+it wants a `_svelte_divergence`-shaped fixture pinning both directions.
+
 ---
 
 ## Related
