@@ -1103,31 +1103,111 @@ Deno.test('css_selector_divergence: negative - selector content actually differs
 	assertEquals(match, null);
 });
 
-// ─── annotation_continuation_indent ─────────────────────────────────────────
+// ─── forced_continuation_indent ─────────────────────────────────────────────
 
-Deno.test('annotation_continuation_indent: positive - type after colon line comment indents one level', () => {
+Deno.test('forced_continuation_indent: positive - type after colon line comment indents one level', () => {
 	const prettier = 'const e: // c\nFoo = x;';
 	const ours = 'const e: // c\n\tFoo = x;';
 	const ctx = make_context(ours, prettier, 'svelte');
-	const match = run_pattern('annotation_continuation_indent', ctx);
+	const match = run_pattern('forced_continuation_indent', ctx);
 	assertNotEquals(match, null);
 });
 
-Deno.test('annotation_continuation_indent: negative - ternary branch (line-leading colon)', () => {
+Deno.test('forced_continuation_indent: positive - module header gap (import keyword→source)', () => {
+	const prettier = "import // c\n'a';";
+	const ours = "import // c\n\t'a';";
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('forced_continuation_indent: positive - prefix type operator operand hang', () => {
+	const prettier = 'type A = keyof // c\nB;';
+	const ours = 'type A = keyof // c\n\tB;';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('forced_continuation_indent: positive - key→colon gap (continuation leads with `:`)', () => {
+	const prettier = 'interface A {\n\t[\n\t\tkey // c\n\t\t: string\n\t]: number;\n}';
+	const ours = 'interface A {\n\t[\n\t\tkey // c\n\t\t\t: string\n\t]: number;\n}';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('forced_continuation_indent: positive - block comment sits in the target→colon gap', () => {
+	// `/* */` never runs to end-of-line, so it cannot force the break — it only
+	// separates the annotation target from its colon, which still carries the `//`.
+	const prettier = 'type T = {\n\t[k: string] /* x */ : // c\n\tnumber;\n};';
+	const ours = 'type T = {\n\t[k: string] /* x */ : // c\n\t\tnumber;\n};';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('forced_continuation_indent: negative - ternary branch (line-leading colon)', () => {
 	// A `:` at the start of its line is a ternary branch, not an annotation target;
 	// requiring a word/closer before the colon excludes it.
 	const prettier = 'const x = cond\n\t? a\n\t: // c\nb;';
 	const ours = 'const x = cond\n\t? a\n\t: // c\n\t\tb;';
 	const ctx = make_context(ours, prettier, 'svelte');
-	const match = run_pattern('annotation_continuation_indent', ctx);
+	const match = run_pattern('forced_continuation_indent', ctx);
 	assertEquals(match, null);
 });
 
-Deno.test('annotation_continuation_indent: negative - pure re-indent with no preceding colon comment', () => {
+Deno.test('forced_continuation_indent: negative - pure re-indent with no comment above it', () => {
+	// The bug-class guard. An indentation defect with no comment in play (a wrong
+	// conditional-type body indent is the real precedent) must stay `unknown` — this
+	// detector exists to explain COMMENT-forced continuations, and claiming a bare
+	// re-indent would mask exactly the tsv defect class it most resembles.
 	const prettier = 'foo(\n\tbar\n);';
 	const ours = 'foo(\n\t\tbar\n);';
 	const ctx = make_context(ours, prettier, 'typescript');
-	const match = run_pattern('annotation_continuation_indent', ctx);
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('forced_continuation_indent: negative - indent delta is two levels, not one', () => {
+	// The rule indents "one level". A larger jump under an otherwise-matching header
+	// is some other layout difference and must not ride along.
+	const prettier = "import // c\n'a';";
+	const ours = "import // c\n\t\t'a';";
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('forced_continuation_indent: negative - ours is shallower than prettier', () => {
+	// Opposite direction: prettier indents and tsv flattens. Not this rule.
+	const prettier = "import // c\n\t\t'a';";
+	const ours = "import // c\n\t'a';";
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('forced_continuation_indent: negative - own-line comment above an unrelated re-indent', () => {
+	// An own-line comment is not evidence that a comment forced the continuation:
+	// where one genuinely does lead a continuation, prettier relocates the comment
+	// and the hunk stops being a pure re-indent (so `comment_position` claims it).
+	// A bare comment sitting above some other re-indent must not be claimed here.
+	const prettier = 'const a = 1;\n// c\nfoo(\n\tbar\n);';
+	const ours = 'const a = 1;\n// c\nfoo(\n\t\tbar\n);';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('forced_continuation_indent: negative - content changed, not a pure re-indent', () => {
+	// `is_pure_reindent` is the content-preservation proof the whole detector rests
+	// on: a token differing beyond leading whitespace must fail it, so no content
+	// change can ever be claimed as an indent divergence.
+	const prettier = 'type A = keyof // c\nB;';
+	const ours = 'type A = keyof // c\n\tC;';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('forced_continuation_indent', ctx);
 	assertEquals(match, null);
 });
 

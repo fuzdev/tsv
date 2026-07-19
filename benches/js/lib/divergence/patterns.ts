@@ -302,6 +302,26 @@ function is_pure_reindent(hunk: DiffHunk): boolean {
 	return any_change;
 }
 
+/** A line's leading whitespace, the unit indent comparisons are made in. */
+function leading_ws(line: string): string {
+	return /^[ \t]*/.exec(line)![0];
+}
+
+/**
+ * Whether a pure-re-indent hunk moves every line exactly ONE indent level deeper
+ * on our side — one tab, the only indent tsv emits.
+ *
+ * §Uniform Forced-Continuation Indent states the rule as "indented one level", so
+ * a different delta, or the opposite direction, is a different layout difference
+ * and must stay unclaimed rather than ride along.
+ */
+function is_one_level_deeper(hunk: DiffHunk): boolean {
+	for (let i = 0; i < hunk.removed_lines.length; i++) {
+		if (leading_ws(hunk.added_lines[i]) !== leading_ws(hunk.removed_lines[i]) + '\t') return false;
+	}
+	return true;
+}
+
 /**
  * Whether a pure-re-indent hunk is CSS *selector* content — at least one line is a
  * list item (`…,`), a post-pseudo continuation (`):not(…)`), or a pseudo-class
@@ -1712,37 +1732,103 @@ const short_expr_100: DivergencePattern = {
 	},
 };
 
-const annotation_continuation_indent: DivergencePattern = {
-	id: 'annotation_continuation_indent',
+/**
+ * Which §Uniform Forced-Continuation Indent site a re-indent sits under, or null.
+ *
+ * The rule is one rule — a **line** comment runs to end-of-line, so whatever the
+ * author wrote after it cannot stay on that line; tsv keeps the comment where it
+ * was written and drops the following token to a continuation line indented one
+ * level, where prettier keeps it flush. The clauses below are the sites the doc
+ * enumerates, each keyed on the line PRECEDING the hunk — the construct head the
+ * comment split.
+ *
+ * Keying on that preceding line is what makes the detector safe to widen: an
+ * ordinary indentation bug (a wrong conditional-type body indent, say) has no
+ * comment above it and is never claimed, so this cannot mask the tsv defect class
+ * it most resembles.
+ *
+ * @param prev_ours - Our line immediately above the hunk (the split construct head)
+ * @param first_added - The hunk's first re-indented line, on our side
+ */
+function forced_continuation_site(prev_ours: string, first_added: string): string | null {
+	// `: Type` annotations — a `:` after an annotation target (identifier / `)` /
+	// `]` / `}` / `>`) carrying a trailing line comment, via the shared
+	// `build_type_annotation_doc`. A line-leading `:` (a ternary branch) is excluded
+	// by requiring the preceding word/closer. Block comments may sit in the gap
+	// between the two (`[k: T] /* x */ : // c`) — a `/* */` does not run to
+	// end-of-line, so it never forces the break and only ever separates the target
+	// from its colon.
+	if (/[\w)\]}>][ \t]*(?:\/\*[^*]*\*\/[ \t]*)*:[ \t]*\/\//.test(prev_ours)) {
+		return 'colon→type annotation';
+	}
+
+	// Declaration and module headers — an `import`/`export` header gap whose
+	// comment forces the tail (source, declarator, binding) onto its own line.
+	if (/^[ \t]*(?:import|export)\b.*\/\//.test(prev_ours)) return 'module header';
+
+	// Prefix type operators — the `keyof` / `typeof` / `infer` operand hang, shared
+	// via `append_keyword_value_line_comments`. The keyword must immediately precede
+	// the comment, so a `typeof` elsewhere on a longer line does not qualify.
+	if (/\b(?:keyof|typeof|infer)[ \t]*\/\//.test(prev_ours)) return 'prefix type operator';
+
+	// Before-`:` key/binding gap — the complement of the annotation case: the
+	// comment sits after the key (or its `?`/`!` marker) and the whole `: type`
+	// continuation drops a level, via `build_marker_colon_line_continuation`. The
+	// continuation LEADING with `:` is the discriminator; without it a bare trailing
+	// comment above an indented line would match almost anything.
+	if (/\/\//.test(prev_ours) && /^[ \t]*:/.test(first_added)) return 'key→colon gap';
+
+	// No clause for an OWN-LINE comment leading the continuation: where the author
+	// wrote the comment on its own line, prettier relocates the comment itself, so
+	// the hunk carries that relocation and is not a pure re-indent at all —
+	// `comment_position` claims it. A clause here would have no witness.
+	return null;
+}
+
+const forced_continuation_indent: DivergencePattern = {
+	id: 'forced_continuation_indent',
 	description:
-		'tsv indents a `: Type` annotation continuation one level when a line comment trails the colon; prettier keeps the type flush',
+		'tsv indents a comment-forced continuation one level (annotation, module header, prefix type operator, key→`:` gap); prettier keeps it flush',
 	languages: ['typescript', 'svelte'],
 	conformance_sections: ['Uniform Forced-Continuation Indent', 'Comment Position Philosophy'],
-	fixtures: ['typescript/types/comments/annotation_continuation_indent_prettier_divergence'],
+	fixtures: [
+		'typescript/types/comments/annotation_continuation_indent_prettier_divergence',
+		'typescript/modules/imports/source_line_comment_prettier_divergence',
+		'typescript/modules/exports/source_line_comment_prettier_divergence',
+		'typescript/types/infer/keyword_line_comment_prettier_divergence',
+		'typescript/types/type_operator_keyword_line_comment_prettier_divergence',
+		'typescript/types/type_members/index_signature_key_colon_line_comment_prettier_divergence',
+		'typescript/types/type_members/index_signature_bracket_colon_value_line_comment_prettier_divergence',
+		'typescript/declarations/class/index_signature_bracket_line_comment_positions_prettier_divergence',
+	],
 	detect(ctx) {
 		if (ctx.language !== 'typescript' && ctx.language !== 'svelte') return null;
 		const ours_lines = ctx.ours_lines!;
 
-		// A `:` immediately after an annotation target (identifier / `)` / `]` / `}` /
-		// `>`) carrying a trailing line comment — the colon→type continuation that tsv
-		// drops to its own line indented one level (the shared `build_type_annotation_doc`
-		// rule), where prettier keeps the type flush. A line-leading `:` (a ternary
-		// branch) is excluded by requiring a preceding word/closer. The continuation
-		// itself is a pure re-indent (indentation-only), so no content can be lost.
-		const annotation_colon_comment = /[\w)\]}>][ \t]*:[ \t]*\/\//;
+		// Which sites fired, for the reason line — a file's continuations can come from
+		// more than one gap, and naming them is what makes `--explain` actionable.
+		const sites = new Set<string>();
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
+			// Indentation-only by construction, so claiming the hunk can never mask a
+			// content change — the whole basis for this detector being safe to widen.
 			if (!is_pure_reindent(hunk)) return false;
+			// "one level", as the rule states it: a different delta or the other
+			// direction is some other layout difference and stays unclaimed.
+			if (!is_one_level_deeper(hunk)) return false;
 			const start = hunk.ours_range?.start;
 			if (start == null || start === 0) return false;
-			return annotation_colon_comment.test(ours_lines[start - 1] ?? '');
+			const site = forced_continuation_site(ours_lines[start - 1] ?? '', hunk.added_lines[0]);
+			if (site === null) return false;
+			sites.add(site);
+			return true;
 		});
 
 		if (hunk_indices.length === 0) return null;
 		return {
-			pattern: 'annotation_continuation_indent',
+			pattern: 'forced_continuation_indent',
 			confidence: 'likely',
 			hunk_indices,
-			reason: 'colon→type annotation continuation indents one level after a trailing line comment',
+			reason: `comment-forced continuation indents one level where prettier keeps it flush (${[...sites].join(', ')})`,
 		};
 	},
 };
@@ -2706,7 +2792,7 @@ export const PATTERNS: DivergencePattern[] = [
 	return_type_generic_union,
 	non_null_paren_base,
 	tabs_only_alignment,
-	annotation_continuation_indent,
+	forced_continuation_indent,
 
 	// 4. Svelte-specific patterns
 	menu_block,
