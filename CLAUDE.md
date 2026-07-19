@@ -1013,8 +1013,9 @@ cargo run -p tsv_debug scan_audit --list     # enumerate every scan site
 #     trim; fixture `inline_boundary_whitespace_prettier_divergence`, conformance_prettier.md
 #     §Svelte: Inline content block-style), so hug↔space↔newline reach ONE fixed point at
 #     every content boundary outside pre/textarea. Sanctioned residual: a BOTH-side
-#     newline-authored boundary keeps its multiline layout (newlines are intent), so its
-#     single-boundary mutants settle glued — reported dual-stable, deliberate.
+#     newline-authored boundary around an ELEMENT child keeps its multiline layout
+#     (newlines are intent; text-only content glues regardless — width alone decides), so
+#     its single-boundary mutants settle glued — reported dual-stable, deliberate.
 # The element expansion a mutation may trigger is the property under test. Svelte only.
 # Gated in `deno task check` via the `authoring:audit` task — which scans tests/fixtures
 # ONLY, so point it at a real codebase too: findings live there (a non-idempotent fill
