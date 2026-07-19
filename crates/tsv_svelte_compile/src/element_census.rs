@@ -21,15 +21,23 @@
 //!
 //! # What the walk descends into
 //!
-//! Every fragment that reaches SSR output: element/component/`<svelte:element>`
-//! subtrees, `{#if}` branches, `{#each}` body + fallback, `{#await}` pending + then,
-//! `{#key}`, `{#snippet}` bodies, and `<svelte:head>` content. It deliberately **excludes
-//! `{:catch}`** — tsv drops that branch from output (the oracle's SSR `$.await`
-//! has no catch arm either), so a catch element is never emitted and never an
-//! `element_scope` candidate. Keeping the census leaf set equal to the emitted set
-//! makes the single-selector match byte-identical to the emission-fused slice-3
-//! result. (The sibling nested-descent still visits `{:catch}` for possible
-//! siblings — those elements are tested but never leaves.)
+//! Every fragment the oracle's CSS pass visits: element/component/`<svelte:element>`
+//! subtrees, `{#if}` branches, `{#each}` body + fallback, **all three `{#await}`
+//! arms**, `{#key}`, `{#snippet}` bodies, `<svelte:head>` content, and
+//! `<svelte:boundary>` content.
+//!
+//! That set is deliberately WIDER than the emitted set, in two places: `{:catch}`
+//! (tsv drops the branch, as the oracle's SSR `$.await` has no catch arm) and the
+//! `<svelte:boundary>` children a `pending` snippet discards. The census follows
+//! the oracle's CSS pass rather than emission because pruning is decided BEFORE
+//! emission is: `css-prune.js:1110-1111` pushes `pending`/`then`/`catch` alike, so
+//! a selector matching only dropped content is still KEPT and still scoped.
+//! Narrowing the census to the emitted set instead made such a selector match
+//! nothing, and tsv over-refused it.
+//!
+//! Marking an element emission never reaches is safe: `element_scope` is a span
+//! lookup performed at emission, so an unemitted element is never queried and
+//! contributes nothing to the output.
 //!
 //! # Boundaries the matcher refuses
 //!
@@ -181,7 +189,7 @@ fn span_key(span: Span) -> (u32, u32) {
 
 impl<'a> ElementCensus<'a> {
     /// The path of the census element with span `span`, or `None` when `span` is
-    /// not a census leaf (a component, a `{:catch}` element, …).
+    /// not a census leaf (a component, a slotted element, …).
     fn path_of<'s>(&'s self, span: Span) -> Option<&'s [PathFrame<'a>]> {
         self.by_span
             .get(&span_key(span))
@@ -266,13 +274,28 @@ fn walk_fragment<'a>(
             }
             FragmentNode::AwaitBlock(block) => {
                 path.push(frame);
-                // Pending + then reach SSR output; `{:catch}` is dropped (see the
-                // module docs), so it is not a census leaf.
+                // All THREE arms are descended, `{:catch}` included — even though
+                // the catch arm never reaches SSR output. The oracle's CSS pass
+                // pushes `pending`, `then` and `catch` alike
+                // (`css-prune.js:1110-1111`), so a selector matching only catch
+                // content is still KEPT and still scoped; excluding it here made
+                // such a selector match nothing and over-refuse. Unlike
+                // `<svelte:boundary>`, no distinct owner is needed: `is_block`
+                // holds `AwaitBlock` (`css-prune.js:1240-1246`), so the upward
+                // sibling walk continues through it exactly as `Owner::Await`
+                // already models.
+                //
+                // Safe for the same reason the boundary descent is: `element_scope`
+                // is a span lookup at emission, so an element the census marks but
+                // emission never reaches contributes nothing to the output.
                 if let Some(pending) = &block.pending {
                     walk_fragment(pending.nodes, Owner::Await, path, elements);
                 }
                 if let Some(then) = &block.then {
                     walk_fragment(then.nodes, Owner::Await, path, elements);
+                }
+                if let Some(catch) = &block.catch {
+                    walk_fragment(catch.nodes, Owner::Await, path, elements);
                 }
                 path.pop();
             }
@@ -392,8 +415,8 @@ enum Existence {
 }
 
 /// One possible sibling element and its own path (borrowed from the census `'c`,
-/// for further combinator resolution) — `None` for a `{:catch}` / slotted element,
-/// which is still testable as a leaf but not navigable further.
+/// for further combinator resolution) — `None` for a slotted element, which is
+/// still testable as a leaf but not navigable further.
 #[derive(Clone, Copy)]
 pub(crate) struct SiblingRef<'a, 'c> {
     pub(crate) node: CensusNode<'a>,

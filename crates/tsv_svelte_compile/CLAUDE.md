@@ -449,7 +449,14 @@ project-wide conventions.
   $.props_id($$renderer)` to the component body's first statement, forcing no
   wrapper; duplicate / non-identifier target / carried comment refuse) — a
   `$state.snapshot(x)` declarator UNWRAPPED to its argument `x` (like `$state`;
-  both via `classify_rune_init`, which refuses an optional-chained init) — a
+  both via `classify_rune_init`, which refuses an optional-chained init) — though
+  UNLIKE `$state`, the snapshot binding stays UNKNOWN to the static evaluator, so a
+  template read never folds (`$.escape(s)`). The unwrap is the emission form, not the
+  evaluation form: the oracle evaluates a rune declarator through its argument for
+  `$state` / `$state.raw` / `$derived` only, and every other rune — `$state.snapshot`
+  included — falls to its `default` arm and yields UNKNOWN
+  (`phases/scope.js:469-503`). That holds however the argument itself evaluates — a
+  plain `let` argument does not fold either — a
   **top-level class declaration** rewritten by `rewrite_class_state_fields`: each
   DIRECT non-static, non-computed `$state(v)`/`$state.raw(v)` field UNWRAPPED to `v`
   (a no-arg `field = $state()` → a BARE field, value dropped, NOT `void 0` — the

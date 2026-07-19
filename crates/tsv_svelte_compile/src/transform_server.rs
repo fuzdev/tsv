@@ -54,11 +54,13 @@ use tsv_lang::{Comment, Span};
 use tsv_svelte::ast::internal::{Element, Root, SpecialElement};
 use tsv_ts::ast::internal::{
     BlockStatement, ExportDefaultDeclaration, ExportDefaultValue, Expression, ExpressionStatement,
-    FunctionDeclaration, ObjectExpression, ObjectProperty, Property, PropertyKind, Statement,
-    VariableDeclaration, VariableDeclarationKind,
+    FunctionDeclaration, ImportSpecifier, ObjectExpression, ObjectProperty, Property, PropertyKind,
+    Statement, VariableDeclaration, VariableDeclarationKind,
 };
 
-use crate::analyze::{Bindings, NameSet, RuneInit, Scope, ScopeEntry, classify_rune_init};
+use crate::analyze::{
+    Bindings, NameSet, RuneInit, Scope, ScopeEntry, classify_rune_init, pattern_binding_names,
+};
 use crate::blocks::declaration_stmt;
 use crate::build::Builder;
 use crate::css_scope::{CssScoping, analyze_style, match_scope, splice_scoped_css};
@@ -90,6 +92,10 @@ pub(crate) struct EmitEnv<'arena, 's> {
     /// `binding.kind` is `state` (non-`normal`), so a component whose name is a
     /// `$state` binding is dynamic — this set recovers that distinction.
     pub(crate) state_names: NameSet,
+    /// Top-level names a `bind:` may NOT write to (`const` declarators + import
+    /// locals, from the instance **and** module scripts) — the oracle's
+    /// `constant_binding`. See `attribute::reassignable_bind_target_root`.
+    pub(crate) unassignable_names: NameSet,
     /// Top-level binding names, for recognizing a `$name` store auto-subscription
     /// (`$name` where the `$`-stripped base is a binding → `$.store_get`). Read by
     /// the template value walk ([`fragment::wrap_value_expr`]).
@@ -273,6 +279,14 @@ pub(crate) struct Analysis<'arena> {
     /// Top-level `$state`/`$state.raw` binding names — a component named after
     /// one is dynamic (see `component_dynamic`).
     pub(crate) state_names: NameSet,
+    /// Top-level names a `bind:` may NOT write to: every `const` declarator name and
+    /// every import local, from the instance **and** module scripts — the rule reads
+    /// the declaration KEYWORD, so which script declared the name is immaterial.
+    /// Deliberately SEPARATE from `state_names` rather than
+    /// subtracted from it — `state_names` also drives the component-dynamic
+    /// classification, where a `const c = $state(…)` is still reactive and still
+    /// dynamic. See `attribute::reassignable_bind_target_root`.
+    pub(crate) unassignable_names: NameSet,
     /// The finished `<style>` scoping — selectors parsed **and** matched against the
     /// element census upfront (scoped-element set, per-selector used flags,
     /// per-relative hash-splice flags). `None` when the component has no `<style>`.
@@ -482,8 +496,17 @@ fn analyze<'arena>(
     let component = analyze_component(root, source, instance_body, module_body, &store_names);
 
     // Top-level `$state`/`$state.raw` binding names — a component named after one
-    // is dynamic (see `component_dynamic`). Order-independent (reads only
-    // `instance_body`), so computed here rather than after the loop.
+    // is dynamic (see `component_dynamic`).
+    //
+    // ⚠️ Scanning `instance_body` alone is safe only BECAUSE a module-script rune
+    // refuses upstream: `analyze_module_script` runs its guard walk before this
+    // point, so no module `$state` can reach here. It is NOT a rule about module
+    // scope — the oracle keys component-dynamism on `binding.kind !== 'normal'`
+    // (`2-analyze/visitors/Component.js:14`), and a module `$state` gets kind
+    // `state` exactly like an instance one, so `<script module>let Thing =
+    // $state(null)</script><Thing />` compiles to the DYNAMIC form. Whoever lifts
+    // the module-rune refusal must widen this scan to `module_body` too, or the
+    // component emits a static call where the oracle guards it — a MISMATCH.
     let mut state_names = NameSet::default();
     for stmt in instance_body {
         if let Statement::VariableDeclaration(decl) = stmt {
@@ -502,10 +525,53 @@ fn analyze<'arena>(
         }
     }
 
+    // The names a `bind:` may not write to. The oracle keys `constant_binding` on
+    // the DECLARATION KEYWORD, not on inferred reassignability — an `import` local,
+    // or a `const` binding whose kind is not `each`
+    // (`phases/2-analyze/visitors/shared/utils.js:82-105`) — so a
+    // `const c = $state(0)` is refused as a bind target despite being reactive.
+    // That is why this is its own set and not a filter on `state_names`.
+    //
+    // Spans BOTH bodies, like `import_names` above: the declaration keyword is what
+    // the rule reads, and a module-script `const`/import is exactly as unrebindable
+    // as an instance one.
+    let mut unassignable_names = NameSet::default();
+    for stmt in instance_body.iter().chain(module_body.iter()) {
+        match stmt {
+            Statement::VariableDeclaration(decl) if decl.kind == VariableDeclarationKind::Const => {
+                for declarator in decl.declarations {
+                    // Best-effort: a pattern this cannot enumerate is one
+                    // `analyze_declarator` refuses anyway, so nothing reaches a
+                    // bind gate unnamed.
+                    let mut names = Vec::new();
+                    if pattern_binding_names(&declarator.id, source, &mut names).is_ok() {
+                        for name in names {
+                            unassignable_names.insert(name);
+                        }
+                    }
+                }
+            }
+            Statement::ImportDeclaration(import) => {
+                for spec in import.specifiers {
+                    let local = match spec {
+                        ImportSpecifier::Default(s) => &s.local,
+                        ImportSpecifier::Named(s) => &s.local,
+                        ImportSpecifier::Namespace(s) => &s.local,
+                    };
+                    if let Some(name) = plain_identifier_name(local, source) {
+                        unassignable_names.insert(name);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
     Ok(Analysis {
         bindings,
         derived_names,
         state_names,
+        unassignable_names,
         scope,
         has_comments,
         snippets,
@@ -529,6 +595,7 @@ pub(crate) fn compile_server<'arena>(
         mut bindings,
         derived_names,
         state_names,
+        unassignable_names,
         scope,
         has_comments,
         snippets,
@@ -783,6 +850,7 @@ pub(crate) fn compile_server<'arena>(
         bindings,
         derived_names,
         state_names,
+        unassignable_names,
         store_names,
         store_shadowed,
         uses_stores: component.uses_stores,

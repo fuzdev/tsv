@@ -4442,6 +4442,137 @@ fn assert_refuses(source: &str) {
 }
 
 #[test]
+fn compile_const_bind_target_refuses() {
+    // The oracle's `constant_binding` rejects a bind whose target IDENTIFIER is
+    // `const`-declared or an import — keyed on the declaration keyword, so a
+    // reactive `const c = $state(0)` is refused too. Corpus-invisible (idiomatic
+    // bindables are `let`), so these tests are the only guard.
+    assert_refuses("<script>const c = $state('');</script><input bind:value={c} />");
+    assert_refuses("<script>const c = $state.raw('');</script><input bind:value={c} />");
+    assert_refuses(
+        "<script>const c = $state(false);</script><input type=\"checkbox\" bind:checked={c} />",
+    );
+    // `bind:this` takes any lvalue with no `$state` gate, so it needs the same
+    // guard — including for a plain (non-rune) const and an import.
+    assert_refuses("<script>const el = $state(null);</script><div bind:this={el}></div>");
+    assert_refuses("<script>const el = null;</script><div bind:this={el}></div>");
+    assert_refuses("<script>import {thing} from './m.js';</script><div bind:this={thing}></div>");
+    // The SSR-inert special-element path shares the primitive.
+    assert_refuses("<script>const w = $state(0);</script><svelte:window bind:innerWidth={w} />");
+    // A MODULE-script const or import is unassignable on exactly the same terms —
+    // the rule reads the declaration keyword, not which script declared it. Only
+    // `bind:this` exposes this (the `$state`-gated binds refuse a module binding
+    // anyway, since it never reaches `state_names`), and it exposes it on all
+    // three bind paths.
+    assert_refuses("<script module>const el = null;</script><div bind:this={el}></div>");
+    assert_refuses(
+        "<script module>import {thing} from './m.js';</script><div bind:this={thing}></div>",
+    );
+    assert_refuses(
+        "<script module>const el = null;</script>\
+         <svelte:element this=\"div\" bind:this={el}></svelte:element>",
+    );
+    assert_refuses("<script module>const el = null;</script><svelte:window bind:this={el} />");
+}
+
+#[test]
+fn compile_const_bind_target_through_member_is_allowed() {
+    // The oracle refuses only REBINDING a const name. Writing THROUGH one mutates
+    // the object, so a member-chain target rooted at a const is accepted — its
+    // `validate_no_const_assignment` tests `Identifier` and lets a
+    // `MemberExpression` fall through. Walking the chain to its root here would
+    // over-refuse a common shape, so this pins the boundary.
+    for source in [
+        "<script>const obj = $state({v: ''});</script><input bind:value={obj.v} />",
+        "<script>const obj = $state({el: null});</script><div bind:this={obj.el}></div>",
+        // A plain `let` target is untouched by the const gate.
+        "<script>let c = $state('');</script><input bind:value={c} />",
+        "<script>let el = $state(null);</script><div bind:this={el}></div>",
+        // Same boundary for a MODULE-script const — the member chain writes
+        // through it, so the oracle accepts and the widened set must not refuse.
+        "<script module>const obj = {el: null};</script><div bind:this={obj.el}></div>",
+        // A top-level class or function is `declaration_kind` 'class'/'function',
+        // never 'const', so the oracle's test does not fire — in either script.
+        "<script module>class C {}</script><div bind:this={C}></div>",
+        "<script module>function f() {}</script><div bind:this={f}></div>",
+        "<script>class C {}</script><div bind:this={C}></div>",
+        "<script>function f() {}</script><div bind:this={f}></div>",
+    ] {
+        compile(source, &CompileOptions::default())
+            .unwrap_or_else(|err| panic!("must still compile: {err:?} for:\n{source}"));
+    }
+}
+
+#[test]
+fn compile_optional_chain_bind_target_refuses() {
+    // acorn wraps a chain containing an optional link in a `ChainExpression`, and
+    // the oracle's bind-expression test admits only `Identifier` /
+    // `MemberExpression` / a `{get, set}` pair — so `bind:this={o?.el}` is
+    // `bind_invalid_expression`. tsv has no chain wrapper, so `bind_target_root`
+    // refuses any optional link and the recursion propagates a deeper one up.
+    assert_refuses("<script>const o = $state({el: null});</script><div bind:this={o?.el}></div>");
+    assert_refuses(
+        "<script>let o = $state({a: {b: null}});</script><div bind:this={o?.a.b}></div>",
+    );
+    assert_refuses(
+        "<script>let o = $state({a: {b: null}});</script><div bind:this={o.a?.b}></div>",
+    );
+    assert_refuses("<script>let o = $state({v: ''});</script><input bind:value={o?.v} />");
+    assert_refuses(
+        "<script>let o = $state({w: 0});</script><svelte:window bind:innerWidth={o?.w} />",
+    );
+    // The non-optional chain is untouched.
+    compile(
+        "<script>let o = $state({el: null});</script><div bind:this={o.el}></div>",
+        &CompileOptions::default(),
+    )
+    .expect("a plain member chain must still compile");
+}
+
+#[test]
+fn compile_template_scoped_const_bind_target_over_accepts() {
+    // TRACKED over-acceptance, pre-existing and shared with the regular-element
+    // path: a `{@const}` name and a `{:then}`/`{:catch}` value are declared
+    // `declaration_kind: 'const'` (kind `'template'`, not `'each'`), so the oracle
+    // raises `constant_binding` — while `unassignable_names` sees top-level script
+    // statements only and tsv compiles. Pinned as a CURRENT-BEHAVIOR test so the
+    // gap is visible and flips loudly when template scopes are modeled.
+    for source in [
+        "<script>let p = $state(0);</script>{#await p then v}<div bind:this={v}></div>{/await}",
+        "<script>let c = $state(0);</script>{#if c}{@const o = {}}<div bind:this={o}></div>{/if}",
+    ] {
+        compile(source, &CompileOptions::default()).unwrap_or_else(|err| {
+            panic!("over-acceptance closed — update the doc residuals: {err:?} for:\n{source}")
+        });
+    }
+}
+
+#[test]
+fn compile_duplicate_props_rune_refuses() {
+    // The oracle's `props_duplicate` rejects a second `$props()`. Corpus-invisible
+    // (no real component writes it), so this test is the only guard.
+    assert_refuses("<script>let {a} = $props(); let {b} = $props();</script>{a}{b}");
+    assert_refuses("<script>let {a} = $props(); let {b} = $props(); let {c} = $props();</script>");
+    // Both declarators in ONE statement is the same duplicate.
+    assert_refuses("<script>let {a} = $props(), {b} = $props();</script>{a}{b}");
+    // A non-destructured second `$props()` duplicates just the same.
+    assert_refuses("<script>let {a} = $props(); let rest = $props();</script>{a}");
+    // A single `$props()` still compiles — the guard must not fire on one.
+    compile(
+        "<script>let {a} = $props();</script>{a}",
+        &CompileOptions::default(),
+    )
+    .expect("a single $props() must still compile");
+    // `$props()` and `$props.id()` are tracked separately (the oracle keeps two
+    // flags), so one of each is NOT a duplicate.
+    compile(
+        "<script>let {a} = $props(); let i = $props.id();</script>{a}{i}",
+        &CompileOptions::default(),
+    )
+    .expect("$props() alongside $props.id() must still compile");
+}
+
+#[test]
 fn compile_use_directive_on_load_error_element_refuses() {
     // `use:` on a load-error element makes the oracle add onload/onerror capture
     // attributes (its `events_to_capture` set) — not implemented, so refuse.

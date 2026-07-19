@@ -531,11 +531,26 @@ pub(crate) fn analyze_script<'arena>(
     bindings: &mut Bindings<'arena>,
     derived_names: &mut NameSet,
 ) -> Result<(), CompileError> {
+    // The oracle's duplicate-`$props()` flag is per-SCRIPT state — its analyze phase
+    // seeds a fresh `has_props_rune: false` for the module and the instance analysis
+    // alike (`phases/2-analyze/index.js:313,725,793`) — so the flag is scoped to one
+    // `analyze_script` call and the export recursion inside it, not to the component.
+    let mut seen_props = false;
+    analyze_script_in(stmts, source, bindings, derived_names, &mut seen_props)
+}
+
+fn analyze_script_in<'arena>(
+    stmts: &'arena [Statement<'arena>],
+    source: &str,
+    bindings: &mut Bindings<'arena>,
+    derived_names: &mut NameSet,
+    seen_props: &mut bool,
+) -> Result<(), CompileError> {
     for stmt in stmts {
         match stmt {
             Statement::VariableDeclaration(decl) => {
                 for declarator in decl.declarations {
-                    analyze_declarator(declarator, source, bindings, derived_names)?;
+                    analyze_declarator(declarator, source, bindings, derived_names, seen_props)?;
                 }
             }
             Statement::FunctionDeclaration(f) => {
@@ -597,7 +612,13 @@ pub(crate) fn analyze_script<'arena>(
             // analysis is consumed, so this only ever fires for the module.
             Statement::ExportNamedDeclaration(export) => {
                 if let Some(decl) = export.declaration {
-                    analyze_script(std::slice::from_ref(decl), source, bindings, derived_names)?;
+                    analyze_script_in(
+                        std::slice::from_ref(decl),
+                        source,
+                        bindings,
+                        derived_names,
+                        seen_props,
+                    )?;
                 }
             }
             _ => {}
@@ -665,6 +686,7 @@ fn analyze_declarator<'arena>(
     source: &str,
     bindings: &mut Bindings<'arena>,
     derived_names: &mut NameSet,
+    seen_props: &mut bool,
 ) -> Result<(), CompileError> {
     let rune = declarator
         .init
@@ -673,6 +695,17 @@ fn analyze_declarator<'arena>(
 
     match rune {
         Some(RuneInit::Props) => {
+            // The oracle rejects a second `$props()` (`props_duplicate`) from its
+            // analyze-phase `CallExpression` visitor
+            // (`phases/2-analyze/visitors/CallExpression.js:68-73`), BEFORE the
+            // placement check — so the duplicate wins over `props_invalid_placement`
+            // when both apply. Only a top-level declarator init is inspected here;
+            // a `$props()` in any other position already refuses on its own path,
+            // so this sees every shape tsv would otherwise accept.
+            if *seen_props {
+                return Err(unsupported(Refusal::DuplicateProps));
+            }
+            *seen_props = true;
             let mut names = Vec::new();
             pattern_binding_names(&declarator.id, source, &mut names)?;
             for name in names {
@@ -721,19 +754,27 @@ fn analyze_declarator<'arena>(
             );
             Ok(())
         }
-        Some(RuneInit::StateSnapshot(arg)) => {
-            // `const s = $state.snapshot(x)` unwraps to `const s = x`; the binding
-            // evaluates through `x` exactly as `x` itself would. A destructured
-            // target refuses — the oracle lowers `const {a} = $state.snapshot(x)`
-            // into a temp-destructure (`const tmp = x, a = tmp.a`), a shape this
-            // transform does not reproduce (a safe over-refusal).
+        Some(RuneInit::StateSnapshot(_)) => {
+            // `const s = $state.snapshot(x)` unwraps to `const s = x` for EMISSION,
+            // but the binding stays UNKNOWN to the evaluator — the unwrap is the
+            // emission form, not the evaluation form. The oracle evaluates a rune
+            // declarator through its argument for `$state` / `$state.raw` /
+            // `$derived` only; every other rune, `$state.snapshot` included, falls
+            // to the `default` arm and yields UNKNOWN, so a `{s}` read never folds
+            // (`$.escape(s)`). That holds however the argument itself evaluates —
+            // a plain `let` argument does not fold either.
+            //
+            // A destructured target refuses — the oracle lowers
+            // `const {a} = $state.snapshot(x)` into a temp-destructure
+            // (`const tmp = x, a = tmp.a`), a shape this transform does not
+            // reproduce (a safe over-refusal).
             let name = identifier_binding_name(&declarator.id, source)
                 .ok_or_else(|| unsupported(Refusal::DestructuringStateSnapshot))?;
             bindings.insert(
                 name,
                 Binding {
                     kind: BindingKind::Normal,
-                    initial: Initial::Expr(arg),
+                    initial: Initial::None,
                     updated: false,
                 },
             );

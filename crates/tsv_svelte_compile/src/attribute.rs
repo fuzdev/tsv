@@ -1178,10 +1178,20 @@ fn classify_input_type(env: &EmitEnv<'_, '_>, element: &Element<'_>) -> InputTyp
 /// The root identifier name of a bind target that is an `Identifier` or a member
 /// chain rooted at one (`v`, `obj.x`, `a[i].b`); `None` for any other shape (a
 /// call, literal, binary — not an lvalue root). Mirrors the oracle's `object()`.
+///
+/// An **optional** link anywhere in the chain (`o?.el`, `o?.a.b`) yields `None`:
+/// acorn wraps a chain containing one in a `ChainExpression`, so the oracle's
+/// `bind_invalid_expression` test — which admits only `Identifier` /
+/// `MemberExpression` / a `{get, set}` `SequenceExpression` — rejects it. tsv's
+/// internal AST has no chain wrapper (the flag rides each member), so the refusal
+/// is expressed by refusing any optional link; the recursion propagates it from a
+/// deeper link up.
 fn bind_target_root(expr: &Expression<'_>, source: &str) -> Option<String> {
     match expr {
         Expression::Identifier(id) => plain_identifier_name(id, source),
-        Expression::MemberExpression(member) => bind_target_root(member.object, source),
+        Expression::MemberExpression(member) if !member.optional => {
+            bind_target_root(member.object, source)
+        }
         _ => None,
     }
 }
@@ -1195,12 +1205,48 @@ fn is_get_set_pair(expr: &Expression<'_>) -> bool {
     matches!(expr, Expression::SequenceExpression(seq) if seq.expressions.len() == 2)
 }
 
-/// Erase + guard + gate the bind target, returning the emitted expression. The
-/// expression-validity gate keeps tsv on the SAFE side of the oracle's assignable
-/// lvalue rule: emit only a `$state`-rooted `Identifier`/member chain (the crate's
-/// one supported bindable). The oracle also accepts props, bindable props,
-/// reassigned plain lets, and each/store bindings — tsv over-refuses those (never
-/// over-accepts).
+/// The bind target's root name, but only when that root is something the oracle
+/// will let a `bind:` WRITE to. `None` when the expression is not an
+/// `Identifier`/member-chain lvalue at all, **or** when its root is one the oracle
+/// rejects with `constant_binding`.
+///
+/// The oracle keys that rejection on the DECLARATION KEYWORD, not on inferred
+/// reassignability (`phases/2-analyze/visitors/shared/utils.js:82-105`): an
+/// `import` local, or a `const` binding whose kind is not `each`. So a
+/// `const c = $state(0)` is refused as a bind target even though it is reactive —
+/// which is exactly why `env.unassignable_names` is its own set rather than a
+/// filter on `state_names` (that set also drives component-dynamic classification,
+/// where the same binding IS dynamic).
+///
+/// This is the single seam every `bind:` target check shares — the `$state`-gated
+/// ones ([`emitted_bind_target`], [`validate_inert_bind_target`]) and the
+/// `bind:this` branches, which take any lvalue with no `$state` gate and so would
+/// otherwise accept a `const`/import target unchallenged.
+///
+/// ⚠️ The set it consults ([`crate::transform_server::EmitEnv::unassignable_names`])
+/// is keyed on **top-level script statements only**, so the rule is closed for a
+/// top-level `const`/import and OPEN for a TEMPLATE-scoped one. A `{@const}` name
+/// (`scope.js:1099`/`1111`) and a `{:then}`/`{:catch}` value (`:1310`/`:1324`) are
+/// declared `declaration_kind: 'const'` with kind `'template'` — not `'each'` — so
+/// the oracle's `validate_no_const_assignment` rejects a bind to one exactly as it
+/// rejects a top-level `const`, while tsv compiles it. Closing that half needs tsv
+/// to model template scopes; see `../../docs/checklist_svelte_compiler.md`.
+fn reassignable_bind_target_root(env: &EmitEnv<'_, '_>, expr: &Expression<'_>) -> Option<String> {
+    let name = bind_target_root(expr, env.source)?;
+    // The rejection applies to a BARE identifier target only. The oracle's
+    // `validate_no_const_assignment` recurses through array/object PATTERNS and
+    // tests `argument.type === 'Identifier'`; a `MemberExpression` argument matches
+    // no branch and falls through with no error. That is not an oversight — writing
+    // through a const binding (`const o = $state({v: ''})` + `bind:value={o.v}`)
+    // MUTATES the object and never rebinds the name, so only rebinding the name
+    // itself is refused. Walking to the member-chain root here instead would
+    // over-refuse a common shape.
+    if matches!(expr, Expression::Identifier(_)) && env.unassignable_names.contains(&name) {
+        return None;
+    }
+    Some(name)
+}
+
 fn emitted_bind_target<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     directive: &'arena BindDirective<'arena>,
@@ -1209,7 +1255,7 @@ fn emitted_bind_target<'arena>(
     // The template borrow point: erase the bind target once, then gate its erased
     // shape (an `x as T` target is `x`, an assignable lvalue).
     let expr = env.erase(&directive.expression)?;
-    match bind_target_root(expr, env.source) {
+    match reassignable_bind_target_root(env, expr) {
         Some(name) if env.state_names.contains(&name) => {}
         _ => return refuse_bind(bind_name),
     }
@@ -1222,8 +1268,9 @@ fn emitted_bind_target<'arena>(
 /// already whitelisted by the caller). Reproduces the SAME reassignable-lvalue rule
 /// regular elements enforce, reusing the shared primitives so the two never drift:
 ///
-/// - `bind:this` accepts any `Identifier`/member-chain lvalue or a `{get, set}`
-///   pair, no `$state` gate — exactly [`resolve_bind_directive`]'s `this` branch.
+/// - `bind:this` accepts any reassignable `Identifier`/member-chain lvalue or a
+///   `{get, set}` pair, no `$state` gate — exactly [`resolve_bind_directive`]'s
+///   `this` branch.
 /// - every other (whitelisted-name) bind requires a `$state`-rooted
 ///   `Identifier`/member lvalue — the SAFE gate [`emitted_bind_target`] applies,
 ///   over-refusing a prop / plain reassignable `let` / each binding (which the
@@ -1232,14 +1279,16 @@ fn emitted_bind_target<'arena>(
 ///   reach `state_names`, so both refuse — matching the oracle's own
 ///   `bind_invalid_expression` / `constant_binding` / `bind_invalid_value`.
 ///
-/// One residual over-acceptance stays open, PRE-EXISTING and SHARED with the
-/// regular-element / `<input>` bind path: `state_names` records a `$state` /
-/// `$state.raw` root without tracking whether it was declared `const` or `let`, so
-/// `const c = $state(0)` + `bind:innerWidth={c}` (and a `const` `bind:this` target,
-/// which takes any lvalue with no `$state` gate) compiles here where the oracle
-/// rejects it (`constant_binding`). Closing it needs reassignability tracking on the
-/// binding table — a dedicated shared-primitive slice covering [`emitted_bind_target`]
-/// and [`resolve_bind_directive`]'s `this` branch at once, not this inert path alone.
+/// The oracle's `constant_binding` rule is enforced on both paths at once by the
+/// shared [`reassignable_bind_target_root`], so a **top-level** `const`-declared or
+/// imported target refuses here exactly as it does on the regular-element path.
+///
+/// ⚠️ That closes the top-level half only. A TEMPLATE-scoped const target — a
+/// `{@const}` name, or a `{:then}`/`{:catch}` value — is just as `const`-declared to
+/// the oracle (`constant_binding`) and still compiles here, because
+/// `unassignable_names` is built from top-level script statements alone. Two open
+/// over-acceptances, both pre-existing and shared with the regular-element path; see
+/// [`reassignable_bind_target_root`] and `../../docs/checklist_svelte_compiler.md`.
 ///
 /// A failure refuses with the collapsing `Refusal::BindDirective { name }` bucket.
 pub(crate) fn validate_inert_bind_target<'arena>(
@@ -1251,12 +1300,12 @@ pub(crate) fn validate_inert_bind_target<'arena>(
     // regular fork does before gating the target's shape.
     let expr = env.erase(&directive.expression)?;
     if bind_name == "this" {
-        if bind_target_root(expr, env.source).is_some() || is_get_set_pair(expr) {
+        if reassignable_bind_target_root(env, expr).is_some() || is_get_set_pair(expr) {
             return Ok(());
         }
         return refuse_bind(&bind_name);
     }
-    match bind_target_root(expr, env.source) {
+    match reassignable_bind_target_root(env, expr) {
         Some(name) if env.state_names.contains(&name) => Ok(()),
         _ => refuse_bind(&bind_name),
     }
@@ -1282,7 +1331,7 @@ pub(crate) fn validate_dynamic_bind<'arena>(
     let bind_name = directive.name_span.extract(env.source).to_string();
     if bind_name == "this" {
         let expr = env.erase(&directive.expression)?;
-        if bind_target_root(expr, env.source).is_some() || is_get_set_pair(expr) {
+        if reassignable_bind_target_root(env, expr).is_some() || is_get_set_pair(expr) {
             return Ok(());
         }
         return refuse_bind(&bind_name);
@@ -1413,7 +1462,7 @@ fn resolve_bind_directive<'arena>(
     // `bind:this={x as T}` TS wrapper first.
     if bind_name == "this" {
         let expr = env.erase(&directive.expression)?;
-        if bind_target_root(expr, env.source).is_some() || is_get_set_pair(expr) {
+        if reassignable_bind_target_root(env, expr).is_some() || is_get_set_pair(expr) {
             return Ok(BindEmission::Omit);
         }
         return refuse_bind(&bind_name);

@@ -214,6 +214,10 @@ pub enum Refusal {
     /// A second `$props.id()` in the component (the oracle's `props_duplicate`).
     #[error("$props.id() used more than once")]
     DuplicatePropsId,
+    /// A second `$props()` in the component (the oracle's `props_duplicate`, raised
+    /// from its analyze-phase `CallExpression` visitor before the placement check).
+    #[error("$props() used more than once")]
+    DuplicateProps,
     /// A class-field `$state(…)` / `$state.raw(…)` whose **whole** argument is a
     /// lone reactive-binding identifier — a store read (`$state($count)`) or a
     /// `$derived` binding (`$state(d)`). The oracle keeps such a lone reactive read
@@ -912,6 +916,7 @@ impl Refusal {
                 Cow::Borrowed("$props.id() outside a plain top-level variable declaration")
             }
             Self::DuplicatePropsId => Cow::Borrowed("$props.id() used more than once"),
+            Self::DuplicateProps => Cow::Borrowed("$props() used more than once"),
             Self::ClassFieldStateReactiveArg => Cow::Borrowed(
                 "class-field $state with a lone store/$derived argument (the oracle keeps it bare)",
             ),
