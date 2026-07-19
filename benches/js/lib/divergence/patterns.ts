@@ -1889,6 +1889,21 @@ function forced_continuation_site(prev_ours: string, first_added: string): strin
 	// comment forces the tail (source, declarator, binding) onto its own line.
 	if (/^[ \t]*(?:import|export)\b.*\/\//.test(prev_ours)) return 'module header';
 
+	// The DECLARATION half of the same doc bullet ("keyword→name"): a line comment
+	// in a declaration's keyword-to-name gap (`function // c⏎f()`, `class // c⏎C {}`,
+	// `enum // c⏎E {}`), which drops the name to a continuation indented one level
+	// where prettier keeps it flat. The keyword must IMMEDIATELY precede the comment,
+	// so a body-open-brace comment (`function f() { // c`) — an entirely different
+	// gap — cannot match.
+	//
+	// The keyword set is closed to the three that are RESERVED words, because those
+	// are the only ones with a witness. `interface`/`namespace`/`module`/`type` are
+	// contextual keywords: with the name on the next line the construct is not a
+	// declaration at all — Svelte's parser and prettier both REJECT the first three,
+	// and all four tools agree to read `type` as an expression statement (`type;`),
+	// so none of them can produce this divergence.
+	if (/\b(?:function|class|enum)\b\*?[ \t]*\/\//.test(prev_ours)) return 'declaration header';
+
 	// Prefix type operators — the `keyof` / `typeof` / `infer` operand hang, shared
 	// via `append_keyword_value_line_comments`. The keyword must immediately precede
 	// the comment, so a `typeof` elsewhere on a longer line does not qualify.
@@ -1911,7 +1926,7 @@ function forced_continuation_site(prev_ours: string, first_added: string): strin
 const forced_continuation_indent: DivergencePattern = {
 	id: 'forced_continuation_indent',
 	description:
-		'tsv indents a comment-forced continuation one level (annotation, module header, prefix type operator, key→`:` gap); prettier keeps it flush',
+		'tsv indents a comment-forced continuation one level (annotation, declaration/module header, prefix type operator, key→`:` gap); prettier keeps it flush',
 	languages: ['typescript', 'svelte'],
 	conformance_sections: ['Uniform Forced-Continuation Indent', 'Comment Position Philosophy'],
 	fixtures: [
@@ -1924,6 +1939,10 @@ const forced_continuation_indent: DivergencePattern = {
 		'typescript/types/type_members/index_signature_key_colon_line_comment_prettier_divergence',
 		'typescript/types/type_members/index_signature_bracket_colon_value_line_comment_prettier_divergence',
 		'typescript/declarations/class/index_signature_bracket_line_comment_positions_prettier_divergence',
+		// The declaration-header clause's only witness, so it is listed deliberately:
+		// if this fixture stops being claimed the clause is dead, and nothing else
+		// would say so.
+		'typescript/syntax/comments/keyword_name_line_comment_prettier_divergence',
 	],
 	detect(ctx) {
 		if (ctx.language !== 'typescript' && ctx.language !== 'svelte') return null;

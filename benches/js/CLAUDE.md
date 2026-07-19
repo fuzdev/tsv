@@ -633,13 +633,13 @@ Divergence Detection Audit Report
 ==================================================
 
 Documented divergences: 526
-Fully explained:        435
+Fully explained:        436
 Partial (hunks left):   25
-Undetected (real gaps): 51
+Undetected (real gaps): 50
 Ungradeable:            15  (pin no prettier form to test)
 Detection:              83%  (85% of gradeable)
 
-Listed in fixtures[]:   155
+Listed in fixtures[]:   156
 Explained but unlisted: 291  (bookkeeping, not a gap)
 
 Undetected Fixtures (pin a prettier form, no pattern explains it):

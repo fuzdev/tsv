@@ -1147,6 +1147,57 @@ Deno.test('forced_continuation_indent: positive - block comment sits in the targ
 	assertNotEquals(match, null);
 });
 
+Deno.test('forced_continuation_indent: positive - declaration header gap (keyword→name)', () => {
+	const prettier = 'function // c\nf1() {}';
+	const ours = 'function // c\n\tf1() {}';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('forced_continuation_indent: positive - generator `*` sits between keyword and comment', () => {
+	const prettier = 'function* // c\ng1() {}';
+	const ours = 'function* // c\n\tg1() {}';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('forced_continuation_indent: negative - body-open-brace comment is a different gap', () => {
+	// The keyword must IMMEDIATELY precede the comment. Here the comment trails the
+	// body's `{`, so it never split a keyword from its name — claiming it would let
+	// the clause absorb any re-indent under any function.
+	const prettier = 'function f() { // c\nbar;\n}';
+	const ours = 'function f() { // c\n\tbar;\n}';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('forced_continuation_indent: negative - prettier RELOCATES the keyword-gap comment', () => {
+	// The anonymous class/function expression shape (`expr_anon_line_comment`): the
+	// head matches the clause's regex, but prettier moves the comment into the body
+	// rather than merely flattening the indent, so `is_pure_reindent` must reject it.
+	// That relocation is `comment_position`'s to claim, not this pattern's.
+	const prettier = 'const a = class {\n\t// c1\n};';
+	const ours = 'const a = class // c1\n{};';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('forced_continuation_indent: negative - contextual keyword is not a declaration head', () => {
+	// The clause's keyword set is closed to the RESERVED words. With the name on the
+	// next line `interface` is not a declaration keyword at all — Svelte's parser and
+	// prettier both reject this input — so no such divergence exists to explain, and
+	// a clause claiming one would be keying on a construct that cannot occur.
+	const prettier = 'interface // c\nX {}';
+	const ours = 'interface // c\n\tX {}';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertEquals(match, null);
+});
+
 Deno.test('forced_continuation_indent: negative - ternary branch (line-leading colon)', () => {
 	// A `:` at the start of its line is a ternary branch, not an annotation target;
 	// requiring a word/closer before the colon excludes it.
