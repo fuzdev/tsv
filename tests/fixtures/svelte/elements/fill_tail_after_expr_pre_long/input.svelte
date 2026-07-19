@@ -4,3 +4,8 @@
 <pre>
 	aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ~{xxxxxxxxxx} cc
 </pre>
+
+<!-- Same for <textarea>, the other whitespace-sensitive element. -->
+<textarea>
+	aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ~{xxxxxxxxxx} cc
+</textarea>

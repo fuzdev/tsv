@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 348,
+	"end": 543,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -73,6 +73,85 @@
 							"type": "Text",
 							"start": 337,
 							"end": 341,
+							"raw": " cc\n",
+							"data": " cc\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 347,
+				"end": 349,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 349,
+				"end": 418,
+				"data": " Same for <textarea>, the other whitespace-sensitive element. "
+			},
+			{
+				"type": "Text",
+				"start": 418,
+				"end": 419,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 419,
+				"end": 542,
+				"name": "textarea",
+				"name_loc": {
+					"start": {
+						"line": 9,
+						"column": 1,
+						"character": 420
+					},
+					"end": {
+						"line": 9,
+						"column": 9,
+						"character": 428
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"start": 429,
+							"end": 515,
+							"type": "Text",
+							"raw": "\n\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ~",
+							"data": "\n\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ~"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 515,
+							"end": 527,
+							"expression": {
+								"type": "Identifier",
+								"start": 516,
+								"end": 526,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 86
+									},
+									"end": {
+										"line": 10,
+										"column": 96
+									}
+								},
+								"name": "xxxxxxxxxx"
+							}
+						},
+						{
+							"start": 527,
+							"end": 531,
+							"type": "Text",
 							"raw": " cc\n",
 							"data": " cc\n"
 						}
