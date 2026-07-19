@@ -352,6 +352,47 @@ function extract_comment_content(line: string): string {
 }
 
 /**
+ * Every line-comment text on a line, undoing prettier's MERGE of several
+ * trailing line comments onto one.
+ *
+ * `extract_comment_content` takes everything after the first `//`, which is
+ * right for one comment but wrong for the merged form: relocating two trailing
+ * line comments onto a single line (`a // c1 // c2`) makes the second `//` mere
+ * TEXT of the first — the information-losing merge tsv deliberately diverges
+ * from by preserving position and continuation-indenting instead
+ * (`docs/conformance_prettier.md` §Comment Position Philosophy). Read as one
+ * comment, that side's text (`c1 // c2`) matches neither of ours, so the
+ * detector missed precisely the canonical instances of the family.
+ *
+ * Splitting on the inner `//` inverts the merge. A `//` preceded by `:` is
+ * skipped so a URL inside a comment (`// see http://x`) stays one text rather
+ * than splitting into two spurious ones.
+ *
+ * Returns `[]` for a line with no `//` (a block comment — the caller falls back
+ * to `extract_comment_content`).
+ */
+export function extract_line_comment_contents(line: string): string[] {
+	const start = line.indexOf('//');
+	if (start === -1) return [];
+	const body = line.slice(start + 2);
+
+	const parts: string[] = [];
+	let current = '';
+	for (let i = 0; i < body.length; i++) {
+		if (body[i] === '/' && body[i + 1] === '/' && body[i - 1] !== ':') {
+			parts.push(current);
+			current = '';
+			i++; // skip the second `/`
+			continue;
+		}
+		current += body[i];
+	}
+	parts.push(current);
+
+	return parts.map((p) => p.trim()).filter((p) => p.length > 0);
+}
+
+/**
  * Check if a comment with the given text content exists in the output.
  * Searches for the text preceded by comment delimiters rather than matching
  * the bare text anywhere — prevents "map" from matching `arr.map(...)`.
@@ -1566,60 +1607,6 @@ const fill_after_inline: DivergencePattern = {
 	},
 };
 
-const block_multiline_attrs_hug: DivergencePattern = {
-	id: 'block_multiline_attrs_hug',
-	description: 'Block element with multiline attrs, we break >',
-	languages: ['svelte'],
-	conformance_sections: ['Svelte/HTML'],
-	// The committed fixture (`<pre>` with multiline attrs) hugs `">{expr}</pre>`
-	// on the attr line in prettier while ours breaks the `>` — but the `>` is not
-	// alone on a line (it carries `{expr}</pre>`), and the `<pre` open tag is a
-	// context line that falls OUTSIDE the single change hunk's range, so neither
-	// the `>`-alone predicate nor the whitespace-sensitive-element context check
-	// this detector keys on can fire. The conformance doc bins this fixture with
-	// the fill-boundary family (prettier fills past print width, we break), which
-	// `fill_101_boundary` detects — so the fixture is claimed there.
-	fixtures: [],
-	detect(ctx) {
-		if (ctx.language !== 'svelte') return null;
-
-		// For each hunk, check if it involves a whitespace-sensitive element
-		// AND shows > placement differences
-		const ours_lines = ctx.ours_lines!;
-		const prettier_lines = ctx.prettier_lines!;
-
-		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
-			// Check for > on its own line in added lines (we break)
-			const added_breaks_gt = hunk.added_lines.some((l) => /^\t*>$/.test(l));
-			// Check for attr followed by > on same line in removed lines (prettier hugs)
-			const removed_hugs_gt = hunk.removed_lines.some((l) => /['"]\s*>/.test(l));
-
-			if (!added_breaks_gt && !removed_hugs_gt) return false;
-
-			// Verify context involves a whitespace-sensitive element
-			// Check ours and prettier lines in hunk range for <pre or <textarea
-			const ws_element = /<(?:pre|textarea)/i;
-			const o_lines = ours_lines_in_hunk(ours_lines, hunk);
-			const p_lines = prettier_lines_in_hunk(prettier_lines, hunk);
-			const context_lines = hunk.lines.filter((l) => l.type === 'same').map((l) => l.line);
-
-			return o_lines.some((l) => ws_element.test(l)) ||
-				p_lines.some((l) => ws_element.test(l)) ||
-				context_lines.some((l) => ws_element.test(l));
-		});
-
-		if (hunk_indices.length > 0) {
-			return {
-				pattern: 'block_multiline_attrs_hug',
-				confidence: 'likely',
-				hunk_indices,
-				reason: 'Block element with multiline attrs, we break > to new line',
-			};
-		}
-		return null;
-	},
-};
-
 const comment_preserved: DivergencePattern = {
 	id: 'comment_preserved',
 	description: 'We preserve a comment inside {…}/a tag that Prettier drops',
@@ -2329,8 +2316,18 @@ const comment_position: DivergencePattern = {
 			// AND the hunk is primarily about comment repositioning (non-comment
 			// content should be similar). This prevents claiming hunks where the
 			// real diff is code layout and comments are incidentally present.
-			const added_texts = added_comment_lines.map(extract_comment_content).sort();
-			const removed_texts = removed_comment_lines.map(extract_comment_content).sort();
+			//
+			// A line may carry SEVERAL line comments once prettier merges them
+			// (`a // c1 // c2`), so each line contributes every comment text on it —
+			// see `extract_line_comment_contents`. Without that split the merged side
+			// reads as one comment named `c1 // c2`, overlapping nothing, and the
+			// hunk goes unclaimed even though its single-comment sibling is claimed.
+			const comment_texts = (line: string): string[] => {
+				const line_comments = extract_line_comment_contents(line);
+				return line_comments.length > 0 ? line_comments : [extract_comment_content(line)];
+			};
+			const added_texts = added_comment_lines.flatMap(comment_texts).sort();
+			const removed_texts = removed_comment_lines.flatMap(comment_texts).sort();
 
 			// Comment content must overlap (at least some comments have same text)
 			const added_set = new Set(added_texts);
@@ -2717,7 +2714,6 @@ export const PATTERNS: DivergencePattern[] = [
 	inline_content_block_style,
 	svelte_boundary_ws_trim,
 	fill_after_inline,
-	block_multiline_attrs_hug,
 	comment_preserved,
 	short_expr_100,
 

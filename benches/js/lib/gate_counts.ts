@@ -486,9 +486,19 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
  */
 export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	svelte: 1,
-	typescript: 54,
+	typescript: 53,
 	css: 9,
 };
+// typescript 54→53 (2026-07-19, ../svelte b4d1583ae, ../kit da5b08ea7, ../svelte.dev c21c2d0,
+// ../prettier 1dcd0b0; svelte 1 + css 9 unchanged, SAFETY 0). `comment_position` now splits
+// the MERGED trailing-line-comment form prettier produces (`a // c1 // c2`), so
+// prettier/tests/format/js/for-of/comments.js moves partial→known — its `//3b //3c` and
+// `//8b //8c` lines are exactly that shape, and read as one comment their text overlapped
+// neither side, leaving those hunks unexplained while their single-comment siblings were
+// claimed. A whole-corpus before/after per-file bucket diff on identical checkouts confirms
+// exactly this one file moved: `unknown` byte-identical at 162 (nothing masked), errors and
+// SAFETY unchanged. The widening cannot excuse content loss — `comment_position` does not
+// declare `may_alter_char_frequency`, so it can never vouch a SAFETY differential.
 // svelte 0→1 + typescript 55→54 (2026-07-18, checkouts unchanged; SAFETY 0). svelte: the
 // boundary trim explains one hunk of prettier/tests/format/html/js/template-literal.html
 // (formerly unknown), leaving its pre-existing nested-`<script>` template-literal-interior
