@@ -15,6 +15,7 @@ import {
 	type DivergenceMatch,
 	detect_divergences,
 	enrich_detection_context,
+	extract_line_comment_contents,
 	PATTERNS,
 	visual_width,
 } from './patterns.ts';
@@ -778,6 +779,41 @@ Deno.test('comment_position: positive - comment moved to different line', () => 
 	assertNotEquals(match, null);
 });
 
+Deno.test('comment_position: positive - prettier MERGED two trailing line comments', () => {
+	// The canonical shape of this divergence family: prettier relocates both
+	// comments onto one line, where the second `//` becomes mere TEXT of the
+	// first (an information-losing merge); tsv preserves position and
+	// continuation-indents. Read as a single comment the merged side is named
+	// `c1 // c2`, which overlaps neither of ours — so this went unclaimed while
+	// its single-comment sibling was claimed.
+	const prettier = 'const b = 2; // c1 // c2';
+	const ours = 'const b // c1\n\t= 2; // c2';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('comment_position', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('comment_position: negative - a URL in a comment is not split at `//`', () => {
+	// `http://x` must stay ONE comment text. Splitting it would invent the texts
+	// `see http:` and `x`, either of which could spuriously overlap a real
+	// comment elsewhere — so the split skips a `//` preceded by `:`.
+	assertEquals(extract_line_comment_contents('a; // see http://x'), ['see http://x']);
+	assertEquals(extract_line_comment_contents('a; // c1 // c2'), ['c1', 'c2']);
+	// no line comment at all — caller falls back to the block-comment extractor
+	assertEquals(extract_line_comment_contents('a; /* b */'), []);
+});
+
+Deno.test('comment_position: negative - merged comments do NOT excuse a code change', () => {
+	// The split widens only the TEXT-overlap gate; the non-comment content
+	// checks still have to pass. Here the code genuinely differs (a call gained
+	// an argument), so the hunk stays unclaimed despite the comment overlap.
+	const prettier = 'f(a); // c1 // c2';
+	const ours = 'f(a, EXTRA_ARGUMENT_ADDED, AND_ANOTHER_ONE_HERE) // c1\n\t; // c2';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('comment_position', ctx);
+	assertEquals(match, null);
+});
+
 Deno.test('comment_position: negative - identical comments same position', () => {
 	const prettier = 'const x = 1; // comment\nconst y = 2;';
 	const ours = 'const x = 1; // comment\nconst y = 2;';
@@ -884,36 +920,6 @@ Deno.test('comment_position: negative - Case 3 preserved comment not bordering t
 	const ours = '\t// faraway\n\tconst z = 1;\n\n\tswitch (x) {\n\t}';
 	const ctx = make_context(ours, prettier, 'typescript');
 	const match = run_pattern('comment_position', ctx);
-	assertEquals(match, null);
-});
-
-// ─── block_multiline_attrs_hug ──────────────────────────────────────────────
-
-Deno.test('block_multiline_attrs_hug: positive - > on own line with pre context', () => {
-	// prettier: <textarea with attr line ending in "> (removed_hugs_gt matches /['"]\s*>/)
-	// ours: > on its own line (added_breaks_gt matches /^\t*>$/)
-	// The <textarea tag must be in the hunk's ours/prettier line range or context lines
-	// Putting the entire element in a single diff hunk by making all lines different
-	const prettier = '<textarea class="code" id="x">content</textarea>';
-	const ours = '<textarea\n\tclass="code"\n\tid="x"\n>\ncontent</textarea>';
-	const ctx = make_context(ours, prettier, 'svelte');
-	const match = run_pattern('block_multiline_attrs_hug', ctx);
-	assertNotEquals(match, null);
-});
-
-Deno.test('block_multiline_attrs_hug: negative - not svelte', () => {
-	const prettier = '<pre\n\tclass="code"\n\tdata-lang="js">content</pre>';
-	const ours = '<pre\n\tclass="code"\n\tdata-lang="js"\n>content</pre>';
-	const ctx = make_context(ours, prettier, 'typescript');
-	const match = run_pattern('block_multiline_attrs_hug', ctx);
-	assertEquals(match, null);
-});
-
-Deno.test('block_multiline_attrs_hug: negative - not ws-sensitive element', () => {
-	const prettier = '<div\n\tclass="long"\n\tdata-x="y">content</div>';
-	const ours = '<div\n\tclass="long"\n\tdata-x="y"\n>content</div>';
-	const ctx = make_context(ours, prettier, 'svelte');
-	const match = run_pattern('block_multiline_attrs_hug', ctx);
 	assertEquals(match, null);
 });
 

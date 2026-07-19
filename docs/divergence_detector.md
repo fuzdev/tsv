@@ -156,14 +156,18 @@ Four buckets, in rough priority order:
 1. **Undetected (~67)** — a documented divergence pinning a prettier form that no
    pattern explains at all. The headline gap. Some are deliberate and will stay
    (see the two families named above); the rest want a detector or a reassignment.
-2. **Partial (~41)** — a pattern explains the divergence but leaves an adjacent hunk
+2. **Partial (~35)** — a pattern explains the divergence but leaves an adjacent hunk
    unclaimed. Not a mystery, and quieter than it sounds: typically the diff splits one
    logical change across hunk boundaries (a dangling `) {` line), or the detector claims
    *some* instances of a repeated divergence but not all — `css/selectors/combinators/
    column_prettier_divergence` pins four identical `||` combinators and the pattern
-   claims three. **These are worth closing**: the corpus classifies by the same rule, so
-   a partial fixture is a real file landing in the pinned `partial` bucket instead of
-   `known`. Of these, the **14 that some pattern also LISTS** are ratcheted by
+   claims three. **These are worth closing, and demonstrably**: the corpus classifies by
+   the same rule, so a partial fixture is a real file landing in the pinned `partial`
+   bucket instead of `known`. Widening `comment_position` to split prettier's *merged*
+   trailing-line-comment form (`a // c1 // c2`) closed 6 fixture partials and moved one
+   real corpus file (`js/for-of/comments.js`) partial→known, ratcheting
+   `CORPUS_FORMAT_PARTIAL_PIN` down. Of the remainder, the **14 that some pattern also
+   LISTS** are ratcheted by
    `KNOWN_PARTIAL` in `fixture_coverage_test.ts` — a listed fixture going partial fails
    the gate, and an entry that stops firing fails too, so the list mirrors the live set
    and can only shrink.
@@ -176,11 +180,11 @@ Four buckets, in rough priority order:
    deliberately **not** a backlog to burn down — list a fixture when you want that
    specific assertion pinned, not to make a number go up.
 
-Separately, `block_multiline_attrs_hug` fires on **nothing** — 0 corpus files and 0 of the
-committed fixture pairs — the one genuinely dead pattern. Deleting it is a judgment call
-(the repo stance is delete-unused, but a detector may be worth keeping for a rare
-construct); `empty_statement_removal` looks dead in this audit but is not, firing on 3
-corpus files, so check `--audit-patterns` before concluding.
+Note that a pattern detecting no *documented* fixture is not thereby dead —
+`empty_statement_removal` detects none yet fires on 3 corpus files, so check
+`--audit-patterns` (the corpus-side view) before concluding. `block_multiline_attrs_hug`
+was the one pattern dead by every measure (0 corpus files, 0 committed fixture pairs, 0
+documented) and has been deleted.
 
 ## Pattern Registry
 
