@@ -440,8 +440,31 @@ A **static** component invocation compiles to `Name($$renderer, props)` (`shared
 | `<svelte:element>` with any `bind:` other than `bind:this` (`bind:value`/`checked`/`group`/`innerWidth`/… — oracle-rejected or oracle-emitted), or a `slot="…"` when it is a component child (the oracle routes it to a named slot) | **Refused**: `bind: directive {name}` / `named slot on <{name}> component` (`bind_invalid_target`/`bind_invalid_name` for the invalid binds). The named slot is the **fenced** case — the special-element half of the legacy-slot fence covered above, so `Refusal::is_deliberate_fence` and permanently outside the achievable-parity denominator. `bind:focused` and the `omit_in_ssr` dimension family are the genuinely **deferred** ones: a safe over-refusal (the oracle emits/drops them) awaiting a later sub-slice. |
 | `<svelte:element>` with a **legacy** `on:` event directive or `let:` | **Refused**: `legacy on: directive (runes-only fence)` / `legacy let: directive (runes-only fence)` (matching the regular-element path) |
 | the legacy special elements (`<slot>`, `<svelte:fragment>`, `<svelte:component>`, `<svelte:self>`) — a **deliberate** runes-only-fence refusal, not a deferral: each is deprecation-warned or superseded by the oracle in Svelte 5 (`<slot>`/`<svelte:fragment>` by the snippets this compiler already emits, `<svelte:component>` by a plain dynamic component reference, `<svelte:self>` by importing the module itself), so they are `Refusal::is_deliberate_fence` and sit OUTSIDE the achievable-parity denominator | **Refused**: `template node special element <{tag}>` — one bucket per kind (`… <slot>`, `… <svelte:fragment>`, `… <svelte:component>`, `… <svelte:self>`) |
-| `<svelte:boundary>` — **not** fenced: a first-class Svelte 5 feature and a real gap, so it stays inside the achievable-parity denominator | **Refused**: `template node special element <svelte:boundary>` |
+| `<svelte:boundary>` — **not** fenced (a first-class Svelte 5 feature), and now emitted. Three shapes, all covered. **No snippet**: an isolated `$$renderer.push('<!--[-->')`, a bare `{ … }` block holding the children, and an isolated `$$renderer.push('<!--]-->')` — spliced straight into the enclosing body, *not* a passthrough (the anchors are real SSR output, and unlike `{#key}`'s marker they never merge into an adjacent sibling's template). **`failed` snippet**: the snippet becomes a `function failed($$renderer, …)` declaration in the enclosing block and the three statements move inside `$$renderer.boundary({ failed }, ($$renderer) => { … })`. **`pending` snippet**: its body REPLACES the children under the `<!--[!-->` opener — but the children are still compiled and discarded, because the oracle visits that fragment unconditionally and a `{#each}` there consumes an `each_array` name a later block must not reuse. ⚠️ Emission order is `failed`-first, VISIT order is children → `pending` → `failed`; the generated names follow the visit order. The children fragment is a block scope (text-first-eligible, `is_standalone` recomputed, `{@const}` legal). `onerror={handler}` is dropped but still guard-walked, like an event handler. | Supported |
+| `<svelte:boundary>` with a scoping `<style>` → CSS-scoped. The element census descends the boundary fragment **unconditionally**, including children a `pending` snippet discards: the oracle's CSS pass runs before it decides what to emit, so a selector matching only dropped boundary content is still kept and still scoped. This is the one place the census leaf set is deliberately wider than the emitted set (safe — `element_scope` is a span lookup at emission, so a marked-but-unemitted element contributes nothing). A boundary is **transparent** to the ancestor walk (`div > p` across one matches — `get_ancestor_elements` counts only `RegularElement`/`SvelteElement`) but **opaque** to the upward sibling walk (`b + p` across one does not — the oracle's `is_block` set holds neither `SvelteHead` nor `SvelteBoundary`, so `if (!is_block(current)) break` stops there). | Supported |
+| `<svelte:boundary>` with an attribute outside the oracle's closed valid set (`onerror`/`failed`/`pending`) — an unknown plain attribute, a `{...spread}`, or any directive — or with a valid-named attribute whose value is not exactly one `{expression}` (a boolean attribute, a static string, a mixed `a{b}c` value) | **Refused**: `invalid attribute on <svelte:boundary> (the oracle rejects it)` / `non-expression value for <svelte:boundary> attribute {name} (the oracle rejects it)` (`svelte_boundary_invalid_attribute` / `svelte_boundary_invalid_attribute_value` — all input tsv's permissive parser accepts, so each would otherwise be an over-acceptance) |
+| `<svelte:boundary>` with the `failed={expr}` / `pending={expr}` **attribute** forms — a deferred gap, not a fence: precedence against a same-named snippet is asymmetric (`failed`: the snippet wins; `pending`: the attribute wins), and a statically-nullish `pending` emits an extra `if`/`else` fork keyed on the evaluator's `is_defined` | **Refused**: `<svelte:boundary> {name}={…} attribute form` |
 | `<svelte:options>` | **Refused**: `<svelte:options>` |
+
+#### Validation holes a `<svelte:boundary>` can now reach
+
+Three **pre-existing, general** over-acceptances (tsv compiles what the oracle
+rejects) become reachable through a boundary now that it emits rather than
+refuses. None is boundary-specific — each fails identically with no boundary in
+the document, so the fix belongs with the oracle's whole-component validations,
+not with `emit_boundary`:
+
+| Shape | Oracle error | Boundary-free analog that over-accepts identically |
+| --- | --- | --- |
+| `<svelte:head>` / `<svelte:options>` inside a boundary | `svelte_meta_invalid_placement` | `<div><svelte:head>…`, `{#if true}<svelte:head>…`, `<div><svelte:options …>` |
+| `<svelte:boundary onerror={a} onerror={b}>` | `attribute_duplicate` | `<div onclick={a} onclick={b}>` |
+| two `{#snippet failed}` (or `pending`) in one boundary | `declaration_duplicate` | `<div>{#snippet a}…{/snippet}{#snippet a}…{/snippet}</div>` |
+
+The last one is why `emit_boundary`'s fragment split takes the first snippet of
+each name without refusing a second: the oracle's server visitor does pair
+`filter` with `find`, but it never has to choose — scope analysis has already
+rejected the duplicate. Scoping a refusal to the boundary would close an
+arbitrary sliver of a general hole.
 
 ### select-family
 

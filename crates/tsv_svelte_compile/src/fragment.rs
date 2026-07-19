@@ -25,8 +25,8 @@ use tsv_ts::ast::internal::{
 use crate::analyze::{NameSet, ScopeEntry, evaluate, stringify_value};
 use crate::attr_refs::{TemplateItem, each_child_fragment, each_template_item};
 use crate::blocks::{
-    emit_await_block, emit_const_tag, emit_each_block, emit_if_block, emit_key_block,
-    emit_svelte_head,
+    emit_await_block, emit_boundary, emit_const_tag, emit_each_block, emit_if_block,
+    emit_key_block, emit_svelte_head,
 };
 use crate::build::{Builder, escape_template_text};
 use crate::element::{component_is_standalone_eligible, emit_element, emit_svelte_element};
@@ -49,6 +49,15 @@ pub(crate) struct BodyBuilder<'arena> {
     pub(crate) stmts: BumpVec<'arena, Statement<'arena>>,
     texts: Vec<String>,
     exprs: BumpVec<'arena, Expression<'arena>>,
+    /// How many leading [`stmts`](Self::stmts) belong to the oracle's **`init`**
+    /// list rather than its template stream. The server `Fragment` visitor returns
+    /// `b.block([...state.init, ...build_template(state.template)])`, so EVERY init
+    /// statement precedes EVERY template push — the two lists are concatenated, not
+    /// interleaved. tsv keeps one list and remembers where init ended
+    /// ([`mark_init_end`](Self::mark_init_end)), so a statement discovered *during*
+    /// the template walk that the oracle would have pushed to `init` can still be
+    /// placed there ([`push_init_statement`](Self::push_init_statement)).
+    init_len: usize,
 }
 
 impl<'arena> BodyBuilder<'arena> {
@@ -57,7 +66,48 @@ impl<'arena> BodyBuilder<'arena> {
             stmts: BumpVec::new_in(arena),
             texts: vec![String::new()],
             exprs: BumpVec::new_in(arena),
+            init_len: 0,
         }
+    }
+
+    /// Close the init region: everything emitted from here on is template.
+    ///
+    /// Called once per **block-scope** fragment, after its hoisted `{@const}` /
+    /// `<svelte:head>` / `<title>` / `{#snippet}` statements — the oracle's
+    /// `for (const node of hoisted) context.visit(node, state)` loop. An
+    /// element-child fragment shares the enclosing block's builder and must NOT
+    /// move the mark.
+    ///
+    /// ⚠️ **Invariant: a fragment that OWNS its builder is exactly a fragment with
+    /// `hoist_snippets`.** [`emit_fragment`] gates this call on that flag, which is
+    /// only sound while the two coincide — a builder-sharing fragment that also
+    /// hoisted would move a mark it does not own, and every already-emitted
+    /// template statement of the enclosing block would fall inside the init region,
+    /// so a later [`push_init_statement`](Self::push_init_statement) would splice
+    /// its declaration BELOW pushes the oracle puts it above. The coincidence holds
+    /// by enumeration over the three [`FragmentCtx`] construction sites, not by
+    /// type: the component root (`transform_server.rs`) and `emit_child_body`
+    /// (below) each build a fresh [`BodyBuilder`] and pass `hoist_snippets: true`;
+    /// the element-child fragment (`element.rs`) forwards the enclosing builder and
+    /// passes `hoist_snippets: false`. A **fourth** site must preserve that pairing
+    /// — or split the two facts apart, so ownership stops riding a flag that means
+    /// something else.
+    pub(crate) fn mark_init_end(&mut self) {
+        self.init_len = self.stmts.len();
+    }
+
+    /// Insert a statement at the end of the init region, without flushing the
+    /// pending template.
+    ///
+    /// The one caller is `<svelte:boundary>`'s `failed` snippet: the oracle's
+    /// `SnippetBlock` visitor pushes its `function` declaration to `state.init`
+    /// even though the boundary is reached mid-template, so the declaration lands
+    /// above every push of the enclosing block rather than beside the boundary.
+    /// Two boundaries in one fragment keep source order (each insert advances the
+    /// mark), matching the oracle's append-to-`init`.
+    pub(crate) fn push_init_statement(&mut self, stmt: Statement<'arena>) {
+        self.stmts.insert(self.init_len, stmt);
+        self.init_len += 1;
     }
 
     /// Append an already template-escaped chunk to the current static part.
@@ -204,6 +254,12 @@ enum CleanNode<'arena> {
     /// non-expr node for whitespace normalization. Carries the `this` tag alongside
     /// the element so emission never re-destructures the (guaranteed) kind.
     SvelteElement(&'arena SpecialElement<'arena>, &'arena SpecialThis<'arena>),
+    /// A `<svelte:boundary>` — emitted as isolated `<!--[-->` / `<!--]-->` anchor
+    /// pushes around a bare block statement, optionally wrapped in a
+    /// `$$renderer.boundary({ failed }, ($$renderer) => …)` call
+    /// ([`crate::blocks::emit_boundary`]). Like a block, it interrupts the template
+    /// push stream, so it is a non-text, non-expr node for whitespace purposes.
+    Boundary(&'arena SpecialElement<'arena>),
     If(&'arena IfBlock<'arena>),
     Each(&'arena EachBlock<'arena>),
     Await(&'arena AwaitBlock<'arena>),
@@ -343,6 +399,13 @@ pub(crate) fn emit_fragment<'arena>(
                     SpecialElementKind::SvelteElement { tag } => {
                         list.push(CleanNode::SvelteElement(se, tag));
                     }
+                    // `<svelte:boundary>` emits anchor pushes around a block
+                    // statement (and, with a `failed` snippet, a
+                    // `$$renderer.boundary(…)` call) — routed to the emit list like a
+                    // block.
+                    SpecialElementKind::SvelteBoundary => {
+                        list.push(CleanNode::Boundary(se));
+                    }
                     // Every other special element (`<svelte:component>`, `<svelte:self>`,
                     // `<slot>`, `<svelte:fragment>`, `<svelte:boundary>`) already refused
                     // above via the shared mapping. They are listed rather than folded
@@ -364,8 +427,7 @@ pub(crate) fn emit_fragment<'arena>(
                     SpecialElementKind::SvelteComponent { .. }
                     | SpecialElementKind::SvelteSelf
                     | SpecialElementKind::SlotElement
-                    | SpecialElementKind::SvelteFragment
-                    | SpecialElementKind::SvelteBoundary => {
+                    | SpecialElementKind::SvelteFragment => {
                         // A silent `{}` here would DROP the node from the output.
                         #[allow(clippy::unreachable)] // the mapping refused these above
                         {
@@ -443,6 +505,12 @@ pub(crate) fn emit_fragment<'arena>(
     for snippet in &hoisted_snippets {
         emit_snippet(env, snippet, out)?;
     }
+    // Everything above is the oracle's `init` list; everything below is its
+    // template stream. Only a block scope owns that split — an element-child
+    // fragment shares the enclosing block's builder and leaves the mark alone.
+    if ctx.hoist_snippets {
+        out.mark_init_end();
+    }
 
     if !ctx.preserve_whitespace {
         normalize_whitespace(&mut list, ctx.parent_name, ctx.namespace, ctx.in_svg_text);
@@ -500,6 +568,7 @@ pub(crate) fn emit_fragment<'arena>(
             CleanNode::SvelteElement(se, tag) => {
                 emit_svelte_element(env, se, tag, out, &ctx)?;
             }
+            CleanNode::Boundary(se) => emit_boundary(env, se, out, &ctx)?,
             CleanNode::Expr(tag) => {
                 emit_expression_tag(env, &tag.expression, out, true)?;
             }
@@ -1642,6 +1711,7 @@ special_element_kind_table! {
     handled SpecialElementKind::SvelteBody,
     handled SpecialElementKind::SvelteDocument,
     handled SpecialElementKind::SvelteElement { .. },
+    handled SpecialElementKind::SvelteBoundary,
 
     // Not emitted — one bucket each.
     /// `<svelte:component>` — a **fenced** legacy tag ([`SPECIAL_ELEMENT_FENCED_KINDS`]).
@@ -1656,10 +1726,6 @@ special_element_kind_table! {
     /// `<svelte:fragment>` — a **fenced** legacy tag ([`SPECIAL_ELEMENT_FENCED_KINDS`]).
     refused SpecialElementKind::SvelteFragment
         => SPECIAL_ELEMENT_SVELTE_FRAGMENT = "special element <svelte:fragment>",
-    /// `<svelte:boundary>` — **not** fenced: a first-class Svelte 5 feature, and the
-    /// next implementation target.
-    refused SpecialElementKind::SvelteBoundary
-        => SPECIAL_ELEMENT_SVELTE_BOUNDARY = "special element <svelte:boundary>",
 }
 
 /// The subset of [`SPECIAL_ELEMENT_REFUSAL_KINDS`] that are **deliberate runes-only

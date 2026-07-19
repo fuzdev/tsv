@@ -146,7 +146,9 @@ project-wide conventions.
   two tags *declare*). Each is deprecation-warned or superseded by the oracle in
   Svelte 5, the slot system by the snippets this compiler already emits.
   **`<svelte:boundary>` is deliberately outside the set**: a first-class Svelte 5
-  feature and a real gap. So is `ComponentDirective` — what a legacy `on:`/`let:` on
+  feature — and it now compiles, so it has no `TemplateNode` label at all; its
+  residual refusals (an oracle-rejected attribute, the `failed=`/`pending=`
+  attribute forms) are ordinary gaps. So is `ComponentDirective` — what a legacy `on:`/`let:` on
   a *component* raises instead of `RunesOnlyFence` — because that bucket also holds
   unimplemented `class:` / `use:` / `transition:` directives and cannot be fenced
   wholesale.
@@ -550,7 +552,29 @@ project-wide conventions.
   `$.await($$renderer, expr, () => {pending}, (value?) => {then})` (empty
   `() => {}` fallbacks; `{:catch}` dropped) + a merge-forward closer; `{#key}`
   is a `<!---->` marker, a bare `{ … }` block, and a closing `<!---->` (key
-  expression guard-walked then dropped, like an each key); `{@const}` hoists a
+  expression guard-walked then dropped, like an each key);
+  **`<svelte:boundary>`** (`emit_boundary`) is an ISOLATED `<!--[-->` push, a bare
+  `{ … }` block of children, and an isolated `<!--]-->` push — isolated because a
+  fresh `BodyBuilder` flushes before each statement, so unlike `{#key}`'s marker the
+  anchors never merge into an adjacent sibling's template. A `failed` snippet moves
+  those three statements inside `$$renderer.boundary({ failed }, ($$renderer) => …)`
+  with the snippet's `function` declaration emitted just above; a `pending` snippet's
+  body REPLACES them under the `<!--[!-->` opener while the children are still
+  compiled into a DISCARDED builder — load-bearing, not wasteful, since the oracle
+  visits that fragment unconditionally and its `{#each}` consumes an `each_array`
+  name. ⚠️ Emission is `failed`-first but VISIT order is children → `pending` →
+  `failed`, and the generated names follow the visit order, so building children
+  before the snippet functions is what keeps the two straight. The attribute set is
+  validated against the oracle's closed `onerror`/`failed`/`pending` list (six
+  distinct over-acceptances otherwise); `onerror` drops but is guard-walked, and the
+  `failed=`/`pending=` attribute FORMS refuse. ⚠️ Emitting rather than refusing a
+  boundary makes three **pre-existing, general** validation over-acceptances
+  newly REACHABLE through one — a `<svelte:head>`/`<svelte:options>` inside it
+  (`svelte_meta_invalid_placement`), a duplicate `onerror` (`attribute_duplicate`),
+  and a duplicate snippet name (`declaration_duplicate`). Each fails identically
+  with no boundary in the document, so the fix is the oracle's whole-component
+  validations, never a boundary-scoped refusal; tracked in
+  `../../docs/checklist_svelte_compiler.md`. `{@const}` hoists a
   `const` declaration to the top of its branch body and enters the evaluator's
   innermost block-scope overlay so later reads fold. Each/await locals and the
   `{:then}` value mask to UNKNOWN in that overlay; a block body that shadows a
@@ -708,9 +732,17 @@ project-wide conventions.
   adjacent early-stop and carries no slot check — `css-prune.js:1041`/`1215`).
   Descends every SSR-reachable fragment (element/component/`<svelte:element>`
   subtrees, `{#if}` / `{#each}` / `{#await}`-pending+then / `{#key}` / `{#snippet}`
-  bodies, `<svelte:head>`) but **not** `{:catch}` (dropped from output), so the census
-  leaf set equals the emitted set — keeping the single-compound match byte-identical to
-  the pre-census emission-fused result.
+  bodies, `<svelte:head>`) but **not** `{:catch}` (dropped from output). The one
+  deliberate exception is `<svelte:boundary>`, descended UNCONDITIONALLY — including
+  the children a `pending` snippet discards: the oracle's CSS pass runs before it
+  decides what to emit, so a selector matching only dropped boundary content is still
+  KEPT and still scoped. Safe because `element_scope` is a span lookup at emission, so
+  a marked-but-unemitted element contributes nothing. Everywhere else the census leaf
+  set equals the emitted set — keeping the single-compound match byte-identical to
+  the pre-census emission-fused result. A boundary OWNER is transparent to the
+  ancestor walk and opaque to the upward sibling walk (`Owner::Boundary`, exactly
+  `Owner::Head`'s pair of answers — the oracle's `is_block` set holds neither), so
+  `div > p` across a boundary matches while `b + p` across one does not.
 - `css_scope.rs` — CSS scoping: parses a rule's selector into a CHAIN of compounds
   (type / id / class / attribute / universal + trailing pseudo, joined by
   combinators), then matches the chain BACKWARD against the element census

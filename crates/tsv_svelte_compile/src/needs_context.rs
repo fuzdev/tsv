@@ -741,12 +741,17 @@ fn walk_fragment_node(node: &FragmentNode<'_>, nc: &mut Nc<'_>) {
                 | SpecialElementKind::SvelteDocument
                 | SpecialElementKind::SvelteElement { .. }
                 | SpecialElementKind::SvelteHead
-                | SpecialElementKind::TitleElement => true,
+                | SpecialElementKind::TitleElement
+                // `<svelte:boundary>` is walked UNCONDITIONALLY — including the
+                // children a `pending` snippet discards. The oracle visits that
+                // fragment whatever it later emits, so a `new`/prop-rooted access
+                // there fires the wrapper and a `$name` store read there injects
+                // `$$store_subs`, even though nothing it contains reaches output.
+                | SpecialElementKind::SvelteBoundary => true,
                 SpecialElementKind::SvelteComponent { .. }
                 | SpecialElementKind::SvelteSelf
                 | SpecialElementKind::SlotElement
-                | SpecialElementKind::SvelteFragment
-                | SpecialElementKind::SvelteBoundary => false,
+                | SpecialElementKind::SvelteFragment => false,
             };
             if nc.in_dropped_catch || walk_on_emitted {
                 walk_special_element(se, nc);

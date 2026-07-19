@@ -663,6 +663,33 @@ pub enum Refusal {
     /// Attributes on a `<svelte:head>` element (not carried in this subset).
     #[error("attributes on <svelte:head>")]
     SvelteHeadAttributes,
+    /// An attribute on `<svelte:boundary>` outside the oracle's closed valid set
+    /// (`onerror`/`failed`/`pending`) — its
+    /// `svelte_boundary_invalid_attribute` analysis error. Covers an unknown plain
+    /// attribute, a `{...spread}`, and every directive; tsv's parser accepts all
+    /// three, so the compiler refuses rather than emit for oracle-rejected input.
+    #[error("invalid attribute on <svelte:boundary> (the oracle rejects it)")]
+    BoundaryInvalidAttribute,
+    /// A valid-named `<svelte:boundary>` attribute whose value is not exactly one
+    /// `{expression}` — a boolean attribute, a static string, or a mixed
+    /// text/expression value. The oracle's
+    /// `svelte_boundary_invalid_attribute_value` analysis error.
+    #[error("non-expression value for <svelte:boundary> attribute {name} (the oracle rejects it)")]
+    BoundaryInvalidAttributeValue {
+        /// The attribute name (`onerror`/`failed`/`pending`).
+        name: String,
+    },
+    /// The `failed={expr}` / `pending={expr}` **attribute** forms of
+    /// `<svelte:boundary>`. The snippet forms compile; the attribute forms are a
+    /// deliberate v1 gap — their precedence against a same-named snippet is
+    /// asymmetric (`failed`: the snippet wins; `pending`: the attribute wins) and a
+    /// statically-nullish `pending` emits an extra `if`/`else` fork keyed on the
+    /// evaluator, so they are refused rather than guessed.
+    #[error("<svelte:boundary> {name}={{…}} attribute form")]
+    BoundaryAttributeSnippet {
+        /// `failed` or `pending`.
+        name: &'static str,
+    },
     /// An attribute on a `<title>` element. The oracle rejects every attribute on
     /// `<title>` in its analysis phase (`title_illegal_attribute`); tsv's parser
     /// accepts them, so the compiler refuses rather than emit for oracle-rejected
@@ -868,7 +895,10 @@ impl Refusal {
             | Self::TsIndexSignature
             | Self::TsImportEquals
             | Self::TsExportAssignment
-            | Self::TsNamespaceExport => Cow::Owned(self.to_string()),
+            | Self::TsNamespaceExport
+            // Closed sets: no attribute name at all, and `failed`/`pending`.
+            | Self::BoundaryInvalidAttribute
+            | Self::BoundaryAttributeSnippet { .. } => Cow::Owned(self.to_string()),
             Self::PropsBindingPattern => Cow::Borrowed(
                 "$props() binding pattern (not an identifier or object pattern — the oracle rejects it)",
             ),
@@ -1012,6 +1042,9 @@ impl Refusal {
                 Cow::Borrowed("<option> (oracle emits $$renderer.option closures)")
             }
             Self::SvelteHeadAttributes => Cow::Borrowed("attributes on <svelte:head>"),
+            Self::BoundaryInvalidAttributeValue { .. } => Cow::Borrowed(
+                "non-expression value for <svelte:boundary> attribute {name} (the oracle rejects it)",
+            ),
             Self::TitleAttributes => Cow::Borrowed("attribute on <title> (the oracle rejects it)"),
             Self::TitleInvalidContent => Cow::Borrowed(
                 "invalid <title> content (only text and {expression} — the oracle rejects it)",
@@ -1197,9 +1230,8 @@ mod tests {
     #[test]
     fn deliberate_fences_are_the_legacy_syntax_only() {
         use crate::fragment::{
-            SPECIAL_ELEMENT_SLOT, SPECIAL_ELEMENT_SVELTE_BOUNDARY,
-            SPECIAL_ELEMENT_SVELTE_COMPONENT, SPECIAL_ELEMENT_SVELTE_FRAGMENT,
-            SPECIAL_ELEMENT_SVELTE_SELF,
+            SPECIAL_ELEMENT_SLOT, SPECIAL_ELEMENT_SVELTE_COMPONENT,
+            SPECIAL_ELEMENT_SVELTE_FRAGMENT, SPECIAL_ELEMENT_SVELTE_SELF,
         };
 
         // Legacy directives.
@@ -1225,14 +1257,11 @@ mod tests {
                 "{kind} is a runes-only fence"
             );
         }
-        // `<svelte:boundary>` is a first-class Svelte 5 feature — a real gap that
-        // MUST stay inside the achievable-parity denominator.
-        assert!(
-            !Refusal::TemplateNode {
-                kind: SPECIAL_ELEMENT_SVELTE_BOUNDARY
-            }
-            .is_deliberate_fence()
-        );
+        // `<svelte:boundary>` is a first-class Svelte 5 feature, so it never joined
+        // the fence set — and it now COMPILES, so it has no `TemplateNode` label at
+        // all. Its residual refusals are ordinary gaps, never fences.
+        assert!(!Refusal::BoundaryInvalidAttribute.is_deliberate_fence());
+        assert!(!Refusal::BoundaryAttributeSnippet { name: "failed" }.is_deliberate_fence());
         // Neither is any other template node, or an ordinary "not yet".
         assert!(
             !Refusal::TemplateNode {

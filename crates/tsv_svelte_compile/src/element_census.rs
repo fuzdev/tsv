@@ -149,6 +149,13 @@ enum Owner<'a> {
     Snippet,
     /// `<svelte:head>` content — an element-like boundary (not a block).
     Head,
+    /// `<svelte:boundary>` content. Like [`Owner::Head`] on both axes, and for the
+    /// same reason: the oracle's `is_block` set (`css-prune.js:1240-1246`) holds
+    /// neither, so the upward SIBLING walk stops here (`if (!is_block(current))
+    /// break`), while `get_ancestor_elements` counts only
+    /// `RegularElement`/`SvelteElement` and so climbs straight THROUGH it. Net: a
+    /// `div > p` across a boundary matches; a `b + p` across one does not.
+    Boundary,
     If,
     /// `is_body` distinguishes the each **body** (the each-self-adjacency wrap-around
     /// applies) from the fallback.
@@ -293,6 +300,18 @@ fn walk_fragment<'a>(
                 walk_fragment(special.fragment.nodes, Owner::Element(node), path, elements);
                 path.pop();
             }
+            // A `<svelte:boundary>` is descended UNCONDITIONALLY — including the
+            // children a `pending` snippet discards from the output. The oracle's
+            // CSS pass runs before it decides what to emit, so a selector matching
+            // only dropped boundary content is still KEPT and still scoped. This is
+            // the one place the census leaf set is deliberately WIDER than the
+            // emitted set; it is safe because `element_scope` is a span lookup at
+            // emission, so a marked-but-unemitted element contributes nothing.
+            FragmentNode::SpecialElement(special) if is_svelte_boundary(special) => {
+                path.push(frame);
+                walk_fragment(special.fragment.nodes, Owner::Boundary, path, elements);
+                path.pop();
+            }
             FragmentNode::SpecialElement(special) if is_svelte_head(special) => {
                 path.push(frame);
                 walk_fragment(special.fragment.nodes, Owner::Head, path, elements);
@@ -307,6 +326,10 @@ fn walk_fragment<'a>(
 
 fn is_svelte_head(special: &SpecialElement<'_>) -> bool {
     matches!(special.kind, SpecialElementKind::SvelteHead)
+}
+
+fn is_svelte_boundary(special: &SpecialElement<'_>) -> bool {
+    matches!(special.kind, SpecialElementKind::SvelteBoundary)
 }
 
 fn is_svelte_element(special: &SpecialElement<'_>) -> bool {
@@ -417,7 +440,7 @@ pub(crate) fn get_possible_element_siblings<'a, 'c>(
             Owner::Snippet => return Err(()),
             // An element / head parent, or the component root, is a sibling-walk
             // boundary.
-            Owner::Element(_) | Owner::Head | Owner::Root => break,
+            Owner::Element(_) | Owner::Head | Owner::Boundary | Owner::Root => break,
         }
     }
     Ok(finish(census, result))

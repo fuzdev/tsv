@@ -9,15 +9,15 @@
 use std::collections::HashMap;
 
 use bumpalo::collections::Vec as BumpVec;
-use tsv_lang::Span;
+use tsv_lang::{InfallibleResolve, Span};
 use tsv_svelte::ast::internal::{
-    AwaitBlock, ConstTag, EachBlock, Element, Fragment, FragmentNode, IfBlock, KeyBlock,
-    SpecialElement,
+    AttributeNode, AttributeValue, AwaitBlock, ConstTag, EachBlock, Element, Fragment,
+    FragmentNode, IfBlock, KeyBlock, SnippetBlock, SpecialElement,
 };
 use tsv_ts::ast::internal::{
     BinaryOperator, BlockStatement, Expression, ExpressionStatement, ForInit, ForStatement,
-    IfStatement, Statement, UpdateOperator, VariableDeclaration, VariableDeclarationKind,
-    VariableDeclarator,
+    IfStatement, ObjectExpression, ObjectProperty, Property, PropertyKind, Statement,
+    UpdateOperator, VariableDeclaration, VariableDeclarationKind, VariableDeclarator,
 };
 
 use crate::analyze::{Binding, BindingKind, Initial, ScopeEntry, pattern_binding_names};
@@ -28,6 +28,8 @@ use crate::fragment::{
 };
 use crate::namespace::{ChildNamespace, FragmentParent, Namespace};
 use crate::script_rewrite::plain_identifier_name;
+use crate::snippet::snippet_name;
+use crate::snippet_emit::build_snippet_function;
 use crate::transform_server::{EmitEnv, unsupported};
 use crate::{CompileError, Refusal};
 
@@ -138,6 +140,246 @@ pub(crate) fn emit_svelte_head<'arena>(
         is_directive: false,
     });
     out.push_statement(&mut env.b, arena, stmt);
+    Ok(())
+}
+
+/// The oracle's boundary anchors (`internal/server/hydration.js`): the normal
+/// block opener, the "else" opener a `pending` snippet's body carries, and the
+/// closer.
+const BOUNDARY_OPEN: &str = "<!--[-->";
+const BOUNDARY_OPEN_PENDING: &str = "<!--[!-->";
+const BOUNDARY_CLOSE: &str = "<!--]-->";
+
+/// The closed set of attributes the oracle accepts on `<svelte:boundary>`
+/// (`2-analyze/visitors/SvelteBoundary.js`).
+const BOUNDARY_VALID_ATTRIBUTES: [&str; 3] = ["onerror", "failed", "pending"];
+
+/// Emit `<svelte:boundary>`: the anchor pushes `<!--[-->` … `<!--]-->` around a
+/// bare block statement holding the children, wrapped in
+/// `$$renderer.boundary({ failed }, ($$renderer) => { … })` when a `failed`
+/// snippet is present.
+///
+/// Three shapes, all covered (the oracle's server `SvelteBoundary` visitor):
+///
+/// - **no snippet** — the three statements go straight into the enclosing body.
+///   Not a passthrough: the anchors are real SSR output.
+/// - **`failed`** — the snippet becomes a `function failed($$renderer, …)`
+///   declaration in the enclosing block, and the anchors move inside the
+///   `$$renderer.boundary` arrow.
+/// - **`pending`** — the snippet's body REPLACES the children entirely, under the
+///   `<!--[!-->` opener. The children are still compiled and thrown away, which is
+///   load-bearing rather than wasteful: the oracle visits the children fragment
+///   unconditionally, so a `{#each}` there consumes an `each_array` name that a
+///   later block must not reuse. Emitting into a discarded [`BodyBuilder`] both
+///   advances those counters and runs every guard the oracle's visit would.
+///
+/// ⚠️ **Emission order is `failed`-first, but VISIT order is children-first.** The
+/// `failed` function prints above the `$$renderer.boundary(…)` call, yet the
+/// oracle visits children → `pending` → `failed`, so that is the order the
+/// generated names are handed out (children's `{#each}` takes `each_array`,
+/// `failed`'s takes `each_array_2`). Building children first and only then the
+/// snippet functions is what keeps the two orders straight; swapping them
+/// mismatches on any boundary with an `{#each}` on both sides.
+///
+/// The `failed={expr}` / `pending={expr}` **attribute** forms refuse
+/// ([`Refusal::BoundaryAttributeSnippet`]); `onerror` is dropped (SSR runs no
+/// error handler) but still guard-walked, like an event handler.
+pub(crate) fn emit_boundary<'arena>(
+    env: &mut EmitEnv<'arena, '_>,
+    boundary: &'arena SpecialElement<'arena>,
+    out: &mut BodyBuilder<'arena>,
+    ctx: &FragmentCtx<'_>,
+) -> Result<(), CompileError> {
+    let arena = env.b.arena;
+    guard_boundary_attributes(env, boundary)?;
+
+    // Split the fragment: EVERY `failed`/`pending` snippet leaves the children
+    // list, and the FIRST of each name is the one used — the oracle's server
+    // visitor pairs `filter` (drop them all) with `find` (take the first).
+    //
+    // That pair never actually has to choose. A repeated snippet name is a
+    // phase-2 `declaration_duplicate` error raised in SCOPE ANALYSIS, well
+    // before the server visitor runs, so a boundary with two `{#snippet failed}`
+    // does not compile at all. tsv over-accepts it — but as part of a GENERAL
+    // duplicate-declaration hole, not a boundary one: `<div>{#snippet a}…
+    // {#snippet a}…</div>` over-accepts identically. Closing it means porting
+    // the oracle's whole-component validations; a refusal scoped to this
+    // emitter would buy an arbitrary sliver of the hole and misplace the fix.
+    let mut failed_snippet: Option<&'arena SnippetBlock<'arena>> = None;
+    let mut pending_snippet: Option<&'arena SnippetBlock<'arena>> = None;
+    let mut children_nodes: BumpVec<'arena, FragmentNode<'arena>> = BumpVec::new_in(arena);
+    for node in boundary.fragment.nodes {
+        let reserved = match node {
+            FragmentNode::SnippetBlock(snippet) => match snippet_name(snippet, env.source) {
+                Some("failed") => {
+                    failed_snippet.get_or_insert(snippet);
+                    true
+                }
+                Some("pending") => {
+                    pending_snippet.get_or_insert(snippet);
+                    true
+                }
+                _ => false,
+            },
+            _ => false,
+        };
+        if !reserved {
+            children_nodes.push(node.clone());
+        }
+    }
+    let children_fragment = Fragment {
+        nodes: children_nodes.into_bump_slice(),
+    };
+
+    // (1) children — always, even when `pending` discards the result.
+    let children_body = emit_child_body(
+        env,
+        &children_fragment,
+        &[],
+        true,
+        ctx.preserve_whitespace,
+        block_child_ns(ctx),
+        HashMap::new(),
+    )?;
+
+    // (2) pending — its body replaces the children under the `<!--[!-->` opener.
+    let (opener, inner_body) = if let Some(pending) = pending_snippet {
+        let body = emit_child_body(
+            env,
+            &pending.body,
+            &[],
+            true,
+            ctx.preserve_whitespace,
+            block_child_ns(ctx),
+            HashMap::new(),
+        )?;
+        (BOUNDARY_OPEN_PENDING, body)
+    } else {
+        (BOUNDARY_OPEN, children_body)
+    };
+
+    // The three statements the oracle's `build_template([open, block, close])`
+    // produces. A fresh `BodyBuilder` gives them the right isolation for free:
+    // `push_statement` flushes the pending template first, so each anchor lands in
+    // its own `$$renderer.push(…)` rather than merging with a sibling's.
+    let mut inner = BodyBuilder::new_in(arena);
+    inner.push_text(opener);
+    let inner_block = (*block_stmt(&env.b, inner_body)).clone();
+    inner.push_statement(&mut env.b, arena, inner_block);
+    inner.push_text(BOUNDARY_CLOSE);
+    let inner_stmts = inner.finish(&mut env.b, arena);
+
+    // (3) failed — visited last, so its generated names come after the children's
+    // and the pending body's, even though its function declaration prints first.
+    let Some(failed) = failed_snippet else {
+        // No `failed`: the oracle skips the wrapper entirely and splices the three
+        // statements into the enclosing body.
+        for stmt in inner_stmts {
+            out.push_statement(&mut env.b, arena, stmt.clone());
+        }
+        return Ok(());
+    };
+    let (fn_decl, name) = build_snippet_function(env, failed)?;
+    // The oracle's `SnippetBlock` visitor pushes the declaration to `state.init`,
+    // and a block is `[...init, ...template]` — so the function lands ABOVE every
+    // push of the enclosing block, not beside the boundary. Emitting it inline here
+    // reorders it past any preceding sibling text (six corpus mismatches).
+    out.push_init_statement(fn_decl);
+
+    // `$$renderer.boundary({ failed }, ($$renderer) => { … })`.
+    let props = boundary_props(env, &name);
+    let renderer_param = Expression::Identifier(env.b.ident("$$renderer"));
+    let params = std::slice::from_ref(arena.alloc(renderer_param));
+    let here = env.b.here();
+    let arrow = env.b.arrow_block(params, inner_stmts, here);
+    let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
+    args.push(props);
+    args.push(arrow);
+    let call = env
+        .b
+        .member_call("$$renderer", "boundary", args.into_bump_slice());
+    let span = call.span();
+    out.push_statement(
+        &mut env.b,
+        arena,
+        Statement::ExpressionStatement(ExpressionStatement {
+            expression: call,
+            span,
+            is_directive: false,
+        }),
+    );
+    Ok(())
+}
+
+/// The `{ failed }` shorthand object the `$$renderer.boundary` call takes as its
+/// first argument — the value references the `function failed(…)` declaration
+/// emitted just above it.
+fn boundary_props<'arena>(env: &mut EmitEnv<'arena, '_>, name: &str) -> Expression<'arena> {
+    let obrace = env.b.mint("{").start;
+    let key = env.b.ident(name);
+    let key_span = key.span;
+    let property = Property {
+        key: Expression::Identifier(key),
+        value: Expression::Identifier(env.b.ident(name)),
+        kind: PropertyKind::Init,
+        shorthand: true,
+        computed: false,
+        method: false,
+        span: key_span,
+    };
+    let properties = std::slice::from_ref(env.b.arena.alloc(ObjectProperty::Property(property)));
+    let cbrace = env.b.mint("}").end;
+    Expression::ObjectExpression(ObjectExpression {
+        properties,
+        spread_trailing_comma: false,
+        span: Span::new(obrace, cbrace),
+    })
+}
+
+/// Validate a `<svelte:boundary>`'s attributes against the oracle's phase-2
+/// `SvelteBoundary` visitor, which accepts a **closed list** of three names, each
+/// carrying exactly one `{expression}` value.
+///
+/// tsv's parser is permissive here, so without this every one of the oracle's
+/// rejections would be an over-acceptance: an unknown attribute, a `{...spread}`,
+/// any directive, a boolean `onerror`, a static-string `onerror`, and a mixed-value
+/// `onerror` are six distinct oracle errors on input tsv would otherwise compile.
+///
+/// A valid `onerror={handler}` is DROPPED from the output (SSR never runs the
+/// handler) but still guard-walked, exactly like an event-handler attribute — a
+/// stray rune or top-level `await` inside it must still refuse.
+fn guard_boundary_attributes<'arena>(
+    env: &EmitEnv<'arena, '_>,
+    boundary: &'arena SpecialElement<'arena>,
+) -> Result<(), CompileError> {
+    for attr_node in boundary.attributes {
+        let AttributeNode::Attribute(attr) = attr_node else {
+            // A spread or any directive — `svelte_boundary_invalid_attribute`.
+            return Err(unsupported(Refusal::BoundaryInvalidAttribute));
+        };
+        let name = {
+            let interner = env.b.interner.borrow();
+            interner.resolve_infallible(attr.name).to_string()
+        };
+        let Some(valid) = BOUNDARY_VALID_ATTRIBUTES
+            .into_iter()
+            .find(|candidate| *candidate == name)
+        else {
+            return Err(unsupported(Refusal::BoundaryInvalidAttribute));
+        };
+        // `svelte_boundary_invalid_attribute_value`: the value must be exactly one
+        // `ExpressionTag` — a boolean attribute (`value: None`), a static string,
+        // and a mixed `a{b}c` value all reject.
+        let Some([AttributeValue::ExpressionTag(tag)]) = attr.value else {
+            return Err(unsupported(Refusal::BoundaryInvalidAttributeValue { name }));
+        };
+        if valid != "onerror" {
+            return Err(unsupported(Refusal::BoundaryAttributeSnippet {
+                name: valid,
+            }));
+        }
+        guard_dropped(env, &tag.expression)?;
+    }
     Ok(())
 }
 
