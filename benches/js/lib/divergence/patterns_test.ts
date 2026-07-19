@@ -410,6 +410,142 @@ Deno.test('inline_content_block_style: negative - content differs (safety gate b
 	assertEquals(match, null);
 });
 
+// ─── svelte_boundary_ws_trim ────────────────────────────────────────────────
+
+Deno.test('svelte_boundary_ws_trim: positive - fragment-edge run trimmed inside a tag', () => {
+	// The legitimate class: whitespace at a tag's content boundary is render-free
+	// (Svelte 5 clean_nodes deletes every fragment-edge run at compile), so tsv
+	// trims it where prettier keeps the boundary space.
+	const prettier = '<span> text </span>';
+	const ours = '<span>text</span>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('svelte_boundary_ws_trim', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('svelte_boundary_ws_trim: positive - block-section boundary runs trimmed', () => {
+	// Each block branch is its own fragment, so the runs after `{#if x}` and
+	// before `{/if}` are fragment edges — render-free, legitimately trimmed.
+	const prettier = '{#if x} <span>a</span> {/if}';
+	const ours = '{#if x}<span>a</span>{/if}';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('svelte_boundary_ws_trim', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('svelte_boundary_ws_trim: positive - boundary trim on a tag with an arrow-handler attr', () => {
+	// The open-tag matcher must tolerate `>` inside a braced attr expression —
+	// `onclick={() => …}` is ubiquitous in Svelte — or a real fragment-edge trim
+	// on such an element reads unknown (regressed live on fuz_ui's Teleport page).
+	const prettier = '<button type="button" onclick={() => (swap = !swap)}> teleport the bunny </button>';
+	const ours = '<button type="button" onclick={() => (swap = !swap)}>teleport the bunny</button>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('svelte_boundary_ws_trim', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('svelte_boundary_ws_trim: positive - boundary trim on a tag with a quoted `>` attr', () => {
+	const prettier = '<span title="a > b"> x </span>';
+	const ours = '<span title="a > b">x</span>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('svelte_boundary_ws_trim', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('svelte_boundary_ws_trim: negative - ours ADDS boundary whitespace (some other reflow)', () => {
+	// The trim only removes; a diff where ours carries more whitespace is some
+	// other reflow and must stay unclaimed (the count_ws direction guard).
+	const prettier = '<span>text</span>';
+	const ours = '<span> text </span>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('svelte_boundary_ws_trim', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('svelte_boundary_ws_trim: negative - inter-sibling space between elements deleted (render-changing)', () => {
+	// NOT the trim class: whitespace BETWEEN sibling nodes is render-significant
+	// (Svelte collapses it to one space — it never vanishes). Ours deleting it
+	// renders "a b" as "ab"; claiming this hunk would bucket a real rendering
+	// bug as a sanctioned divergence.
+	const prettier = '<p><span>a</span> <span>b</span></p>';
+	const ours = '<p><span>a</span><span>b</span></p>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('svelte_boundary_ws_trim', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('svelte_boundary_ws_trim: negative - inter-sibling space between expression tags deleted (render-changing)', () => {
+	// `{a} {b}` renders with a space; `{a}{b}` without. Same render-significant
+	// inter-sibling class as adjacent elements — must not be claimed.
+	const prettier = '<p>{a} {b}</p>';
+	const ours = '<p>{a}{b}</p>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('svelte_boundary_ws_trim', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('svelte_boundary_ws_trim: negative - space between text and inline element deleted (render-changing)', () => {
+	// "hi <b>x</b>" renders "hi x"; gluing renders "hix". The run sits between
+	// sibling nodes (text, element) — render-significant, must not be claimed.
+	const prettier = '<p>hi <b>x</b></p>';
+	const ours = '<p>hi<b>x</b></p>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('svelte_boundary_ws_trim', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('svelte_boundary_ws_trim: positive - identical script present, template trim still claimed', () => {
+	// A verbatim <script> region must not defeat the equality when its content is
+	// byte-identical on both sides — the trim claim rides on the template alone.
+	const prettier = '<script>\n\tlet x = 1;\n</script>\n\n<span> text </span>';
+	const ours = '<script>\n\tlet x = 1;\n</script>\n\n<span>text</span>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('svelte_boundary_ws_trim', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('svelte_boundary_ws_trim: negative - ws deleted inside a script template-literal string', () => {
+	// `a <b> c` → `a <b>c` inside a template literal is STRING content — program
+	// bytes, not template markup. Tag-shaped, so the fragment-edge erasure would
+	// equate the two sides if it ran over script text; SAFETY counts no whitespace,
+	// so a claim here would hide real content loss. Script interiors stay verbatim.
+	const prettier = '<script>\n\tconst s = `a <b> c`;\n</script>';
+	const ours = '<script>\n\tconst s = `a <b>c`;\n</script>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('svelte_boundary_ws_trim', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('svelte_boundary_ws_trim: negative - ws deleted inside a style content string', () => {
+	// The CSS analog: `content: 'a <b> c'` → `'a <b>c'` is string bytes.
+	const prettier = "<style>\n\tp::before {\n\t\tcontent: 'a <b> c';\n\t}\n</style>";
+	const ours = "<style>\n\tp::before {\n\t\tcontent: 'a <b>c';\n\t}\n</style>";
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('svelte_boundary_ws_trim', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('svelte_boundary_ws_trim: negative - script-string deletion not claimed alongside a template trim', () => {
+	// Mixed file: the template trim hunk may be claimed, but the hunk inside the
+	// <script> region must not be — its whitespace is program bytes.
+	const prettier = '<script>\n\tconst s = `a <b> c`;\n</script>\n\n<div>\n\t<span> ok </span>\n</div>';
+	const ours = '<script>\n\tconst s = `a <b>c`;\n</script>\n\n<div>\n\t<span>ok</span>\n</div>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const coverage = detect_divergences(ctx);
+	assertNotEquals(coverage.classification, 'all_explained');
+});
+
+Deno.test('svelte_boundary_ws_trim: negative - mixed file must not blanket-claim the render-changing hunk', () => {
+	// One legitimate fragment-edge trim plus one render-changing inter-sibling
+	// deletion. The legit trim may be claimed, but the deletion's hunk must not
+	// be — a blanket claim would classify the file all_explained and hide the bug.
+	const prettier = '<div>\n\t<span> a </span>\n\t<p><i>x</i> <i>y</i></p>\n</div>';
+	const ours = '<div>\n\t<span>a</span>\n\t<p><i>x</i><i>y</i></p>\n</div>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const coverage = detect_divergences(ctx);
+	assertNotEquals(coverage.classification, 'all_explained');
+});
+
 // ─── single_specifier_import ────────────────────────────────────────────────
 
 Deno.test('single_specifier_import: positive - long import wraps', () => {
