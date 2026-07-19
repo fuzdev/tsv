@@ -19,6 +19,13 @@ comment still leads the element, so it stays after the comma and takes its own l
 line is authorship *about the element* and survives between them (`h`). Only the comment's own
 line break is ours to reflow.
 
+That is the opposite of a **value** gap, where the same blank yields with the break
+([conformance_prettier.md §Authored breaks in value position](../../../../../../docs/conformance_prettier.md#authored-breaks-in-value-position)),
+and the contrast is deliberate: here the blank sits between two *list items*, which is ordinary
+blank-line authoring tsv preserves; there it sits inside a head→value break the formatter has
+already judged unforced, leaving no two lines for it to separate. The printer names the split as
+the leading-run modes `Adjacent` (this case) and `AdjacentValueGap`.
+
 This is *not* the sanctioned pure-separator trail. That carve-out covers a same-line **line**
 comment (`A // c⏎, B` → `A, // c`), where the comment trails `A` in both forms — only the comma
 slides across it, the binding never changes, and a `//` runs to end-of-line so no other
