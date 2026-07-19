@@ -796,6 +796,7 @@ dependencies = [
  "tsv_lang",
  "tsv_svelte",
  "tsv_ts",
+ "unicode-ident",
 ]
 
 [[package]]

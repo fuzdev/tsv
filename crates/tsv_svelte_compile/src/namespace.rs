@@ -20,6 +20,7 @@ use tsv_svelte::ast::internal::{
     AwaitBlock, Element, ElementKind, FragmentNode, IfBlock, SpecialElementKind,
 };
 
+use crate::text_class::js_trim;
 use crate::transform_server::EmitEnv;
 
 /// The SSR namespace of a fragment (Svelte's `Namespace`). Only [`Namespace::Svg`]
@@ -216,7 +217,7 @@ fn check_node(
             false
         }
         FragmentNode::Text(t) => {
-            if !t.data(env.source).trim().is_empty() {
+            if !js_trim(&t.data(env.source)).is_empty() {
                 *acc = NsAccum::MaybeHtml;
             }
             false

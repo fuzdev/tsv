@@ -70,8 +70,9 @@ use crate::namespace::{FragmentParent, Namespace, infer_namespace};
 use crate::needs_context::{ComponentContext, analyze_component};
 use crate::script_rewrite::{
     BindableEntry, analyze_module_script, analyze_script, collect_script_comments,
-    document_ts_flag, identifier_binding_name, plain_identifier_name, refuse_runes_invalid_import,
-    refuse_template_typescript, rewrite_script_statement, self_check_no_typescript,
+    document_ts_flag, identifier_binding_name, plain_identifier_name, refuse_rune_store_collision,
+    refuse_runes_invalid_import, refuse_template_typescript, rewrite_script_statement,
+    self_check_no_typescript,
 };
 use crate::snippet::{SnippetAnalysis, analyze_snippets};
 use crate::{CompileError, CompileOutput, Refusal, erase, store_rewrite};
@@ -409,6 +410,13 @@ fn analyze<'arena>(
     // refuse — see `collect_script_comments`.
     let script_comments = collect_script_comments(root, source, instance_body)?;
     let has_comments = !script_comments.is_empty();
+
+    // A rune keyword whose stem is also a binding in scope at the instance script
+    // (`import { state } from './store'` + `$state`) is READ AS A STORE by the
+    // oracle, not as the rune — refuse before the binding table (which would
+    // classify it as the rune) is built. `instance.scope.get` chains to the module
+    // scope, so both bodies are searched. See `refuse_rune_store_collision`.
+    refuse_rune_store_collision(instance_body, module_body, source, &root.interner)?;
 
     // Script analysis pass: the top-level binding table (evaluator input) and
     // the derived-name set (read rewriting / refusal). The instance script fills

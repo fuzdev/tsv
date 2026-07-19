@@ -144,8 +144,9 @@ Everything else `$`-shaped refuses (the `rune_guard.rs` exhaustive walk):
 - **Refused**: `destructuring a $state declarator` / `destructuring a $state.snapshot declarator` / `destructuring a $derived declarator` / `destructuring a $derived.by declarator`
 - **Refused**: `binding pattern shape ({kind})` — a `$props()`-family binding whose pattern the analyzer doesn't classify
 - **Refused**: `top-level await (async component output not implemented)`
+- **Refused**: `rune {name} whose base is also an instance binding` — a rune keyword whose `$`-stripped stem is *also* a binding **in scope at the instance script** (`import { state } from './store'` beside a `$state` reference). The oracle's `analyze_component` reclassifies such a reference as a **store subscription** on that binding, not as the rune, and deletes it from `module.scope.references` before it infers runes mode — so the collision can flip the whole component out of runes mode. tsv models neither, so it refuses rather than compile the rune. The scope tested is the oracle's `instance.scope.get`, which walks **up** the chain into the **module** scope (so a `<script module>` binding collides too) it never walks **down**, so a function parameter, a block-scoped `let`, or a name bound in a nested function body does *not* collide and keeps compiling. Two nested forms still reach script scope, and they differ: a function-scoped **`var`** in any block, for-head, switch, or try/catch — which the oracle re-declares on the parent **without its initializer** (`phases/scope.js:673-681`), so no rune init can exempt it — and a declaration in a class **static block**, which `phases/scope.js` gives no scope at all (there is no `StaticBlock` visitor), so it declares at script scope with its initializer **intact**. The two are handled asymmetrically, deliberately: the `var` hoist is modelled **exactly** (one exhaustive `Statement` enumeration, `each_script_declaration`), while the static block is **fenced lexically** — a component containing any `static { … }` refuses on its first rune reference, whatever that block declares. Reaching every class body a script can hold means enumerating every expression position of every statement (a for-head, a `super_class`, a property initializer — which is **not** a function scope, `phases/scope.js` having no `PropertyDefinition` visitor either — a computed key, a function parameter default), and a hand-enumerated version of that surface shipped silent MISMATCHes twice. A static block is `static`, then trivia, then `{`, and its token always sits inside a statement's span — so the fence misses one only by mis-classifying the trivia, and its completeness is exactly the completeness of its **whitespace class**. It matches ECMAScript `WhiteSpace`/`LineTerminator` (`text_class::is_js_whitespace`), not Rust's `char::is_whitespace`: the two differ at `U+FEFF` (ECMAScript whitespace, but with no Unicode `White_Space` property), and `static\u{FEFF}{ … }` was invisible to the fence, compiling the rune where the oracle emits a store read. It over-reports harmlessly; its measured parity cost is **zero** — no `.svelte` file in the ~4900-file compile corpus contains a static block at all. The oracle's **exemption** — a binding whose `initial` *is* a rune call (`let state = $state(0)`, `const props = $props()`) — is modelled, so the common shapes keep compiling; so are the corners of its clause (`let state = $props()` **is** reclassified; `$derived` beside `import { derived } from 'svelte/store'` is **not**; a rune-initialized `var` hoisted through a porous scope **is**). Corpus-invisible — found against Svelte's own `validator` / `compiler-errors` suites.
 
-A `$`-prefixed *member name* (`a.$foo`) is not a rune reference and stays compilable.
+A `$`-prefixed *member name* (`a.$foo`) is not a rune reference, and the rune guard leaves it alone. It is not unconditionally compilable, though: the collision pre-pass above uses a whole-document source scan, so `obj.$state` (or `{ $state: 1 }`, or `$state` in a comment or in template text) counts as a `$state` reference and refuses whenever `state` is *also* a binding in scope — a deliberate over-refusal, never a wrong compile.
 
 ### Stores (`$name` auto-subscription) — Supported
 
@@ -368,6 +369,15 @@ implements the oracle's *emission*, not its *analysis*, so a component the oracl
 analyzer rejects can still compile. Each row below is an over-acceptance with a
 standalone repro, none of them dropped-region-specific:
 
+> **This inventory is now GATED, not just described.** Svelte's own `compiler-errors` +
+> `validator` suites — 455 files, ~2/3 deliberately invalid — are a standing corpus behind
+> `deno task compile:validation`, a path-keyed known-bug ratchet over the 49
+> over-acceptances they currently expose across 25 oracle codes. A *new* over-acceptance
+> fails the gate; a pinned one that stops firing fails too, so closing a rule forces
+> removing its lines and the list cannot rot. The prose below stays the *diagnosis*; the
+> snapshot is the *measurement*. See
+> [compile_validation_ratchet.md](compile_validation_ratchet.md).
+
 | Repro | Oracle error |
 | --- | --- |
 | `<h1><h1>t</h1></h1>` | `node_invalid_placement` |
@@ -551,7 +561,7 @@ A **static** component invocation compiles to `Name($$renderer, props)` (`shared
 
 | Shape | Status |
 | --- | --- |
-| HTML elements, nesting, void elements | Supported |
+| HTML elements, nesting, void elements | Supported. A tag name is **lowercased at emission** when the element sits in the `html` namespace (`RegularElement.js:18` — `context.state.namespace === 'html' ? node.name.toLowerCase() : node.name`); the parser does not normalize case. That one lowered name drives every downstream decision in the oracle's visitor, so `<bR>` lowers to `br`, is therefore VOID, and self-closes with no close tag. A tag in the `svg`/`mathml` namespace keeps its case (`<clipPath>`), and `<foreignObject>` resets its children to `html` so they lower again. `<svelte:element this={…}>` is never lowercased — neither at compile time nor at runtime. |
 | components (`<Foo … />`) | Supported (self-closing / prop-only) — see [Components](#components) |
 | `<option>` | **Refused**: `<option> (oracle emits $$renderer.option closures)` |
 | populated `<select>` / `<optgroup>` | **Refused**: `` <{name}> with children (oracle emits a `<!>` anchor) `` (empty `<select>` is Supported) |

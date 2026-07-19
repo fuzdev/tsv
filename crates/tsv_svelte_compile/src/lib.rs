@@ -42,6 +42,7 @@ mod script_rewrite;
 mod snippet;
 mod snippet_emit;
 mod store_rewrite;
+mod text_class;
 mod transform_server;
 
 pub use parity::{Parity, compare_canonical};

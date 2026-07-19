@@ -751,6 +751,11 @@ fn to_int32(n: f64) -> i32 {
 
 /// Collect the identifier names a binding pattern declares (destructure
 /// properties, defaults, rests, nested patterns).
+///
+/// ⚠️ **Escaped binding identifiers are SKIPPED** — `const { a: \u0073tate } = x`
+/// binds `state`, but the name lives in the interner, not in the source slice,
+/// and this walk has no interner. A caller that must not MISS a binding pairs
+/// this with [`pattern_binds_unnameable_identifier`].
 pub(crate) fn pattern_binding_names(
     pattern: &Expression<'_>,
     source: &str,
@@ -803,6 +808,45 @@ pub(crate) fn pattern_binding_names(
         other => Err(CompileError::Unsupported(Refusal::BindingPatternShape {
             kind: expression_kind(other),
         })),
+    }
+}
+
+/// Whether `pattern` binds at least one name [`pattern_binding_names`] cannot
+/// report — an ESCAPED identifier (`const \u0073tate = 1`), or a pattern shape
+/// that walk rejects outright.
+///
+/// The pair exists because the two questions differ: `pattern_binding_names`
+/// answers "which names, exactly", this one answers "is there a name I could not
+/// tell you about". A caller for which a MISSED binding is a correctness bug
+/// (the rune/store collision walk) must ask both.
+///
+/// Deliberately **conservative on every unrecognized shape**: the fallback arm is
+/// `true`, so a new `Expression` variant reaching a pattern position reads as
+/// "there may be a hidden binding" rather than silently as "no". That is what
+/// keeps this from drifting out of step with `pattern_binding_names` — the two
+/// can only disagree in the safe direction.
+pub(crate) fn pattern_binds_unnameable_identifier(pattern: &Expression<'_>) -> bool {
+    use tsv_ts::ast::internal::{ObjectPatternProperty, ObjectProperty};
+    match pattern {
+        Expression::Identifier(id) => id.escaped_name.is_some(),
+        Expression::ObjectPattern(obj) => obj.properties.iter().any(|prop| match prop {
+            ObjectPatternProperty::Property(p) => pattern_binds_unnameable_identifier(&p.value),
+            ObjectPatternProperty::RestElement(rest) => {
+                pattern_binds_unnameable_identifier(rest.argument)
+            }
+        }),
+        Expression::ObjectExpression(obj) => obj.properties.iter().any(|prop| match prop {
+            ObjectProperty::Property(p) => pattern_binds_unnameable_identifier(&p.value),
+            ObjectProperty::SpreadElement(s) => pattern_binds_unnameable_identifier(s.argument),
+        }),
+        Expression::ArrayPattern(arr) => arr
+            .elements
+            .iter()
+            .flatten()
+            .any(pattern_binds_unnameable_identifier),
+        Expression::AssignmentPattern(assign) => pattern_binds_unnameable_identifier(assign.left),
+        Expression::RestElement(rest) => pattern_binds_unnameable_identifier(rest.argument),
+        _ => true,
     }
 }
 

@@ -195,7 +195,25 @@ pub(crate) fn emit_element<'arena>(
         ElementKind::Html => {}
         ElementKind::Component => return emit_component(env, element, out, &name, is_standalone),
     }
-    match name.as_str() {
+    // The oracle's `RegularElement` visitor lowercases the tag name once, at the
+    // top, whenever the element sits in the html namespace
+    // (`3-transform/server/visitors/RegularElement.js:18`: `const name =
+    // context.state.namespace === 'html' ? node.name.toLowerCase() : node.name`),
+    // and then reuses that ONE lowered name for every downstream decision in the
+    // visitor: `is_void(name)`, the `script`/`style`/`select`/`option` special
+    // cases, and both the open- and close-tag literals. So `<bR>` lowers to `br`,
+    // is therefore VOID, and self-closes. Everything keyed on the RAW name in the
+    // oracle stays keyed on `name` here: `preserve_whitespace` (`node.name ===
+    // 'pre'`), the ancestor svg-`<text>` guard, `determine_namespace_for_children`
+    // (which reads `node.metadata.svg`, itself derived from the raw name), and the
+    // whole attribute machinery (`shared/element.js` tests `node.name`
+    // throughout, and `get_attribute_name` keys on `element.metadata.svg`).
+    let emit_name = if parent_ctx.namespace == Namespace::Html {
+        name.to_lowercase()
+    } else {
+        name.clone()
+    };
+    match emit_name.as_str() {
         // Template-level <script>/<style> have special semantics in the oracle.
         "script" | "style" => {
             return Err(unsupported(Refusal::TemplateLevelElement {
@@ -227,7 +245,7 @@ pub(crate) fn emit_element<'arena>(
     // The open tag's attributes: the per-attribute drop/emit loop, or — for an
     // element carrying a `{...spread}` — one fused `$.attributes(…)` call (routed
     // inside `emit_host_attributes`).
-    out.push_text(&format!("<{name}"));
+    out.push_text(&format!("<{emit_name}"));
     emit_host_attributes(
         env,
         AttrHost::Regular(element),
@@ -240,7 +258,7 @@ pub(crate) fn emit_element<'arena>(
         parent_ctx.namespace,
     )?;
 
-    if tsv_html::is_void_element(&name) {
+    if tsv_html::is_void_element(&emit_name) {
         // XHTML-compliant self-close, matching the oracle.
         out.push_text("/>");
         if !element.fragment.nodes.is_empty() {
@@ -274,7 +292,7 @@ pub(crate) fn emit_element<'arena>(
             in_svg_text: parent_ctx.in_svg_text || name == "text",
         },
     )?;
-    out.push_text(&format!("</{name}>"));
+    out.push_text(&format!("</{emit_name}>"));
     Ok(())
 }
 

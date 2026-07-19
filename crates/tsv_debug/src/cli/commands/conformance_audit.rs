@@ -56,6 +56,7 @@ const CONFORMANCE_SVELTE: &str = "docs/conformance_svelte.md";
 const LINK_CHECKED_DOCS: &[&str] = &[
     "docs/conformance_svelte_compiler.md",
     "docs/checklist_svelte_compiler.md",
+    "docs/compile_validation_ratchet.md",
 ];
 
 /// Non-divergence fixtures that deliberately keep a README because it documents a

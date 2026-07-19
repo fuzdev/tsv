@@ -190,6 +190,8 @@ deno task canonicalize:audit         # canonicalize_js idempotence + output vali
 deno task compile:fixtures:init      # create/reinit a compile fixture (oracle-compiles + canonicalizes; tests/fixtures_compile)
 deno task compile:fixtures:validate  # validate compile fixtures: oracle freshness + expected idempotence + ours parity (all gating; the sidecar-free slice also gates in cargo test)
 deno task compile:corpus:compare     # compile-parity wide net over real repos + the Svelte suites: per-file parity/refused/oracle-rejected buckets; MISMATCH = always a bug by the refusal contract (sidecar-dependent, on demand — kept out of `deno task check`); see Debug Tooling
+deno task compile:validation         # VALIDATION-SUITE RATCHET: compile-parity over Svelte's own `compiler-errors` + `validator` suites (455 files, ~2/3 deliberately INVALID) — the compiler's *validation* surface, which the real-component corpus above barely touches and which sat in NO gated corpus. A file the oracle REJECTS that tsv compiles is an OVER-ACCEPTANCE, a refusal-contract bug; there are 49 today across 25 oracle codes, so the shape is a known-bug RATCHET (gaps:audit / blanks:audit style) over a machine-generated snapshot (`compile_validation_known.txt`) rather than a green gate: every line is a bug and the file shrinking is the goal, so a finding NOT on the list, or one on it that no longer fires, FAILS. PATH-keyed — unlike `compile:fuzz`'s generated mutants, these files are authored and committed upstream at stable paths, so the path IS the finding's identity (the oracle error code rides along, so a pin bump that changes which rule rejects a file re-triages rather than silently matching). A MISMATCH is NEVER pinnable (absolute by the refusal contract) and fails unconditionally, as does a HARNESS-ERROR — every harness failure that is tsv's or the machine's rather than upstream's (a tsv compiler self-check, a parse over-rejection, a canonicalizer failure, an unreadable file, a dead sidecar); refusal/fenced counts are deliberately NOT pinned (a refusal is not a defect and its buckets churn with every slice). One `ORACLE-ERROR` line is pinned and is UPSTREAM's bug, not tsv's — one sample makes svelte 5.56.4's own warning constructor throw under the `runes: true` the sidecar forces (it compiles fine at the default mode); pinned rather than skipped so it stays visible AND so a DIFFERENT future harness error still fails. ⚠️ Always a SEPARATE invocation from `compile:corpus:compare`, never extra roots on it — folding a ~2/3-invalid corpus in would corrupt that run's `parity / achievable` denominator. Sidecar-dependent, so on demand only — NOT in `deno task check`, and outside `conformance`/publish Step 3b (the compiler arc ships no artifact). Full reference: ./docs/compile_validation_ratchet.md
+deno task compile:validation:update  # regenerate that snapshot after fixing a finding (or newly refusing a shape); refuses a narrowed run, and never pins a MISMATCH
 deno task compile:fuzz               # DIFFERENTIAL compile fuzzer: generate feature CROSS-PRODUCTS from the compile fixtures and grade each against the oracle. The compiler's adversarial leg — the corpus above tests real components, so it exercises every feature while missing nearly every feature PAIR (every interaction bug found by hand was corpus-invisible). Ten AST/feature-level operators compose names × scopes, constructs × server-dropped regions, and one seed's features into another's; a MISMATCH and an OVER-ACCEPTANCE are both bugs by the refusal contract and both gate — and the gate is currently RED (a `--seed 0 --iterations 20000` run reports ~647 over-acceptances + 26 mismatches, so it ALWAYS exits 1): it is a discovery tool with an open work list, not a regression gate. tsv's compile runs FIRST and a refusal skips the sidecar (the throughput lever). Deterministic per `--seed` (independent of `--jobs`) and corpus-add-stable for nine of the ten operators — the cross-product graft reads the whole corpus, so it is outside that guarantee by construction; sidecar-dependent, so on demand only — NOT in `deno task check`; see Debug Tooling
 deno task pins:audit                 # canonical-oracle version sync (gated in `deno task check`): (1) pin agreement — sidecar.ts VERSIONS + npm: imports, benches/js/package.json, actor.rs acorn import-map must be identical; (2) checkout alignment — a PRESENT ../svelte or ../acorn-typescript checkout must match its pin (absent → skipped, so clean machines pass)
 deno task scan:audit                 # guard against new raw find/rfind/match_indices substring scans over source (gated in `deno task check`); see Debug Tooling
@@ -780,6 +782,54 @@ cargo run -p tsv_debug compile_fixtures_validate [pattern...]
 # estimate) is checkable.
 cargo run -p tsv_debug compile_corpus_compare <paths...>
 # Also: --list, --json.
+
+# compile_corpus_compare --ratchet - the VALIDATION-SUITE GATE. Same pipeline, different
+# corpus and a different verdict: it grades the run against a committed, PATH-keyed
+# known-bug snapshot (`compile_validation_known.txt`) over Svelte's own
+# ../svelte/packages/svelte/tests/{compiler-errors,validator} suites. Those 455 files are
+# ~2/3 deliberately INVALID — the inverse of the real-component corpus above, which is
+# overwhelmingly valid Svelte and so exercises EMISSION while barely touching VALIDATION.
+# They were in no gated corpus at all, and the compiler's validation holes lived as prose
+# in docs/checklist_svelte_compiler.md §The wider validation surface.
+#
+# Four key kinds. OVER-ACCEPT (the oracle rejected it, tsv compiled it) is PINNABLE — the
+# ratcheted debt, 49 findings across 25 oracle codes today. MISMATCH is NEVER pinnable
+# (absolute by the refusal contract, exactly as a PANIC is unpinnable in gap_audit) and
+# fails unconditionally — redundantly with the pinnability rule, so relaxing one can't
+# silently ungate it. ORACLE-ERROR is pinnable and is UPSTREAM's bug: one sample
+# (validator/samples/silence-warnings-2) makes svelte 5.56.4's own warning constructor
+# throw under the `runes: true` the sidecar forces — verified to compile fine at the
+# DEFAULT mode and at `runes: false`, under both generate targets, which is why it's green
+# in Svelte's own harness. Pinned rather than skipped so it stays VISIBLE and so a
+# DIFFERENT future harness error still FAILS; ⚠️ an errored file gets no oracle verdict, so
+# tsv is never probed on it and a pinned one could hide an over-acceptance of its own.
+# HARNESS-ERROR is every OTHER harness failure and is NEVER pinnable: a tsv compiler
+# self-check (tsv-corrupt-output / tsv-type-erasure-leak), a tsv parse over-rejection, a
+# canonicalizer failure, an unreadable file, a dead sidecar. Pinnability is decided by
+# WHOSE bug it is and only the oracle's throw is upstream's — otherwise a slice that
+# introduced a corrupt output could be laundered by the next `--update` into a list whose
+# header says an errored line is upstream's. Refusal/fenced counts are deliberately NOT
+# pinned — a refusal is not a defect and its buckets churn with every compiler slice.
+#
+# The verdict is deliberately NOT `exit_verdict` (which fails on any over-acceptance — the
+# very debt being ratcheted, so it would be permanently red): a MISMATCH fails, and the
+# grade must hold. Both are pure functions of the report, so both are unit-tested without
+# a live sidecar. Passing explicit paths is a NARROWING (the snapshot is path-keyed): the
+# run reports but is neither GRADED nor pinnable, and `--update` refuses it — ⭐ but not
+# graded is NOT un-gated: the terms needing no snapshot still fire, so a narrowed run
+# exits non-zero on a MISMATCH or an unpinnable HARNESS-ERROR (only the ratcheted
+# over-acceptance debt is ungated there). A missing ../svelte checkout is fail-closed by
+# EITHER of two mechanisms: an absent root path fails at DISCOVERY (`path not found`)
+# before any file is walked, never reaching the ratchet; roots that exist but are EMPTY
+# (a partial checkout) do reach it and fail as a wall of stale entries. A missing
+# snapshot is a hard read error.
+#
+# ⚠️ Always a SEPARATE invocation from the ordinary corpus run — never extra roots on it.
+cargo run -p tsv_debug compile_corpus_compare --ratchet            # the gate
+cargo run -p tsv_debug compile_corpus_compare --ratchet --update   # re-pin
+deno task compile:validation                                       # the on-demand tasks
+# Sidecar-dependent, so NOT in `deno task check`, and outside conformance/publish Step 3b.
+# Full reference: ./docs/compile_validation_ratchet.md
 
 # compile_fuzz - the DIFFERENTIAL compile fuzzer: generate feature cross-products from the
 # compile fixtures and grade each mutant against the canonical compiler. The compiler's

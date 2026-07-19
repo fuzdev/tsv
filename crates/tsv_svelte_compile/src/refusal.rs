@@ -276,6 +276,46 @@ pub enum Refusal {
         /// The shadowed derived binding name.
         name: String,
     },
+    /// A rune keyword whose `$`-stripped stem is also a binding **in scope at the
+    /// instance script** — `import { state } from './store'` beside a `$state`
+    /// reference. The oracle's `analyze_component`
+    /// (`phases/2-analyze/index.js`) reclassifies such a `$stem` reference as a
+    /// STORE subscription rather than the rune, and deletes it from
+    /// `module.scope.references` *before* it infers runes mode — so the
+    /// collision can also flip the whole component out of runes mode. tsv is a
+    /// runes-only compiler and models neither the reclassification nor mode
+    /// inference, so refuse. The oracle EXEMPTS the common shapes — `let state =
+    /// $state(0)`, `const props = $props()` — because the binding's own
+    /// initializer is a rune call; those keep compiling.
+    ///
+    /// Scope is the oracle's `instance.scope.get`, which walks UP the chain
+    /// (`phases/scope.js:748`) into the MODULE scope — so a `<script module>`
+    /// binding collides too. It never walks DOWN, so a function parameter, a
+    /// block-scoped `let`, or a name bound in a nested function body is a child
+    /// scope and does not collide. Two nested forms still reach script scope: a
+    /// function-scoped `var` in any block, for-head, switch, or try/catch (which
+    /// arrives with its initializer DROPPED, `scope.js:673-681`, so the rune
+    /// exemption can never apply to it), and a declaration in a class STATIC
+    /// BLOCK, which the oracle gives no scope at all (no `StaticBlock` visitor)
+    /// so the initializer survives. The first is modelled exactly; the second is
+    /// covered by a lexical fence — a component containing ANY static block
+    /// refuses on the first rune reference, a deliberate over-refusal at
+    /// measured-zero corpus cost (see `script_rewrite`'s
+    /// `script_contains_static_block`).
+    ///
+    /// ⚠️ The fence is a SOURCE SCAN, so its completeness is exactly the
+    /// completeness of its whitespace class: the trivia between `static` and its
+    /// `{` must be matched with ECMAScript's `WhiteSpace`/`LineTerminator`
+    /// (`text_class::is_js_whitespace`), never Rust's `char::is_whitespace`.
+    /// The two differ at `U+FEFF`, and a `static\u{FEFF}{ … }` block written with
+    /// one was invisible to the fence — the rune compiled where the oracle emits
+    /// a store read (pinned by
+    /// `compile_refuses_static_block_separated_by_zwnbsp`).
+    #[error("rune {name} whose base is also an instance binding (the oracle reads it as a store)")]
+    RuneNameBoundAsStore {
+        /// The rune keyword (`$state`, `$derived`, …).
+        name: String,
+    },
     /// A top-level `await` (async component output is not implemented).
     #[error("top-level await (async component output not implemented)")]
     TopLevelAwait,
@@ -932,6 +972,9 @@ impl Refusal {
             Self::ClassFieldStateReactiveArg => Cow::Borrowed(
                 "class-field $state with a lone store/$derived argument (the oracle keeps it bare)",
             ),
+            Self::RuneNameBoundAsStore { .. } => {
+                Cow::Borrowed("rune {name} whose base is also an instance binding")
+            }
             Self::TopLevelAwait => {
                 Cow::Borrowed("top-level await (async component output not implemented)")
             }
@@ -1203,6 +1246,9 @@ impl Refusal {
                 name: "{name}".to_string(),
             },
             Self::DerivedReadShadowed {
+                name: "{name}".to_string(),
+            },
+            Self::RuneNameBoundAsStore {
                 name: "{name}".to_string(),
             },
             Self::TopLevelAwait,

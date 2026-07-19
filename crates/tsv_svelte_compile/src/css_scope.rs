@@ -33,6 +33,7 @@ use crate::element_census::{
     CensusNode, ElementCensus, PathFrame, get_ancestor_elements, get_possible_element_siblings,
     has_element_parent,
 };
+use crate::text_class::{is_css_whitespace, is_js_whitespace};
 use crate::transform_server::unsupported;
 use crate::{CompileError, Refusal};
 
@@ -542,7 +543,9 @@ fn pure_global_strip(global_span: Span) -> Vec<Removal> {
 
 /// The strip removal for a bare `:global`: drop `:global`, plus the preceding
 /// whitespace when the combinator is descendant (`div :global.x` → `div.x`,
-/// index.js `remove_global_pseudo_class`).
+/// index.js `remove_global_pseudo_class`). The oracle's back-scan is
+/// `while (/\s/.test(state.code.original[start - 1])) start--` — a JavaScript
+/// regex over CSS text, so the class is [`is_js_whitespace`], not a CSS one.
 fn bare_global_strip(
     global_span: Span,
     combinator: Option<Combinator>,
@@ -552,7 +555,7 @@ fn bare_global_strip(
     if combinator == Some(Combinator::Descendant) {
         let before = &source[..global_span.start as usize];
         for (i, c) in before.char_indices().rev() {
-            if is_js_ws(c) {
+            if is_js_whitespace(c) {
                 start = i as u32;
             } else {
                 break;
@@ -638,10 +641,25 @@ fn compute_splice(simples: &[SimpleSelector<'_>]) -> Option<Splice> {
     None
 }
 
+/// A pseudo-class's name, lowercased (CSS keywords are ASCII case-insensitive).
+///
+/// The trim is [`is_css_whitespace`], NOT Rust's `str::trim`. Every code point
+/// at or above `U+0080` is a CSS ident code point, so a Unicode-whitespace trim
+/// eats part of the NAME: `:global\u{00A0}` is the pseudo-class
+/// `global\u{00A0}`, which the oracle does not recognize as `:global` at all. It
+/// is then just an unknown trailing pseudo-class — the rule is KEPT and its
+/// compounds scoped the ordinary way, in BOTH the descendant form
+/// (`div :global\u{00A0}.x` → `div.svelte-tsvhash :global\u{00A0}.x:where(…)`)
+/// and the compound form (`.x:global\u{00A0}` → `.x.svelte-tsvhash:global\u{00A0}`);
+/// oracle-probed, and tsv reaches parity on each. A `str::trim` instead read the
+/// name as `:global` and took the global-handling path (strip / no hash) — an
+/// oracle-verified MISMATCH.
 fn pseudo_name(raw: &str) -> String {
     let stripped = raw.trim_start_matches(':');
     let end = stripped.find('(').unwrap_or(stripped.len());
-    stripped[..end].trim().to_ascii_lowercase()
+    stripped[..end]
+        .trim_matches(is_css_whitespace)
+        .to_ascii_lowercase()
 }
 
 fn flags_has(flags: Option<&str>, ch: char) -> bool {
@@ -972,7 +990,9 @@ fn test_attribute(
 fn test_attribute_cs(operator: Option<AttributeMatcher>, expected: &str, value: &str) -> bool {
     match operator {
         None | Some(AttributeMatcher::Exact) => value == expected,
-        Some(AttributeMatcher::Contains) => value.split(is_js_ws).any(|token| token == expected),
+        Some(AttributeMatcher::Contains) => {
+            value.split(is_js_whitespace).any(|token| token == expected)
+        }
         Some(AttributeMatcher::DashMatch) => {
             format!("{value}-").starts_with(&format!("{expected}-"))
         }
@@ -980,30 +1000,6 @@ fn test_attribute_cs(operator: Option<AttributeMatcher>, expected: &str, value: 
         Some(AttributeMatcher::Suffix) => value.ends_with(expected),
         Some(AttributeMatcher::Substring) => value.contains(expected),
     }
-}
-
-/// JavaScript `\s` (the exact class the oracle's `value.split(/\s/)` uses — NOT
-/// Rust's `char::is_whitespace`: BOM in, NEL out).
-fn is_js_ws(c: char) -> bool {
-    matches!(
-        c,
-        '\u{0009}'
-            | '\u{000A}'
-            | '\u{000B}'
-            | '\u{000C}'
-            | '\u{000D}'
-            | '\u{0020}'
-            | '\u{00A0}'
-            | '\u{1680}'
-            | '\u{2000}'
-            ..='\u{200A}'
-                | '\u{2028}'
-                | '\u{2029}'
-                | '\u{202F}'
-                | '\u{205F}'
-                | '\u{3000}'
-                | '\u{FEFF}'
-    )
 }
 
 // ── Splicing ──────────────────────────────────────────────────────────────────

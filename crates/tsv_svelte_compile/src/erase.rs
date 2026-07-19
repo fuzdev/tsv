@@ -57,6 +57,7 @@ use tsv_ts::ast::internal::{
 
 use crate::CompileError;
 use crate::refusal::Refusal;
+use crate::text_class::js_char_at;
 
 /// The product of erasing a statement list.
 pub(crate) struct Erased<'arena> {
@@ -144,8 +145,12 @@ pub fn next_token_pos(source: &str, from: u32) -> u32 {
     let end = bytes.len();
     let mut pos = (from as usize).min(end);
     loop {
-        while pos < end && bytes[pos].is_ascii_whitespace() {
-            pos += 1;
+        // JS whitespace, not `u8::is_ascii_whitespace` — see `js_char_at`.
+        while pos < end
+            && let Some(c) = js_char_at(source, pos)
+            && c.is_whitespace
+        {
+            pos += c.len;
         }
         match skip_trivia(bytes, pos, end, TriviaProfile::COMMENTS) {
             Some(next) if next > pos => pos = next,
@@ -183,10 +188,17 @@ fn prev_token_end(source: &str, anchor: u32, to: u32) -> u32 {
             pos = next;
             continue;
         }
-        if !bytes[pos].is_ascii_whitespace() {
-            last = u32::try_from(pos + 1).unwrap_or(to);
+        // JS whitespace, not `u8::is_ascii_whitespace` — see `js_char_at`. BOTH
+        // branches step a whole character: a multi-byte token character (a
+        // `café` identifier) would otherwise leave `pos` on a continuation byte,
+        // and `last` — a returned span position — inside one.
+        let Some(c) = js_char_at(source, pos) else {
+            break;
+        };
+        if !c.is_whitespace {
+            last = u32::try_from(pos + c.len).unwrap_or(to).min(to);
         }
-        pos += 1;
+        pos += c.len;
     }
     last
 }

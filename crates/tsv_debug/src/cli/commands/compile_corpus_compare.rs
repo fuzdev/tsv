@@ -4,6 +4,7 @@ use crate::deno::{self, DenoError, SvelteGenerate};
 use crate::diff::{ColorChoice, DiffOptions, diff_to_string};
 use argh::FromArgs;
 use futures_util::StreamExt;
+
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use tsv_cli::json_utils::to_json_with_tabs;
@@ -11,6 +12,9 @@ use tsv_svelte_compile::{
     CompileError, CompileOptions, Parity, canonicalize_js, census, census_detected_buckets,
     compare_canonical, compile,
 };
+
+/// The `--ratchet` gate: the validation-suite snapshot, its key shape, and its verdict.
+mod ratchet;
 
 /// Run the Svelte compile-parity pipeline over corpora of `.svelte` files.
 ///
@@ -58,12 +62,39 @@ use tsv_svelte_compile::{
 /// ([`census_detected_buckets`](tsv_svelte_compile::census_detected_buckets)) —
 /// those files may hide an undetected co-blocker, so their sole counts could be
 /// over-promised. Diagnostic only: it exits 0 unless a harness error occurs (2).
+///
+/// # `--ratchet` (the validation-suite gate)
+///
+/// Grades the run against a committed, PATH-keyed known-bug snapshot over Svelte's own
+/// `compiler-errors` + `validator` suites, so the compiler's over-acceptance debt is a
+/// standing gate rather than a hand-maintained list nothing reads. The corpus defaults
+/// to those two suites, and [`exit_verdict`] is replaced by
+/// [`ratchet::grade_and_report`]'s own — over-acceptances are the ratcheted debt, so
+/// gating on their raw count (as `exit_verdict` does) would make the gate permanently
+/// red. `--update` re-pins it.
+///
+/// ⚠️ A **separate invocation** from the ordinary corpus run, never extra roots on it:
+/// these suites are ~2/3 deliberately-invalid input, so folding them in would corrupt
+/// the arc's `parity / achievable` reporting. Safe by construction — [`Report::build`]
+/// and [`Report::target_set`] are pure functions of the per-call outcomes slice, with no
+/// statics and no cross-invocation state. See the [`ratchet`] module docs.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "compile_corpus_compare")]
+#[allow(clippy::struct_excessive_bools)] // independent CLI flags
 pub struct CompileCorpusCompareCommand {
     /// list the discovered in-scope `.svelte` files without comparing
     #[argh(switch)]
     list: bool,
+
+    /// grade the run against the committed validation-suite ratchet snapshot (defaults
+    /// the corpus to Svelte's compiler-errors + validator suites)
+    #[argh(switch)]
+    ratchet: bool,
+
+    /// re-pin the ratchet snapshot from this run (requires --ratchet; refuses a
+    /// narrowed run)
+    #[argh(switch)]
+    update: bool,
 
     /// re-price the refusal buckets: per class, sole-blocker vs co-blocker counts
     /// over the oracle-accepted, tsv-refused files (diagnostic; see the command
@@ -126,7 +157,47 @@ struct GroupInfo {
 
 impl CompileCorpusCompareCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
-        if self.paths.is_empty() {
+        // Mode guards first — a misuse must fail before any corpus work.
+        if self.update && !self.ratchet {
+            eprintln!(
+                "Error: --update re-pins the ratchet snapshot, so it requires --ratchet \
+                 (the snapshot is keyed to that fixed corpus)."
+            );
+            return Err(CliError::Failed);
+        }
+        if self.ratchet && self.census {
+            eprintln!("Error: --ratchet and --census are different pipelines; pick one.");
+            return Err(CliError::Failed);
+        }
+        // The ratchet's snapshot is PATH-keyed against a fixed corpus, so an explicit
+        // path is a NARROWING: gradable-against-nothing and never pinnable. It stays
+        // allowed (a subtree spot-check is useful) but is refused for `--update` and
+        // reported without a verdict.
+        let narrowed = ratchet::RatchetArgs {
+            paths: self.paths.clone(),
+        }
+        .narrowing_flags();
+        if self.update && !narrowed.is_empty() {
+            eprintln!(
+                "Error: --update pins the FULL ratchet corpus ({}). This run is narrowed \
+                 by {}, so its finding set is a SUBSET of what the snapshot means — \
+                 writing it would silently unpin real bugs. Re-run without {}.",
+                ratchet::RATCHET_ROOTS.join(" + "),
+                narrowed.join(" / "),
+                narrowed.join(" / ")
+            );
+            return Err(CliError::Failed);
+        }
+
+        let paths: Vec<String> = if self.ratchet && self.paths.is_empty() {
+            ratchet::RATCHET_ROOTS
+                .iter()
+                .map(|r| (*r).to_string())
+                .collect()
+        } else {
+            self.paths.clone()
+        };
+        if paths.is_empty() {
             eprintln!("Error: compile_corpus_compare needs at least one path");
             return Err(CliError::Failed);
         }
@@ -139,7 +210,7 @@ impl CompileCorpusCompareCommand {
         let mut groups: Vec<GroupInfo> = Vec::new();
         let mut items: Vec<(usize, PathBuf)> = Vec::new();
         let mut visited = VisitedSet::default();
-        for (gi, root) in self.paths.iter().enumerate() {
+        for (gi, root) in paths.iter().enumerate() {
             let p = Path::new(root);
             if !p.exists() {
                 eprintln!("Error: path not found: {root}");
@@ -226,6 +297,25 @@ impl CompileCorpusCompareCommand {
             report.print_json()?;
         } else {
             report.print_human();
+        }
+
+        if self.update {
+            return ratchet::update(&groups, &outcomes);
+        }
+        if self.ratchet {
+            // Recomputed rather than threaded from `run`: one definition of "narrowed"
+            // (`RatchetArgs::narrowing_flags`), read at both decision points.
+            let narrowed = ratchet::RatchetArgs {
+                paths: self.paths.clone(),
+            }
+            .narrowing_flags();
+            // A narrowed ratchet run reaches only part of the snapshot's finding set, so
+            // grading it would report every unreached line as stale. It is still GATED
+            // on the absolute terms, which need no snapshot — see `narrowed_verdict`.
+            if narrowed.is_empty() {
+                return ratchet::grade_and_report(&groups, &outcomes, &report);
+            }
+            return ratchet::report_narrowed(&groups, &outcomes, &report, &narrowed);
         }
 
         exit_verdict(&report)

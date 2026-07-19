@@ -423,8 +423,9 @@ project-wide conventions.
   the rune-rewrite loop and `EmitEnv` construction, using the `store_names` /
   `store_shadowed` sets frozen there.
 - `script_rewrite.rs` — the document-wide TypeScript flag and gate
-  (`document_ts_flag`/`refuse_template_typescript`), the top-level
-  binding-table analysis (`analyze_script`/`analyze_declarator`), and the
+  (`document_ts_flag`/`refuse_template_typescript`), the whole-component
+  rune/store collision pre-pass (`refuse_rune_store_collision`, below), the
+  top-level binding-table analysis (`analyze_script`/`analyze_declarator`), and the
   per-statement rune rewrites (`rewrite_script_statement`) — `$props()` →
   `$$props` (span-stolen; a rest element in its pattern gains the oracle's
   `$$slots, $$events` injection immediately before it, and a non-destructured
@@ -507,6 +508,68 @@ project-wide conventions.
   spans only, so a carried comment window can't reach them and they compile. Also
   `self_check_no_typescript`, the type-erasure self-check that closes the
   loop on the finished program (see `erase.rs`).
+
+  Two whole-component pieces live here rather than in a per-statement path:
+
+  - `each_script_declaration` — the **single exhaustive answer** to "what does
+    this script declare at script scope?" (`ScriptDeclaration` = declarator /
+    function / class / import-local, `VarScope` selecting whether a
+    function-scoped `var` hoisted out of a nested block or for-head is included).
+    Both the binding-table analysis and the collision pre-pass route through it,
+    so the `Statement` enumeration exists once; the match is exhaustive on
+    purpose, so a new AST variant fails compilation instead of silently escaping
+    a guard. Its `top` flag is what encodes strict-mode scoping — below the script's
+    own statement list only a `var` reaches script scope — and its `porous` flag
+    records whether a porous scope sat on the way up, because the oracle re-declares
+    a hoisting `var` on the parent **without its initializer**
+    (`scope.js:673-681`), which `ScriptDeclaration::Declarator::initial_dropped`
+    carries to the consumer. A class body is deliberately **opaque** to it, and so
+    is every expression position: a class **static block** is the one nested
+    statement list that is not a scope at all in the oracle (`phases/scope.js` has
+    no `StaticBlock` visitor), so a `var` there does declare at script scope with
+    its initializer intact — but reaching every class body a script can hold means
+    enumerating every expression position of every statement, a surface that
+    shipped holes twice (a class expression in a for-head, in a `super_class`, in a
+    property initializer — which is NOT a function scope, there being no
+    `PropertyDefinition` visitor either — in a computed key, in a parameter
+    default), each hole a silent MISMATCH. `refuse_rune_store_collision` covers the
+    whole family with a lexical fence instead (`script_contains_static_block`): a
+    component containing any `static { … }` refuses on its first rune reference.
+    The scan is complete for a static block **exactly as far as its whitespace
+    class is ECMAScript's** — a static block is `static`, then trivia, then `{`,
+    and its token always sits inside a statement's span, so the only way to miss
+    one is to mis-classify the trivia. It therefore matches with
+    `text_class::is_js_whitespace`, never Rust's `char::is_whitespace`: the two
+    differ at `U+FEFF` (ECMAScript `WhiteSpace`, but not the Unicode `White_Space`
+    property), and `static\u{FEFF}{ … }` was invisible to the fence, compiling the
+    rune where the oracle emits a store read. Over-reporting stays harmless
+    (`static` in a comment or string, a `/` that is division, a `U+0085` that JS
+    would reject anyway) — measured at zero, no `.svelte` file in the ~4900-file
+    compile corpus contains a static block.
+  - `refuse_rune_store_collision` — a pre-pass over the WHOLE component, run
+    before the binding table is built. A rune keyword whose `$`-stripped stem is
+    also a binding in scope at the instance script (`import { state } from
+    './store'` beside a `$state` reference) is read by the oracle as a **store
+    subscription**, not as the rune (`2-analyze/index.js`, the "create synthetic
+    bindings for store subscriptions" loop), and the reference is deleted from
+    `module.scope.references` before runes-mode inference — so the collision can
+    flip the whole component out of runes mode. tsv models neither, so it
+    refuses. The scope tested is the oracle's `instance.scope.get`, which walks
+    **up** into the module scope (`scope.js:748`; the instance scope's parent IS
+    `module.scope`) and never **down** — a function parameter, a block-scoped
+    `let`, and a name bound in a nested function body are child scopes and keep
+    compiling — plus the two nested forms that DO reach script scope, a hoisting
+    `var` (modelled exactly) and a class static block (fenced, above). The oracle's exemption (a binding
+    whose `initial` *is* a rune call) is modelled, which is why the common
+    `let state = $state(0)` shapes are unaffected; it reads the oracle's
+    `binding.initial`, so a rune-initialized `var` that hoisted through a porous
+    scope is **not** exempt (its initializer was dropped). The `$stem` REFERENCE
+    test is a whole-document, boundary-checked source scan rather than an AST
+    walk: tsv recognizes a rune at half a dozen scattered sites and a per-site
+    check can miss one (an under-refusal = a MISMATCH), while one scan cannot;
+    its cost is over-refusing a document that merely mentions `$state` in a
+    comment, a string, template text, or as a member/property NAME
+    (`obj.$state`).
 - `fragment.rs` — the per-fragment walk (`emit_fragment`) and its
   `BodyBuilder` accumulator (alternating static text and interpolation
   expressions, flushed into a `$$renderer.push(…)` statement). Static

@@ -18,6 +18,7 @@ use crate::css_scope::SCOPE_HASH_CLASS;
 use crate::fragment::{BodyBuilder, escape_html_attr, guard_dropped, wrap_value_expr};
 use crate::namespace::{Namespace, element_is_mathml, element_is_svg};
 use crate::script_rewrite::plain_identifier_name;
+use crate::text_class::js_trim;
 use crate::transform_server::{EmitEnv, unsupported};
 use crate::{CompileError, Refusal};
 
@@ -181,7 +182,7 @@ pub(crate) fn emit_attribute<'arena>(
                 // empty `style`/`id` stay.
                 let escaped = escape_html_attr(&value);
                 let text = if element_scoped {
-                    format!("{escaped} {SCOPE_HASH_CLASS}").trim().to_string()
+                    js_trim(&format!("{escaped} {SCOPE_HASH_CLASS}")).to_string()
                 } else {
                     escaped
                 };
@@ -279,23 +280,29 @@ fn class_needs_clsx(expr: &Expression<'_>, quoted: bool) -> bool {
     }
 }
 
-/// `class`/`style` value whitespace collapse (`[ \t\n\r\f]+` → one space, then
-/// trim) — the oracle's `WHITESPACE_INSENSITIVE_ATTRIBUTES` handling.
+/// The single-`Text`-chunk `class`/`style` value rule — the oracle's
+/// `WHITESPACE_INSENSITIVE_ATTRIBUTES` handling, which is literally
+/// `chunk.data.replace(regex_whitespaces_strict, ' ').trim()`
+/// (`server/visitors/shared/utils.js:208`).
+///
+/// **Two different whitespace classes, in this order.** The collapse is the
+/// NARROW `regex_whitespaces_strict = /[ \t\n\r\f]+/g` (`phases/patterns.js:11`)
+/// — deliberately not `\s+`, so an explicit `&nbsp;` inside the value survives.
+/// The trim is then JavaScript's WIDE `String.prototype.trim`
+/// ([`js_trim`]). Fusing the two into one narrow-class pass — collapsing and
+/// dropping the edge runs together — is not the same function: a boundary
+/// character that is JS whitespace but not in the narrow class (`U+00A0`,
+/// `U+FEFF`, `U+000B`, `U+3000`, …) then survives where the oracle strips it.
+///
+/// Rust's `str::trim` is not the wide class either — see [`js_trim`]. The
+/// discriminator is exactly ECMAScript's whitespace set: `U+0085` (`<NEL>`) and
+/// `U+180E` sit outside it and the oracle KEEPS them.
+///
+/// The multi-chunk (mixed-value) rule is a different function: the oracle
+/// collapses each chunk and never trims — [`collapse_runs_no_trim`], which this
+/// composes with.
 pub(crate) fn collapse_attr_whitespace(decoded: &str) -> String {
-    let mut collapsed = String::with_capacity(decoded.len());
-    let mut in_ws = false;
-    for c in decoded.chars() {
-        if matches!(c, ' ' | '\t' | '\n' | '\r' | '\x0c') {
-            in_ws = true;
-        } else {
-            if in_ws && !collapsed.is_empty() {
-                collapsed.push(' ');
-            }
-            in_ws = false;
-            collapsed.push(c);
-        }
-    }
-    collapsed
+    js_trim(&collapse_runs_no_trim(decoded)).to_string()
 }
 
 /// A single-expression attribute value: `title={expr}` (or quoted,
@@ -882,7 +889,7 @@ pub(crate) fn emit_class_directives<'arena>(
             // matching, matching the oracle.
             let escaped = escape_html_attr(&s);
             let text = if scoped {
-                format!("{escaped} {SCOPE_HASH_CLASS}").trim().to_string()
+                js_trim(&format!("{escaped} {SCOPE_HASH_CLASS}")).to_string()
             } else {
                 escaped
             };
