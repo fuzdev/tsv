@@ -1051,7 +1051,7 @@ impl<'a> Printer<'a> {
             // line (a newline precedes it) forces the body onto its own line. A
             // single-line block glued to `=>` keeps the body hugged even when the
             // body follows on the next source line (`=> /* c */⏎expr` → `=> /* c */ expr`).
-            if self.comment_forces_own_line(comment) {
+            if self.comment_cannot_glue_to_operator(comment) {
                 return true;
             }
         }

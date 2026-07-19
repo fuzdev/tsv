@@ -417,14 +417,18 @@ impl<'a> Printer<'a> {
         // position an author can comment in, and measuring never scans it.
         let (keyword_doc, keyword_end) =
             self.build_keyword_words_doc(&["export", "default"], decl.span.start, decl_start);
-        // A comment that can't stay inline (a line comment, or a block comment with
-        // the value authored on a later line) forces the value onto its own indented
-        // line, keeping the comment where the author wrote it: own-line stays on its
-        // own line, a same-line comment trails the keyword. This is the value
-        // counterpart of `build_keyword_to_name_continuation`, parallel to the
-        // `as`/`satisfies` cast gap — prettier relocates the comment instead. A
-        // same-line block glued to the value (`export default /* c */ x`) stays inline.
-        if self.comment_forces_following_own_line(keyword_end, decl_start) {
+        // A comment that can't stay inline forces the value onto its own indented
+        // line, keeping the comment where the author wrote it. This gap uses the
+        // SHARED keyword→value gate — the same one `as`/`satisfies`, `keyof`/`typeof`,
+        // `infer`, and the type-alias `=` use — so only a **line** comment (runs to
+        // end-of-line) or a **multiline** block the author broke after hangs the value.
+        // A single-line block does not: nothing forces it off the line, so the author's
+        // break is ordinary layout and is reflowed (§Authored breaks in value position).
+        // This gap used to carve itself out via `comment_hangs_binary_operand`,
+        // which also hangs a single-line block — that made `export default` the lone
+        // value gap preserving an unforced break, disagreeing with its own twin
+        // `export =`. Prettier keeps the break at both; tsv reflows at both.
+        if self.comments_force_own_line_between(keyword_end, decl_start) {
             let mut parts: DocBuf = smallvec![keyword_doc];
             self.append_keyword_value_line_comments(&mut parts, keyword_end, decl_start, value_doc);
             return d.concat(&parts);

@@ -1109,15 +1109,12 @@ impl<'a> Printer<'a> {
             // continuation forms). For binary expressions, indent so wrapped
             // continuations align under the value; any `=`→value block comment
             // leads it.
-            let value_doc = {
-                let init_with_indent = if matches!(init, internal::Expression::BinaryExpression(_))
-                {
-                    d.indent(init_doc)
-                } else {
-                    init_doc
-                };
-                self.prepend_rhs_comments(init_with_indent, eq_pos + 1, init_start)
+            let init_with_indent = if matches!(init, internal::Expression::BinaryExpression(_)) {
+                d.indent(init_doc)
+            } else {
+                init_doc
             };
+            let value_doc = self.prepend_rhs_comments(init_with_indent, eq_pos + 1, init_start);
 
             // A line comment between the name and `=` keeps the comment after the
             // name and drops `= value` to a continuation line indented one level
@@ -1138,7 +1135,37 @@ impl<'a> Printer<'a> {
                 } else {
                     id_doc
                 };
-                d.concat(&[id_doc, d.text(" = "), value_doc])
+                // The `=`→value gap shares the initializer comment layout with variable
+                // declarators and for-loop init clauses. A **line** comment partitions
+                // (trailing on the `=` line, the rest leading the value); an **own-line
+                // or multiline block** hangs after the operator, keeping the comment on
+                // its own line; a **glued single-line block** returns `None` and falls
+                // through to the inline `= /* c */ value` form below.
+                //
+                // Sharing the helper is what makes this gap agree with every other
+                // initializer. Emitting the run positionally instead (`prepend_rhs_comments`
+                // alone) both preserved a break the siblings reflow AND relocated an
+                // own-line comment up onto the `=` line — and that relocation is not
+                // idempotent, since the moved comment reads as glued on the next pass and
+                // then collapses. The helper cannot drift that way: it decides the layout
+                // from the comment's authored position and emits the matching shape.
+                if let Some(rhs) =
+                    self.build_eq_comment_break_rhs(eq_pos, init_start, || init_with_indent)
+                {
+                    d.concat(&[id_doc, rhs])
+                } else {
+                    // Only a glued single-line block (or no comment) reaches here — the
+                    // helper claimed every authoring that hangs. The value gets its own
+                    // `group` so the leading run's soft `line` is measured against the
+                    // value rather than the enum body, which is hardline-joined and so
+                    // always broken; without it the `line` rendered as a newline and
+                    // preserved a break every sibling initializer reflows. This is the
+                    // array-family/params-family distinction: an element in its own group
+                    // collapses, an unwrapped one inherits the broken parent. Safe only
+                    // because the own-line authoring no longer passes through here — when
+                    // it did, this group made the format non-idempotent.
+                    d.concat(&[id_doc, d.text(" = "), d.group(value_doc)])
+                }
             }
         } else {
             id_doc
