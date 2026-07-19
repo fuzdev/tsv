@@ -48,10 +48,55 @@ budget. Any entry requires:
    document.
 3. A catalog entry below explaining exactly why matching the oracle is wrong.
 
-`compile_conformance_audit` (gated in `deno task check`) enforces 1↔3 linkage
-and the README back-link.
+`compile_conformance_audit` (gated in `deno task check`) checks each
+`_compiled_divergence` fixture for its catalog entry (1↔3) and its README
+back-link (2). Both checks are per-fixture, so while the catalog is empty they
+inspect nothing and gate nothing — they are a tripwire armed for the first
+entry, not a standing gate. Two properties the parser-side `conformance_audit`
+carries are deliberately absent here: it does not check this document for stray
+READMEs on matching fixtures, and it does not check its own Markdown links —
+those resolve under `conformance_audit`, which link-checks the compiler doc pair
+alongside the parser conformance docs. The audit's one check that holds today,
+independent of the catalog, is the checklist ↔ `Refusal` bucket-key drift check
+(see [checklist_svelte_compiler.md](./checklist_svelte_compiler.md)).
 
 ## Catalog
 
 None. Every compile fixture matches the canonical compiler's output exactly
 (after canonical reprint).
+
+## Candidates (recorded, not yet fixtures)
+
+A candidate is a shape where the oracle's own output looks wrong and tsv's differs.
+Recording it here is *not* an entry in the catalog above — no fixture exists, nothing
+is sanctioned, and the audit is untouched. It is a note so a future burn-down does not
+re-triage it as a compiler bug.
+
+### Module-script comment teleported into the instance script
+
+The oracle prints the transformed program with **esrap**
+(`packages/svelte/src/compiler/phases/3-transform/index.js:4`), which binds a comment to
+the next-following printed node **by source offset**. A `<script module>` placed *after*
+`<script>` puts its comments at offsets that immediately precede an instance-script or
+template expression — so the comment is re-attached across the module→instance boundary
+and printed inside an expression it has nothing to do with. tsv omits it.
+
+The most legible instance is a comment landing between `function` and its name:
+
+```js
+function // a module comment
+  s($$renderer) {
+```
+
+Others land mid-expression (`$.attr('id', /* comment */ id)`, `value: /* comment */ w`).
+
+Mechanically confirmed: moving the `<script module>` block **above** `<script>` — the
+same component otherwise byte-for-byte — reaches full parity, the comment vanishing
+entirely rather than moving. Every occurrence found by `compile_fuzz` had the module
+script second.
+
+tsv's behavior (omitting the comment) is the more defensible one, and the parity bar's
+comment-position tolerance does not cover this — the comment crosses into an unrelated
+subtree, which is a comment *presence* difference in that subtree, not a position one.
+No fixture is proposed: the shape is an oracle print artifact, and pinning it would pin
+esrap's offset behavior rather than anything about tsv.

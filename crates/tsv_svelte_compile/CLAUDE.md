@@ -860,4 +860,12 @@ count in a separate `comment_position` bucket so the tolerance is never silent.
 ## See Also
 
 - Root [`../../CLAUDE.md`](../../CLAUDE.md) — build, test, and workflow commands
+- `compile_fuzz` (in `tsv_debug`) — the differential fuzzer over this crate: it generates
+  feature CROSS-PRODUCTS and grades each against the oracle. It exists because the corpus
+  runner tests real components, so it exercises every feature while missing nearly every
+  feature *pair* — and the refusal sub-group this crate's port makes structurally fragile
+  (`GeneratedNameCollision`, `MemberCallAmbiguousRoot`, `DerivedReadShadowed`,
+  `SnippetHoistAmbiguous`, `BlockScopeShadowsDerived`, `StoreScopedSubscription`) is
+  inherently two-name: the port is **name-based where the oracle is scope-sensitive**. See
+  [../../CLAUDE.md §Debug Tooling](../../CLAUDE.md#debug-tooling).
 - `tsv_ts` `format_canonical` — the intent-erased reprint entry point this crate drives

@@ -19,6 +19,7 @@
 //! quotes their messages.
 
 use std::borrow::Cow;
+use std::collections::BTreeSet;
 
 use crate::fragment::SPECIAL_ELEMENT_FENCED_KINDS;
 
@@ -1118,6 +1119,228 @@ impl Refusal {
     /// `let:` on a *component* raises instead of `RunesOnlyFence`, but whose bucket
     /// mixes those with unimplemented `class:` / `use:` / `transition:` directives,
     /// so it cannot be fenced wholesale.
+    /// One representative of every [`Refusal`] variant, for enumerating the
+    /// bucket-key catalog.
+    ///
+    /// Parameter values are the field name in braces (`"{name}"`), so a
+    /// parameterized variant whose key *is* its `Display` message renders in the
+    /// same placeholder form `docs/checklist_svelte_compiler.md` quotes; for a
+    /// variant whose key collapses its parameters the value is irrelevant.
+    ///
+    /// ⚠️ Hand-maintained, and **not** compiler-enforced — a new variant compiles
+    /// fine while missing here (unlike [`bucket_key`](Refusal::bucket_key), whose
+    /// match is exhaustive). `compile_conformance_audit`'s drift check reads this
+    /// list, so an omission silently narrows that audit's oracle. Add the variant
+    /// here in the same change.
+    #[must_use]
+    pub fn every_variant() -> Vec<Self> {
+        vec![
+            Self::ClientGeneration,
+            Self::DevMode,
+            Self::ModuleDefaultExport,
+            Self::ModuleInstanceNameCollision {
+                name: "{name}".to_string(),
+            },
+            Self::SvelteOptions,
+            Self::InstanceScriptExport,
+            Self::LegacyReactiveStatement,
+            Self::SvelteInternalImport,
+            Self::RunesInvalidImport {
+                name: "{name}".to_string(),
+            },
+            Self::GenericsAttribute,
+            Self::LangInstanceScript {
+                lang: "{lang}".to_string(),
+            },
+            Self::TypeScriptWithoutLangTs,
+            Self::CommentInErasedTypeRegion,
+            Self::TsEnum,
+            Self::TsNamespaceWithValue,
+            Self::TsDottedNamespace,
+            Self::TsParameterProperty,
+            Self::Decorator,
+            Self::TsAccessorField,
+            Self::TsAbstractProperty,
+            Self::TsOverloadSignature,
+            Self::TsIndexSignature,
+            Self::TsImportEquals,
+            Self::TsExportAssignment,
+            Self::TsNamespaceExport,
+            Self::GeneratedNameCollision {
+                name: "{name}".to_string(),
+            },
+            Self::PropsBindingPattern,
+            Self::BindingPatternShape { kind: "{kind}" },
+            Self::DestructuringState,
+            Self::DestructuringStateSnapshot,
+            Self::DestructuringDerived,
+            Self::DestructuringDerivedBy,
+            Self::PropsIdBindingPattern,
+            Self::DuplicatePropsId,
+            Self::DuplicateProps,
+            Self::ClassFieldStateReactiveArg,
+            Self::Rune {
+                name: "{name}".to_string(),
+            },
+            Self::DollarPrefixedIdentifier {
+                name: "{name}".to_string(),
+            },
+            Self::DerivedBindingRead {
+                name: "{name}".to_string(),
+            },
+            Self::DerivedReadShadowed {
+                name: "{name}".to_string(),
+            },
+            Self::TopLevelAwait,
+            Self::StoreScopedSubscription,
+            Self::StoreMemberWrite,
+            Self::StoreDestructuringWrite,
+            Self::MemberCallAmbiguousRoot {
+                name: "{name}".to_string(),
+            },
+            Self::MemberCallEscapedRoot,
+            Self::CommentsAlongsideMultiDeclarator,
+            Self::CommentsWithStore,
+            Self::CommentInRewrittenRuneRegion,
+            Self::CommentAfterLastStatementWithBlock,
+            Self::LeadingCommentGluedToScript,
+            Self::CommentsWithTemplateBeforeScript,
+            Self::CommentsWithArglessState,
+            Self::CommentsWithRestProps,
+            Self::CommentsWithNonDestructuredProps,
+            Self::CommentsWithPropsId,
+            Self::CommentsWithBindable,
+            Self::CommentsWithSlots,
+            Self::MultilineBlockComment,
+            Self::FormatIgnoreComment,
+            Self::TemplateComments,
+            Self::TemplateNode { kind: "{kind}" },
+            Self::ConstTagAtRoot,
+            Self::DestructuredConstTag,
+            Self::ConstTagNonPlainName,
+            Self::ConstTagOutsideBlock,
+            Self::NestedEach,
+            Self::SnippetSignatureUnparsed,
+            Self::SnippetEscapedName,
+            Self::SnippetRestParameter,
+            Self::SnippetHoistAmbiguous {
+                name: "{name}".to_string(),
+            },
+            Self::SnippetHoistOrder,
+            Self::DuplicateSnippetName {
+                name: "{name}".to_string(),
+            },
+            Self::RenderTagUnsupportedCallee,
+            Self::BlockScopeShadowsDerived {
+                name: "{name}".to_string(),
+            },
+            Self::HtmlTagStaticValue,
+            Self::MutationInTemplateExpr,
+            Self::StaticEvalNotPortable("{reason}".to_string()),
+            Self::StaticFoldNotPortable("{reason}".to_string()),
+            Self::EventAttribute {
+                name: "{name}".to_string(),
+            },
+            Self::EventCaptureAttribute {
+                name: "{name}".to_string(),
+            },
+            Self::UseDirectiveOnLoadErrorElement,
+            Self::TransitionDirectiveConflict,
+            Self::AnimateDirectiveInvalid,
+            Self::RunesOnlyFence {
+                directive: "{directive}",
+            },
+            Self::SpreadOnSelect,
+            Self::SpreadOnLoadErrorElement,
+            Self::BindDirective {
+                name: "{name}".to_string(),
+            },
+            Self::ClassDirectiveWithMixedClass,
+            Self::StyleDirectiveWithMixedStyle,
+            Self::StyleDirectiveWithMixedValue,
+            Self::StyleDirectiveInvalidModifier,
+            Self::StringLiteralExprAttribute,
+            Self::DynamicClassOnStyled,
+            Self::DynamicStyleOnStyled,
+            Self::InterpolatedAttrOnStyled {
+                name: "{name}".to_string(),
+            },
+            Self::ValueAttribute {
+                name: "{name}".to_string(),
+            },
+            Self::DynamicComponent {
+                name: "{name}".to_string(),
+            },
+            Self::ComponentNamedSlot {
+                name: "{name}".to_string(),
+            },
+            Self::ComponentChildrenPropConflict {
+                name: "{name}".to_string(),
+            },
+            Self::ComponentCustomProperty {
+                name: "{name}".to_string(),
+            },
+            Self::ComponentBindDirective {
+                name: "{name}".to_string(),
+            },
+            Self::ComponentDirective {
+                name: "{name}".to_string(),
+            },
+            Self::ElementWithChildren {
+                name: "{name}".to_string(),
+            },
+            Self::TemplateLevelElement {
+                name: "{name}".to_string(),
+            },
+            Self::VoidElementChildren {
+                name: "{name}".to_string(),
+            },
+            Self::OptionElement,
+            Self::SvelteHeadAttributes,
+            Self::BoundaryInvalidAttribute,
+            Self::BoundaryInvalidAttributeValue {
+                name: "{name}".to_string(),
+            },
+            Self::BoundaryAttributeSnippet { name: "{name}" },
+            Self::TitleAttributes,
+            Self::TitleInvalidContent,
+            Self::SvelteHeadWithConstTag,
+            Self::SpecialElementInvalidPlacement {
+                name: "{name}".to_string(),
+            },
+            Self::DuplicateSpecialElement {
+                name: "{name}".to_string(),
+            },
+            Self::SpecialElementChildren {
+                name: "{name}".to_string(),
+            },
+            Self::SpecialElementIllegalAttribute {
+                name: "{name}".to_string(),
+            },
+            Self::CssAtRule,
+            Self::CssNestedRule,
+            Self::CssEmptyRule,
+            Self::CssCombinatorSelector,
+            Self::CssUnsupportedSelector,
+            Self::CssDynamicAttributeMatch,
+            Self::CssCaseInsensitiveNonAscii,
+            Self::CssSelectorNoMatch {
+                selector: "{selector}".to_string(),
+            },
+        ]
+    }
+
+    /// Every bucket key the refusal catalog can produce, in the placeholder form
+    /// the checklist document quotes. See [`every_variant`](Refusal::every_variant)
+    /// for the caveat on completeness.
+    #[must_use]
+    pub fn all_bucket_keys() -> BTreeSet<String> {
+        Self::every_variant()
+            .iter()
+            .map(|r| r.bucket_key().into_owned())
+            .collect()
+    }
+
     #[must_use]
     pub fn is_deliberate_fence(&self) -> bool {
         match self {

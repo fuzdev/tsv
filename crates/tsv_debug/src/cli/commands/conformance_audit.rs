@@ -14,7 +14,8 @@ use std::path::{Path, PathBuf};
 ///    A divergence suffix asserts a deliberate difference; that claim must be cataloged
 ///    so it is discoverable and reviewable.
 /// 2. **Dead links** — every Markdown link (relative path and `#anchor`) in the two
-///    conformance docs and in every fixture README must resolve on disk. The orphan
+///    conformance docs, in the compiler doc pair ([`LINK_CHECKED_DOCS`]), and in
+///    every fixture README must resolve on disk. The orphan
 ///    check only proves *forward* coverage (live fixture → mentioned in doc); this is
 ///    the *reverse* direction — a link to a renamed/demoted/deleted fixture, or a
 ///    back-link with the wrong `../` depth or a stale anchor, is otherwise invisible.
@@ -42,6 +43,20 @@ pub struct ConformanceAuditCommand {
 
 const CONFORMANCE_PRETTIER: &str = "docs/conformance_prettier.md";
 const CONFORMANCE_SVELTE: &str = "docs/conformance_svelte.md";
+
+/// Docs that participate in the dead-link check only — they sanction no fixture
+/// suffix, so the orphan and back-link checks have nothing to ask of them, but
+/// their relative paths and cross-doc anchors rot exactly like the others'. The
+/// compiler pair cross-links each other, the checklists, and repo-root
+/// `CLAUDE.md`, and nothing else was resolving those.
+///
+/// Only Markdown *links* (`[text](target)`) are checked; a backticked path such
+/// as `` `../../svelte/packages/…` `` is a code span, not a link, so the
+/// out-of-repo source references these docs cite are never visited.
+const LINK_CHECKED_DOCS: &[&str] = &[
+    "docs/conformance_svelte_compiler.md",
+    "docs/checklist_svelte_compiler.md",
+];
 
 /// Non-divergence fixtures that deliberately keep a README because it documents a
 /// real parser/spec/contrast fact that cannot live as an `input.*` comment. Every
@@ -225,12 +240,14 @@ struct DeadLink {
     reason: String,
 }
 
-/// Sources to link-check: the two conformance docs plus every fixture README.
+/// Sources to link-check: the two conformance docs, the link-checked-only docs
+/// ([`LINK_CHECKED_DOCS`]), and every fixture README.
 fn run_link_audit(
     readmes: &[(&fixtures::Fixture, PathBuf)],
     cache: &mut DocCache,
 ) -> Vec<DeadLink> {
     let mut sources: Vec<PathBuf> = vec![CONFORMANCE_PRETTIER.into(), CONFORMANCE_SVELTE.into()];
+    sources.extend(LINK_CHECKED_DOCS.iter().map(PathBuf::from));
     sources.extend(readmes.iter().map(|(_, p)| p.clone()));
 
     let mut dead = Vec::new();
@@ -238,7 +255,20 @@ fn run_link_audit(
         // Clone the parsed links so we can borrow the cache mutably while resolving.
         let links = match cache.get(source) {
             Some(doc) => doc.links.clone(),
-            None => continue,
+            // A README that vanished between the walk and here is a race we ignore,
+            // but a *named* source that can't be read is a mis-wired audit, not a
+            // clean run — report it rather than silently checking nothing.
+            None => {
+                if LINK_CHECKED_DOCS.iter().any(|d| Path::new(d) == source) {
+                    dead.push(DeadLink {
+                        source: source.display().to_string(),
+                        line: 0,
+                        target: String::new(),
+                        reason: "link-checked doc could not be read".to_string(),
+                    });
+                }
+                continue;
+            }
         };
         for link in links {
             if let Err(reason) = resolve_link(source, &link.target, cache) {
@@ -580,7 +610,7 @@ impl Report {
         }
 
         if self.dead_links.is_empty() {
-            println!("✓ all Markdown links resolve (conformance docs + fixture READMEs)");
+            println!("✓ all Markdown links resolve (conformance + compiler docs, fixture READMEs)");
         } else {
             eprintln!("✗ {} dead link(s):", self.dead_links.len());
             for d in &self.dead_links {

@@ -19,6 +19,7 @@ pub mod compile_conformance_audit;
 pub mod compile_corpus_compare;
 pub mod compile_fixture_init;
 pub mod compile_fixtures_validate;
+pub mod compile_fuzz;
 pub mod compile_profile;
 pub mod conformance_audit;
 pub mod erase_comment_census;

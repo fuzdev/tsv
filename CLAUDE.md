@@ -184,12 +184,13 @@ deno task fixtures:update            # regenerate expected.json + output_prettie
 deno task fixtures:update:parsed     # regenerate expected.json only (run when parser changes)
 deno task fixtures:update:formatted  # regenerate output_prettier.svelte only
 deno task fixtures:audit             # audit _prettier_divergence fixtures (diagnostic; --all for every fixture)
-deno task conformance:audit          # doc/fixture integrity: divergence fixtures cataloged + every doc/README link resolves + each divergence README back-links its sanctioning doc + no stray READMEs on matching fixtures (gated in `deno task check`)
-deno task conformance:audit:compiler # compile-fixture divergence integrity: any _compiled_divergence fixture must be cataloged in docs/conformance_svelte_compiler.md + carry a back-linking README — the catalog is expected to stay EMPTY (gated in `deno task check`); see Debug Tooling
+deno task conformance:audit          # doc/fixture integrity: divergence fixtures cataloged + every doc/README link resolves (the two conformance docs, the two compiler docs, and every fixture README) + each divergence README back-links its sanctioning doc + no stray READMEs on matching fixtures (gated in `deno task check`)
+deno task conformance:audit:compiler # compile-fixture divergence integrity: any _compiled_divergence fixture must be cataloged in docs/conformance_svelte_compiler.md + carry a back-linking README — the catalog is expected to stay EMPTY, so those two checks are a tripwire armed for a future entry rather than a standing gate. The check that DOES hold today is checklist ↔ `Refusal` drift: every bucket key docs/checklist_svelte_compiler.md quotes must be one the refusal catalog can produce (gating); a producible key the doc never quotes is report-only. Gated in `deno task check`; see Debug Tooling
 deno task canonicalize:audit         # canonicalize_js idempotence + output validity + comment preservation (the COMMENT-LOSS bucket) over tests/fixtures + tests/fixtures_compile (pure Rust; gated in `deno task check`) — point the command at real corpora on demand; see Debug Tooling
 deno task compile:fixtures:init      # create/reinit a compile fixture (oracle-compiles + canonicalizes; tests/fixtures_compile)
 deno task compile:fixtures:validate  # validate compile fixtures: oracle freshness + expected idempotence + ours parity (all gating; the sidecar-free slice also gates in cargo test)
 deno task compile:corpus:compare     # compile-parity wide net over real repos + the Svelte suites: per-file parity/refused/oracle-rejected buckets; MISMATCH = always a bug by the refusal contract (sidecar-dependent, on demand — kept out of `deno task check`); see Debug Tooling
+deno task compile:fuzz               # DIFFERENTIAL compile fuzzer: generate feature CROSS-PRODUCTS from the compile fixtures and grade each against the oracle. The compiler's adversarial leg — the corpus above tests real components, so it exercises every feature while missing nearly every feature PAIR (every interaction bug found by hand was corpus-invisible). Ten AST/feature-level operators compose names × scopes, constructs × server-dropped regions, and one seed's features into another's; a MISMATCH and an OVER-ACCEPTANCE are both bugs by the refusal contract and both gate — and the gate is currently RED (a `--seed 0 --iterations 20000` run reports ~647 over-acceptances + 26 mismatches, so it ALWAYS exits 1): it is a discovery tool with an open work list, not a regression gate. tsv's compile runs FIRST and a refusal skips the sidecar (the throughput lever). Deterministic per `--seed` (independent of `--jobs`) and corpus-add-stable for nine of the ten operators — the cross-product graft reads the whole corpus, so it is outside that guarantee by construction; sidecar-dependent, so on demand only — NOT in `deno task check`; see Debug Tooling
 deno task pins:audit                 # canonical-oracle version sync (gated in `deno task check`): (1) pin agreement — sidecar.ts VERSIONS + npm: imports, benches/js/package.json, actor.rs acorn import-map must be identical; (2) checkout alignment — a PRESENT ../svelte or ../acorn-typescript checkout must match its pin (absent → skipped, so clean machines pass)
 deno task scan:audit                 # guard against new raw find/rfind/match_indices substring scans over source (gated in `deno task check`); see Debug Tooling
 deno task fanout:audit               # guard against super-linear doc-node fanout (the per-layout-candidate rebuild blowup); gated in `deno task check`; see Debug Tooling
@@ -780,6 +781,73 @@ cargo run -p tsv_debug compile_fixtures_validate [pattern...]
 cargo run -p tsv_debug compile_corpus_compare <paths...>
 # Also: --list, --json.
 
+# compile_fuzz - the DIFFERENTIAL compile fuzzer: generate feature cross-products from the
+# compile fixtures and grade each mutant against the canonical compiler. The compiler's
+# adversarial leg. `compile_corpus_compare` is a wide net over REAL components, so it
+# exercises every feature and still misses nearly every feature PAIR — every interaction
+# bug found in this arc was corpus-invisible while the full corpus was green.
+#
+# Operators are AST/FEATURE level, never byte level: a mutant must stay oracle-COMPILABLE to
+# grade anything, so each operator splices a whole well-formed construct at an offset read
+# off tsv's own parse, and the document is re-anchored between operators. Ten of them, each
+# crossing two axes — a template read re-bound by a wrapping {#each}; an instance-script name
+# re-bound by a block {@const}; a generated name ($$payload/$$props/$$slots/$0) declared in
+# user scope; a construct injected into a server-DROPPED region ({:catch}, a <svelte:boundary>
+# pending/failed snippet); a dropped {#snippet} exported from a module script (both the
+# `export const` and the bare-specifier form — only the second reaches the oracle's
+# snippet_invalid_export rule); a subtree wrapped in a new scope (two of the five wraps move
+# it INTO a dropped region); a comment injected where a rewrite may re-span it; a subtree
+# duplicated (generated-name ordering vs emission order); a directive added beside a spread;
+# and the cross-product engine — grafting one seed's template AND instance script into
+# another, guarded on name collision and on a TS donor needing a TS host. Seeds are
+# `tests/fixtures_compile`, chosen because many fixtures are ALREADY 2-3-way feature crosses:
+# mutating within a composed seed reaches interactions that layering onto a single-feature
+# one does not.
+#
+# Grading: MISMATCH (both compiled, canonical code differs) and OVER-ACCEPTANCE (the oracle
+# REJECTED it, tsv compiled it) are both bugs by the refusal contract and both exit 1; a tsv
+# refusal is a clean "not yet" and never a finding; a tsv PARSE rejection is bucketed and
+# reported but not gated (a frontend question); a mutant whose JS does not PARSE
+# (`js_parse_error`) is a generator defect, bucketed as `harness_invalid_js` and never
+# gated — reporting a harness regression as a compiler bug is this tool's worst failure
+# mode. The parity bar is `compare_canonical`, the same comment-position-tolerant bar
+# `compile_compare` uses.
+#
+# ⚠️ THE GATE IS CURRENTLY RED, BY DESIGN OF THE FINDINGS, NOT AS AN ORDINARY GREEN GATE.
+# A `--seed 0 --iterations 20000` run reports ~647 over-acceptances (11 distinct oracle
+# error codes) and 26 mismatches, so it ALWAYS exits 1 today. It is a discovery tool with
+# an open work list, not a regression gate — which is also why it is on demand rather
+# than in `deno task check`. The findings are cataloged in
+# docs/checklist_svelte_compiler.md §The wider validation surface + §Mismatch classes
+# under mutation. Turning it into a real gate wants a known-bug RATCHET keyed on the
+# oracle error codes (gap_audit / blank_audit style) — the recommended follow-up slice.
+#
+# Throughput: tsv's compile runs FIRST and a refusal skips the sidecar entirely — a refusal is
+# definitionally outside the target set, and tsv's compile is ~10-40x faster than a warm
+# oracle round trip. That is the ONE lever; there is deliberately no batching protocol and no
+# result cache (a content-addressed cache would be sound, the oracle being pinned
+# deterministic, but has a near-0% hit rate on fresh mutants). The report prints the measured
+# pass-through rate, since it is what the throughput model rests on. Measured: ~68% of
+# mutants survive the pre-filter, and 3 concurrent sidecar slots at ~0.83 ms per round trip
+# sustain ~218-235K oracle calls/min — well above the 35-75K originally predicted, because
+# that prediction was calibrated for REAL-FILE-sized inputs and this generates 50-200-byte
+# mutants. Not a measurement error; no further throughput work is indicated.
+#
+# Determinism: every mutant is generated up front, single-threaded, from per-seed-file
+# path-keyed PRNG streams scheduled round-robin; grading then fans out over the sidecar pool
+# and results are re-sorted by index, so the report is a pure function of --seed +
+# --iterations + the corpus, independent of --jobs. Corpus-add stability (a fixture
+# add/rename changes only THAT file's mutants) holds for nine operators and is pinned by a
+# test; the donor GRAFT is outside it by construction — a cross-product engine reads the
+# whole corpus, so a corpus edit changes which donor a draw selects.
+cargo run --profile corpus -p tsv_debug compile_fuzz                 # tests/fixtures_compile
+cargo run --profile corpus -p tsv_debug compile_fuzz --iterations 20000 --dump-dir /tmp/cf
+deno task compile:fuzz                                              # the on-demand task
+# Also: --seed, --max-mutations N, --limit N, --jobs N, --max-findings N, --list, --json.
+# Build with `--profile corpus` (release + panic=unwind) so a panic in tsv's compile is caught
+# and REPORTED as a finding rather than killing the run. Sidecar-dependent, so NOT in
+# `deno task check` (which is the pure-Rust fixture gate).
+
 # erase_comment_census - size the type-eraser's comment-refusal haircut over a corpus (pure
 # Rust, no Deno). Per lang="ts" component: collects the spans type erasure drops (TS-only
 # statements, `: T` annotations, type params/args, as/satisfies/! tails, type-only
@@ -843,9 +911,12 @@ cargo run -p tsv_debug ts_fixture_audit [pattern...]
 #  (1) Orphans - every divergence-suffixed fixture must be linked in its conformance doc
 #      (_prettier_divergence → docs/conformance_prettier.md, _svelte_divergence →
 #      docs/conformance_svelte.md, _svelte_prettier_divergence in both).
-#  (2) Dead links - every Markdown link (relative path + #anchor) in both conformance docs and
-#      every fixture README must resolve on disk (catches renamed/deleted fixtures, wrong ../
-#      depth, stale anchors).
+#  (2) Dead links - every Markdown link (relative path + #anchor) in both conformance docs, in
+#      the compiler doc pair (docs/conformance_svelte_compiler.md + checklist_svelte_compiler.md,
+#      which sanction no fixture suffix and so join this check only), and in every fixture
+#      README must resolve on disk (catches renamed/deleted fixtures, wrong ../ depth, stale
+#      anchors). Only Markdown LINKS are visited — a backticked out-of-repo path such as
+#      `../../svelte/packages/…` is a code span, not a link.
 #  (3) Missing back-links - every divergence fixture's README must contain a link resolving to
 #      its sanctioning doc. (A missing README entirely is the validator's D1 rule.)
 #  (4) Stray READMEs - a non-divergence fixture shouldn't carry a README; exceptions live in
@@ -858,7 +929,19 @@ cargo run -p tsv_debug conformance_audit
 # any _compiled_divergence-suffixed compile fixture must be cataloged in
 # docs/conformance_svelte_compiler.md AND carry a README back-linking it. The catalog is expected
 # to stay EMPTY (a safety valve for declining to reproduce a genuine oracle output bug — never a
-# tolerance budget), so this mostly asserts emptiness. Pure Rust (no Deno). Exits non-zero on any
+# tolerance budget), so those two checks inspect nothing today — a tripwire armed for the first
+# entry, not a standing gate. The third check needs no fixture and is the one that holds now:
+# CHECKLIST ↔ `Refusal` DRIFT. docs/checklist_svelte_compiler.md quotes refusal bucket keys
+# verbatim in its `**Refused**:` bullets and claims it maps onto corpus runs; nothing verified
+# that. The audit extracts each quoted key and compares it against the keys the `Refusal` catalog
+# can actually produce (`Refusal::all_bucket_keys`, one representative per variant; backticks are
+# stripped on both sides, since a key may itself contain one). Only the DOC-QUOTES-A-NONEXISTENT-KEY
+# direction GATES — that is the claim being false where a reader is misled. The reverse (a
+# producible key with no bullet) is REPORT-ONLY: a variant covered by a prose paragraph rather than
+# its own bullet is fine, so gating it would be born red and would push the doc toward a mechanical
+# key dump. ⚠️ `Refusal::every_variant` (the oracle behind that check) is hand-maintained and NOT
+# compiler-enforced — a new variant compiles fine while missing from it, silently narrowing the
+# oracle; a pinned-count unit test is the only backstop. Pure Rust (no Deno). Exits non-zero on any
 # finding. Gated in `deno task check`.
 cargo run -p tsv_debug compile_conformance_audit
 # Also: --json
