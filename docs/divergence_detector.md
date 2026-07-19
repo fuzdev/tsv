@@ -153,10 +153,10 @@ The audit's report **is** the work-list — these numbers move as detectors are 
 so read them live (`deno task divergence:audit`) rather than trusting the counts here.
 Four buckets, in rough priority order:
 
-1. **Undetected (~67)** — a documented divergence pinning a prettier form that no
+1. **Undetected (~64)** — a documented divergence pinning a prettier form that no
    pattern explains at all. The headline gap. Some are deliberate and will stay
    (see the two families named above); the rest want a detector or a reassignment.
-2. **Partial (~35)** — a pattern explains the divergence but leaves an adjacent hunk
+2. **Partial (~25)** — a pattern explains the divergence but leaves an adjacent hunk
    unclaimed. Not a mystery, and quieter than it sounds: typically the diff splits one
    logical change across hunk boundaries (a dangling `) {` line), or the detector claims
    *some* instances of a repeated divergence but not all — `css/selectors/combinators/
@@ -166,15 +166,27 @@ Four buckets, in rough priority order:
    bucket instead of `known`. Widening `comment_position` to split prettier's *merged*
    trailing-line-comment form (`a // c1 // c2`) closed 6 fixture partials and moved one
    real corpus file (`js/for-of/comments.js`) partial→known, ratcheting
-   `CORPUS_FORMAT_PARTIAL_PIN` down. Of the remainder, the **14 that some pattern also
-   LISTS** are ratcheted by
+   `CORPUS_FORMAT_PARTIAL_PIN` down.
+
+   The dominant remaining shape was **indentation**, and it turned out not to be
+   leftover reflow at all: for those fixtures the indent shift *is* the whole
+   divergence — the sanctioned [§Uniform Forced-Continuation
+   Indent](conformance_prettier.md#uniform-forced-continuation-indent) rule, where a
+   line comment forces a construct's tail onto a continuation line that tsv indents one
+   level and prettier keeps flush. `forced_continuation_indent` covers it across the
+   sites that section enumerates (annotation `:`, module headers, prefix type
+   operators, the before-`:` key gap). It stays safe to apply broadly because it is
+   keyed on the construct head *above* the hunk carrying the comment that forced the
+   break: an ordinary indentation defect has no such comment and is never claimed, so
+   the detector cannot mask the tsv defect class it most resembles.
+   Of the remainder, the **11 that some pattern also LISTS** are ratcheted by
    `KNOWN_PARTIAL` in `fixture_coverage_test.ts` — a listed fixture going partial fails
    the gate, and an entry that stops firing fails too, so the list mirrors the live set
    and can only shrink.
 3. **Ungradeable (~15)** — the fixture pins no prettier form at all, so detection is
    unanswerable. Not a detector gap: either the fixture gains a witness file, or it stays
    honestly unmeasurable.
-4. **Explained but unlisted (~282)** — pure bookkeeping. The detector sees them; no
+4. **Explained but unlisted (~291)** — pure bookkeeping. The detector sees them; no
    `fixtures[]` array says so. Listing one buys an explicit per-pattern assertion (the
    gated test) at the cost of a hand-maintained entry that can drift, so this is
    deliberately **not** a backlog to burn down — list a fixture when you want that

@@ -297,9 +297,6 @@ const KNOWN_PARTIAL: Record<string, string> = {
 	'svelte/syntax/comments/expr_trailing_line_prettier_divergence': '1 hunk',
 	// comment_position claims the comment hunk, not the reflow tail it sits in
 	'typescript/expressions/calls/chained/trailing_member_comment_prettier_divergence': '2 hunks',
-	'typescript/modules/exports/all_namespace_keyword_comment_prettier_divergence': '1 hunk',
-	'typescript/modules/imports/default_keyword_comment_prettier_divergence': '2 hunks',
-	'typescript/modules/imports/namespace_keyword_comment_prettier_divergence': '2 hunks',
 	'typescript/statements/switch/case_block_comment_prettier_divergence': '1 hunk',
 	'typescript/statements/switch/discriminant_trailing_comment_prettier_divergence': '1 hunk',
 	'typescript/statements/switch/empty_comment_prettier_divergence': '1 hunk',
