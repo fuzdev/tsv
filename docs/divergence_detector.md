@@ -153,7 +153,7 @@ The audit's report **is** the work-list — these numbers move as detectors are 
 so read them live (`deno task divergence:audit`) rather than trusting the counts here.
 Four buckets, in rough priority order:
 
-1. **Undetected (~51)** — a documented divergence pinning a prettier form that no
+1. **Undetected (~50)** — a documented divergence pinning a prettier form that no
    pattern explains at all. The headline gap.
 
    A triage of this bucket found **none of it uncovered by design**: the two
@@ -168,6 +168,16 @@ Four buckets, in rough priority order:
    because escape opacity is a recurring **tsv** bug class and a detector there could
    mask the next one; and a long tail of one-off CSS value/at-rule forms, width
    cases, and comment-relocation residue.
+
+   One sub-family in that tail is a **doc question, not a detector question**:
+   `export default /* c */⏎x` and its siblings are pure one-level re-indents whose
+   shape `forced_continuation_indent` already handles, but the comment is a *block*
+   comment. §Uniform Forced-Continuation Indent states its rule for `//` specifically
+   — a line comment runs to end-of-line, so it *forces* the break — whereas a `/* */`
+   forces nothing and the break is the author's. tsv indents both the same way, so
+   either the section grows a bullet covering the author-broken case or these stay
+   undetected; widening the detector ahead of that decision would put it out of step
+   with the rule it cites.
 2. **Partial (~25)** — a pattern explains the divergence but leaves an adjacent hunk
    unclaimed. Not a mystery, and quieter than it sounds: typically the diff splits one
    logical change across hunk boundaries (a dangling `) {` line), or the detector claims
@@ -186,8 +196,13 @@ Four buckets, in rough priority order:
    Indent](conformance_prettier.md#uniform-forced-continuation-indent) rule, where a
    line comment forces a construct's tail onto a continuation line that tsv indents one
    level and prettier keeps flush. `forced_continuation_indent` covers it across the
-   sites that section enumerates (annotation `:`, module headers, prefix type
-   operators, the before-`:` key gap). It stays safe to apply broadly because it is
+   sites that section enumerates (annotation `:`, declaration and module headers,
+   prefix type operators, the before-`:` key gap). Its declaration-header clause is
+   closed to the three **reserved** keywords (`function`/`class`/`enum`): with the name
+   on the next line, a contextual keyword is not a declaration at all — Svelte's parser
+   and prettier both reject `interface`/`namespace`/`module` there, and all four tools
+   read `type` as an expression statement — so those cannot produce the divergence.
+   It stays safe to apply broadly because it is
    keyed on the construct head *above* the hunk carrying the comment that forced the
    break: an ordinary indentation defect has no such comment and is never claimed, so
    the detector cannot mask the tsv defect class it most resembles.
