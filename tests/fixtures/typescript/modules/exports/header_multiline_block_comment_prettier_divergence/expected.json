@@ -1,0 +1,328 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 320,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " export→star gap: multiline block hangs the star, indented one level",
+			"start": 20,
+			"end": 90,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x\ny ",
+			"start": 99,
+			"end": 108,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 8
+				},
+				"end": {
+					"line": 4,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " star→from gap: multiline block hangs the keyword",
+			"start": 127,
+			"end": 178,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 52
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x\ny ",
+			"start": 194,
+			"end": 203,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 15
+				},
+				"end": {
+					"line": 9,
+					"column": 4
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " star→as gap: multiline block hangs the keyword",
+			"start": 220,
+			"end": 269,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " x\ny ",
+			"start": 280,
+			"end": 289,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 10
+				},
+				"end": {
+					"line": 14,
+					"column": 4
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 319,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 310,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 16,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExportAllDeclaration",
+					"start": 92,
+					"end": 124,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 15
+						}
+					},
+					"exportKind": "value",
+					"exported": null,
+					"source": {
+						"type": "Literal",
+						"start": 118,
+						"end": 123,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 9
+							},
+							"end": {
+								"line": 5,
+								"column": 14
+							}
+						},
+						"value": "./a",
+						"raw": "'./a'",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " x\ny ",
+								"start": 99,
+								"end": 108
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " export→star gap: multiline block hangs the star, indented one level",
+							"start": 20,
+							"end": 90
+						}
+					]
+				},
+				{
+					"type": "ExportAllDeclaration",
+					"start": 180,
+					"end": 217,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 13
+						}
+					},
+					"exportKind": "type",
+					"exported": null,
+					"source": {
+						"type": "Literal",
+						"start": 211,
+						"end": 216,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 7
+							},
+							"end": {
+								"line": 10,
+								"column": 12
+							}
+						},
+						"value": "./b",
+						"raw": "'./b'",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " x\ny ",
+								"start": 194,
+								"end": 203
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " star→from gap: multiline block hangs the keyword",
+							"start": 127,
+							"end": 178
+						}
+					]
+				},
+				{
+					"type": "ExportAllDeclaration",
+					"start": 271,
+					"end": 309,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 19
+						}
+					},
+					"exportKind": "value",
+					"exported": {
+						"type": "Identifier",
+						"start": 295,
+						"end": 297,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 5
+							},
+							"end": {
+								"line": 15,
+								"column": 7
+							}
+						},
+						"name": "ns",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " x\ny ",
+								"start": 280,
+								"end": 289
+							}
+						]
+					},
+					"source": {
+						"type": "Literal",
+						"start": 303,
+						"end": 308,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 13
+							},
+							"end": {
+								"line": 15,
+								"column": 18
+							}
+						},
+						"value": "./c",
+						"raw": "'./c'"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " star→as gap: multiline block hangs the keyword",
+							"start": 220,
+							"end": 269
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

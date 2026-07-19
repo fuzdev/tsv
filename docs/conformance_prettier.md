@@ -207,18 +207,22 @@ The rule holds at every value gap whose own-line authoring **hangs** the comment
 initializer family: declarator, class property, object value, enum member, and the `=`/`:`
 gaps that share their emitters).
 
-**Known residual.** Three gaps still keep the blank: `await`→operand, `new`→callee, and the
-import/export header gaps (`from`→source and the specifiers→`from` / keyword→`{` / `*`→`as` /
-source→`with` family on `gap_comment_continuation_tail`). They are not an exception to the
-rule so much as a place it cannot yet be applied: those emitters **relocate** an own-line
-comment up onto the head line, while the leading run picks its separator from the comment's
-*authored* position. Collapsing the blank there makes the two disagree — pass 1 relocates and
-keeps the blank, pass 2 sees a now-glued comment and collapses it, so the format is not
-idempotent (verified: the change is stable at each gap in isolation and cycles only through
-the relocation). Closing it means changing whether those gaps relocate at all, which is a
-comment-**position** decision under [§Comment Position
-Philosophy](#comment-position-philosophy), not a blank-line one. Until that is settled the
-three gaps keep the blank, and the F1 invariant is what holds them there.
+**Known residual.** Two gaps still keep the blank: `await`→operand and `new`→callee (inside a
+declarator; a bare expression statement has no group to collapse into, so it holds the break
+regardless of width). Those emitters **relocate** an own-line comment up onto the head line
+while the leading run picks its separator from the comment's *authored* position, so the two
+disagree: pass 1 relocates and keeps the break, pass 2 sees a now-glued comment and collapses
+it. That is not a stable resting place — it is a **non-idempotent format**, and the blank is
+incidental to it.
+
+The import/export header family had the same defect and is now fixed. The diagnosis there was
+**not** a comment-position question: `gap_comment_continuation_tail` simply never consulted its
+gate, keying the choice on line-vs-block alone while `comment_hangs_next` — the shared
+keyword→value rule its `export default` / `export =` siblings already use — says a single-line
+block collapses from *any* authored position. Routing the emitter through that gate made all 19
+header gaps idempotent and is what `export * from` needed too (it had been the lone header gap
+preserving the break, for want of the same collapse). The same shape is the likely fix for the
+two remaining gaps: ask the gate, don't re-derive the answer at the call site.
 
 Prettier is split here and not along tsv's line: it preserves the blank for a declarator and
 an object value while collapsing it (with a relocation) for a class property, a parameter
@@ -933,6 +937,8 @@ Prettier moves comments between syntactic boundaries into adjacent blocks, paren
 - Own-line line comment before a statement's `;`, blank line after → Prettier floats the blank above the comment (promoting it to lead the next statement); tsv keeps the blank below (comment stays with its statement). General — imports are the example, the `; // 1` is incidental — [source_trailing_comment](../tests/fixtures/typescript/modules/imports/source_trailing_comment_prettier_divergence/)
 - Import keyword/`from`→source (line) → In place flat (bare/empty), into braces (named), after `;` (default); tsv indents — [source_line_comment](../tests/fixtures/typescript/modules/imports/source_line_comment_prettier_divergence/)
 - Re-export `from`→source (line) → In place flat (empty/export-all), into braces (named); tsv indents — [source_line_comment](../tests/fixtures/typescript/modules/exports/source_line_comment_prettier_divergence/)
+- Module header gap, **multiline block** (`import { a } from /* x⏎y */⏎'./a'`) → The author broke after a comment that cannot be reflowed (inlining would swallow the `*/` line into the header), so the break is forced and tsv indents the continuation one level — [§Uniform Forced-Continuation Indent](#uniform-forced-continuation-indent), uniformly with the same gap's *line* comment and with every value gap's multiline block (`const x =⏎\t/* x⏎y */⏎\t1;`). The comment's own interior lines stay flush; tsv never re-indents a comment body. Prettier relocates the comment into the braces (imports) or past `from` (export-all) and leaves the continuation flat — [imports/header_multiline_block_comment](../tests/fixtures/typescript/modules/imports/header_multiline_block_comment_prettier_divergence/), [exports/header_multiline_block_comment](../tests/fixtures/typescript/modules/exports/header_multiline_block_comment_prettier_divergence/)
+- Module header gap, **own-line block** (`import { a }⏎/* c */⏎from './a'`) → Prettier preserves the break and relocates the comment per gap (into the braces as a specifier-trailing comment for specifiers→`from`, as a leading comment for keyword→`{`, flat for default→`from`); tsv trails it inline and reflows the value onto the header line. A module header is a keyword→value gap, so a single-line block collapses from any authored position — the shared `comment_hangs_next` rule its `export default` / `export =` siblings use ([§Authored breaks in value position](#authored-breaks-in-value-position)); an authored blank line in the gap yields with the break. Prettier's first pass is unstable here, so the chain is pinned `prettier_intermediate_to_variant_*` → `variant_*` — [header_own_line_block_comment](../tests/fixtures/typescript/modules/imports/header_own_line_block_comment_prettier_divergence/)
 - No-`from` empty export keyword→`{}` (line) → In place flat; tsv indents — [empty_no_from_line_comment](../tests/fixtures/typescript/modules/exports/empty_no_from_line_comment_prettier_divergence/)
 - `export`/`export default`→declaration (line) → In place flat; tsv indents — [export_declaration_line_comment](../tests/fixtures/typescript/syntax/comments/export_declaration_line_comment_prettier_divergence/)
 - `export default`→value / `export =`→value, **same-line** comment + value on the next line → comment position matches (both trail the keyword/`=`); prettier preserves the author's line break, tsv **reflows the value inline**. The author's break carries no meaning here — a block comment does not run to end-of-line, so nothing forces the tail off the line — and tsv's TS printer reflows this gap at every other value position (`const`/`let` `=`, `type =`, class property, object value, parameter default, arrow body, `:` annotation, return type, `satisfies`, `as`). See [§Authored breaks in value position](#authored-breaks-in-value-position) — [default_value_same_line_comment](../tests/fixtures/typescript/modules/exports/default_value_same_line_comment_prettier_divergence/), [export_equals_value_same_line_comment](../tests/fixtures/typescript/modules/exports/export_equals_value_same_line_comment_prettier_divergence/)
