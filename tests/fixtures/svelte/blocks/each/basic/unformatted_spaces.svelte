@@ -1,1 +1,1 @@
-{#each  items  as  item  }<div  >{  item  }</div  >{/each}
+{#each  items  as  item  }<div  >{  item  }</div  >{/each }

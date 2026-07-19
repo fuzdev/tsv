@@ -4,7 +4,8 @@
 	{aaaaaaaaaaaaaaaaaaaa} bbbb cccc, {dddddddddddddddddddd} eeee ffff gggg ({hhhhhh} iiii), {jjjjjjjj} kkkk
 </p>
 
-<!-- One character shorter: the whole fill stays on a single block-style line (both formatters). -->
+<!-- One character shorter: prettier keeps the whole fill on one line (105), tsv breaks the
+     trailing word off to hold the line at exactly 100. -->
 <p>
 	{aaaaaaaaaaaaaaaaaaaa} bbbb cccc, {dddddddddddddddddddd} eeee ffff gggg ({hhhhhh} iii), {jjjjjjjj} kkkk
 </p>

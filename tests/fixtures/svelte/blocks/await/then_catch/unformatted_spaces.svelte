@@ -4,4 +4,4 @@
    <div  >  { value }  </div  >
 {:catch  error  }
    <div  >  { error }  </div  >
-{/await}
+{/await }

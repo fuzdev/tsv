@@ -361,6 +361,33 @@ function count_semantic_chars(text: string): Map<string, number> {
 }
 
 /**
+ * Whether a single diff hunk changes semantic character counts — i.e. whether this
+ * hunk could be the one responsible for a file-level SAFETY differential.
+ *
+ * The SAFETY check itself is whole-file (it compares source/ours/prettier as three
+ * strings), so on its own it cannot say WHICH hunk carried the flagged characters.
+ * That gap is what let an unrelated pattern's coverage vouch for a differential it
+ * had nothing to do with: on `prettier/tests/format/html/tags/tags.html` the entire
+ * 9-char delta lives in one self-closing-tag hunk, while two pure-whitespace hunks
+ * elsewhere in the file were equally load-bearing for the downgrade. Scoring each
+ * hunk here restores the causal link — a whitespace-only hunk is never char-risky,
+ * so it can never be asked to vouch, and losing its explanation can no longer flip
+ * the file into the gated bucket.
+ *
+ * Uses the same folding/exclusion rules as the whole-file check (`count_semantic_chars`),
+ * so "risky" here means exactly "would move the number SAFETY reports".
+ */
+export function hunk_alters_semantic_chars(removed: string, added: string): boolean {
+	const before = count_semantic_chars(removed);
+	const after = count_semantic_chars(added);
+	if (before.size !== after.size) return true;
+	for (const [char, count] of before) {
+		if ((after.get(char) ?? 0) !== count) return true;
+	}
+	return false;
+}
+
+/**
  * Fold an ASCII uppercase letter (A–Z) to lowercase; every other code point
  * (digits, punctuation, non-ASCII, astral) is returned unchanged. Deliberately
  * ASCII-only — `String.prototype.toLowerCase` is Unicode-aware and would fold

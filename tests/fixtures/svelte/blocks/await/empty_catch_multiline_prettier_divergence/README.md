@@ -47,5 +47,5 @@ runtime behavior. tsv keeps it — inline or block-style. See
 ## Related
 
 - [await/empty_catch](../empty_catch_prettier_divergence/) — the inline-form empty-catch divergence
-- [await/whitespace_mixed](../whitespace_mixed/) — per-body boundary-whitespace preservation in the
-  space-only layout (not a divergence)
+- [await/boundary_space_trim](../boundary_space_trim_prettier_divergence/) — space-only section
+  boundaries glue inline (the boundary-whitespace divergence)

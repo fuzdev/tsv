@@ -4,6 +4,6 @@
    <div  >  text2  </div  >
 {:else if  c  }
    <div  >  text3  </div  >
-{:else}
+{:else  }
    <div  >  text4  </div  >
-{/if}
+{/if }

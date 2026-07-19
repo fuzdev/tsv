@@ -219,10 +219,15 @@ export const CORPUS_PARSE_TSV_ERRORS_PIN: Record<Language, number> = {
  * §Pinned gate counts.
  */
 export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
-	svelte: 530,
+	svelte: 514,
 	typescript: 2332,
 	css: 90,
 };
+// svelte 530→514 (2026-07-18, checkouts unchanged from the pin above; SAFETY 0). The
+// Svelte-mirror boundary-whitespace trim (conformance_prettier.md §Svelte: Inline content
+// block-style): 16 pinned-suite files whose fits-inline boundary spaces prettier preserves
+// now trim, all moving match→known via the `svelte_boundary_ws_trim` detector — a deliberate
+// divergence, not a regression (render:audit 0 findings over the same suites).
 // ─── SUPERSEDED HISTORY (kept for the attribution trail, NOT current guidance) ───
 // Everything below described the OLD AGGREGATE pin (over live+framework), retired by the
 // 2026-07-16 reproducible-subset split. The very churn it narrates — "both rises are
@@ -290,10 +295,16 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
  * `CORPUS_FORMAT_MATCH_MIN`; SAFETY 0).
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
-	svelte: 7,
+	svelte: 6,
 	typescript: 133,
 	css: 22,
 };
+// svelte 7→6 (2026-07-18, checkouts unchanged; SAFETY 0). The boundary-trim detector claims
+// two former unknowns: prettier-plugin-svelte await-inline.html (unknown→known) and
+// prettier/tests/format/html/js/template-literal.html (unknown→partial — its remaining
+// template-literal-interior indent hunk is a pre-existing unclaimed class, see
+// CORPUS_FORMAT_PARTIAL_PIN); prettier-plugin-svelte inline-element-single-text.html moves
+// match→known (the trim). Net −1.
 // typescript 136→133 (2026-07-17, ../svelte b4d1583ae, ../kit da5b08ea7, ../svelte.dev
 // c21c2d0, ../prettier 1dcd0b0; svelte 7 + css 22 unchanged, SAFETY 0). The
 // conditional/parenthesized-type body-indent fix (bug141 §Bug 2): two files move
@@ -474,10 +485,17 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
  * WARN, not the gate.
  */
 export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
-	svelte: 0,
-	typescript: 55,
+	svelte: 1,
+	typescript: 54,
 	css: 9,
 };
+// svelte 0→1 + typescript 55→54 (2026-07-18, checkouts unchanged; SAFETY 0). svelte: the
+// boundary trim explains one hunk of prettier/tests/format/html/js/template-literal.html
+// (formerly unknown), leaving its pre-existing nested-`<script>` template-literal-interior
+// reindent hunk unexplained — so the file lands partial. typescript: the −1 PREDATES the
+// boundary-trim change — a `git archive HEAD` rerun on identical checkouts measures the
+// same 54 with byte-identical partial/unknown file sets, so the move happened in the
+// pin→HEAD window (svelte-only commits; no TS printer change); re-pinned to record it.
 // typescript 56→55 (2026-07-17, checkouts as in CORPUS_FORMAT_UNKNOWN_PIN above; svelte 0 +
 // css 9 unchanged, SAFETY 0). The postfix-operator RHS `fluid` fix: ../kit exports/public.d.ts
 // moves partial→known — `type RemoteFormFieldType<T> = { [K in keyof InputTypeMap]: … }[keyof

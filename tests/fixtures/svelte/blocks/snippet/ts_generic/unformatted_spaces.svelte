@@ -3,4 +3,4 @@
 
 {#snippet  fn<T>(a: T)}
 	<span>{a}</span>
-{/snippet}
+{/snippet }

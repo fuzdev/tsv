@@ -1,5 +1,5 @@
 <div  >
    {#if  a  }
       <span  >text</span  >
-   {/if}
+   {/if }
 </div  >

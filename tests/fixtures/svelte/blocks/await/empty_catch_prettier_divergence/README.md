@@ -29,4 +29,4 @@ runtime behavior. tsv keeps it where prettier drops it. See
 ## Related
 
 - [await/empty_sibling_gt](../empty_sibling_gt/) — a bare empty `{#await promise}{/await}` after a sibling (`>` hugged, in parity with prettier — not a divergence)
-- [await/whitespace_internal](../whitespace_internal/) — sections with real content + surrounding whitespace (not a divergence)
+- [await/boundary_space_trim](../boundary_space_trim_prettier_divergence/) — space-only section boundaries glue inline (the surrounding-whitespace divergence)

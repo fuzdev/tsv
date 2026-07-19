@@ -7,13 +7,6 @@
 	id="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	data-attr="ccccccccccccccccccccccccccc"></textarea>
 
-<!-- Long - self-closing, attrs wrap; the `/>` drops to its own line (not hugged) -->
-<textarea
-	class="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-	id="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-	data-attr="ccccccccccccccccccccccccccc"
-/>
-
 <!-- With content - whitespace-sensitive, hug behavior -->
 <textarea class="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" id="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	>content</textarea

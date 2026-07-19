@@ -46,7 +46,6 @@ impl<'a> Printer<'a> {
             is_void: false,
             // Every `svelte:*` kind may print self-closing when the source wrote it that way.
             can_self_close: true,
-            attributes: element.attributes,
             nodes: element.fragment.nodes,
             span: element.span,
         };

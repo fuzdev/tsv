@@ -1,7 +1,7 @@
-<!-- Fits: the inline span's line is exactly 100, so it stays on one line and the leading
-     newline before the first child collapses to a single space (`<span> text1…`). -->
+<!-- Fits: the inline span's line is exactly 100, so it stays on one line; the leading
+     newline before the first child is a render-free boundary run, trimmed (`<span>text1…`). -->
 <p>
-	<span> text1 text2 text3 text4 text5 text6 text7 text8 text9abcdefghij <a href="#">link</a></span>
+	<span>text1 text2 text3 text4 text5 text6 text7 text8 text9abcdefghijk <a href="#">link</a></span>
 </p>
 
 <!-- Breaks: one char longer (101), so the span lays out block-style — both tags intact, content on
@@ -10,6 +10,6 @@
      dangle the closing `>` instead — see prettier_variant_dangle. -->
 <p>
 	<span>
-		text1 text2 text3 text4 text5 text6 text7 text8 text9abcdefghijk <a href="#">link</a></span
+		text1 text2 text3 text4 text5 text6 text7 text8 text9abcdefghijkl <a href="#">link</a></span
 	>
 </p>

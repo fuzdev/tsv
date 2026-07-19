@@ -29,5 +29,5 @@
 	text{expr}
 </span>
 
-<!-- Text-only on separate line - COLLAPSES to single line (different behavior) -->
-<a href="x"> text </a>
+<!-- Text-only COLLAPSES to single line (newlines between words are separators, the boundary run trims) -->
+<a href="x">text</a>

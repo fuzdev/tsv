@@ -95,7 +95,7 @@ pub(crate) struct Printer<'a> {
     /// inline run** (`{x}{#if c}…{/if}` with no newline). The unified
     /// [`Printer::build_nodes_doc_multiline`] builds these in inline context (long body
     /// inner-breaks) rather than multiline context (body drops to its own line), reproducing
-    /// the root's pre-unification `build_nodes_doc_with_context` layout (the load-bearing
+    /// the root's pre-unification `build_nodes_doc` layout (the load-bearing
     /// single-line-run discriminator). Span-keyed, so it scopes to **root-level** runs only —
     /// element-nested blocks (different spans) keep the multiline body-drop divergence (e.g.
     /// `blocks/await/preceding_sibling_body_long`). Populated once by

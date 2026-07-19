@@ -661,6 +661,14 @@ Directives without official modifiers: `AnimateDirective`, `BindDirective`, `Cla
 
 **Reference**: `svelte/packages/svelte/src/compiler/types/template.d.ts`
 
+### Template Whitespace (`clean_nodes`)
+
+Svelte deals with template whitespace at **compile time**, not parse time. The parser — and tsv's drop-in AST — keeps every whitespace character verbatim: boundary runs, inter-sibling runs, and whitespace-only `Text` nodes all appear in the AST byte-for-byte, so no whitespace behavior here is a `_svelte_divergence`. The trimming happens in the transform phase (`clean_nodes`): comments are removed first (unless `preserveComments`), whitespace-only text nodes at a fragment's edges are dropped, and the first/last text node's edge run is stripped — unconditionally, for **every** fragment in the language (element/component content and block bodies alike), even when the neighbor is an `ExpressionTag`. Interior runs collapse to one space (text adjacent to an `ExpressionTag` stays verbatim). The whitespace set is `[ \t\r\n]` exactly — NBSP and other Unicode spaces are content. Exemptions: `preserveWhitespace` and `<pre>`/`<textarea>` subtrees.
+
+The **formatter** mirrors this: in inline layout tsv deletes exactly the render-free boundary runs `clean_nodes` deletes — a `_prettier_divergence`, cataloged in [conformance_prettier.md §Svelte: Inline content block-style](./conformance_prettier.md#svelte-inline-content-block-style) (elements) and [§Svelte: Blocks](./conformance_prettier.md#svelte-blocks) (block sections). tsv is deliberately more conservative than the compiler in one respect: comments **block** the trim (they are treated as nodes rather than removed first), so the formatted output renders identically under `preserveComments` too. `<svelte:options preserveWhitespace />` is not detected — any reformatting is already render-visible under it (prettier behaves the same).
+
+**Reference**: `svelte/packages/svelte/src/compiler/phases/3-transform/utils.js` (`clean_nodes`), `phases/patterns.js` (the whitespace regexes)
+
 ---
 
 ## Related

@@ -1,0 +1,1037 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1229,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 28,
+				"data": " Leading space trims "
+			},
+			{
+				"type": "Text",
+				"start": 28,
+				"end": 29,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 29,
+				"end": 46,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 30
+					},
+					"end": {
+						"line": 2,
+						"column": 5,
+						"character": 34
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 35,
+							"end": 39,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 46,
+				"end": 48,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 48,
+				"end": 77,
+				"data": " Trailing space trims "
+			},
+			{
+				"type": "Text",
+				"start": 77,
+				"end": 78,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 78,
+				"end": 95,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 79
+					},
+					"end": {
+						"line": 5,
+						"column": 5,
+						"character": 83
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 84,
+							"end": 88,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 95,
+				"end": 97,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 97,
+				"end": 131,
+				"data": " Both boundary spaces trim "
+			},
+			{
+				"type": "Text",
+				"start": 131,
+				"end": 132,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 132,
+				"end": 149,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 133
+					},
+					"end": {
+						"line": 8,
+						"column": 5,
+						"character": 137
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 138,
+							"end": 142,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 149,
+				"end": 151,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 151,
+				"end": 173,
+				"data": " Tab run trims "
+			},
+			{
+				"type": "Text",
+				"start": 173,
+				"end": 174,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 174,
+				"end": 191,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 11,
+						"column": 1,
+						"character": 175
+					},
+					"end": {
+						"line": 11,
+						"column": 5,
+						"character": 179
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 180,
+							"end": 184,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 191,
+				"end": 193,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 193,
+				"end": 238,
+				"data": " Multiple words, boundary spaces trim "
+			},
+			{
+				"type": "Text",
+				"start": 238,
+				"end": 239,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 239,
+				"end": 263,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 14,
+						"column": 1,
+						"character": 240
+					},
+					"end": {
+						"line": 14,
+						"column": 5,
+						"character": 244
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 245,
+							"end": 256,
+							"raw": "text1 text2",
+							"data": "text1 text2"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 263,
+				"end": 265,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 265,
+				"end": 313,
+				"data": " With expression, leading boundary trims "
+			},
+			{
+				"type": "Text",
+				"start": 313,
+				"end": 314,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 314,
+				"end": 337,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 17,
+						"column": 1,
+						"character": 315
+					},
+					"end": {
+						"line": 17,
+						"column": 5,
+						"character": 319
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 320,
+							"end": 322,
+							"raw": "→ ",
+							"data": "→ "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 322,
+							"end": 328,
+							"expression": {
+								"type": "Identifier",
+								"start": 323,
+								"end": 327,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 9
+									},
+									"end": {
+										"line": 17,
+										"column": 13
+									}
+								},
+								"name": "expr"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 328,
+							"end": 330,
+							"raw": "ms",
+							"data": "ms"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 337,
+				"end": 339,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 339,
+				"end": 388,
+				"data": " With expression, trailing boundary trims "
+			},
+			{
+				"type": "Text",
+				"start": 388,
+				"end": 389,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 389,
+				"end": 412,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 20,
+						"column": 1,
+						"character": 390
+					},
+					"end": {
+						"line": 20,
+						"column": 5,
+						"character": 394
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 395,
+							"end": 401,
+							"expression": {
+								"type": "Identifier",
+								"start": 396,
+								"end": 400,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 7
+									},
+									"end": {
+										"line": 20,
+										"column": 11
+									}
+								},
+								"name": "expr"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 401,
+							"end": 405,
+							"raw": "ms →",
+							"data": "ms →"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 412,
+				"end": 414,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 414,
+				"end": 436,
+				"data": " Small element "
+			},
+			{
+				"type": "Text",
+				"start": 436,
+				"end": 437,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 437,
+				"end": 456,
+				"name": "small",
+				"name_loc": {
+					"start": {
+						"line": 23,
+						"column": 1,
+						"character": 438
+					},
+					"end": {
+						"line": 23,
+						"column": 6,
+						"character": 443
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 444,
+							"end": 448,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 456,
+				"end": 458,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 458,
+				"end": 506,
+				"data": " Nested inline element at the boundaries "
+			},
+			{
+				"type": "Text",
+				"start": 506,
+				"end": 507,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 507,
+				"end": 541,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 26,
+						"column": 1,
+						"character": 508
+					},
+					"end": {
+						"line": 26,
+						"column": 5,
+						"character": 512
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 513,
+							"end": 534,
+							"name": "strong",
+							"name_loc": {
+								"start": {
+									"line": 26,
+									"column": 7,
+									"character": 514
+								},
+								"end": {
+									"line": 26,
+									"column": 13,
+									"character": 520
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 521,
+										"end": 525,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 541,
+				"end": 543,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 543,
+				"end": 585,
+				"data": " Whitespace-only element collapses "
+			},
+			{
+				"type": "Text",
+				"start": 585,
+				"end": 586,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 586,
+				"end": 593,
+				"name": "b",
+				"name_loc": {
+					"start": {
+						"line": 29,
+						"column": 1,
+						"character": 587
+					},
+					"end": {
+						"line": 29,
+						"column": 2,
+						"character": 588
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 593,
+				"end": 595,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 595,
+				"end": 652,
+				"data": " Whitespace-only element with attribute collapses "
+			},
+			{
+				"type": "Text",
+				"start": 652,
+				"end": 653,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 653,
+				"end": 678,
+				"name": "b",
+				"name_loc": {
+					"start": {
+						"line": 32,
+						"column": 1,
+						"character": 654
+					},
+					"end": {
+						"line": 32,
+						"column": 2,
+						"character": 655
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 656,
+						"end": 673,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 32,
+								"column": 3,
+								"character": 656
+							},
+							"end": {
+								"line": 32,
+								"column": 12,
+								"character": 665
+							}
+						},
+						"value": [
+							{
+								"start": 667,
+								"end": 672,
+								"type": "Text",
+								"raw": "value",
+								"data": "value"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 678,
+				"end": 680,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 680,
+				"end": 769,
+				"data": " Comment at leading boundary: the edge space trims, the inter-sibling space stays "
+			},
+			{
+				"type": "Text",
+				"start": 769,
+				"end": 770,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 770,
+				"end": 798,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 35,
+						"column": 1,
+						"character": 771
+					},
+					"end": {
+						"line": 35,
+						"column": 5,
+						"character": 775
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Comment",
+							"start": 776,
+							"end": 786,
+							"data": " c "
+						},
+						{
+							"type": "Text",
+							"start": 786,
+							"end": 791,
+							"raw": " text",
+							"data": " text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 798,
+				"end": 800,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 800,
+				"end": 890,
+				"data": " Comment at trailing boundary: the inter-sibling space stays, the edge space trims "
+			},
+			{
+				"type": "Text",
+				"start": 890,
+				"end": 891,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 891,
+				"end": 919,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 38,
+						"column": 1,
+						"character": 892
+					},
+					"end": {
+						"line": 38,
+						"column": 5,
+						"character": 896
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 897,
+							"end": 902,
+							"raw": "text ",
+							"data": "text "
+						},
+						{
+							"type": "Comment",
+							"start": 902,
+							"end": 912,
+							"data": " c "
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 919,
+				"end": 921,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 921,
+				"end": 960,
+				"data": " NBSP is content, never trimmed "
+			},
+			{
+				"type": "Text",
+				"start": 960,
+				"end": 961,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 961,
+				"end": 980,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 41,
+						"column": 1,
+						"character": 962
+					},
+					"end": {
+						"line": 41,
+						"column": 5,
+						"character": 966
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 967,
+							"end": 973,
+							"raw": " text ",
+							"data": " text "
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 980,
+				"end": 982,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 982,
+				"end": 1047,
+				"data": " Inter-sibling spaces around a nested inline element stay "
+			},
+			{
+				"type": "Text",
+				"start": 1047,
+				"end": 1048,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1048,
+				"end": 1087,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 44,
+						"column": 1,
+						"character": 1049
+					},
+					"end": {
+						"line": 44,
+						"column": 2,
+						"character": 1050
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1051,
+							"end": 1057,
+							"raw": "text1 ",
+							"data": "text1 "
+						},
+						{
+							"type": "RegularElement",
+							"start": 1057,
+							"end": 1077,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 44,
+									"column": 10,
+									"character": 1058
+								},
+								"end": {
+									"line": 44,
+									"column": 14,
+									"character": 1062
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1063,
+										"end": 1070,
+										"raw": "inline1",
+										"data": "inline1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1077,
+							"end": 1083,
+							"raw": " text2",
+							"data": " text2"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1087,
+				"end": 1089,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1089,
+				"end": 1138,
+				"data": " Expression at start, leading space trims "
+			},
+			{
+				"type": "Text",
+				"start": 1138,
+				"end": 1139,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1139,
+				"end": 1158,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 47,
+						"column": 1,
+						"character": 1140
+					},
+					"end": {
+						"line": 47,
+						"column": 5,
+						"character": 1144
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 1145,
+							"end": 1151,
+							"expression": {
+								"type": "Identifier",
+								"start": 1146,
+								"end": 1150,
+								"loc": {
+									"start": {
+										"line": 47,
+										"column": 7
+									},
+									"end": {
+										"line": 47,
+										"column": 11
+									}
+								},
+								"name": "expr"
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1158,
+				"end": 1160,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1160,
+				"end": 1208,
+				"data": " Expression at end, trailing space trims "
+			},
+			{
+				"type": "Text",
+				"start": 1208,
+				"end": 1209,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1209,
+				"end": 1228,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 50,
+						"column": 1,
+						"character": 1210
+					},
+					"end": {
+						"line": 50,
+						"column": 5,
+						"character": 1214
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 1215,
+							"end": 1221,
+							"expression": {
+								"type": "Identifier",
+								"start": 1216,
+								"end": 1220,
+								"loc": {
+									"start": {
+										"line": 50,
+										"column": 7
+									},
+									"end": {
+										"line": 50,
+										"column": 11
+									}
+								},
+								"name": "expr"
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

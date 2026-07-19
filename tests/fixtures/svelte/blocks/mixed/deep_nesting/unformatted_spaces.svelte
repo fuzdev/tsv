@@ -3,7 +3,7 @@
       {#each  items  as  item  }
          {#key  item.id  }
             <Comp  prop={item}  />
-         {/key}
-      {/each}
-   {/if}
+         {/key }
+      {/each }
+   {/if }
 </div  >

@@ -68,6 +68,23 @@ fn trim_last_line_in_place(s: &mut String) {
 // Shared rendering helpers
 //
 
+/// The invariant context of one render pass: everything the render path needs that does not
+/// change as the doc tree is walked. Bundled so the mutually-recursive render functions pass one
+/// `&RenderCtx` instead of threading four parameters through every call — this is what retires
+/// the `clippy::too_many_arguments` allows across this module.
+///
+/// Deliberately holds **only shared references**. The mutable render state (`output`, `pos`,
+/// `should_remeasure`) stays as separate `&mut` parameters: bundling those behind a struct
+/// pointer would take their address and sink them out of registers in the hot loop. A `&RenderCtx`
+/// has no aliasing writes through it, so its field loads hoist freely — and `render_doc_core`
+/// already hoists the arena borrows into locals for the loop body regardless.
+pub(super) struct RenderCtx<'a, R: TextResolver + ?Sized> {
+    pub(super) arena: &'a DocArena,
+    pub(super) render: &'a RenderConfig,
+    pub(super) embed: &'a EmbedContext,
+    pub(super) resolver: Option<&'a R>,
+}
+
 /// Render text content and update position.
 ///
 /// Uses cached width when available to skip `visual_width()` for the common
@@ -214,15 +231,11 @@ fn render_line_break(
 /// there exists only to cancel the stack's LIFO pop, so the net emission order is
 /// FIFO. This renderer drives the suffixes directly, so it must iterate forward:
 /// reversing here would emit two suffixes queued on one line back-to-front.
-#[allow(clippy::too_many_arguments)]
 fn flush_line_suffix<R: TextResolver + ?Sized>(
-    arena: &DocArena,
+    ctx: &RenderCtx<'_, R>,
     line_suffix: &mut LineSuffixBuf,
     output: &mut String,
     pos: &mut usize,
-    render: &RenderConfig,
-    embed: &EmbedContext,
-    resolver: Option<&R>,
     should_remeasure: &mut bool,
 ) {
     if line_suffix.is_empty() {
@@ -230,15 +243,12 @@ fn flush_line_suffix<R: TextResolver + ?Sized>(
     }
     for suffix_cmd in std::mem::take(line_suffix) {
         render_single_doc_inner(
-            arena,
+            ctx,
             suffix_cmd.doc,
             output,
             pos,
             suffix_cmd.indent,
             suffix_cmd.mode,
-            render,
-            embed,
-            resolver,
             None,
             should_remeasure,
         );
@@ -306,14 +316,16 @@ pub fn arena_measure_doc_flat_resolved<R: TextResolver + ?Sized>(
     let mut pos: usize = 0;
 
     render_doc_iterative(
-        arena,
+        &RenderCtx {
+            arena,
+            render: &render,
+            embed,
+            resolver: Some(resolver),
+        },
         doc,
         &mut output,
         &mut pos,
         0,
-        &render,
-        embed,
-        Some(resolver),
     );
 
     trim_last_line(output)
@@ -389,14 +401,16 @@ pub fn arena_print_doc_with_indent_resolved_into<R: TextResolver + ?Sized>(
 
     output.reserve(arena.estimated_output_capacity());
     render_doc_iterative(
-        arena,
+        &RenderCtx {
+            arena,
+            render: &render,
+            embed,
+            resolver: Some(resolver),
+        },
         doc,
         output,
         &mut pos,
         start_indent_level,
-        &render,
-        embed,
-        Some(resolver),
     );
 
     trim_last_line_in_place(output);
@@ -444,14 +458,16 @@ pub fn arena_print_doc_with_indent_resolved_preserve_whitespace_into<R: TextReso
 
     output.reserve(arena.estimated_output_capacity());
     render_doc_iterative(
-        arena,
+        &RenderCtx {
+            arena,
+            render: &render,
+            embed,
+            resolver: Some(resolver),
+        },
         doc,
         output,
         &mut pos,
         start_indent_level,
-        &render,
-        embed,
-        Some(resolver),
     );
 }
 
@@ -471,14 +487,16 @@ pub(crate) fn arena_print_doc_with_indent_and_render(
     let mut pos: usize = start_column;
 
     render_doc_iterative::<dyn TextResolver>(
-        arena,
+        &RenderCtx {
+            arena,
+            render,
+            embed,
+            resolver: None,
+        },
         doc,
         &mut output,
         &mut pos,
         start_indent_level,
-        render,
-        embed,
-        None,
     );
 
     trim_last_line(output)
@@ -654,17 +672,14 @@ impl RenderPolicy for SingleDocPolicy {
 /// `line_suffix` content (flushed at line breaks and once at the end), and
 /// (under the `swallow_check` feature) hosts the line-comment swallow
 /// diagnostic. The loop itself is [`render_doc_core`].
-#[allow(clippy::too_many_arguments)]
 fn render_doc_iterative<R: TextResolver + ?Sized>(
-    arena: &DocArena,
+    ctx: &RenderCtx<'_, R>,
     doc: DocId,
     output: &mut String,
     pos: &mut usize,
     start_indent_level: usize,
-    render: &RenderConfig,
-    embed: &EmbedContext,
-    resolver: Option<&R>,
 ) {
+    let arena = ctx.arena;
     // The swallow tracker (opt-in diagnostic) snapshots the process-global
     // enabled flag once per render and is inert when disabled. Compiled out
     // entirely without the feature. See `crate::doc::swallow`.
@@ -682,31 +697,19 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
     let mut should_remeasure = false;
 
     render_doc_core(
-        arena,
+        ctx,
         doc,
         output,
         pos,
         start_indent_level,
         Mode::Break,
-        render,
-        embed,
-        resolver,
         &mut policy,
         &mut commands,
         &mut line_suffix,
         &mut should_remeasure,
     );
 
-    flush_line_suffix(
-        arena,
-        &mut line_suffix,
-        output,
-        pos,
-        render,
-        embed,
-        resolver,
-        &mut should_remeasure,
-    );
+    flush_line_suffix(ctx, &mut line_suffix, output, pos, &mut should_remeasure);
 }
 
 /// The shared command-stack render loop with look-ahead — the single
@@ -725,22 +728,28 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
 /// (those run before the continuation would have been pushed). Only
 /// terminal arms (Text, Line, Fill, …) fall through to the pop at the
 /// bottom of the loop.
+// Remaining args are the MUTABLE render state (`output`/`pos`/`should_remeasure`, plus the
+// work buffers). Deliberately not bundled: a struct would take their address and sink them out
+// of registers in the hot loop — see `RenderCtx`, which carries only the shared context.
 #[allow(clippy::too_many_arguments)]
 fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
-    arena: &DocArena,
+    ctx: &RenderCtx<'_, R>,
     doc: DocId,
     output: &mut String,
     pos: &mut usize,
     indent_level: usize,
     mode: Mode,
-    render: &RenderConfig,
-    embed: &EmbedContext,
-    resolver: Option<&R>,
     policy: &mut P,
     commands: &mut CmdStack,
     line_suffix: &mut LineSuffixBuf,
     should_remeasure: &mut bool,
 ) {
+    let &RenderCtx {
+        arena,
+        render,
+        embed,
+        resolver,
+    } = ctx;
     // The loop's termination condition is `commands` draining back to empty,
     // so the caller-provided (pooled or local) stack must start empty.
     debug_assert!(commands.is_empty());
@@ -810,16 +819,7 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
                         *should_remeasure = true;
                     }
                     if policy.tracking_suffix() {
-                        flush_line_suffix(
-                            arena,
-                            line_suffix,
-                            output,
-                            pos,
-                            render,
-                            embed,
-                            resolver,
-                            should_remeasure,
-                        );
+                        flush_line_suffix(ctx, line_suffix, output, pos, should_remeasure);
                     }
                     render_line_break(
                         LineKind::Hard,
@@ -854,16 +854,7 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
                     *should_remeasure = true;
                 }
                 if policy.tracking_suffix() && (cmd.mode == Mode::Break || is_hard) {
-                    flush_line_suffix(
-                        arena,
-                        line_suffix,
-                        output,
-                        pos,
-                        render,
-                        embed,
-                        resolver,
-                        should_remeasure,
-                    );
+                    flush_line_suffix(ctx, line_suffix, output, pos, should_remeasure);
                 }
                 // A real newline ends the comment's line → clears the pending swallow.
                 let emitted_newline =
@@ -1059,16 +1050,13 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
             DocNode::Fill(range) => {
                 let parts = range.resolve(children_vec);
                 render_fill_iterative(
-                    arena,
+                    ctx,
                     parts,
                     output,
                     pos,
                     cmd.indent,
-                    render,
-                    embed,
                     &DocContext::default(),
                     commands,
-                    resolver,
                     should_remeasure,
                 );
             }
@@ -1081,16 +1069,13 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
                         let context = context.clone();
                         let parts = fill_range.resolve(children_vec);
                         render_fill_iterative(
-                            arena,
+                            ctx,
                             parts,
                             output,
                             pos,
                             cmd.indent,
-                            render,
-                            embed,
                             &context,
                             policy.with_context_fill_rest(commands),
-                            resolver,
                             should_remeasure,
                         );
                     } else {
@@ -1117,16 +1102,7 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
 
             DocNode::LineSuffixBoundary => {
                 if policy.tracking_suffix() {
-                    flush_line_suffix(
-                        arena,
-                        line_suffix,
-                        output,
-                        pos,
-                        render,
-                        embed,
-                        resolver,
-                        should_remeasure,
-                    );
+                    flush_line_suffix(ctx, line_suffix, output, pos, should_remeasure);
                 }
             }
 
@@ -1144,43 +1120,27 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
 }
 
 /// Render a single doc with specified mode (helper for Fill).
-#[allow(clippy::too_many_arguments)]
 pub(super) fn render_single_doc<R: TextResolver + ?Sized>(
-    arena: &DocArena,
+    ctx: &RenderCtx<'_, R>,
     doc: DocId,
     output: &mut String,
     pos: &mut usize,
     indent_level: usize,
     mode: Mode,
-    render: &RenderConfig,
-    embed: &EmbedContext,
-    resolver: Option<&R>,
     should_remeasure: &mut bool,
 ) {
     let mut line_suffix: LineSuffixBuf = SmallVec::new();
     render_single_doc_inner(
-        arena,
+        ctx,
         doc,
         output,
         pos,
         indent_level,
         mode,
-        render,
-        embed,
-        resolver,
         Some(&mut line_suffix),
         should_remeasure,
     );
-    flush_line_suffix(
-        arena,
-        &mut line_suffix,
-        output,
-        pos,
-        render,
-        embed,
-        resolver,
-        should_remeasure,
-    );
+    flush_line_suffix(ctx, &mut line_suffix, output, pos, should_remeasure);
 }
 
 /// Unified single-doc renderer with optional suffix handling — the
@@ -1195,17 +1155,17 @@ pub(super) fn render_single_doc<R: TextResolver + ?Sized>(
 /// single-doc instantiation two call sites flips its inlining and puts a call
 /// on the hot per-line-break suffix-flush path. Keep the wrapper; re-attempt
 /// only with an instruction-count gate.
+// Remaining args are the MUTABLE render state (`output`/`pos`/`should_remeasure`, plus the
+// work buffers). Deliberately not bundled: a struct would take their address and sink them out
+// of registers in the hot loop — see `RenderCtx`, which carries only the shared context.
 #[allow(clippy::too_many_arguments)]
 fn render_single_doc_inner<R: TextResolver + ?Sized>(
-    arena: &DocArena,
+    ctx: &RenderCtx<'_, R>,
     doc: DocId,
     output: &mut String,
     pos: &mut usize,
     indent_level: usize,
     mode: Mode,
-    render: &RenderConfig,
-    embed: &EmbedContext,
-    resolver: Option<&R>,
     suffix_buffer: Option<&mut LineSuffixBuf>,
     should_remeasure: &mut bool,
 ) {
@@ -1222,15 +1182,12 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
     // one, which the enclosing top-level render already holds.
     let mut commands: CmdStack = SmallVec::new();
     render_doc_core(
-        arena,
+        ctx,
         doc,
         output,
         pos,
         indent_level,
         mode,
-        render,
-        embed,
-        resolver,
         &mut policy,
         &mut commands,
         line_suffix,

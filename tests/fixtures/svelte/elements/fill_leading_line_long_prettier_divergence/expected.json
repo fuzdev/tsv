@@ -1,0 +1,221 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 372,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 73,
+				"data": " fits: the leading `line` before `ccccc` renders flat, as a space "
+			},
+			{
+				"type": "Text",
+				"start": 73,
+				"end": 74,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 74,
+				"end": 143,
+				"name": "li",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 75
+					},
+					"end": {
+						"line": 2,
+						"column": 3,
+						"character": 77
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 78,
+							"end": 87,
+							"raw": "\n\taaaaa ~",
+							"data": "\n\taaaaa ~"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 87,
+							"end": 99,
+							"expression": {
+								"type": "Identifier",
+								"start": 88,
+								"end": 98,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 9
+									},
+									"end": {
+										"line": 3,
+										"column": 19
+									}
+								},
+								"name": "xxxxxxxxxx"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 99,
+							"end": 107,
+							"raw": " bbbbb ~",
+							"data": " bbbbb ~"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 107,
+							"end": 119,
+							"expression": {
+								"type": "Identifier",
+								"start": 108,
+								"end": 118,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 29
+									},
+									"end": {
+										"line": 3,
+										"column": 39
+									}
+								},
+								"name": "yyyyyyyyyy"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 119,
+							"end": 138,
+							"raw": " ccccc ccccc ccccc\n",
+							"data": " ccccc ccccc ccccc\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 143,
+				"end": 145,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 145,
+				"end": 233,
+				"data": " breaks AT that leading `line`: it must become the newline, not a space after it "
+			},
+			{
+				"type": "Text",
+				"start": 233,
+				"end": 234,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 234,
+				"end": 371,
+				"name": "li",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 235
+					},
+					"end": {
+						"line": 7,
+						"column": 3,
+						"character": 237
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 238,
+							"end": 271,
+							"raw": "\n\taaaaa aaaaa aaaaa aaaaa aaaaa ~",
+							"data": "\n\taaaaa aaaaa aaaaa aaaaa aaaaa ~"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 271,
+							"end": 283,
+							"expression": {
+								"type": "Identifier",
+								"start": 272,
+								"end": 282,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 33
+									},
+									"end": {
+										"line": 8,
+										"column": 43
+									}
+								},
+								"name": "xxxxxxxxxx"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 283,
+							"end": 328,
+							"raw": " bbbbb bbbbb bbbbb bbbbb bbbbb bbbbb bbbbb\n\t~",
+							"data": " bbbbb bbbbb bbbbb bbbbb bbbbb bbbbb bbbbb\n\t~"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 328,
+							"end": 340,
+							"expression": {
+								"type": "Identifier",
+								"start": 329,
+								"end": 339,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 3
+									},
+									"end": {
+										"line": 9,
+										"column": 13
+									}
+								},
+								"name": "yyyyyyyyyy"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 340,
+							"end": 366,
+							"raw": "\n\tccccc ccccc ccccc ccccc\n",
+							"data": "\n\tccccc ccccc ccccc ccccc\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

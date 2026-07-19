@@ -1,7 +1,8 @@
 # inline_boundary_whitespace_multiline_prettier_divergence
 
-The multiline counterpart of [inline_boundary_whitespace](../inline_boundary_whitespace/), which
-covers an inline element whose content stays inline (boundary spaces preserved).
+The multiline counterpart of
+[inline_boundary_whitespace](../inline_boundary_whitespace_prettier_divergence/), which covers an
+inline element whose content stays inline (boundary runs trimmed there too).
 
 Once the children force multiline (a block child, a control-flow block), the element lays out
 **block-style** — both tags intact, content on its own indented lines — and the content-boundary

@@ -1,0 +1,241 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 72,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 17,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 4,
+						"character": 4
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 5,
+							"end": 11,
+							"name": "br",
+							"name_loc": {
+								"start": {
+									"line": 1,
+									"column": 6,
+									"character": 6
+								},
+								"end": {
+									"line": 1,
+									"column": 8,
+									"character": 8
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 17,
+				"end": 18,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 18,
+				"end": 44,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 19
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 22
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 23,
+							"end": 24,
+							"raw": "a",
+							"data": "a"
+						},
+						{
+							"type": "RegularElement",
+							"start": 24,
+							"end": 30,
+							"name": "br",
+							"name_loc": {
+								"start": {
+									"line": 2,
+									"column": 7,
+									"character": 25
+								},
+								"end": {
+									"line": 2,
+									"column": 9,
+									"character": 27
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 30,
+							"end": 31,
+							"raw": "b",
+							"data": "b"
+						},
+						{
+							"type": "RegularElement",
+							"start": 31,
+							"end": 37,
+							"name": "hr",
+							"name_loc": {
+								"start": {
+									"line": 2,
+									"column": 14,
+									"character": 32
+								},
+								"end": {
+									"line": 2,
+									"column": 16,
+									"character": 34
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 37,
+							"end": 38,
+							"raw": "c",
+							"data": "c"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 44,
+				"end": 45,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 45,
+				"end": 71,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 46
+					},
+					"end": {
+						"line": 3,
+						"column": 4,
+						"character": 49
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 50,
+							"end": 65,
+							"name": "img",
+							"name_loc": {
+								"start": {
+									"line": 3,
+									"column": 6,
+									"character": 51
+								},
+								"end": {
+									"line": 3,
+									"column": 9,
+									"character": 54
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 55,
+									"end": 62,
+									"name": "src",
+									"name_loc": {
+										"start": {
+											"line": 3,
+											"column": 10,
+											"character": 55
+										},
+										"end": {
+											"line": 3,
+											"column": 13,
+											"character": 58
+										}
+									},
+									"value": [
+										{
+											"start": 60,
+											"end": 61,
+											"type": "Text",
+											"raw": "x",
+											"data": "x"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

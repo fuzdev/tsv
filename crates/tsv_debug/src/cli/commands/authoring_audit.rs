@@ -31,16 +31,14 @@
 //!    be *created and destroyed*, not just reshaped: each boundary is probed at all
 //!    three forms it can take — **hug (zero whitespace) ↔ space ↔ newline**. This is the
 //!    family that catches a formatter letting a render-free character pick the layout.
-//!    Restricted to elements whose content already spans lines in the base, because that is
-//!    where layout is at stake. Be honest about what this excludes: when the content fits on
-//!    one line, tsv *preserves* an authored boundary space (`<span> text </span>` and
-//!    `<span>text</span>` are both stable), so it is authoring-DEPENDENT there too — on a
-//!    character the compiler removes. That is a deliberate, prettier-matching preservation
-//!    choice, pinned by the `inline_boundary_whitespace` fixture and cataloged in
-//!    conformance_prettier.md §Svelte: Inline content block-style; it costs nothing
-//!    structurally, and probing it would bury the layout signal this audit exists to find
-//!    under a wall of sanctioned noise. So: a clean run means no render-free character picks
-//!    a LAYOUT — not that none survives in the output.
+//!    Fits-inline content is probed too: tsv trims a render-free boundary run even when
+//!    the content fits (`<span> text </span>` → `<span>text</span>` — the Svelte-mirror
+//!    trim, conformance_prettier.md §Svelte: Inline content block-style), so hug ↔ space ↔
+//!    newline must reach one fixed point at every content boundary outside
+//!    `<pre>`/`<textarea>`. The one sanctioned residual: a base whose boundary is
+//!    newline-authored on BOTH sides keeps its multiline layout (newlines are authoring
+//!    intent), so its single-boundary mutants legitimately settle on the glued form —
+//!    reported as dual-stable, deliberate.
 //!
 //! The enumeration reuses the parser's own node structure + `preserves_whitespace`
 //! rather than re-deriving significance (audit *policy* lives here in the caller;
@@ -285,8 +283,9 @@ fn collect_boundary_sites(
     let (Some(first), Some(last)) = (nodes.first(), nodes.last()) else {
         return;
     };
-    // An all-whitespace fragment is an EMPTY element, not content with a boundary. (Its
-    // lone space — `<span> </span>` — is a deliberate, prettier-matching preservation.)
+    // An all-whitespace fragment is an EMPTY element (`<span> </span>` collapses to
+    // `<span></span>`), not content with two independent boundaries — its single run
+    // would be both the leading and the trailing site at once.
     let has_content = nodes
         .iter()
         .any(|n| !matches!(n, FragmentNode::Text(t) if t.raw(src).trim_ascii().is_empty()));
@@ -295,12 +294,6 @@ fn collect_boundary_sites(
     }
     let content_start = first.span().start_usize();
     let content_end = last.span().end_usize();
-    // Probe only where LAYOUT is at stake — content that already spans lines. See the
-    // module doc: for content that fits on one line, both formatters deliberately keep an
-    // authored boundary space, so probing it would only pile up sanctioned divergences.
-    if !src[content_start..content_end].contains('\n') {
-        return;
-    }
 
     // The leading run lives inside the first child when that child is text; otherwise the
     // boundary is a hug and the run is the empty span at the content's start. Same, mirrored,

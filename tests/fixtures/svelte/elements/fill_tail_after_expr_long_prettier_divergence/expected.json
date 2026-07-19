@@ -1,0 +1,165 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 486,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 95,
+				"data": " 100 chars: the tail word after the expression tag fits, so the fill stays on one line. "
+			},
+			{
+				"type": "Text",
+				"start": 95,
+				"end": 96,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 96,
+				"end": 206,
+				"name": "li",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 97
+					},
+					"end": {
+						"line": 2,
+						"column": 3,
+						"character": 99
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 100,
+							"end": 185,
+							"raw": "\n\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ~",
+							"data": "\n\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ~"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 185,
+							"end": 197,
+							"expression": {
+								"type": "Identifier",
+								"start": 186,
+								"end": 196,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 85
+									},
+									"end": {
+										"line": 3,
+										"column": 95
+									}
+								},
+								"name": "xxxxxxxxxx"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 197,
+							"end": 201,
+							"raw": " cc\n",
+							"data": " cc\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 206,
+				"end": 208,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 208,
+				"end": 372,
+				"data": " 101 chars: tsv breaks at the collapsible space before the tail word to hold the line\n     <= 100. Prettier keeps the tail on the line and overflows to 101. "
+			},
+			{
+				"type": "Text",
+				"start": 372,
+				"end": 373,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 373,
+				"end": 485,
+				"name": "li",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 374
+					},
+					"end": {
+						"line": 8,
+						"column": 3,
+						"character": 376
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 377,
+							"end": 463,
+							"raw": "\n\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ~",
+							"data": "\n\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ~"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 463,
+							"end": 475,
+							"expression": {
+								"type": "Identifier",
+								"start": 464,
+								"end": 474,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 86
+									},
+									"end": {
+										"line": 9,
+										"column": 96
+									}
+								},
+								"name": "xxxxxxxxxx"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 475,
+							"end": 480,
+							"raw": "\n\tcc\n",
+							"data": "\n\tcc\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
