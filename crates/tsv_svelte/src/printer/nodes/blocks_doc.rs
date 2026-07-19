@@ -941,12 +941,7 @@ impl<'a> Printer<'a> {
     ///
     fn build_section_body_doc(&self, fragment: &Fragment<'_>) -> DocId {
         let nodes = fragment.nodes;
-        self.build_nodes_doc_trimmed(
-            nodes,
-            true,
-            Self::nodes_have_breakable_expression(nodes),
-            false,
-        )
+        self.build_nodes_doc_trimmed(nodes, Self::nodes_have_breakable_expression(nodes), false)
     }
 
     /// The `{:then …}` keyword doc — `{:then value}` if a `then` value binds, else

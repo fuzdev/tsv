@@ -26,8 +26,6 @@ struct MultilineInputs {
     kind: ElementKind,
     /// Whether element has no meaningful content
     is_empty: bool,
-    /// Whether content should hug the closing tag
-    hug_end: bool,
     /// Whether source has newline at opening boundary
     source_has_leading_break: bool,
     /// Whether source has newline at closing boundary
@@ -166,22 +164,19 @@ impl<'a> Printer<'a> {
             return false;
         };
 
-        // Inline elements: preserve multiline when content starts with newline AND ends
-        // with any whitespace (space, tab, or newline), and has non-text children.
+        // Inline elements: preserve multiline only when BOTH boundaries are newline-authored
+        // (both-or-neither, same as components) and there are non-text children.
         // `<a>\n\t{expr}\n</a>` preserves (leading newline + trailing newline).
-        // `<a>\n\t{expr} </a>` preserves (leading newline + trailing space).
-        // `<a>\n\t{expr}</a>` collapses (leading newline but no trailing whitespace).
-        // `<a>\n  text<span>text</span></a>` collapses (no trailing whitespace).
+        // `<a>\n\t{expr} </a>` collapses (trailing space is render-free — not a second break).
+        // `<a>\n\t{expr}</a>` collapses (leading newline but no trailing break).
+        // `<a>\n  text<span>text</span></a>` collapses (no trailing break).
         // `<span>  \n  {expr}</span>` collapses (space before \n, not leading).
         // Fill mode (`{a} {b}`) stays inline even with both breaks.
         let first_text_starts_with_newline = nodes
             .first()
             .is_some_and(|n| matches!(n, FragmentNode::Text(t) if t.raw(source).starts_with('\n')));
-        let last_text_ends_with_whitespace = nodes.last().is_some_and(
-            |n| matches!(n, FragmentNode::Text(t) if t.raw(source).ends_with(|c: char| c.is_ascii_whitespace())),
-        );
 
-        if first_text_starts_with_newline && last_text_ends_with_whitespace {
+        if first_text_starts_with_newline && self.nodes_boundary_newline(nodes, false) {
             let has_nontext_content = nodes[first..=last]
                 .iter()
                 .any(|n| !matches!(n, FragmentNode::Text(_)));
@@ -241,7 +236,6 @@ impl<'a> Printer<'a> {
         let ElementParts {
             kind,
             can_self_close,
-            attributes,
             nodes,
             span,
             ..
@@ -270,7 +264,7 @@ impl<'a> Printer<'a> {
         let block_flow_multiline =
             has_block_flow_children && self.block_flow_forces_multiline(nodes);
 
-        // Any attribute doc that will_break (forces attr group break + trim_boundaries)
+        // Any attribute doc that will_break (forces attr group break)
         let has_multiline_attr = attr_docs.iter().any(|&doc| self.d().will_break(doc));
 
         // Check if all content children are text nodes (no elements, expressions, blocks)
@@ -283,7 +277,6 @@ impl<'a> Printer<'a> {
             MultilineInputs {
                 kind,
                 is_empty,
-                hug_end,
                 source_has_leading_break,
                 source_has_trailing_break,
                 block_flow_multiline,
@@ -291,21 +284,12 @@ impl<'a> Printer<'a> {
             },
         );
 
-        // Compute trim_boundaries
-        let will_go_multiline = attributes.len() > 1
-            || block_flow_multiline
-            || super::helpers::has_nested_block_flow(nodes)
-            || has_multiline_attr;
-        let trim_boundaries = !kind.is_inline() || will_go_multiline;
-
         ElementContext {
             is_self_closing,
             is_empty,
             hug_both: hug_start && hug_end,
             needs_multiline,
-            trim_boundaries,
             has_multiline_attr,
-            only_text_content,
         }
     }
 
@@ -314,7 +298,6 @@ impl<'a> Printer<'a> {
         let MultilineInputs {
             kind,
             is_empty,
-            hug_end,
             source_has_leading_break,
             source_has_trailing_break,
             block_flow_multiline,
@@ -365,18 +348,6 @@ impl<'a> Printer<'a> {
                 source_has_trailing_break,
             )
         {
-            return true;
-        }
-
-        // Expression splitting forces an element multiline when authored with a leading break,
-        // a non-hugged trailing boundary, and 2+ spaced `{expr}` siblings — a multiline-*entry*
-        // trigger (distinct from sibling separation, which `build_nodes_doc_multiline` handles).
-        // Load-bearing for the component case (`components/multi_expressions_multiline`): without
-        // it such a `<Comp>` would stay inline. The only remaining use of
-        // `should_split_expressions_in_nodes` now that the sibling-break caller is retired.
-        let should_split = self.should_split_expressions_in_nodes(nodes);
-        let has_trailing_ws = !hug_end;
-        if source_has_leading_break && has_trailing_ws && should_split {
             return true;
         }
 

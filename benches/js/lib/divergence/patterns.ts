@@ -1740,6 +1740,82 @@ const inline_content_block_style: DivergencePattern = {
 	},
 };
 
+const svelte_boundary_ws_trim: DivergencePattern = {
+	id: 'svelte_boundary_ws_trim',
+	description:
+		'tsv trims render-free content-boundary whitespace (the Svelte-mirror trim: the compiler removes every fragment edge run at compile); prettier keeps a boundary space or expands the construct',
+	languages: ['svelte'],
+	conformance_sections: ['Svelte: Inline content block-style', 'Svelte: Blocks'],
+	fixtures: [
+		'svelte/elements/inline_boundary_whitespace_prettier_divergence',
+		'svelte/elements/inline_empty_long_prettier_divergence',
+		'svelte/blocks/boundary_space_trim_prettier_divergence',
+		'svelte/blocks/await/boundary_space_trim_prettier_divergence',
+		'svelte/blocks/if/spaces_prettier_divergence',
+	],
+	detect(ctx) {
+		if (ctx.language !== 'svelte') return null;
+
+		// No file-level whitespace-only gate: each claim below carries its own
+		// content-preservation proof (the collapse equality over the exact text it claims),
+		// so trim hunks are claimable even in a file whose OTHER hunks carry a non-ws
+		// divergence (e.g. the self-closing expansion `self_closing_nonvoid` explains) —
+		// those other hunks stay unclaimed by this pattern.
+
+		// FAMILY SIGNATURE: the two sides are IDENTICAL once whitespace runs adjacent to a
+		// tag/section-boundary character (`>`/`}` on the left, `<`/`{` on the right) are
+		// removed from both — the exact class the trim deletes — and ours carries strictly
+		// LESS whitespace (the trim only removes; a diff where ours adds whitespace is some
+		// other reflow and stays unclaimed). Boundary-adjacent runs both sides keep (an
+		// inter-sibling space) collapse identically on both, so they can't defeat the
+		// equality; a run not touching a boundary character (a text-fill rewrap) survives on
+		// both sides and fails it.
+		//
+		// Tried WHOLE-FILE first: when the entire ours/prettier difference is this class,
+		// every hunk is claimed at once — necessary, not just convenient, because the diff
+		// often splits a trimmed line's removed/added forms into SEPARATE hunks around a
+		// shared glued context line (`<span> hi</span>` → `<span>hi</span>` where an
+		// identical glued line sits between them), leaving per-hunk pairs asymmetric.
+		// A mixed file falls back to the per-hunk pair check for the trim hunks alone.
+		const collapse_boundary_ws = (s: string): string =>
+			s.replace(/[ \t\r\n]+(?=[<{])|(?<=[>}])[ \t\r\n]+/g, '');
+		const count_ws = (s: string): number => (s.match(/[ \t\r\n]/g) ?? []).length;
+		if (
+			collapse_boundary_ws(ctx.prettier) === collapse_boundary_ws(ctx.ours) &&
+			count_ws(ctx.ours) < count_ws(ctx.prettier)
+		) {
+			return {
+				pattern: 'svelte_boundary_ws_trim',
+				confidence: 'likely',
+				hunk_indices: ctx.hunks.map((h) => h.index),
+				reason:
+					'render-free content-boundary whitespace trimmed (Svelte-mirror trim); prettier keeps the boundary space or expands the construct',
+			};
+		}
+		const claimed: number[] = [];
+		for (const hunk of ctx.hunks) {
+			const ours_join = hunk.added_lines.join('\n');
+			const prettier_join = hunk.removed_lines.join('\n');
+			if (
+				prettier_join !== ours_join &&
+				collapse_boundary_ws(prettier_join) === collapse_boundary_ws(ours_join) &&
+				count_ws(ours_join) < count_ws(prettier_join)
+			) {
+				claimed.push(hunk.index);
+			}
+		}
+		if (claimed.length === 0) return null;
+
+		return {
+			pattern: 'svelte_boundary_ws_trim',
+			confidence: 'likely',
+			hunk_indices: claimed,
+			reason:
+				'render-free content-boundary whitespace trimmed (Svelte-mirror trim); prettier keeps the boundary space or expands the construct',
+		};
+	},
+};
+
 // ─── Broad patterns (run last) ──────────────────────────────────────────────
 
 const css_url_opaque: DivergencePattern = {
@@ -2439,6 +2515,7 @@ export const PATTERNS: DivergencePattern[] = [
 	menu_block,
 	inline_content_hug,
 	inline_content_block_style,
+	svelte_boundary_ws_trim,
 	fill_after_inline,
 	block_multiline_attrs_hug,
 	comment_preserved,

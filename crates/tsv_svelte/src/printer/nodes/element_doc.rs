@@ -13,7 +13,6 @@
 
 use crate::ast::internal::{self, FragmentNode};
 use crate::printer::Printer;
-use crate::printer::text::TextAnalysis;
 use smallvec::smallvec;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::{DocBuf, arena::DocId};
@@ -105,7 +104,6 @@ pub(super) struct ElementParts<'arena> {
     pub(super) is_void: bool,
     /// Whether an empty element may print self-closing when the source wrote it that way
     pub(super) can_self_close: bool,
-    pub(super) attributes: &'arena [internal::AttributeNode<'arena>],
     pub(super) nodes: &'arena [FragmentNode<'arena>],
     pub(super) span: Span,
 }
@@ -176,12 +174,8 @@ pub(super) struct ElementContext {
     pub(super) hug_both: bool,
     /// Whether children need multiline formatting
     pub(super) needs_multiline: bool,
-    /// Whether to trim boundary whitespace from children
-    pub(super) trim_boundaries: bool,
     /// Whether any attribute source contains embedded newlines (forces attr group break)
     pub(super) has_multiline_attr: bool,
-    /// Whether all content children are text nodes (no elements, expressions, blocks)
-    pub(super) only_text_content: bool,
 }
 
 impl<'a> Printer<'a> {
@@ -238,7 +232,6 @@ impl<'a> Printer<'a> {
             // Components, foreign (SVG/MathML), and namespaced (`foo:bar`) elements may print
             // self-closing (prettier's `didSelfClose`).
             can_self_close: class.kind.is_component() || class.is_foreign || class.is_namespaced,
-            attributes: element.attributes,
             nodes: element.fragment.nodes,
             span: element.span,
         }
@@ -347,14 +340,24 @@ impl<'a> Printer<'a> {
         );
         let parts = self.element_parts(element, class);
         let ctx = self.analyze_element(&parts, &attr_docs);
-        // Only the flat hug-both content layout has a single trailing `>` we can cleanly
-        // split off. Multiline children, boundary breaks, and the void/empty/self-closing
-        // and non-hug boundary forms all keep their `>` (return None → no dangle).
+        // Only a flat content layout has a single trailing `>` we can cleanly split off:
+        // Hug (glued boundaries), and Soft (a collapsing boundary — a one-sided newline or
+        // a render-free run — that trims to the same glued form; without the dangle here,
+        // format(one-sided-newline authoring) would emit the glued no-dangle form, which
+        // the next pass reads as Hug and dangles — a non-idempotent 2-cycle,
+        // `authoring_audit`'s hard bucket). Multiline children (Hard) and the
+        // void/empty/self-closing forms keep their `>` (return None → no dangle).
         match self.compute_element_layout(&parts, &ctx) {
-            ElementLayout::WithContent(BoundaryMode::Hug) => {
-                let trim_text = !class.kind.is_inline() && ctx.only_text_content;
-                let children_doc =
-                    self.build_nodes_doc_with_context(element.fragment.nodes, trim_text);
+            ElementLayout::WithContent(BoundaryMode::Hug | BoundaryMode::Soft) => {
+                // Children built exactly as `build_content_element_doc`'s Hug arm builds
+                // them (trimmed), so the dangled element renders its content identically
+                // to its undangled form — incl. trimming a render-free boundary space
+                // (`<span>text </span>{#each…}` must dangle like the glued authoring).
+                let children_doc = self.build_nodes_doc_trimmed(
+                    element.fragment.nodes,
+                    Self::nodes_have_breakable_expression(element.fragment.nodes),
+                    false,
+                );
                 Some(self.build_hug_both_doc(&parts, &ctx, &attr_docs, children_doc, true))
             }
             _ => None,
@@ -449,55 +452,27 @@ impl<'a> Printer<'a> {
         boundary: BoundaryMode,
     ) -> DocId {
         let d = self.d();
-        let is_inline = parts.kind.is_inline();
         let nodes = parts.nodes;
 
         // Build the children doc EXACTLY ONCE, in the variant the resolved boundary arm
-        // actually uses. Every input to that decision (both boundary modes, `multiline_children`,
-        // `is_inline`, `trim_boundaries`) is already known here, so the final `(trim, breakable,
-        // multiline)` triple can be selected up front. Previously a "default" children doc was
-        // built eagerly and then several arms threw it away and rebuilt it (`trim=true` for a
-        // padded inline element, or the multiline form) — and because those rebuilds recurse into
-        // children that ALSO rebuild, deeply nested inline content was O(2^depth). Selecting the
-        // variant up front keeps output byte-identical (each arm ends up using exactly one of the
-        // builds either way) while building each subtree once. See the build-fanout audit.
+        // actually uses (rebuilding per arm recursed into children that ALSO rebuilt, making
+        // deeply nested inline content O(2^depth) — see the build-fanout audit). Boundary
+        // whitespace is always trimmed: it is render-free under Svelte 5 (`clean_nodes` trims
+        // every fragment edge at compile), so no element kind keeps it. Only the multiline-ness
+        // varies — `Hard` is exactly the multiline case.
         //
         // `breakable_exprs` (the fill-vs-hard-width divergence for long multi-expression runs,
-        // `fill_multiple_expr_long`) is only consulted by the multiline variants, so it is computed
-        // only where used.
-        let (child_trim, child_breakable, child_multiline) = match boundary {
-            BoundaryMode::Hug => {
-                // Hug both: the prettier-shaped trimmed builder (the convergence base). Hugging
-                // implies `!needs_multiline`, so the children are never the multiline shape here.
-                (
-                    ctx.trim_boundaries,
-                    Self::nodes_have_breakable_expression(nodes),
-                    false,
-                )
-            }
-            BoundaryMode::Hard => {
-                // Full multiline — always the `build_nodes_doc_multiline` shape.
-                (true, Self::nodes_have_breakable_expression(nodes), true)
-            }
-            BoundaryMode::Soft => {
-                // A padded inline element trims (the boundary line() supplies the space).
-                //
-                // `breakable_exprs` is read the same way as in the other two arms: it is a property
-                // of the CONTENT (does a child `{expr}` have internal break points?), not of the
-                // boundary, so it cannot depend on which boundary mode we landed in. Passing `false`
-                // here strands a breakable expression group flat under a fits()-Break `line` — which,
-                // on a fill whose text and ternaries compete for the same line, oscillates between
-                // two layouts (a non-idempotent 2-cycle, `authoring_audit`'s hard bucket).
-                let breakable = Self::nodes_have_breakable_expression(nodes);
-                if is_inline && !ctx.trim_boundaries {
-                    (true, breakable, false)
-                } else {
-                    (ctx.trim_boundaries, breakable, false)
-                }
-            }
-        };
-        let children_doc =
-            self.build_nodes_doc_trimmed(nodes, child_trim, child_breakable, child_multiline);
+        // `fill_multiple_expr_long`) is a property of the CONTENT (does a child `{expr}` have
+        // internal break points?), not of the boundary, so it cannot depend on which boundary
+        // mode we landed in. Passing `false` strands a breakable expression group flat under a
+        // fits()-Break `line` — which, on a fill whose text and ternaries compete for the same
+        // line, oscillates between two layouts (a non-idempotent 2-cycle, `authoring_audit`'s
+        // hard bucket).
+        let children_doc = self.build_nodes_doc_trimmed(
+            nodes,
+            Self::nodes_have_breakable_expression(nodes),
+            boundary == BoundaryMode::Hard,
+        );
 
         // Hug-both builds its own opening, so handle it before building `opening_tag` — both
         // remaining arms use `opening_tag`, this one doesn't.
@@ -525,28 +500,20 @@ impl<'a> Printer<'a> {
 
         // Soft boundaries: collapse when the element fits, break block-style when it doesn't.
         //
-        // For inline elements, use line() (space in flat, newline in break) when the boundary
-        // text has whitespace. This matches Prettier's printLineBeforeChildren (element.js:99-102),
-        // which returns `line` when hasLeadingSpaces && isLeadingSpaceSensitive — so an authored
-        // boundary space survives when the element fits inline, and becomes the block-style
-        // newline when it doesn't.
-        let leading_break = if is_inline && Self::first_child_has_leading_ws(nodes, self.source) {
-            d.line()
-        } else {
-            d.softline()
-        };
-        let trailing_break = if is_inline && Self::last_child_has_trailing_ws(nodes, self.source) {
-            d.line()
-        } else {
-            d.softline()
-        };
+        // Always softlines: an authored boundary space is render-free (the compiler trims every
+        // fragment edge), so it neither survives inline — `<span> text </span>` collapses to
+        // `<span>text</span>` — nor selects the layout. Prettier instead keeps the space
+        // (`printLineBeforeChildren`'s `line` when hasLeadingSpaces && isLeadingSpaceSensitive,
+        // the HTML/CSS inline whitespace model Svelte 5 broke from) — see
+        // conformance_prettier.md §Svelte: Inline content block-style and the
+        // inline_boundary_whitespace fixture.
         let inner_group = d.group(children_doc);
-        let indent_inner = d.indent(d.concat(&[leading_break, inner_group]));
+        let indent_inner = d.indent(d.concat(&[d.softline(), inner_group]));
         d.group(d.concat(&[
             opening_tag,
             d.text(">"),
             indent_inner,
-            trailing_break,
+            d.softline(),
             d.text("</"),
             parts.name,
             d.text(">"),
@@ -602,23 +569,13 @@ impl<'a> Printer<'a> {
         ]))
     }
 
-    fn first_child_has_leading_ws(nodes: &[FragmentNode<'_>], source: &str) -> bool {
-        nodes.first().is_some_and(
-            |n| matches!(n, FragmentNode::Text(t) if !t.raw(source).leading_whitespace().is_empty()),
-        )
-    }
-
-    fn last_child_has_trailing_ws(nodes: &[FragmentNode<'_>], source: &str) -> bool {
-        nodes.last().is_some_and(
-            |n| matches!(n, FragmentNode::Text(t) if !t.raw(source).trailing_whitespace().is_empty()),
-        )
-    }
-
     /// Build doc for empty element with no hugging
     ///
-    /// For inline elements with whitespace-only content (e.g., `<span> </span>`),
-    /// the space is preserved. When attrs force multiline, `>` and `</tag>` go
-    /// on separate lines (matching Prettier behavior).
+    /// A whitespace-only fragment counts as empty for every element kind — `<b> </b>`
+    /// collapses to `<b></b>` (Svelte renders nothing there: the boundary run is trimmed at
+    /// compile, so the space is render-free; prettier preserves it — see
+    /// conformance_prettier.md §Svelte: Inline content block-style). When attrs force
+    /// multiline, `>` and `</tag>` go on separate lines (matching Prettier behavior).
     fn build_empty_element_doc(
         &self,
         element: &internal::Element<'_>,
@@ -628,43 +585,10 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let tag_sym = element.name.to_u32();
-        let is_inline = kind.is_inline();
         let is_html = element.kind == internal::ElementKind::Html;
+        let closing = d.concat(&[d.text("></"), d.symbol(tag_sym), d.text(">")]);
 
-        // Inline elements with whitespace-only content preserve a space
-        // e.g., <span> </span> stays as-is, not collapsed to <span></span>
-        // Matches prettier-plugin-svelte: isInlineElement = !isBlockElement
-        let has_ws_content = is_inline
-            && !element.fragment.nodes.is_empty()
-            && element
-                .fragment
-                .nodes
-                .iter()
-                .all(FragmentNode::is_whitespace_only_text);
-
-        if has_attrs && (is_inline || kind.is_component()) {
-            // Closing for inline/hug states: "></tag>" or "> </tag>"
-            let closing = if has_ws_content {
-                d.concat(&[d.text("> </"), d.symbol(tag_sym), d.text(">")])
-            } else {
-                d.concat(&[d.text("></"), d.symbol(tag_sym), d.text(">")])
-            };
-
-            // Closing for full multiline state: with whitespace content,
-            // > and </tag> go on separate lines; without, same as inline (hugged)
-            let closing_multiline = if has_ws_content {
-                let hl = d.hardline();
-                d.concat(&[
-                    d.text(">"),
-                    hl,
-                    d.text("</"),
-                    d.symbol(tag_sym),
-                    d.text(">"),
-                ])
-            } else {
-                closing
-            };
-
+        if has_attrs && (kind.is_inline() || kind.is_component()) {
             // State 1: All inline
             let inline_state = d.concat(&[opening_tag, closing]);
 
@@ -699,16 +623,12 @@ impl<'a> Printer<'a> {
                 d.symbol(tag_sym),
                 multiline_indent,
                 d.hardline(),
-                closing_multiline,
+                closing,
             ]);
 
             d.conditional_group(&[inline_state, hug_state, multiline_state])
-        } else if has_ws_content {
-            // Inline element with whitespace content, no attrs: <span> </span>
-            d.concat(&[opening_tag, d.text("> </"), d.symbol(tag_sym), d.text(">")])
         } else {
-            // Block elements or truly empty - use simple structure
-            d.group(d.concat(&[opening_tag, d.text("></"), d.symbol(tag_sym), d.text(">")]))
+            d.group(d.concat(&[opening_tag, closing]))
         }
     }
 

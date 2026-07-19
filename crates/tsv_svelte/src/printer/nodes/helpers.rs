@@ -143,20 +143,6 @@ fn has_expanding_block_in_await(nodes: &[FragmentNode<'_>]) -> bool {
     })
 }
 
-/// Check if any child element contains block flow (if/each/etc).
-///
-/// Used to detect when a parent element will go multiline due to
-/// nested content forcing line breaks.
-pub(crate) fn has_nested_block_flow(nodes: &[FragmentNode<'_>]) -> bool {
-    nodes.iter().any(|n| {
-        if let FragmentNode::Element(child) = n {
-            child.fragment.nodes.iter().any(is_control_flow_block)
-        } else {
-            false
-        }
-    })
-}
-
 impl<'a> Printer<'a> {
     /// Collect the leading-comment run in `[from, to)` — one doc per comment via
     /// [`build_leading_js_comment_doc`](Self::build_leading_js_comment_doc), so every

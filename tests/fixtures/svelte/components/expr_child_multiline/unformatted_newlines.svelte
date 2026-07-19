@@ -2,4 +2,5 @@
 
 	{
 	  expr
-	} </Comp>
+	}
+</Comp>
