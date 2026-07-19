@@ -1,0 +1,256 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 275,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 59,
+				"data": " Inline-classified table cell: boundary spaces trim "
+			},
+			{
+				"type": "Text",
+				"start": 59,
+				"end": 60,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 60,
+				"end": 97,
+				"name": "table",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 61
+					},
+					"end": {
+						"line": 2,
+						"column": 6,
+						"character": 66
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 67,
+							"end": 89,
+							"name": "tr",
+							"name_loc": {
+								"start": {
+									"line": 2,
+									"column": 8,
+									"character": 68
+								},
+								"end": {
+									"line": 2,
+									"column": 10,
+									"character": 70
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "RegularElement",
+										"start": 71,
+										"end": 84,
+										"name": "td",
+										"name_loc": {
+											"start": {
+												"line": 2,
+												"column": 12,
+												"character": 72
+											},
+											"end": {
+												"line": 2,
+												"column": 14,
+												"character": 74
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 75,
+													"end": 79,
+													"raw": "text",
+													"data": "text"
+												}
+											]
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 97,
+				"end": 99,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 99,
+				"end": 154,
+				"data": " Inline-classified option: boundary spaces trim "
+			},
+			{
+				"type": "Text",
+				"start": 154,
+				"end": 155,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 155,
+				"end": 193,
+				"name": "select",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 156
+					},
+					"end": {
+						"line": 5,
+						"column": 7,
+						"character": 162
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 163,
+							"end": 184,
+							"name": "option",
+							"name_loc": {
+								"start": {
+									"line": 5,
+									"column": 9,
+									"character": 164
+								},
+								"end": {
+									"line": 5,
+									"column": 15,
+									"character": 170
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 171,
+										"end": 175,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 193,
+				"end": 195,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 195,
+				"end": 245,
+				"data": " Foreign (svg) child: boundary spaces trim "
+			},
+			{
+				"type": "Text",
+				"start": 245,
+				"end": 246,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 246,
+				"end": 274,
+				"name": "svg",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 247
+					},
+					"end": {
+						"line": 8,
+						"column": 4,
+						"character": 250
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 251,
+							"end": 268,
+							"name": "text",
+							"name_loc": {
+								"start": {
+									"line": 8,
+									"column": 6,
+									"character": 252
+								},
+								"end": {
+									"line": 8,
+									"column": 10,
+									"character": 256
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 257,
+										"end": 261,
+										"raw": "text",
+										"data": "text"
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

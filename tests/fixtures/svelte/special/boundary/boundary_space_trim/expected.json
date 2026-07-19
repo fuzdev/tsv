@@ -1,0 +1,149 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 198,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 72,
+				"data": " Space-only content boundaries glue (render-free under Svelte 5) "
+			},
+			{
+				"type": "Text",
+				"start": 72,
+				"end": 73,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteBoundary",
+				"start": 73,
+				"end": 112,
+				"name": "svelte:boundary",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 74
+					},
+					"end": {
+						"line": 2,
+						"column": 16,
+						"character": 89
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 90,
+							"end": 94,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 112,
+				"end": 114,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 114,
+				"end": 137,
+				"data": " With attribute "
+			},
+			{
+				"type": "Text",
+				"start": 137,
+				"end": 138,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteBoundary",
+				"start": 138,
+				"end": 197,
+				"name": "svelte:boundary",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 139
+					},
+					"end": {
+						"line": 5,
+						"column": 16,
+						"character": 154
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 155,
+						"end": 167,
+						"name": "onerror",
+						"name_loc": {
+							"start": {
+								"line": 5,
+								"column": 17,
+								"character": 155
+							},
+							"end": {
+								"line": 5,
+								"column": 24,
+								"character": 162
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 163,
+							"end": 167,
+							"expression": {
+								"type": "Identifier",
+								"start": 164,
+								"end": 166,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 26
+									},
+									"end": {
+										"line": 5,
+										"column": 28
+									}
+								},
+								"name": "fn"
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 168,
+							"end": 179,
+							"raw": "text1 text2",
+							"data": "text1 text2"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

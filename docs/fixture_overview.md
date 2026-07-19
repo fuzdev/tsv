@@ -431,11 +431,15 @@ on real codebases.
 
 The N rules prove only that a variant *normalizes to* input (`ours(variant) == input`);
 they never prove the variant is **render-equivalent** to input. So a formatter bug that
-changes the rendered output *and* happens to land on input would pass N green — worst for
-`unformatted_ours_*`, where N6 makes prettier deliberately disagree, leaving `ours` (the
-formatter under test) as the sole witness. R closes that hole for **Svelte templates**
-(`.svelte` only — `.svelte.ts`/`.ts`/`.css` have nothing Svelte renders), independent of
-the formatter, over both `unformatted_*` and `unformatted_ours_*`:
+changes the rendered output *and* happens to land on input would pass N green — worst
+where prettier deliberately disagrees with the normalization, leaving `ours` (the
+formatter under test) as the sole witness: `unformatted_ours_*` (N6 makes prettier land
+elsewhere) and `prettier_variant_*` (N1 makes prettier keep the variant). R closes that
+hole for **Svelte templates** (`.svelte` only — `.svelte.ts`/`.ts`/`.css` have nothing
+Svelte renders), independent of the formatter, over every file `ours` maps to input:
+`unformatted_*`, `unformatted_ours_*`, and `prettier_variant_*` (`variant_*` /
+`divergent_variant_*` stay out — ours does not map them to input, so there is no
+variant↔input claim to prove):
 
 - **R1 (compile arm, authoritative — GATES)**: `render_key(variant) == render_key(input)`,
   where the render key is `svelte compile --generate server` reduced to its browser-visible

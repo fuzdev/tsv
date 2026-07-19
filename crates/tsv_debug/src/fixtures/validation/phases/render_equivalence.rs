@@ -154,7 +154,10 @@ pub(in crate::fixtures::validation) async fn validate_render_equivalence(
     if fixture.input_type() != InputType::Svelte {
         return;
     }
-    if files.unformatted.is_empty() && files.unformatted_ours.is_empty() {
+    if files.unformatted.is_empty()
+        && files.unformatted_ours.is_empty()
+        && files.prettier_variant.is_empty()
+    {
         return;
     }
 
@@ -164,18 +167,25 @@ pub(in crate::fixtures::validation) async fn validate_render_equivalence(
     // first fallback.
     let mut input_template: Option<Value> = None;
 
-    // Both variant kinds share the identical check; the file lists differ only
-    // in which N-rule guarantees `ours(variant) == input` upstream.
+    // All three variant kinds share the identical check; the file lists differ
+    // only in which N-rule guarantees `ours(variant) == input` upstream. A
+    // `prettier_variant_*` belongs here for the same reason `unformatted_ours_*`
+    // does: prettier keeps the variant (≠ input), so `ours` is the SOLE witness
+    // to the variant↔input relationship — without this check a render-changing
+    // normalization that lands on `input` would validate green. (`variant_*` /
+    // `divergent_variant_*` stay out: ours does not map them to input, so there
+    // is no variant↔input claim to prove.)
     let variants = files
         .unformatted
         .iter()
-        .chain(files.unformatted_ours.iter());
+        .chain(files.unformatted_ours.iter())
+        .chain(files.prettier_variant.iter());
 
     for variant_name in variants {
         let variant_path = fixture.path.join(variant_name);
         // The read is owned + reported by the normalization phases (N3/N4 for
-        // unformatted_*, N5/N6 for unformatted_ours_*); skip silently here to
-        // avoid double-reporting.
+        // unformatted_*, N5/N6 for unformatted_ours_*, N1/N2 for
+        // prettier_variant_*); skip silently here to avoid double-reporting.
         let Ok(variant_content) = read_file(&variant_path) else {
             continue;
         };

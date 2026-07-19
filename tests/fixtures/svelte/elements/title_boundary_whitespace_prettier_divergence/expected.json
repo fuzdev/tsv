@@ -1,0 +1,147 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 194,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 97,
+				"data": " <title> outside <svelte:head> is a RegularElement — its render-free boundary spaces trim "
+			},
+			{
+				"type": "Text",
+				"start": 97,
+				"end": 98,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 98,
+				"end": 117,
+				"name": "title",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 99
+					},
+					"end": {
+						"line": 2,
+						"column": 6,
+						"character": 104
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 105,
+							"end": 109,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 117,
+				"end": 119,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 119,
+				"end": 152,
+				"data": " Inside a regular element "
+			},
+			{
+				"type": "Text",
+				"start": 152,
+				"end": 153,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 153,
+				"end": 193,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 154
+					},
+					"end": {
+						"line": 5,
+						"column": 4,
+						"character": 157
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 158,
+							"end": 160,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 160,
+							"end": 186,
+							"name": "title",
+							"name_loc": {
+								"start": {
+									"line": 6,
+									"column": 2,
+									"character": 161
+								},
+								"end": {
+									"line": 6,
+									"column": 7,
+									"character": 166
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 167,
+										"end": 178,
+										"raw": "text1 text2",
+										"data": "text1 text2"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 186,
+							"end": 187,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
