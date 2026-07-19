@@ -23,14 +23,13 @@ use tsv_lang::{Span, SymbolToU32};
 /// This determines what separator (if any) appears between the tag and content.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum BoundaryMode {
-    /// Content touches tag directly, no separator
-    /// Example: `<span>text` or `text</span>`
-    Hug,
     /// Hardline separator - preserves source structure
     /// Example: `<p>\n  text` (source had newline, preserve it)
     Hard,
     /// Softline separator - collapses or breaks based on fit
-    /// Example: `<span> text` where space can collapse if needed
+    /// Example: `<span> text` and `<span>text` alike: the authored boundary run is
+    /// render-free, so both collapse onto the tag line when the content fits and break
+    /// block-style when it doesn't.
     Soft,
 }
 
@@ -167,11 +166,6 @@ pub(super) struct ElementContext {
     pub(super) is_self_closing: bool,
     /// Whether element has no meaningful content
     pub(super) is_empty: bool,
-    /// Whether content hugs BOTH tags — i.e. the source has no whitespace at either content
-    /// boundary. Hugging is all-or-nothing on purpose: content-boundary whitespace is
-    /// render-free under Svelte 5, so a lone boundary character must not select the layout.
-    /// See [`Printer::compute_element_layout`].
-    pub(super) hug_both: bool,
     /// Whether children need multiline formatting
     pub(super) needs_multiline: bool,
     /// Whether any attribute source contains embedded newlines (forces attr group break)
@@ -220,7 +214,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Project a regular element onto the shared [`ElementParts`] view.
-    fn element_parts<'e>(
+    pub(super) fn element_parts<'e>(
         &self,
         element: &'e internal::Element<'e>,
         class: TagClass,
@@ -348,7 +342,7 @@ impl<'a> Printer<'a> {
         // `authoring_audit`'s hard bucket). Multiline children (Hard) and the
         // void/empty/self-closing forms keep their `>` (return None → no dangle).
         match self.compute_element_layout(&parts, &ctx) {
-            ElementLayout::WithContent(BoundaryMode::Hug | BoundaryMode::Soft) => {
+            ElementLayout::WithContent(BoundaryMode::Soft) => {
                 // Children built exactly as `build_content_element_doc`'s Hug arm builds
                 // them (trimmed), so the dangled element renders its content identically
                 // to its undangled form — incl. trimming a render-free boundary space
@@ -358,7 +352,13 @@ impl<'a> Printer<'a> {
                     Self::nodes_have_breakable_expression(element.fragment.nodes),
                     false,
                 );
-                Some(self.build_hug_both_doc(&parts, &ctx, &attr_docs, children_doc, true))
+                Some(self.build_collapsible_element_doc(
+                    &parts,
+                    &ctx,
+                    &attr_docs,
+                    children_doc,
+                    true,
+                ))
             }
             _ => None,
         }
@@ -474,30 +474,6 @@ impl<'a> Printer<'a> {
             boundary == BoundaryMode::Hard,
         );
 
-        // Hug-both builds its own opening, so handle it before building `opening_tag` — both
-        // remaining arms use `opening_tag`, this one doesn't.
-        if boundary == BoundaryMode::Hug {
-            return self.build_hug_both_doc(parts, ctx, attr_docs, children_doc, false);
-        }
-
-        let opening_tag = self.build_opening_tag(parts.name, attr_docs, ctx.has_multiline_attr);
-
-        if boundary == BoundaryMode::Hard {
-            // Full multiline. `children_doc` was built once above as the multiline shape
-            // (`build_nodes_doc_multiline` == `build_nodes_doc_trimmed(nodes, true, breakable,
-            // true)`); rebuilding here per level is what made deeply-nested content O(2^depth).
-            let indent_inner = d.indent(d.concat(&[d.hardline(), children_doc]));
-            return d.concat(&[
-                opening_tag,
-                d.text(">"),
-                indent_inner,
-                d.hardline(),
-                d.text("</"),
-                parts.name,
-                d.text(">"),
-            ]);
-        }
-
         // Soft boundaries: collapse when the element fits, break block-style when it doesn't.
         //
         // Always softlines: an authored boundary space is render-free (the compiler trims every
@@ -507,33 +483,43 @@ impl<'a> Printer<'a> {
         // the HTML/CSS inline whitespace model Svelte 5 broke from) — see
         // conformance_prettier.md §Svelte: Inline content block-style and the
         // inline_boundary_whitespace fixture.
-        let inner_group = d.group(children_doc);
-        let indent_inner = d.indent(d.concat(&[d.softline(), inner_group]));
-        d.group(d.concat(&[
+        if boundary == BoundaryMode::Soft {
+            return self.build_collapsible_element_doc(parts, ctx, attr_docs, children_doc, false);
+        }
+
+        // Full multiline. `children_doc` was built once above as the multiline shape
+        // (`build_nodes_doc_multiline` == `build_nodes_doc_trimmed(nodes, true, breakable,
+        // true)`); rebuilding here per level is what made deeply-nested content O(2^depth).
+        let opening_tag = self.build_opening_tag(parts.name, attr_docs, ctx.has_multiline_attr);
+        let indent_inner = d.indent(d.concat(&[d.hardline(), children_doc]));
+        d.concat(&[
             opening_tag,
             d.text(">"),
             indent_inner,
-            d.softline(),
+            d.hardline(),
             d.text("</"),
             parts.name,
             d.text(">"),
-        ]))
+        ])
     }
 
-    /// Build doc for hug-both mode — content touches both tags in the source.
+    /// Build doc for the collapsible (`Soft`) content layout — the single inline shape, whatever
+    /// the author wrote at the boundary.
     ///
     /// Softline boundaries: the content collapses onto the tag line when it fits and drops to its
-    /// own indented line (block-style, both tags intact) when it doesn't. No hardline force is
-    /// needed — every multiline trigger (an expanding control-flow block, block-flow children,
-    /// any other `needs_multiline`) already resolves the boundary to `Hard` in
-    /// [`Printer::compute_element_layout`], so it never reaches this builder.
+    /// own indented line (block-style, both tags intact) when it doesn't. Since the boundary run
+    /// is render-free and always trimmed, a glued authoring and a spaced one reach this same
+    /// builder — that is what makes them converge. No hardline force is needed — every multiline
+    /// trigger (an expanding control-flow block, block-flow children, any other `needs_multiline`)
+    /// already resolves the boundary to `Hard` in [`Printer::compute_element_layout`], so it never
+    /// reaches this builder.
     ///
     /// When `external_close` is true the element's own trailing closing `>` (and the boundary
     /// break before it) is omitted — the caller emits the `>` elsewhere. This powers the axis-3
     /// sibling-`>` dangle: an inline element directly followed by an expanding block renders as
     /// `</tag` and hands its `>` to the block so it can dangle onto the block-head line. See
     /// [`Printer::build_inline_element_omit_close_gt`].
-    fn build_hug_both_doc(
+    fn build_collapsible_element_doc(
         &self,
         parts: &ElementParts<'_>,
         ctx: &ElementContext,

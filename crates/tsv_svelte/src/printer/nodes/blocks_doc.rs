@@ -1160,7 +1160,7 @@ impl<'a> Printer<'a> {
         // Uniform body-drop: when every present section is inline-authored, the body +
         // `{:then}`/`{:catch}` keywords + `{/await}` drop to their own lines on overflow.
         // Keyed on `can_wrap` — the same gate `{#if}`/`{#each}` use — so the body hugs in the
-        // inline-content/hug-both path (`can_wrap` false) but drops in the multiline-fragment
+        // inline-content path (`can_wrap` false) but drops in the multiline-fragment
         // path. A block-parent sibling routes await through the multiline path via
         // `has_control_flow_after_sibling` (so `can_wrap` is true there); an inline parent
         // keeps `can_wrap` false and hugs, matching `{#if}`/`{#each}`.

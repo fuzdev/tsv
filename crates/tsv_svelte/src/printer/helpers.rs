@@ -37,7 +37,7 @@ impl<'a> Printer<'a> {
     /// selects the layout. Interior newlines don't count either — they are fill
     /// separators, not boundary authoring (`{#if c}x\ny{/if}` fills; only the boundary
     /// run speaks for the boundary). ASCII whitespace only: an NBSP is content.
-    /// The single boundary-authoring question — the element hug probes, the block
+    /// The single boundary-authoring question — the element boundary probes, the block
     /// section paths, and `is_inline_fragment` all route through it.
     /// See conformance_prettier.md §Svelte: Blocks.
     pub(super) fn nodes_boundary_newline(

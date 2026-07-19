@@ -10,6 +10,7 @@
 
 import type { DiffHunk, DiffLine } from '../diff.ts';
 import type { Language } from '../types.ts';
+import { hunk_alters_semantic_chars } from './safety.ts';
 
 export interface DetectionContext {
 	/** Original source code */
@@ -54,6 +55,22 @@ export interface DivergencePattern {
 	conformance_sections: string[];
 	/** Fixture paths (relative to tests/fixtures/) this pattern should detect */
 	fixtures: string[];
+	/**
+	 * Whether this pattern's transformation can legitimately change semantic character
+	 * counts — adding or removing letters, digits, or brackets, as opposed to only
+	 * reflowing whitespace/quotes/commas/parens (the chars SAFETY already excludes).
+	 *
+	 * Only a pattern declaring this may vouch for a hunk that carries a SAFETY
+	 * differential (see `detect_divergences`'s `safety_vouched`). Optional and defaulting
+	 * to `false` so the gate fails CLOSED: a pattern that has not thought about the
+	 * question cannot excuse content loss, and a new pattern is safe by omission.
+	 *
+	 * Setting this `true` is a promise that the pattern's own `detect` carries a
+	 * content-preservation proof for whatever it claims — as `bom_strip` (byte-exact BOM
+	 * prefix test), `self_closing_nonvoid` (matching tag names on both sides) and
+	 * `comment_preserved` (the comment text must appear in ours) each do.
+	 */
+	may_alter_char_frequency?: boolean;
 	/** Detection function */
 	detect: (ctx: DetectionContext) => DivergenceMatch | null;
 }
@@ -80,6 +97,18 @@ export interface HunkCoverageResult {
 	unexplained_hunks: number[];
 	/** Overall classification */
 	classification: 'all_explained' | 'partial' | 'none_explained';
+	/**
+	 * Whether this coverage may excuse a file-level SAFETY differential.
+	 *
+	 * Stricter than `classification === 'all_explained'`, and deliberately a separate
+	 * question: every hunk that actually moves the semantic character count must be
+	 * claimed by a pattern declaring `may_alter_char_frequency`. Whitespace-only hunks
+	 * still need explaining for the ordinary `partial`/`unknown` bucketing, but they can
+	 * no longer prop up a SAFETY downgrade they had no part in causing.
+	 */
+	safety_vouched: boolean;
+	/** Indices of hunks whose own added/removed lines move the semantic char count */
+	char_risky_hunks: number[];
 }
 
 /**
@@ -389,6 +418,9 @@ const bom_strip: DivergencePattern = {
 	description: 'BOM (byte order mark) removed',
 	languages: ['svelte', 'typescript', 'css'],
 	conformance_sections: ['Whitespace: BOM Handling'],
+	// U+FEFF is not in FORMATTING_CHARS, so stripping it moves the semantic count. The
+	// detect below is byte-exact (source starts with the BOM, ours does not, prettier does).
+	may_alter_char_frequency: true,
 	fixtures: [
 		'svelte/syntax/whitespace/bom_prettier_divergence',
 		'css/tokens/whitespace/bom_prettier_divergence',
@@ -426,7 +458,13 @@ const self_closing_nonvoid: DivergencePattern = {
 	description: 'Non-void HTML element self-closing normalization',
 	languages: ['svelte'],
 	conformance_sections: ['Svelte/HTML'],
-	fixtures: ['svelte/elements/self_closing_nonvoid_prettier_divergence'],
+	fixtures: [
+		'svelte/elements/self_closing_nonvoid_prettier_divergence',
+		'svelte/elements/ws_sensitive_self_closing_kinds_prettier_divergence',
+	],
+	// `<i … />` → `<i …></i>` adds `<`, `/`, `>` and the tag name — real semantic chars.
+	// The detect below proves preservation by matching the tag NAME on both sides.
+	may_alter_char_frequency: true,
 	detect(ctx) {
 		if (ctx.language !== 'svelte') return null;
 
@@ -805,6 +843,10 @@ const css_scss_directive_number: DivergencePattern = {
 	languages: ['css', 'svelte'],
 	conformance_sections: ['CSS: At-Rules'],
 	fixtures: ['css/at_rules/scss_directive_number_preserved_prettier_divergence'],
+	// Re-spelling a number changes digit counts (`.5` ↔ `0.5`). The detect below carries
+	// the matching proof: identical non-numeric skeletons AND equal numeric-token counts,
+	// so a number can be re-spelled but never dropped or added.
+	may_alter_char_frequency: true,
 	detect(ctx) {
 		if (ctx.language !== 'css' && ctx.language !== 'svelte') return null;
 
@@ -1519,6 +1561,9 @@ const comment_preserved: DivergencePattern = {
 	description: 'We preserve a comment inside {…}/a tag that Prettier drops',
 	languages: ['svelte'],
 	conformance_sections: ['Svelte: Attributes', 'Svelte: Elements'],
+	// Keeping content prettier drops means ours has MORE semantic chars, by design. The
+	// detect below requires the comment text to actually appear in our output.
+	may_alter_char_frequency: true,
 	fixtures: [
 		'svelte/syntax/comments/expr_trailing_prettier_divergence',
 		'svelte/syntax/comments/expr_trailing_line_prettier_divergence',
@@ -2534,6 +2579,9 @@ export const PATTERNS: DivergencePattern[] = [
 	comment_position,
 ];
 
+/** Pattern lookup by id, for resolving a `DivergenceMatch` back to its declaring pattern. */
+const pattern_by_id = new Map(PATTERNS.map((p) => [p.id, p]));
+
 /**
  * Detect which known divergence patterns explain the difference between
  * our formatter output and Prettier's output.
@@ -2579,11 +2627,33 @@ export function detect_divergences(ctx: DetectionContext): HunkCoverageResult {
 		classification = 'partial';
 	}
 
+	// Hunk-scoped SAFETY vouching. `all_explained` alone is too weak to excuse a
+	// character-frequency differential: it is a set-cover over hunk indices, so a pattern
+	// covering some unrelated hunk is as load-bearing as the one covering the hunk that
+	// actually carried the flagged characters. Score each hunk on its own lines, then
+	// require every char-risky one to be claimed by a pattern that has declared it can
+	// legitimately change char counts.
+	const vouching_hunks = new Set<number>();
+	for (const match of matches) {
+		const pattern = pattern_by_id.get(match.pattern);
+		if (!pattern?.may_alter_char_frequency) continue;
+		for (const idx of match.hunk_indices) vouching_hunks.add(idx);
+	}
+	const char_risky_hunks = hunks
+		.filter((h) =>
+			hunk_alters_semantic_chars(h.removed_lines.join('\n'), h.added_lines.join('\n')),
+		)
+		.map((h) => h.index);
+	const safety_vouched =
+		unexplained_hunks.length === 0 && char_risky_hunks.every((idx) => vouching_hunks.has(idx));
+
 	return {
 		hunks,
 		matches,
 		explained_hunks,
 		unexplained_hunks,
 		classification,
+		safety_vouched,
+		char_risky_hunks,
 	};
 }

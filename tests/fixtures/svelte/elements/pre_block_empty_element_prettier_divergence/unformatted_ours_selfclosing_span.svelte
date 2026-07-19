@@ -6,7 +6,7 @@
 		></Comp>{/if}</pre>
 
 <pre>{#if cond}<span data-a={value1} data-b={value2} data-c={value3} data-d={value4} data-e={value5}
-		></span>{/if}</pre>
+		/>{/if}</pre>
 
 <!-- attrs too long to fit on one line: they wrap one per line, the close form is still preserved, and `/>` drops to its own line rather than hugging the last attr -->
 <pre>{#if cond}<Comp

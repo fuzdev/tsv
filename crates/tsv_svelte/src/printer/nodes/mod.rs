@@ -17,7 +17,6 @@
 // - **helpers.rs** - Shared utilities (node classification, pattern/expression doc builders, source position tracking)
 
 mod blocks_doc;
-mod element;
 mod element_analysis;
 mod element_doc;
 mod element_ws_sensitive_doc;

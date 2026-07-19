@@ -490,12 +490,20 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 				//
 				// Safety guarantee: if we lose content that prettier preserves, the
 				// differential keeps it AND it surfaces as an unexplained diff hunk →
-				// classification stays SAFETY. Overmatching risk is low because
-				// patterns like comment_position require the comment text to exist
-				// in both outputs — a dropped comment won't match.
+				// classification stays SAFETY.
+				//
+				// The downgrade keys on `safety_vouched`, NOT `all_explained`. The latter is
+				// a set-cover over hunk indices, so it cannot distinguish the hunk that
+				// carried the flagged characters from one that merely sits in the same file:
+				// on `prettier/tests/format/html/tags/tags.html` the whole 9-char delta lives
+				// in a self-closing-tag hunk, yet two unrelated whitespace hunks were equally
+				// load-bearing for the downgrade — a change to the pattern claiming THOSE
+				// would have flipped the file into this gated bucket with no formatter change.
+				// `safety_vouched` requires every char-risky hunk to be claimed by a pattern
+				// that declares `may_alter_char_frequency`, restoring the causal link.
 				const { hunks, coverage } = run_detection(file.content, ours, prettier, lang);
 
-				if (coverage.classification === 'all_explained') {
+				if (coverage.safety_vouched) {
 					// Safety violations are fully explained by known divergence patterns
 					lang_stats.known_divergence++;
 					lang_results.push({

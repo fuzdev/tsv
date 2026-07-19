@@ -169,11 +169,11 @@ impl<'a> Printer<'a> {
     /// # Parameters
     /// - `breakable_exprs`: If true, boundary text adjacent to expression/html/render tags is
     ///   emitted as plain spaces instead of `fill` `line`s. Set when the fragment has a
-    ///   break-capable expression tag (the hug-both hard-width divergence): a `line` in
+    ///   break-capable expression tag (the hard-width divergence): a `line` in
     ///   fits()-Break mode short-circuits a preceding expression group's width check, stranding
     ///   it flat and overshooting printWidth (`fill_multiple_expr_long`). Plain spaces keep the
-    ///   expression group's full `fits()` obligation so it breaks instead. The existing
-    ///   (non-hug-both) callers pass `false` to stay byte-identical.
+    ///   expression group's full `fits()` obligation so it breaks instead. Callers with no
+    ///   break-capable expression pass `false`.
     /// - `multiline`: the convergence mode — set only by the element multiline arm
     ///   (`compute_needs_multiline`). It turns on the ported prettier-plugin-svelte printChildren
     ///   handling that the legacy inline callers don't need (and would be churned by): block
