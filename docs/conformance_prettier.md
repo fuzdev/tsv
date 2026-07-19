@@ -179,6 +179,8 @@ construct the comment split.
 
 The benefit: predictable output that respects the configured line length. The tradeoff: some constructs may break where Prettier would keep them inline.
 
+**"When possible" has one systematic exception: whitespace-sensitive content.** Inside `<pre>` / `<textarea>` a line break *is* content, so print width yields to render semantics and an over-width line stands — those elements never reach the shared layout analysis (see [§Svelte: Inline content block-style](#svelte-inline-content-block-style)). Both formatters agree there, so it is not a divergence; it is pinned by [fill_tail_after_expr_pre](../tests/fixtures/svelte/elements/fill_tail_after_expr_pre_long/), whose two cases are the same overflowing fill in a `<pre>` and a `<textarea>`. Everywhere else, a line tsv *can* break is a line tsv *does* break.
+
 ### Tabs-Only Indentation Philosophy
 
 **tsv renders all indentation as whole tabs and never mixes tabs with alignment spaces.**
