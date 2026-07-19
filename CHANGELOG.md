@@ -21,7 +21,7 @@ tsv has no config that changes its formatting style behavior, and none will be a
 - feat: collapse render-insignificant spaces and
   converge on block style wrapping using Svelte 5 whitespace changes
   ([#76](https://github.com/fuzdev/tsv/pull/76), [#447](https://github.com/fuzdev/tsv/pull/447),
-  [#449](https://github.com/fuzdev/tsv/pull/449))
+  [#449](https://github.com/fuzdev/tsv/pull/449), [#515](https://github.com/fuzdev/tsv/pull/515))
 - feat: `tsv format` directory discovery now honors `.gitignore` and the tsv-native
   `.formatignore` hierarchically (one per directory, repo-rooted like git —
   unlike Prettier, which reads only one `.gitignore` and one `.prettierignore`
