@@ -16,6 +16,7 @@ import {
 	detect_divergences,
 	enrich_detection_context,
 	PATTERNS,
+	visual_width,
 } from './patterns.ts';
 import type { Language } from '../types.ts';
 
@@ -40,15 +41,6 @@ function make_context(
 	};
 	enrich_detection_context(ctx);
 	return ctx;
-}
-
-/** Calculate visual width of a line (tabs = 2 spaces). */
-function visual_width(line: string): number {
-	let width = 0;
-	for (const char of line) {
-		width += char === '\t' ? 2 : 1;
-	}
-	return width;
 }
 
 /** Run a single pattern's detect() on a context. */

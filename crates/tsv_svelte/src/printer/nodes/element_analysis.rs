@@ -13,23 +13,46 @@ use tsv_ts::ast::internal::Expression;
 
 use super::element_doc::{BoundaryMode, ElementContext, ElementKind, ElementLayout, ElementParts};
 
+/// Whether each edge of an element's content is newline-authored.
+///
+/// Two INDEPENDENT facts, both from the one boundary-authoring question
+/// ([`Printer::nodes_boundary_newline`]). They are kept apart because the layout
+/// rules read them differently — a block expands on the leading edge alone, while
+/// components and inline elements are both-or-neither ([`Self::both`]) — and
+/// folding them into a single "does it break" flag hides which rule is in play.
+#[derive(Clone, Copy)]
+struct BoundaryBreaks {
+    /// Source has a newline in the run at the opening boundary
+    leading: bool,
+    /// Source has a newline in the run at the closing boundary
+    trailing: bool,
+}
+
+impl BoundaryBreaks {
+    /// Both edges newline-authored — the both-or-neither expansion signal.
+    ///
+    /// A lone leading break is not an expansion signal on its own: it used to
+    /// harden the opening tag while leaving the children built inline, producing
+    /// a third stable form. See [`Printer::compute_element_layout`].
+    fn both(self) -> bool {
+        self.leading && self.trailing
+    }
+}
+
 /// Inputs to the [`Printer::compute_needs_multiline`] decision.
 ///
 /// Bundles the per-element flags the predicate reads so they pass by name
 /// rather than as positional bools that are easy to misorder at the call site.
 /// Mirrors the corresponding [`ElementContext`] fields — both are built from
 /// the same locals.
-#[allow(clippy::struct_excessive_bools)]
 #[derive(Clone, Copy)]
 struct MultilineInputs {
     /// Element type classification
     kind: ElementKind,
     /// Whether element has no meaningful content
     is_empty: bool,
-    /// Whether source has newline at opening boundary
-    source_has_leading_break: bool,
-    /// Whether source has newline at closing boundary
-    source_has_trailing_break: bool,
+    /// Whether each content boundary is newline-authored
+    boundary: BoundaryBreaks,
     /// Whether block-flow children force this element multiline (cached, mirrors
     /// [`ElementContext::block_flow_multiline`])
     block_flow_multiline: bool,
@@ -147,14 +170,11 @@ impl<'a> Printer<'a> {
         &self,
         nodes: &[FragmentNode<'_>],
         kind: ElementKind,
-        source_has_leading_break: bool,
-        source_has_trailing_break: bool,
+        boundary: BoundaryBreaks,
     ) -> bool {
         // Blocks: leading break alone triggers multiline
         // Components: require both boundaries
-        if (kind.is_block() && source_has_leading_break)
-            || (kind.is_component() && source_has_leading_break && source_has_trailing_break)
-        {
+        if (kind.is_block() && boundary.leading) || (kind.is_component() && boundary.both()) {
             return true;
         }
 
@@ -178,15 +198,15 @@ impl<'a> Printer<'a> {
         // because of the leading spaces: both boundaries route through the same run predicate.
         // Fill mode (`{a} {b}`) stays inline even with both breaks.
         //
-        // Both edges ask `nodes_boundary_newline` — the single boundary-authoring question. It
-        // is a RUN predicate (does the edge whitespace run contain a newline?), so horizontal
-        // whitespace before the newline is not authoring: `<span>␣␣\n␣␣{x}\n</span>` and its
-        // mirror `<span>\n{x}␣␣\n␣␣</span>` are the same document and must reach one form. A
-        // strict `starts_with('\n')` on the leading edge alone made them settle on two, which
-        // is also what prettier's own run-based `startsWithLinebreak`/`endsWithLinebreak`
-        // (`^([\t\f\r ]*\n)` / `(\n[\t\f\r ]*)$`) rules out. Pinned by
-        // `elements/boundary_newline_padded`.
-        if self.nodes_boundary_newline(nodes, true) && self.nodes_boundary_newline(nodes, false) {
+        // Both edges come from `nodes_boundary_newline` — the single boundary-authoring
+        // question. It is a RUN predicate (does the edge whitespace run contain a newline?),
+        // so horizontal whitespace before the newline is not authoring:
+        // `<span>␣␣\n␣␣{x}\n</span>` and its mirror `<span>\n{x}␣␣\n␣␣</span>` are the same
+        // document and must reach one form. A strict `starts_with('\n')` on the leading edge
+        // alone made them settle on two, which is also what prettier's own run-based
+        // `startsWithLinebreak`/`endsWithLinebreak` (`^([\t\f\r ]*\n)` / `(\n[\t\f\r ]*)$`)
+        // rules out. Pinned by `elements/boundary_newline_padded`.
+        if boundary.both() {
             let has_nontext_content = nodes[first..=last]
                 .iter()
                 .any(|n| !matches!(n, FragmentNode::Text(_)));
@@ -261,10 +281,12 @@ impl<'a> Printer<'a> {
         // Source boundary breaks — the same run predicate every other boundary question uses
         // (`nodes_boundary_newline`), not the stricter whitespace-only-node test. The two agree
         // wherever it matters (verified byte-identical over the fixture suite and 1200 real
-        // components), and one question wants one predicate.
-        let source_has_leading_break = self.nodes_boundary_newline(nodes, true);
-        let source_has_trailing_break =
-            source_has_leading_break && self.nodes_boundary_newline(nodes, false);
+        // components), and one question wants one predicate. Each edge is asked on its own;
+        // the both-or-neither rules combine them via `BoundaryBreaks::both`.
+        let boundary = BoundaryBreaks {
+            leading: self.nodes_boundary_newline(nodes, true),
+            trailing: self.nodes_boundary_newline(nodes, false),
+        };
 
         // Block flow children → whether they force multiline. Computed once here (a non-trivial
         // traversal) and cached, since `will_go_multiline` and `compute_needs_multiline` both
@@ -286,8 +308,7 @@ impl<'a> Printer<'a> {
             MultilineInputs {
                 kind,
                 is_empty,
-                source_has_leading_break,
-                source_has_trailing_break,
+                boundary,
                 block_flow_multiline,
                 only_text_content,
             },
@@ -306,8 +327,7 @@ impl<'a> Printer<'a> {
         let MultilineInputs {
             kind,
             is_empty,
-            source_has_leading_break,
-            source_has_trailing_break,
+            boundary,
             block_flow_multiline,
             only_text_content,
         } = inputs;
@@ -348,14 +368,7 @@ impl<'a> Printer<'a> {
         // Skip for block elements with text-only content — whitespace newlines between
         // text words collapse to spaces, so the group mechanism should decide layout
         // based on whether the joined text fits inline.
-        if !only_text_content
-            && self.has_source_breaks_in_content(
-                nodes,
-                kind,
-                source_has_leading_break,
-                source_has_trailing_break,
-            )
-        {
+        if !only_text_content && self.has_source_breaks_in_content(nodes, kind, boundary) {
             return true;
         }
 
@@ -383,7 +396,7 @@ impl<'a> Printer<'a> {
 
         // Text with internal newlines
         // Skip for text-only content — newlines between words are just whitespace
-        if !only_text_content && self.text_has_internal_newlines(nodes, source_has_leading_break) {
+        if !only_text_content && self.text_has_internal_newlines(nodes, boundary.leading) {
             return true;
         }
 

@@ -43,8 +43,19 @@ export interface AuditReport {
 	uncovered_fixtures: string[];
 	/** Per-pattern coverage details */
 	pattern_coverage: PatternCoverage[];
-	/** Patterns that claim fixtures not in the doc */
+	/** Patterns that claim fixtures not in the doc (the directory DOES exist) */
 	orphaned_pattern_fixtures: { pattern_id: string; fixtures: string[] }[];
+	/**
+	 * Patterns that claim a fixture path with no directory on disk.
+	 *
+	 * Reported apart from `orphaned_pattern_fixtures` because the two mean opposite
+	 * things: an orphan is a real fixture awaiting a doc entry (a documentation gap),
+	 * while a missing path is a BROKEN REFERENCE — a fixture that was renamed or that
+	 * lost its `_prettier_divergence` suffix when its divergence was resolved, leaving
+	 * a listing pointing at nothing. Folded together, a broken reference reads as a
+	 * doc gap and survives indefinitely; eight did. Gated by `fixture_coverage_test`.
+	 */
+	missing_pattern_fixtures: { pattern_id: string; fixtures: string[] }[];
 	/** Summary stats */
 	stats: {
 		total_documented: number;
@@ -176,6 +187,24 @@ function split_table_row(row: string): string[] {
 	return cells;
 }
 
+/** Fixtures root, shared by the on-disk checks below. */
+const FIXTURES_ROOT = new URL('../../../../tests/fixtures/', import.meta.url);
+
+/**
+ * Whether a pattern's claimed fixture path names a real directory.
+ *
+ * Any error other than "not found" re-throws — a permission error must never be
+ * mistaken for a missing fixture, which would report every listing as broken.
+ */
+export function fixture_dir_exists(fixture_path: string): boolean {
+	try {
+		return Deno.statSync(new URL(fixture_path + '/', FIXTURES_ROOT)).isDirectory;
+	} catch (err) {
+		if (err instanceof Deno.errors.NotFound) return false;
+		throw err;
+	}
+}
+
 /**
  * Load and parse conformance_prettier.md from the repo.
  */
@@ -234,13 +263,21 @@ export async function generate_audit_report(): Promise<AuditReport> {
 		};
 	});
 
-	// Find orphaned pattern fixtures (claimed but not documented)
+	// Split claimed-but-undocumented into the two cases that look alike in a list
+	// but mean opposite things: the directory exists (a doc gap) vs it does not
+	// (a broken reference). See `missing_pattern_fixtures`.
 	const orphaned_pattern_fixtures: { pattern_id: string; fixtures: string[] }[] = [];
+	const missing_pattern_fixtures: { pattern_id: string; fixtures: string[] }[] = [];
 	for (const pattern of PATTERNS) {
 		const claimed = pattern.fixtures || [];
-		const orphaned = claimed.filter((f) => !documented_paths.has(f));
+		const undocumented = claimed.filter((f) => !documented_paths.has(f));
+		const missing = claimed.filter((f) => !fixture_dir_exists(f));
+		const orphaned = undocumented.filter((f) => !missing.includes(f));
 		if (orphaned.length > 0) {
 			orphaned_pattern_fixtures.push({ pattern_id: pattern.id, fixtures: orphaned });
+		}
+		if (missing.length > 0) {
+			missing_pattern_fixtures.push({ pattern_id: pattern.id, fixtures: missing });
 		}
 	}
 
@@ -259,6 +296,7 @@ export async function generate_audit_report(): Promise<AuditReport> {
 		uncovered_fixtures,
 		pattern_coverage,
 		orphaned_pattern_fixtures,
+		missing_pattern_fixtures,
 		stats,
 	};
 }
@@ -303,6 +341,22 @@ export function format_audit_report(report: AuditReport): string {
 				lines.push(`      ${f.fixture_path}`);
 			}
 		}
+		lines.push('');
+	}
+
+	// Broken references — listed first, above the orphans they used to hide among
+	if (report.missing_pattern_fixtures.length > 0) {
+		lines.push('BROKEN Pattern Fixtures (claimed path has no directory on disk):');
+		lines.push('-'.repeat(50));
+		for (const { pattern_id, fixtures } of report.missing_pattern_fixtures) {
+			lines.push(`\n  ${pattern_id}:`);
+			for (const f of fixtures) {
+				lines.push(`    - ${f}`);
+			}
+		}
+		lines.push('');
+		lines.push('  Fix the path or unlist it — a renamed fixture, or one that lost its');
+		lines.push('  _prettier_divergence suffix when its divergence was resolved.');
 		lines.push('');
 	}
 
