@@ -1,3 +1,6 @@
+// helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
+#![allow(clippy::expect_used)]
+
 //! `{@debug}` arguments must be plain identifiers.
 //!
 //! Svelte's parser (`1-parse/state/tag.js`) reads the whole `{@debug …}` content

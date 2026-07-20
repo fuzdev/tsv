@@ -838,15 +838,15 @@ impl<'a> Printer<'a> {
     ///
     /// This is the gate for the keyword→value gaps (as/satisfies,
     /// heritage/conditional `extends`, keyof/typeof/readonly, infer,
-    /// type-param constraint/default, predicate `is`, indexed access) and the
-    /// type-alias `=` layout. Keying the multiline case on the newline *after*
+    /// type-param constraint/default, predicate `is`, indexed access,
+    /// `export default`) and the type-alias `=` layout. Keying the multiline case on the newline *after*
     /// the comment (not before) keeps it idempotent: a block glued to the value
     /// stays inline even at line start in already-broken output, and only an
     /// authored break hangs it. Contrast
-    /// [`Self::comment_forces_following_own_line`], which *also* hangs a
+    /// [`Self::comment_hangs_binary_operand`], which *also* hangs a
     /// single-line own-line block — the two differ only in that `c.multiline`
-    /// guard; use that variant only at the two carve-out sites where prettier
-    /// *keeps* that break (binary/logical operands, `export default`).
+    /// guard; use that variant only at the one carve-out site where prettier
+    /// *keeps* that break (binary/logical operands).
     pub(crate) fn comments_force_own_line_between(&self, start: u32, end: u32) -> bool {
         self.any_comment_on_page_with_next(start, end, |c, next| self.comment_hangs_next(c, next))
     }
@@ -869,7 +869,7 @@ impl<'a> Printer<'a> {
     /// the authored newline is decided by a newline that very collapse destroys, so the
     /// format stops being idempotent on its own output.
     ///
-    /// Contrast [`Self::comment_forces_own_line`], the operator-glue rule, which keys on
+    /// Contrast [`Self::comment_cannot_glue_to_operator`], the operator-glue rule, which keys on
     /// the newline *before* a comment and hangs an own-line **single-line** block too.
     pub(crate) fn comment_hangs_next(&self, c: &internal::Comment, next: u32) -> bool {
         !c.is_block || (c.multiline && self.has_newline_between(c.span.end, next))
@@ -881,14 +881,21 @@ impl<'a> Printer<'a> {
     /// `hasLeadingOwnLineComment`). Keying on the newline *after* the comment (not
     /// before) keeps the layout idempotent: a block glued to the value (`/* c */ v`,
     /// even at line start in already-broken output) stays inline, only an authored
-    /// break (`/* c */⏎v`) forces the value down. Used only at the two carve-out
-    /// sites where prettier *keeps* the operand break — binary/logical operands
-    /// (`operators.rs`) and `export default` (`modules/mod.rs`) — so hanging is the
-    /// smaller (indent-only) divergence than collapsing. Contrast
+    /// break (`/* c */⏎v`) forces the value down.
+    ///
+    /// ⚠️ **Site-specific — the name says which.** This serves binary/logical
+    /// operands only (`operators.rs`), mirroring prettier's own
+    /// `hasLeadingOwnLineComment` for that layout, where prettier *keeps* the operand
+    /// break so hanging is the smaller divergence than collapsing. It is NOT a
+    /// general keyword→value gate: `export default` reached for it (under its old,
+    /// general-sounding name) and became the lone value gap preserving an unforced
+    /// break, disagreeing with its own twin `export =`. A keyword→value gap wants
+    /// [`Self::comments_force_own_line_between`]; an operator→value gap wants
+    /// [`Self::comment_cannot_glue_to_operator`]. Contrast
     /// [`Self::comments_force_own_line_between`], which collapses an authored
     /// own-line single-line block inline; that is the gate for every other
     /// keyword→value gap.
-    pub(crate) fn comment_forces_following_own_line(&self, start: u32, end: u32) -> bool {
+    pub(crate) fn comment_hangs_binary_operand(&self, start: u32, end: u32) -> bool {
         self.any_comment_on_page_with_next(start, end, |c, next| {
             !c.is_block || self.has_newline_between(c.span.end, next)
         })
@@ -949,7 +956,19 @@ impl<'a> Printer<'a> {
     /// glued block that
     /// [`build_rhs_comments_glued_opt`](Self::build_rhs_comments_glued_opt) hugs across
     /// a source newline, so the two stay in lockstep.
-    pub(crate) fn comment_forces_own_line(&self, comment: &internal::Comment) -> bool {
+    ///
+    /// The **operator→value** rule (assignment `=` and friends), as distinct from the
+    /// **keyword→value** rule ([`Self::comments_force_own_line_between`]): the two
+    /// differ on an own-line *single-line* block, which this hangs and that collapses.
+    /// Both are right for their family — assignment preserves it
+    /// (`assignment/rhs_block_comment_newline`), `as`/`keyof`/`export default` reflow
+    /// it, and prettier agrees with each.
+    ///
+    /// ⚠️ A **line** comment satisfies this via `is_own_line_comment`'s `!is_block`
+    /// disjunct, not via any newline scan — so this never collapses one, and reading
+    /// the name as "own line means a newline precedes it" is a mistake that has been
+    /// made. Open the definition before reasoning about a line comment here.
+    pub(crate) fn comment_cannot_glue_to_operator(&self, comment: &internal::Comment) -> bool {
         comment.multiline || self.is_own_line_comment(comment)
     }
 

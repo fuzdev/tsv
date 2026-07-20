@@ -89,9 +89,9 @@ deno task corpus:compare:format ~/dev/some-project
 deno task corpus:compare:format ~/dev/some-project --explain         # Show which patterns matched
 deno task corpus:compare:format --all --audit-patterns               # Per-pattern coverage with samples
 
-# Audit: static metadata check — cross-references each pattern's `fixtures` list
-# against the conformance doc. Does NOT run patterns (reports documented-vs-claimed
-# coverage only); the behavioral test below is what actually runs them.
+# Audit: runs every pattern against every documented fixture's committed prettier
+# forms and reports which are actually DETECTED, plus the `fixtures[]` listing
+# drift as separate bookkeeping. Exits 1 on a genuine detection gap.
 deno task divergence:audit        # Human-readable report
 deno task divergence:audit --json # Machine-readable JSON
 
@@ -107,15 +107,36 @@ deno task test:deno
 Every pattern in `patterns.ts` includes:
 
 - `conformance_sections` - Which sections of `conformance_prettier.md` it covers
-- `fixtures` - Which `*_prettier_divergence` fixtures it detects. This is **enforced**:
-  the behavioral fixture-coverage audit (`fixture_coverage_test.ts`) drives each pattern
-  against the fixtures it lists and fails if one stops being detected — closing the gap
-  where the static audit (below) could report a fixture as "covered" while the detector
-  had silently drifted away from it.
+- `fixtures` - An **explicit assertion** that this pattern detects these
+  `*_prettier_divergence` fixtures. **Enforced**: the behavioral fixture-coverage audit
+  (`fixture_coverage_test.ts`, in `deno task check`) drives each pattern against the
+  fixtures it lists and fails if one stops being detected, or if a listed path names no
+  directory on disk.
 
-`deno task divergence:audit` cross-references the `fixtures` lists against
-`conformance_prettier.md` and reports how many documented divergences are claimed by some
-pattern versus the uncovered remainder. **Coverage is partial by design** — some documented
+**Coverage is computed, not declared.** `deno task divergence:audit` answers "is this
+documented divergence detected?" by running `detect_divergences` — the same classifier the
+corpus comparison uses — against each fixture's committed prettier forms
+(`fixture_cases.ts`, shared with the test above — no build, no sidecar, ~0.2 s for the
+whole set). Going through the classifier rather than looping `detect()` is deliberate: it
+inherits both the per-pattern language filter and the three-level hunk coverage, so a
+fixture with an unexplained hunk left over is reported **partial**, never folded in with
+the fully-explained ones. A binary detected/undetected metric would re-introduce, one
+level up, precisely the masking that hunk-aware detection exists to prevent.
+
+It does **not** read the answer out of the `fixtures[]`
+arrays: those are a hand-maintained mirror of a computable fact, and the two diverge badly
+— most detected fixtures are simply unlisted. That drift is what produced every mislisting
+and stale path the audit has had to repair, so listing gaps are now reported as
+bookkeeping, below the detection headline, and only a genuine gap (a fixture pinning a
+prettier form that no pattern explains) exits 1.
+
+A fixture that pins **no** prettier form — no `output_prettier.*`, no
+`prettier_variant_*`/`prettier_intermediate_*`/`divergent_variant_*`, and not an
+unambiguous N10 case — is reported **ungradeable**: detection can't be asked of it, so it
+counts as neither a success nor a gap. The report gives both rates (over all documented,
+and over the gradeable subset) rather than folding it into either.
+
+**Coverage is partial by design** — some documented
 divergences have no detector, and a few deliberately never will: the `typescript/chain-expression`
 optional-chain paren torture files mix a tsv-keeps/prettier-strips correctness divergence *and* its
 reverse in one file, so any detector reaching them would have to claim the ours-side strip direction
@@ -125,6 +146,84 @@ drops a comment" family (Svelte `expr_trailing`, `debug_comment`) is claimed by 
 `comment_position`'s content guard cannot claim, since a dropped comment is absent from prettier's
 output. Genuinely-uncovered divergences surface in the audit's uncovered list rather than being
 falsely claimed by a pattern that cannot actually detect them.
+
+## Pending work
+
+The audit's report **is** the work-list — these numbers move as detectors are widened,
+so read them live (`deno task divergence:audit`) rather than trusting the counts here.
+Four buckets, in rough priority order:
+
+1. **Undetected (~50)** — a documented divergence pinning a prettier form that no
+   pattern explains at all. The headline gap.
+
+   A triage of this bucket found **none of it uncovered by design**: the two
+   deliberate exclusions named above don't reach it (the `chain-expression` files
+   are prettier's own suite, so they land in the corpus `unknown` bucket, not here;
+   the preserve-a-dropped-comment family is `comment_preserved`'s). Every entry is a
+   real gap. What remains clusters as: ~8 "prettier drops content tsv keeps"
+   (dropped directive modifiers, a dropped `catch error`, a dropped `a:` destructure
+   rename — several are prettier *correctness* bugs worth a look on their own terms),
+   which need `may_alter_char_frequency` and so carry a much higher bar; ~6 CSS
+   escape-opacity cases (prettier inserts a space after a `\`), detectable but risky
+   because escape opacity is a recurring **tsv** bug class and a detector there could
+   mask the next one; and a long tail of one-off CSS value/at-rule forms, width
+   cases, and comment-relocation residue.
+
+   One sub-family in that tail is a **doc question, not a detector question**:
+   `export default /* c */⏎x` and its siblings are pure one-level re-indents whose
+   shape `forced_continuation_indent` already handles, but the comment is a *block*
+   comment. §Uniform Forced-Continuation Indent states its rule for `//` specifically
+   — a line comment runs to end-of-line, so it *forces* the break — whereas a `/* */`
+   forces nothing and the break is the author's. tsv indents both the same way, so
+   either the section grows a bullet covering the author-broken case or these stay
+   undetected; widening the detector ahead of that decision would put it out of step
+   with the rule it cites.
+2. **Partial (~25)** — a pattern explains the divergence but leaves an adjacent hunk
+   unclaimed. Not a mystery, and quieter than it sounds: typically the diff splits one
+   logical change across hunk boundaries (a dangling `) {` line), or the detector claims
+   *some* instances of a repeated divergence but not all — `css/selectors/combinators/
+   column_prettier_divergence` pins four identical `||` combinators and the pattern
+   claims three. **These are worth closing, and demonstrably**: the corpus classifies by
+   the same rule, so a partial fixture is a real file landing in the pinned `partial`
+   bucket instead of `known`. Widening `comment_position` to split prettier's *merged*
+   trailing-line-comment form (`a // c1 // c2`) closed 6 fixture partials and moved one
+   real corpus file (`js/for-of/comments.js`) partial→known, ratcheting
+   `CORPUS_FORMAT_PARTIAL_PIN` down.
+
+   The dominant remaining shape was **indentation**, and it turned out not to be
+   leftover reflow at all: for those fixtures the indent shift *is* the whole
+   divergence — the sanctioned [§Uniform Forced-Continuation
+   Indent](conformance_prettier.md#uniform-forced-continuation-indent) rule, where a
+   line comment forces a construct's tail onto a continuation line that tsv indents one
+   level and prettier keeps flush. `forced_continuation_indent` covers it across the
+   sites that section enumerates (annotation `:`, declaration and module headers,
+   prefix type operators, the before-`:` key gap). Its declaration-header clause is
+   closed to the three **reserved** keywords (`function`/`class`/`enum`): with the name
+   on the next line, a contextual keyword is not a declaration at all — Svelte's parser
+   and prettier both reject `interface`/`namespace`/`module` there, and all four tools
+   read `type` as an expression statement — so those cannot produce the divergence.
+   It stays safe to apply broadly because it is
+   keyed on the construct head *above* the hunk carrying the comment that forced the
+   break: an ordinary indentation defect has no such comment and is never claimed, so
+   the detector cannot mask the tsv defect class it most resembles.
+   Of the remainder, the **11 that some pattern also LISTS** are ratcheted by
+   `KNOWN_PARTIAL` in `fixture_coverage_test.ts` — a listed fixture going partial fails
+   the gate, and an entry that stops firing fails too, so the list mirrors the live set
+   and can only shrink.
+3. **Ungradeable (~15)** — the fixture pins no prettier form at all, so detection is
+   unanswerable. Not a detector gap: either the fixture gains a witness file, or it stays
+   honestly unmeasurable.
+4. **Explained but unlisted (~291)** — pure bookkeeping. The detector sees them; no
+   `fixtures[]` array says so. Listing one buys an explicit per-pattern assertion (the
+   gated test) at the cost of a hand-maintained entry that can drift, so this is
+   deliberately **not** a backlog to burn down — list a fixture when you want that
+   specific assertion pinned, not to make a number go up.
+
+Note that a pattern detecting no *documented* fixture is not thereby dead —
+`empty_statement_removal` detects none yet fires on 3 corpus files, so check
+`--audit-patterns` (the corpus-side view) before concluding. `block_multiline_attrs_hug`
+was the one pattern dead by every measure (0 corpus files, 0 committed fixture pairs, 0
+documented) and has been deleted.
 
 ## Pattern Registry
 
@@ -144,8 +243,11 @@ language/feature pattern claims a hunk before the broad `fill_101_boundary` /
    `comment_position`
 
 `patterns.ts` is the source of truth for the full list and each pattern's
-`conformance_sections` / `fixtures`; `deno task divergence:audit` prints the live
-per-pattern fixture counts and overall coverage. Each pattern's `detect()` returns
+`conformance_sections` / `fixtures`; `deno task divergence:audit` prints, per pattern,
+both the `listed` count (its `fixtures[]` entries) and the measured `detects` count, plus
+overall detection. A pattern with `detects 0` explains no *documented* divergence — which
+does not by itself make it dead, since it may fire only on corpus code
+(`--audit-patterns` is the corpus-side view). Each pattern's `detect()` returns
 `hunk_indices` identifying which specific hunks it explains.
 
 ## Safety Checks

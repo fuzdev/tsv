@@ -593,7 +593,10 @@ Patterns are ordered specific to broad. Each links to `conformance_sections` and
 ### Divergence Audit & Testing
 
 ```bash
-# Static check: cross-references pattern fixtures arrays vs conformance_prettier.md
+# Detection audit: runs every pattern against every documented fixture's committed
+# prettier forms (coverage is COMPUTED, not read out of the fixtures[] arrays — those
+# are explicit assertions, gated by test:deno, and drift from what the detectors
+# actually see). Exits 1 on a genuine gap; listing drift is reported as bookkeeping.
 deno task divergence:audit        # Human-readable report
 deno task divergence:audit --json # Machine-readable JSON
 
@@ -618,23 +621,28 @@ deno task test:deno:canonical
 deno task corpus:compare:format --all --audit-patterns
 ```
 
-Output shows coverage gaps (numbers illustrative — the live run prints
-current counts). "Documented" = every `*_prettier_divergence`-suffixed
-fixture linked from `conformance_prettier.md` in any of its three anchor
-formats (table rows, list items, prose paragraphs); non-divergence fixture
-links (match/contrast anchors) don't count. Coverage is partial by design —
-see `docs/divergence_detector.md` §Traceability.
+Output shows the measured detection rate and the real gaps (numbers
+illustrative — the live run prints current counts). "Documented" = every
+`*_prettier_divergence`-suffixed fixture linked from `conformance_prettier.md`
+in any of its three anchor formats (table rows, list items, prose paragraphs);
+non-divergence fixture links (match/contrast anchors) don't count. Coverage is
+partial by design — see `docs/divergence_detector.md` §Traceability.
 
 ```
 Divergence Detection Audit Report
 ==================================================
 
-Documented divergences: 209
-Covered by patterns:    125
-Uncovered:              84
-Coverage:               60%
+Documented divergences: 526
+Fully explained:        436
+Partial (hunks left):   25
+Undetected (real gaps): 50
+Ungradeable:            15  (pin no prettier form to test)
+Detection:              83%  (85% of gradeable)
 
-Uncovered Fixtures (no pattern detects these):
+Listed in fixtures[]:   156
+Explained but unlisted: 291  (bookkeeping, not a gap)
+
+Undetected Fixtures (pin a prettier form, no pattern explains it):
 --------------------------------------------------
   CSS: At-Rules:
     - container_spacing (Spec violation)
@@ -642,10 +650,32 @@ Uncovered Fixtures (no pattern detects these):
     ...
 ```
 
+The headline numbers answer different questions and must not be conflated:
+**detection** is measured (the audit runs `detect_divergences`, the same
+classifier the corpus comparison uses — so the language filter and the
+three-level hunk coverage are identical), **listed** is bookkeeping (what the
+`fixtures[]` arrays say). The old audit reported only the latter and called it
+coverage, which read as 26%.
+
+`partial` is counted apart from `explained` for the same reason the corpus
+classifies it apart from `known`: a pattern IS attached, so a binary
+detected/undetected metric would read it as covered while hunks go unexplained —
+re-introducing at the audit level exactly the masking hunk-aware detection
+exists to prevent.
+
+**The report is the work-list** — undetected, partial, ungradeable, and the
+(deliberately non-backlog) unlisted bookkeeping. Read the counts live rather than
+from any doc. `docs/divergence_detector.md` §Pending work explains what each
+bucket means and which are worth closing. The subset of partial fixtures that a
+pattern also *lists* is ratcheted by `KNOWN_PARTIAL` in `fixture_coverage_test.ts`
+and gated in `deno task check`: a listed fixture going partial fails, and a stale
+entry fails too, so it mirrors the live set and can only shrink.
+
 Every pattern in `patterns.ts` includes:
 
 - `conformance_sections` - Which doc sections it covers
-- `fixtures` - Which `*_prettier_divergence` fixtures it detects
+- `fixtures` - An explicit assertion that this pattern detects these
+  `*_prettier_divergence` fixtures (gated by `test:deno`)
 
 ## Benchmark Commands
 
