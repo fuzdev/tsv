@@ -773,9 +773,16 @@ pipeline order.
   references `$$slots` the injected sanitize_slots const owns that name, so the
   destructured prop deconflicts by renaming (`$$slots: $$slots_` — the oracle's
   always-`_`-suffix rule; `$$events` never renames).
-- `fragment.rs` — the per-fragment walk (`emit_fragment`) and its
-  `BodyBuilder` accumulator (alternating static text and interpolation
-  expressions, flushed into a `$$renderer.push(…)` statement). Static
+The **fragment walk and its shared primitives** are five modules. Unlike the
+script side, they cannot split along a target-independence line — the whole
+emission layer is server codegen — so the organizing principle is **role in the
+emission pipeline**: one walk plus four primitives it and every per-node emitter
+share. `fragment.rs` is the hub and the only module with an outgoing edge to the
+other four; none of them calls back into it, so the sole remaining cycle is the
+tree's own recursion (`emit_fragment` → `emit_element` → `emit_child_body`).
+They are listed here in dependency order, walk first.
+
+- `fragment.rs` — the per-fragment walk (`emit_fragment`). Static
   emission implements the oracle's normalization, derived from Svelte's own
   `clean_nodes`/`escape_html` and probe-verified: whitespace-only boundary
   text drops and edge runs trim per fragment; a text edge run abutting a
@@ -785,12 +792,24 @@ pipeline order.
   root or `{#each}` body — the oracle's `is_text_first` parent set) gets a
   `<!---->` prefix. `{expr}` → `$.escape(expr)` (a derived read, bare or nested,
   becomes `d()`; known evaluations fold as static text), `{@html expr}` →
-  `$.html(expr)`; entities decode then re-escape (`[&<]` in text). The
-  `guard_dropped`/`guard_pattern`/`guard_dropped_fragment`/`wrap_single`/
-  `wrap_value_expr` family prepares a borrowed template expression for a
-  synthetic call argument slot, guarding stray runes and rewriting a derived
-  read (bare or nested) to `d()`. `wrap_value_expr`'s core `rewrite_template_value`
-  is the **item-6 template-value substitution walk**: it rewrites every read of a
+  `$.html(expr)`; entities decode then re-escape (`[&<]` in text). The rules are
+  keyed on a node's *neighbors*, so a second copy at any emitter would see a
+  different neighbor list and silently change the rendered output — which is why
+  they stay here rather than moving with the per-node emitters. Also
+  `emit_child_body` (the block-body seam every control-flow emitter recurses
+  through) and the hoisted-`<title>` emitter (`$$renderer.title(…)`, private —
+  only `emit_fragment` reaches it).
+- `body_builder.rs` — the `BodyBuilder` accumulator: alternating static text and
+  interpolation expressions, flushed into a `$$renderer.push(…)` statement. A pure
+  leaf shared by five consumers (`blocks`, `transform_server`, `snippet_emit`,
+  `attribute`, `element`). Single home of the oracle's
+  `b.block([...state.init, ...build_template(state.template)])` shape — the
+  init/template split `mark_init_end` / `push_init_statement` model — so no emitter
+  reconstructs that ordering itself.
+- `template_value.rs` — the **item-6 template-value substitution walk**
+  (`wrap_value_expr` / `wrap_single` over the `rewrite_template_value` core), the
+  single home every template value position routes through. It rewrites every read
+  of a
   `$derived` binding — bare (`{d}`) or nested at any depth (`{d + 1}`, `{obj[d]}`,
   `{f(d)}`, `{d.x}`) — to `d()`, every `$state.snapshot(x)` sub-node to
   `$.snapshot(<processed x>)`, and every **store read** — a `$name` whose
@@ -809,7 +828,37 @@ pipeline order.
   does not descend (an object literal, an arrow, a tagged template) or a pattern
   default is left for the guard, which refuses it (a safe over-refusal); a
   **script-position** derived read is instead rewritten to `d()` by `store_rewrite`
-  (not refused).
+  (not refused). Duplicating any of the three rewrites at a borrow point is
+  dangerous in both directions — a missed one emits a bare `d` where the oracle
+  emits `d()` (a MISMATCH), while one the guard does not know about turns a safe
+  over-refusal into silently divergent output.
+- `dropped.rs` — the guards for what the SSR output does **not** emit, the inverse
+  of every emitter's job: `guard_dropped` (the `{#each}` key, the `{#key}`
+  expression, an event handler, everything in a `{:catch}`), `guard_pattern` (a
+  pattern emitted verbatim, where the derived rule stays ON), `guard_dropped_fragment`
+  (a whole dropped branch — the references walk plus the presence walk
+  `guard_dropped_presence` / `dropped_presence_refusal`, whose two-axis membership
+  argument is detailed under `attr_refs.rs` above), and `guard_inert_special_element`
+  (`<svelte:window>`/`<svelte:body>`/`<svelte:document>` — emitted as NOTHING, yet
+  fully phase-2 validated). An emitter never visits a dropped region, so nothing it
+  does can refuse what sits there; the oracle decides TypeScript at parse time and
+  rune placement at analysis time, both before it chooses what to emit, so a dropped
+  region still needs refusal-equivalent walking. The scoping rule — "refuse where
+  the construct can affect the result", deliberately narrower than "a fence refuses
+  everywhere" — lives in one exhaustive match rather than at each caller, because
+  both directions are dangerous: refusing too little is an over-acceptance the
+  corpus cannot see, refusing too much turns correct output into refusals for
+  nothing.
+- `special_element_kind.rs` — the macro-generated special-element
+  handled-or-refused table: a label constant per refused kind, the
+  `SPECIAL_ELEMENT_REFUSAL_KINDS` list, and the `special_element_refusal_kind`
+  mapping, all from one set of rows, plus `SPECIAL_ELEMENT_FENCED_KINDS`. Read by
+  three consumers that are asking a question rather than walking — `fragment.rs`'s
+  dispatch (which refuses), `census.rs` (which detects the same shapes as
+  co-blockers), and `refusal.rs`'s `is_deliberate_fence`. It is a macro because only
+  the mapping is checked by exhaustiveness: a hand-written list beside it keeps
+  compiling when a sixth kind appears, silently dropping that kind's key from the
+  census's declared buckets and quietly skewing its exposure accounting.
 - `blocks.rs` — **control-flow blocks** split the single template into
   multiple `$$renderer.push(…)` statements, each block emitting its own
   statements between flushes and merging its closer/opener into the adjacent
@@ -871,13 +920,18 @@ pipeline order.
   unless the enclosing block's sole trimmed child is this render with a
   non-dynamic (local-snippet) callee — the `is_standalone` flag, inherited by
   element children.
-- `element.rs` — element and component emission: `emit_element` prints
+The **element emitters** are two modules. `<svelte:element>` deliberately stays
+WITH regular elements rather than forming a third: the attribute machinery is
+shared between the two hosts "so they never drift", and splitting them apart would
+need a third module for the `AttrHost` core and — worse — would *read* as licensing
+a fork of those functions per host, which is exactly the drift the design prevents.
+If `element.rs` still feels too large, raise it rather than splitting `AttrHost`'s
+functions by host.
+
+- `element.rs` — element emission: `emit_element` prints
   static HTML (void elements close `/>`) and routes a component invocation
-  (`<Foo … />`) to `emit_component`, which builds the `Foo($$renderer,
-  {…props})` call — a plain object literal, or `$.spread_props([…])` when a
-  `{...spread}` attribute is present — the implicit `children` snippet prop
-  for default-slot content, and named `{#snippet}` children as named snippet
-  props (`$$slots: { key: true, … }` alongside). A regular element carrying a
+  (`<Foo … />`) to `component::emit_component` — one dispatch, the only edge
+  between the two modules. A regular element carrying a
   `{...spread}` routes its WHOLE attribute set through `emit_spread_attributes`
   → one fused `$.attributes(object, css_hash, classes, styles, flags)` call
   (`<name${$.attributes(…)}>`): `build_element_spread_object` builds the
@@ -925,8 +979,33 @@ pipeline order.
   special-element half of the named-slot fence, and a legacy `on:`/`let:`.
   **Deferred** (a real gap, safely refused meanwhile): `bind:focused` and the
   `omit_in_ssr` family.
-- `attribute.rs` — attribute emission: dynamic and mixed attributes →
-  `$.attr(name, expr[, true])` / `$.attr_class` / `$.attr_style` with
+
+  ⚠️ In `emit_plain_attributes` / `emit_spread_attributes` the `transition:` and
+  `animate:` arms are byte-identical twins, but the neighboring **`use:` arm is
+  not**: the plain path checks `is_load_error_element` and refuses before guarding,
+  while the spread path already did that check once for the whole element, so only
+  the guard remains. Do not fold all three into one helper.
+- `component.rs` — component invocation: `emit_component` builds the
+  `Foo($$renderer, {…props})` call — a plain object literal, or
+  `$.spread_props([…])` when a `{...spread}` attribute is present — the implicit
+  `children` snippet prop for default-slot content, and named `{#snippet}` children
+  as named snippet props (`$$slots: { key: true, … }` alongside). A leaf with zero
+  outgoing edges back to element / `<svelte:element>` emission. Single home of the
+  props shape: the prop *order* is the oracle's source order across all three kinds,
+  so a second builder assembling any one of them separately would reorder the
+  object. Also `component_is_standalone_eligible`, which `fragment.rs`'s
+  `is_standalone` recomputation reads.
+
+The **attribute emitters** are three modules, split by what an attribute *is*
+rather than by where it is emitted (each covers both the inline and spread paths,
+so the shared validity forks stay whole). The dependency is one-way:
+`attribute_class_style` borrows four value-shaping helpers from `attribute`,
+`attribute_bind` calls into neither, and nothing depends back on either. There is
+deliberately no `attribute_common.rs` — it would add a module for four small
+functions and obscure that the class/style half genuinely depends on the base.
+
+- `attribute.rs` — plain attribute emission: dynamic and mixed attributes →
+  `$.attr(name, expr[, true])` with
   `$.stringify` interpolations (a mixed attribute whose every part folds
   statically emits a *static* attribute instead — attr-escaped `[&"<]`,
   folded value verbatim: no trim, no empty-class drop, boolean attributes
@@ -935,7 +1014,32 @@ pipeline order.
   boolean attributes emit `name=""`; `class`/`style` values collapse+trim,
   and a string-valued `class` that collapses+trims to empty is dropped
   entirely (static path only — bare `class` keeps `class=""`, empty
-  `style`/`id` stay). Also `emit_class_directives` — a regular element's
+  `style`/`id` stay).
+  Also `build_attribute_value_expr` — the object-path value builder the element
+  `{...spread}` object uses (the oracle's `build_attribute_value`, `is_component`
+  false): boolean → `true`, single Text → HTML-escaped literal, single expression
+  → the bare erased/wrapped value (`class` wrapped in `$.clsx` per `needs_clsx`),
+  mixed → a folded (un-HTML-escaped) literal or `$.stringify` template — sharing
+  the fold-or-template loop (`build_mixed_attr_value`) with `emit_mixed_attribute`,
+  which alone HTML-escapes and pushes the full-fold static form. The two differ
+  only in that escaping, so a second copy of the loop would drift on the fold
+  decision — which changes whether an attribute emits as static text or as a
+  `$.stringify` template. And
+  `build_spread_object_property` — one `key: value` object property from a plain
+  attribute (key lowercased, `shorthand` on a same-named identifier value), `None`
+  for a dropped attribute (a single-expression event handler — still guarded — and
+  `defaultValue`/`defaultChecked`). Hosts the four helpers the class/style half
+  shares (`collapse_attr_whitespace`, `preceded_by_quote`, `class_needs_clsx`,
+  `is_js_identifier`) plus `escape_html_attr`, the attribute-position sibling of
+  the fragment walk's text escape (`[&"<]` vs `[&<]` — a `"` is content in text
+  and a delimiter here).
+- `attribute_class_style.rs` — the `class:` / `style:` directive builders, on
+  both the inline and spread paths. Single home of the class-vs-style asymmetry,
+  which is easy to collapse by mistake and wrong in both directions: `class`
+  carries the CSS scope hash and `style` never does, `class` wraps a dynamic base
+  in `$.clsx` and `style` takes the bare expression, and `|important` partitions
+  the INLINE `$.attr_style` argument into a 2-element array while the SPREAD
+  `styles` object stays FLAT. `emit_class_directives` — a regular element's
   `class:name={expr}` directives fuse with the authored `class` attribute (or
   the phase-2 synthetic empty `''`) into `$.attr_class(base, css_hash, { name:
   expr, … })` (the oracle's `build_attr_class`): the base is the static value /
@@ -959,7 +1063,20 @@ pipeline order.
   `style:x="a {b}"` refuses (`StyleDirectiveWithMixedValue`), and any modifier but
   a single `|important` refuses (`StyleDirectiveInvalidModifier`). `element.rs`'s
   attribute loop pre-scans the `class:` and `style:` directives and calls these at
-  the authored slot (or after all plain attributes when synthetic). Also
+  the authored slot (or after all plain attributes when synthetic). The two
+  spread-path builders live here too: `build_spread_class_object` (the `classes`
+  argument — identifier keys, case-preserved, with the object-shorthand collapse
+  the oracle's `b.init` applies, checked on the RAW directive expression) and
+  `build_spread_style_object` (the `styles` argument — a FLAT object, `|important`
+  validated but NOT partitioned, reusing `build_style_property`).
+- `attribute_bind.rs` — `bind:` resolution and emission, the most self-contained
+  of the three (it calls into neither sibling). Single home of the bind validity
+  fork `resolve_bind_directive`, which the inline and spread paths both read so
+  the two can never drift — a divergence there would emit a `value`/`checked`
+  property on one path and refuse on the other for the same authored bind. The
+  `OMIT_IN_SSR_BINDS` list is likewise one place: the oracle skips those with an
+  early `continue` *before* it visits the target, so a copy that drifted would
+  either emit output the oracle omits or refuse a bind it accepts.
   `emit_bind_directive` — a `bind:` **core kind** on a regular element, emitted
   inline at its source slot (delegating to `resolve_bind_directive`, the validity
   fork the spread `build_bind_object_property` shares so the two never drift):
@@ -978,25 +1095,14 @@ pipeline order.
   `bind:` (non-`<input>` target, `value` on `<textarea>`/`<select>`, `omit_in_ssr`
   media/dimension binds, `bind:open`, the content-editable trio, an invalid
   target/type, a non-`$state` target) refuses via `Refusal::BindDirective { name }`.
-  Also `build_attribute_value_expr` — the object-path value builder the element
-  `{...spread}` object uses (the oracle's `build_attribute_value`, `is_component`
-  false): boolean → `true`, single Text → HTML-escaped literal, single expression
-  → the bare erased/wrapped value (`class` wrapped in `$.clsx` per `needs_clsx`),
-  mixed → a folded (un-HTML-escaped) literal or `$.stringify` template — sharing
-  the fold-or-template loop (`build_mixed_attr_value`) with `emit_mixed_attribute`,
-  which alone HTML-escapes and pushes the full-fold static form. And
-  `build_spread_object_property` — one `key: value` object property from a plain
-  attribute (key lowercased, `shorthand` on a same-named identifier value), `None`
-  for a dropped attribute (a single-expression event handler — still guarded — and
-  `defaultValue`/`defaultChecked`). And the three spread-directive builders:
-  `build_bind_object_property` (a `bind:` core kind's `value`/`checked` property via
-  the shared `resolve_bind_directive` — `bind:this`/a no-companion `bind:group` yield
-  `None`, and an `omit_in_ssr` bind **refuses** on both the spread and inline paths, a
-  safe over-refusal), `build_spread_class_object` (the `classes` argument —
-  identifier keys, case-preserved, with the object-shorthand collapse the oracle's
-  `b.init` applies, checked on the RAW directive expression), and
-  `build_spread_style_object` (the `styles` argument — a FLAT object, `|important`
-  validated but NOT partitioned, reusing `build_style_property`).
+  Its spread-path counterpart is `build_bind_object_property` (a `bind:` core
+  kind's `value`/`checked` property via the shared `resolve_bind_directive` —
+  `bind:this`/a no-companion `bind:group` yield `None`, and an `omit_in_ssr` bind
+  **refuses** on both the spread and inline paths, a safe over-refusal). Also
+  `validate_inert_bind_target`, the fork `dropped.rs` reuses for an SSR-inert
+  special element's bind. ⚠️ `build_companion_value` reimplements a subset of
+  `attribute.rs`'s `build_attribute_value_expr` **deliberately** (no fold, no
+  mixed) — deduping the two is a behavior change, not cleanup.
 - `element_census.rs` — the **upfront element census** (`ElementCensus`): one
   top-down walk over `root.fragment`, run in `analyze()`, producing a
   `CensusElement` per scoping candidate — a regular HTML element or a

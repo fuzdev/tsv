@@ -54,16 +54,17 @@ use tsv_lang::{Comment, Span};
 use tsv_svelte::ast::internal::{Element, Root, SpecialElement};
 use tsv_ts::ast::internal::{
     BlockStatement, ExportDefaultDeclaration, ExportDefaultValue, Expression, ExpressionStatement,
-    FunctionDeclaration, ObjectExpression, ObjectProperty, Property, PropertyKind, Statement,
-    VariableDeclaration, VariableDeclarationKind,
+    FunctionDeclaration, ObjectExpression, ObjectProperty, Statement, VariableDeclaration,
+    VariableDeclarationKind,
 };
 
 use crate::analyze::{Bindings, NameSet, RuneInit, Scope, ScopeEntry, classify_rune_init};
 use crate::blocks::{self, declaration_stmt};
-use crate::build::Builder;
+use crate::body_builder::BodyBuilder;
+use crate::build::{Builder, init_property};
 use crate::css_scope::{CssScoping, analyze_style, match_scope, splice_scoped_css};
 use crate::element_census::build_census;
-use crate::fragment::{BodyBuilder, FragmentCtx, emit_fragment};
+use crate::fragment::{FragmentCtx, emit_fragment};
 use crate::namespace::{FragmentParent, Namespace, infer_namespace};
 use crate::needs_context::{ComponentContext, analyze_component, collect_constant_names};
 use crate::script_bindings::{analyze_module_script, analyze_script, refuse_runes_invalid_import};
@@ -100,12 +101,12 @@ pub(crate) struct EmitEnv<'arena, 's> {
     pub(crate) unassignable_names: NameSet,
     /// Top-level binding names, for recognizing a `$name` store auto-subscription
     /// (`$name` where the `$`-stripped base is a binding → `$.store_get`). Read by
-    /// the template value walk ([`fragment::wrap_value_expr`]).
+    /// the template value walk ([`template_value::wrap_value_expr`](crate::template_value::wrap_value_expr)).
     pub(crate) store_names: NameSet,
     /// Store bases bound in a nested scope (`nested_declared` ∪
     /// `component.fn_declared`). A `$name` store read whose base is here is the
     /// oracle's `store_invalid_scoped_subscription`; the dropped-region guard
-    /// refuses it. See [`fragment::guard_dropped`].
+    /// refuses it. See [`dropped::guard_dropped`](crate::dropped::guard_dropped).
     pub(crate) store_shadowed: NameSet,
     /// Whether the component makes any valid `$name` store reference anywhere
     /// (read or write, emitted or dropped) — forces the `var $$store_subs;` /
@@ -1253,15 +1254,12 @@ fn build_bindable_object<'arena>(
             b.mint(": ");
             Expression::Identifier(b.ident(&entry.local))
         };
-        properties.push(ObjectProperty::Property(Property {
-            key: Expression::Identifier(key),
+        properties.push(ObjectProperty::Property(init_property(
+            Expression::Identifier(key),
             value,
-            kind: PropertyKind::Init,
             shorthand,
-            computed: false,
-            method: false,
-            span: key_span,
-        }));
+            key_span,
+        )));
     }
     let cbrace = b.mint(" }").end;
     Expression::ObjectExpression(ObjectExpression {

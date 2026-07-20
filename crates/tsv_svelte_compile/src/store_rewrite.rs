@@ -1,6 +1,6 @@
 //! Store subscription (and script-position `$derived` read) rewriting for the
 //! instance script — the script-position analog of the template value walk
-//! (`fragment::rewrite_template_value`).
+//! (`template_value`'s `rewrite_template_value`).
 //!
 //! A tree→tree pass over the (already type-erased and rune-rewritten) instance
 //! body that rewrites every `$name` store access the oracle's SSR transform
@@ -181,7 +181,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
 
     /// The `$`-stripped base of a plain `$name` identifier that resolves to a
     /// top-level component binding (a store), else `None`. Mirrors
-    /// `fragment::bare_store_read`.
+    /// `template_value`'s `bare_store_read`.
     fn store_base(&self, id: &Identifier<'_>) -> Option<String> {
         if id.escaped_name.is_some() {
             return None;
@@ -193,7 +193,7 @@ impl<'arena> StoreRewriter<'_, 'arena> {
     }
 
     /// Whether `id` is a plain (non-escaped) read of a `$derived` binding — the
-    /// script analog of `fragment::is_bare_derived_read`. Such a read rewrites to
+    /// script analog of [`template_value::is_bare_derived_read`](crate::template_value::is_bare_derived_read). Such a read rewrites to
     /// the derived-thunk call `d()`. An escaped derived read is refused by the
     /// rune guard before this pass, and a *shadowed* derived name is refused by
     /// the whole-compile check in `compile_server`, so any read reaching here that

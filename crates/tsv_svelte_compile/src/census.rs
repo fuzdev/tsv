@@ -82,9 +82,7 @@ use crate::analyze::{Bindings, NameSet};
 use crate::attr_refs::each_child_fragment;
 use crate::build::Builder;
 use crate::css_scope::analyze_style;
-use crate::fragment::{
-    SPECIAL_ELEMENT_REFUSAL_KINDS, fragment_node_kind, special_element_refusal_kind,
-};
+use crate::fragment::fragment_node_kind;
 use crate::needs_context::{analyze_component, collect_constant_names};
 use crate::script_bindings::{analyze_script, refuse_runes_invalid_import};
 use crate::script_comments::collect_script_comments;
@@ -92,6 +90,7 @@ use crate::script_decls::plain_identifier_name;
 use crate::script_rewrite::rewrite_script_statement;
 use crate::script_ts_gate::{document_ts_flag, refuse_template_typescript};
 use crate::snippet::analyze_snippets;
+use crate::special_element_kind::{SPECIAL_ELEMENT_REFUSAL_KINDS, special_element_refusal_kind};
 use crate::{CompileError, CompileOptions, Generate, Refusal, erase, refusal};
 
 /// Enumerate every refusal class the census can independently detect for

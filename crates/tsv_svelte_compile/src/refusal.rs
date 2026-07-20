@@ -21,7 +21,7 @@
 use std::borrow::Cow;
 use std::collections::BTreeSet;
 
-use crate::fragment::SPECIAL_ELEMENT_FENCED_KINDS;
+use crate::special_element_kind::SPECIAL_ELEMENT_FENCED_KINDS;
 
 /// The three [`Refusal::InvalidAssignmentTarget`] targets — one per oracle rule
 /// in the `validate_assignment` family. A closed set, so each is its own bucket
@@ -1328,7 +1328,7 @@ impl Refusal {
     /// - [`RunesOnlyFence`](Refusal::RunesOnlyFence) — a legacy `on:` event
     ///   directive and `let:`, on a regular or special element;
     /// - the legacy special-element tags
-    ///   ([`SPECIAL_ELEMENT_FENCED_KINDS`](crate::fragment::SPECIAL_ELEMENT_FENCED_KINDS))
+    ///   ([`SPECIAL_ELEMENT_FENCED_KINDS`](crate::special_element_kind::SPECIAL_ELEMENT_FENCED_KINDS))
     ///   — `<slot>`, `<svelte:fragment>`, `<svelte:component>`, `<svelte:self>`; and
     /// - [`ComponentNamedSlot`](Refusal::ComponentNamedSlot) — a `slot="…"` on a
     ///   component's child, the *consumer* half of the same slot system whose
@@ -1714,7 +1714,7 @@ mod tests {
     /// left to whatever the label table happens to contain.
     #[test]
     fn deliberate_fences_are_the_legacy_syntax_only() {
-        use crate::fragment::{
+        use crate::special_element_kind::{
             SPECIAL_ELEMENT_SLOT, SPECIAL_ELEMENT_SVELTE_COMPONENT,
             SPECIAL_ELEMENT_SVELTE_FRAGMENT, SPECIAL_ELEMENT_SVELTE_SELF,
         };

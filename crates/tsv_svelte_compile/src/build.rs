@@ -46,9 +46,10 @@ use tsv_ts::ast::internal::{
     BinaryExpression, BinaryOperator, BlockStatement, CallExpression, Expression,
     ExpressionStatement, FunctionDeclaration, IdentName, Identifier, IfStatement,
     ImportDeclaration, ImportKind, ImportNamespaceSpecifier, ImportPhase, ImportSpecifier, Literal,
-    LiteralValue, MemberExpression, ObjectExpression, Statement, StringCooked, TemplateCooked,
-    TemplateElement, TemplateLiteral, UnaryExpression, UnaryOperator, UpdateExpression,
-    UpdateOperator, VariableDeclaration, VariableDeclarationKind, VariableDeclarator,
+    LiteralValue, MemberExpression, ObjectExpression, Property, PropertyKind, Statement,
+    StringCooked, TemplateCooked, TemplateElement, TemplateLiteral, UnaryExpression, UnaryOperator,
+    UpdateExpression, UpdateOperator, VariableDeclaration, VariableDeclarationKind,
+    VariableDeclarator,
 };
 
 /// The appendix-buffer bookkeeping plus interner access — everything node
@@ -697,6 +698,29 @@ impl<'arena> Builder<'arena> {
             params_start,
             span: Span::new(start, end),
         })
+    }
+}
+
+/// One plain `key: value` object property — the shape all 14 synthetic-property
+/// sites build (`kind: Init`, never computed, never a method).
+///
+/// `span` is an explicit parameter rather than derived from `key`: thirteen sites
+/// use the key's own span, but `script_props`'s injected `$$slots`/`$$events`
+/// property spans key→value, and deriving it would silently change that one site.
+pub(crate) fn init_property<'arena>(
+    key: Expression<'arena>,
+    value: Expression<'arena>,
+    shorthand: bool,
+    span: Span,
+) -> Property<'arena> {
+    Property {
+        key,
+        value,
+        kind: PropertyKind::Init,
+        shorthand,
+        computed: false,
+        method: false,
+        span,
     }
 }
 

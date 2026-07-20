@@ -16,21 +16,21 @@ use tsv_svelte::ast::internal::{
 };
 use tsv_ts::ast::internal::{
     BinaryOperator, BlockStatement, Expression, ExpressionStatement, ForInit, ForStatement,
-    IfStatement, ObjectExpression, ObjectProperty, Property, PropertyKind, Statement,
-    UpdateOperator, VariableDeclaration, VariableDeclarationKind, VariableDeclarator,
+    IfStatement, ObjectExpression, ObjectProperty, Statement, UpdateOperator, VariableDeclaration,
+    VariableDeclarationKind, VariableDeclarator,
 };
 
 use crate::analyze::{Binding, BindingKind, Initial, ScopeEntry, pattern_binding_names};
 use crate::attr_refs::each_child_fragment;
-use crate::build::Builder;
-use crate::fragment::{
-    BodyBuilder, FragmentCtx, emit_child_body, guard_dropped, guard_dropped_fragment,
-    guard_pattern, wrap_single,
-};
+use crate::body_builder::BodyBuilder;
+use crate::build::{Builder, init_property};
+use crate::dropped::{guard_dropped, guard_dropped_fragment, guard_pattern};
+use crate::fragment::{FragmentCtx, emit_child_body};
 use crate::namespace::{ChildNamespace, FragmentParent, Namespace};
 use crate::script_decls::plain_identifier_name;
 use crate::snippet::snippet_name;
 use crate::snippet_emit::build_snippet_function;
+use crate::template_value::wrap_single;
 use crate::transform_server::{EmitEnv, unsupported};
 use crate::{CompileError, Refusal};
 
@@ -365,15 +365,12 @@ fn boundary_props<'arena>(env: &mut EmitEnv<'arena, '_>, name: &str) -> Expressi
     let obrace = env.b.mint("{").start;
     let key = env.b.ident(name);
     let key_span = key.span;
-    let property = Property {
-        key: Expression::Identifier(key),
-        value: Expression::Identifier(env.b.ident(name)),
-        kind: PropertyKind::Init,
-        shorthand: true,
-        computed: false,
-        method: false,
-        span: key_span,
-    };
+    let property = init_property(
+        Expression::Identifier(key),
+        Expression::Identifier(env.b.ident(name)),
+        true,
+        key_span,
+    );
     let properties = std::slice::from_ref(env.b.arena.alloc(ObjectProperty::Property(property)));
     let cbrace = env.b.mint("}").end;
     Expression::ObjectExpression(ObjectExpression {

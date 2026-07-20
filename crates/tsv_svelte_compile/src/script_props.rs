@@ -8,11 +8,10 @@
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
 use tsv_ts::ast::internal::{
-    AssignmentPattern, Expression, ObjectPattern, ObjectPatternProperty, Property, PropertyKind,
-    RestElement,
+    AssignmentPattern, Expression, ObjectPattern, ObjectPatternProperty, Property, RestElement,
 };
 
-use crate::build::Builder;
+use crate::build::{Builder, init_property};
 use crate::script_decls::plain_identifier_name;
 use crate::transform_server::unsupported;
 use crate::{CompileError, Refusal};
@@ -257,15 +256,12 @@ fn slots_pattern_prop<'arena>(
     b.mint(": ");
     let value = b.ident("$$slots_");
     let span = Span::new(key.span.start, value.span.end);
-    ObjectPatternProperty::Property(Property {
-        key: Expression::Identifier(key),
-        value: Expression::Identifier(value),
-        kind: PropertyKind::Init,
-        shorthand: false,
-        computed: false,
-        method: false,
+    ObjectPatternProperty::Property(init_property(
+        Expression::Identifier(key),
+        Expression::Identifier(value),
+        false,
         span,
-    })
+    ))
 }
 
 /// A shorthand `{ name }` pattern property over a synthetic identifier
@@ -276,13 +272,10 @@ fn shorthand_pattern_prop<'arena>(
 ) -> ObjectPatternProperty<'arena> {
     let ident = b.ident(name);
     let span = ident.span;
-    ObjectPatternProperty::Property(Property {
-        key: Expression::Identifier(ident.clone()),
-        value: Expression::Identifier(ident),
-        kind: PropertyKind::Init,
-        shorthand: true,
-        computed: false,
-        method: false,
+    ObjectPatternProperty::Property(init_property(
+        Expression::Identifier(ident.clone()),
+        Expression::Identifier(ident),
+        true,
         span,
-    })
+    ))
 }

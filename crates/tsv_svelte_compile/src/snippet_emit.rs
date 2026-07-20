@@ -13,9 +13,11 @@ use tsv_svelte::ast::internal::{RenderTag, SnippetBlock};
 use tsv_ts::ast::internal::{CallExpression, Expression, ExpressionStatement, Statement};
 
 use crate::analyze::{ScopeEntry, pattern_binding_names};
-use crate::fragment::{BodyBuilder, emit_child_body, wrap_single};
+use crate::body_builder::BodyBuilder;
+use crate::fragment::emit_child_body;
 use crate::namespace::{ChildNamespace, FragmentParent, Namespace};
 use crate::snippet::snippet_name;
+use crate::template_value::wrap_single;
 use crate::transform_server::{EmitEnv, unsupported};
 use crate::{CompileError, Refusal};
 

@@ -25,13 +25,13 @@ use tsv_ts::ast::internal::{
 
 use crate::analyze::{NameSet, RuneInit, classify_rune_init, is_effect_call, is_inspect_call};
 use crate::build::Builder;
-use crate::fragment::is_bare_derived_read;
 use crate::rune_guard::{
     WalkCtx, refuse_dollar_binding_name, refuse_dollar_binding_pattern, walk_class_member_guarded,
     walk_expression_guarded, walk_statement_guarded,
 };
 use crate::script_decls::{identifier_binding_name, plain_identifier_name};
 use crate::script_props::{BindableEntry, rewrite_props_pattern};
+use crate::template_value::is_bare_derived_read;
 use crate::transform_server::unsupported;
 use crate::{CompileError, Refusal};
 
