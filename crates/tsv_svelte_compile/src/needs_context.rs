@@ -38,7 +38,7 @@ use tsv_svelte::ast::internal::{
 use tsv_ts::ast::internal::{
     ArrowFunctionBody, ClassBody, ClassMember, ExportDefaultValue, Expression, ForInOfLeft,
     ForInit, FunctionExpression, ObjectPatternProperty, ObjectProperty, Statement,
-    VariableDeclaration,
+    VariableDeclaration, VariableDeclarationKind,
 };
 
 use crate::analyze::{NameSet, RuneInit, classify_rune_init, pattern_binding_names};
@@ -75,6 +75,28 @@ struct Nc<'a> {
     snippet_params: NameSet,
     /// Names bound anywhere below the component's top-level instance scope.
     shadowed: NameSet,
+    /// The JS bindings of the scopes currently OPEN around the walk — a function's
+    /// parameters and name, a nested `let`/`const`/`var`/`class`/function
+    /// declaration, a `catch` parameter, a `for`-head binding. Unlike
+    /// [`Nc::shadowed`] (a whole-component union, deliberately cumulative) this is
+    /// scoped: pushed at the declaration and popped when its scope closes, so it
+    /// answers "which JS binding of this name is in scope here, and of what kind?".
+    /// `refuse_invalid_assign_target` reads it first, because a JS scope is always
+    /// innermost relative to the template scopes (`each_items`/`snippet_params`) —
+    /// template blocks never nest inside a JS scope, only the reverse. A lookup
+    /// scans BACKWARD, so it finds the innermost binding of a name.
+    ///
+    /// It is a stack rather than a set because the binding's KIND is part of the
+    /// answer: a nested `const` is not a plain shadow that suppresses the rule, it
+    /// is `declaration_kind: 'const'` to the oracle and carries
+    /// `constant_assignment` itself. A set could record that a name is bound and
+    /// that some binding of it is `const`, but not WHICH of two nested ones is
+    /// innermost — and the two orderings have opposite verdicts
+    /// (`let a; { const a; a = 1 }` refuses, `const a; { let a; a = 1 }` compiles).
+    /// Scanning back gets both right, and makes a re-declaration of an open name
+    /// self-restoring: it is pushed like any other, and popping it uncovers the
+    /// outer entry that was never disturbed.
+    js_scope: Vec<JsBinding>,
     /// Context-root names observed as the root of a member/call access.
     member_roots: NameSet,
     /// Set by a `new` expression or a non-identifier member/call root.
@@ -111,6 +133,14 @@ struct Nc<'a> {
     /// trigger the wrapper, so those positions are walked. Sticky for the whole
     /// catch subtree.
     in_dropped_catch: bool,
+}
+
+/// One JS binding open around the walk (an entry of [`Nc::js_scope`]).
+struct JsBinding {
+    name: String,
+    /// Whether the oracle would read this binding as `declaration_kind: 'const'`,
+    /// i.e. whether a write to it is `constant_assignment`.
+    is_const: bool,
 }
 
 /// The whole-component analysis product consumed by the server transform.
@@ -169,6 +199,7 @@ pub(crate) fn analyze_component(
         each_items: NameSet::default(),
         snippet_params: NameSet::default(),
         shadowed: NameSet::default(),
+        js_scope: Vec::new(),
         member_roots: NameSet::default(),
         needs: false,
         refuse: None,
@@ -180,12 +211,20 @@ pub(crate) fn analyze_component(
         in_dropped_catch: false,
     };
 
+    // Each phase is its own JS-scope root: nothing a script's nested scopes
+    // declared may still be open when the next script or the template is walked.
+    // Every scope-introducing node already restores itself, so these rewinds are
+    // belt-and-braces — but they are what makes "a shadow cannot outlive its
+    // phase" hold by construction rather than by auditing every walk arm (the
+    // one direction that would turn a safe over-refusal into an over-acceptance).
     for stmt in instance_body {
         walk_stmt(stmt, &mut nc, false);
     }
+    js_scope_restore(&mut nc, 0);
     for stmt in module_body {
         walk_stmt(stmt, &mut nc, false);
     }
+    js_scope_restore(&mut nc, 0);
     walk_fragment(&root.fragment, &mut nc);
 
     if let Some(reason) = nc.refuse {
@@ -345,12 +384,70 @@ pub(crate) fn collect_constant_names(
 /// tree, where `(x as any) = 1` is simply `x = 1`; parentheses are peeled because
 /// ESTree has no paren node.
 ///
-/// The set membership is **name-based** where the oracle is scope-sensitive.
-/// `each_items` / `snippet_params` are block-scoped (so an outer name is not
-/// consulted inside an unrelated block), but a *nested* re-declaration — a
-/// function parameter or a local `let` sharing a name with a component `const` —
-/// is not modelled, and over-refuses. Safe by the refusal contract; the residual
-/// is measured against the compile corpus.
+/// Set membership is **scoped, not merely name-based**. `each_items` /
+/// `snippet_params` are block-scoped to their template blocks, and a nested JS
+/// re-declaration — a function parameter, a `catch` parameter, a `for`-head
+/// binding, a local `let`/`const`/`var`/`class`/function sharing a name with a
+/// component `const` — enters [`Nc::js_scope`] for exactly its scope, as the
+/// oracle's scope chain does.
+///
+/// ⚠️ **Recording a binding is not the same as suppressing the rule**, and
+/// conflating the two was a live over-acceptance. Every JS binding form enters
+/// the scope stack, but what it then means splits by KIND: a `let`/`var`/
+/// parameter/`catch`/function/class binding carries no rule, so a write to it is
+/// accepted; a nested `const` is `declaration_kind: 'const'` to the oracle
+/// wherever it sits, so it carries `constant_assignment` itself and the write
+/// REFUSES. Treating the stack as a uniform "shadow ⇒ no rule" set therefore
+/// compiled a write the oracle rejects. The stack stores `is_const` per entry
+/// precisely so the two cannot be conflated again.
+///
+/// The enumeration of declaration FORMS is deliberately allowed to be
+/// **incomplete**, but ⚠️ that incompleteness is **not unconditionally safe**, and
+/// reading it as such was itself a live over-acceptance. A form the walk does not
+/// record leaves no binding, so the write falls through — and what it falls
+/// through TO decides the direction:
+///
+/// - the name is ALSO in a component-level set (a top-level `const`, an import
+///   local, an `{#each}` item, a `{#snippet}` parameter): the fall-through hits
+///   that set's rule and REFUSES. The write was really to the unrecorded local, so
+///   this is an over-refusal — safe, and what the refusal contract permits;
+/// - the name is purely LOCAL: the fall-through hits **nothing at all**, no rule
+///   applies, and the write is ACCEPTED. If that local was a `const`, the oracle
+///   rejects it and tsv has an OVER-ACCEPTANCE — a refusal-contract bug.
+///
+/// So a missing form is safe exactly for the NON-const forms (which carry no rule
+/// either way) and for a name that collides with a component-level one. A missing
+/// `const` form is a bug. Two such gaps were closed by recording the binding
+/// rather than by narrowing anything — a `switch` now gets ONE scope shared by all
+/// its cases (the oracle's `SwitchStatement: create_block_scope`), and a block's
+/// `const` declarations hoist into scope before its statements are walked
+/// ([`hoist_block_consts`], the oracle's scope pre-pass). Known remaining gaps:
+///
+/// - a `var` is recorded at its BLOCK, not hoisted to its function scope, so a
+///   write to it elsewhere in the function still refuses. SAFE — a `var` is never
+///   `const`, so the miss can only over-refuse;
+/// - a non-`const` declaration (`let`, `class`, a function name) is recorded where
+///   the walk REACHES it rather than hoisted, so a write textually before it still
+///   refuses. SAFE for the same reason; the hoist is deliberately `const`-only
+///   because hoisting a rule-free binding could only REMOVE a refusal;
+/// - a class EXPRESSION's own name (`const C = class C { … }`) is not recorded —
+///   only a class *declaration*'s is. SAFE: that name is `'let'` to the oracle
+///   (`phases/scope.js`'s `ClassDeclaration` visitor), not `const`;
+/// - ⚠️ the TEMPLATE-scoped consts — a `{@const}`, a `{:then}`/`{:catch}` value, an
+///   `{#each}` index — are not recorded at all. These ARE `const` to the oracle, so
+///   by the rule above a write to one is an OVER-ACCEPTANCE. It is the family's one
+///   open residual, and the one gap of this shape that is not safe. ⚠️ It is MASKED
+///   in exactly one write position: an assignment sitting directly in an emitted
+///   template expression (`{(c = 2)}`) refuses as `mutation inside a template
+///   expression`, an unrelated general rule that fires whatever the target is — so
+///   the most natural repro reads green and has already been mistaken for a
+///   refutation of this whole entry. Probe an event-handler arrow
+///   (`onclick={() => (c = 2)}`) or a write in a dropped `{:catch}` instead: those
+///   compile, for all three binding forms.
+///
+/// The one direction that must never occur is a binding that OUTLIVES its scope:
+/// it would suppress a genuine refusal and produce an over-acceptance.
+/// [`js_scope_restore`] is what forecloses it.
 ///
 /// Sets `nc.refuse` rather than returning: like every other refusal this walk
 /// raises, it is resolved late so the script-loop refusals keep winning for an
@@ -365,7 +462,20 @@ fn refuse_invalid_assign_target(target: &Expression<'_>, nc: &mut Nc<'_>, top: b
             // SHADOWS a same-named script `const`, and its own rule is the one the
             // oracle applies (an each binding is `declaration_kind: 'const'` too,
             // but `validate_no_const_assignment` excludes `kind === 'each'`).
-            let reason = if nc.each_items.contains(name) {
+            // A JS binding open around this write SHADOWS every component-level
+            // and template-level name, so the write resolves to that binding and
+            // the outer names are irrelevant. Checked first because a JS scope is
+            // always the innermost one here: a template block can never nest
+            // inside a JS scope. Which rule then applies is the INNERMOST JS
+            // binding's own: a `const` is `declaration_kind: 'const'` to the
+            // oracle wherever it is declared, so it carries `constant_assignment`
+            // exactly as a top-level one does; every other binding form carries no
+            // rule at all.
+            let reason = if let Some(binding) = js_binding(nc, name) {
+                binding
+                    .is_const
+                    .then_some(refusal::INVALID_ASSIGNMENT_CONSTANT)
+            } else if nc.each_items.contains(name) {
                 top.then_some(refusal::INVALID_ASSIGNMENT_EACH_ITEM)
             } else if nc.snippet_params.contains(name) {
                 top.then_some(refusal::INVALID_ASSIGNMENT_SNIPPET_PARAMETER)
@@ -421,6 +531,115 @@ fn exit_block_scope(set: &mut NameSet, added: Vec<String>) {
     for name in added {
         set.remove(&name);
     }
+}
+
+/// Open a JS scope: the mark [`js_scope_restore`] rewinds to.
+fn js_scope_mark(nc: &Nc<'_>) -> usize {
+    nc.js_scope.len()
+}
+
+/// Close a JS scope opened at `mark`, removing every binding declared inside it.
+///
+/// Truncating the stack is what makes this **leak-proof by construction**: whatever
+/// the walk did in between, no binding pushed after `mark` can survive. That
+/// direction is the load-bearing one — a leaked shadow would suppress a genuine
+/// `constant_assignment` refusal, an over-acceptance and a refusal-contract
+/// violation, where a MISSING shadow only over-refuses.
+fn js_scope_restore(nc: &mut Nc<'_>, mark: usize) {
+    nc.js_scope.truncate(mark);
+}
+
+/// Record a JS binding in the innermost open scope (see [`Nc::js_scope`]).
+fn declare_js_local(name: String, is_const: bool, nc: &mut Nc<'_>) {
+    nc.js_scope.push(JsBinding { name, is_const });
+}
+
+/// The innermost open JS binding of `name`, or `None` when the name is not bound
+/// by any JS scope around the walk.
+fn js_binding<'b>(nc: &'b Nc<'_>, name: &str) -> Option<&'b JsBinding> {
+    nc.js_scope
+        .iter()
+        .rev()
+        .find(|binding| binding.name == name)
+}
+
+/// [`declare_pattern`] plus the JS-scope record. The two are separate entry points
+/// on purpose: the TEMPLATE binding sites (an `{#each}` context, a `{#snippet}`
+/// parameter) call the bare form, because each has its own oracle rule and folding
+/// it into `js_scope` would SUPPRESS that rule's refusal.
+///
+/// `is_const` is true only for a `const` declarator (including a `for (const … of
+/// …)` head) — the one JS binding form the oracle reads as
+/// `declaration_kind: 'const'`. Every other site (a parameter, a `catch` binding,
+/// a `let`/`var`, a function or class name) passes false. A `using` /
+/// `await using` declarator is deliberately NOT const here, on the SOURCE reading
+/// alone: the oracle's test is `declaration_kind === 'const'` exactly
+/// (`shared/utils.js`), and forbidding a write to one is JavaScript's own early
+/// error rather than a Svelte rule. ⚠️ The behavioral half is **undemonstrable**
+/// against the pinned oracle, which cannot parse `using` at all (its acorn rejects
+/// the declaration outright with `js_parse_error`), so this choice is unreachable
+/// there and untested by probe. That parse gap is itself a standing tsv
+/// over-acceptance, owed to the frontend — see
+/// `../../docs/checklist_svelte_compiler.md` §Owed to main.
+fn declare_js_pattern(pattern: &Expression<'_>, nc: &mut Nc<'_>, is_const: bool) {
+    declare_pattern(pattern, nc);
+    let mut names = Vec::new();
+    if pattern_binding_names(pattern, nc.source, &mut names).is_ok() {
+        for name in names {
+            declare_js_local(name, is_const, nc);
+        }
+    }
+}
+
+/// [`declare_ident`] plus the JS-scope record. A function or class NAME is never a
+/// `const` binding.
+fn declare_js_ident(id: &tsv_ts::ast::internal::Identifier<'_>, nc: &mut Nc<'_>) {
+    declare_ident(id, nc);
+    if let Some(name) = plain_name(id, nc.source) {
+        let name = name.to_string();
+        declare_js_local(name, false, nc);
+    }
+}
+
+/// Record the `const` declarations of a statement list into the CURRENTLY open JS
+/// scope, before any of its statements is walked.
+///
+/// The oracle builds its scopes in a **pre-pass** (`phases/scope.js`'s
+/// `create_scopes`), so every binding of a block exists before any reference in
+/// that block is validated: a write textually EARLIER than the `const` still
+/// resolves to it and is `constant_assignment` (a TDZ error at runtime, a compile
+/// error to Svelte either way).
+///
+/// Deliberately `const`-only. Hoisting a `let`/`class`/function name would also be
+/// faithful to the pre-pass, but those bindings carry NO rule — recording one
+/// earlier can only turn a refusal into an acceptance, the unsafe direction. A
+/// `const` can only add refusals, so the hoist is safe by construction; the
+/// non-const forms stay recorded where the walk reaches them, an over-refusal the
+/// refusal contract permits.
+///
+/// A `const` recorded here is recorded a second time when [`walk_var_decl`]
+/// reaches its declarator. The duplicate entry is benign — same name, same kind,
+/// and the backward scan finds either — so the two paths are left independent.
+fn hoist_block_consts(stmts: &[Statement<'_>], nc: &mut Nc<'_>) {
+    for stmt in stmts {
+        if let Statement::VariableDeclaration(decl) = stmt
+            && decl.kind == VariableDeclarationKind::Const
+        {
+            for declarator in decl.declarations {
+                declare_js_pattern(&declarator.id, nc, true);
+            }
+        }
+    }
+}
+
+/// Walk a nested statement list as its own JS block scope.
+fn walk_block(stmts: &[Statement<'_>], nc: &mut Nc<'_>) {
+    let mark = js_scope_mark(nc);
+    hoist_block_consts(stmts, nc);
+    for stmt in stmts {
+        walk_stmt(stmt, nc, true);
+    }
+    js_scope_restore(nc, mark);
 }
 
 /// Add every name a binding pattern declares to `shadowed` (best-effort — a
@@ -548,18 +767,16 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
         // scope, so record them and walk the body (always nested).
         Expression::ArrowFunctionExpression(a) => {
             nc.fn_depth += 1;
+            let mark = js_scope_mark(nc);
             for param in a.params {
-                declare_pattern(param, nc);
+                declare_js_pattern(param, nc, false);
                 walk_expr(param, nc);
             }
             match &a.body {
                 ArrowFunctionBody::Expression(e) => walk_expr(e, nc),
-                ArrowFunctionBody::BlockStatement(b) => {
-                    for stmt in b.body {
-                        walk_stmt(stmt, nc, true);
-                    }
-                }
+                ArrowFunctionBody::BlockStatement(b) => walk_block(b.body, nc),
             }
+            js_scope_restore(nc, mark);
             nc.fn_depth -= 1;
         }
         Expression::FunctionExpression(f) => walk_function_expression(f, nc),
@@ -675,16 +892,17 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
 
 fn walk_function_expression(f: &FunctionExpression<'_>, nc: &mut Nc<'_>) {
     nc.fn_depth += 1;
+    let mark = js_scope_mark(nc);
+    // A function EXPRESSION's own name binds inside its own scope only.
     if let Some(id) = &f.id {
-        declare_ident(id, nc);
+        declare_js_ident(id, nc);
     }
     for param in f.params {
-        declare_pattern(param, nc);
+        declare_js_pattern(param, nc, false);
         walk_expr(param, nc);
     }
-    for stmt in f.body.body {
-        walk_stmt(stmt, nc, true);
-    }
+    walk_block(f.body.body, nc);
+    js_scope_restore(nc, mark);
     nc.fn_depth -= 1;
 }
 
@@ -705,9 +923,7 @@ fn walk_class_body(body: &ClassBody<'_>, nc: &mut Nc<'_>) {
             }
             ClassMember::StaticBlock(b) => {
                 nc.fn_depth += 1;
-                for stmt in b.body {
-                    walk_stmt(stmt, nc, true);
-                }
+                walk_block(b.body, nc);
                 nc.fn_depth -= 1;
             }
             ClassMember::IndexSignature(_) => {}
@@ -718,9 +934,10 @@ fn walk_class_body(body: &ClassBody<'_>, nc: &mut Nc<'_>) {
 /// Walk a variable declaration: at nested depth its pattern names shadow the
 /// component scope; the init/default expressions are always trigger-checked.
 fn walk_var_decl(decl: &VariableDeclaration<'_>, nc: &mut Nc<'_>, shadow: bool) {
+    let is_const = decl.kind == VariableDeclarationKind::Const;
     for declarator in decl.declarations {
         if shadow {
-            declare_pattern(&declarator.id, nc);
+            declare_js_pattern(&declarator.id, nc, is_const);
         }
         walk_expr(&declarator.id, nc);
         walk_opt(declarator.init.as_ref(), nc);
@@ -741,32 +958,30 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
     match stmt {
         Statement::VariableDeclaration(d) => walk_var_decl(d, nc, shadow),
         Statement::FunctionDeclaration(f) => {
+            // The declaration's own name binds in the ENCLOSING scope, so it is
+            // recorded before the mark; the parameters and body are its own.
             if shadow && let Some(id) = &f.id {
-                declare_ident(id, nc);
+                declare_js_ident(id, nc);
             }
             nc.fn_depth += 1;
+            let mark = js_scope_mark(nc);
             for param in f.params {
-                declare_pattern(param, nc);
+                declare_js_pattern(param, nc, false);
                 walk_expr(param, nc);
             }
-            for s in f.body.body {
-                walk_stmt(s, nc, true);
-            }
+            walk_block(f.body.body, nc);
+            js_scope_restore(nc, mark);
             nc.fn_depth -= 1;
         }
         Statement::ClassDeclaration(c) => {
             if shadow && let Some(id) = &c.id {
-                declare_ident(id, nc);
+                declare_js_ident(id, nc);
             }
             walk_class_body(&c.body, nc);
         }
         Statement::ExpressionStatement(s) => walk_expr(&s.expression, nc),
         Statement::ReturnStatement(s) => walk_opt(s.argument.as_ref(), nc),
-        Statement::BlockStatement(s) => {
-            for stmt in s.body {
-                walk_stmt(stmt, nc, true);
-            }
-        }
+        Statement::BlockStatement(s) => walk_block(s.body, nc),
         Statement::IfStatement(s) => {
             walk_expr(&s.test, nc);
             walk_stmt(s.consequent, nc, true);
@@ -774,7 +989,10 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
                 walk_stmt(alt, nc, true);
             }
         }
+        // A `for`-head binding scopes over the head AND the body, so the mark
+        // wraps both.
         Statement::ForStatement(s) => {
+            let mark = js_scope_mark(nc);
             match &s.init {
                 Some(ForInit::VariableDeclaration(d)) => walk_var_decl(d, nc, true),
                 Some(ForInit::Expression(e)) => walk_expr(e, nc),
@@ -783,16 +1001,21 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
             walk_opt(s.test.as_ref(), nc);
             walk_opt(s.update.as_ref(), nc);
             walk_stmt(s.body, nc, true);
+            js_scope_restore(nc, mark);
         }
         Statement::ForInStatement(s) => {
+            let mark = js_scope_mark(nc);
             walk_for_left(&s.left, nc);
             walk_expr(&s.right, nc);
             walk_stmt(s.body, nc, true);
+            js_scope_restore(nc, mark);
         }
         Statement::ForOfStatement(s) => {
+            let mark = js_scope_mark(nc);
             walk_for_left(&s.left, nc);
             walk_expr(&s.right, nc);
             walk_stmt(s.body, nc, true);
+            js_scope_restore(nc, mark);
         }
         Statement::WhileStatement(s) => {
             walk_expr(&s.test, nc);
@@ -804,30 +1027,39 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
         }
         Statement::SwitchStatement(s) => {
             walk_expr(&s.discriminant, nc);
+            // The oracle gives a `switch` ONE block scope shared by ALL its cases
+            // (`phases/scope.js`: `SwitchStatement: create_block_scope`), so a
+            // `const` in one case is in scope for a write in another and refuses.
+            // Scoping per case instead was an OVER-ACCEPTANCE, not the over-refusal
+            // it looked like: a case-local name has no component-level entry to fall
+            // through to, so the write met no rule at all. Every case's consts hoist
+            // first, so both orderings (const-then-write and write-then-const) see
+            // the binding.
+            let mark = js_scope_mark(nc);
+            for case in s.cases {
+                hoist_block_consts(case.consequent, nc);
+            }
             for case in s.cases {
                 walk_opt(case.test.as_ref(), nc);
                 for stmt in case.consequent {
                     walk_stmt(stmt, nc, true);
                 }
             }
+            js_scope_restore(nc, mark);
         }
         Statement::TryStatement(s) => {
-            for stmt in s.block.body {
-                walk_stmt(stmt, nc, true);
-            }
+            walk_block(s.block.body, nc);
             if let Some(handler) = &s.handler {
+                let mark = js_scope_mark(nc);
                 if let Some(param) = &handler.param {
-                    declare_pattern(param, nc);
+                    declare_js_pattern(param, nc, false);
                     walk_expr(param, nc);
                 }
-                for stmt in handler.body.body {
-                    walk_stmt(stmt, nc, true);
-                }
+                walk_block(handler.body.body, nc);
+                js_scope_restore(nc, mark);
             }
             if let Some(finalizer) = &s.finalizer {
-                for stmt in finalizer.body {
-                    walk_stmt(stmt, nc, true);
-                }
+                walk_block(finalizer.body, nc);
             }
         }
         Statement::ThrowStatement(s) => walk_expr(&s.argument, nc),
@@ -841,13 +1073,13 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
             ExportDefaultValue::Expression(e) => walk_expr(e, nc),
             ExportDefaultValue::FunctionDeclaration(f) => {
                 nc.fn_depth += 1;
+                let mark = js_scope_mark(nc);
                 for param in f.params {
-                    declare_pattern(param, nc);
+                    declare_js_pattern(param, nc, false);
                     walk_expr(param, nc);
                 }
-                for stmt in f.body.body {
-                    walk_stmt(stmt, nc, true);
-                }
+                walk_block(f.body.body, nc);
+                js_scope_restore(nc, mark);
                 nc.fn_depth -= 1;
             }
             ExportDefaultValue::ClassDeclaration(c) => walk_class_body(&c.body, nc),

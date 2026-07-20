@@ -428,37 +428,121 @@ of those three positions across the instance script, the module script and the t
 dropped `{:catch}` branches and event handlers included, which is where two of the
 suite's samples put the write.
 
-- **Refused**: `assignment to a constant (a const declarator or import local — the oracle's constant_assignment)` — a write to a top-level `const` declarator or import local, in either script. Keyed on the DECLARATION KEYWORD, exactly as the oracle is, so a reactive `const c = $state(0)` refuses too. The pattern recursion mirrors `validate_no_const_assignment` exactly: `ArrayPattern` elements and `ObjectPattern` property *values*, and nothing else — a `RestElement`, an `AssignmentPattern` default and a `MemberExpression` match no branch there and are **accepted**, a member target writing *through* the binding rather than rebinding it.
+- **Refused**: `assignment to a constant (a const declarator or import local — the oracle's constant_assignment)` — a write to a `const` declarator or import local: a top-level one in either script, and equally a NESTED one (a `const` in a block or function body, or a `for (const … of …)` head), since the oracle's `validate_no_const_assignment` resolves the target through the SCOPE CHAIN rather than against a top-level set. Keyed on the DECLARATION KEYWORD, exactly as the oracle is, so a reactive `const c = $state(0)` refuses too. Only the innermost binding of the name decides — a `let` nested inside a same-named `const` is an ordinary local and its write is accepted. The pattern recursion mirrors `validate_no_const_assignment` exactly: `ArrayPattern` elements and `ObjectPattern` property *values*, and nothing else — a `RestElement`, an `AssignmentPattern` default and a `MemberExpression` match no branch there and are **accepted**, a member target writing *through* the binding rather than rebinding it.
 - **Refused**: `assignment to an {#each} item (the oracle's each_item_invalid_assignment)` — a write to an `{#each}` context binding. Block-scoped to the block's body and fallback (the oracle's child scope, `phases/scope.js:1244`/`:1280`), and checked only for a whole-`Identifier` target, both matching the oracle. Runes-only there; this compiler is unconditionally runes-only.
 - **Refused**: `assignment to a {#snippet} parameter (the oracle's snippet_parameter_assignment)` — a write to a `{#snippet}` parameter (`phases/scope.js:1342`). NOT runes-gated in the oracle.
 
-⚠️ **Two residuals stay open, both over-acceptances, both narrower than the rule.** The
-constant set is built from **top-level script statements only**
-(`needs_context::collect_constant_names`), so a `const` in a nested block or function
-body, and every TEMPLATE-scoped const — a `{@const}` name, a `{:then}`/`{:catch}` value,
-an `{#each}` INDEX, all `declaration_kind: 'const'` to the oracle — still compile when
-written to. And the set membership is name-based where the oracle is scope-sensitive: a
-nested re-declaration that *shadows* one of these names is not modelled, which
-**over**-refuses (safe by the refusal contract) rather than under-refuses.
+**The shadowing over-refusal is closed.** Set membership was name-based where the oracle
+is scope-sensitive, so a nested re-declaration sharing a name with a component `const` or
+import — an ordinary helper reusing a name for its own local — over-refused. The
+`needs_context` walk now carries a **scoped** JS-binding stack (`Nc::js_scope`) beside the
+cumulative `shadowed` union: a function parameter and name, a `catch` parameter, a
+`for`-head binding, and a nested `let`/`const`/`var`/`class`/function declaration are
+pushed at their declaration and popped when their scope closes, and a lookup scans
+BACKWARD so the innermost binding of a name decides. Each phase (instance script, module
+script, template) additionally rewinds to zero.
 
-⚠️ **That second residual is corpus-reachable, and closing this family cost one parity
-point.** The shape it over-refuses is ordinary — a helper function that reuses a
-component-level name for its own local — and it appears in Svelte's own test suite:
-`../svelte/packages/svelte/tests/runtime-runes/samples/mutation-local/main.svelte`
-declares `const x = localMutation(1)` beside a `function localMutation(input) { let x =
-input; … x = 2; … }`. The oracle's scope-sensitive lookup resolves that write to the
-function-local `let`; tsv's name-based set sees the top-level `const` and refuses. Probing
-the shape directly reproduces it on a function parameter, a block `let`, and an arrow
-parameter alike, each shadowing a component `const` or import.
+⚠️ **Recording a binding is not the same as suppressing the rule.** The stack carries each
+entry's KIND, because the two halves of that sentence have different answers. A nested
+`let`/`var`/parameter/`catch`/function/class binding carries no oracle rule, so a write to
+it is a write to the local and compiles. A nested `const` does not: it is
+`declaration_kind: 'const'` to the oracle wherever it sits — `validate_no_const_assignment`
+reads the SCOPE CHAIN, not a top-level set — so it carries `constant_assignment` itself and
+the write must REFUSE. An earlier form of this scoped set treated every entry uniformly as
+"shadowed ⇒ no rule" and so **compiled writes the oracle rejects** — an over-acceptance and
+a refusal-contract violation, live-verified on
+`const a = 1; function f() { { const a = 0; a = 2; } }` and three siblings. Storing the
+kind is what keeps the two apart, and it must stay stored: the two nested orderings have
+opposite verdicts (`let a; { const a; a = 1 }` refuses; `const a; { let a; a = 1 }`
+compiles, both oracle-verified), so a set that merely knew "some open binding of this name
+is const" would get one of them wrong.
 
-The cost is **measured, not assumed**: over the full `compile:corpus:compare` roots (2996
-files — parity 1370, refused 1041, 0 MISMATCH, 0 over-acceptance) the whole
-`InvalidAssignmentTarget` refusal has exactly **one** member, that file, and the other two
-rules have none. It is not a bucket substitution — renaming the inner local reaches parity
-byte-for-byte, so the file's only blocker is this rule, and the pre-family numbers were
-parity **1371** / refused **1040**. One parity point bought the family's three oracle
-rules; narrowing the over-refusal means modelling script scopes, which is its own slice
-(the arc deliberately refuses on ambiguity instead of building a scope resolver).
+The enumeration of declaration FORMS is a **separate** question from the kind one above.
+⚠️ An earlier form of this section claimed that incompleteness "fails in the safe
+direction — a form the walk does not record leaves no binding, so the write falls through
+to the component-level sets and still refuses". **That claim is FALSE, and it is the same
+conflation as the one above, one level out**: the fall-through refuses only when the name
+is ALSO in a component-level set. When the shadowed-out name is purely LOCAL there is no
+component-level entry to fall through to, no rule applies at all, and the write is
+ACCEPTED — an over-acceptance whenever that local was a `const`. Two such over-acceptances
+were live, both listed by the old text as safe examples, both oracle-verified
+(`constant_assignment`):
+
+```svelte
+<script>function f(v) { switch (v) { case 1: const w = 1; break; case 2: w = 2; } }</script>
+<script>function g() { z = 1; const z = 2; return z; }</script>
+```
+
+Both are now **closed**, in the refusing direction only: a `switch` gets ONE block scope
+shared by all its cases (the oracle's `SwitchStatement: create_block_scope`,
+`phases/scope.js`), and a block's `const` declarations are hoisted into scope before its
+statements are walked, mirroring the oracle's scope PRE-PASS (`create_scopes` runs to
+completion before any reference is validated, so a write textually earlier than the
+`const` still resolves to it). The hoist is deliberately `const`-only: hoisting a `let`,
+`class` or function name would be equally faithful to the pre-pass, but those carry no
+rule, so recording one earlier could only turn a refusal into an acceptance.
+
+The correct rule for the remaining gaps: **a missing NON-const form is safe** (it carries
+no rule either way, so the miss can only over-refuse), **a missing `const` form is a bug**.
+Remaining gaps, all of the safe shape — a `var` is scoped to its block rather than hoisted
+to its function; a non-`const` declaration (`let`, `class`, a function name) is recorded
+where the walk reaches it rather than hoisted; a class EXPRESSION's own name is unrecorded
+where a class declaration's is (harmless because the oracle declares a class name `'let'`,
+not `const` — `phases/scope.js`'s `ClassDeclaration` visitor). The other direction that
+must never occur is a binding OUTLIVING its scope, which would suppress a genuine refusal;
+the stack's truncation forecloses it.
+
+⚠️ **One residual stays open, an over-acceptance narrower than the rule**: the
+TEMPLATE-scoped consts — a `{@const}` name, a `{:then}`/`{:catch}` value, an
+`{#each}` INDEX, all `declaration_kind: 'const'` to the oracle — which are recorded in no
+set and so still compile when written to. They are the one remaining gap of the UNSAFE
+shape (`const` to the oracle, unrecorded here).
+
+⚠️ **One write position MASKS it, and the masking has already been mistaken for a
+refutation.** An assignment sitting directly in an emitted template expression
+(`{(c = 2)}`) refuses as `mutation inside a template expression` — an unrelated general
+rule that fires whatever the target is, `const` or not — so the most natural repro reads
+green while the residual is fully live. The two unmasked positions are an event-handler
+arrow (`onclick={() => (c = 2)}`) and a write inside a dropped `{:catch}`; both compile,
+for all three binding forms. Live-verified over nine probes (three forms × three
+positions): the oracle rejects all nine as `constant_assignment`, tsv over-accepts the
+six unmasked ones, and the nine write-free controls reach parity 9/9 — so the write is
+the only variable.
+
+The NESTED-script half of this residual (a
+`const` in a block or function body, whether or not it collides with a component-level
+name, and now including the cross-case and before-declaration orderings above) is
+**closed**: such a binding is on the scope stack with `is_const`, so the write
+refuses. Closing the template half means giving those three binding forms scope entries of
+their own, and is its own slice.
+
+**Closing the shadowing over-refusal did not move corpus parity, and the earlier claim that
+it would is falsified.** This section previously recorded that the family cost one parity
+point, on the evidence that
+`../svelte/packages/svelte/tests/runtime-runes/samples/mutation-local/main.svelte` — a
+`const x = localMutation(1)` beside a `function localMutation(input) { let x = input; … x =
+2; … }` — was the rule's only corpus member and that "renaming the inner local reaches
+parity byte-for-byte, so the file's only blocker is this rule". The rename experiment
+**cannot discriminate**: renaming the inner local removes the name collision, which clears
+*two* independent name-based residuals at once. Isolating them shows the file has a second
+blocker. With the write kept but the template read of `x` removed, the file now reaches
+parity (it refused `constant_assignment` before this change) — so the assignment rule is
+genuinely closed. With the template read present, it refuses `static evaluation not
+portable: binding x is not statically modeled`: the evaluator marks a component binding
+`Opaque` when its name appears in `fn_declared`, the whole-component union of names
+declared inside any function-like subtree, which exists to compensate for `reassigned`
+being shadow-naive. So `mutation-local` moves buckets rather than reaching parity, and the
+corpus totals hold at parity **1370** / refused **1041** / 0 MISMATCH / 0 over-acceptance
+over 2996 files. The measurement that shows the change fired is the bucket membership, not
+the totals: `InvalidAssignmentTarget` goes from one member to **none**, and `static
+evaluation not portable` gains exactly that path.
+
+Narrowing that second residual is its own slice, and the scoped set built here is the
+substrate for it — `reassigned` is collected at the same two write positions that now
+consult `js_scope`, so a write resolving to a local need not mark the component binding.
+But relaxing an `Opaque` binding to foldable is the **unsafe** direction (a wrong fold is a
+MISMATCH, not an over-refusal), so it wants its own safety analysis rather than a
+follow-on edit here.
 
 #### `dollar_prefix_invalid` — closed, and wider than one carve-out
 
@@ -531,6 +615,36 @@ Found by `compile_fuzz`'s `exotic_whitespace` operator, which is why the operato
 exists: the mutant is `.z\u{0085} + .z` grown out of an ordinary scoping fixture,
 and no gate, no fixture, and no corpus file reached it. The fix is in `tsv_css`'s
 lexer, so it lands on the parser side rather than in this crate.
+
+### Owed to main
+
+Over-acceptances whose root cause is in a **frontend** crate (`tsv_ts`, `tsv_css`,
+`tsv_svelte`), not in `tsv_svelte_compile`. Nothing in this crate can close them —
+the dependency runs compiler → frontend, never back — so each is recorded here and
+fixed on **main**, graded by a parser-conformance fixture. The two entries above
+(the `U+0085` CSS ident code point, and the C5 trailing-`trimEnd` class under
+§Mismatch classes under mutation) belong to this family too.
+
+#### `using` / `await using` declarations
+
+`using u = expr;` and `await using u = expr;` in a `<script>` are a standing
+**parse-surface** over-acceptance: tsv parses and compiles them, while the pinned
+oracle rejects the document outright with `js_parse_error` — its acorn cannot parse
+a `using` declaration at all. Probe-verified in both directions (a bare `using`
+declarator and one with a later write to the binding; both `js_parse_error`).
+
+Pre-existing and unrelated to the `constant_assignment` rule: the compiler's
+scope-stack treatment of a `using` binding (not `const`, per the oracle's exact
+`declaration_kind === 'const'` test in `shared/utils.js`) is a source reading only,
+and its behavioral half is **undemonstrable** against this oracle — no `using`
+document ever reaches the analysis phase. Do not cite oracle behavior for it.
+
+The fix is a `tsv_ts` parser question — whether tsv should accept a declaration
+form the canonical parser rejects — and belongs with the parser's
+[deliberate early-error deferral](conformance_svelte.md) discussion, not here.
+
+Repro: `printf '<script>function f() { using u = g(); }</script>' > t.svelte &&
+cargo run -p tsv_debug compile_corpus_compare t.svelte`.
 
 ### Mismatch classes under mutation
 

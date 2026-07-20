@@ -293,11 +293,39 @@ project-wide conventions.
   recursion mirrors `validate_no_const_assignment` exactly — `ArrayPattern` elements
   and `ObjectPattern` property *values* only, so a `RestElement`, an
   `AssignmentPattern` default and a `MemberExpression` are accepted — while the
-  each/snippet rules test the whole argument, as the oracle does. Two residual
-  over-acceptances stay open, both narrower than the rule: a **nested** or
-  **template-scoped** const (`{@const}`, a `{:then}`/`{:catch}` value, an `{#each}`
-  index) is not in the constant set, and set membership is name-based where the
-  oracle is scope-sensitive, so a shadowing nested local **over**-refuses. See
+  each/snippet rules test the whole argument, as the oracle does. Membership is
+  **scoped**, not merely name-based: beside the cumulative `shadowed` union the walk
+  carries `js_scope`, a STACK of the JS bindings of the scopes currently OPEN around
+  it (a function's parameters and name, a `catch` parameter, a `for`-head binding, a
+  nested `let`/`const`/`var`/`class`/function), each entry carrying whether it is a
+  `const`; a lookup scans backward, so the INNERMOST binding decides. ⚠️ Recording a
+  binding is not the same as suppressing the rule: a nested `let`/parameter/`catch`
+  binding carries no rule and the write is accepted, but a nested `const` is
+  `declaration_kind: 'const'` to the oracle wherever it sits, so it carries
+  `constant_assignment` itself and the write REFUSES. That is why the stack stores the
+  kind rather than mere membership — a uniform "shadow ⇒ no rule" set compiled a write
+  the oracle rejects, and the two nested orderings have opposite verdicts
+  (`let a; { const a; a = 1 }` refuses, `const a; { let a; a = 1 }` compiles). The
+  enumeration of declaration FORMS is separately allowed to be incomplete, but ⚠️ a miss
+  there is **not unconditionally safe** — reading it as such was itself an
+  over-acceptance. An unrecorded binding makes the write fall through, and what it falls
+  through TO decides the direction: when the name is ALSO in a component-level set that
+  set's rule fires and the write over-REFUSES (safe), but when the name is purely LOCAL
+  nothing fires at all and the write is ACCEPTED — which for a `const` local is an
+  over-acceptance and a bug. So a missing NON-const form is safe (it carries no rule
+  either way): a `var` scopes to its block rather than its function, a `let`/`class`/
+  function name is recorded where the walk reaches it rather than hoisted, and a class
+  EXPRESSION's own name is unrecorded — the last two harmless because the oracle
+  declares a class name `'let'`, not `const`. A missing `const` form is not: a `switch`
+  therefore now gets ONE scope shared by all its cases (the oracle's `SwitchStatement:
+  create_block_scope`) and a block's `const` declarations hoist into scope before its
+  statements are walked (the oracle's scope pre-pass), closing two over-acceptances. The
+  hoist is deliberately `const`-only — hoisting a rule-free binding could only remove a
+  refusal. The other unsafe direction is a binding OUTLIVING its scope, which would
+  suppress a genuine refusal; the stack's truncation forecloses it. One residual
+  over-acceptance stays open: the **template-scoped** consts
+  (`{@const}`, a `{:then}`/`{:catch}` value, an `{#each}` index) are `const` to the
+  oracle but are recorded nowhere, so a write to one still compiles. See
   `../../docs/checklist_svelte_compiler.md` §The wider validation surface.
 - `store_rewrite.rs` — **store-access (and script-position `$derived` read)
   rewriting** for the instance script (the
