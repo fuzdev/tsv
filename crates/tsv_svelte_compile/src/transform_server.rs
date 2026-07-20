@@ -554,7 +554,7 @@ fn analyze<'arena>(
     // `export { … }` specifiers (`2-analyze/index.js:823-836`). It reads the
     // hoist decision (a hoistable snippet's binding lands in module scope), so it
     // runs after `analyze_snippets`.
-    crate::validate::validate_module_exports(module_body, source, &snippets)?;
+    crate::validate::validate_module_exports(module_body, source, &snippets, &root.interner)?;
 
     // Every top-level binding name — instance AND module — is a candidate store
     // base: a `$name` reference is a store auto-subscription iff `name` is a

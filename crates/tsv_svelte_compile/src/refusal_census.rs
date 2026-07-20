@@ -266,7 +266,7 @@ fn collect<'arena>(
         && module.content.body.iter().any(|stmt| match stmt {
             Statement::ExportDefaultDeclaration(_) => true,
             Statement::ExportNamedDeclaration(export) => {
-                crate::validate::export_named_has_default_specifier(export, source)
+                crate::validate::export_named_has_default_specifier(export, source, &root.interner)
             }
             _ => false,
         })

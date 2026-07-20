@@ -34,9 +34,18 @@ fn compile_module_refuses_export_as_default() {
         "<script module>\n\texport { foo as default } from './y.js';\n</script>\n<p>hi</p>",
         "default export in <script module>",
     );
+    // An ESCAPED identifier alias that decodes to `default` — the oracle compares
+    // the DECODED `.name`, so it rejects this too. `Identifier::name` decodes via
+    // the interner, so tsv catches it (a plain-source-slice read would miss it).
+    assert_unsupported(
+        "<script module>\n\tlet answer = 42;\n\texport { answer as \\u0064efault };\n</script>\n<p>hi</p>",
+        "default export in <script module>",
+    );
     // Discriminating controls: a non-`default` alias compiles on both paths (the
-    // rule keys on the exported name being `default`, not on aliasing itself).
+    // rule keys on the exported name being `default`, not on aliasing itself) —
+    // including an escaped alias that decodes to something OTHER than `default`.
     let _ = compile_js("<script module>let answer = 42;\nexport { answer as other };</script>");
+    let _ = compile_js("<script module>let answer = 42;\nexport { answer as \\u0066oo };</script>");
     let _ = compile_js("<script module>export { foo as bar } from './y.js';</script>");
 }
 
