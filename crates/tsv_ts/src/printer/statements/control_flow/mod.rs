@@ -76,6 +76,21 @@ impl<'a> Printer<'a> {
         (inline_prev, own_line, inline_next)
     }
 
+    /// Does a header→body gap's comment run force the body onto its own line?
+    ///
+    /// Two independent reasons, and the second is easy to miss: a **line** comment must
+    /// break wherever it sits (a `//` would otherwise swallow the body), and **any**
+    /// comment the author put on its own line must break to keep that line. Only a
+    /// block comment trailing the anchor leaves the body free to stay inline.
+    ///
+    /// The gap emitters answer this by construction once they have partitioned; this is
+    /// for the caller that must choose an inline-capable layout *before* building one
+    /// ([`Self::build_adjust_clause_with_comments`]).
+    fn header_to_body_gap_breaks(&self, gap_start: u32, body_start: u32) -> bool {
+        comments_to_emit_in_range(self.comments, gap_start, body_start)
+            .any(|comment| !comment.is_block || !self.is_same_line(gap_start, comment.span.start))
+    }
+
     /// Build comments between a keyword and its `(`, preserving position.
     ///
     /// Returns the full keyword→`(` transition (leading space included) for comments
@@ -201,10 +216,18 @@ impl<'a> Printer<'a> {
     /// `finally`. Only the anchor differed between them, which is why it stays the
     /// caller's job.
     ///
-    /// A **block** comment normalizes to trailing the anchor wherever the author wrote
-    /// it (matching prettier); only a **line** comment keeps its authored position —
-    /// trailing stays trailing, own-line keeps its own line — and any line comment in
-    /// the gap forces a hardline so the `//` can't swallow the body.
+    /// Every comment keeps its **authored position** — trailing the anchor stays
+    /// trailing, own-line keeps its own line — regardless of kind. A line comment
+    /// additionally forces a hardline wherever it sits, so the `//` can't swallow the
+    /// body.
+    ///
+    /// ⚠️ A block comment is **not** flexible here. This emitter used to normalize an
+    /// own-line block comment to trail the anchor (`if (a)⏎/* b */⏎{` → `if (a) /* b */ {`)
+    /// on the premise that prettier does the same; measured, prettier **preserves** it in
+    /// every construct and body kind, and the line-comment path was already preserving.
+    /// Own-line-ness is authoring signal, so relocating it also cut against tsv's own
+    /// comment-position stance. Pinned by
+    /// `syntax/comments/head_body_own_line_block_comment`.
     ///
     /// A blank above the first own-line comment is **dropped** (`blank_seed` = `None`),
     /// so a body block's `{` never sits below one. That is consistent with tsv's own
@@ -216,52 +239,44 @@ impl<'a> Printer<'a> {
     /// no-comment fast path differs (`") "` vs a bare space), so it stays theirs.
     fn push_header_to_body_gap(&self, parts: &mut DocBuf, gap_start: u32, body_start: u32) {
         let d = self.d();
-        let (mut inline_prev, own_line, inline_next) =
+        let (inline_prev, mut own_line, inline_next) =
             self.partition_comments_by_line(gap_start, body_start);
 
-        // Own-line block comments become inline — block comments are flexible and
-        // normalize to trailing position (matches prettier). Only line comments preserve
-        // own-line position. `inline_next` (a comment sharing the body's line) is treated
-        // the same as own-line.
-        let mut own_line_lines: CommentVec<'_> = SmallVec::new();
-        for comment in own_line.into_iter().chain(inline_next) {
-            if comment.is_block {
-                inline_prev.push(comment);
-            } else {
-                own_line_lines.push(comment);
-            }
-        }
+        // `inline_next` (a comment sharing the body's line) is treated the same as
+        // own-line — it is not trailing the anchor, so it gets its own line.
+        own_line.extend(inline_next);
 
-        self.build_comments_between_parts(parts, &inline_prev, &own_line_lines, None);
+        self.build_comments_between_parts(parts, &inline_prev, &own_line, None);
 
-        // The reclassification above only ever moves *block* comments into `inline_prev`,
-        // so this is exactly "the gap held a `//`" — cheaper than rescanning the source,
-        // and true by construction rather than by a second opinion.
-        if !own_line_lines.is_empty() || inline_prev.iter().any(|c| !c.is_block) {
+        // Anything on its own line already forced a break; otherwise only a `//` does,
+        // since it would swallow the body.
+        if !own_line.is_empty() || inline_prev.iter().any(|c| !c.is_block) {
             parts.push(d.hardline());
         } else {
             parts.push(d.text(" "));
         }
     }
 
-    /// The header→body gap for a **non-block** body: every comment drops to its own
-    /// line, sharing the body's indent (`if (a)⏎↹// c⏎↹fn();` — prettier's `adjustClause`
-    /// shape). The caller pushes its own anchor (`)` / `else`) first.
+    /// The header→body gap for a **non-block** body: the comment run, then the body on
+    /// its own line, all sharing the body's indent (`if (a)⏎↹// c⏎↹fn();` — prettier's
+    /// `adjustClause` shape). The caller pushes its own anchor (`)` / `else`) first.
     ///
-    /// ⚠️ **Position-agnostic, unlike [`Self::push_header_to_body_gap`]** — and, for the
-    /// `)` gap, that asymmetry is prettier's, measured on all four combinations:
+    /// ⚠️ **Position-agnostic for a `//` only**, unlike [`Self::push_header_to_body_gap`];
+    /// a block comment keeps its authored line here too. For the `)` gap that split is
+    /// prettier's, measured on all four combinations:
     ///
     /// | body | authored trailing `)` | authored own-line |
     /// | --- | --- | --- |
-    /// | **non-block** | moved to its own line | own line |
-    /// | **block** | stays trailing | own line |
+    /// | **non-block**, `//` | moved to its own line | own line |
+    /// | **non-block**, `/* */` | stays trailing | own line |
+    /// | **block**, either | stays trailing | own line |
     ///
-    /// So a block body preserves the authored position and a non-block body normalizes
-    /// it. That is not tsv relocating a comment against its own stance: a non-block body
-    /// has no `{` to anchor a trailing comment against, and prettier does the same, so
-    /// there is nothing to diverge over. Routing this through the position-preserving
-    /// emitter regressed `if/head_body_nonblock_comment`, which pins the trailing
-    /// authoring normalizing to the own-line form under **both** formatters.
+    /// So only the non-block `//` normalizes. That is not tsv relocating a comment
+    /// against its own stance: a non-block body has no `{` for a trailing `//` to anchor
+    /// against, and prettier does the same, so there is nothing to diverge over. Routing
+    /// *that* case through the position-preserving emitter regressed
+    /// `if/head_body_nonblock_comment`, which pins the trailing authoring normalizing to
+    /// the own-line form under **both** formatters.
     ///
     /// A blank line between two own-line comments survives via the shared comment-run
     /// builder ([`Self::push_gap_blank_before`]'s counterpart in `build_comments_between`).
@@ -276,9 +291,32 @@ impl<'a> Printer<'a> {
         body_doc: DocId,
     ) {
         let d = self.d();
-        let comment_doc =
-            self.build_inline_comments_between_doc_no_leading_space(gap_start, body_start);
-        parts.push(d.indent(d.concat(&[d.hardline(), comment_doc, d.hardline(), body_doc])));
+        let (anchor_line, mut own_line, inline_next) =
+            self.partition_comments_by_line(gap_start, body_start);
+        own_line.extend(inline_next);
+
+        // Only a **block** comment can stay on the anchor's line. A line comment authored
+        // trailing `)` normalizes to its own line — that is the position-agnostic half
+        // this gap is pinned to (`if/head_body_nonblock_comment`), and it is prettier's
+        // behavior too: a non-block body has no `{` for a trailing comment to anchor
+        // against. Source order survives the split because a comment trailing `)`
+        // precedes every own-line one.
+        let mut inline_prev: CommentVec<'a> = SmallVec::new();
+        let mut run: CommentVec<'a> = SmallVec::new();
+        for comment in anchor_line {
+            if comment.is_block {
+                inline_prev.push(comment);
+            } else {
+                run.push(comment);
+            }
+        }
+        run.extend(own_line);
+
+        let mut inner = DocBuf::new();
+        self.build_comments_between_parts(&mut inner, &inline_prev, &run, None);
+        inner.push(d.hardline());
+        inner.push(body_doc);
+        parts.push(d.indent(d.concat(&inner)));
     }
 
     /// The `else`→**non-block** body gap: the comment run keeps its **authored
@@ -450,11 +488,11 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         if self.has_comments_to_emit_between(paren_end, body_start) {
-            let has_line = self.has_line_comments_between(paren_end, body_start);
             let mut parts: DocBuf = SmallVec::from_slice(head_parts);
             parts.push(d.text(")"));
-            if has_line {
-                // Line comment forces break: stmt (cond)\n\t// comment\n\tfn();
+            if self.header_to_body_gap_breaks(paren_end, body_start) {
+                // A `//` (which would swallow the body) or any own-line comment forces
+                // the break: stmt (cond)\n\t// comment\n\tfn();
                 self.push_indented_header_to_body_gap(&mut parts, paren_end, body_start, body_doc);
                 d.concat(&parts)
             } else {
@@ -651,18 +689,34 @@ impl<'a> Printer<'a> {
                 inner_parts.push(d.hardline());
             }
 
-            // Own-line comments
+            // Own-line comments: exactly one separator *before* each (plus any authored
+            // blank), then one before the condition after the last.
+            //
+            // ⚠️ This used to push a break both after each comment and before the next,
+            // which **fabricated a blank line between every pair** — `// c1⏎// c2` came
+            // out `// c1⏎⏎// c2`, a blank the author never wrote. It was a stable fixed
+            // point, so idempotency never caught it, and prettier agrees with the
+            // adjacent form (it is no oracle for a comment after `(` here, but it is for
+            // this shape). Pinned by `do_while/condition_own_line_comment_run`.
+            let mut prev_end: Option<u32> = None;
             for comment in &leading_comments {
-                if !self.is_same_line(open_paren_pos, comment.span.start) {
-                    if !has_inline_comment_followed_by_newline {
-                        inner_parts.push(d.hardline());
-                    }
-                    inner_parts.push(self.build_comment_doc(comment));
-                    if !self.is_same_line(comment.span.end, test_start) {
-                        inner_parts.push(d.hardline());
-                    } else {
-                        inner_parts.push(d.text(" "));
-                    }
+                if self.is_same_line(open_paren_pos, comment.span.start) {
+                    continue;
+                }
+                // The first own-line comment needs no break of its own when an inline
+                // comment already ended the line above it.
+                if prev_end.is_some() || !has_inline_comment_followed_by_newline {
+                    self.push_gap_blank_before(&mut inner_parts, prev_end, comment.span.start);
+                    inner_parts.push(d.hardline());
+                }
+                inner_parts.push(self.build_comment_doc(comment));
+                prev_end = Some(comment.span.end);
+            }
+            if let Some(end) = prev_end {
+                if self.is_same_line(end, test_start) {
+                    inner_parts.push(d.text(" "));
+                } else {
+                    inner_parts.push(d.hardline());
                 }
             }
 
@@ -673,37 +727,41 @@ impl<'a> Printer<'a> {
             // Normalize comments based on their position:
             // - Comments on own line (not same line as open paren): force break with hardline
             // - Comments inline with open paren: allow collapsing with softline
-            let mut added_comment = false;
-            let mut last_comment_same_line_as_test = false;
+            // `None` for the first comment: a blank directly under `(` is dropped (both
+            // formatters), while a blank *between* two comments separates two distinct
+            // remarks and survives — the same split the gap emitters make.
+            let mut prev_end: Option<u32> = None;
             for comment in &leading_comments {
-                let on_same_line_as_open = self.is_same_line(open_paren_pos, comment.span.start);
-
-                if on_same_line_as_open {
+                if self.is_same_line(open_paren_pos, comment.span.start) {
                     // Comment is inline with open paren - use softline to allow collapse
                     inner_parts.push(d.softline());
                 } else {
                     // Comment is on its own line - force break
+                    self.push_gap_blank_before(&mut inner_parts, prev_end, comment.span.start);
                     inner_parts.push(d.hardline());
                 }
+                prev_end = Some(comment.span.end);
                 inner_parts.push(self.build_comment_doc(comment));
-                added_comment = true;
 
-                // Check if condition is on same line as comment end
-                last_comment_same_line_as_test = self.is_same_line(comment.span.end, test_start);
-                // Space if on same line, hardline if on different line
-                if last_comment_same_line_as_test {
+                // A comment sharing the condition's line is separated from it by a
+                // space. Emitted per comment rather than once after the loop because it
+                // doubles as the separator between two comments on that same line; the
+                // break case needs nothing here, since the next iteration (or the
+                // closing separator below) supplies it.
+                if self.is_same_line(comment.span.end, test_start) {
                     inner_parts.push(d.text(" "));
-                } else if !comment.is_block {
-                    // Line comment - need hardline before condition (next comment iteration will add it, or we add it below)
                 }
             }
 
-            // Add softline before condition if no comments were added
-            // If we added comments and the last one wasn't on same line as test, we need hardline
-            if !added_comment {
-                inner_parts.push(d.softline());
-            } else if !last_comment_same_line_as_test {
-                inner_parts.push(d.hardline());
+            // The separator before the condition. With no comments the group is free to
+            // collapse; otherwise the last comment decides — one sharing the condition's
+            // line already pushed its space above.
+            match leading_comments.last() {
+                None => inner_parts.push(d.softline()),
+                Some(last) if !self.is_same_line(last.span.end, test_start) => {
+                    inner_parts.push(d.hardline());
+                }
+                Some(_) => {}
             }
         }
 
@@ -716,17 +774,18 @@ impl<'a> Printer<'a> {
         let (trailing_inline, trailing_own_line, _) =
             self.partition_comments_by_line(test_end, close_paren_pos);
 
-        // Trailing inline comments (same line as condition)
-        for comment in &trailing_inline {
-            inner_parts.push(d.text(" "));
-            inner_parts.push(self.build_comment_doc(comment));
-        }
-
-        // Trailing comments on their own line (after condition)
-        for comment in &trailing_own_line {
-            inner_parts.push(d.hardline());
-            inner_parts.push(self.build_comment_doc(comment));
-        }
+        // Trailing comments — the shared run builder, which owns the blank rule. An
+        // authored blank survives both above the first own-line comment (`blank_seed` =
+        // `Some(test_end)`; there is no body `{` here for one to sit below, only the
+        // `)`) and between subsequent ones. Prettier keeps both, and tsv's own call-arg
+        // and array builders already did; this gap re-derived the run by hand and
+        // dropped every blank.
+        self.build_comments_between_parts(
+            &mut inner_parts,
+            &trailing_inline,
+            &trailing_own_line,
+            Some(test_end),
+        );
 
         // Structure: group([indent([softline/hardline, comments, condition, comments]), softline/hardline])
         // The closing softline/hardline is OUTSIDE the indent so `)` aligns with `(`

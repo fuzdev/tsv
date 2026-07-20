@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 412,
+	"end": 668,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -185,24 +185,120 @@
 					"column": 6
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " Try - an own-line block comment keeps its line, like a line comment does",
+			"start": 404,
+			"end": 479,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 1
+				},
+				"end": {
+					"line": 33,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c8 ",
+			"start": 486,
+			"end": 494,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 1
+				},
+				"end": {
+					"line": 35,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Bare catch - own-line block comment",
+			"start": 516,
+			"end": 554,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 1
+				},
+				"end": {
+					"line": 39,
+					"column": 39
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c9 ",
+			"start": 572,
+			"end": 580,
+			"loc": {
+				"start": {
+					"line": 42,
+					"column": 1
+				},
+				"end": {
+					"line": 42,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Finally - own-line block comment",
+			"start": 587,
+			"end": 622,
+			"loc": {
+				"start": {
+					"line": 45,
+					"column": 1
+				},
+				"end": {
+					"line": 45,
+					"column": 36
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c10 ",
+			"start": 642,
+			"end": 651,
+			"loc": {
+				"start": {
+					"line": 48,
+					"column": 1
+				},
+				"end": {
+					"line": 48,
+					"column": 10
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 411,
+		"end": 667,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 402,
+			"end": 658,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 32,
+					"line": 51,
 					"column": 9
 				}
 			},
@@ -556,6 +652,245 @@
 							"value": " Finally - same blank handling after the keyword",
 							"start": 312,
 							"end": 362
+						}
+					]
+				},
+				{
+					"type": "TryStatement",
+					"start": 481,
+					"end": 513,
+					"loc": {
+						"start": {
+							"line": 34,
+							"column": 1
+						},
+						"end": {
+							"line": 37,
+							"column": 15
+						}
+					},
+					"block": {
+						"type": "BlockStatement",
+						"start": 496,
+						"end": 500,
+						"loc": {
+							"start": {
+								"line": 36,
+								"column": 1
+							},
+							"end": {
+								"line": 37,
+								"column": 2
+							}
+						},
+						"body": [],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c8 ",
+								"start": 486,
+								"end": 494
+							}
+						]
+					},
+					"handler": {
+						"type": "CatchClause",
+						"start": 501,
+						"end": 513,
+						"loc": {
+							"start": {
+								"line": 37,
+								"column": 3
+							},
+							"end": {
+								"line": 37,
+								"column": 15
+							}
+						},
+						"param": {
+							"type": "Identifier",
+							"start": 508,
+							"end": 509,
+							"loc": {
+								"start": {
+									"line": 37,
+									"column": 10
+								},
+								"end": {
+									"line": 37,
+									"column": 11
+								}
+							},
+							"name": "e"
+						},
+						"body": {
+							"type": "BlockStatement",
+							"start": 511,
+							"end": 513,
+							"loc": {
+								"start": {
+									"line": 37,
+									"column": 13
+								},
+								"end": {
+									"line": 37,
+									"column": 15
+								}
+							},
+							"body": []
+						}
+					},
+					"finalizer": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Try - an own-line block comment keeps its line, like a line comment does",
+							"start": 404,
+							"end": 479
+						}
+					]
+				},
+				{
+					"type": "TryStatement",
+					"start": 556,
+					"end": 584,
+					"loc": {
+						"start": {
+							"line": 40,
+							"column": 1
+						},
+						"end": {
+							"line": 43,
+							"column": 3
+						}
+					},
+					"block": {
+						"type": "BlockStatement",
+						"start": 560,
+						"end": 564,
+						"loc": {
+							"start": {
+								"line": 40,
+								"column": 5
+							},
+							"end": {
+								"line": 41,
+								"column": 2
+							}
+						},
+						"body": []
+					},
+					"handler": {
+						"type": "CatchClause",
+						"start": 565,
+						"end": 584,
+						"loc": {
+							"start": {
+								"line": 41,
+								"column": 3
+							},
+							"end": {
+								"line": 43,
+								"column": 3
+							}
+						},
+						"param": null,
+						"body": {
+							"type": "BlockStatement",
+							"start": 582,
+							"end": 584,
+							"loc": {
+								"start": {
+									"line": 43,
+									"column": 1
+								},
+								"end": {
+									"line": 43,
+									"column": 3
+								}
+							},
+							"body": [],
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c9 ",
+									"start": 572,
+									"end": 580
+								}
+							]
+						}
+					},
+					"finalizer": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Bare catch - own-line block comment",
+							"start": 516,
+							"end": 554
+						}
+					]
+				},
+				{
+					"type": "TryStatement",
+					"start": 624,
+					"end": 657,
+					"loc": {
+						"start": {
+							"line": 46,
+							"column": 1
+						},
+						"end": {
+							"line": 50,
+							"column": 2
+						}
+					},
+					"block": {
+						"type": "BlockStatement",
+						"start": 628,
+						"end": 632,
+						"loc": {
+							"start": {
+								"line": 46,
+								"column": 5
+							},
+							"end": {
+								"line": 47,
+								"column": 2
+							}
+						},
+						"body": []
+					},
+					"handler": null,
+					"finalizer": {
+						"type": "BlockStatement",
+						"start": 653,
+						"end": 657,
+						"loc": {
+							"start": {
+								"line": 49,
+								"column": 1
+							},
+							"end": {
+								"line": 50,
+								"column": 2
+							}
+						},
+						"body": [],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c10 ",
+								"start": 642,
+								"end": 651
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Finally - own-line block comment",
+							"start": 587,
+							"end": 622
 						}
 					]
 				}

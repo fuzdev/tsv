@@ -28,7 +28,9 @@ tsv keeps the author's placement.
 ## Cases
 
 Own-line line comment, trailing-`)` line comment, a blank between two own-line comments
-(preserved), and a block comment (normalizes to trailing `)` with `{` on the same line — the
-one shape where both formatters keep the brace hugged).
+(preserved), and both block-comment authorings. A block comment keeps its authored line like
+every other kind: authored trailing `)` it stays there with `{` hugged (the one shape where
+both formatters keep the brace hugged), authored on its own line it keeps that line and `{`
+drops below — where prettier absorbs it into the body, same as it does a `//`.
 
 See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

@@ -33,4 +33,26 @@
 	// c7
 	{
 	}
+
+	// Try - an own-line block comment keeps its line, like a line comment does
+	try
+
+	/* c8 */
+	{
+	} catch (e) {}
+
+	// Bare catch - own-line block comment
+	try {
+	} catch
+
+	/* c9 */
+	{}
+
+	// Finally - own-line block comment
+	try {
+	} finally
+
+	/* c10 */
+	{
+	}
 </script>

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 2570,
+	"end": 2572,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -236,9 +236,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " If - own-line block normalizes to inline",
+			"value": " If - same-line block comment stays inline",
 			"start": 473,
-			"end": 516,
+			"end": 517,
 			"loc": {
 				"start": {
 					"line": 28,
@@ -246,15 +246,15 @@
 				},
 				"end": {
 					"line": 28,
-					"column": 44
+					"column": 45
 				}
 			}
 		},
 		{
 			"type": "Block",
-			"value": " own line block ",
-			"start": 525,
-			"end": 545,
+			"value": " same line block ",
+			"start": 526,
+			"end": 547,
 			"loc": {
 				"start": {
 					"line": 29,
@@ -262,15 +262,15 @@
 				},
 				"end": {
 					"line": 29,
-					"column": 28
+					"column": 29
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " While - block comment before non-block body",
-			"start": 553,
-			"end": 599,
+			"start": 555,
+			"end": 601,
 			"loc": {
 				"start": {
 					"line": 32,
@@ -285,8 +285,8 @@
 		{
 			"type": "Block",
 			"value": " comment ",
-			"start": 611,
-			"end": 624,
+			"start": 613,
+			"end": 626,
 			"loc": {
 				"start": {
 					"line": 33,
@@ -301,8 +301,8 @@
 		{
 			"type": "Line",
 			"value": " While - line comment before non-block body",
-			"start": 633,
-			"end": 678,
+			"start": 635,
+			"end": 680,
 			"loc": {
 				"start": {
 					"line": 35,
@@ -317,8 +317,8 @@
 		{
 			"type": "Line",
 			"value": " comment",
-			"start": 692,
-			"end": 702,
+			"start": 694,
+			"end": 704,
 			"loc": {
 				"start": {
 					"line": 37,
@@ -333,8 +333,8 @@
 		{
 			"type": "Line",
 			"value": " For-in - block comment before block body",
-			"start": 713,
-			"end": 756,
+			"start": 715,
+			"end": 758,
 			"loc": {
 				"start": {
 					"line": 40,
@@ -349,8 +349,8 @@
 		{
 			"type": "Block",
 			"value": " comment ",
-			"start": 771,
-			"end": 784,
+			"start": 773,
+			"end": 786,
 			"loc": {
 				"start": {
 					"line": 41,
@@ -365,8 +365,8 @@
 		{
 			"type": "Line",
 			"value": " For-of - block comment before block body",
-			"start": 792,
-			"end": 835,
+			"start": 794,
+			"end": 837,
 			"loc": {
 				"start": {
 					"line": 44,
@@ -381,8 +381,8 @@
 		{
 			"type": "Block",
 			"value": " comment ",
-			"start": 850,
-			"end": 863,
+			"start": 852,
+			"end": 865,
 			"loc": {
 				"start": {
 					"line": 45,
@@ -397,8 +397,8 @@
 		{
 			"type": "Line",
 			"value": " Do - block comment between do and body",
-			"start": 871,
-			"end": 912,
+			"start": 873,
+			"end": 914,
 			"loc": {
 				"start": {
 					"line": 48,
@@ -413,8 +413,8 @@
 		{
 			"type": "Block",
 			"value": " comment ",
-			"start": 917,
-			"end": 930,
+			"start": 919,
+			"end": 932,
 			"loc": {
 				"start": {
 					"line": 49,
@@ -429,8 +429,8 @@
 		{
 			"type": "Line",
 			"value": " Else - block comment before block body",
-			"start": 947,
-			"end": 988,
+			"start": 949,
+			"end": 990,
 			"loc": {
 				"start": {
 					"line": 51,
@@ -445,8 +445,8 @@
 		{
 			"type": "Block",
 			"value": " comment ",
-			"start": 1007,
-			"end": 1020,
+			"start": 1009,
+			"end": 1022,
 			"loc": {
 				"start": {
 					"line": 53,
@@ -461,8 +461,8 @@
 		{
 			"type": "Line",
 			"value": " Else - block comment before non-block body",
-			"start": 1028,
-			"end": 1073,
+			"start": 1030,
+			"end": 1075,
 			"loc": {
 				"start": {
 					"line": 56,
@@ -477,8 +477,8 @@
 		{
 			"type": "Block",
 			"value": " comment ",
-			"start": 1092,
-			"end": 1105,
+			"start": 1094,
+			"end": 1107,
 			"loc": {
 				"start": {
 					"line": 58,
@@ -493,8 +493,8 @@
 		{
 			"type": "Line",
 			"value": " Try - block comment before body",
-			"start": 1114,
-			"end": 1148,
+			"start": 1116,
+			"end": 1150,
 			"loc": {
 				"start": {
 					"line": 60,
@@ -509,8 +509,8 @@
 		{
 			"type": "Block",
 			"value": " comment ",
-			"start": 1154,
-			"end": 1167,
+			"start": 1156,
+			"end": 1169,
 			"loc": {
 				"start": {
 					"line": 61,
@@ -525,8 +525,8 @@
 		{
 			"type": "Line",
 			"value": " Catch param - block comment before body",
-			"start": 1188,
-			"end": 1230,
+			"start": 1190,
+			"end": 1232,
 			"loc": {
 				"start": {
 					"line": 64,
@@ -541,8 +541,8 @@
 		{
 			"type": "Block",
 			"value": " comment ",
-			"start": 1251,
-			"end": 1264,
+			"start": 1253,
+			"end": 1266,
 			"loc": {
 				"start": {
 					"line": 66,
@@ -557,8 +557,8 @@
 		{
 			"type": "Line",
 			"value": " Catch no param - block comment before body",
-			"start": 1270,
-			"end": 1315,
+			"start": 1272,
+			"end": 1317,
 			"loc": {
 				"start": {
 					"line": 68,
@@ -573,8 +573,8 @@
 		{
 			"type": "Block",
 			"value": " comment ",
-			"start": 1332,
-			"end": 1345,
+			"start": 1334,
+			"end": 1347,
 			"loc": {
 				"start": {
 					"line": 70,
@@ -589,8 +589,8 @@
 		{
 			"type": "Line",
 			"value": " Finally - block comment before body",
-			"start": 1351,
-			"end": 1389,
+			"start": 1353,
+			"end": 1391,
 			"loc": {
 				"start": {
 					"line": 72,
@@ -605,8 +605,8 @@
 		{
 			"type": "Block",
 			"value": " comment ",
-			"start": 1408,
-			"end": 1421,
+			"start": 1410,
+			"end": 1423,
 			"loc": {
 				"start": {
 					"line": 74,
@@ -621,8 +621,8 @@
 		{
 			"type": "Line",
 			"value": " Else - long block comment (exceeds short lookback)",
-			"start": 1429,
-			"end": 1482,
+			"start": 1431,
+			"end": 1484,
 			"loc": {
 				"start": {
 					"line": 77,
@@ -637,8 +637,8 @@
 		{
 			"type": "Block",
 			"value": " very long block comment that exceeds twenty bytes easily ",
-			"start": 1501,
-			"end": 1563,
+			"start": 1503,
+			"end": 1565,
 			"loc": {
 				"start": {
 					"line": 79,
@@ -653,8 +653,8 @@
 		{
 			"type": "Line",
 			"value": " If - blank between two own-line comments, non-block body",
-			"start": 1571,
-			"end": 1630,
+			"start": 1573,
+			"end": 1632,
 			"loc": {
 				"start": {
 					"line": 82,
@@ -669,8 +669,8 @@
 		{
 			"type": "Line",
 			"value": " c1",
-			"start": 1641,
-			"end": 1646,
+			"start": 1643,
+			"end": 1648,
 			"loc": {
 				"start": {
 					"line": 84,
@@ -685,8 +685,8 @@
 		{
 			"type": "Line",
 			"value": " c2",
-			"start": 1650,
-			"end": 1655,
+			"start": 1652,
+			"end": 1657,
 			"loc": {
 				"start": {
 					"line": 86,
@@ -701,8 +701,8 @@
 		{
 			"type": "Line",
 			"value": " While - blank between two own-line comments, non-block body",
-			"start": 1666,
-			"end": 1728,
+			"start": 1668,
+			"end": 1730,
 			"loc": {
 				"start": {
 					"line": 89,
@@ -717,8 +717,8 @@
 		{
 			"type": "Line",
 			"value": " c1",
-			"start": 1742,
-			"end": 1747,
+			"start": 1744,
+			"end": 1749,
 			"loc": {
 				"start": {
 					"line": 91,
@@ -733,8 +733,8 @@
 		{
 			"type": "Line",
 			"value": " c2",
-			"start": 1751,
-			"end": 1756,
+			"start": 1753,
+			"end": 1758,
 			"loc": {
 				"start": {
 					"line": 93,
@@ -749,8 +749,8 @@
 		{
 			"type": "Line",
 			"value": " For-of - blank between two own-line comments, non-block body",
-			"start": 1767,
-			"end": 1830,
+			"start": 1769,
+			"end": 1832,
 			"loc": {
 				"start": {
 					"line": 96,
@@ -765,8 +765,8 @@
 		{
 			"type": "Line",
 			"value": " c1",
-			"start": 1847,
-			"end": 1852,
+			"start": 1849,
+			"end": 1854,
 			"loc": {
 				"start": {
 					"line": 98,
@@ -781,8 +781,8 @@
 		{
 			"type": "Line",
 			"value": " c2",
-			"start": 1856,
-			"end": 1861,
+			"start": 1858,
+			"end": 1863,
 			"loc": {
 				"start": {
 					"line": 100,
@@ -797,8 +797,8 @@
 		{
 			"type": "Line",
 			"value": " For-in - blank between two own-line comments, non-block body",
-			"start": 1872,
-			"end": 1935,
+			"start": 1874,
+			"end": 1937,
 			"loc": {
 				"start": {
 					"line": 103,
@@ -813,8 +813,8 @@
 		{
 			"type": "Line",
 			"value": " c1",
-			"start": 1952,
-			"end": 1957,
+			"start": 1954,
+			"end": 1959,
 			"loc": {
 				"start": {
 					"line": 105,
@@ -829,8 +829,8 @@
 		{
 			"type": "Line",
 			"value": " c2",
-			"start": 1961,
-			"end": 1966,
+			"start": 1963,
+			"end": 1968,
 			"loc": {
 				"start": {
 					"line": 107,
@@ -845,8 +845,8 @@
 		{
 			"type": "Line",
 			"value": " For - blank between two own-line comments, non-block body",
-			"start": 1977,
-			"end": 2037,
+			"start": 1979,
+			"end": 2039,
 			"loc": {
 				"start": {
 					"line": 110,
@@ -861,8 +861,8 @@
 		{
 			"type": "Line",
 			"value": " c1",
-			"start": 2050,
-			"end": 2055,
+			"start": 2052,
+			"end": 2057,
 			"loc": {
 				"start": {
 					"line": 112,
@@ -877,8 +877,8 @@
 		{
 			"type": "Line",
 			"value": " c2",
-			"start": 2059,
-			"end": 2064,
+			"start": 2061,
+			"end": 2066,
 			"loc": {
 				"start": {
 					"line": 114,
@@ -893,8 +893,8 @@
 		{
 			"type": "Line",
 			"value": " If - blank between two own-line comments, block body",
-			"start": 2075,
-			"end": 2130,
+			"start": 2077,
+			"end": 2132,
 			"loc": {
 				"start": {
 					"line": 117,
@@ -909,8 +909,8 @@
 		{
 			"type": "Line",
 			"value": " c1",
-			"start": 2140,
-			"end": 2145,
+			"start": 2142,
+			"end": 2147,
 			"loc": {
 				"start": {
 					"line": 119,
@@ -925,8 +925,8 @@
 		{
 			"type": "Line",
 			"value": " c2",
-			"start": 2148,
-			"end": 2153,
+			"start": 2150,
+			"end": 2155,
 			"loc": {
 				"start": {
 					"line": 121,
@@ -941,8 +941,8 @@
 		{
 			"type": "Line",
 			"value": " For - blank between two own-line comments, block body",
-			"start": 2162,
-			"end": 2218,
+			"start": 2164,
+			"end": 2220,
 			"loc": {
 				"start": {
 					"line": 125,
@@ -957,8 +957,8 @@
 		{
 			"type": "Line",
 			"value": " c1",
-			"start": 2230,
-			"end": 2235,
+			"start": 2232,
+			"end": 2237,
 			"loc": {
 				"start": {
 					"line": 127,
@@ -973,8 +973,8 @@
 		{
 			"type": "Line",
 			"value": " c2",
-			"start": 2238,
-			"end": 2243,
+			"start": 2240,
+			"end": 2245,
 			"loc": {
 				"start": {
 					"line": 129,
@@ -989,8 +989,8 @@
 		{
 			"type": "Line",
 			"value": " Else - blank between two own-line comments, block body",
-			"start": 2250,
-			"end": 2307,
+			"start": 2252,
+			"end": 2309,
 			"loc": {
 				"start": {
 					"line": 132,
@@ -1005,8 +1005,8 @@
 		{
 			"type": "Line",
 			"value": " c1",
-			"start": 2327,
-			"end": 2332,
+			"start": 2329,
+			"end": 2334,
 			"loc": {
 				"start": {
 					"line": 135,
@@ -1021,8 +1021,8 @@
 		{
 			"type": "Line",
 			"value": " c2",
-			"start": 2335,
-			"end": 2340,
+			"start": 2337,
+			"end": 2342,
 			"loc": {
 				"start": {
 					"line": 137,
@@ -1037,8 +1037,8 @@
 		{
 			"type": "Line",
 			"value": " Else - blank between two own-line comments, non-block body",
-			"start": 2349,
-			"end": 2410,
+			"start": 2351,
+			"end": 2412,
 			"loc": {
 				"start": {
 					"line": 141,
@@ -1053,8 +1053,8 @@
 		{
 			"type": "Line",
 			"value": " c1",
-			"start": 2431,
-			"end": 2436,
+			"start": 2433,
+			"end": 2438,
 			"loc": {
 				"start": {
 					"line": 144,
@@ -1069,8 +1069,8 @@
 		{
 			"type": "Line",
 			"value": " c2",
-			"start": 2440,
-			"end": 2445,
+			"start": 2442,
+			"end": 2447,
 			"loc": {
 				"start": {
 					"line": 146,
@@ -1085,8 +1085,8 @@
 		{
 			"type": "Line",
 			"value": " Do - blank between two own-line comments before the body",
-			"start": 2456,
-			"end": 2515,
+			"start": 2458,
+			"end": 2517,
 			"loc": {
 				"start": {
 					"line": 149,
@@ -1101,8 +1101,8 @@
 		{
 			"type": "Line",
 			"value": " c1",
-			"start": 2521,
-			"end": 2526,
+			"start": 2523,
+			"end": 2528,
 			"loc": {
 				"start": {
 					"line": 151,
@@ -1117,8 +1117,8 @@
 		{
 			"type": "Line",
 			"value": " c2",
-			"start": 2529,
-			"end": 2534,
+			"start": 2531,
+			"end": 2536,
 			"loc": {
 				"start": {
 					"line": 153,
@@ -1134,12 +1134,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 2569,
+		"end": 2571,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 2560,
+			"end": 2562,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -1617,8 +1617,8 @@
 				},
 				{
 					"type": "IfStatement",
-					"start": 518,
-					"end": 550,
+					"start": 519,
+					"end": 552,
 					"loc": {
 						"start": {
 							"line": 29,
@@ -1631,8 +1631,8 @@
 					},
 					"test": {
 						"type": "Identifier",
-						"start": 522,
-						"end": 523,
+						"start": 523,
+						"end": 524,
 						"loc": {
 							"start": {
 								"line": 29,
@@ -1647,20 +1647,20 @@
 						"trailingComments": [
 							{
 								"type": "Block",
-								"value": " own line block ",
-								"start": 525,
-								"end": 545
+								"value": " same line block ",
+								"start": 526,
+								"end": 547
 							}
 						]
 					},
 					"consequent": {
 						"type": "BlockStatement",
-						"start": 546,
-						"end": 550,
+						"start": 548,
+						"end": 552,
 						"loc": {
 							"start": {
 								"line": 29,
-								"column": 29
+								"column": 30
 							},
 							"end": {
 								"line": 30,
@@ -1673,16 +1673,16 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " If - own-line block normalizes to inline",
+							"value": " If - same-line block comment stays inline",
 							"start": 473,
-							"end": 516
+							"end": 517
 						}
 					]
 				},
 				{
 					"type": "WhileStatement",
-					"start": 601,
-					"end": 630,
+					"start": 603,
+					"end": 632,
 					"loc": {
 						"start": {
 							"line": 33,
@@ -1695,8 +1695,8 @@
 					},
 					"test": {
 						"type": "Identifier",
-						"start": 608,
-						"end": 609,
+						"start": 610,
+						"end": 611,
 						"loc": {
 							"start": {
 								"line": 33,
@@ -1712,15 +1712,15 @@
 							{
 								"type": "Block",
 								"value": " comment ",
-								"start": 611,
-								"end": 624
+								"start": 613,
+								"end": 626
 							}
 						]
 					},
 					"body": {
 						"type": "ExpressionStatement",
-						"start": 625,
-						"end": 630,
+						"start": 627,
+						"end": 632,
 						"loc": {
 							"start": {
 								"line": 33,
@@ -1733,8 +1733,8 @@
 						},
 						"expression": {
 							"type": "CallExpression",
-							"start": 625,
-							"end": 629,
+							"start": 627,
+							"end": 631,
 							"loc": {
 								"start": {
 									"line": 33,
@@ -1747,8 +1747,8 @@
 							},
 							"callee": {
 								"type": "Identifier",
-								"start": 625,
-								"end": 627,
+								"start": 627,
+								"end": 629,
 								"loc": {
 									"start": {
 										"line": 33,
@@ -1769,15 +1769,15 @@
 						{
 							"type": "Line",
 							"value": " While - block comment before non-block body",
-							"start": 553,
-							"end": 599
+							"start": 555,
+							"end": 601
 						}
 					]
 				},
 				{
 					"type": "WhileStatement",
-					"start": 680,
-					"end": 710,
+					"start": 682,
+					"end": 712,
 					"loc": {
 						"start": {
 							"line": 36,
@@ -1790,8 +1790,8 @@
 					},
 					"test": {
 						"type": "Identifier",
-						"start": 687,
-						"end": 688,
+						"start": 689,
+						"end": 690,
 						"loc": {
 							"start": {
 								"line": 36,
@@ -1806,8 +1806,8 @@
 					},
 					"body": {
 						"type": "ExpressionStatement",
-						"start": 705,
-						"end": 710,
+						"start": 707,
+						"end": 712,
 						"loc": {
 							"start": {
 								"line": 38,
@@ -1820,8 +1820,8 @@
 						},
 						"expression": {
 							"type": "CallExpression",
-							"start": 705,
-							"end": 709,
+							"start": 707,
+							"end": 711,
 							"loc": {
 								"start": {
 									"line": 38,
@@ -1834,8 +1834,8 @@
 							},
 							"callee": {
 								"type": "Identifier",
-								"start": 705,
-								"end": 707,
+								"start": 707,
+								"end": 709,
 								"loc": {
 									"start": {
 										"line": 38,
@@ -1855,8 +1855,8 @@
 							{
 								"type": "Line",
 								"value": " comment",
-								"start": 692,
-								"end": 702
+								"start": 694,
+								"end": 704
 							}
 						]
 					},
@@ -1864,15 +1864,15 @@
 						{
 							"type": "Line",
 							"value": " While - line comment before non-block body",
-							"start": 633,
-							"end": 678
+							"start": 635,
+							"end": 680
 						}
 					]
 				},
 				{
 					"type": "ForInStatement",
-					"start": 758,
-					"end": 789,
+					"start": 760,
+					"end": 791,
 					"loc": {
 						"start": {
 							"line": 41,
@@ -1885,8 +1885,8 @@
 					},
 					"left": {
 						"type": "Identifier",
-						"start": 763,
-						"end": 764,
+						"start": 765,
+						"end": 766,
 						"loc": {
 							"start": {
 								"line": 41,
@@ -1901,8 +1901,8 @@
 					},
 					"right": {
 						"type": "Identifier",
-						"start": 768,
-						"end": 769,
+						"start": 770,
+						"end": 771,
 						"loc": {
 							"start": {
 								"line": 41,
@@ -1918,15 +1918,15 @@
 							{
 								"type": "Block",
 								"value": " comment ",
-								"start": 771,
-								"end": 784
+								"start": 773,
+								"end": 786
 							}
 						]
 					},
 					"body": {
 						"type": "BlockStatement",
-						"start": 785,
-						"end": 789,
+						"start": 787,
+						"end": 791,
 						"loc": {
 							"start": {
 								"line": 41,
@@ -1943,15 +1943,15 @@
 						{
 							"type": "Line",
 							"value": " For-in - block comment before block body",
-							"start": 713,
-							"end": 756
+							"start": 715,
+							"end": 758
 						}
 					]
 				},
 				{
 					"type": "ForOfStatement",
-					"start": 837,
-					"end": 868,
+					"start": 839,
+					"end": 870,
 					"loc": {
 						"start": {
 							"line": 45,
@@ -1965,8 +1965,8 @@
 					"await": false,
 					"left": {
 						"type": "Identifier",
-						"start": 842,
-						"end": 843,
+						"start": 844,
+						"end": 845,
 						"loc": {
 							"start": {
 								"line": 45,
@@ -1981,8 +1981,8 @@
 					},
 					"right": {
 						"type": "Identifier",
-						"start": 847,
-						"end": 848,
+						"start": 849,
+						"end": 850,
 						"loc": {
 							"start": {
 								"line": 45,
@@ -1998,15 +1998,15 @@
 							{
 								"type": "Block",
 								"value": " comment ",
-								"start": 850,
-								"end": 863
+								"start": 852,
+								"end": 865
 							}
 						]
 					},
 					"body": {
 						"type": "BlockStatement",
-						"start": 864,
-						"end": 868,
+						"start": 866,
+						"end": 870,
 						"loc": {
 							"start": {
 								"line": 45,
@@ -2023,15 +2023,15 @@
 						{
 							"type": "Line",
 							"value": " For-of - block comment before block body",
-							"start": 792,
-							"end": 835
+							"start": 794,
+							"end": 837
 						}
 					]
 				},
 				{
 					"type": "DoWhileStatement",
-					"start": 914,
-					"end": 944,
+					"start": 916,
+					"end": 946,
 					"loc": {
 						"start": {
 							"line": 49,
@@ -2044,8 +2044,8 @@
 					},
 					"body": {
 						"type": "BlockStatement",
-						"start": 931,
-						"end": 933,
+						"start": 933,
+						"end": 935,
 						"loc": {
 							"start": {
 								"line": 49,
@@ -2061,15 +2061,15 @@
 							{
 								"type": "Block",
 								"value": " comment ",
-								"start": 917,
-								"end": 930
+								"start": 919,
+								"end": 932
 							}
 						]
 					},
 					"test": {
 						"type": "Identifier",
-						"start": 941,
-						"end": 942,
+						"start": 943,
+						"end": 944,
 						"loc": {
 							"start": {
 								"line": 49,
@@ -2086,15 +2086,15 @@
 						{
 							"type": "Line",
 							"value": " Do - block comment between do and body",
-							"start": 871,
-							"end": 912
+							"start": 873,
+							"end": 914
 						}
 					]
 				},
 				{
 					"type": "IfStatement",
-					"start": 990,
-					"end": 1025,
+					"start": 992,
+					"end": 1027,
 					"loc": {
 						"start": {
 							"line": 52,
@@ -2107,8 +2107,8 @@
 					},
 					"test": {
 						"type": "Identifier",
-						"start": 994,
-						"end": 995,
+						"start": 996,
+						"end": 997,
 						"loc": {
 							"start": {
 								"line": 52,
@@ -2123,8 +2123,8 @@
 					},
 					"consequent": {
 						"type": "BlockStatement",
-						"start": 997,
-						"end": 1001,
+						"start": 999,
+						"end": 1003,
 						"loc": {
 							"start": {
 								"line": 52,
@@ -2139,8 +2139,8 @@
 					},
 					"alternate": {
 						"type": "BlockStatement",
-						"start": 1021,
-						"end": 1025,
+						"start": 1023,
+						"end": 1027,
 						"loc": {
 							"start": {
 								"line": 53,
@@ -2156,8 +2156,8 @@
 							{
 								"type": "Block",
 								"value": " comment ",
-								"start": 1007,
-								"end": 1020
+								"start": 1009,
+								"end": 1022
 							}
 						]
 					},
@@ -2165,15 +2165,15 @@
 						{
 							"type": "Line",
 							"value": " Else - block comment before block body",
-							"start": 947,
-							"end": 988
+							"start": 949,
+							"end": 990
 						}
 					]
 				},
 				{
 					"type": "IfStatement",
-					"start": 1075,
-					"end": 1111,
+					"start": 1077,
+					"end": 1113,
 					"loc": {
 						"start": {
 							"line": 57,
@@ -2186,8 +2186,8 @@
 					},
 					"test": {
 						"type": "Identifier",
-						"start": 1079,
-						"end": 1080,
+						"start": 1081,
+						"end": 1082,
 						"loc": {
 							"start": {
 								"line": 57,
@@ -2202,8 +2202,8 @@
 					},
 					"consequent": {
 						"type": "BlockStatement",
-						"start": 1082,
-						"end": 1086,
+						"start": 1084,
+						"end": 1088,
 						"loc": {
 							"start": {
 								"line": 57,
@@ -2218,8 +2218,8 @@
 					},
 					"alternate": {
 						"type": "ExpressionStatement",
-						"start": 1106,
-						"end": 1111,
+						"start": 1108,
+						"end": 1113,
 						"loc": {
 							"start": {
 								"line": 58,
@@ -2232,8 +2232,8 @@
 						},
 						"expression": {
 							"type": "CallExpression",
-							"start": 1106,
-							"end": 1110,
+							"start": 1108,
+							"end": 1112,
 							"loc": {
 								"start": {
 									"line": 58,
@@ -2246,8 +2246,8 @@
 							},
 							"callee": {
 								"type": "Identifier",
-								"start": 1106,
-								"end": 1108,
+								"start": 1108,
+								"end": 1110,
 								"loc": {
 									"start": {
 										"line": 58,
@@ -2267,8 +2267,8 @@
 							{
 								"type": "Block",
 								"value": " comment ",
-								"start": 1092,
-								"end": 1105
+								"start": 1094,
+								"end": 1107
 							}
 						]
 					},
@@ -2276,15 +2276,15 @@
 						{
 							"type": "Line",
 							"value": " Else - block comment before non-block body",
-							"start": 1028,
-							"end": 1073
+							"start": 1030,
+							"end": 1075
 						}
 					]
 				},
 				{
 					"type": "TryStatement",
-					"start": 1150,
-					"end": 1185,
+					"start": 1152,
+					"end": 1187,
 					"loc": {
 						"start": {
 							"line": 61,
@@ -2297,8 +2297,8 @@
 					},
 					"block": {
 						"type": "BlockStatement",
-						"start": 1168,
-						"end": 1172,
+						"start": 1170,
+						"end": 1174,
 						"loc": {
 							"start": {
 								"line": 61,
@@ -2314,15 +2314,15 @@
 							{
 								"type": "Block",
 								"value": " comment ",
-								"start": 1154,
-								"end": 1167
+								"start": 1156,
+								"end": 1169
 							}
 						]
 					},
 					"handler": {
 						"type": "CatchClause",
-						"start": 1173,
-						"end": 1185,
+						"start": 1175,
+						"end": 1187,
 						"loc": {
 							"start": {
 								"line": 62,
@@ -2335,8 +2335,8 @@
 						},
 						"param": {
 							"type": "Identifier",
-							"start": 1180,
-							"end": 1181,
+							"start": 1182,
+							"end": 1183,
 							"loc": {
 								"start": {
 									"line": 62,
@@ -2351,8 +2351,8 @@
 						},
 						"body": {
 							"type": "BlockStatement",
-							"start": 1183,
-							"end": 1185,
+							"start": 1185,
+							"end": 1187,
 							"loc": {
 								"start": {
 									"line": 62,
@@ -2371,15 +2371,15 @@
 						{
 							"type": "Line",
 							"value": " Try - block comment before body",
-							"start": 1114,
-							"end": 1148
+							"start": 1116,
+							"end": 1150
 						}
 					]
 				},
 				{
 					"type": "TryStatement",
-					"start": 1232,
-					"end": 1267,
+					"start": 1234,
+					"end": 1269,
 					"loc": {
 						"start": {
 							"line": 65,
@@ -2392,8 +2392,8 @@
 					},
 					"block": {
 						"type": "BlockStatement",
-						"start": 1236,
-						"end": 1240,
+						"start": 1238,
+						"end": 1242,
 						"loc": {
 							"start": {
 								"line": 65,
@@ -2408,8 +2408,8 @@
 					},
 					"handler": {
 						"type": "CatchClause",
-						"start": 1241,
-						"end": 1267,
+						"start": 1243,
+						"end": 1269,
 						"loc": {
 							"start": {
 								"line": 66,
@@ -2422,8 +2422,8 @@
 						},
 						"param": {
 							"type": "Identifier",
-							"start": 1248,
-							"end": 1249,
+							"start": 1250,
+							"end": 1251,
 							"loc": {
 								"start": {
 									"line": 66,
@@ -2439,15 +2439,15 @@
 								{
 									"type": "Block",
 									"value": " comment ",
-									"start": 1251,
-									"end": 1264
+									"start": 1253,
+									"end": 1266
 								}
 							]
 						},
 						"body": {
 							"type": "BlockStatement",
-							"start": 1265,
-							"end": 1267,
+							"start": 1267,
+							"end": 1269,
 							"loc": {
 								"start": {
 									"line": 66,
@@ -2466,15 +2466,15 @@
 						{
 							"type": "Line",
 							"value": " Catch param - block comment before body",
-							"start": 1188,
-							"end": 1230
+							"start": 1190,
+							"end": 1232
 						}
 					]
 				},
 				{
 					"type": "TryStatement",
-					"start": 1317,
-					"end": 1348,
+					"start": 1319,
+					"end": 1350,
 					"loc": {
 						"start": {
 							"line": 69,
@@ -2487,8 +2487,8 @@
 					},
 					"block": {
 						"type": "BlockStatement",
-						"start": 1321,
-						"end": 1325,
+						"start": 1323,
+						"end": 1327,
 						"loc": {
 							"start": {
 								"line": 69,
@@ -2503,8 +2503,8 @@
 					},
 					"handler": {
 						"type": "CatchClause",
-						"start": 1326,
-						"end": 1348,
+						"start": 1328,
+						"end": 1350,
 						"loc": {
 							"start": {
 								"line": 70,
@@ -2518,8 +2518,8 @@
 						"param": null,
 						"body": {
 							"type": "BlockStatement",
-							"start": 1346,
-							"end": 1348,
+							"start": 1348,
+							"end": 1350,
 							"loc": {
 								"start": {
 									"line": 70,
@@ -2535,8 +2535,8 @@
 								{
 									"type": "Block",
 									"value": " comment ",
-									"start": 1332,
-									"end": 1345
+									"start": 1334,
+									"end": 1347
 								}
 							]
 						}
@@ -2546,15 +2546,15 @@
 						{
 							"type": "Line",
 							"value": " Catch no param - block comment before body",
-							"start": 1270,
-							"end": 1315
+							"start": 1272,
+							"end": 1317
 						}
 					]
 				},
 				{
 					"type": "TryStatement",
-					"start": 1391,
-					"end": 1426,
+					"start": 1393,
+					"end": 1428,
 					"loc": {
 						"start": {
 							"line": 73,
@@ -2567,8 +2567,8 @@
 					},
 					"block": {
 						"type": "BlockStatement",
-						"start": 1395,
-						"end": 1399,
+						"start": 1397,
+						"end": 1401,
 						"loc": {
 							"start": {
 								"line": 73,
@@ -2584,8 +2584,8 @@
 					"handler": null,
 					"finalizer": {
 						"type": "BlockStatement",
-						"start": 1422,
-						"end": 1426,
+						"start": 1424,
+						"end": 1428,
 						"loc": {
 							"start": {
 								"line": 74,
@@ -2601,8 +2601,8 @@
 							{
 								"type": "Block",
 								"value": " comment ",
-								"start": 1408,
-								"end": 1421
+								"start": 1410,
+								"end": 1423
 							}
 						]
 					},
@@ -2610,15 +2610,15 @@
 						{
 							"type": "Line",
 							"value": " Finally - block comment before body",
-							"start": 1351,
-							"end": 1389
+							"start": 1353,
+							"end": 1391
 						}
 					]
 				},
 				{
 					"type": "IfStatement",
-					"start": 1484,
-					"end": 1568,
+					"start": 1486,
+					"end": 1570,
 					"loc": {
 						"start": {
 							"line": 78,
@@ -2631,8 +2631,8 @@
 					},
 					"test": {
 						"type": "Identifier",
-						"start": 1488,
-						"end": 1489,
+						"start": 1490,
+						"end": 1491,
 						"loc": {
 							"start": {
 								"line": 78,
@@ -2647,8 +2647,8 @@
 					},
 					"consequent": {
 						"type": "BlockStatement",
-						"start": 1491,
-						"end": 1495,
+						"start": 1493,
+						"end": 1497,
 						"loc": {
 							"start": {
 								"line": 78,
@@ -2663,8 +2663,8 @@
 					},
 					"alternate": {
 						"type": "BlockStatement",
-						"start": 1564,
-						"end": 1568,
+						"start": 1566,
+						"end": 1570,
 						"loc": {
 							"start": {
 								"line": 79,
@@ -2680,8 +2680,8 @@
 							{
 								"type": "Block",
 								"value": " very long block comment that exceeds twenty bytes easily ",
-								"start": 1501,
-								"end": 1563
+								"start": 1503,
+								"end": 1565
 							}
 						]
 					},
@@ -2689,15 +2689,15 @@
 						{
 							"type": "Line",
 							"value": " Else - long block comment (exceeds short lookback)",
-							"start": 1429,
-							"end": 1482
+							"start": 1431,
+							"end": 1484
 						}
 					]
 				},
 				{
 					"type": "IfStatement",
-					"start": 1632,
-					"end": 1663,
+					"start": 1634,
+					"end": 1665,
 					"loc": {
 						"start": {
 							"line": 83,
@@ -2710,8 +2710,8 @@
 					},
 					"test": {
 						"type": "Identifier",
-						"start": 1636,
-						"end": 1637,
+						"start": 1638,
+						"end": 1639,
 						"loc": {
 							"start": {
 								"line": 83,
@@ -2726,8 +2726,8 @@
 					},
 					"consequent": {
 						"type": "ExpressionStatement",
-						"start": 1658,
-						"end": 1663,
+						"start": 1660,
+						"end": 1665,
 						"loc": {
 							"start": {
 								"line": 87,
@@ -2740,8 +2740,8 @@
 						},
 						"expression": {
 							"type": "CallExpression",
-							"start": 1658,
-							"end": 1662,
+							"start": 1660,
+							"end": 1664,
 							"loc": {
 								"start": {
 									"line": 87,
@@ -2754,8 +2754,8 @@
 							},
 							"callee": {
 								"type": "Identifier",
-								"start": 1658,
-								"end": 1660,
+								"start": 1660,
+								"end": 1662,
 								"loc": {
 									"start": {
 										"line": 87,
@@ -2775,14 +2775,14 @@
 							{
 								"type": "Line",
 								"value": " c1",
-								"start": 1641,
-								"end": 1646
+								"start": 1643,
+								"end": 1648
 							},
 							{
 								"type": "Line",
 								"value": " c2",
-								"start": 1650,
-								"end": 1655
+								"start": 1652,
+								"end": 1657
 							}
 						]
 					},
@@ -2791,15 +2791,15 @@
 						{
 							"type": "Line",
 							"value": " If - blank between two own-line comments, non-block body",
-							"start": 1571,
-							"end": 1630
+							"start": 1573,
+							"end": 1632
 						}
 					]
 				},
 				{
 					"type": "WhileStatement",
-					"start": 1730,
-					"end": 1764,
+					"start": 1732,
+					"end": 1766,
 					"loc": {
 						"start": {
 							"line": 90,
@@ -2812,8 +2812,8 @@
 					},
 					"test": {
 						"type": "Identifier",
-						"start": 1737,
-						"end": 1738,
+						"start": 1739,
+						"end": 1740,
 						"loc": {
 							"start": {
 								"line": 90,
@@ -2828,8 +2828,8 @@
 					},
 					"body": {
 						"type": "ExpressionStatement",
-						"start": 1759,
-						"end": 1764,
+						"start": 1761,
+						"end": 1766,
 						"loc": {
 							"start": {
 								"line": 94,
@@ -2842,8 +2842,8 @@
 						},
 						"expression": {
 							"type": "CallExpression",
-							"start": 1759,
-							"end": 1763,
+							"start": 1761,
+							"end": 1765,
 							"loc": {
 								"start": {
 									"line": 94,
@@ -2856,8 +2856,8 @@
 							},
 							"callee": {
 								"type": "Identifier",
-								"start": 1759,
-								"end": 1761,
+								"start": 1761,
+								"end": 1763,
 								"loc": {
 									"start": {
 										"line": 94,
@@ -2877,14 +2877,14 @@
 							{
 								"type": "Line",
 								"value": " c1",
-								"start": 1742,
-								"end": 1747
+								"start": 1744,
+								"end": 1749
 							},
 							{
 								"type": "Line",
 								"value": " c2",
-								"start": 1751,
-								"end": 1756
+								"start": 1753,
+								"end": 1758
 							}
 						]
 					},
@@ -2892,15 +2892,15 @@
 						{
 							"type": "Line",
 							"value": " While - blank between two own-line comments, non-block body",
-							"start": 1666,
-							"end": 1728
+							"start": 1668,
+							"end": 1730
 						}
 					]
 				},
 				{
 					"type": "ForOfStatement",
-					"start": 1832,
-					"end": 1869,
+					"start": 1834,
+					"end": 1871,
 					"loc": {
 						"start": {
 							"line": 97,
@@ -2914,8 +2914,8 @@
 					"await": false,
 					"left": {
 						"type": "Identifier",
-						"start": 1837,
-						"end": 1838,
+						"start": 1839,
+						"end": 1840,
 						"loc": {
 							"start": {
 								"line": 97,
@@ -2930,8 +2930,8 @@
 					},
 					"right": {
 						"type": "Identifier",
-						"start": 1842,
-						"end": 1843,
+						"start": 1844,
+						"end": 1845,
 						"loc": {
 							"start": {
 								"line": 97,
@@ -2946,8 +2946,8 @@
 					},
 					"body": {
 						"type": "ExpressionStatement",
-						"start": 1864,
-						"end": 1869,
+						"start": 1866,
+						"end": 1871,
 						"loc": {
 							"start": {
 								"line": 101,
@@ -2960,8 +2960,8 @@
 						},
 						"expression": {
 							"type": "CallExpression",
-							"start": 1864,
-							"end": 1868,
+							"start": 1866,
+							"end": 1870,
 							"loc": {
 								"start": {
 									"line": 101,
@@ -2974,8 +2974,8 @@
 							},
 							"callee": {
 								"type": "Identifier",
-								"start": 1864,
-								"end": 1866,
+								"start": 1866,
+								"end": 1868,
 								"loc": {
 									"start": {
 										"line": 101,
@@ -2995,14 +2995,14 @@
 							{
 								"type": "Line",
 								"value": " c1",
-								"start": 1847,
-								"end": 1852
+								"start": 1849,
+								"end": 1854
 							},
 							{
 								"type": "Line",
 								"value": " c2",
-								"start": 1856,
-								"end": 1861
+								"start": 1858,
+								"end": 1863
 							}
 						]
 					},
@@ -3010,15 +3010,15 @@
 						{
 							"type": "Line",
 							"value": " For-of - blank between two own-line comments, non-block body",
-							"start": 1767,
-							"end": 1830
+							"start": 1769,
+							"end": 1832
 						}
 					]
 				},
 				{
 					"type": "ForInStatement",
-					"start": 1937,
-					"end": 1974,
+					"start": 1939,
+					"end": 1976,
 					"loc": {
 						"start": {
 							"line": 104,
@@ -3031,8 +3031,8 @@
 					},
 					"left": {
 						"type": "Identifier",
-						"start": 1942,
-						"end": 1943,
+						"start": 1944,
+						"end": 1945,
 						"loc": {
 							"start": {
 								"line": 104,
@@ -3047,8 +3047,8 @@
 					},
 					"right": {
 						"type": "Identifier",
-						"start": 1947,
-						"end": 1948,
+						"start": 1949,
+						"end": 1950,
 						"loc": {
 							"start": {
 								"line": 104,
@@ -3063,8 +3063,8 @@
 					},
 					"body": {
 						"type": "ExpressionStatement",
-						"start": 1969,
-						"end": 1974,
+						"start": 1971,
+						"end": 1976,
 						"loc": {
 							"start": {
 								"line": 108,
@@ -3077,8 +3077,8 @@
 						},
 						"expression": {
 							"type": "CallExpression",
-							"start": 1969,
-							"end": 1973,
+							"start": 1971,
+							"end": 1975,
 							"loc": {
 								"start": {
 									"line": 108,
@@ -3091,8 +3091,8 @@
 							},
 							"callee": {
 								"type": "Identifier",
-								"start": 1969,
-								"end": 1971,
+								"start": 1971,
+								"end": 1973,
 								"loc": {
 									"start": {
 										"line": 108,
@@ -3112,14 +3112,14 @@
 							{
 								"type": "Line",
 								"value": " c1",
-								"start": 1952,
-								"end": 1957
+								"start": 1954,
+								"end": 1959
 							},
 							{
 								"type": "Line",
 								"value": " c2",
-								"start": 1961,
-								"end": 1966
+								"start": 1963,
+								"end": 1968
 							}
 						]
 					},
@@ -3127,15 +3127,15 @@
 						{
 							"type": "Line",
 							"value": " For-in - blank between two own-line comments, non-block body",
-							"start": 1872,
-							"end": 1935
+							"start": 1874,
+							"end": 1937
 						}
 					]
 				},
 				{
 					"type": "ForStatement",
-					"start": 2039,
-					"end": 2072,
+					"start": 2041,
+					"end": 2074,
 					"loc": {
 						"start": {
 							"line": 111,
@@ -3151,8 +3151,8 @@
 					"update": null,
 					"body": {
 						"type": "ExpressionStatement",
-						"start": 2067,
-						"end": 2072,
+						"start": 2069,
+						"end": 2074,
 						"loc": {
 							"start": {
 								"line": 115,
@@ -3165,8 +3165,8 @@
 						},
 						"expression": {
 							"type": "CallExpression",
-							"start": 2067,
-							"end": 2071,
+							"start": 2069,
+							"end": 2073,
 							"loc": {
 								"start": {
 									"line": 115,
@@ -3179,8 +3179,8 @@
 							},
 							"callee": {
 								"type": "Identifier",
-								"start": 2067,
-								"end": 2069,
+								"start": 2069,
+								"end": 2071,
 								"loc": {
 									"start": {
 										"line": 115,
@@ -3200,14 +3200,14 @@
 							{
 								"type": "Line",
 								"value": " c1",
-								"start": 2050,
-								"end": 2055
+								"start": 2052,
+								"end": 2057
 							},
 							{
 								"type": "Line",
 								"value": " c2",
-								"start": 2059,
-								"end": 2064
+								"start": 2061,
+								"end": 2066
 							}
 						]
 					},
@@ -3215,15 +3215,15 @@
 						{
 							"type": "Line",
 							"value": " For - blank between two own-line comments, non-block body",
-							"start": 1977,
-							"end": 2037
+							"start": 1979,
+							"end": 2039
 						}
 					]
 				},
 				{
 					"type": "IfStatement",
-					"start": 2132,
-					"end": 2159,
+					"start": 2134,
+					"end": 2161,
 					"loc": {
 						"start": {
 							"line": 118,
@@ -3236,8 +3236,8 @@
 					},
 					"test": {
 						"type": "Identifier",
-						"start": 2136,
-						"end": 2137,
+						"start": 2138,
+						"end": 2139,
 						"loc": {
 							"start": {
 								"line": 118,
@@ -3252,8 +3252,8 @@
 					},
 					"consequent": {
 						"type": "BlockStatement",
-						"start": 2155,
-						"end": 2159,
+						"start": 2157,
+						"end": 2161,
 						"loc": {
 							"start": {
 								"line": 122,
@@ -3269,14 +3269,14 @@
 							{
 								"type": "Line",
 								"value": " c1",
-								"start": 2140,
-								"end": 2145
+								"start": 2142,
+								"end": 2147
 							},
 							{
 								"type": "Line",
 								"value": " c2",
-								"start": 2148,
-								"end": 2153
+								"start": 2150,
+								"end": 2155
 							}
 						]
 					},
@@ -3285,15 +3285,15 @@
 						{
 							"type": "Line",
 							"value": " If - blank between two own-line comments, block body",
-							"start": 2075,
-							"end": 2130
+							"start": 2077,
+							"end": 2132
 						}
 					]
 				},
 				{
 					"type": "ForStatement",
-					"start": 2220,
-					"end": 2247,
+					"start": 2222,
+					"end": 2249,
 					"loc": {
 						"start": {
 							"line": 126,
@@ -3309,8 +3309,8 @@
 					"update": null,
 					"body": {
 						"type": "BlockStatement",
-						"start": 2245,
-						"end": 2247,
+						"start": 2247,
+						"end": 2249,
 						"loc": {
 							"start": {
 								"line": 130,
@@ -3326,14 +3326,14 @@
 							{
 								"type": "Line",
 								"value": " c1",
-								"start": 2230,
-								"end": 2235
+								"start": 2232,
+								"end": 2237
 							},
 							{
 								"type": "Line",
 								"value": " c2",
-								"start": 2238,
-								"end": 2243
+								"start": 2240,
+								"end": 2245
 							}
 						]
 					},
@@ -3341,15 +3341,15 @@
 						{
 							"type": "Line",
 							"value": " For - blank between two own-line comments, block body",
-							"start": 2162,
-							"end": 2218
+							"start": 2164,
+							"end": 2220
 						}
 					]
 				},
 				{
 					"type": "IfStatement",
-					"start": 2309,
-					"end": 2346,
+					"start": 2311,
+					"end": 2348,
 					"loc": {
 						"start": {
 							"line": 133,
@@ -3362,8 +3362,8 @@
 					},
 					"test": {
 						"type": "Identifier",
-						"start": 2313,
-						"end": 2314,
+						"start": 2315,
+						"end": 2316,
 						"loc": {
 							"start": {
 								"line": 133,
@@ -3378,8 +3378,8 @@
 					},
 					"consequent": {
 						"type": "BlockStatement",
-						"start": 2316,
-						"end": 2320,
+						"start": 2318,
+						"end": 2322,
 						"loc": {
 							"start": {
 								"line": 133,
@@ -3394,8 +3394,8 @@
 					},
 					"alternate": {
 						"type": "BlockStatement",
-						"start": 2342,
-						"end": 2346,
+						"start": 2344,
+						"end": 2348,
 						"loc": {
 							"start": {
 								"line": 138,
@@ -3411,14 +3411,14 @@
 							{
 								"type": "Line",
 								"value": " c1",
-								"start": 2327,
-								"end": 2332
+								"start": 2329,
+								"end": 2334
 							},
 							{
 								"type": "Line",
 								"value": " c2",
-								"start": 2335,
-								"end": 2340
+								"start": 2337,
+								"end": 2342
 							}
 						]
 					},
@@ -3426,15 +3426,15 @@
 						{
 							"type": "Line",
 							"value": " Else - blank between two own-line comments, block body",
-							"start": 2250,
-							"end": 2307
+							"start": 2252,
+							"end": 2309
 						}
 					]
 				},
 				{
 					"type": "IfStatement",
-					"start": 2412,
-					"end": 2453,
+					"start": 2414,
+					"end": 2455,
 					"loc": {
 						"start": {
 							"line": 142,
@@ -3447,8 +3447,8 @@
 					},
 					"test": {
 						"type": "Identifier",
-						"start": 2416,
-						"end": 2417,
+						"start": 2418,
+						"end": 2419,
 						"loc": {
 							"start": {
 								"line": 142,
@@ -3463,8 +3463,8 @@
 					},
 					"consequent": {
 						"type": "BlockStatement",
-						"start": 2419,
-						"end": 2423,
+						"start": 2421,
+						"end": 2425,
 						"loc": {
 							"start": {
 								"line": 142,
@@ -3479,8 +3479,8 @@
 					},
 					"alternate": {
 						"type": "ExpressionStatement",
-						"start": 2448,
-						"end": 2453,
+						"start": 2450,
+						"end": 2455,
 						"loc": {
 							"start": {
 								"line": 147,
@@ -3493,8 +3493,8 @@
 						},
 						"expression": {
 							"type": "CallExpression",
-							"start": 2448,
-							"end": 2452,
+							"start": 2450,
+							"end": 2454,
 							"loc": {
 								"start": {
 									"line": 147,
@@ -3507,8 +3507,8 @@
 							},
 							"callee": {
 								"type": "Identifier",
-								"start": 2448,
-								"end": 2450,
+								"start": 2450,
+								"end": 2452,
 								"loc": {
 									"start": {
 										"line": 147,
@@ -3528,14 +3528,14 @@
 							{
 								"type": "Line",
 								"value": " c1",
-								"start": 2431,
-								"end": 2436
+								"start": 2433,
+								"end": 2438
 							},
 							{
 								"type": "Line",
 								"value": " c2",
-								"start": 2440,
-								"end": 2445
+								"start": 2442,
+								"end": 2447
 							}
 						]
 					},
@@ -3543,15 +3543,15 @@
 						{
 							"type": "Line",
 							"value": " Else - blank between two own-line comments, non-block body",
-							"start": 2349,
-							"end": 2410
+							"start": 2351,
+							"end": 2412
 						}
 					]
 				},
 				{
 					"type": "DoWhileStatement",
-					"start": 2517,
-					"end": 2559,
+					"start": 2519,
+					"end": 2561,
 					"loc": {
 						"start": {
 							"line": 150,
@@ -3564,8 +3564,8 @@
 					},
 					"body": {
 						"type": "BlockStatement",
-						"start": 2536,
-						"end": 2548,
+						"start": 2538,
+						"end": 2550,
 						"loc": {
 							"start": {
 								"line": 154,
@@ -3579,8 +3579,8 @@
 						"body": [
 							{
 								"type": "ExpressionStatement",
-								"start": 2540,
-								"end": 2545,
+								"start": 2542,
+								"end": 2547,
 								"loc": {
 									"start": {
 										"line": 155,
@@ -3593,8 +3593,8 @@
 								},
 								"expression": {
 									"type": "CallExpression",
-									"start": 2540,
-									"end": 2544,
+									"start": 2542,
+									"end": 2546,
 									"loc": {
 										"start": {
 											"line": 155,
@@ -3607,8 +3607,8 @@
 									},
 									"callee": {
 										"type": "Identifier",
-										"start": 2540,
-										"end": 2542,
+										"start": 2542,
+										"end": 2544,
 										"loc": {
 											"start": {
 												"line": 155,
@@ -3630,21 +3630,21 @@
 							{
 								"type": "Line",
 								"value": " c1",
-								"start": 2521,
-								"end": 2526
+								"start": 2523,
+								"end": 2528
 							},
 							{
 								"type": "Line",
 								"value": " c2",
-								"start": 2529,
-								"end": 2534
+								"start": 2531,
+								"end": 2536
 							}
 						]
 					},
 					"test": {
 						"type": "Identifier",
-						"start": 2556,
-						"end": 2557,
+						"start": 2558,
+						"end": 2559,
 						"loc": {
 							"start": {
 								"line": 156,
@@ -3661,8 +3661,8 @@
 						{
 							"type": "Line",
 							"value": " Do - blank between two own-line comments before the body",
-							"start": 2456,
-							"end": 2515
+							"start": 2458,
+							"end": 2517
 						}
 					]
 				}
