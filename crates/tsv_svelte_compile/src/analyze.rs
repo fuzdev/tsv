@@ -278,6 +278,56 @@ pub(crate) fn store_read_base(name: &str) -> Option<&str> {
     Some(base)
 }
 
+/// The oracle's `RUNES` set (`utils.js`) as tsv can spell it. The `$inspect().with`
+/// form is omitted because [`callee_keypath`] cannot produce it — its callee is a
+/// `CallExpression`, not an identifier chain — so a spread inside a
+/// `$inspect(...).with(cb)` is a hyper-rare over-acceptance left open (not in the
+/// corpus or the validation suites).
+const RUNE_KEYPATHS: &[&str] = &[
+    "$state",
+    "$state.raw",
+    "$derived",
+    "$derived.by",
+    "$state.eager",
+    "$state.snapshot",
+    "$props",
+    "$props.id",
+    "$bindable",
+    "$effect",
+    "$effect.pre",
+    "$effect.tracking",
+    "$effect.root",
+    "$effect.pending",
+    "$inspect",
+    "$inspect.trace",
+    "$host",
+];
+
+/// The rune keypath of a call the oracle's `rune_invalid_spread`
+/// (`2-analyze/visitors/CallExpression.js:24`) rejects: a rune call — any rune but
+/// `$inspect` — carrying a `SpreadElement` argument. `None` otherwise. The oracle
+/// runs this on EVERY call before its rune dispatch, so the caller must walk the
+/// whole component (script + template), not just recognized rune positions.
+///
+/// A shadowed rune root needs no scope check here: a `$`-prefixed binding is
+/// refused upstream ([`Refusal::DollarPrefixedBinding`](crate::Refusal::DollarPrefixedBinding)),
+/// so a `const $state = f; $state(...args)` never reaches a valid compile —
+/// matching the oracle's `get_rune` returning null for a bound root, without
+/// modeling the scope.
+pub(crate) fn rune_call_spread(
+    call: &tsv_ts::ast::internal::CallExpression<'_>,
+    source: &str,
+) -> Option<String> {
+    let keypath = callee_keypath(call.callee, source)?;
+    if keypath == "$inspect" || !RUNE_KEYPATHS.contains(&keypath.as_str()) {
+        return None;
+    }
+    call.arguments
+        .iter()
+        .any(|arg| matches!(arg, Expression::SpreadElement(_)))
+        .then_some(keypath)
+}
+
 /// Evaluate `expr` against the binding table — the ported `scope.evaluate`.
 pub(crate) fn evaluate(
     expr: &Expression<'_>,

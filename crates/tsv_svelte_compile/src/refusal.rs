@@ -862,6 +862,19 @@ pub enum Refusal {
     /// order can't be fixed.
     #[error("<svelte:head> alongside a {{@const}} in the same fragment (hoist order)")]
     SvelteHeadWithConstTag,
+    /// A rune call (any rune but `$inspect`) carrying a `SpreadElement` argument —
+    /// the oracle's `rune_invalid_spread` (`2-analyze/visitors/CallExpression.js:24`,
+    /// checked on EVERY rune call before its dispatch, so it fires wherever the call
+    /// sits — a script declarator init `$derived.by(...args)`, a statement-position
+    /// `$effect(...args)`, a template `{$state.snapshot(...args)}`). tsv recognizes
+    /// each rune shape and rewrites/drops it, so a spread arg would otherwise ride
+    /// into `$.derived(...args)` (valid JS, so the reparse self-check misses it) or a
+    /// dropped effect. `$inspect` is exempt (the oracle allows a spread there).
+    #[error("{rune} cannot be called with a spread argument (the oracle rejects it)")]
+    RuneInvalidSpread {
+        /// The rune keypath (`$derived.by`, `$effect`, `$state.snapshot`, …).
+        rune: String,
+    },
     /// A `svelte:`-prefixed element whose name is not one of the known meta tags —
     /// the oracle's parse-time `svelte_meta_invalid_tag`
     /// (`phases/1-parse/state/element.js:142`, `tag.name.startsWith('svelte:') &&

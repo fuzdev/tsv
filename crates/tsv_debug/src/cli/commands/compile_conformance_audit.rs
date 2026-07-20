@@ -412,6 +412,7 @@ mod tests {
         "{@const} with a non-plain binding name",
         "{@html} with a statically-known value",
         "{@render} callee is not a resolvable local snippet or snippet prop",
+        "{rune} cannot be called with a spread argument (the oracle rejects it)",
     ];
 
     #[test]

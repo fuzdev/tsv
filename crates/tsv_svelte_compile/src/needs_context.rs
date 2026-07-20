@@ -808,6 +808,16 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
             walk_exprs(new_expr.arguments, nc);
         }
         Expression::CallExpression(call) => {
+            // The oracle's `rune_invalid_spread` (`CallExpression.js:24`), checked
+            // on every rune call BEFORE its dispatch and before recursing — so the
+            // outer rune call's spread wins, matching the oracle's visit order. Any
+            // rune but `$inspect`; fires wherever the call sits (this walk covers
+            // the instance/module scripts and the template, pre-rewrite).
+            if nc.refuse.is_none()
+                && let Some(rune) = crate::analyze::rune_call_spread(call, nc.source)
+            {
+                nc.refuse = Some(Refusal::RuneInvalidSpread { rune });
+            }
             check_root(call.callee, nc);
             walk_expr(call.callee, nc);
             walk_exprs(call.arguments, nc);

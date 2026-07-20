@@ -317,6 +317,9 @@ impl Refusal {
             Self::SvelteHeadWithConstTag => Cow::Borrowed(
                 "<svelte:head> alongside a {@const} in the same fragment (hoist order)",
             ),
+            Self::RuneInvalidSpread { .. } => {
+                Cow::Borrowed("{rune} cannot be called with a spread argument (the oracle rejects it)")
+            }
             Self::SvelteMetaInvalidTag { .. } => {
                 Cow::Borrowed("<{name}> is not a valid <svelte:...> meta tag (the oracle rejects it)")
             }
@@ -595,6 +598,9 @@ impl Refusal {
             Self::TitleAttributes,
             Self::TitleInvalidContent,
             Self::SvelteHeadWithConstTag,
+            Self::RuneInvalidSpread {
+                rune: "{rune}".to_string(),
+            },
             Self::SvelteMetaInvalidTag {
                 name: "{name}".to_string(),
             },

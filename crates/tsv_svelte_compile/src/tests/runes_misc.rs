@@ -38,6 +38,36 @@ fn compile_inspect_with_wrong_arity_refuses() {
 }
 
 #[test]
+fn compile_rune_call_with_spread_refuses() {
+    // The oracle's `rune_invalid_spread` (`CallExpression.js:24`): any rune but
+    // `$inspect` called with a spread argument. It fires wherever the call sits —
+    // the oracle checks it on every call before dispatch — so all three positions
+    // below over-accepted (each is rewritten/dropped, so the spread rode into
+    // valid-but-wrong JS or a dropped effect) until this rule.
+    // Script declarator init (the validation-suite pin):
+    assert_unsupported(
+        "<script>\n\tconst args = [0];\n\tconst count = $derived.by(...args);\n</script>",
+        "spread argument",
+    );
+    // Statement-position effect:
+    assert_unsupported(
+        "<script>\n\tconst args = [() => {}];\n\t$effect(...args);\n</script>",
+        "spread argument",
+    );
+    // Template position:
+    assert_unsupported(
+        "<script>\n\tconst args = [{}];\n\tlet s = $state({});\n</script>\n{$state.snapshot(...args)}",
+        "spread argument",
+    );
+
+    // Controls. `$inspect` is EXEMPT (the oracle allows a spread there), so the
+    // whole component still compiles. And a NON-spread rune call is untouched.
+    let _ = compile_js("<script>\n\tconst args = [0];\n\t$inspect(...args);\n</script>");
+    let _ =
+        compile_js("<script>\n\tconst count = $derived.by(() => 1);\n</script>\n<p>{count}</p>");
+}
+
+#[test]
 fn compile_rejects_rune_in_nested_function() {
     assert_unsupported(
         "<script>\n\tfunction f() {\n\t\tlet c = $state(0);\n\t\treturn c;\n\t}\n</script>\n<p>text</p>",
