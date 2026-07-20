@@ -7,7 +7,7 @@
 		a
 	);
 
-	// Own-line comment before while (a blank above the comment is dropped)
+	// Own-line comment before while; a blank line above it is preserved
 	do {
 		fn();
 	} while (
