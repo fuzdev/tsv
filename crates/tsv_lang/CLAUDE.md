@@ -59,6 +59,7 @@ All methods take `&self` (interior mutability via `RefCell`):
 - Line suffix — `line_suffix()`, `line_suffix_boundary()`, `break_parent()`
 - Convenience — `wrap()`, `parens()`, `brackets()`, `braces()`
 - Inspection — `will_break()`, `has_forced_break()`
+- Transforms — `remove_lines()` / `atomize()` — rebuild a subtree with its lines statically flattened (old nodes stay in the arena, unused). **Two operations, not one function with a strength dial**, so pick by which prettier behavior you want: `remove_lines` is prettier's `removeLines` (breakable lines only; hard lines and `MultilineText` survive — it cannot promise one line), while `atomize` emulates a re-render at `printWidth: Infinity` (hard lines deleted, `conditional_group` collapsed to its least-expanded state). Atomizing is only sound where the caller has proved no newline is required — deleting a hard line fuses the content around it. The atomize contract is asserted directly by a width-invariance test: its result must render identically at every width
 - Diagnostics — `line_comment_text_pooled()` (tags `//` text for the swallow check)
 
 The `doc::swallow` module is a render-time guard against the
