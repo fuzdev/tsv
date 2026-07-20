@@ -26,13 +26,8 @@
 # its buckets churn with every compiler slice.
 #
 # Format: KIND<TAB>ORACLE_CODE<TAB>PATH (path relative to its suite root)
-# shapes: 30
+# shapes: 20
 OVER-ACCEPT	attribute_invalid_event_handler	validator/samples/event-attribute/input.svelte
-OVER-ACCEPT	attribute_invalid_name	validator/samples/attribute-invalid-name-2/input.svelte
-OVER-ACCEPT	attribute_invalid_name	validator/samples/attribute-invalid-name-3/input.svelte
-OVER-ACCEPT	attribute_invalid_name	validator/samples/attribute-invalid-name-4/input.svelte
-OVER-ACCEPT	attribute_invalid_name	validator/samples/attribute-invalid-name-5/input.svelte
-OVER-ACCEPT	attribute_invalid_name	validator/samples/attribute-invalid-name/input.svelte
 OVER-ACCEPT	attribute_invalid_sequence_expression	compiler-errors/samples/attribute-sequence-expression-2/main.svelte
 OVER-ACCEPT	attribute_invalid_sequence_expression	compiler-errors/samples/attribute-sequence-expression/main.svelte
 OVER-ACCEPT	declaration_duplicate	validator/samples/snippet-already-declared/input.svelte
@@ -45,11 +40,6 @@ OVER-ACCEPT	props_illegal_name	compiler-errors/samples/runes-props-illegal-name-
 OVER-ACCEPT	props_illegal_name	compiler-errors/samples/runes-props-illegal-name-2/main.svelte
 OVER-ACCEPT	rune_invalid_spread	validator/samples/rune-invalid-spread-derived-by/input.svelte
 OVER-ACCEPT	script_invalid_context	validator/samples/script-invalid-context/input.svelte
-OVER-ACCEPT	slot_attribute_invalid_placement	compiler-errors/samples/component-slot-nested-error-3/main.svelte
-OVER-ACCEPT	slot_attribute_invalid_placement	validator/samples/component-slotted-custom-element-2/input.svelte
-OVER-ACCEPT	slot_attribute_invalid_placement	validator/samples/component-slotted-each-block/input.svelte
-OVER-ACCEPT	slot_attribute_invalid_placement	validator/samples/component-slotted-if-block/input.svelte
-OVER-ACCEPT	slot_attribute_invalid_placement	validator/samples/slot-attribute-invalid/input.svelte
 OVER-ACCEPT	snippet_conflict	compiler-errors/samples/snippet-children-conflict/main.svelte
 OVER-ACCEPT	snippet_invalid_export	compiler-errors/samples/snippet-invalid-export/main.svelte
 OVER-ACCEPT	snippet_shadowing_prop	validator/samples/snippet-shadowing-prop/input.svelte

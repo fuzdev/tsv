@@ -392,7 +392,19 @@ enforce. (`dollar_prefix_invalid` was enforced first, and the three-rule
 above. Then `attribute_duplicate`, `svelte_meta_invalid_placement` and
 `svelte_meta_duplicate` — see [The parse-time rules](#the-parse-time-rules--closed) —
 and then `node_invalid_placement`, see
-[The HTML content model](#the-html-content-model--closed).)
+[The HTML content model](#the-html-content-model--closed). Most recently
+`attribute_invalid_name` and `slot_attribute_invalid_placement`, the two largest
+clusters in the ratchet, both ported into `validate.rs` beside `attribute_duplicate`
+— they are two checks inside the oracle's single `validate_element` /
+`validate_slot_attribute` pair, whose callers are `RegularElement.js` and
+`SvelteElement.js` only, so a **component** is exempt from both.)
+
+⚠️ `slot_attribute_invalid_placement` is NOT the named-slot fence. The oracle
+*accepts* a `slot="…"` on a component's direct child, which tsv declines as the
+deliberate `ComponentNamedSlot` runes-only fence; this rule covers only the shapes
+the oracle *rejects* (no owner, or an owner that is not the direct parent). Merging
+them would move files out of the fenced count and flatter the achievable-parity
+denominator — see [compile_validation_ratchet.md](compile_validation_ratchet.md).
 
 ⚠️ **An earlier form of this section claimed all nine were whole-component checks in
 `2-analyze`, and that claim was FALSE for three of them.** `attribute_duplicate`,

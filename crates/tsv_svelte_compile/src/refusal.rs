@@ -851,6 +851,34 @@ pub enum Refusal {
     /// parse-time `attribute_duplicate` (`phases/1-parse/state/element.js:250`).
     /// tsv's parser is permissive here, so the compiler refuses rather than emit
     /// output for a component the oracle rejects.
+    /// An attribute name carrying a character the oracle forbids — its phase-2
+    /// `attribute_invalid_name` (`2-analyze/visitors/shared/element.js:59`,
+    /// `regex_illegal_attribute_character`). tsv's parser is permissive here, so
+    /// the compiler refuses rather than emit output for a component the oracle
+    /// rejects.
+    ///
+    /// ⚠️ Scoped to a REGULAR element and `<svelte:element>` — the oracle reaches
+    /// the rule only from `RegularElement.js` / `SvelteElement.js`, never from its
+    /// Component visitor, so a component prop may legally carry a name no element
+    /// attribute could.
+    #[error("invalid attribute name `{name}` (the oracle rejects it)")]
+    AttributeInvalidName {
+        /// The offending attribute name.
+        name: String,
+    },
+    /// A `slot="…"` attribute whose slot OWNER is not its direct parent — the
+    /// oracle's `slot_attribute_invalid_placement`
+    /// (`2-analyze/visitors/shared/attribute.js:90,123`).
+    ///
+    /// ⚠️ Distinct from the [`Self::ComponentNamedSlot`] FENCE, and the split is
+    /// load-bearing for the achievable-parity denominator. The fence covers the
+    /// shape the oracle **accepts** — a slot attribute on a component's direct
+    /// child — which tsv declines by product choice. This variant covers the
+    /// shapes the oracle **rejects**, which are ordinary over-acceptance debt and
+    /// must NOT be fenced: counting them as permanent scope would shrink the
+    /// denominator and flatter the parity rate.
+    #[error("misplaced slot=\"…\" attribute (the oracle rejects it)")]
+    SlotAttributeInvalidPlacement,
     #[error("duplicate `{name}` attribute on one element (the oracle rejects it)")]
     DuplicateAttribute {
         /// The repeated attribute/directive name.
@@ -1206,6 +1234,12 @@ impl Refusal {
             Self::DuplicateSpecialElement { .. } => {
                 Cow::Borrowed("duplicate <{name}> element (the oracle rejects it)")
             }
+            Self::AttributeInvalidName { .. } => {
+                Cow::Borrowed("invalid attribute name `{name}` (the oracle rejects it)")
+            }
+            Self::SlotAttributeInvalidPlacement => {
+                Cow::Borrowed("misplaced slot=\"…\" attribute (the oracle rejects it)")
+            }
             Self::DuplicateAttribute { .. } => Cow::Borrowed(
                 "duplicate `{name}` attribute on one element (the oracle rejects it)",
             ),
@@ -1477,6 +1511,10 @@ impl Refusal {
             Self::DuplicateSpecialElement {
                 name: "{name}".to_string(),
             },
+            Self::AttributeInvalidName {
+                name: "{name}".to_string(),
+            },
+            Self::SlotAttributeInvalidPlacement,
             Self::DuplicateAttribute {
                 name: "{name}".to_string(),
             },

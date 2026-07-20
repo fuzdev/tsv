@@ -81,6 +81,7 @@ pub(crate) fn validate_document(root: &Root<'_>, source: &str) -> Result<(), Com
         source,
         seen_meta: Vec::new(),
         path: Vec::new(),
+        slot_path: Vec::new(),
     };
     validator.walk_fragment(&root.fragment, true)
 }
@@ -110,10 +111,44 @@ enum PathEntry<'s> {
     Block,
 }
 
+/// One entry of the **slot** rule's view of `context.path` — a separate stack from
+/// [`PathEntry`], and deliberately so.
+///
+/// `PathEntry` answers the HTML-placement rules' questions and collapses every
+/// walk-stopping node into one `Barrier`; the slot rule must tell those apart (a
+/// component owner errors where a `<svelte:element>` owner does not). More
+/// importantly the two stacks have different MEMBERSHIP: `PathEntry` omits nodes
+/// transparent to placement — `<svelte:boundary>`, `<slot>`, `<title>`, the meta
+/// tags — while the slot rule reads `path.at(-2)`, the element's immediate parent,
+/// so a node it omitted would silently promote a grandparent into the parent slot.
+/// A `<svelte:boundary>` between a component and a slotted child is exactly that
+/// case, and the oracle rejects it (live-verified), so **every** fragment node is
+/// pushed here.
+///
+/// The oracle's own path additionally carries a `Fragment` between every parent and
+/// child, which is why it reads `at(-2)` rather than `at(-1)`; this stack simply
+/// omits the fragments, so `last()` IS the parent.
+enum SlotAncestor {
+    /// A component invocation, `<svelte:component>`, or `<svelte:self>` — the owner
+    /// class the placement rule fires on when it is not the direct parent.
+    ComponentLike,
+    /// `<svelte:element>` or a custom-element regular element — a slot owner that
+    /// ENDS the search but never raises the error (the oracle's `if (owner)` block
+    /// tests for the component types alone, so a non-component owner falls through
+    /// with no report).
+    NonComponentOwner,
+    /// A `{#snippet}` — the oracle's early return: a slot attribute directly inside
+    /// one is governed by `slot_attribute_invalid`, not by placement.
+    Snippet,
+    /// Any other node. Not an owner, but still occupies the parent position.
+    Transparent,
+}
+
 struct Validator<'s> {
     source: &'s str,
     seen_meta: Vec<&'static str>,
     path: Vec<PathEntry<'s>>,
+    slot_path: Vec<SlotAncestor>,
 }
 
 impl<'s> Validator<'s> {
@@ -133,10 +168,14 @@ impl<'s> Validator<'s> {
             FragmentNode::Element(element) => {
                 refuse_duplicate_attributes(element.attributes, self.source)?;
                 if element.kind == ElementKind::Html {
+                    self.validate_element(element.attributes)?;
                     self.refuse_invalid_element_placement(element.name_span.extract(self.source))?;
                 }
             }
             FragmentNode::SpecialElement(special) => {
+                if matches!(special.kind, SpecialElementKind::SvelteElement { .. }) {
+                    self.validate_element(special.attributes)?;
+                }
                 if let Some(tag) = root_only_meta_tag(&special.kind) {
                     // The oracle raises placement BEFORE duplicate at the same site,
                     // and does not record a mis-placed tag in its `meta_tags` dict
@@ -205,6 +244,17 @@ impl<'s> Validator<'s> {
             self.path.push(entry);
         }
 
+        // ⚠️ Two invariants the slot rule depends on, both encoded here rather than
+        // where it reads them:
+        //   - UNCONDITIONAL, unlike `path` above. The rule reads the immediate
+        //     parent, so skipping a "transparent" node would promote its grandparent
+        //     — which is how a `<svelte:boundary>` between a component and a slotted
+        //     child would wrongly compile.
+        //   - AFTER this node's own checks ran, so the stack holds ancestors ONLY.
+        //     That is the oracle's shape: a custom element carrying `slot` is not
+        //     its own owner. Moving this above the match silently accepts that case.
+        self.slot_path.push(slot_ancestor(node, self.source));
+
         // Every child fragment is below the root, so `at_root` is false from here down
         // — matching the oracle's `parent.type !== 'Root'`, which is a *direct*-child
         // test: a block or an element between the root and the tag makes it invalid.
@@ -218,7 +268,71 @@ impl<'s> Validator<'s> {
         if pushed {
             self.path.pop();
         }
+        self.slot_path.pop();
         result
+    }
+
+    /// The attribute rules of the oracle's `validate_element`
+    /// (`2-analyze/visitors/shared/element.js:29`).
+    ///
+    /// ⚠️ The pairing is the point: these two fire together because they are two
+    /// checks inside ONE oracle function, whose only callers are `RegularElement.js`
+    /// and `SvelteElement.js`. So a **component** is exempt from both — its visitor
+    /// never reaches here, which is why `<F 3aa="abc" />` is legal while
+    /// `<p 3aa="abc">` is not. Adding a third check from that function belongs here,
+    /// not at either call site.
+    fn validate_element(&self, attributes: &[AttributeNode<'_>]) -> Result<(), CompileError> {
+        refuse_invalid_attribute_names(attributes, self.source)?;
+        if has_plain_attribute(attributes, self.source, "slot") {
+            self.refuse_invalid_slot_placement()?;
+        }
+        Ok(())
+    }
+
+    /// The oracle's `validate_slot_attribute`
+    /// (`2-analyze/visitors/shared/attribute.js:56-125`), for the `is_component =
+    /// false` callers — a regular element or `<svelte:element>`.
+    ///
+    /// The component caller (`is_component = true`) suppresses both error branches,
+    /// and `<svelte:fragment>`, the third caller, is a deliberate fence — so the
+    /// false case is the whole reachable rule.
+    ///
+    /// `slot_path` excludes the element itself (it is pushed after this runs), which
+    /// is the oracle's own shape: its walk is over ancestors, so a custom element
+    /// carrying `slot` is not its own owner.
+    fn refuse_invalid_slot_placement(&self) -> Result<(), CompileError> {
+        // The oracle's early return — placement does not apply directly inside a
+        // `{#snippet}`. (Its sibling rule there, `slot_attribute_invalid` for a
+        // non-text value, is not ported; a text value is legal and must compile.)
+        if matches!(self.slot_path.last(), Some(SlotAncestor::Snippet)) {
+            return Ok(());
+        }
+
+        let owner = self.slot_path.iter().rposition(|ancestor| {
+            matches!(
+                ancestor,
+                SlotAncestor::ComponentLike | SlotAncestor::NonComponentOwner
+            )
+        });
+
+        match owner {
+            // No owner at all — the oracle's trailing `else if (!is_component)`.
+            None => Err(unsupported(Refusal::SlotAttributeInvalidPlacement)),
+            Some(index) => {
+                // `owner !== parent` — the parent is the innermost entry, so the
+                // owner being the parent means it sits at the top of the stack.
+                // A non-component owner reports nothing either way.
+                let is_parent = index == self.slot_path.len() - 1;
+                if matches!(self.slot_path[index], SlotAncestor::ComponentLike) && !is_parent {
+                    return Err(unsupported(Refusal::SlotAttributeInvalidPlacement));
+                }
+                // An owner that IS the parent is the oracle-ACCEPTED named-slot
+                // shape, which tsv declines separately as the deliberate
+                // `ComponentNamedSlot` fence. Refusing it here would move the file
+                // out of the fenced count and flatter the parity denominator.
+                Ok(())
+            }
+        }
     }
 
     /// The oracle's `parent_element` — the nearest enclosing `RegularElement`, or
@@ -317,6 +431,130 @@ const TEXT_PSEUDO_TAG: &str = "#text";
 /// Rust's `char::is_whitespace`.
 fn is_not_html_whitespace(c: char) -> bool {
     !matches!(c, ' ' | '\t' | '\r' | '\n')
+}
+
+/// Classify one fragment node for the slot rule's ancestor stack.
+///
+/// The owner set is transcribed from the oracle
+/// (`2-analyze/visitors/shared/attribute.js:69-77`): a component,
+/// `<svelte:component>`, `<svelte:self>`, `<svelte:element>`, or a
+/// **custom-element** regular element.
+///
+/// # The catch-alls, and which way they fail
+///
+/// Unlike this module's other walks, the two `_ =>` arms below are deliberate
+/// rather than exhaustive — so per the crate's rule they must name their failure
+/// direction. A new variant defaulting to [`SlotAncestor::Transparent`] can only
+/// **over-refuse**, never over-accept:
+///
+/// - the parent position is never wrong, because *every* node is pushed — only
+///   owner *candidacy* is lost;
+/// - losing a candidate either finds no owner (refuse) or finds an outer one. An
+///   outer `ComponentLike` that is not the parent refuses — stricter. An outer
+///   `NonComponentOwner` accepts, but so does the oracle in that shape (its true
+///   owner would have been the parent, taking the non-erroring `else` branch);
+/// - a variant that should have been [`SlotAncestor::Snippet`] skips the early
+///   return and runs the owner search, which refuses where the oracle accepts.
+///
+/// So an unhandled variant lands in the class the refusal contract *permits* — a
+/// "not yet" — never in the class that fails the validation gate. An exhaustive
+/// match is still preferable and cheap here; the catch-alls exist only because
+/// `SpecialElementKind` and `FragmentNode` carry many variants that are all
+/// genuinely transparent, and listing them would drift on every new one for no
+/// behavioral gain.
+fn slot_ancestor(node: &FragmentNode<'_>, source: &str) -> SlotAncestor {
+    match node {
+        FragmentNode::Element(element) => match element.kind {
+            ElementKind::Component => SlotAncestor::ComponentLike,
+            ElementKind::Html => {
+                let name = element.name_span.extract(source);
+                if is_custom_element(name, element.attributes, source) {
+                    SlotAncestor::NonComponentOwner
+                } else {
+                    SlotAncestor::Transparent
+                }
+            }
+        },
+        FragmentNode::SpecialElement(special) => match special.kind {
+            SpecialElementKind::SvelteComponent { .. } | SpecialElementKind::SvelteSelf => {
+                SlotAncestor::ComponentLike
+            }
+            SpecialElementKind::SvelteElement { .. } => SlotAncestor::NonComponentOwner,
+            _ => SlotAncestor::Transparent,
+        },
+        FragmentNode::SnippetBlock(_) => SlotAncestor::Snippet,
+        _ => SlotAncestor::Transparent,
+    }
+}
+
+/// The oracle's `is_custom_element_node` (`phases/nodes.js:40-46`): a regular
+/// element whose tag contains a `-`, **or** which carries an `is` attribute.
+fn is_custom_element(name: &str, attributes: &[AttributeNode<'_>], source: &str) -> bool {
+    name.contains('-') || has_plain_attribute(attributes, source, "is")
+}
+
+/// Does this attribute list carry a plain `Attribute` of this name?
+///
+/// Both callers key on the oracle's own `attribute.type === 'Attribute' &&
+/// attribute.name === …` test, so a directive (`bind:slot`), a spread, and an
+/// `{@attach}` all correctly miss.
+fn has_plain_attribute(attributes: &[AttributeNode<'_>], source: &str, name: &str) -> bool {
+    attributes.iter().any(
+        |attribute| matches!(attribute, AttributeNode::Attribute(a) if a.name_span.extract(source) == name),
+    )
+}
+
+/// The oracle's `attribute_invalid_name`
+/// (`2-analyze/visitors/shared/element.js:56-60`) — a transcription of
+/// `regex_illegal_attribute_character` (`phases/patterns.js:23`):
+///
+/// ```text
+/// /(^[0-9-.])|[\^$@%&#?!|()[\]{}^*+~;]/
+/// ```
+///
+/// Two independent alternatives, and reading them as one class is the trap: the
+/// first is anchored (an illegal **leading** character — a digit, `-`, or `.`),
+/// the second is unanchored (an illegal character **anywhere**). `.` and `-`
+/// appear ONLY in the anchored half, so `a.b` and `data-x` are legal while `.a`
+/// and `-a` are not — and `data-` names are ubiquitous, so collapsing the two
+/// alternatives would refuse most real components.
+///
+/// ⚠️ Only a plain `Attribute` participates. A directive, a spread and an
+/// `{@attach}` carry their own grammar (`bind:`, `class:`, `on:` — every one of
+/// which contains a `:` that this class does not even list) and the oracle's loop
+/// guards on `attribute.type === 'Attribute'` before testing.
+fn refuse_invalid_attribute_names(
+    attributes: &[AttributeNode<'_>],
+    source: &str,
+) -> Result<(), CompileError> {
+    for attribute in attributes {
+        let AttributeNode::Attribute(a) = attribute else {
+            continue;
+        };
+        let name = a.name_span.extract(source);
+        if has_illegal_attribute_character(name) {
+            return Err(unsupported(Refusal::AttributeInvalidName {
+                name: name.to_string(),
+            }));
+        }
+    }
+    Ok(())
+}
+
+/// `regex_illegal_attribute_character` as a predicate — see
+/// [`refuse_invalid_attribute_names`] for why the two alternatives stay separate.
+fn has_illegal_attribute_character(name: &str) -> bool {
+    // The ANCHORED alternative, `(^[0-9-.])`. Byte-wise is sound: every member is
+    // ASCII, so a multi-byte leading char simply does not match.
+    if matches!(name.as_bytes().first(), Some(b'0'..=b'9' | b'-' | b'.')) {
+        return true;
+    }
+    // The UNANCHORED alternative. `^` and `[` appear twice in the source class
+    // (`\^` … `^`, and `[` … `[\]`); the duplicates are inert.
+    name.contains([
+        '^', '$', '@', '%', '&', '#', '?', '!', '|', '(', ')', '[', ']', '{', '}', '*', '+', '~',
+        ';',
+    ])
 }
 
 /// The oracle's `attribute_duplicate` (`phases/1-parse/state/element.js:238-256`).

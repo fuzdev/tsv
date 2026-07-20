@@ -6569,3 +6569,126 @@ fn compile_invalid_node_placement_gates_the_custom_element_reset_on_reset_by() {
     // Confirmed oracle-REJECTED.
     assert_unsupported("<p><foo-bar><div>x</div></foo-bar></p>", "descendant");
 }
+
+#[test]
+fn compile_refuses_an_invalid_attribute_name() {
+    // The oracle's `attribute_invalid_name`
+    // (`2-analyze/visitors/shared/element.js:59`), whose regex has TWO alternatives:
+    // an illegal LEADING character, and an illegal character anywhere.
+    // Each shape below is live-verified oracle-REJECTED.
+
+    // Leading alternative — `^[0-9-.]`.
+    assert_unsupported("<p 3aa=\"abc\">x</p>", "attribute name");
+    assert_unsupported("<p -a>x</p>", "attribute name");
+    assert_unsupported("<p .a>x</p>", "attribute name");
+
+    // Anywhere alternative — the punctuation class.
+    assert_unsupported("<p a*a>x</p>", "attribute name");
+    assert_unsupported("<p a;=\"abc\">x</p>", "attribute name");
+    assert_unsupported("<p }>x</p>", "attribute name");
+
+    // `<svelte:element>` shares `validate_element`, so it is in scope too.
+    assert_unsupported(
+        "<svelte:element this=\"p\" 3aa=\"x\">y</svelte:element>",
+        "attribute name",
+    );
+}
+
+#[test]
+fn compile_accepts_attribute_names_the_oracle_allows() {
+    // ⚠️ The negatives are the load-bearing half — an over-REFUSAL here would turn
+    // ordinary components into refusals, which no ratchet would catch (the
+    // validation suites only hold invalid input). All live-verified oracle-ACCEPTED.
+
+    // `.` is illegal only as the LEADING character, never within.
+    let _ = compile_js("<p a.b=\"x\">y</p>");
+    // A `-` within is the ubiquitous `data-`/`aria-` shape.
+    let _ = compile_js("<p data-x=\"1\" aria-label=\"y\">z</p>");
+    // A digit within, not leading.
+    let _ = compile_js("<p a3=\"x\">y</p>");
+}
+
+#[test]
+fn compile_does_not_apply_the_attribute_name_rule_to_components() {
+    // ⚠️ The oracle calls `validate_element` from `RegularElement.js` and
+    // `SvelteElement.js` ONLY — never from the Component visitor — so a component
+    // prop may carry a name no element attribute could. Live-verified
+    // oracle-ACCEPTED. Widening the rule to components would be an over-refusal
+    // that only this test catches.
+    let _ = compile_js("<script>import F from './F.svelte';</script><F 3aa=\"abc\" />");
+}
+
+/// A component import, so a `<N>` below is a Component rather than an unknown tag.
+const SLOT_IMPORT: &str = "<script>import N from './N.svelte';</script>";
+
+#[test]
+fn compile_refuses_a_misplaced_slot_attribute() {
+    // The oracle's `slot_attribute_invalid_placement`
+    // (`2-analyze/visitors/shared/attribute.js:90,123`). Its `owner` is the
+    // INNERMOST ancestor that is a component / `<svelte:element>` / custom element,
+    // and a slot attribute is legal only when that owner is the element's DIRECT
+    // parent. Every shape below is live-verified oracle-REJECTED.
+
+    // No owner at all.
+    assert_unsupported("<div slot=\"foo\">x</div>", "slot");
+    // ⚠️ Self does NOT count as its own owner — the oracle's walk is over ancestors
+    // only, so a custom element carrying `slot` at the root is still misplaced.
+    assert_unsupported("<custom-el slot=\"foo\">x</custom-el>", "slot");
+
+    // Owner found, but not the direct parent — a block, an element, or a
+    // `<svelte:boundary>` in between. The boundary case is why the path must carry
+    // EVERY node: it is transparent to the owner search yet is still the parent.
+    assert_unsupported(
+        &format!("{SLOT_IMPORT}<N>{{#if t}}<div slot=\"foo\">x</div>{{/if}}</N>"),
+        "slot",
+    );
+    assert_unsupported(
+        &format!("{SLOT_IMPORT}<N><div><div slot=\"foo\">x</div></div></N>"),
+        "slot",
+    );
+    assert_unsupported(
+        &format!(
+            "{SLOT_IMPORT}<N><svelte:boundary><div slot=\"foo\">x</div></svelte:boundary></N>"
+        ),
+        "slot",
+    );
+}
+
+#[test]
+fn compile_accepts_slot_attributes_the_oracle_allows() {
+    // ⚠️ The over-refusal guard. All live-verified oracle-ACCEPTED.
+
+    // An owner that is NOT a component takes neither error branch: the rule fires
+    // only when the owner is a Component / `<svelte:component>` / `<svelte:self>`.
+    let _ = compile_js("<custom-el><div slot=\"foo\">x</div></custom-el>");
+    let _ = compile_js("<svelte:element this=\"div\"><div slot=\"foo\">x</div></svelte:element>");
+    // A `{#snippet}` parent is the oracle's early return — a TEXT slot value is fine
+    // there. (A non-text one is its own rule, `slot_attribute_invalid`, not ported.)
+    let _ = compile_js(&format!(
+        "{SLOT_IMPORT}<N>{{#snippet s()}}<div slot=\"foo\">x</div>{{/snippet}}</N>"
+    ));
+}
+
+#[test]
+fn compile_keeps_the_direct_child_named_slot_a_fence_not_a_placement_refusal() {
+    // ⭐ METRIC-PROTECTING. `<N><div slot="foo">` — owner IS the direct parent, so
+    // the oracle ACCEPTS it and tsv declines it as the deliberate runes-only
+    // `ComponentNamedSlot` FENCE. If the placement rule widened to cover this shape,
+    // the file would move from `fenced` to an ordinary refusal — shrinking the
+    // fenced count and SILENTLY RAISING the reported achievable-parity rate with no
+    // behavior change. The refusal must stay the fence.
+    let source = format!("{SLOT_IMPORT}<N><div slot=\"foo\">x</div></N>");
+    match compile(&source, &CompileOptions::default()) {
+        Err(CompileError::Unsupported(reason)) => {
+            assert!(
+                reason.is_deliberate_fence(),
+                "a direct-child named slot must stay a FENCE, got: {reason}"
+            );
+            assert!(
+                reason.to_string().contains("named slot"),
+                "expected the ComponentNamedSlot fence, got: {reason}"
+            );
+        }
+        other => panic!("expected the named-slot fence, got {other:?}"),
+    }
+}
