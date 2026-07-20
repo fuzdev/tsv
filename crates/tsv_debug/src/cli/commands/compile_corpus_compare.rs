@@ -9,8 +9,8 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use tsv_cli::json_utils::to_json_with_tabs;
 use tsv_svelte_compile::{
-    CompileError, CompileOptions, Parity, canonicalize_js, census, census_detected_buckets,
-    compare_canonical, compile,
+    CompileError, CompileOptions, Parity, Refusal, canonicalize_js, census,
+    census_detected_buckets, compare_canonical, compile,
 };
 
 /// The `--ratchet` gate: the validation-suite snapshot, its key shape, and its verdict.
@@ -125,7 +125,18 @@ enum Bucket {
     /// verdict — a permanent runes-only product fence rather than a "not yet". It is
     /// read from the classifier, never re-derived from the reason string, so the
     /// measurement and the contract cannot drift.
-    Refused { reason: String, fenced: bool },
+    ///
+    /// `fence_contained` is the DIAGNOSTIC companion, computed only when `fenced`
+    /// is false: does [`census`](tsv_svelte_compile::census) independently find a
+    /// fenced construct in a file whose FIRST refusal was something else? It sizes
+    /// the gap between the fence-first count and the conceptually-right containment
+    /// population — and it deliberately does **not** feed [`TargetSet`]. See
+    /// [`TargetSet`] §Why the census does not supply this denominator.
+    Refused {
+        reason: String,
+        fenced: bool,
+        fence_contained: bool,
+    },
     /// The oracle rejected the source, keyed on the Svelte error code (or the
     /// error's first line when no code is present). `tsv_refusal` carries tsv's own
     /// verdict on the same file: `None` means tsv's `compile()` nevertheless
@@ -368,6 +379,28 @@ async fn classify_file(group: usize, path: PathBuf) -> FileOutcome {
     }
 }
 
+/// Does the refusal census independently find a **deliberate fence** in `source`?
+///
+/// The diagnostic behind the fence-containment line. `compile` bails at the first
+/// refusal, so a file whose fence sits behind an earlier refusal is invisible to
+/// the fence-first count; [`census`](tsv_svelte_compile::census) enumerates every
+/// refusal class it can detect independently, so it sees that fence.
+///
+/// ⚠️ **It sees only ONE of the three fence sources**, which is why this feeds a
+/// report line and not [`TargetSet`]. The census tests a node's KIND and never
+/// inspects an attribute list, so it reaches the fenced `<slot>` /
+/// `<svelte:fragment>` / `<svelte:component>` / `<svelte:self>` tags but neither
+/// `RunesOnlyFence` (a legacy `on:`/`let:`) nor `ComponentNamedSlot` — both
+/// attribute-level facts. The count is therefore a floor on a floor.
+///
+/// A census error (only a parse failure is reachable, and `compile` already
+/// parsed) reads as "no fence found": this is a diagnostic, so it must never
+/// promote a harness hiccup into a claim about the corpus.
+fn census_finds_fence(source: &str) -> bool {
+    census(source, &CompileOptions::default())
+        .is_ok_and(|found| found.iter().any(Refusal::is_deliberate_fence))
+}
+
 /// The per-file compile-parity pipeline. Oracle-first: an oracle rejection is
 /// out of scope for parity (and needs no tsv output), so it short-circuits
 /// before tsv even runs; a tsv refusal short-circuits before either side is
@@ -403,8 +436,15 @@ async fn classify(source: &str) -> Bucket {
     let ours = match compile(source, &CompileOptions::default()) {
         Ok(o) => o,
         Err(CompileError::Unsupported(reason)) => {
+            let fenced = reason.is_deliberate_fence();
             return Bucket::Refused {
-                fenced: reason.is_deliberate_fence(),
+                fenced,
+                // Only asked when the first refusal was NOT itself a fence — a
+                // fence-first file is already counted, and the census is the more
+                // expensive question (a second parse + analysis pass). Measured at
+                // ~43 µs/file, ~5% of one warm oracle round trip, so it is invisible
+                // beside the sidecar this pipeline is bound by.
+                fence_contained: !fenced && census_finds_fence(source),
                 reason: reason.bucket_key().into_owned(),
             };
         }
@@ -632,6 +672,15 @@ struct Stats {
     /// files no amount of future work makes reachable. See
     /// [`Report::target_set`].
     fenced: usize,
+    /// Refused files whose first refusal was NOT a fence but which the census
+    /// nevertheless finds a fenced construct in — the measured floor on how far
+    /// `fenced` under-counts the containment population.
+    ///
+    /// **Diagnostic only: deliberately absent from [`TargetSet`].** Subtracting it
+    /// would move a published metric in the flattering direction on a partial and
+    /// non-monotone signal — see [`TargetSet`] §Why the census does not supply this
+    /// denominator.
+    fence_contained: usize,
     oracle_rejected: usize,
     mismatch: usize,
     error: usize,
@@ -667,6 +716,33 @@ struct Stats {
 /// So the reported denominator is too LARGE and the parity rate too LOW. Under-
 /// claiming is the safe direction: the real achievable-parity rate is at least the
 /// one printed.
+///
+/// # Why the census does not supply this denominator
+///
+/// [`census`](tsv_svelte_compile::census) enumerates refusal classes independently
+/// of first-refusal order, so it looks like the sound containment detector the list
+/// above says does not exist. It is not one, for two measured reasons — and the
+/// `fence_contained` line reports its finding precisely so the size of the gap is
+/// visible without moving the metric:
+///
+/// - **It reaches one of the three fence sources.** The census tests a node's KIND
+///   and never inspects an attribute list, so it sees the fenced special-element
+///   tags but neither `RunesOnlyFence` (`on:`/`let:`) nor `ComponentNamedSlot`. The
+///   correction it offers is smaller than the population it still misses, so the
+///   estimate stays an under-count either way.
+/// - **Its remaining error is not one-directional.** The census walks every child
+///   fragment, including an SSR-dropped `{:catch}`, where `<svelte:self>`,
+///   `<svelte:fragment>` and `<svelte:component>` all COMPILE rather than refuse.
+///   Booking such a file as fenced would subtract an achievable file from the
+///   denominator. Harmless for a sole-blocker diagnostic (its own docs accept the
+///   over-detection); not harmless for a denominator.
+///
+/// Together those trade a rule that is exact, directly observed, and provably a
+/// floor for one that is neither statable in a sentence nor provably signed — while
+/// raising the published parity rate with zero behavior change. Revisit only when
+/// all three sources are detectable AND the dropped-region over-detection is
+/// scoped; then report both denominators for a release so a reader can tell
+/// "parity improved" from "the denominator moved".
 #[derive(Clone, serde::Serialize)]
 struct TargetSet {
     /// Files the oracle compiled — `files - oracle_rejected - error`.
@@ -824,12 +900,20 @@ impl Report {
                         comment_position_paths.push((root_of(o.group), path));
                     }
                 }
-                Bucket::Refused { reason, fenced } => {
+                Bucket::Refused {
+                    reason,
+                    fenced,
+                    fence_contained,
+                } => {
                     totals.refused += 1;
                     gs.refused += 1;
                     if *fenced {
                         totals.fenced += 1;
                         gs.fenced += 1;
+                    }
+                    if *fence_contained {
+                        totals.fence_contained += 1;
+                        gs.fence_contained += 1;
                     }
                     refusal.entry(reason.clone()).or_default().add(&path);
                 }
@@ -930,6 +1014,13 @@ impl Report {
              behind an earlier refusal is not counted, making `achievable` too large and the \
              parity rate a conservative under-estimate."
         );
+        if self.totals.fence_contained > 0 {
+            println!(
+                "  ≥{} further refused files CONTAIN a fenced construct (special elements only; \
+                 directives and named slots not detected) — census, NOT subtracted.",
+                self.totals.fence_contained
+            );
+        }
 
         print_reasons("Top refusal reasons", &self.refusal_reasons, 15);
         print_reasons(
@@ -1488,6 +1579,21 @@ mod tests {
             bucket: Bucket::Refused {
                 reason: reason.to_string(),
                 fenced,
+                fence_contained: false,
+            },
+        }
+    }
+
+    /// A refused file whose first refusal is NOT a fence but which the census
+    /// finds a fenced construct in — the `fence_contained` diagnostic population.
+    fn refused_containing_fence(path: &str, reason: &str) -> FileOutcome {
+        FileOutcome {
+            group: 0,
+            path: PathBuf::from(path),
+            bucket: Bucket::Refused {
+                reason: reason.to_string(),
+                fenced: false,
+                fence_contained: true,
             },
         }
     }
@@ -1613,6 +1719,106 @@ mod tests {
 
         // The per-group stats carry the same split.
         assert_eq!(report.groups[0].1.fenced, 1);
+    }
+
+    #[test]
+    fn census_finds_a_fence_hidden_behind_an_earlier_refusal() {
+        // The whole point of the diagnostic: `compile` bails on the CSS selector and
+        // never reaches the `<slot>`, so the fence-first count misses this file.
+        let source = "<style>:has(.x) { color: red; }</style>\n<slot />\n";
+        assert!(
+            census_finds_fence(source),
+            "census must see a fence the first refusal hides"
+        );
+    }
+
+    #[test]
+    fn census_does_not_reach_the_attribute_level_fences() {
+        // ⚠️ Pins the documented reach — the census tests a node's KIND and never
+        // inspects an attribute list, so `RunesOnlyFence` and `ComponentNamedSlot`
+        // are invisible to it. This is WHY the count is a floor on a floor and why
+        // it does not feed the denominator. If a later slice teaches the census
+        // attribute-level detection, this test REDS — which is the signal to revisit
+        // `TargetSet` §Why the census does not supply this denominator, not to
+        // quietly relax the assertion.
+        assert!(
+            !census_finds_fence("<button on:click={h}>x</button>\n"),
+            "a legacy on: directive is an attribute-level fact the census cannot see"
+        );
+        assert!(
+            !census_finds_fence(
+                "<script>import C from './C.svelte';</script>\n<C><p slot=\"a\">x</p></C>\n"
+            ),
+            "a component named slot is an attribute-level fact the census cannot see"
+        );
+    }
+
+    #[test]
+    fn fence_containment_is_counted_but_never_subtracted() {
+        // The load-bearing property of the whole diagnostic: `fence_contained`
+        // reports how far `fenced` under-counts the containment population WITHOUT
+        // entering the denominator. Wiring it into `target_set` would raise the
+        // published parity rate with zero behavior change, on a signal that reaches
+        // one of three fence sources and over-detects in a dropped `{:catch}` — so
+        // this test is what REDS if a later slice subtracts it.
+        //
+        // 5 files: 1 parity, 1 fenced refusal, 2 fence-CONTAINING refusals, 1 plain
+        // refusal. Achievable stays (5 − 0 oracle-rejected) − 1 fenced = 4 — the two
+        // contained files stay IN the denominator.
+        let groups = one_group(5);
+        let report = Report::build(
+            &groups,
+            &[
+                FileOutcome {
+                    group: 0,
+                    path: PathBuf::from("p.svelte"),
+                    bucket: Bucket::Parity { tolerated: false },
+                },
+                refused("f.svelte", "template node special element <slot>", true),
+                refused_containing_fence("c1.svelte", "css at-rule in <style>"),
+                refused_containing_fence("c2.svelte", "instance-script export"),
+                refused("r.svelte", "css at-rule in <style>", false),
+            ],
+        );
+
+        assert_eq!(report.totals.fenced, 1, "fence-FIRST count is unchanged");
+        assert_eq!(
+            report.totals.fence_contained, 2,
+            "both contained files are counted"
+        );
+        assert_eq!(report.groups[0].1.fence_contained, 2, "and per-group");
+
+        let t = report.target_set();
+        assert_eq!(t.fenced, 1, "the denominator reads fence-FIRST only");
+        assert_eq!(
+            t.achievable, 4,
+            "the two contained files must NOT be subtracted"
+        );
+        assert!(
+            (t.parity_pct.unwrap() - 25.0).abs() < f64::EPSILON,
+            "parity stays 1/4 — the diagnostic cannot flatter the rate"
+        );
+    }
+
+    #[test]
+    fn fence_containment_is_not_asked_of_a_fence_first_file() {
+        // A fence-first file is already in `fenced`; counting it again would
+        // double-book it and make the two lines describe overlapping populations.
+        // `classify` guards this with `!fenced && …`, so the two counts partition
+        // the refused set rather than overlapping.
+        let report = Report::build(
+            &one_group(1),
+            &[refused(
+                "f.svelte",
+                "legacy on: directive (runes-only fence)",
+                true,
+            )],
+        );
+        assert_eq!(report.totals.fenced, 1);
+        assert_eq!(
+            report.totals.fence_contained, 0,
+            "a fence-first file never also counts as fence-CONTAINING"
+        );
     }
 
     #[test]

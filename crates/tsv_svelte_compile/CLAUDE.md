@@ -165,6 +165,22 @@ project-wide conventions.
   over-counts component `on:`/`let:` and constructs in SSR-dropped `{:catch}`
   regions, and a source regex over-counts comments — so the denominator stays
   deliberately too large and the parity rate a conservative under-estimate.
+
+  The `census` **sizes** that floor without moving it: the runner asks it, per
+  refused file whose first refusal was not itself a fence, whether a fence is
+  present anyway, and reports the count as a separate non-participating line
+  (`≥N further refused files CONTAIN a fenced construct`). It is deliberately NOT
+  subtracted, for two reasons that survive being tempting. The census tests a
+  node's KIND and never inspects an attribute list, so it reaches the fenced
+  special-element tags but neither `RunesOnlyFence` nor `ComponentNamedSlot` —
+  one of three sources, and the correction it offers is smaller than the
+  population it still misses. And its residual error is **not one-directional**:
+  it walks every child fragment including a dropped `{:catch}`, where
+  `<svelte:self>` / `<svelte:fragment>` / `<svelte:component>` COMPILE rather
+  than refuse, so subtracting would book an achievable file as unreachable.
+  Together those would trade a rule that is exact and provably a floor for one
+  that is neither statable nor provably signed — while raising the published
+  parity rate with zero behavior change.
 - `parity.rs` — **the comment-position-tolerant parity comparator**
   (`compare_canonical` → `Parity`). The compiler's parity bar over two canonical JS
   strings: byte-exact, or tolerated when they differ ONLY in comment *position*

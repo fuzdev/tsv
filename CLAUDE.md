@@ -780,7 +780,14 @@ cargo run -p tsv_debug compile_fixtures_validate [pattern...]
 # parity as a % of it. `fenced` counts FIRST refusals, so it is a FLOOR — a file whose fence sits
 # behind an earlier refusal is equally unreachable but uncounted (no sound cheap detector: a node walk
 # over-counts component `on:`/`let:` and SSR-dropped `{:catch}` regions, a regex over-counts comments),
-# leaving `achievable` too large and the parity rate a conservative UNDER-estimate.
+# leaving `achievable` too large and the parity rate a conservative UNDER-estimate. The refusal
+# `census` SIZES that floor without moving it: per refused file whose first refusal was not itself a
+# fence, it asks whether a fence is present anyway, reported as a separate NON-participating line
+# (`≥N further refused files CONTAIN a fenced construct`). Deliberately not subtracted — the census
+# reaches the fenced special-element TAGS but neither `RunesOnlyFence` nor `ComponentNamedSlot` (it
+# never inspects an attribute list), and it over-detects in a dropped `{:catch}` where those tags
+# COMPILE, so its residual error is not one-directional. Subtracting would raise the published parity
+# rate with zero behavior change, on a partial and unsigned signal.
 # Exit codes: 0 clean, 1 FAILURE (mismatch or over-acceptance), 2 harness error. Sidecar-dependent —
 # kept out of `deno task check`; the `compile:corpus:compare` deno task points it at the real-repo
 # corpus + Svelte suites. `--json` carries the full per-file path list per refusal / oracle-reject /

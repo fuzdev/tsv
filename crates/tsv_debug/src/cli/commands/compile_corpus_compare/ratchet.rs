@@ -594,6 +594,7 @@ mod tests {
                     Bucket::Refused {
                         reason: "css at-rule in <style>".to_string(),
                         fenced: false,
+                        fence_contained: false,
                     },
                 ),
             ],
