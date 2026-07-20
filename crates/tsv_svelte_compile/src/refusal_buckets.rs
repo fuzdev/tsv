@@ -127,6 +127,9 @@ impl Refusal {
             Self::ScriptInvalidContext => Cow::Borrowed(
                 "<script> context attribute other than context=\"module\" (the oracle rejects it)",
             ),
+            Self::ScriptInvalidAttributeValue => Cow::Borrowed(
+                "<script module> attribute with a value (must be boolean — the oracle rejects it)",
+            ),
             // TypeScript — closed-set discriminants, the message is the bucket.
             Self::TypeScriptWithoutLangTs
             | Self::CommentInErasedTypeRegion
@@ -420,6 +423,7 @@ impl Refusal {
             },
             Self::GenericsAttribute,
             Self::ScriptInvalidContext,
+            Self::ScriptInvalidAttributeValue,
             Self::LangInstanceScript {
                 lang: "{lang}".to_string(),
             },

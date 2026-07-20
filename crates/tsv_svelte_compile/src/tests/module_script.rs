@@ -50,6 +50,44 @@ fn compile_refuses_invalid_script_context() {
 }
 
 #[test]
+fn compile_refuses_valued_module_attribute() {
+    // The oracle's parse-time `script_invalid_attribute_value` (read/script.js:57-64):
+    // the `module` attribute must be a plain BOOLEAN; any value refuses.
+    assert_unsupported(
+        "<script module=\"foo\">\n\tconst a = 1;\n</script>\n<p>x</p>",
+        "<script module> attribute with a value",
+    );
+    // Even `module="module"` refuses — the VALUE is what's illegal, not the text.
+    assert_unsupported(
+        "<script module=\"module\">\n\tconst a = 1;\n</script>\n<p>x</p>",
+        "<script module> attribute with a value",
+    );
+    // An empty string value.
+    assert_unsupported(
+        "<script module=\"\">\n\tconst a = 1;\n</script>\n<p>x</p>",
+        "<script module> attribute with a value",
+    );
+    // A `{…}` value.
+    assert_unsupported(
+        "<script module={x}>\n\tconst a = 1;\n</script>\n<p>x</p>",
+        "<script module> attribute with a value",
+    );
+    // Mixed attributes — the shared source-order pass matches the oracle's
+    // first-error-wins: `module` first reports the module-value rule…
+    assert_unsupported(
+        "<script module=\"bar\" context=\"foo\">\n\tconst a = 1;\n</script>\n<p>x</p>",
+        "<script module> attribute with a value",
+    );
+    // …`context` first reports the context rule.
+    assert_unsupported(
+        "<script context=\"foo\" module=\"bar\">\n\tconst a = 1;\n</script>\n<p>x</p>",
+        "context attribute other than context=\"module\"",
+    );
+    // Control: the bare boolean `module` is the valid module-script spelling.
+    let _ = compile_js("<script module>const a = 1;</script>\n<p>x</p>");
+}
+
+#[test]
 fn compile_module_refuses_export_as_default() {
     // The oracle's single `module_illegal_default_export` fires from its
     // `ExportNamedDeclaration` visitor too: an `export { x as default }` specifier

@@ -111,6 +111,19 @@ pub enum Refusal {
     /// oracle still rejects its `context="foo"`.
     #[error("<script> context attribute other than context=\"module\" (the oracle rejects it)")]
     ScriptInvalidContext,
+    /// A `<script>` `module` attribute carrying a VALUE — the oracle's parse-time
+    /// `script_invalid_attribute_value` (`1-parse/read/script.js:57-64`, the
+    /// sibling of [`Self::ScriptInvalidContext`] in the same attribute loop). The
+    /// `module` attribute must be a plain BOOLEAN (`<script module>`); the oracle
+    /// rejects `attribute.value !== true`, so `module="foo"`, `module="module"`,
+    /// `module=""`, and `module={x}` all fail. tsv's parser routes `module` to the
+    /// module slot only when it is value-less, so a valued `module` becomes an
+    /// ordinary instance script and the compiler refuses rather than emit for a
+    /// component the oracle rejects. The oracle raises this in the SAME source-order
+    /// loop as the `context` check, first-error-wins, which is why the two share one
+    /// pass (`refuse_invalid_script_attributes`).
+    #[error("<script module> attribute with a value (must be boolean — the oracle rejects it)")]
+    ScriptInvalidAttributeValue,
     /// A `<script>` with a `lang` other than `ts`/`js`/empty (instance or module).
     /// The oracle's TypeScript flag tests `lang === 'ts'` **exactly**, so
     /// `lang="typescript"` and `lang="TS"` are not TypeScript to it; rather than

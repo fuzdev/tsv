@@ -126,19 +126,29 @@ pub(crate) fn document_ts_flag(root: &Root<'_>, source: &str) -> Result<bool, Co
     Ok(ts)
 }
 
-/// The oracle's parse-time `script_invalid_context`
-/// (`1-parse/read/script.js:66-78`): a `<script>`'s `context` attribute is valid
-/// ONLY as a single Text value `"module"` (the legacy spelling of
-/// `<script module>`). A boolean `context`, an expression value `context={x}`, a
-/// multi-chunk value, or any other text (`context="default"`, `context="server"`,
-/// …) is rejected.
+/// The oracle's parse-time `<script>` attribute-value rules, both raised in one
+/// source-order loop (`1-parse/read/script.js:48-79`, first error wins):
 ///
-/// tsv's parser only routes `context="module"` to the module slot and treats every
-/// other `context` attribute as an ordinary instance script (`detect_script_context`
-/// in `tsv_svelte`), so this refuses rather than emit for a component the oracle
-/// rejects. Checked on **both** scripts: `<script module context="foo">` is a
-/// module script to tsv, yet the oracle still rejects its `context="foo"`.
-pub(crate) fn refuse_invalid_script_context(
+/// - **`script_invalid_context`** — a `context` attribute is valid ONLY as a single
+///   Text value `"module"` (the legacy spelling of `<script module>`). A boolean
+///   `context`, an expression `context={x}`, a multi-chunk value, or any other text
+///   (`context="default"`, …) is rejected.
+/// - **`script_invalid_attribute_value`** — a `module` attribute must be a plain
+///   BOOLEAN (`<script module>`); the oracle rejects `attribute.value !== true`, so
+///   `module="foo"`, `module="module"`, `module=""`, and `module={x}` all fail.
+///
+/// tsv's parser (`detect_script_context` in `tsv_svelte`) routes to the module slot
+/// only for `context="module"` or a value-less `module`, treating every other form
+/// as an ordinary instance script — so both invalid shapes reach here as an accepted
+/// component the oracle rejects, and both are refused. Checked on **both** scripts:
+/// `<script module context="foo">` is a module script to tsv, yet the oracle still
+/// rejects its `context="foo"`.
+///
+/// The two rules share ONE per-attribute pass — not two — so the refusal REASON
+/// matches the oracle's first-error-wins order: `<script module="x" context="y">`
+/// reports the `module` value (source-first), `<script context="y" module="x">` the
+/// `context`.
+pub(crate) fn refuse_invalid_script_attributes(
     root: &Root<'_>,
     source: &str,
 ) -> Result<(), CompileError> {
@@ -147,22 +157,33 @@ pub(crate) fn refuse_invalid_script_context(
             let AttributeNode::Attribute(attr) = attr_node else {
                 continue;
             };
-            let is_context = {
+            let name = {
                 let interner = script.content.interner.borrow();
-                interner.resolve_infallible(attr.name) == "context"
+                interner.resolve_infallible(attr.name).to_string()
             };
-            if !is_context {
-                continue;
-            }
-            // The oracle's `is_text_attribute(attr) && attr.value[0].data === 'module'`
-            // — a single Text node equal to "module". A boolean (`value` is `None`),
-            // an expression, a multi-chunk value, or any other text fails.
-            let valid = matches!(
-                attr.value,
-                Some([AttributeValue::Text(text)]) if text.data(source) == "module"
-            );
-            if !valid {
-                return Err(unsupported(Refusal::ScriptInvalidContext));
+            match name.as_str() {
+                "context" => {
+                    // The oracle's `is_text_attribute(attr) && attr.value[0].data ===
+                    // 'module'` — a single Text node equal to "module". A boolean
+                    // (`value` is `None`), an expression, a multi-chunk value, or any
+                    // other text fails.
+                    let valid = matches!(
+                        attr.value,
+                        Some([AttributeValue::Text(text)]) if text.data(source) == "module"
+                    );
+                    if !valid {
+                        return Err(unsupported(Refusal::ScriptInvalidContext));
+                    }
+                }
+                "module" => {
+                    // The oracle's `attribute.value !== true` — a boolean carries no
+                    // value (`None`); any value (`Some(_)`, incl. an empty string)
+                    // refuses.
+                    if attr.value.is_some() {
+                        return Err(unsupported(Refusal::ScriptInvalidAttributeValue));
+                    }
+                }
+                _ => {}
             }
         }
     }
