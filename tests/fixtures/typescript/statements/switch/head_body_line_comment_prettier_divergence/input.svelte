@@ -24,8 +24,16 @@
 			break;
 	}
 
-	// Block comment normalizes to trailing ) with the brace on the same line
+	// Block comment authored trailing ) stays trailing, brace on the same line
 	switch (a) /* c5 */ {
+		case 1:
+			break;
+	}
+
+	// Block comment authored on its own line keeps it, brace drops below
+	switch (a)
+	/* c6 */
+	{
 		case 1:
 			break;
 	}

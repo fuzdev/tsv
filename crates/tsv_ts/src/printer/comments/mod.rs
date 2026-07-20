@@ -59,7 +59,11 @@ pub(crate) enum CommentSpacing {
     Leading,
     /// Space after comment: `/* c */ `
     Trailing,
-    /// No spacing: `/* c */`
+    /// No spacing around the run: `/* c */`.
+    ///
+    /// ⚠️ This governs the run's **outer** edges only — comments *within* the run are
+    /// still separated, or a multi-comment run fuses into `/* a *//* b */`. The caller
+    /// picks `None` because it has already placed the anchor's space itself.
     None,
 }
 
@@ -443,11 +447,20 @@ impl<'a> Printer<'a> {
                     }
                 }
                 CommentSpacing::None => {
-                    if !first && prev_was_line {
-                        if blank_before {
-                            parts.push(d.literalline());
+                    if !first {
+                        if prev_was_line {
+                            if blank_before {
+                                parts.push(d.literalline());
+                            }
+                            parts.push(d.hardline());
+                        } else {
+                            // A block comment doesn't end its line, so the next comment
+                            // still needs an explicit separator — without one the run
+                            // fuses into `/* a *//* b */`. `None` suppresses the
+                            // *leading* space before the run, not the separators inside
+                            // it.
+                            parts.push(d.text(" "));
                         }
-                        parts.push(d.hardline());
                     }
                     parts.push(self.build_comment_doc(comment));
                 }
