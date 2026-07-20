@@ -6,8 +6,8 @@
 use super::super::{ParenContext, Printer, has_multiline_content};
 use super::arg_comments::{
     PartitionedComments, any_comment_forces_expansion, build_after_comma_leading_comments,
-    first_arg_has_any_comments, has_blank_line_between_args, has_inter_argument_comments,
-    has_trailing_comments_on_args, last_arg_has_comments, should_force_expansion_for_comments,
+    first_arg_has_any_comments, has_inter_argument_comments, has_trailing_comments_on_args,
+    last_arg_has_comments, should_force_expansion_for_comments,
 };
 use super::arg_predicates::{
     arrow_body_is_call_through_non_null, arrow_has_trailing_param_comments,
@@ -368,15 +368,10 @@ pub(super) fn build_call_doc_with_wrapping(
     // Check for blank lines between arguments (forces expansion and preservation).
     // NOTE: This path is only reached when has_inter_arg_comments is false (the
     // comment-handling path above returns early). No comment handling needed here.
-    // Uses has_blank_line_between_args to skip stripped grouping paren span gaps.
-    let has_blank_lines = call.arguments.windows(2).any(|window| {
-        has_blank_line_between_args(
-            printer.source,
-            printer.line_breaks,
-            window[0].span().end,
-            window[1].span().start,
-        )
-    });
+    let has_blank_lines = call
+        .arguments
+        .windows(2)
+        .any(|window| printer.is_next_line_empty(window[0].span().end, window[1].span().start));
 
     if has_blank_lines {
         // Build arguments with blank line preservation (forced expansion).
@@ -1372,12 +1367,7 @@ fn build_call_with_arg_comments(
                 // (`C`), emitted inline with it.
                 pc.emit_leading_comments_inline_aware(&mut arg_parts, printer);
             } else {
-                let has_blank_line = has_blank_line_between_args(
-                    printer.source,
-                    printer.line_breaks,
-                    arg_end,
-                    next_arg_start,
-                );
+                let has_blank_line = printer.is_next_line_empty(arg_end, next_arg_start);
                 if has_blank_line {
                     // No comments but blank line between args
                     force_expansion = true;

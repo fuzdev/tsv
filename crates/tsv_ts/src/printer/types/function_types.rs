@@ -9,7 +9,7 @@
 use super::super::comments_to_emit_in_range;
 use super::super::expressions::functions::{has_huggable_type_annotation, is_huggable_pattern};
 use super::helpers::type_args_should_wrap_for_return_type;
-use super::{CommentSpacing, Printer};
+use super::{BlankRule, CommentSpacing, Printer};
 use crate::ast::internal::{self, TSConstructorType, TSFunctionType, TSType};
 use crate::printer::layout::hang_after_operator;
 use smallvec::smallvec;
@@ -625,6 +625,12 @@ impl<'a> Printer<'a> {
         // emission below) — same as regular function params; prettier keeps the blank
         // in every parameter-list position.
         let force_multiline = self.has_blank_line_between_params(params)
+            // An own-line comment BETWEEN two params forces multiline, the same as one in
+            // the `(`→first-param gap below. Shared with the value-level router rather than
+            // re-derived here — the between-params case used to be reached only by accident,
+            // via a blank-line check that miscounted a comment's own two newlines as a blank.
+            || (comments_present
+                && self.has_leading_own_line_comment_in_params(params, paren_pos.map(|p| p + 1)))
             || (comments_present
                 && (self.has_line_comments_in_delimited_list(
                     params,
@@ -814,6 +820,8 @@ impl<'a> Printer<'a> {
                 || has_own_line_block_after_last
                 || has_leading_gap_forcing
                 || self.has_blank_line_between_params(params)
+                // Same between-params own-line rule as the router above.
+                || self.has_leading_own_line_comment_in_params(params, paren_pos.map(|p| p + 1))
             {
                 return self.build_type_params_multiline_parts(params, paren_pos);
             }
@@ -1026,7 +1034,7 @@ impl<'a> Printer<'a> {
                     &mut inner_parts,
                     param_end,
                     next_start,
-                    true,
+                    BlankRule::NextLineEmpty,
                 );
             } else {
                 // Last param: no trailing comma (trailingComma: 'none') + comments before `)`

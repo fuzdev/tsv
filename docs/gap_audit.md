@@ -13,6 +13,14 @@ result.
 
 Pure Rust, no sidecar. Gated in `deno task check` as a **ratchet**, not a green gate.
 
+**Two detectors ride the one format.** The ledger answers "was a comment dropped or printed
+twice?"; the render-time [swallow check](audits.md#line-comment-swallow-audit-swallowaudit)
+answers "did a `//` comment eat following content on its output line?" — a class the ledger is
+**structurally blind** to, since a swallowing comment is printed exactly once and the
+print-once account balances. Arming both on the *same* format call is what makes the second
+detector affordable: no extra format, no extra parse. Its findings are held **report-only**
+(see [The SWALLOW class](#the-swallow-class)).
+
 **Design rationale lives next to the code** — why sites are byte offsets rather than tokens,
 why the ledger (and not an output diff) is the oracle, why the payload set is plural, and
 what a green run does *not* prove: see the module docs at the top of
@@ -92,6 +100,33 @@ today and starts dropping a `block` one tomorrow is a new bug on a new ownership
 on the shape alone it would land inside an existing entry and never be seen. It is also
 stable in the way a count is not: it changes when the bug's character changes, not when a
 fixture is added.
+
+### The SWALLOW class
+
+A `SWALLOW` shape is **report-only**: neither pinned into the snapshot nor able to fail the
+gate. Mechanically it is *filtered out of the graded key set* (`is_graded`) — a third category
+beside pinnable and never-pinnable, mirroring `blank_audit`'s `STRUCTURAL-DIVERGENCE`. Making
+it *un*-pinnable instead would make it fail like a panic, the opposite of what is wanted.
+
+It is real content loss, so this is a **staging decision, not a verdict**: the class only
+became visible when the check was armed here, and pinning several hundred untriaged claims
+into a ratchet whose shrinking is the goal would be pinning noise. It reports until its
+shapes are triaged; the run prints its own `○ N SWALLOW shape(s) … reported, NOT gated`
+section so a quiet `✓` can never be misread as "no swallows".
+
+Two properties differ from the ledger kinds. It is **not self-verified** — a swallow is
+observed directly on the rendered output (like `blank_audit`'s F1/reparse kinds), so the
+`UNCONFIRMED`/`PARTIAL` axis does not apply; the verify pass's oracle is the multiset of
+comment *contents*, which answers the ledger's question and not this one. And it has **no
+bystander axis**: the tracker reports a property of an output *line*, not of a registered
+comment, so every finding keys at its injection site.
+
+Cost: arming the check adds roughly **+10% CPU** to a run (measured over `tests/fixtures`:
+~146 s → ~160 s user, ~17 s → ~19 s wall), against a whole-`deno task check` budget of
+~137 s. The rejected alternative — running the full `f1_check` battery per injection — was
+measured at **>40x** baseline CPU, because it pays `tsv_parse_to_value` twice per accepted
+injection and, unlike `blank_audit`, gap injection has no absorbed-input fast path (an
+injected comment must appear in the output, so it is never absorbed).
 
 ### A panic is never pinned
 

@@ -32,6 +32,7 @@ mod union_intersection;
 pub use helpers::unwrap_parenthesized;
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`
+pub(super) use super::comments::BlankRule;
 pub(super) use super::{CommentFilter, CommentSpacing, Printer};
 
 use crate::ast::internal::{TSImportType, TSParenthesizedType, TSType};

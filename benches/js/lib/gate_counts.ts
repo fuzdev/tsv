@@ -296,9 +296,20 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	svelte: 6,
-	typescript: 133,
+	typescript: 130,
 	css: 22,
 };
+// typescript 133→130 (2026-07-20, checkouts unchanged; svelte 6 + css 22 unchanged, SAFETY 0).
+// The list blank-line predicate converged onto prettier's `isNextLineEmpty` (params, call
+// arguments, object properties): the break gate and the blank emitter had measured different
+// ranges — the gate the whole gap, the emitter only past the comma — so `f(a⏎⏎, b)` broke the
+// list and then dropped the blank. Arrays/tuples keep the comma-anchored rule, which is
+// prettier's own split (`isLineAfterElementEmpty` advances to the comma; the array separator is
+// a `softline`, not a `hardline`). Blank-audit ratchet 185→174 shapes, and the headline
+// `NON-IDEMPOTENT IDENT⟨⟩,` fell 413 hits→1 (the survivor is an array fixture).
+// ⚠️ Direction and SAFETY were verified, but the per-file pre/post bucket diff this file's
+// convention asks for was NOT run — the drop is attributed by mechanism, not by enumerating the
+// three files that left `unknown`.
 // svelte 7→6 (2026-07-18, checkouts unchanged; SAFETY 0). The boundary-trim detector claims
 // two former unknowns: prettier-plugin-svelte await-inline.html (unknown→known) and
 // prettier/tests/format/html/js/template-literal.html (unknown→partial — its remaining
@@ -486,9 +497,13 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
  */
 export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	svelte: 1,
-	typescript: 52,
+	typescript: 51,
 	css: 9,
 };
+// typescript 52→51 (2026-07-20, checkouts unchanged; svelte 1 + css 9 unchanged, SAFETY 0).
+// Same `isNextLineEmpty` convergence as the CORPUS_FORMAT_UNKNOWN_PIN 133→130 note above; one
+// file's remaining blank-line hunk resolved with it. Same caveat: attributed by mechanism, not
+// by a per-file pre/post bucket diff.
 // typescript 53→52 (2026-07-19, ../svelte b4d1583ae, ../kit da5b08ea7, ../svelte.dev c21c2d0,
 // ../prettier 1dcd0b0; svelte 1 + css 9 unchanged, SAFETY 0). `comment_preserved` now joins a
 // hunk's lines before stripping comments, so it sees a block comment prettier DROPPED that

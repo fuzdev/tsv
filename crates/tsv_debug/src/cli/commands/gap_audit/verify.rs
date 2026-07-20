@@ -68,6 +68,7 @@ pub(super) fn verify_example(example: &Example, kind: Kind, parser: ParserType) 
         findings,
         comments: input_comments,
         output,
+        ..
     } = ledger_format_with_comments(&injected, parser)
     else {
         return Verdict::Unconfirmed;

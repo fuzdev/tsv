@@ -101,12 +101,35 @@ fn payload_column(payloads: &BTreeSet<&'static str>) -> String {
 pub(super) fn snapshot_keys(shapes: &BTreeMap<(Kind, String), ShapeAgg>) -> BTreeSet<KnownKey> {
     shapes
         .iter()
+        .filter(|((kind, _), _)| is_graded(*kind))
         .map(|((kind, shape), agg)| KnownKey {
             kind: *kind,
             shape: shape.clone(),
             payloads: payload_column(&agg.payloads),
         })
         .collect()
+}
+
+/// Whether a kind is part of the RATCHET-GRADED set at all — the report-only carve-out.
+///
+/// [`Kind::Swallow`] is held **report-only**, mirroring `blank_audit`'s
+/// `STRUCTURAL-DIVERGENCE`: it is neither pinned nor gate-failing, achieved by FILTERING its
+/// keys out of the set the [`Ratchet`] ever sees ([`snapshot_keys`]), so the grade produces no
+/// new / stale / unpinnable for it. Deliberately **not** [`is_pinnable`] — making a swallow
+/// un-pinnable would make it FAIL the gate like a panic, the opposite of report-only. Two
+/// orthogonal filters: `is_graded` decides what the ratchet sees, `is_pinnable` decides,
+/// within that, what may be written vs always-fails.
+///
+/// The class is real content loss, so this is a staging decision, not a verdict: it reports
+/// until its shapes are triaged, rather than pinning several hundred unreviewed claims.
+pub(super) fn is_graded(kind: Kind) -> bool {
+    kind != Kind::Swallow
+}
+
+/// How many of `shapes` are the report-only [`Kind::Swallow`] class, excluded from the
+/// ratchet by [`is_graded`].
+pub(super) fn count_soft(shapes: &BTreeMap<(Kind, String), ShapeAgg>) -> usize {
+    shapes.keys().filter(|(k, _)| !is_graded(*k)).count()
 }
 
 /// Whether a shape is something the snapshot may pin — everything but a [`Kind::Panic`].

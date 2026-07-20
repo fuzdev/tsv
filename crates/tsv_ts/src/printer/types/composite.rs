@@ -13,7 +13,7 @@ use super::helpers::{
     type_needs_parens_for_array_element, type_needs_parens_for_conditional_check,
     type_needs_parens_for_conditional_extends, unwrap_parenthesized,
 };
-use super::{CommentSpacing, Printer};
+use super::{BlankRule, CommentSpacing, Printer};
 use crate::ast::internal::{
     self, TSArrayType, TSConditionalType, TSMappedType, TSMappedTypeModifier, TSTupleType, TSType,
 };
@@ -1012,7 +1012,7 @@ impl<'a> Printer<'a> {
                     &mut inner_parts,
                     elem_end,
                     next_start,
-                    true,
+                    BlankRule::AfterComma,
                 );
             } else {
                 // Last element: no trailing comma under `trailingComma: 'none'`, then

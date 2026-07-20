@@ -36,6 +36,7 @@ mod render;
 mod scan;
 
 pub(crate) use declarations::HeritageKeyword;
+pub(crate) use lists::BlankRule;
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`.
 pub(super) use super::{Printer, calls, layout};
