@@ -88,14 +88,14 @@ impl<'a> Printer<'a> {
         let do_end = stmt.span.start + "do".len() as u32;
         let body_start = stmt.body.span().start;
         let mut parts = if self.has_comments_to_emit_between(do_end, body_start) {
-            let has_line = self.has_line_comments_between(do_end, body_start);
+            let gap_breaks = self.header_to_body_gap_breaks(do_end, body_start);
             let mut p = smallvec![d.text("do")];
-            if has_line && !is_block {
-                // Non-block body: the comment run shares the body's indent and every
-                // comment takes its own line, whatever the author wrote — prettier does
-                // the same here, so there is nothing to preserve.
+            if gap_breaks && !is_block {
+                // Non-block body: the comment run shares the body's indent, with a `//`
+                // normalized onto its own line — prettier does the same here, so there
+                // is nothing to preserve.
                 self.push_indented_header_to_body_gap(&mut p, do_end, body_start, body_doc);
-            } else if has_line {
+            } else if gap_breaks {
                 // Block body — the shared header→body gap, exactly as `try`/`catch`/
                 // `finally` use it: a comment trailing `do` stays trailing, one on its own
                 // line keeps it. Emitting the run inline after a bare space relocated an

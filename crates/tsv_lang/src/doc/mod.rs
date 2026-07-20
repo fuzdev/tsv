@@ -533,6 +533,129 @@ mod arena_tests {
         assert_eq!(render_default(&a, a.remove_lines(literal)), "a\nb");
     }
 
+    /// Atomizing a `conditional_group` must yield its *least*-expanded state — what
+    /// prettier's re-render at `printWidth: Infinity` would pick.
+    ///
+    /// The states are dead once every line is flattened. Keeping them let render fall
+    /// through to the most-expanded one at the real width and emit its separators as
+    /// literal spaces (`fn( a, b )`) — the template-interpolation bug this guards.
+    #[test]
+    fn test_arena_atomize_collapses_conditional_group() {
+        let a = DocArena::new();
+        let flat = a.concat(&[
+            a.text("fn("),
+            a.text("a"),
+            a.text(", "),
+            a.text("b"),
+            a.text(")"),
+        ]);
+        let expanded = a.concat(&[
+            a.text("fn("),
+            a.indent(a.concat(&[a.line(), a.text("a"), a.text(","), a.line(), a.text("b")])),
+            a.line(),
+            a.text(")"),
+        ]);
+        let cg = a.conditional_group(&[flat, expanded]);
+
+        // Far too narrow for any state to fit — without the collapse, render picks the
+        // most-expanded state and its flattened `line`s surface as spaces.
+        assert_eq!(render_pw_tab(&a, a.atomize(cg), 5), "fn(a, b)");
+    }
+
+    /// **The contract of `atomize`, asserted directly: the result renders
+    /// identically at every width.**
+    ///
+    /// It emulates prettier's re-render at `printWidth: Infinity`, so width must stop
+    /// being an input. Any node where flattening disagrees with "what would infinite width
+    /// print?" shows up here as a width-dependent string — which is precisely how the
+    /// `conditional_group` bug behaved (`fn(a, b)` wide, `fn( a, b )` narrow) while every
+    /// external gate stayed green: the output was still idempotent, still reparsed, and
+    /// still dropped no comment, so only a prettier diff could see it.
+    ///
+    /// Prefer extending this over adding another single-width case — a new doc shape gets
+    /// graded at every width for free.
+    #[test]
+    fn test_arena_atomize_is_width_invariant() {
+        let a = DocArena::new();
+        let inner_cg = a.conditional_group(&[
+            a.concat(&[a.text("g("), a.text("x"), a.text(")")]),
+            a.concat(&[
+                a.text("g("),
+                a.indent(a.concat(&[a.line(), a.text("x")])),
+                a.line(),
+                a.text(")"),
+            ]),
+        ]);
+        let shapes: &[(&str, DocId)] = &[
+            ("conditional_group", {
+                let flat = a.concat(&[
+                    a.text("fn("),
+                    a.text("a"),
+                    a.text(", "),
+                    a.text("b"),
+                    a.text(")"),
+                ]);
+                let expanded = a.concat(&[
+                    a.text("fn("),
+                    a.indent(a.concat(&[
+                        a.line(),
+                        a.text("a"),
+                        a.text(","),
+                        a.line(),
+                        a.text("b"),
+                    ])),
+                    a.line(),
+                    a.text(")"),
+                ]);
+                a.conditional_group(&[flat, expanded])
+            }),
+            (
+                "nested conditional_group",
+                a.concat(&[a.text("outer("), inner_cg, a.text(")")]),
+            ),
+            (
+                "plain group",
+                a.group(a.concat(&[a.text("a"), a.line(), a.text("b")])),
+            ),
+            (
+                "group_break",
+                a.group_break(a.concat(&[a.text("a"), a.line(), a.text("b")])),
+            ),
+            (
+                "if_break",
+                a.group(a.concat(&[a.text("a"), a.if_break(a.text("B"), a.text("F"))])),
+            ),
+            (
+                "fill",
+                a.fill(&[a.text("a"), a.line(), a.text("b"), a.line(), a.text("c")]),
+            ),
+            (
+                "hardline",
+                a.concat(&[a.text("a"), a.hardline(), a.text("b")]),
+            ),
+            (
+                "indent + softline",
+                a.indent(a.concat(&[a.softline(), a.text("a"), a.softline(), a.text("b")])),
+            ),
+        ];
+
+        for &(label, doc) in shapes {
+            let flat = a.atomize(doc);
+            let wide = render_pw_tab(&a, flat, 10_000);
+            for width in [1, 2, 5, 13, 40, 100] {
+                assert_eq!(
+                    render_pw_tab(&a, flat, width),
+                    wide,
+                    "{label}: atomized doc rendered differently at width {width} than at infinite width"
+                );
+            }
+            assert!(
+                !wide.contains('\n'),
+                "{label}: atomized doc kept a newline: {wide:?}"
+            );
+        }
+    }
+
     #[test]
     fn test_arena_fill_all_fit() {
         let a = DocArena::new();

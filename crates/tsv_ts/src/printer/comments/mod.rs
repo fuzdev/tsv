@@ -59,7 +59,11 @@ pub(crate) enum CommentSpacing {
     Leading,
     /// Space after comment: `/* c */ `
     Trailing,
-    /// No spacing: `/* c */`
+    /// No spacing around the run: `/* c */`.
+    ///
+    /// ⚠️ This governs the run's **outer** edges only — comments *within* the run are
+    /// still separated, or a multi-comment run fuses into `/* a *//* b */`. The caller
+    /// picks `None` because it has already placed the anchor's space itself.
     None,
 }
 
@@ -443,11 +447,20 @@ impl<'a> Printer<'a> {
                     }
                 }
                 CommentSpacing::None => {
-                    if !first && prev_was_line {
-                        if blank_before {
-                            parts.push(d.literalline());
+                    if !first {
+                        if prev_was_line {
+                            if blank_before {
+                                parts.push(d.literalline());
+                            }
+                            parts.push(d.hardline());
+                        } else {
+                            // A block comment doesn't end its line, so the next comment
+                            // still needs an explicit separator — without one the run
+                            // fuses into `/* a *//* b */`. `None` suppresses the
+                            // *leading* space before the run, not the separators inside
+                            // it.
+                            parts.push(d.text(" "));
                         }
-                        parts.push(d.hardline());
                     }
                     parts.push(self.build_comment_doc(comment));
                 }
@@ -495,6 +508,75 @@ impl<'a> Printer<'a> {
         }
         // `concat` short-circuits the no-comments-in-range case to `empty()`.
         d.concat(&parts)
+    }
+
+    /// Leading comment run for a conditional branch arm (`?`/`:` → branch value):
+    /// each comment takes a space when the next content shares its closing line
+    /// (`? /* c */ v` stays glued), else `soft_sep` — the caller's collapsible
+    /// line, so an authored break after the comment holds when the conditional is
+    /// broken and yields when it is flat. This is prettier's `printLeadingComment`
+    /// separator, except its own-line `hardline` case is deliberately not
+    /// mirrored: tsv re-glues an own-line comment to the operator, so a hardline
+    /// keyed on the authored newline *before* the comment would collapse on the
+    /// second pass (prettier itself is non-idempotent there), and the
+    /// §Authored-breaks-in-value-position rule collapses the fitting form anyway.
+    /// Separator anchors ride the physical next comment
+    /// ([`Self::blank_scan_end`]) so an owned comment glued to the value can't
+    /// desync them.
+    ///
+    /// Line comments never reach this run — both conditional printers route them
+    /// to their breaking layouts — and a line comment's collapsible separator
+    /// would swallow the branch, so that routing is load-bearing.
+    ///
+    /// Returns `None` when the gap has no comments to emit.
+    pub(crate) fn build_branch_comment_run(
+        &self,
+        start: u32,
+        end: u32,
+        soft_sep: DocId,
+    ) -> Option<DocId> {
+        let d = self.d();
+        let mut parts = DocBuf::new();
+        let mut comments = comments_to_emit_in_range(self.comments, start, end).peekable();
+        while let Some(comment) = comments.next() {
+            debug_assert!(
+                comment.is_block,
+                "line comments belong to the breaking layout"
+            );
+            parts.push(self.build_comment_doc(comment));
+            let emit_next = comments.peek().map_or(end, |n| n.span.start);
+            let next = self.blank_scan_end(comment.span.end, emit_next);
+            if self.comment_hugs_next(comment, next) {
+                parts.push(d.text(" "));
+            } else if self.has_blank_line_between(comment.span.end, next) {
+                // An author blank after the comment is itself a break trigger
+                // (prettier breaks the conditional on it too), so the break is
+                // forced and the blank survives — the conditional-branch
+                // carve-out in conformance_prettier.md §Authored breaks in
+                // value position. The expression printer routes blank gaps to
+                // its breaking layout before building a run
+                // (`comment_followed_by_blank`), so this arm serves the
+                // conditional-type branches.
+                parts.push(d.literalline());
+                parts.push(d.hardline());
+            } else {
+                parts.push(soft_sep);
+            }
+        }
+        if parts.is_empty() {
+            None
+        } else {
+            Some(d.concat(&parts))
+        }
+    }
+
+    /// Prepend an optional leading doc (a comment run) to `doc`; `None` passes
+    /// `doc` through untouched, keeping the comment-free path allocation-free.
+    pub(crate) fn prepend_opt(&self, lead: Option<DocId>, doc: DocId) -> DocId {
+        match lead {
+            Some(lead) => self.d().concat(&[lead, doc]),
+            None => doc,
+        }
     }
 
     /// Leading-spacing counterpart of [`Self::build_trailing_comments_hang_next`]: a

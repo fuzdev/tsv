@@ -72,13 +72,9 @@ impl<'a> Printer<'a> {
         let (inline_prev, own_line, inline_next) =
             self.partition_comments_by_line(paren_end, body_start);
 
-        // Check if any line comment forces a break
-        let has_line =
-            inline_prev.iter().any(|c| !c.is_block) || own_line.iter().any(|c| !c.is_block);
-
         parts.push(d.text(")"));
 
-        if has_line {
+        if self.header_to_body_gap_breaks(paren_end, body_start) {
             // Emit trailing comments on the `)` line
             for comment in &inline_prev {
                 parts.push(d.text(" "));
@@ -93,14 +89,15 @@ impl<'a> Printer<'a> {
             // the blank line an author put between two own-line comments
             // (`push_gap_blank_before`, the one place that rule lives).
             //
-            // A block comment keeps what follows on its line; a line comment must end it
-            // or the `//` swallows the next comment / the body. That rule applies both
-            // between comments and before the body, so it is written once.
-            let sep_after = |p: &Comment| {
-                if p.is_block {
-                    d.text(" ")
-                } else {
+            // The separator preserves the authored line: what the author wrote on one
+            // line stays on one line. A line comment is the one override — it must end
+            // its line or the `//` swallows the next comment / the body. That rule
+            // applies both between comments and before the body, so it is written once.
+            let sep_after = |p: &Comment, next_start: u32| {
+                if !p.is_block || !self.is_same_line(p.span.end, next_start) {
                     d.hardline()
+                } else {
+                    d.text(" ")
                 }
             };
             let mut inner = DocBuf::new();
@@ -109,32 +106,28 @@ impl<'a> Printer<'a> {
                 match prev {
                     None => inner.push(d.hardline()),
                     Some(p) => {
-                        if !p.is_block {
-                            self.push_gap_blank_before(
-                                &mut inner,
-                                Some(p.span.end),
-                                comment.span.start,
-                            );
-                        }
-                        inner.push(sep_after(p));
+                        self.push_gap_blank_before(
+                            &mut inner,
+                            Some(p.span.end),
+                            comment.span.start,
+                        );
+                        inner.push(sep_after(p, comment.span.start));
                     }
                 }
                 inner.push(self.build_comment_doc(comment));
                 prev = Some(comment);
             }
-            inner.push(prev.map_or_else(|| d.hardline(), sep_after));
+            inner.push(prev.map_or_else(|| d.hardline(), |p| sep_after(p, body_start)));
             inner.push(body_doc);
             parts.push(d.indent(d.concat(&inner)));
         } else {
-            // Block comments only: adjustClause — `) /* a */ body` stays flat but the
-            // comment(s) + body drop to their own indented line when the enclosing
-            // for-in/for-of group breaks (overflow). Matches Prettier.
+            // Nothing forces a break, so by `header_to_body_gap_breaks` every comment is
+            // a block comment already trailing `)` — `own_line` and `inline_next` are
+            // empty here and iterating them would be dead. adjustClause: `) /* a */ body`
+            // stays flat, but the comment(s) + body drop to their own indented line when
+            // the enclosing for-in/for-of group breaks (overflow). Matches Prettier.
             let mut inner = DocBuf::new();
-            for comment in inline_prev
-                .iter()
-                .chain(own_line.iter())
-                .chain(inline_next.iter())
-            {
+            for comment in &inline_prev {
                 inner.push(self.build_comment_doc(comment));
                 inner.push(d.text(" "));
             }
@@ -1251,9 +1244,6 @@ impl<'a> Printer<'a> {
         let body_start = stmt.body.span().start;
 
         if has_pre_paren_comments || self.has_comments_to_emit_between(header_end, body_start) {
-            // Check if we have line comments (need special handling)
-            let has_line_comment = self.has_line_comments_between(header_end, body_start);
-
             // Build parts with proper comment handling. A comment between `)` and the
             // body does NOT force the header to break — the header decides its own
             // flat/break on its own width (prettier 3.9 collapses `for (i; c; u)` and
@@ -1271,37 +1261,31 @@ impl<'a> Printer<'a> {
             // A C-style `for` collapses its empty block body (`for (…) {}`).
             let body_doc = self.build_collapsing_body_doc(stmt.body);
 
+            let gap_breaks = self.header_to_body_gap_breaks(header_end, body_start);
             let (tail, group_it) = if self.has_comments_to_emit_between(header_end, body_start) {
-                if has_line_comment && !is_block_body {
-                    // Line comment(s), non-block body: each comment on its own
-                    // indented line, then the body — break-safe so a `//` can't
-                    // swallow the next comment or the body (matches Prettier's
-                    // adjustClause; multiple comments previously collapsed inline).
-                    let mut inner = DocBuf::new();
-                    let mut prev: Option<u32> = None;
-                    for comment in comments_to_emit_in_range(self.comments, header_end, body_start)
-                    {
-                        self.push_gap_blank_before(&mut inner, prev, comment.span.start);
-                        inner.push(d.hardline());
-                        inner.push(self.build_comment_doc(comment));
-                        prev = Some(comment.span.end);
-                    }
-                    inner.push(d.hardline());
-                    inner.push(body_doc);
-                    (d.indent(d.concat(&inner)), false)
-                } else if has_line_comment {
-                    // Line comment(s), block body — the shared header→body gap. The
-                    // C-style `for` pushes no anchor of its own: its `)` is already
-                    // inside the header doc. Given a line comment in the gap (this
-                    // branch's guard), the gap's separator is the hardline that drops
-                    // the block to the next line.
+                if gap_breaks && !is_block_body {
+                    // Non-block body, and something in the gap forces the break: the
+                    // shared indented emitter — each own-line comment on its own
+                    // indented line, then the body — break-safe so a `//` can't swallow
+                    // the next comment or the body (Prettier's `adjustClause`).
+                    let mut tail = DocBuf::new();
+                    self.push_indented_header_to_body_gap(
+                        &mut tail, header_end, body_start, body_doc,
+                    );
+                    (d.concat(&tail), false)
+                } else if gap_breaks {
+                    // Block body, and something in the gap forces the break — the shared
+                    // header→body gap. The C-style `for` pushes no anchor of its own: its
+                    // `)` is already inside the header doc. Given this branch's guard, the
+                    // gap's separator is the hardline that drops the block to the next line.
                     let mut tail = DocBuf::new();
                     self.push_header_to_body_gap(&mut tail, header_end, body_start);
                     tail.push(body_doc);
                     (d.concat(&tail), false)
                 } else {
-                    // Block comment(s) only — built here so the line-comment paths
-                    // above don't compute an unused doc.
+                    // Nothing in the gap forces a break, so every comment is a block
+                    // comment already trailing the `)` — built here so the breaking
+                    // paths above don't compute a doc they discard.
                     let comment_doc = self
                         .build_inline_comments_between_doc_no_leading_space(header_end, body_start);
                     if is_block_body {
