@@ -126,6 +126,49 @@ pub(crate) fn document_ts_flag(root: &Root<'_>, source: &str) -> Result<bool, Co
     Ok(ts)
 }
 
+/// The oracle's parse-time `script_invalid_context`
+/// (`1-parse/read/script.js:66-78`): a `<script>`'s `context` attribute is valid
+/// ONLY as a single Text value `"module"` (the legacy spelling of
+/// `<script module>`). A boolean `context`, an expression value `context={x}`, a
+/// multi-chunk value, or any other text (`context="default"`, `context="server"`,
+/// …) is rejected.
+///
+/// tsv's parser only routes `context="module"` to the module slot and treats every
+/// other `context` attribute as an ordinary instance script (`detect_script_context`
+/// in `tsv_svelte`), so this refuses rather than emit for a component the oracle
+/// rejects. Checked on **both** scripts: `<script module context="foo">` is a
+/// module script to tsv, yet the oracle still rejects its `context="foo"`.
+pub(crate) fn refuse_invalid_script_context(
+    root: &Root<'_>,
+    source: &str,
+) -> Result<(), CompileError> {
+    for script in [root.module, root.instance].into_iter().flatten() {
+        for attr_node in script.attributes {
+            let AttributeNode::Attribute(attr) = attr_node else {
+                continue;
+            };
+            let is_context = {
+                let interner = script.content.interner.borrow();
+                interner.resolve_infallible(attr.name) == "context"
+            };
+            if !is_context {
+                continue;
+            }
+            // The oracle's `is_text_attribute(attr) && attr.value[0].data === 'module'`
+            // — a single Text node equal to "module". A boolean (`value` is `None`),
+            // an expression, a multi-chunk value, or any other text fails.
+            let valid = matches!(
+                attr.value,
+                Some([AttributeValue::Text(text)]) if text.data(source) == "module"
+            );
+            if !valid {
+                return Err(unsupported(Refusal::ScriptInvalidContext));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// The **template** half of the document-wide TypeScript gate: refuse any
 /// TypeScript in the template of a component with no `lang="ts"`.
 ///

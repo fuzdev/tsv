@@ -98,6 +98,19 @@ pub enum Refusal {
     /// not annotation erasure — a separate slice). Refused on either script.
     #[error("generics attribute on <script> (implies TypeScript)")]
     GenericsAttribute,
+    /// A `<script>` whose `context` attribute is anything but a plain
+    /// `context="module"` — the oracle's parse-time `script_invalid_context`
+    /// (`1-parse/read/script.js:66-78`). The only valid `context` value is the
+    /// text `"module"` (the legacy spelling of `<script module>`); a boolean
+    /// `context`, an expression value `context={x}`, a multi-chunk value, or any
+    /// other text (`context="default"`, `context="server"`, …) is rejected. tsv's
+    /// parser only ROUTES `context="module"` to the module slot and treats every
+    /// other `context` attribute as an ordinary instance script, so the compiler
+    /// refuses rather than emit for a component the oracle rejects. Checked on BOTH
+    /// scripts — `<script module context="foo">` is a module script to tsv but the
+    /// oracle still rejects its `context="foo"`.
+    #[error("<script> context attribute other than context=\"module\" (the oracle rejects it)")]
+    ScriptInvalidContext,
     /// A `<script>` with a `lang` other than `ts`/`js`/empty (instance or module).
     /// The oracle's TypeScript flag tests `lang === 'ts'` **exactly**, so
     /// `lang="typescript"` and `lang="TS"` are not TypeScript to it; rather than

@@ -13,6 +13,43 @@ fn compile_module_refuses_default_export() {
 }
 
 #[test]
+fn compile_refuses_invalid_script_context() {
+    // The oracle's parse-time `script_invalid_context` (read/script.js:66-78): a
+    // `context` attribute is valid ONLY as the text "module". Any other text.
+    assert_unsupported(
+        "<script context=\"foo\">\n\tlet x = 1;\n</script>\n<p>{x}</p>",
+        "context attribute other than context=\"module\"",
+    );
+    // `context="default"` — a plausible mistake, still rejected.
+    assert_unsupported(
+        "<script context=\"default\">\n\tlet x = 1;\n</script>\n<p>{x}</p>",
+        "context attribute other than context=\"module\"",
+    );
+    // A boolean `context` (no value).
+    assert_unsupported(
+        "<script context>\n\tlet x = 1;\n</script>\n<p>{x}</p>",
+        "context attribute other than context=\"module\"",
+    );
+    // An expression value `context={…}` — not a text attribute.
+    assert_unsupported(
+        "<script context={foo}>\n\tlet x = 1;\n</script>\n<p>{x}</p>",
+        "context attribute other than context=\"module\"",
+    );
+    // Checked on the MODULE script too: `<script module context="foo">` is a module
+    // script to tsv (the boolean `module`), but the oracle still rejects the bad
+    // `context`.
+    assert_unsupported(
+        "<script module context=\"foo\">\n\tconst a = 1;\n</script>\n<p>x</p>",
+        "context attribute other than context=\"module\"",
+    );
+    // Discriminating controls, all COMPILE: the legacy `context="module"`, the
+    // modern `module`, and a plain instance script.
+    let _ = compile_js("<script context=\"module\">const a = 1;</script>\n<p>x</p>");
+    let _ = compile_js("<script module>const a = 1;</script>\n<p>x</p>");
+    let _ = compile_js("<script>let x = 1;</script>\n<p>{x}</p>");
+}
+
+#[test]
 fn compile_module_refuses_export_as_default() {
     // The oracle's single `module_illegal_default_export` fires from its
     // `ExportNamedDeclaration` visitor too: an `export { x as default }` specifier

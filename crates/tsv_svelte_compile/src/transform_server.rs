@@ -391,6 +391,9 @@ fn analyze<'arena>(
     // document `ts` flag is decided from the first lang-bearing script in source
     // order — the module can set it (`document_ts_flag`).
     let ts_document = document_ts_flag(root, source)?;
+    // The oracle's parse-time `script_invalid_context`: a `context` attribute on
+    // either script that isn't `context="module"` is rejected.
+    crate::script_ts_gate::refuse_invalid_script_context(root, source)?;
     let (instance_body, erased_windows) = match root.instance {
         Some(script) => {
             let erased = erase::erase_statements(arena, source, script.content.body)?;

@@ -275,6 +275,7 @@ mod tests {
         "$props.id() used more than once",
         "--custom-property attribute on <{name}> component",
         "<option> (oracle emits $$renderer.option closures)",
+        "<script> context attribute other than context=\"module\" (the oracle rejects it)",
         "<svelte:boundary> {name}={…} attribute form",
         "<svelte:head> alongside a {@const} in the same fragment (hoist order)",
         "<svelte:options>",
