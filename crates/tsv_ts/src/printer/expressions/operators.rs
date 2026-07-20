@@ -1166,7 +1166,7 @@ impl<'a> Printer<'a> {
             if has_trailing_comments {
                 self.append_trailing_paren_comments(&mut body, argument_end, yield_expr.span.end);
             }
-            return self.build_hanging_paren_doc(keyword, d.concat(&body), ")");
+            return self.build_hanging_paren_doc(keyword, d.concat(&body));
         }
 
         let mut parts: DocBuf = smallvec![d.text(keyword), d.text(" ")];
