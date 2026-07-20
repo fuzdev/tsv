@@ -3,10 +3,10 @@
 // for-loop header layout (init/test/update clauses with comment placement),
 // for-in/for-of left/right printing.
 
-use super::super::ControlFlowGap;
 use crate::ast::internal::{self, Expression, Statement};
 use crate::printer::{CommentVec, LeadingGlue, Printer};
 use smallvec::smallvec;
+use tsv_lang::Comment;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -85,16 +85,44 @@ impl<'a> Printer<'a> {
                 parts.push(self.build_comment_doc(comment));
             }
 
-            // Remaining comments (own_line + inline_next) go indented before body
-            let mut inner: DocBuf = smallvec![d.hardline()];
-            for comment in own_line.into_iter().chain(inline_next) {
-                inner.push(self.build_comment_doc(comment));
-                if comment.is_block {
-                    inner.push(d.text(" "));
+            // Remaining comments (own_line + inline_next) go indented before body.
+            //
+            // Separator-BEFORE form: the separator ahead of each comment is keyed on the
+            // PREVIOUS comment, and the one before the body on the last — identical to
+            // keying each separator on the comment it follows, but it leaves a seam for
+            // the blank line an author put between two own-line comments
+            // (`push_gap_blank_before`, the one place that rule lives).
+            //
+            // A block comment keeps what follows on its line; a line comment must end it
+            // or the `//` swallows the next comment / the body. That rule applies both
+            // between comments and before the body, so it is written once.
+            let sep_after = |p: &Comment| {
+                if p.is_block {
+                    d.text(" ")
                 } else {
-                    inner.push(d.hardline());
+                    d.hardline()
                 }
+            };
+            let mut inner = DocBuf::new();
+            let mut prev: Option<&Comment> = None;
+            for comment in own_line.into_iter().chain(inline_next) {
+                match prev {
+                    None => inner.push(d.hardline()),
+                    Some(p) => {
+                        if !p.is_block {
+                            self.push_gap_blank_before(
+                                &mut inner,
+                                Some(p.span.end),
+                                comment.span.start,
+                            );
+                        }
+                        inner.push(sep_after(p));
+                    }
+                }
+                inner.push(self.build_comment_doc(comment));
+                prev = Some(comment);
             }
+            inner.push(prev.map_or_else(|| d.hardline(), sep_after));
             inner.push(body_doc);
             parts.push(d.indent(d.concat(&inner)));
         } else {
@@ -1250,48 +1278,25 @@ impl<'a> Printer<'a> {
                     // swallow the next comment or the body (matches Prettier's
                     // adjustClause; multiple comments previously collapsed inline).
                     let mut inner = DocBuf::new();
-                    let mut prev = header_end;
+                    let mut prev: Option<u32> = None;
                     for comment in comments_to_emit_in_range(self.comments, header_end, body_start)
                     {
-                        if prev != header_end
-                            && self.has_blank_line_between(prev, comment.span.start)
-                        {
-                            inner.push(d.literalline());
-                        }
+                        self.push_gap_blank_before(&mut inner, prev, comment.span.start);
                         inner.push(d.hardline());
                         inner.push(self.build_comment_doc(comment));
-                        prev = comment.span.end;
+                        prev = Some(comment.span.end);
                     }
                     inner.push(d.hardline());
                     inner.push(body_doc);
                     (d.indent(d.concat(&inner)), false)
                 } else if has_line_comment {
-                    // Line comment(s), block body. Preserve each comment's position
-                    // (no inline collapse → no swallow): a comment trailing `)`
-                    // stays on the `)` line, own-line comments each keep their own
-                    // line; then the block drops to the next line. Mirrors the
-                    // shared `append_close_paren_with_comments` (which the C-style
-                    // for can't call directly — its `)` is already in the header).
-                    let (mut inline_prev, own_line, inline_next) =
-                        self.partition_comments_by_line(header_end, body_start);
-                    let mut own_line_lines: CommentVec<'_> = smallvec![];
-                    for comment in own_line.into_iter().chain(inline_next) {
-                        if comment.is_block {
-                            inline_prev.push(comment);
-                        } else {
-                            own_line_lines.push(comment);
-                        }
-                    }
+                    // Line comment(s), block body — the shared header→body gap. The
+                    // C-style `for` pushes no anchor of its own: its `)` is already
+                    // inside the header doc. Given a line comment in the gap (this
+                    // branch's guard), the gap's separator is the hardline that drops
+                    // the block to the next line.
                     let mut tail = DocBuf::new();
-                    let effective_prev_end = inline_prev.last().map_or(header_end, |c| c.span.end);
-                    self.build_comments_between_parts(
-                        &mut tail,
-                        &inline_prev,
-                        &own_line_lines,
-                        effective_prev_end,
-                        ControlFlowGap::HeaderToBody,
-                    );
-                    tail.push(d.hardline());
+                    self.push_header_to_body_gap(&mut tail, header_end, body_start);
                     tail.push(body_doc);
                     (d.concat(&tail), false)
                 } else {

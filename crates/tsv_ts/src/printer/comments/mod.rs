@@ -399,6 +399,7 @@ impl<'a> Printer<'a> {
         // comment keeps the inline spacing.
         let mut parts = DocBuf::new();
         let mut prev_was_line = false;
+        let mut prev_end: Option<u32> = None;
         let mut first = true;
         for comment in comments_to_emit_in_range(self.comments, start, end) {
             // Apply filter
@@ -406,12 +407,23 @@ impl<'a> Printer<'a> {
                 continue;
             }
 
+            // An authored blank line between two comments that each occupy their own
+            // line separates two distinct remarks, exactly as a blank between two
+            // statements does, so it survives (`conformance_prettier.md` §"No blank above
+            // a body block's `{`"). Only meaningful where the separator is a `hardline`:
+            // an inline run has no lines to separate.
+            let blank_before = prev_was_line
+                && prev_end.is_some_and(|p| self.has_blank_line_between(p, comment.span.start));
+
             match spacing {
                 CommentSpacing::Leading => {
                     // Separator before this comment: the surrounding-indent `hardline`
                     // after a line comment (no leading space — it starts the line),
                     // else the inline leading space.
                     if !first && prev_was_line {
+                        if blank_before {
+                            parts.push(d.literalline());
+                        }
                         parts.push(d.hardline());
                     } else {
                         parts.push(d.text(" "));
@@ -431,12 +443,16 @@ impl<'a> Printer<'a> {
                 }
                 CommentSpacing::None => {
                     if !first && prev_was_line {
+                        if blank_before {
+                            parts.push(d.literalline());
+                        }
                         parts.push(d.hardline());
                     }
                     parts.push(self.build_comment_doc(comment));
                 }
             }
             prev_was_line = !comment.is_block;
+            prev_end = Some(comment.span.end);
             first = false;
         }
         Some(d.concat(&parts))

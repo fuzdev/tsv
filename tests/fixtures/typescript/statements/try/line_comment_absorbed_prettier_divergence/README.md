@@ -11,9 +11,18 @@ tsv treats user comment placement as intentional. Consistent with tsv's handling
 
 ## Cases
 
-- `try // comment {}` → Prettier absorbs into try block
-- `catch (e) // comment {}` → Prettier absorbs into catch parens (`catch (\n\te\n\t// comment\n)`)
-- `finally // comment {}` → Prettier absorbs into finally block
+Both authorings of the same gap, across all four keywords — Prettier absorbs either one, tsv
+keeps each where it was written. This mirrors the `if`/`while` `)`→`{` gap exactly.
+
+| gap | trailing (`try // c⏎{`) | own-line (`try⏎// c⏎{`) |
+| --- | --- | --- |
+| `try` | absorbed into the try block | absorbed into the try block |
+| `catch (e)` | absorbed into the catch parens (`catch (⏎\te // c⏎)`) | absorbed into the catch parens |
+| bare `catch` | absorbed into the catch block | absorbed into the catch block |
+| `finally` | absorbed into the finally block | absorbed into the finally block |
+
+Only **line** comments are covered: an own-line **block** comment normalizes to trailing the
+keyword in both formatters (`try⏎/* c */⏎{` → `try /* c */ {`), so it is not a divergence.
 
 The absorbed form (`variant_absorbed.svelte`) is dual-stable: both formatters keep it as-is, so it is a `variant_*`, not the canonical input.
 

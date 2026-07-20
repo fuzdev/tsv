@@ -13,18 +13,16 @@ impl<'a> Printer<'a> {
     /// Append a space (or comments + space/hardline) between a keyword/token end and body start.
     ///
     /// Used for `try /* c */ {`, `catch (e) /* c */ {`, `catch /* c */ {`, `finally /* c */ {`.
+    ///
+    /// The keyword anchor for `push_header_to_body_gap` — see there for the gap's comment
+    /// rules. Emitting this gap inline instead (the pre-`bug164` shape) relocated an
+    /// own-line `//` up onto the keyword line (`try⏎// c⏎{` → `try // c⏎{`), which the
+    /// `if`/`while` `)`→`{` siblings never do.
     fn append_keyword_to_body_comments(&self, parts: &mut DocBuf, token_end: u32, body_start: u32) {
-        let d = self.d();
         if self.has_comments_to_emit_between(token_end, body_start) {
-            let has_line = self.has_line_comments_between(token_end, body_start);
-            parts.push(self.build_inline_comments_between_doc(token_end, body_start));
-            if has_line {
-                parts.push(d.hardline());
-            } else {
-                parts.push(d.text(" "));
-            }
+            self.push_header_to_body_gap(parts, token_end, body_start);
         } else {
-            parts.push(d.text(" "));
+            parts.push(self.d().text(" "));
         }
     }
 
