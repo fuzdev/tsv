@@ -10,8 +10,8 @@ use super::super::{
     is_curried_arrow_chain, is_multiline_template_expression,
 };
 use super::arg_comments::{
-    emit_first_arg_leading_comments, find_comma_pos, has_blank_line_between_args,
-    is_inline_block_after_comma, is_inline_block_before_comma, push_empty_args,
+    emit_first_arg_leading_comments, find_comma_pos, is_inline_block_after_comma,
+    is_inline_block_before_comma, push_empty_args,
 };
 use super::arg_predicates::{
     arrow_body_is_call_through_non_null, is_block_function, is_short_second_arg_for_expand_first,
@@ -939,12 +939,8 @@ pub(super) fn build_args_with_blank_lines(
             // newlines, so it must stop at the comment: `[prev_end, comment_start)` excludes
             // the annotation's own newlines yet keeps an authored blank line *before* it.
             if !printer.has_comments_to_emit_between(prev_end, curr_start)
-                && has_blank_line_between_args(
-                    printer.source,
-                    printer.line_breaks,
-                    prev_end,
-                    printer.blank_scan_end(prev_end, curr_start),
-                )
+                && printer
+                    .is_next_line_empty(prev_end, printer.blank_scan_end(prev_end, curr_start))
             {
                 arg_parts.push(d.literalline());
                 arg_parts.push(d.hardline());
@@ -976,12 +972,8 @@ pub(super) fn build_args_with_blank_lines(
                 // Skip hardline if next arg has blank line
                 // (handled at top of next iteration — same physical scan window, so the
                 // two agree even when an owned annotation sits in the gap).
-                let next_has_blank = has_blank_line_between_args(
-                    printer.source,
-                    printer.line_breaks,
-                    arg_end,
-                    printer.blank_scan_end(arg_end, next_start),
-                );
+                let next_has_blank = printer
+                    .is_next_line_empty(arg_end, printer.blank_scan_end(arg_end, next_start));
                 if !next_has_blank {
                     arg_parts.push(d.hardline());
                 }

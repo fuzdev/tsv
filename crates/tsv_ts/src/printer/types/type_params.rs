@@ -5,7 +5,7 @@
 // - Type parameter instantiation (type arguments): `<T, U>`
 
 use super::helpers::is_simple_type_arg;
-use super::{CommentFilter, CommentSpacing, Printer};
+use super::{BlankRule, CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{self, TSType, TSTypeParameter, TSTypeParameterDeclaration};
 use crate::printer::layout::fluid_after_operator;
 use smallvec::smallvec;
@@ -114,7 +114,7 @@ impl<'a> Printer<'a> {
                     &mut inner_parts,
                     param_end,
                     next_start,
-                    false,
+                    BlankRule::None,
                 );
             } else {
                 // Last param: no trailing comma under `trailingComma: 'none'`, then
@@ -740,7 +740,7 @@ impl<'a> Printer<'a> {
                     &mut inner_parts,
                     param_end,
                     next_start,
-                    false,
+                    BlankRule::None,
                 );
             } else {
                 // Last param: trailing comments before `>`

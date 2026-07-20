@@ -288,16 +288,20 @@ impl<'a> Printer<'a> {
             // No comments, no forced multiline: use width-based wrapping with soft lines
             let mut parts = d.pooled_docbuf();
 
+            // Whether each gap between consecutive properties carries an author blank line.
+            // Derived ONCE per gap: the loop below asks the same question from both sides —
+            // "is there a blank before me?" at property `i`, and "before the next one?" when
+            // emitting `i`'s separator — which is the same gap, and computing it twice invites
+            // the two answers to drift apart.
+            let gap_blank: SmallVec<[bool; 8]> = obj
+                .properties
+                .windows(2)
+                .map(|pair| self.is_next_line_empty(pair[0].value_end(), pair[1].span().start))
+                .collect();
+
             for (i, prop) in obj.properties.iter().enumerate() {
                 // Check for blank line before this property (preserved in multiline).
-                let has_blank_before = if i > 0 {
-                    let prev_prop = &obj.properties[i - 1];
-                    let prev_end = prev_prop.value_end();
-                    let prop_start = prop.span().start;
-                    self.has_blank_line_after_comma(prev_end, prop_start)
-                } else {
-                    false
-                };
+                let has_blank_before = i > 0 && gap_blank[i - 1];
 
                 if has_blank_before {
                     // Blank line preservation
@@ -312,13 +316,9 @@ impl<'a> Printer<'a> {
                 // Add comma and line break
                 if i < obj.properties.len() - 1 {
                     parts.push(d.text(","));
-                    // Only add line break if next property doesn't have blank line before it
-                    let next_prop = &obj.properties[i + 1];
-                    let curr_end = prop.value_end();
-                    let next_start = next_prop.span().start;
-                    let next_has_blank = self.has_blank_line_after_comma(curr_end, next_start);
-
-                    if !next_has_blank {
+                    // Only add a line break when the next property has no blank line before
+                    // it — the blank's own `literalline` + `hardline` already separates them.
+                    if !gap_blank[i] {
                         parts.push(d.line());
                     }
                 }

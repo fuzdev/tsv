@@ -637,6 +637,9 @@ mod ledger {
         Ok {
             /// The ledger's findings — normally empty.
             findings: Vec<CommentFinding>,
+            /// PROTOTYPE (measurement only): the render-time swallow reports drained from
+            /// the same format. Empty unless `swallow::set_swallow_check(true)` is armed.
+            swallows: Vec<tsv_lang::doc::swallow::SwallowReport>,
             /// The source text of every comment the document registered — the `verify_example`
             /// content oracle. Populated only by [`ledger_format_with_comments`] (empty under
             /// the hot-path [`ledger_format`], which never reads it), so the per-injection loop
@@ -667,15 +670,18 @@ mod ledger {
     /// otherwise be attributed to the next injection.
     fn ledger_format_inner(src: &str, parser: ParserType, collect_comments: bool) -> Formatted {
         let _ = comment_ledger::take_comment_ledger();
+        let _ = tsv_lang::doc::swallow::take_swallow_reports();
         let result =
             std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| format_source(src, parser)));
         match result {
             Err(_) => {
                 let _ = comment_ledger::take_comment_ledger();
+                let _ = tsv_lang::doc::swallow::take_swallow_reports();
                 Formatted::Panicked
             }
             Ok(Err(_)) => {
                 let _ = comment_ledger::take_comment_ledger();
+                let _ = tsv_lang::doc::swallow::take_swallow_reports();
                 Formatted::Rejected
             }
             Ok(Ok(output)) => {
@@ -686,8 +692,10 @@ mod ledger {
                     Vec::new()
                 };
                 let ledger = comment_ledger::take_comment_ledger();
+                let swallows = tsv_lang::doc::swallow::take_swallow_reports();
                 Formatted::Ok {
                     findings: ledger.findings,
+                    swallows,
                     comments,
                     output,
                 }
