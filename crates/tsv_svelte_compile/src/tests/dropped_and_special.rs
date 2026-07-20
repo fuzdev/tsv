@@ -1,7 +1,6 @@
 //! Dropped regions and the SSR-inert special elements.
 
 use super::support::*;
-use crate::*;
 
 #[test]
 fn dropped_fragments_are_walked() {
@@ -267,14 +266,10 @@ fn compile_ssr_inert_special_elements() {
     // lvalue for a normal bind (`innerWidth`), and ANY lvalue for `bind:this` (no
     // `$state` gate — even an uninitialized `let el`), matching the regular-element
     // fork.
-    assert!(
-        compile(
-            "<script>\n\tlet s = $state(0);\n\tlet el;\n</script>\n\
-             <svelte:window bind:innerWidth={s} bind:this={el} />",
-            &CompileOptions::default(),
-        )
-        .is_ok(),
-        "a whitelisted bind with a valid $state / bind:this target must compile"
+    // a whitelisted bind with a valid $state / bind:this target must compile
+    let _ = compile_js(
+        "<script>\n\tlet s = $state(0);\n\tlet el;\n</script>\n\
+         <svelte:window bind:innerWidth={s} bind:this={el} />",
     );
 
     // The no-op drop family is oracle-accepted on these elements and guard-dropped
@@ -289,11 +284,9 @@ fn compile_ssr_inert_special_elements() {
         "animate:ok",
         "{@attach ok}",
     ] {
+        // drop-family directive must compile on an inert element
         let src = format!("<script>\n\tlet ok = 0;\n</script>\n<svelte:window {attr} />");
-        assert!(
-            compile(&src, &CompileOptions::default()).is_ok(),
-            "drop-family directive must compile on an inert element: {attr}"
-        );
+        let _ = compile_js(&src);
     }
 }
 

@@ -255,18 +255,36 @@ fn compile_rune_optional_chain_declarator_refuses() {
     // (the oracle rejects those, tsv used to compile them). Both the
     // optional-call and optional-member spellings, over every declarator-unwrap
     // rune.
-    for src in [
-        "<script>\n\tlet o = $state({ a: 1 });\n\tconst s = $state.snapshot?.(o);\n</script>\n<p>{s.a}</p>",
-        "<script>\n\tlet o = $state({ a: 1 });\n\tconst s = $state?.snapshot(o);\n</script>\n<p>{s.a}</p>",
-        "<script>\n\tconst id = $props.id?.();\n</script>\n<p>{id}</p>",
-        "<script>\n\tconst x = $state?.(1);\n</script>\n<p>{x}</p>",
-        "<script>\n\tconst p = $props?.();\n</script>\n<p>text</p>",
-        "<script>\n\tconst d = $derived?.(1);\n</script>\n<p>{d}</p>",
+    // Each source is paired with the rune the refusal must name: an
+    // `is_err()`-style assertion would pass on a PARSE error too, and would merge
+    // these three distinct refusals into one.
+    for (src, rune) in [
+        (
+            "<script>\n\tlet o = $state({ a: 1 });\n\tconst s = $state.snapshot?.(o);\n</script>\n<p>{s.a}</p>",
+            "rune $state",
+        ),
+        (
+            "<script>\n\tlet o = $state({ a: 1 });\n\tconst s = $state?.snapshot(o);\n</script>\n<p>{s.a}</p>",
+            "rune $state",
+        ),
+        (
+            "<script>\n\tconst id = $props.id?.();\n</script>\n<p>{id}</p>",
+            "rune $props",
+        ),
+        (
+            "<script>\n\tconst x = $state?.(1);\n</script>\n<p>{x}</p>",
+            "rune $state",
+        ),
+        (
+            "<script>\n\tconst p = $props?.();\n</script>\n<p>text</p>",
+            "rune $props",
+        ),
+        (
+            "<script>\n\tconst d = $derived?.(1);\n</script>\n<p>{d}</p>",
+            "rune $derived",
+        ),
     ] {
-        assert!(
-            compile(src, &CompileOptions::default()).is_err(),
-            "optional-chained rune init must refuse: {src}"
-        );
+        assert_unsupported(src, rune);
     }
 }
 

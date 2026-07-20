@@ -1,7 +1,6 @@
 //! The `$`-prefixed identifier rules and the oracle exemptions.
 
 use super::support::*;
-use crate::*;
 
 #[test]
 fn compile_rejects_bare_rune_reference() {
@@ -223,10 +222,7 @@ fn compile_allows_dollar_prefixed_binding_positions_the_oracle_exempts() {
         "{#await Promise.resolve(1) then $$slots}<p>{$$slots}</p>{/await}",
         "{#snippet s($$slots)}<p>{$$slots}</p>{/snippet}",
     ] {
-        assert!(
-            compile(source, &CompileOptions::default()).is_ok(),
-            "expected compile to succeed for:\n{source}"
-        );
+        let _ = compile_js(source);
     }
 }
 

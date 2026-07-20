@@ -209,3 +209,90 @@ fn compile_rejects_load_error_event_capture() {
         "load-error element",
     );
 }
+
+#[test]
+fn compile_attr_whitespace_collapse_trims_the_js_class_not_the_narrow_one() {
+    // The oracle is `chunk.data.replace(/[ \t\n\r\f]+/g, ' ').trim()`
+    // (`server/visitors/shared/utils.js:208` + `phases/patterns.js:11`): a NARROW
+    // ASCII collapse, then JavaScript's WIDE `String.prototype.trim`. Fusing them
+    // into one narrow-class pass left every boundary character that is JS
+    // whitespace but not `[ \t\n\r\f]` in place — 7 oracle-verified MISMATCHes.
+    // All four affected sites, with two distinct exotic characters each.
+
+    // Site 1 — an unscoped plain `class` attribute.
+    let js = compile_js("<div class=\"\u{a0}x\u{a0}\">t</div>");
+    assert!(js.contains("class=\"x\""), "U+00A0 must trim:\n{js}");
+    let js = compile_js("<div class=\"\u{feff}x\u{feff}\">t</div>");
+    assert!(js.contains("class=\"x\""), "U+FEFF must trim:\n{js}");
+
+    // Site 2 — a plain `style` attribute.
+    let js = compile_js("<div style=\"\u{a0}color: red;\u{a0}\">t</div>");
+    assert!(
+        js.contains("style=\"color: red;\""),
+        "U+00A0 must trim:\n{js}"
+    );
+    let js = compile_js("<div style=\"\u{3000}color: red;\u{3000}\">t</div>");
+    assert!(
+        js.contains("style=\"color: red;\""),
+        "U+3000 must trim:\n{js}"
+    );
+
+    // Site 3 — a SCOPED `class` attribute (the hash concat runs on the trimmed
+    // value, so a stray boundary character would sit between value and hash).
+    let js = compile_js(
+        "<div class=\"\u{a0}x\u{a0}\">t</div>\n<style>\n\t.x {\n\t\tcolor: red;\n\t}\n</style>",
+    );
+    assert!(
+        js.contains("class=\"x svelte-tsvhash\""),
+        "scoped class must trim before the hash concat:\n{js}"
+    );
+
+    // Site 4 — the `class:` directive BASE (`$.attr_class(base, …)`).
+    let js = compile_js("<div class:on={true} class=\"\u{a0}x\u{a0}\">t</div>");
+    assert!(
+        js.contains("$.attr_class('x'"),
+        "directive base must trim:\n{js}"
+    );
+    // U+000B is ASCII yet outside the narrow collapse class — the same bug.
+    let js = compile_js("<div class:on={true} class=\"\u{b}x\u{b}\">t</div>");
+    assert!(js.contains("$.attr_class('x'"), "U+000B must trim:\n{js}");
+
+    // The spread-object path and a `style:` directive value share the function.
+    let js = compile_js(
+        "<script>\n\tlet o = {};\n</script>\n\n<div {...o} class=\"\u{a0}x\u{a0}\">t</div>",
+    );
+    assert!(js.contains("class: 'x'"), "spread object must trim:\n{js}");
+    let js = compile_js("<div style:color=\"\u{a0}red\u{a0}\">t</div>");
+    assert!(
+        js.contains("color: 'red'"),
+        "style directive value must trim:\n{js}"
+    );
+
+    // ⚠️ THE DISCRIMINATOR. `U+0085` (<NEL>) and `U+180E` carry Unicode's
+    // `White_Space` property but are NOT ECMAScript whitespace, so JS `.trim()`
+    // KEEPS them — and so must tsv. This is what a `str::trim` would get wrong in
+    // the opposite direction; both are oracle-verified at parity.
+    let js = compile_js("<div class=\"\u{85}y\u{85}\">t</div>");
+    assert!(
+        js.contains("class=\"\u{85}y\u{85}\""),
+        "U+0085 must NOT trim (not ECMAScript whitespace):\n{js}"
+    );
+    let js = compile_js("<div class=\"\u{180e}y\u{180e}\">t</div>");
+    assert!(
+        js.contains("class=\"\u{180e}y\u{180e}\""),
+        "U+180E must NOT trim (not ECMAScript whitespace):\n{js}"
+    );
+
+    // Interior narrow-class runs still collapse to one space, and an interior
+    // `&nbsp;` still survives (why the oracle's collapse is not `\s+`).
+    let js = compile_js("<div class=\"a  \t b\">t</div>");
+    assert!(
+        js.contains("class=\"a b\""),
+        "interior run must collapse:\n{js}"
+    );
+    let js = compile_js("<div class=\"a\u{a0}b\">t</div>");
+    assert!(
+        js.contains("class=\"a\u{a0}b\""),
+        "interior U+00A0 must survive the narrow collapse:\n{js}"
+    );
+}

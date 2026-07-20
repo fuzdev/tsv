@@ -493,3 +493,39 @@ fn compile_refuses_comment_glued_to_script_line() {
         "glued to the <script> line",
     );
 }
+
+#[test]
+fn compile_non_ascii_identifier_beside_erased_typescript() {
+    // ⚠️ REGRESSION GUARD (a PANIC, not a mismatch). The erased-region comment
+    // window scans bytes with `text_class::js_char_at`; a scan that advanced by
+    // ONE BYTE over a non-whitespace character landed on a continuation byte of
+    // a multi-byte identifier and panicked (`byte index N is not a char boundary;
+    // it is inside 'é'`) on ordinary, legal TypeScript. Both halves of the window
+    // are exercised: a `<T>` parameter list (the BACKWARD half — `prev_token_end`
+    // scans over the name to find the token before the detached region) and a
+    // `: T` annotation (the FORWARD half).
+    let js = compile_js(
+        "<script lang=\"ts\">\n\tfunction caf\u{e9}<T>(x: T): T {\n\t\treturn x;\n\t}\n\tlet v = caf\u{e9}(1);\n</script>\n<p>{v}</p>",
+    );
+    assert!(js.contains("caf\u{e9}"), "identifier must survive:\n{js}");
+    assert!(!js.contains(": T"), "type annotation must erase:\n{js}");
+
+    // The annotation shape: a multi-byte PARAMETER name immediately preceding the
+    // erased `: number`.
+    let js = compile_js(
+        "<script lang=\"ts\">\n\tfunction f(caf\u{e9}: number): number {\n\t\treturn caf\u{e9};\n\t}\n\tlet v = f(1);\n</script>\n<p>{v}</p>",
+    );
+    assert!(js.contains("caf\u{e9}"), "identifier must survive:\n{js}");
+    assert!(!js.contains(": number"), "annotation must erase:\n{js}");
+
+    // A multi-byte name before an erased `implements` clause and a return type —
+    // the two other detached regions the backward half exists for.
+    let js = compile_js(
+        "<script lang=\"ts\">\n\tinterface I {}\n\tclass \u{4e2d}\u{6587} implements I {\n\t\tm(): void {}\n\t}\n\tlet v = new \u{4e2d}\u{6587}();\n</script>\n<p>{v}</p>",
+    );
+    assert!(
+        js.contains("\u{4e2d}\u{6587}"),
+        "identifier must survive:\n{js}"
+    );
+    assert!(!js.contains("implements"), "implements must erase:\n{js}");
+}

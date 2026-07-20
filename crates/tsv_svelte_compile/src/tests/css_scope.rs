@@ -322,3 +322,17 @@ fn compile_css_spread_element_scoped_by_type() {
         "{js}"
     );
 }
+
+#[test]
+fn compile_refuses_global_pseudo_class_with_a_non_ascii_ident_char() {
+    // A CSS name must NOT be trimmed with a Unicode-whitespace notion: every code
+    // point at or above U+0080 is a CSS *ident* code point, so `:global\u{a0}` is
+    // the pseudo-class `global\u{a0}`, not `:global`. Rust's `str::trim` stripped
+    // the NBSP, tsv read `:global`, and scoped the element while the oracle pruned
+    // the rule as unused — an oracle-verified MISMATCH, now a safe over-refusal
+    // (the selector matches no element).
+    assert_unsupported(
+        "<div class=\"x\">a</div>\n<style>\n\tdiv :global\u{a0}.x { color: red }\n</style>",
+        "matches no element",
+    );
+}
