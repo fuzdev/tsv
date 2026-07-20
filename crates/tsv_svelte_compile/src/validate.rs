@@ -715,7 +715,7 @@ pub(crate) fn validate_module_exports(
             };
             // The oracle's `analysis.module.scope.get(name)` — the module script's
             // own declarations PLUS every hoisted snippet's binding.
-            if module_declared.contains(&name) || snippets.is_hoisted(&name) {
+            if module_declared.contains(&name) || snippets.has_hoisted_snippet_named(&name) {
                 continue;
             }
             if snippets.names.contains(&name) {

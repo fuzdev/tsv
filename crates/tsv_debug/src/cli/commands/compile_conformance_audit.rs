@@ -341,7 +341,6 @@ mod tests {
         "misplaced slot=\"…\" attribute (the oracle rejects it)",
         "invalid HTML node placement (the oracle rejects it)",
         "duplicate {#snippet} {name} (the oracle rejects it)",
-        "nested {#snippet} {name} shares a top-level snippet's name (the hoist decision is name-keyed)",
         "dynamic <{name}> component (member or reactive binding)",
         "dynamic class attribute on a styled component",
         "dynamic style attribute on a styled component",

@@ -246,9 +246,6 @@ impl Refusal {
             Self::DuplicateSnippetName { .. } => {
                 Cow::Borrowed("duplicate {#snippet} {name} (the oracle rejects it)")
             }
-            Self::NestedSnippetNameCollision { .. } => Cow::Borrowed(
-                "nested {#snippet} {name} shares a top-level snippet's name (the hoist decision is name-keyed)",
-            ),
             Self::SnippetDeclarationDuplicate { .. } => Cow::Borrowed(
                 "{#snippet} {name} is already declared by the instance script (the oracle rejects it)",
             ),
@@ -496,9 +493,6 @@ impl Refusal {
             },
             Self::SnippetHoistOrder,
             Self::DuplicateSnippetName {
-                name: "{name}".to_string(),
-            },
-            Self::NestedSnippetNameCollision {
                 name: "{name}".to_string(),
             },
             Self::SnippetDeclarationDuplicate {

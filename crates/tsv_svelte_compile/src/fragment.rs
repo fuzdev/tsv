@@ -315,7 +315,11 @@ pub(crate) fn emit_fragment<'arena>(
     // elements (which share the block's `init`): a block-scope fragment collects
     // its whole element subtree's snippets and emits their `function`
     // declarations first (hoistable top-level ones to module scope, the rest to
-    // this block's init); an element-child fragment leaves them to the block.
+    // this block's init); an element-child fragment leaves them to the block. The
+    // collection order is recursive-direct-first — a fragment's own snippets
+    // before its descendant elements' — mirroring the oracle's push-order timing
+    // (Fragment.js:35-44 + RegularElement.js:229-231; see
+    // `collect_hoisted_snippets`).
     let hoisted_snippets = if ctx.hoist_snippets {
         let mut collected: Vec<&'arena SnippetBlock<'arena>> = Vec::new();
         collect_hoisted_snippets(fragment, &mut collected);
@@ -479,17 +483,45 @@ pub(crate) fn emit_child_body<'arena>(
 /// block's `init`). Stops at nested blocks, special elements, and **components** —
 /// those are separate scopes that collect their own (a component's snippet
 /// children become its snippet props, handled by `plan_component_children`).
+///
+/// Emit ORDER is recursive-direct-first, not document pre-order: at each level
+/// the fragment's OWN direct-child snippets come first in source order, THEN each
+/// non-Component element subtree is recursed with the same rule. This mirrors the
+/// oracle's push-order timing — `server/visitors/Fragment.js:35-44` drains a
+/// fragment's own hoisted `SnippetBlock`s into `state.init` before it processes
+/// the rest of its children, and the **transparent** branch of
+/// `server/visitors/RegularElement.js:229-231` flattens each element's own `init`
+/// onto the ancestor's shared array only as that element is reached during that
+/// later walk — so a transparent element's snippets always follow the ancestor's
+/// own. A **non-transparent** element takes the other branch (`:221-224`),
+/// wrapping its `init` + `template` in a nested `b.block` pushed to the parent
+/// template, so a snippet inside it stays sealed in that block rather than
+/// hoisting to the block scope.
+///
+/// This collector recurses into EVERY non-Component element unconditionally, yet
+/// can't diverge — because no oracle-accepted program reaches a non-transparent
+/// element here. The only constructs that make a fragment non-transparent are all
+/// unreachable at emission: a fragment-level declaration tag (`{ let … }`) is
+/// refused (`Refusal::TemplateNode`, "declaration tag"), a `{@const}` directly in
+/// a regular element is oracle-rejected (`const_tag_invalid_placement`), and an
+/// async element is `experimental.async`-fenced.
 fn collect_hoisted_snippets<'arena>(
     fragment: &Fragment<'arena>,
     out: &mut Vec<&'arena SnippetBlock<'arena>>,
 ) {
+    // Phase 1: this fragment's own direct-child snippets, source order.
     for node in fragment.nodes {
-        match node {
-            FragmentNode::SnippetBlock(snippet) => out.push(snippet),
-            FragmentNode::Element(element) if element.kind != ElementKind::Component => {
-                collect_hoisted_snippets(&element.fragment, out);
-            }
-            _ => {}
+        if let FragmentNode::SnippetBlock(snippet) = node {
+            out.push(snippet);
+        }
+    }
+    // Phase 2: each transparent (non-Component) element subtree, source order,
+    // recursed with the same two-phase rule.
+    for node in fragment.nodes {
+        if let FragmentNode::Element(element) = node
+            && element.kind != ElementKind::Component
+        {
+            collect_hoisted_snippets(&element.fragment, out);
         }
     }
 }

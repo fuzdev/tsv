@@ -192,89 +192,94 @@ fn compile_accepts_same_named_snippets_in_different_fragments() {
     // The must-not-over-refuse companion: a fragment is a fresh scope, so the same
     // name one fragment deeper is legal. Live-probed against the oracle.
     //
-    // ⚠️ Neither of these has a TOP-LEVEL snippet of the shared name, which is what
-    // the name-keyed hoist map cannot disambiguate — see
-    // `compile_rejects_a_nested_snippet_named_after_a_top_level_snippet` for the
-    // shape this port still refuses.
+    // A TOP-LEVEL snippet of the shared name is legal too now that the hoist map is
+    // keyed by snippet identity — see
+    // `compile_places_a_nested_snippet_named_after_a_top_level_snippet`.
     let _ = compile_js("<div>{#snippet a()}x{/snippet}{#if y}{#snippet a()}z{/snippet}{/if}</div>");
     // A nested snippet whose name matches nothing at the top level.
     let _ = compile_js("{#snippet top()}t{/snippet}<div>{#snippet a()}x{/snippet}</div>");
 }
 
 #[test]
-fn compile_rejects_a_nested_snippet_named_after_a_top_level_snippet() {
-    // The oracle COMPILES both of these (a fragment is a fresh scope, so it places
-    // the two declarations independently). This port's hoist decision is keyed by
-    // NAME and cannot tell them apart, so it can place neither reliably — and the
-    // two sub-cases fail in DIFFERENT ways, which is why the refusal is not gated
-    // on hoistability. Both pin the same reason; they are distinct emission bugs.
+fn compile_places_a_nested_snippet_named_after_a_top_level_snippet() {
+    // A NESTED `{#snippet}` sharing a top-level snippet's name is legal on both
+    // sides — a fragment is a fresh scope, so the oracle places the two
+    // declarations independently. The hoist decision is keyed by snippet IDENTITY
+    // (`SnippetAnalysis`'s span set), so the nested twin never inherits the
+    // top-level one's verdict; both former sub-cases now COMPILE (they were the
+    // retired `NestedSnippetNameCollision` refusal). Byte-parity is pinned by the
+    // `snippets/nested_name_{hoisted,body}` compile fixtures; these assertions pin
+    // the placement directly and cover the fixpoint case (b′) that has no fixture.
 
-    // (a) the top-level snippet HOISTS: the nested one inherits `is_hoisted` and
-    // would emit a SECOND module-scope `function a` — invalid JS.
-    assert_unsupported(
-        "<div>{#snippet a()}x{/snippet}</div>{#snippet a()}y{/snippet}{@render a()}",
-        "nested {#snippet} a shares a top-level snippet's name",
-    );
-
-    // (b) the top-level snippet does NOT hoist (it reads the instance binding `v`):
-    // both land in the component body, legal JS — but tsv emits them in the
-    // OPPOSITE order from the oracle, and function declarations are last-wins, so
-    // `{@render a()}` renders `1` for tsv and `nested` for the oracle. A silent
-    // MISMATCH, the reason the `hoistable == true` gate was wrong.
-    assert_unsupported(
+    // (a) the top-level `a` HOISTS (static, no instance binding) → module scope;
+    // the nested `a` reads the instance binding `v` → the component body. The nested
+    // twin does NOT follow the module-hoisted one.
+    let hoisted = compile_js(
         "<script>let v = 1;</script>\
-         <div>{#snippet a()}nested{/snippet}</div>{#snippet a()}{v}{/snippet}{@render a()}",
-        "nested {#snippet} a shares a top-level snippet's name",
+         {#snippet a()}static{/snippet}<div>{#snippet a()}{v}{/snippet}</div>{@render a()}",
     );
-
-    // (b′) the same MISMATCH reached through the hoist FIXPOINT rather than
-    // directly: `a` is itself free of instance bindings, and is demoted only
-    // because the snippet it renders is not hoistable.
-    assert_unsupported(
-        "<script>let v = 1;</script>\
-         <div>{#snippet a()}nested{/snippet}</div>\
-         {#snippet b()}{v}{/snippet}{#snippet a()}{@render b()}{/snippet}{@render a()}",
-        "nested {#snippet} a shares a top-level snippet's name",
-    );
-
-    // ⚠️ The three assertions above all pin ONE reason, so on their own they stay
-    // green even if the hoist split they describe stopped existing. These two
-    // controls pin that split: they are (a) and (b) with the collision renamed
-    // away, so they COMPILE, and each asserts WHERE the top-level `a` lands. If a
-    // future change made both cases hoist (or neither), the sub-case story above
-    // would be false and one of these fails loudly.
-
-    // (a)-control: `a` reads no instance binding, so it hoists to MODULE scope —
-    // declared before `export default`, which is what makes the nested twin's
-    // inherited `is_hoisted` a duplicate module-scope `function` rather than a
-    // harmless one.
-    let hoisted =
-        compile_js("<div>{#snippet b()}x{/snippet}</div>{#snippet a()}y{/snippet}{@render a()}");
-    let (before_export, _) = hoisted
+    let (before_export, after_export) = hoisted
         .split_once("export default")
         .expect("compiled component exports a default");
     assert!(
         before_export.contains("function a("),
-        "expected `a` to hoist to module scope, got:\n{hoisted}"
+        "expected the static `a` to hoist to module scope, got:\n{hoisted}"
+    );
+    assert!(
+        after_export.contains("function a("),
+        "expected the state-reading `a` in the component body, got:\n{hoisted}"
     );
 
-    // (b)-control: the same `a` reading the instance binding `v` does NOT hoist —
-    // it lands in the COMPONENT BODY, which is why the nested twin joins it there
-    // and the two are merely mis-ORDERED rather than invalid JS.
-    let unhoisted = compile_js(
+    // (b) the top-level `a` reads `v` → the component body; the nested `a` (static)
+    // ALSO lands in the body. Two body `function a` declarations, the top-level
+    // (direct) one emitted FIRST — the oracle's order, reproduced by
+    // `collect_hoisted_snippets`'s recursive-direct-first walk.
+    let body = compile_js(
         "<script>let v = 1;</script>\
-         <div>{#snippet b()}nested{/snippet}</div>{#snippet a()}{v}{/snippet}{@render a()}",
+         <div>{#snippet a()}nested{/snippet}</div>{#snippet a()}{v}{/snippet}{@render a()}",
     );
-    let (before_export, after_export) = unhoisted
+    let (before_export, after_export) = body
         .split_once("export default")
         .expect("compiled component exports a default");
     assert!(
         !before_export.contains("function a("),
-        "expected `a` NOT to hoist to module scope, got:\n{unhoisted}"
+        "expected no module-scope `a`, got:\n{body}"
     );
+    assert_eq!(
+        after_export.matches("function a(").count(),
+        2,
+        "expected two body `function a` declarations, got:\n{body}"
+    );
+    let one = after_export
+        .find("`<!---->1`")
+        .expect("the top-level `a` body renders `1`");
+    let nested = after_export
+        .find("`<!---->nested`")
+        .expect("the nested `a` body renders `nested`");
     assert!(
-        after_export.contains("function a("),
-        "expected `a` in the component body, got:\n{unhoisted}"
+        one < nested,
+        "expected the top-level (direct) `a` emitted first, got:\n{body}"
+    );
+
+    // (b′) the same all-body placement reached through the hoist FIXPOINT: the
+    // top-level `a` is itself free of instance bindings but is demoted because the
+    // snippet it renders (`b`) reads `v` and cannot hoist. No fixture covers this.
+    let fixpoint = compile_js(
+        "<script>let v = 1;</script>\
+         <div>{#snippet a()}nested{/snippet}</div>\
+         {#snippet b()}{v}{/snippet}{#snippet a()}{@render b()}{/snippet}{@render a()}",
+    );
+    let (before_export, after_export) = fixpoint
+        .split_once("export default")
+        .expect("compiled component exports a default");
+    assert!(
+        !before_export.contains("function a("),
+        "expected no module-scope `a` (demoted by the fixpoint), got:\n{fixpoint}"
+    );
+    assert_eq!(
+        after_export.matches("function a(").count(),
+        2,
+        "expected two body `function a` declarations, got:\n{fixpoint}"
     );
 }
 
@@ -385,4 +390,35 @@ fn compile_accepts_the_children_conflict_rule_s_exemptions() {
     let _ = compile_js("<Foo><!--c-->{#snippet children()}hi{/snippet}</Foo>");
     let _ = compile_js("<Foo>hello{#snippet other()}hi{/snippet}</Foo>");
     let _ = compile_js("<div>hello{#snippet children()}hi{/snippet}</div>");
+}
+
+#[test]
+fn compile_non_hoistable_snippets_emit_in_recursive_direct_first_order() {
+    // Non-module-hoistable snippets bubbling to the same block scope emit in
+    // recursive-direct-first order, NOT document pre-order: a fragment's own
+    // direct-child snippets (source order) precede its descendant elements'
+    // snippets. Mirrors the oracle's push-order timing
+    // (Fragment.js:35-44 + RegularElement.js:229-231).
+    //
+    // `a` is a root snippet reading instance state `v` (not module-hoistable →
+    // component body); `b` is nested in a `<div>` (never hoistable → bubbles to
+    // the component body). Document pre-order would emit `b` first (the bug);
+    // the oracle emits `a` before `b`.
+    let js = compile_js(
+        "<script>let v = 1;</script>\n<div>{#snippet b()}nested{/snippet}</div>\n{#snippet a()}{v}{/snippet}\n{@render a()}",
+    );
+    let a = js.find("function a($$renderer)").unwrap();
+    let b = js.find("function b($$renderer)").unwrap();
+    assert!(a < b, "expected `function a` before `function b`:\n{js}");
+
+    // Interleaved: a root snippet, then a `<div>` holding one, then another root
+    // snippet — the two root snippets (a1, a2) precede the element's (b), and
+    // a1 before a2 in source order.
+    let js = compile_js(
+        "<script>let v = 1;</script>\n{#snippet a1()}{v}{/snippet}\n<div>{#snippet b()}x{/snippet}</div>\n{#snippet a2()}{v}{/snippet}\n{@render a1()}",
+    );
+    let a1 = js.find("function a1($$renderer)").unwrap();
+    let a2 = js.find("function a2($$renderer)").unwrap();
+    let b = js.find("function b($$renderer)").unwrap();
+    assert!(a1 < a2 && a2 < b, "expected order a1 < a2 < b:\n{js}");
 }

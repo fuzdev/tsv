@@ -653,32 +653,24 @@ no `at(-2)`, so at most one of the three can fire.
   `<div>{#snippet a}…{/snippet}</div>` plus a root-level `{#snippet a}` do not. tsv
   previously enforced only the root-level slice of this, in `snippet.rs`; the rule now
   rides `validate.rs`'s per-fragment walk and `snippet.rs` carries none of it.
-- **Refused**: `nested {#snippet} {name} shares a top-level snippet's name (the hoist
-  decision is name-keyed)` — **not** an oracle rule but a port gap. The oracle compiles
-  `<div>{#snippet a()}x{/snippet}</div>{#snippet a()}y{/snippet}{@render a()}`: a
-  fragment is a fresh scope, so it places the two declarations independently.
-  `SnippetAnalysis::hoistable` is keyed by NAME and cannot tell them apart, so tsv can
-  place neither reliably. Two emission bugs motivate it, failing in
-  opposite ways. When the top-level name **hoists**, the nested snippet inherits its
-  `is_hoisted` and hoists too — two module-scope `function a` declarations, a
-  `SyntaxError` in an ES module. When it does **not** hoist, both land in the component
-  body, which is legal JS, but tsv emits them in the OPPOSITE order from the oracle;
-  function declarations are last-wins, so `{@render a()}` resolves to a different body
-  on each side — a silent MISMATCH, reachable both directly
-  (`<script>let v = 1;</script><div>{#snippet a()}nested{/snippet}</div>{#snippet
-  a()}{v}{/snippet}{@render a()}`) and through the hoist fixpoint (a top-level snippet
-  hoistable but for its dependency on a non-hoistable one). MISMATCH = 0 is the hard
-  bar, so the check is deliberately NOT gated on hoistability; over-refusal is safe and
-  neither alternative is. ⚠️ The rule is deliberately **broader** than those two bugs,
-  and the gap is structural rather than an unenumerated third case: it keys on a name
-  **collision**, a property of the SOURCE, while both bugs are properties of where the
-  two snippets are **placed**. A collision in a region that emits nothing — a nested
-  snippet inside a dropped `{:catch}`, which NEITHER side emits
-  (`{#snippet a()}top{/snippet}{#await p}w{:catch e}{#snippet a()}dead{/snippet}{/await}{@render a()}`)
-  — is therefore refused for uniformity, not because it would mis-emit. Narrowing to the
-  placements that actually mis-emit is not the fix. **The proper fix is keying the hoist
-  map by snippet identity rather than name**, which retires the refusal entirely; it is
-  the safe interim.
+- **Compiles**: a nested `{#snippet}` sharing a top-level snippet's name — the oracle
+  places the two declarations independently (a fragment is a fresh scope), and so does
+  tsv now that `SnippetAnalysis`'s hoist product is keyed by snippet **identity**
+  (`SnippetBlock::span.start`) rather than name. Only a top-level snippet's span is
+  inserted into the hoistable set, so a nested snippet's span is absent by
+  construction: `is_hoisted` returns false for it and it lands in its enclosing block
+  body regardless of its top-level twin's verdict. Both shapes this formerly refused
+  now compile at parity — the top-level twin **hoists** (static, no instance binding),
+  leaving the nested one in the body
+  (`<script>let v = 1;</script>{#snippet a()}static{/snippet}<div>{#snippet a()}{v}{/snippet}</div>{@render a()}`,
+  pinned by `snippets/nested_name_hoisted`), and the top-level twin does **not** hoist,
+  putting both in the body in source order (top-level/direct first, via
+  `collect_hoisted_snippets`'s recursive-direct-first walk)
+  (`<script>let v = 1;</script><div>{#snippet a()}nested{/snippet}</div>{#snippet a()}{v}{/snippet}{@render a()}`,
+  pinned by `snippets/nested_name_body`); the fixpoint-demotion variant compiles too.
+  This retired the former `NestedSnippetNameCollision` refusal. (The per-**fragment**
+  `declaration_duplicate` rule above is distinct and still refuses — it fires only when
+  two snippets share a name in ONE fragment.)
 - **Refused**: `{#snippet} {name} shadows the component prop of the same name (the
   oracle rejects it)` — `snippet_shadowing_prop` (`SnippetBlock.js:59`). ⚠️ Two
   narrownesses, both live-probed and both easy to widen by mistake. The parent must be

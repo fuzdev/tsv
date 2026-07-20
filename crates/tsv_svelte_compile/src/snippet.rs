@@ -20,7 +20,7 @@
 //! **refuses**. An identifier this port can't name (a `\u`-escaped reference)
 //! also makes the decision undecidable and refuses.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use tsv_svelte::ast::internal::{
     AttributeNode, AwaitBlock, ConstTag, DebugTag, DeclarationTag, EachBlock, Element, Fragment,
@@ -43,8 +43,16 @@ use crate::{CompileError, Refusal};
 
 /// The snippet analysis product consumed by the server transform.
 pub(crate) struct SnippetAnalysis {
-    /// Top-level snippet name → whether it hoists to module scope.
-    hoistable: HashMap<String, bool>,
+    /// Spans (`SnippetBlock::span.start`) of the top-level snippets that hoist to
+    /// module scope — keyed by snippet IDENTITY, not name. Only top-level snippets
+    /// are ever inserted, so a nested snippet's span is absent by construction and
+    /// `is_hoisted` returns false for it even when it shares a top-level snippet's
+    /// name.
+    hoistable: HashSet<u32>,
+    /// The NAMES of those hoistable top-level snippets — the module-export scope
+    /// query. A top-level snippet name is unique (duplicates refused upstream), so
+    /// this is unambiguous even though it is name-based.
+    hoisted_names: NameSet,
     /// Every snippet name declared anywhere in the component (top-level and
     /// nested) — the render-callee classification and generated-name collision
     /// both consult this.
@@ -52,10 +60,20 @@ pub(crate) struct SnippetAnalysis {
 }
 
 impl SnippetAnalysis {
-    /// Whether a top-level snippet of this name hoists to module scope (`false`
-    /// for a body-local or a nested snippet, which never hoists).
-    pub fn is_hoisted(&self, name: &str) -> bool {
-        self.hoistable.get(name).copied().unwrap_or(false)
+    /// Whether the snippet at this identity hoists to module scope. Keyed by
+    /// `SnippetBlock::span.start`, so a body-local snippet and a nested snippet
+    /// (neither of which is ever inserted) both return `false` — a nested snippet
+    /// sharing a top-level snippet's name is never mistaken for it.
+    pub fn is_hoisted(&self, snippet: &SnippetBlock<'_>) -> bool {
+        self.hoistable.contains(&snippet.span.start)
+    }
+
+    /// Whether a top-level snippet of this NAME hoists to module scope — the
+    /// export-scope query (`validate_module_exports`), which asks whether module
+    /// scope holds a binding of a given export name. Name-based and unambiguous:
+    /// a top-level snippet name is unique.
+    pub fn has_hoisted_snippet_named(&self, name: &str) -> bool {
+        self.hoisted_names.contains(name)
     }
 }
 
@@ -187,52 +205,39 @@ pub(crate) fn analyze_snippets(
         }
     }
 
-    // ⚠️ `hoistable` is keyed by NAME, and `is_hoisted` is asked per emitted
-    // snippet — so a NESTED snippet sharing a top-level snippet's name is
-    // INDISTINGUISHABLE from it here. The two are distinct declarations the
-    // oracle places independently (a fragment is a fresh scope, so the shape is
-    // legal on both sides), and this port can place neither reliably.
+    // `hoistable` above is a name→bool fixpoint over the top-level snippets, whose
+    // names are unique (a duplicate is refused upstream by `validate.rs`). The
+    // analysis PRODUCT, however, is keyed by snippet IDENTITY (`span.start`), not
+    // name, because `is_hoisted` is asked per EMITTED snippet: a NESTED snippet
+    // sharing a top-level snippet's name is a distinct declaration the oracle
+    // places independently (a fragment is a fresh scope), and identity-keying
+    // places each correctly. Only a top-level snippet's span is inserted, so a
+    // nested snippet's span is absent by construction — it lands in its enclosing
+    // block body, exactly where the oracle puts it, whether or not its top-level
+    // twin hoists. This is what retired the former `NestedSnippetNameCollision`
+    // refusal: both former sub-cases (the twin hoists → the nested one no longer
+    // follows it to module scope; the twin does not → both bodies, emitted in
+    // source order by `collect_hoisted_snippets`) now compile at parity.
     //
-    // Two emission bugs motivate the refusal, and they fail in opposite ways:
-    //
-    // - the top-level name HOISTS: the nested snippet inherits `true` and hoists
-    //   to module scope alongside it — two `function` declarations of one name at
-    //   module scope, invalid JS;
-    // - the top-level name does NOT hoist: both land in the COMPONENT BODY, which
-    //   is legal JS, but tsv emits them in the opposite order from the oracle.
-    //   Function declarations are last-wins, so `{@render name()}` resolves to a
-    //   different body on each side — a silent MISMATCH, the worse of the two.
-    //
-    // ⚠️ The rule is deliberately BROADER than those two bugs, and the gap is
-    // structural rather than an unenumerated third case: the rule keys on a NAME
-    // COLLISION, a property of the SOURCE, while both bugs are properties of
-    // where the two snippets are PLACED. So a collision in a region that emits
-    // nothing — a nested snippet inside a dropped `{:catch}`, which NEITHER side
-    // emits — is refused for uniformity, not because it would mis-emit. Narrowing
-    // the rule to the placements that actually mis-emit is not the fix; keying the
-    // map by snippet IDENTITY rather than name is, and it retires the refusal
-    // entirely. Over-refusing meanwhile is safe; neither alternative is, which is
-    // also why the check is not gated on hoistability.
-    let mut nested_names = NameSet::default();
-    for node in root.fragment.nodes {
-        each_child_fragment(node, &mut |child| {
-            name_collector.collect_names(child, &mut nested_names);
-        });
-    }
-    // Iterated over the source-ordered top-level snippets, not over the nested
-    // name set, so the reported name is deterministic (`NameSet` is a `HashSet`).
+    // `hoisted_names` carries the same fixpoint result by NAME, for the export
+    // check (`validate_module_exports`) — an inherently name-based query,
+    // unambiguous because a top-level snippet name is unique.
+    let mut hoistable_spans: HashSet<u32> = HashSet::new();
+    let mut hoisted_names = NameSet::default();
     for snippet in &top_level {
-        let Some(name) = snippet_name(snippet, source) else {
-            continue;
-        };
-        if nested_names.contains(name) {
-            return Err(unsupported(Refusal::NestedSnippetNameCollision {
-                name: name.to_string(),
-            }));
+        if let Some(name) = snippet_name(snippet, source)
+            && hoistable.get(name).copied() == Some(true)
+        {
+            hoistable_spans.insert(snippet.span.start);
+            hoisted_names.insert(name.to_string());
         }
     }
 
-    Ok(SnippetAnalysis { hoistable, names })
+    Ok(SnippetAnalysis {
+        hoistable: hoistable_spans,
+        hoisted_names,
+        names,
+    })
 }
 
 fn unsupported(reason: Refusal) -> CompileError {

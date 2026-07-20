@@ -416,8 +416,15 @@ project-wide conventions.
   names; a free reference to an instance binding (prop/`$state`/`$derived`/plain
   top-level decl — *not* imports/globals) blocks hoisting, and a name that is both
   an instance binding and a nested local is ambiguous and refuses. Hoistability is
-  a fixpoint over snippet-to-snippet references. Also collects every snippet name
-  (render-callee classification, generated-name collisions).
+  a fixpoint over snippet-to-snippet references. The reference collection is
+  name-based, but the analysis **product** is keyed by snippet IDENTITY
+  (`SnippetBlock::span.start`, a `HashSet<u32>` of hoistable top-level snippet
+  spans read by `is_hoisted`), not name — only top-level snippets are inserted, so
+  a NESTED snippet sharing a top-level snippet's name is never mistaken for it and
+  lands in the body regardless of its twin's verdict (the module-export check
+  `has_hoisted_snippet_named` keeps the name-based query it genuinely needs). Also
+  collects every snippet name (render-callee classification, generated-name
+  collisions).
 - `attr_refs.rs` — the **shared template traversals**, so no analysis hand-writes
   its own walk and drifts (which is how the component-spread arm once existed in
   one and not the other). Three levels:

@@ -517,33 +517,6 @@ pub enum Refusal {
         /// The duplicated snippet name.
         name: String,
     },
-    /// A NESTED `{#snippet}` sharing its name with a top-level `{#snippet}`.
-    /// Legal on both sides — a fragment is a fresh scope, so the oracle places
-    /// the two independently — but the hoist decision this port carries is keyed
-    /// by NAME (`SnippetAnalysis::hoistable`), which cannot tell the two
-    /// declarations apart, so tsv can place neither reliably. Two emission bugs
-    /// motivate it: when the top-level name hoists, the nested snippet inherits
-    /// `true` and hoists alongside it, emitting two module-scope `function`
-    /// declarations of one name (invalid JS); when it does not, both land in the
-    /// component body in the OPPOSITE order from the oracle, and function
-    /// declarations being last-wins, `{@render}` resolves to a different body on
-    /// each side (a MISMATCH). Hence the refusal is not gated on hoistability.
-    ///
-    /// The rule is deliberately BROADER than those two bugs: it keys on a name
-    /// COLLISION, a property of the source, while both bugs are properties of
-    /// where the snippets are PLACED — so a collision in a region neither side
-    /// emits (a nested snippet in a dropped `{:catch}`) is refused for
-    /// uniformity, not because it would mis-emit. The proper fix is keying the
-    /// hoist map by snippet identity rather than name, which retires the refusal
-    /// entirely.
-    #[error(
-        "nested {{#snippet}} {name} shares a top-level snippet's name \
-         (the hoist decision is name-keyed)"
-    )]
-    NestedSnippetNameCollision {
-        /// The colliding snippet name.
-        name: String,
-    },
     /// A **top-level** `{#snippet}` whose name is also declared by the instance
     /// script (`2-analyze/visitors/SnippetBlock.js:34`). A distinct rule from
     /// [`Refusal::DuplicateSnippetName`]: this one is snippet-vs-*script*, and it

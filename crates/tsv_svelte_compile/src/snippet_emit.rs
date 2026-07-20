@@ -33,10 +33,11 @@ pub(crate) fn emit_snippet<'arena>(
     out: &mut BodyBuilder<'arena>,
 ) -> Result<(), CompileError> {
     let arena = env.b.arena;
-    let (fn_decl, name) = build_snippet_function(env, snippet)?;
-    // Only a hoistable *top-level* snippet is in the hoistable map; a nested or
-    // body-local snippet (`is_hoisted` false) goes to this block's init.
-    if env.snippets.is_hoisted(&name) {
+    let (fn_decl, _name) = build_snippet_function(env, snippet)?;
+    // Only a hoistable *top-level* snippet's identity is in the hoistable set; a
+    // nested or body-local snippet (`is_hoisted` false — its span is never
+    // inserted) goes to this block's init.
+    if env.snippets.is_hoisted(snippet) {
         env.hoisted_snippets.push(fn_decl);
     } else {
         out.push_statement(&mut env.b, arena, fn_decl);
