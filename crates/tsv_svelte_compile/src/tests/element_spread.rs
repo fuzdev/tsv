@@ -1,7 +1,6 @@
 //! A regular element `{...spread}`: the fused `$.attributes(...)` call.
 
 use super::support::*;
-use crate::*;
 
 #[test]
 fn compile_element_spread_object() {
@@ -46,11 +45,9 @@ fn compile_element_spread_flags_and_elision() {
 fn compile_element_spread_scope_hash_rides_second_arg() {
     // In spread mode the scope hash is NOT concatenated into the class value — it
     // rides the `css_hash` (2nd) argument.
-    let out = compile(
+    let out = compile_checked(
         "<script>let props = $state({});</script>\n<div class=\"foo\" {...props}></div><style>.foo{color:red}</style>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    );
     assert!(
         out.js
             .contains("$.attributes({ class: 'foo', ...props }, 'svelte-tsvhash')"),
@@ -63,11 +60,7 @@ fn compile_element_spread_scope_hash_rides_second_arg() {
 fn compile_element_spread_prop_root_forces_context_wrapper() {
     // A member access rooted at a prop inside a `{...spread}` must fire the
     // `$$renderer.component` wrapper (the reference feeds `needs_context`).
-    let out = compile(
-        "<script>let obj = $props();</script>\n<div {...obj.foo}></div>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    let out = compile_checked("<script>let obj = $props();</script>\n<div {...obj.foo}></div>");
     assert!(
         out.js.contains("$$renderer.component(($$renderer) =>"),
         "prop-rooted spread must wrap: {}",

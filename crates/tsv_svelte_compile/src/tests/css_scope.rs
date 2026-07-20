@@ -1,18 +1,13 @@
 //! CSS scoping: selector matching against the element census.
 
 use super::support::*;
-use crate::*;
 
 #[test]
 fn compile_css_type_selector_synthesizes_class() {
     // A bare `<div>` scoped by a type selector gains a synthetic
     // `class="svelte-tsvhash"` (no class markup of its own), and the type selector
     // splices the hash after the tag name.
-    let out = compile(
-        "<div>x</div>\n<style>div{ color: red }</style>",
-        &CompileOptions::default(),
-    )
-    .expect("type selector compiles");
+    let out = compile_checked("<div>x</div>\n<style>div{ color: red }</style>");
     assert!(
         out.js.contains(r#"<div class="svelte-tsvhash">x</div>"#),
         "synthetic scoped class: {}",
@@ -57,29 +52,17 @@ fn compile_css_id_and_attribute_selectors() {
 #[test]
 fn compile_css_universal_replaces_span() {
     // A bare `*` is REPLACED by the hash class (not appended).
-    let out = compile(
-        "<div>x</div>\n<style>*{ color: red }</style>",
-        &CompileOptions::default(),
-    )
-    .expect("universal compiles");
+    let out = compile_checked("<div>x</div>\n<style>*{ color: red }</style>");
     assert_eq!(out.css.as_deref(), Some(".svelte-tsvhash{ color: red }"));
     // `*.c` appends on `.c` (only a bare trailing `*` replaces).
-    let out = compile(
-        "<div class=\"c\">x</div>\n<style>*.c{ color: red }</style>",
-        &CompileOptions::default(),
-    )
-    .expect("universal compound compiles");
+    let out = compile_checked("<div class=\"c\">x</div>\n<style>*.c{ color: red }</style>");
     assert_eq!(out.css.as_deref(), Some("*.c.svelte-tsvhash{ color: red }"));
 }
 
 #[test]
 fn compile_css_compound_needs_same_element() {
     // `.a.b` matches an element carrying BOTH classes.
-    let out = compile(
-        "<div class=\"a b\">x</div>\n<style>.a.b{ color: red }</style>",
-        &CompileOptions::default(),
-    )
-    .expect("same-element compound compiles");
+    let out = compile_checked("<div class=\"a b\">x</div>\n<style>.a.b{ color: red }</style>");
     assert!(
         out.js.contains(r#"class="a b svelte-tsvhash""#),
         "{}",
@@ -116,11 +99,7 @@ fn compile_css_type_matching_no_element_refuses() {
 fn compile_css_combinator_selectors() {
     // Descendant: both compounds scope (each matched element gains the hash), the
     // first bump is a plain class, the second a zero-specificity `:where(...)`.
-    let out = compile(
-        "<div><p>hi</p></div>\n<style>div p{ color: red }</style>",
-        &CompileOptions::default(),
-    )
-    .expect("descendant compiles");
+    let out = compile_checked("<div><p>hi</p></div>\n<style>div p{ color: red }</style>");
     assert!(
         out.js
             .contains(r#"<div class="svelte-tsvhash"><p class="svelte-tsvhash">hi</p></div>"#),
@@ -176,11 +155,8 @@ fn compile_css_combinator_no_match_refuses() {
 fn compile_css_global_leading_trailing_and_bare() {
     // Leading `:global(.x) .y`: `.x` is global (no hash, wrapper stripped), `.y`
     // scopes (the first bump, plain class). The `.y` element gains the class.
-    let out = compile(
-        "<div class=\"y\">hi</div>\n<style>:global(.x) .y{ color: red }</style>",
-        &CompileOptions::default(),
-    )
-    .expect("leading :global compiles");
+    let out =
+        compile_checked("<div class=\"y\">hi</div>\n<style>:global(.x) .y{ color: red }</style>");
     assert!(out.js.contains(r#"class="y svelte-tsvhash""#), "{}", out.js);
     assert_eq!(
         out.css.as_deref(),
@@ -302,11 +278,9 @@ fn compile_css_non_ascii_case_insensitive_refuses() {
     );
     // A case-SENSITIVE compare (no flag, not an HTML ci attr) is a byte test and
     // stays supported with a non-ASCII value.
-    let out = compile(
+    let out = compile_checked(
         "<p data-x=\"caf\u{e9}\">y</p>\n<style>[data-x=\"caf\u{e9}\"] { color: red }</style>",
-        &CompileOptions::default(),
-    )
-    .expect("case-sensitive non-ASCII attribute value compiles");
+    );
     assert!(out.js.contains("class=\"svelte-tsvhash\""), "{}", out.js);
 }
 

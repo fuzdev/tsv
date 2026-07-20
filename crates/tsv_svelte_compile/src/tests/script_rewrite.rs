@@ -1,7 +1,6 @@
 //! Instance-script rewrites: declarator splits, props injection, export refusals.
 
 use super::support::*;
-use crate::*;
 
 #[test]
 fn compile_splits_multi_declarator_declaration() {
@@ -215,8 +214,7 @@ fn compile_allows_lang_js_and_empty() {
         "<script lang=\"js\">let x = 5;</script>\n<p>text</p>",
         "<script lang=\"\">let x = 5;</script>\n<p>text</p>",
     ] {
-        compile(source, &CompileOptions::default())
-            .unwrap_or_else(|e| panic!("{source} must compile: {e:?}"));
+        let _ = compile_js(source);
     }
     assert_unsupported(
         "<script lang=\"coffee\">let x = 5;</script>\n<p>text</p>",
@@ -244,7 +242,7 @@ fn compile_rejects_option_and_populated_select() {
 #[test]
 fn compile_allows_empty_select() {
     // An empty <select> emits statically and matches the oracle.
-    let out = compile("<select name=\"n\"></select>", &CompileOptions::default()).unwrap();
+    let out = compile_checked("<select name=\"n\"></select>");
     assert!(
         out.js.contains("`<select name=\"n\"></select>`"),
         "got: {}",

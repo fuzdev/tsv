@@ -1,7 +1,6 @@
 //! Component invocation: props, children snippets, anchors, refusals.
 
 use super::support::*;
-use crate::*;
 
 #[test]
 fn compile_self_closing_component() {
@@ -155,11 +154,7 @@ fn compile_refuses_dynamic_components() {
         "dynamic <Foo> component",
     );
     // A plain local / import is NOT dynamic — it compiles.
-    compile(
-        "<script>const Foo = null;</script>\n<Foo />",
-        &CompileOptions::default(),
-    )
-    .expect("plain-local component compiles");
+    compile_checked("<script>const Foo = null;</script>\n<Foo />");
 }
 
 #[test]

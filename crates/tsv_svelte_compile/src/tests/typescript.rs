@@ -1,7 +1,6 @@
 //! TypeScript erasure, the `lang="ts"` gate, and the refuse-don't-erase set.
 
 use super::support::*;
-use crate::*;
 
 #[test]
 fn compile_refuses_unrecognized_lang() {
@@ -23,7 +22,7 @@ fn compile_refuses_unrecognized_lang() {
         "<script lang=\"js\">let x = 5;</script>\n<p>text</p>",
         "<script lang=\"\">let x = 5;</script>\n<p>text</p>",
     ] {
-        compile(source, &CompileOptions::default()).expect("plain script compiles");
+        compile_checked(source);
     }
 }
 

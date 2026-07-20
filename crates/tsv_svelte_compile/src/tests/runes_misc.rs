@@ -1,17 +1,14 @@
 //! `$effect`, `$inspect`, `$props.id`, `$state.snapshot`, and rune misuse.
 
 use super::support::*;
-use crate::*;
 
 #[test]
 fn compile_effect_forces_component_wrapper() {
     // Statement-position `$effect(…)` is dropped; the whole body moves
     // inside `$$renderer.component(($$renderer) => { … })`.
-    let out = compile(
+    let out = compile_checked(
         "<script>\n\tlet { a } = $props();\n\t$effect(() => {});\n</script>\n<p>{a}</p>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    );
     assert_eq!(
         out.js,
         "import * as $ from 'svelte/internal/server';\n\
@@ -52,11 +49,7 @@ fn compile_rejects_rune_in_nested_function() {
 fn compile_state_raw_drops_wrapper() {
     // `$state.raw(v)` is a sanctioned init: the wrapper drops; an array
     // value isn't statically foldable, so the read stays dynamic.
-    let out = compile(
-        "<script>let a = $state.raw([1]);</script>\n<p>{a}</p>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    let out = compile_checked("<script>let a = $state.raw([1]);</script>\n<p>{a}</p>");
     assert!(out.js.contains("let a = [1];"), "got: {}", out.js);
     assert!(
         out.js.contains("`<p>${$.escape(a)}</p>`"),
@@ -86,11 +79,7 @@ fn compile_props_id_hoists_declaration() {
     // `const id = $props.id()` is skipped in place; a `const id =
     // $.props_id($$renderer)` is hoisted to the top of the component body, and a
     // `{id}` read stays dynamic (`$.escape(id)`, never a fold).
-    let out = compile(
-        "<script>\n\tconst id = $props.id();\n</script>\n<p>{id}</p>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    let out = compile_checked("<script>\n\tconst id = $props.id();\n</script>\n<p>{id}</p>");
     assert_eq!(
         out.js,
         "import * as $ from 'svelte/internal/server';\n\
@@ -105,11 +94,9 @@ fn compile_props_id_hoists_declaration() {
 fn compile_props_id_hoists_before_other_declarators() {
     // In `const a = 1, id = $props.id()` the hoisted `id` decl leads the body,
     // then the surviving `const a = 1` (the oracle's shape).
-    let out = compile(
+    let out = compile_checked(
         "<script>\n\tconst a = 1,\n\t\tid = $props.id();\n</script>\n<p>{a}{id}</p>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    );
     assert!(
         out.js
             .contains("const id = $.props_id($$renderer);\n\tconst a = 1;"),
@@ -151,11 +138,9 @@ fn compile_props_id_refuses_misuse() {
 fn compile_state_snapshot_declarator_unwraps() {
     // `const s = $state.snapshot(obj)` unwraps to `const s = obj`; the `{s.a}`
     // read stays dynamic.
-    let out = compile(
+    let out = compile_checked(
         "<script>\n\tlet obj = $state({ a: 1 });\n\tconst s = $state.snapshot(obj);\n</script>\n<p>{s.a}</p>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    );
     assert!(out.js.contains("const s = obj;"), "got: {}", out.js);
     assert!(
         out.js.contains("`<p>${$.escape(s.a)}</p>`"),
@@ -168,21 +153,17 @@ fn compile_state_snapshot_declarator_unwraps() {
 fn compile_state_snapshot_template_rewrites_to_runtime_call() {
     // A `$state.snapshot(x)` in a template value becomes `$.snapshot(x)`, at the
     // root and nested inside a wrapper expression.
-    let bare = compile(
+    let bare = compile_checked(
         "<script>\n\tlet obj = $state({ a: 1 });\n</script>\n{$state.snapshot(obj)}",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    );
     assert!(
         bare.js.contains("$.escape($.snapshot(obj))"),
         "bare snapshot: {}",
         bare.js
     );
-    let nested = compile(
+    let nested = compile_checked(
         "<script>\n\tlet state = $state({ a: 1 });\n</script>\n{2 in $state.snapshot(state)}",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    );
     assert!(
         nested.js.contains("$.escape(2 in $.snapshot(state))"),
         "nested snapshot: {}",
@@ -194,11 +175,9 @@ fn compile_state_snapshot_template_rewrites_to_runtime_call() {
 fn compile_state_snapshot_derived_arg_becomes_call() {
     // A bare derived read as the snapshot argument becomes `d()` inside the
     // `$.snapshot(...)` call.
-    let out = compile(
+    let out = compile_checked(
         "<script>\n\tlet a = $state(1);\n\tlet d = $derived(a * 2);\n</script>\n{$state.snapshot(d)}",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    );
     assert!(
         out.js.contains("$.escape($.snapshot(d()))"),
         "got: {}",
@@ -206,11 +185,9 @@ fn compile_state_snapshot_derived_arg_becomes_call() {
     );
     // A NESTED derived read inside the snapshot argument (`d + 1`) also rewrites —
     // the snapshot walk and the derived-read walk compose on one node set.
-    let nested = compile(
+    let nested = compile_checked(
         "<script>\n\tlet a = $state(1);\n\tlet d = $derived(a * 2);\n</script>\n{$state.snapshot(d + 1)}",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    );
     assert!(
         nested.js.contains("$.escape($.snapshot(d() + 1))"),
         "nested derived in snapshot arg: {}",
@@ -293,11 +270,8 @@ fn compile_state_snapshot_optional_chain_template_still_parity() {
     // In a TEMPLATE value position the optional form is fine: the oracle emits
     // `$.snapshot(x)` regardless of the `?.`, and `snapshot_call_arg` matches it,
     // so tsv emits the same — the declarator guard above does NOT reach here.
-    let out = compile(
-        "<script>\n\tlet o = $state({ a: 1 });\n</script>\n{$state.snapshot?.(o)}",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    let out =
+        compile_checked("<script>\n\tlet o = $state({ a: 1 });\n</script>\n{$state.snapshot?.(o)}");
     assert!(
         out.js.contains("$.escape($.snapshot(o))"),
         "got: {}",
@@ -327,7 +301,7 @@ fn compile_exponentiation_fold_matches_js_semantics() {
         "<p>{(0 - 1) ** (1 / 0)}</p>",
         "<p>{1 ** (0 / 0)}</p>",
     ] {
-        let out = compile(source, &CompileOptions::default()).unwrap();
+        let out = compile_checked(source);
         assert!(
             out.js.contains("`<p>NaN</p>`"),
             "{source} must fold to NaN: {}",
@@ -335,6 +309,6 @@ fn compile_exponentiation_fold_matches_js_semantics() {
         );
     }
     // The plain case stays IEEE.
-    let out = compile("<p>{2 ** 3}</p>", &CompileOptions::default()).unwrap();
+    let out = compile_checked("<p>{2 ** 3}</p>");
     assert!(out.js.contains("`<p>8</p>`"), "got: {}", out.js);
 }

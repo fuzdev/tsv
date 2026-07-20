@@ -1,7 +1,6 @@
 //! The `bind:` directives: the supported core kinds and every refusal.
 
 use super::support::*;
-use crate::*;
 
 #[test]
 fn compile_bind_this_omits() {
@@ -283,8 +282,7 @@ fn compile_const_bind_target_through_member_is_allowed() {
         "<script>class C {}</script><div bind:this={C}></div>",
         "<script>function f() {}</script><div bind:this={f}></div>",
     ] {
-        compile(source, &CompileOptions::default())
-            .unwrap_or_else(|err| panic!("must still compile: {err:?} for:\n{source}"));
+        let _ = compile_js(source);
     }
 }
 
@@ -316,11 +314,7 @@ fn compile_optional_chain_bind_target_refuses() {
         "bind: directive innerWidth",
     );
     // The non-optional chain is untouched.
-    compile(
-        "<script>let o = $state({el: null});</script><div bind:this={o.el}></div>",
-        &CompileOptions::default(),
-    )
-    .expect("a plain member chain must still compile");
+    compile_checked("<script>let o = $state({el: null});</script><div bind:this={o.el}></div>");
 }
 
 #[test]

@@ -6,7 +6,7 @@ use crate::*;
 #[test]
 fn compile_slots_reference_injects_sanitize() {
     // A `$$slots` reference injects the binding and takes `$$props`.
-    let out = compile("<p>{$$slots}</p>", &CompileOptions::default()).unwrap();
+    let out = compile_checked("<p>{$$slots}</p>");
     assert!(
         out.js.contains("const $$slots = $.sanitize_slots($$props)")
             && out.js.contains("function Input($$renderer, $$props)"),
@@ -30,11 +30,7 @@ fn compile_slots_with_props_rest_renames_destructured_slots() {
     // The injected sanitize_slots const owns `$$slots`, so the rest-props
     // injection deconflicts by renaming: `$$slots: $$slots_` (a shorthand
     // `$$slots` would be a duplicate lexical declaration — invalid JS).
-    let out = compile(
-        "<script>let {...r} = $props();</script><p>{$$slots}{r}</p>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    let out = compile_checked("<script>let {...r} = $props();</script><p>{$$slots}{r}</p>");
     assert!(
         out.js.contains("const $$slots = $.sanitize_slots($$props)")
             && out.js.contains("{ $$slots: $$slots_, $$events, ...r }"),
@@ -42,22 +38,14 @@ fn compile_slots_with_props_rest_renames_destructured_slots() {
         out.js
     );
     // Non-destructured `let props = $props()` deconflicts the same way.
-    let out = compile(
-        "<script>let props = $props();</script><p>{$$slots}{props}</p>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    let out = compile_checked("<script>let props = $props();</script><p>{$$slots}{props}</p>");
     assert!(
         out.js.contains("{ $$slots: $$slots_, $$events, ...props }"),
         "non-destructured $$slots rename wrong: {}",
         out.js
     );
     // Without a `$$slots` reference the injection stays shorthand.
-    let out = compile(
-        "<script>let {...r} = $props();</script><p>{r}</p>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    let out = compile_checked("<script>let {...r} = $props();</script><p>{r}</p>");
     assert!(
         out.js.contains("{ $$slots, $$events, ...r }"),
         "shorthand injection regressed: {}",
@@ -69,11 +57,7 @@ fn compile_slots_with_props_rest_renames_destructured_slots() {
 fn compile_svelte_head_emits_head_call() {
     // `<svelte:head>` → `$.head('<hash>', $$renderer, closure)`. The hash is
     // the ported `hash("input.svelte")`.
-    let out = compile(
-        "<svelte:head><meta charset=\"utf-8\" /></svelte:head>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    let out = compile_checked("<svelte:head><meta charset=\"utf-8\" /></svelte:head>");
     assert!(
         out.js
             .contains("$.head('4hbqx4', $$renderer, ($$renderer) =>"),
@@ -86,11 +70,7 @@ fn compile_svelte_head_emits_head_call() {
 fn compile_svelte_head_title_emits_title_call() {
     // `<title>` inside `<svelte:head>` → `$$renderer.title(($$renderer) => …)`,
     // hoisted before any sibling head content.
-    let out = compile(
-        "<svelte:head><title>Hi</title></svelte:head>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    let out = compile_checked("<svelte:head><title>Hi</title></svelte:head>");
     assert!(
         out.js.contains("$$renderer.title(($$renderer) =>")
             && out.js.contains("$$renderer.push(`<title>Hi</title>`)"),

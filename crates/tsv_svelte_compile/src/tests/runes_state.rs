@@ -1,18 +1,13 @@
 //! The `$state` family: folding, class state fields, and their refusals.
 
 use super::support::*;
-use crate::*;
 
 #[test]
 fn compile_state_rune_folds_known_read() {
     // `$state(0)` drops the wrapper; the never-updated binding is
     // statically known, so `{a}` folds into the template (the oracle's
     // evaluator behavior).
-    let out = compile(
-        "<script>let a = $state(0);</script>\n<p>{a}</p>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    let out = compile_checked("<script>let a = $state(0);</script>\n<p>{a}</p>");
     assert_eq!(
         out.js,
         "import * as $ from 'svelte/internal/server';\n\
@@ -26,11 +21,9 @@ fn compile_state_rune_folds_known_read() {
 #[test]
 fn compile_state_rune_escapes_updated_read() {
     // A mutated state binding is not foldable — the read stays dynamic.
-    let out = compile(
-            "<script>\n\tlet a = $state(0);\n\tfunction inc() {\n\t\ta += 1;\n\t}\n</script>\n<p>{a}</p>",
-            &CompileOptions::default(),
-        )
-        .unwrap();
+    let out = compile_checked(
+        "<script>\n\tlet a = $state(0);\n\tfunction inc() {\n\t\ta += 1;\n\t}\n</script>\n<p>{a}</p>",
+    );
     assert!(
         out.js.contains("`<p>${$.escape(a)}</p>`"),
         "updated state read must stay dynamic: {}",
@@ -43,11 +36,9 @@ fn compile_class_state_field_unwraps() {
     // A top-level class `$state` field unwraps exactly like a top-level `$state`
     // declarator: `count = $state(0)` → `count = 0`. The `new Counter()` forces
     // the component wrapper. (Durable coverage is `runes/class_state_*`.)
-    let out = compile(
+    let out = compile_checked(
         "<script>\n\tclass Counter {\n\t\tcount = $state(0);\n\t}\n\tconst c = new Counter();\n</script>\n<p>{c.count}</p>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    );
     assert!(
         out.js.contains("count = 0;"),
         "class $state field not unwrapped: {}",

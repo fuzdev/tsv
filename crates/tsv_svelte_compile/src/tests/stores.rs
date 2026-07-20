@@ -1,7 +1,6 @@
 //! Store access: reads, writes, and the subscription injection.
 
 use super::support::*;
-use crate::*;
 
 #[test]
 fn compile_store_read_subscribes() {
@@ -9,11 +8,8 @@ fn compile_store_read_subscribes() {
     // auto-subscription: `$.store_get(($$store_subs ??= {}), '$name', name)`, plus
     // the `var $$store_subs;` header and the `$.unsubscribe_stores` cleanup,
     // injected at the component-body level (no wrapper forced on its own).
-    let out = compile(
-        "<script>\n\timport { count } from './s';\n</script>\n<p>{$count}</p>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    let out =
+        compile_checked("<script>\n\timport { count } from './s';\n</script>\n<p>{$count}</p>");
     assert!(
         out.js
             .contains("$.store_get(($$store_subs ??= {}), '$count', count)"),
@@ -140,11 +136,7 @@ fn compile_dollar_rune_is_not_a_store_read() {
     // coincides with a binding (`const props = $props()`): stripping `$props` to
     // `props` and treating it as a store on the props object would spuriously force
     // the `$$renderer.component` wrapper. Regression guard for `store_read_base`.
-    let out = compile(
-        "<script>\n\tconst props = $props();\n</script>\n<p>text</p>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    let out = compile_checked("<script>\n\tconst props = $props();\n</script>\n<p>text</p>");
     assert!(
         !out.js.contains("$$store_subs"),
         "$props() must not mint store subscriptions: {}",
@@ -158,11 +150,9 @@ fn compile_store_read_in_snippet_stays_nested() {
     // must NOT hoist to module scope — its body reads the component-local
     // `$$store_subs`. (Regression: the free-var collector recorded `$count`, which
     // is not a binding name, so the store read failed to block hoisting.)
-    let out = compile(
+    let out = compile_checked(
         "<script>\n\timport { count } from './s';\n</script>\n{#snippet foo()}{$count}{/snippet}{@render foo()}",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    );
     // The snippet function nests inside the component (after `var $$store_subs;`),
     // never as a module-scope sibling of the import.
     let subs = out.js.find("var $$store_subs;").expect("subs var");
@@ -178,11 +168,7 @@ fn compile_store_read_in_snippet_stays_nested() {
 fn compile_derived_store_reads_call() {
     // A store whose base is a `$derived` binding reads `d()` as the store value —
     // a `$derived` read is a call at every position.
-    let out = compile(
-        "<script>\n\tlet d = $derived(0);\n</script>\n<p>{$d}</p>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    let out = compile_checked("<script>\n\tlet d = $derived(0);\n</script>\n<p>{$d}</p>");
     assert!(
         out.js
             .contains("$.store_get(($$store_subs ??= {}), '$d', d())"),

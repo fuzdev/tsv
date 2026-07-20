@@ -59,7 +59,7 @@ pub(super) fn assert_comments_lossless(source: &str, comments: &[&str]) -> Strin
 ///
 /// The single place that contract lives — `compile_js` and `compile_css` are
 /// views onto it, so a test that only reads one output still pins both.
-fn compile_checked(source: &str) -> CompileOutput {
+pub(super) fn compile_checked(source: &str) -> CompileOutput {
     let out = compile(source, &CompileOptions::default())
         .unwrap_or_else(|e| panic!("compile failed for {source:?}: {e:?}"));
     assert!(

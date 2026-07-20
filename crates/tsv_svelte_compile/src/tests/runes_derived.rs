@@ -1,17 +1,14 @@
 //! The `$derived` family: init rewrite, read positions, writes.
 
 use super::support::*;
-use crate::*;
 
 #[test]
 fn compile_derived_rune_rewrites_init_and_read() {
     // `$derived(e)` → `$.derived(() => e)`; a bare template read of the
     // (non-foldable) derived binding becomes `d()`.
-    let out = compile(
-            "<script>\n\tlet a = $state(1);\n\tlet d = $derived(a * 2);\n\tfunction inc() {\n\t\ta += 1;\n\t}\n</script>\n<p>{d}</p>",
-            &CompileOptions::default(),
-        )
-        .unwrap();
+    let out = compile_checked(
+        "<script>\n\tlet a = $state(1);\n\tlet d = $derived(a * 2);\n\tfunction inc() {\n\t\ta += 1;\n\t}\n</script>\n<p>{d}</p>",
+    );
     assert!(
         out.js.contains("let d = $.derived(() => a * 2);"),
         "derived init not rewritten: {}",
@@ -82,13 +79,11 @@ fn compile_derived_read_script_position_rewrites() {
     // template value walk applies — extended to the script by `store_rewrite`.
     // Script positions never fold (only template text folds), so it is always
     // `d()`, never the derived's value.
-    let out = compile(
+    let out = compile_checked(
         "<script>\n\tlet { a } = $props();\n\tlet d = $derived(a * 2);\n\tlet e = d + 1;\n\
          \tfunction total() {\n\t\treturn d + 1;\n\t}\n\tlet d2 = $derived(d + 1);\n\
          </script>\n<button onclick={total}>{a}</button>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    );
     // The top-level initializer (no fold), the function-body read, and the read
     // inside the `$.derived` thunk all become `d()`; the derived declarations keep
     // their bare binding names.
@@ -114,13 +109,11 @@ fn compile_derived_read_script_position_rewrites() {
 fn compile_derived_read_name_only_positions_stay_bare() {
     // Name-only positions are NOT reads: a non-computed member property (`o.d`) and
     // an object key (`{ d: 1 }`) stay verbatim, exactly like the store rewrite.
-    let out = compile(
+    let out = compile_checked(
         "<script>\n\tlet { a } = $props();\n\tlet d = $derived(a * 2);\n\
          \tfunction g() {\n\t\tconst o = { d: 1 };\n\t\treturn o.d + d;\n\t}\n\
          </script>\n<button onclick={g}>{a}</button>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    );
     assert!(
         out.js.contains("const o = { d: 1 };"),
         "object key stays: {}",
@@ -192,24 +185,20 @@ fn compile_derived_member_write_compiles() {
     // A member/index target READS the derived (its object / computed index), never
     // binds it — `d.x = v` → `d().x = v` and `x[d] = v` → `x[d()] = v` compile via
     // the read rewrite (the narrower binding-leaf refusal stops at members).
-    let out = compile(
+    let out = compile_checked(
         "<script>\n\tlet { a } = $props();\n\tlet d = $derived({ x: a });\n\
          \tfunction b() {\n\t\td.x = 5;\n\t}\n</script>\n<button onclick={b}>{a}</button>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    );
     assert!(
         out.js.contains("d().x = 5;"),
         "member write reads derived: {}",
         out.js
     );
 
-    let out = compile(
+    let out = compile_checked(
         "<script>\n\tlet { a } = $props();\n\tlet d = $derived(a * 2);\n\tlet arr = [1];\n\
          \tfunction b() {\n\t\tarr[d] = 5;\n\t}\n</script>\n<button onclick={b}>{a}</button>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    );
     assert!(
         out.js.contains("arr[d()] = 5;"),
         "index write reads derived: {}",
@@ -223,12 +212,10 @@ fn compile_derived_by_bare_read_compiles() {
     // through as the compute function (`$.derived(d)`) and the read rewrite lowers
     // it to `$.derived(d())`, the oracle's output. (Contrast `$derived(d)`, which the
     // oracle unthunk-collapses to `$.derived(d)` — refused as unreproducible.)
-    let out = compile(
+    let out = compile_checked(
         "<script>\n\tlet { a } = $props();\n\tlet d = $derived(a * 2);\n\tlet e = $derived.by(d);\n\
          </script>\n<button onclick={() => e}>{a}</button>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    );
     assert!(
         out.js.contains("let e = $.derived(d());"),
         "$derived.by(d): {}",
@@ -241,11 +228,9 @@ fn compile_escaped_local_read_still_compiles() {
     // An escaped identifier is NOT auto-refused — only one decoding to a `$derived`
     // name is. An escaped read of a plain (non-derived) local compiles, reading the
     // binding bare (`d`, never `d()`).
-    let out = compile(
+    let out = compile_checked(
         "<script>\n\tlet { a } = $props();\n\tlet d = a * 2;\n</script>\n{\\u0064}",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    );
     assert!(
         out.js.contains("$.escape(d)"),
         "escaped plain-local read must compile bare: {}",
@@ -257,11 +242,9 @@ fn compile_escaped_local_read_still_compiles() {
 fn compile_derived_read_state_stays_bare() {
     // Only names in `derived_names` rewrite. A reassigned `$state` binding is NOT
     // derived, so a nested read of it stays bare (`s + 1`, never `s() + 1`).
-    let out = compile(
+    let out = compile_checked(
         "<script>\n\tlet s = $state(1);\n\tfunction inc() {\n\t\ts += 1;\n\t}\n</script>\n{s + 1}",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    );
     assert!(
         out.js.contains("$.escape(s + 1)"),
         "state read must stay bare: {}",

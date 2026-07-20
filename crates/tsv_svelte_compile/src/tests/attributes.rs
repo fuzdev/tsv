@@ -1,7 +1,6 @@
 //! Plain attribute emission: folding, boolean/void attributes, event handlers.
 
 use super::support::*;
-use crate::*;
 
 #[test]
 fn compile_mixed_attribute_full_fold_emits_static() {
@@ -63,11 +62,7 @@ fn compile_empty_class_attribute_drops() {
 
 #[test]
 fn compile_void_and_boolean_attributes() {
-    let out = compile(
-        "<p>text1<br />text2</p>\n<input value=\"value\" disabled />",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    let out = compile_checked("<p>text1<br />text2</p>\n<input value=\"value\" disabled />");
     assert!(
         out.js
             .contains("`<p>text1<br/>text2</p> <input value=\"value\" disabled=\"\"/>`"),
@@ -79,11 +74,7 @@ fn compile_void_and_boolean_attributes() {
 #[test]
 fn compile_drops_event_handler_attribute() {
     // An `on*` single-expression handler is omitted from SSR output.
-    let out = compile(
-        "<script>function go() {}</script><button onclick={go}>x</button>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    let out = compile_checked("<script>function go() {}</script><button onclick={go}>x</button>");
     assert!(
         out.js.contains("`<button>x</button>`") && !out.js.contains("onclick"),
         "event handler not dropped: {}",
@@ -95,11 +86,7 @@ fn compile_drops_event_handler_attribute() {
 fn compile_event_handler_new_forces_wrapper() {
     // A `new` inside a dropped handler still triggers the component wrapper
     // (needs_context walks the handler even though its markup is dropped).
-    let out = compile(
-        "<button onclick={() => new Date()}>x</button>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    let out = compile_checked("<button onclick={() => new Date()}>x</button>");
     assert!(
         out.js.contains("$$renderer.component("),
         "needs_context wrapper missing: {}",
@@ -112,21 +99,15 @@ fn compile_event_handler_decision_uses_raw_name() {
     // The oracle's `is_event_attribute` tests the RAW authored name
     // (case-sensitive `startsWith('on')`); lowercasing happens at emission
     // only. So `onClick` drops but `ONCLICK` emits `$.attr('onclick', …)`.
-    let out = compile(
-        "<script>let { h } = $props();</script><button ONCLICK={h}>x</button>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    let out =
+        compile_checked("<script>let { h } = $props();</script><button ONCLICK={h}>x</button>");
     assert!(
         out.js.contains("$.attr('onclick', h)"),
         "ONCLICK must emit, not drop: {}",
         out.js
     );
-    let out = compile(
-        "<script>let { h } = $props();</script><button onClick={h}>x</button>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    let out =
+        compile_checked("<script>let { h } = $props();</script><button onClick={h}>x</button>");
     assert!(
         out.js.contains("`<button>x</button>`") && !out.js.contains("onclick"),
         "onClick must drop: {}",
@@ -134,11 +115,7 @@ fn compile_event_handler_decision_uses_raw_name() {
     );
     // Raw `onLoad` on a load-error element is a plain drop (the capture
     // exception matches the raw name exactly).
-    let out = compile(
-        "<script>let { h } = $props();</script><img onLoad={h} src=\"a\" />",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    let out = compile_checked("<script>let { h } = $props();</script><img onLoad={h} src=\"a\" />");
     assert!(
         out.js.contains("`<img src=\"a\"/>`"),
         "onLoad on img must plain-drop: {}",
@@ -146,11 +123,9 @@ fn compile_event_handler_decision_uses_raw_name() {
     );
     // A mixed-value `ONCLICK` is not an event (raw test) and emits through
     // the normal interpolated-attribute path.
-    let out = compile(
+    let out = compile_checked(
         "<script>let { h } = $props();</script><button ONCLICK=\"a {h}\">x</button>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    );
     assert!(
         out.js.contains("$.attr('onclick'"),
         "mixed ONCLICK must emit: {}",
@@ -175,11 +150,9 @@ fn compile_handler_shadow_never_masks_the_outer_fold_wrongly() {
     }
     // The non-shadow direction still masks: `(x) => a++` reassigns the
     // OUTER `a`, so its read escapes instead of folding.
-    let out = compile(
+    let out = compile_checked(
         "<script>let a = 1;</script><p>{a}</p><button onclick={(x) => a++}>x</button>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    );
     assert!(
         out.js.contains("$.escape(a)"),
         "outer mutation must escape: {}",
@@ -187,11 +160,9 @@ fn compile_handler_shadow_never_masks_the_outer_fold_wrongly() {
     );
     // Partial shadow: the shadowed name refuses only when read; the
     // non-shadowed co-mutated name still masks.
-    let out = compile(
-            "<script>let a = 1;\n\tlet b = 2;</script><p>{b}</p><button onclick={(a) => { a++; b++; }}>x</button>",
-            &CompileOptions::default(),
-        )
-        .unwrap();
+    let out = compile_checked(
+        "<script>let a = 1;\n\tlet b = 2;</script><p>{b}</p><button onclick={(a) => { a++; b++; }}>x</button>",
+    );
     assert!(
         out.js.contains("$.escape(b)"),
         "co-mutated b must escape: {}",

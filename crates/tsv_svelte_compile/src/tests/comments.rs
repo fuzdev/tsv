@@ -121,11 +121,9 @@ fn compile_carries_script_comments_losslessly() {
     // Leading, trailing-same-line, and between-statement comments carry
     // through: each present exactly once, relative order preserved, and
     // the output is a canonicalize fixed point.
-    let out = compile(
-            "<script>\n\t// leading\n\tlet { prop } = $props();\n\tlet a = 1; // trailing\n\t// between one\n\t// between two\n\tlet b = 2;\n</script>\n\n<p>{prop}</p>\n",
-            &CompileOptions::default(),
-        )
-        .unwrap();
+    let out = compile_checked(
+        "<script>\n\t// leading\n\tlet { prop } = $props();\n\tlet a = 1; // trailing\n\t// between one\n\t// between two\n\tlet b = 2;\n</script>\n\n<p>{prop}</p>\n",
+    );
     let mut prev = 0;
     for comment in [
         "// leading",

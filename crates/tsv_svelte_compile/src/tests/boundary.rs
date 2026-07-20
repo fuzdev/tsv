@@ -1,7 +1,6 @@
 //! `<svelte:boundary>`: attribute validation, anchors, snippet forms.
 
 use super::support::*;
-use crate::*;
 
 #[test]
 fn compile_boundary_invalid_attributes_refuse() {
@@ -56,11 +55,7 @@ fn compile_boundary_snippet_attribute_forms_refuse() {
 fn compile_boundary_onerror_is_dropped_but_guarded() {
     // A valid `onerror={handler}` never reaches SSR output, but the oracle still
     // analyzes it — so it is guard-walked like an event-handler attribute.
-    let out = compile(
-        "<svelte:boundary onerror={(e) => e}><p>a</p></svelte:boundary>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    let out = compile_checked("<svelte:boundary onerror={(e) => e}><p>a</p></svelte:boundary>");
     assert!(!out.js.contains("onerror"), "onerror must drop: {}", out.js);
     assert_unsupported(
         "<svelte:boundary onerror={() => $state(1)}><p>a</p></svelte:boundary>",
@@ -74,11 +69,7 @@ fn compile_boundary_anchors_are_isolated_pushes() {
     // adjacent sibling's template — the oracle's `build_template` starts a fresh
     // push for each. A merge would be invisible to the fixtures if no fixture put a
     // sibling beside a boundary, so pin it here too.
-    let out = compile(
-        "<b>a</b><svelte:boundary><p>hi</p></svelte:boundary><i>z</i>",
-        &CompileOptions::default(),
-    )
-    .unwrap();
+    let out = compile_checked("<b>a</b><svelte:boundary><p>hi</p></svelte:boundary><i>z</i>");
     assert!(
         out.js.contains("$$renderer.push(`<b>a</b>`)")
             && out.js.contains("$$renderer.push(`<!--[-->`)"),

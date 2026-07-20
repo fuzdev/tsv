@@ -1,7 +1,6 @@
 //! Per-element refusals: duplicate `$props()`, the select family, `<svelte:element>`.
 
 use super::support::*;
-use crate::*;
 
 #[test]
 fn compile_duplicate_props_rune_refuses() {
@@ -26,18 +25,10 @@ fn compile_duplicate_props_rune_refuses() {
         "$props() used more than once",
     );
     // A single `$props()` still compiles — the guard must not fire on one.
-    compile(
-        "<script>let {a} = $props();</script>{a}",
-        &CompileOptions::default(),
-    )
-    .expect("a single $props() must still compile");
+    compile_checked("<script>let {a} = $props();</script>{a}");
     // `$props()` and `$props.id()` are tracked separately (the oracle keeps two
     // flags), so one of each is NOT a duplicate.
-    compile(
-        "<script>let {a} = $props(); let i = $props.id();</script>{a}{i}",
-        &CompileOptions::default(),
-    )
-    .expect("$props() alongside $props.id() must still compile");
+    compile_checked("<script>let {a} = $props(); let i = $props.id();</script>{a}{i}");
 }
 
 #[test]
@@ -48,13 +39,13 @@ fn compile_use_directive_on_load_error_element_refuses() {
     assert_unsupported("<img use:action />", "load-error element");
     assert_unsupported("<iframe use:action></iframe>", "load-error element");
     // `transition:`/`{@attach}` on the same element are a plain drop.
-    let out = compile("<img transition:fade />", &CompileOptions::default()).unwrap();
+    let out = compile_checked("<img transition:fade />");
     assert!(
         out.js.contains("`<img/>`"),
         "transition on img must plain-drop: {}",
         out.js
     );
-    let out = compile("<img {@attach a} />", &CompileOptions::default()).unwrap();
+    let out = compile_checked("<img {@attach a} />");
     assert!(
         out.js.contains("`<img/>`"),
         "attach on img must plain-drop: {}",
@@ -106,11 +97,9 @@ fn compile_svelte_element_const_tag_direct_child_refuses() {
     );
     // A `{#snippet}` direct child stays valid (proves the guard didn't drop the
     // overlay the hoist analysis needs).
-    compile(
+    compile_checked(
         "<svelte:element this={tag}>{#snippet s()}x{/snippet}{@render s()}</svelte:element>",
-        &CompileOptions::default(),
-    )
-    .expect("a {#snippet} child of <svelte:element> still compiles");
+    );
 }
 
 #[test]
@@ -130,11 +119,7 @@ fn compile_svelte_element_specific_refusals() {
     // A scoping `<style>` scopes the element: a type selector matches a
     // `<svelte:element>` unconditionally, so it synthesizes the hash class and the
     // selector is used (not pruned → no `CssSelectorNoMatch`).
-    let out = compile(
-        "<svelte:element this={tag} /><style>div { color: red }</style>",
-        &CompileOptions::default(),
-    )
-    .expect("scoped <svelte:element> compiles");
+    let out = compile_checked("<svelte:element this={tag} /><style>div { color: red }</style>");
     assert!(
         out.js.contains(r#" class="svelte-tsvhash""#),
         "expected synthesized hash class, got: {}",
@@ -148,9 +133,5 @@ fn compile_svelte_element_specific_refusals() {
         out.css
     );
     // A `bind:this` omits and the element compiles.
-    compile(
-        "<script>let el;</script><svelte:element this={tag} bind:this={el} />",
-        &CompileOptions::default(),
-    )
-    .expect("bind:this on <svelte:element> compiles");
+    compile_checked("<script>let el;</script><svelte:element this={tag} bind:this={el} />");
 }
