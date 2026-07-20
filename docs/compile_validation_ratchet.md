@@ -11,7 +11,7 @@ generic `Ratchet` / `SnapshotKey` substrate.
 
 ## Why these suites
 
-The ordinary `compile:corpus:compare` corpus is real components: overwhelmingly *valid*
+The ordinary [`compile:corpus:compare`](compile_tooling.md) corpus is real components: overwhelmingly *valid*
 Svelte, so it exercises the compiler's **emission** and barely touches its **validation**
 surface. These two suites are the inverse — roughly two thirds of their files are
 deliberately invalid, each authored to trip exactly one oracle rule. They sat in no gated
@@ -35,7 +35,7 @@ cargo run -p tsv_debug compile_corpus_compare --ratchet ../svelte/packages/svelt
 
 Sidecar-dependent (every file needs an oracle compile), so it is **not** in
 `deno task check` — the same reason `compile:corpus:compare` and `compile:fuzz` are
-freestanding. It is also outside `conformance` / `conformance:all` / publish Step 3b: the
+freestanding ([compile_tooling.md](compile_tooling.md)). It is also outside `conformance` / `conformance:all` / publish Step 3b: the
 compiler arc ships no artifact and the branch is unmerged.
 
 ⚠️ Always a **separate invocation** from `compile:corpus:compare`, never extra roots on
@@ -189,3 +189,12 @@ retired `ORACLE-ERROR` is not an over-acceptance win, and is reported on its own
 - The suites are static and version-pinned to the `../svelte` checkout; a pin bump can
   legitimately move many lines at once. `deno task pins:audit` is what keeps the checkout
   and the sidecar pin aligned.
+
+## See Also
+
+- [compile_tooling.md](compile_tooling.md) — the sibling harnesses: the wide-net corpus
+  comparison this shares a pipeline with, and the differential compile fuzzer
+- [checklist_svelte_compiler.md](checklist_svelte_compiler.md) — the diagnosis behind the
+  pinned findings (this snapshot is the measurement, that doc is the prose)
+- [conformance_svelte_compiler.md](conformance_svelte_compiler.md) — where tsv's compiled
+  output deliberately differs from the oracle's

@@ -88,7 +88,7 @@ cargo run --release -p tsv_debug -- profile ~/dev/zzz/src/lib
 # Profile specific files
 cargo run --release -p tsv_debug -- profile file1.ts file2.svelte
 
-# More iterations for stability
+# More iterations for stability (default: 10)
 cargo run --release -p tsv_debug -- profile ~/dev/zzz/src/lib --iterations 20
 
 # JSON output for scripting
@@ -141,6 +141,7 @@ cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib
 
 # JSON output with per-file data (e.g. to split costs by multibyte flag)
 cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib --json
+# Also: --iterations <n> (default: 5)
 ```
 
 Output shows, per language: file/byte/wire-byte/multibyte counts and the
@@ -415,7 +416,21 @@ cargo run -p tsv_debug arena_stats <paths> --reuse         # reset()-reuse high-
 cargo run -p tsv_debug arena_stats <paths> --list-errors   # list parse-skipped files
 ```
 
-### 8. `tsv_debug compile_profile` — Svelte compile against the format wall
+### 8. `tsv_debug buffer_sizes` — printer buffer sizing
+
+AST histograms for tuning the TS printer's SmallVec inline capacities (`named_specs`,
+`CommentLines`) and the line-count distribution behind the `MultilineText` doc node:
+named-import-specifier count per import, and line count per multi-line block comment.
+Covers `.ts`/`.svelte.ts` AND `.svelte` (the `<script>`/`{expr}` feed the same
+TS-printer buffers). Prints percentiles + spill rate at candidate inline N. For sizing,
+exclude the prettier/svelte test suites (edge-case skew). Pure Rust, no Deno.
+
+```bash
+cargo run -p tsv_debug buffer_sizes ~/dev/zzz/src ~/dev/gro/src
+cargo run -p tsv_debug buffer_sizes <paths> --json
+```
+
+### 9. `tsv_debug compile_profile` — Svelte compile against the format wall
 
 Times the Svelte compiler (`tsv_svelte_compile::compile`) per file and reports it
 as a **ratio** against parsing plus formatting the same file. The ratio is the

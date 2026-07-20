@@ -759,7 +759,8 @@ cargo run -p tsv_debug compile_corpus_compare t.svelte`.
 ### Mismatch classes under mutation
 
 `compile_fuzz --seed 0 --iterations 20000` produces **16 mismatches**, classified from
-the dumped mutants by diff signature.
+the dumped mutants by diff signature. The fuzzer's operators, grading rules, and flags
+are documented in [compile_tooling.md](compile_tooling.md).
 
 ⚠️ The count is not comparable across corpus edits. The seed corpus IS
 `tests/fixtures_compile`, so adding a fixture changes which mutants are generated;

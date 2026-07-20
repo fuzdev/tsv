@@ -172,3 +172,12 @@ alternative is reproducing invalid output in one case and a phantom injection in
 other. No fixture is proposed: a fixture would pin the oracle's defect as expected
 output, which is exactly what the catalog above exists to avoid. The shape appears in no
 real component.
+
+## See Also
+
+- [checklist_svelte_compiler.md](./checklist_svelte_compiler.md) — what the compiler
+  supports, refuses, and is known to over-accept
+- [compile_tooling.md](./compile_tooling.md) — the harnesses that find these divergences:
+  the corpus comparison and the differential compile fuzzer
+- [compile_validation_ratchet.md](./compile_validation_ratchet.md) — the gated
+  over-acceptance debt over Svelte's own validation suites

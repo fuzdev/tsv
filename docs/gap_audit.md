@@ -3,7 +3,7 @@
 > Inject a comment into every gap and re-run the print-once ledger
 
 `gap_audit` is the **discovery** arm of the dropped-comment class. The print-once ledger
-([Comment Ledger Audit](../CLAUDE.md#debug-tooling)) is the detector, but it only ever sees
+([Comment Ledger Audit](audits.md#comment-ledger-audit-commentsaudit)) is the detector, but it only ever sees
 a document **as authored** — so a gap no fixture happens to put a comment in is a gap it
 never checks. Eight such drops were found by hand, each green on `cargo test`,
 `comments:audit`, `roundtrip:audit`, and the corpus diff, purely because no fixture covered
@@ -250,5 +250,5 @@ the short version:
   comments as AST nodes and never lexes a declaration-value comment as a `Comment` at all —
   so extending the ledger (see `comment_ledger`'s TODO) is the honest prerequisite.
 
-Related: [Comment Ledger Audit](../CLAUDE.md#debug-tooling) (the detector this drives),
+Related: [Comment Ledger Audit](audits.md#comment-ledger-audit-commentsaudit) (the detector this drives),
 [conformance_prettier.md §Comment Position Philosophy](conformance_prettier.md#comment-position-philosophy).

@@ -13,12 +13,15 @@ use std::path::{Path, PathBuf};
 ///    `_svelte_divergence` → `docs/conformance_svelte.md`, both for the combined suffix).
 ///    A divergence suffix asserts a deliberate difference; that claim must be cataloged
 ///    so it is discoverable and reviewable.
-/// 2. **Dead links** — every Markdown link (relative path and `#anchor`) in the two
-///    conformance docs, in the compiler doc pair ([`LINK_CHECKED_DOCS`]), and in
-///    every fixture README must resolve on disk. The orphan
-///    check only proves *forward* coverage (live fixture → mentioned in doc); this is
-///    the *reverse* direction — a link to a renamed/demoted/deleted fixture, or a
-///    back-link with the wrong `../` depth or a stale anchor, is otherwise invisible.
+/// 2. **Dead links** — every Markdown link (relative path and `#anchor`) in every
+///    `docs/*.md` (enumerated at run time, so a new doc is gated by existing) and in
+///    every fixture README must resolve on disk. The orphan check only proves
+///    *forward* coverage (live fixture → mentioned in doc); this is the *reverse*
+///    direction — a link to a renamed/demoted/deleted fixture, or a back-link with
+///    the wrong `../` depth or a stale anchor, is otherwise invisible. Targets that
+///    climb out of the repo (sibling checkouts like `../../ecma262/…`) are
+///    machine-dependent, so they are out of scope like external URLs — the audit
+///    gates repo-internal integrity only.
 /// 3. **Missing back-links** — every `_*_divergence` fixture's README must *contain* a
 ///    link that resolves to the doc that sanctions its claim (`_prettier_divergence` →
 ///    `docs/conformance_prettier.md`, `_svelte_divergence` → `docs/conformance_svelte.md`,
@@ -43,21 +46,6 @@ pub struct ConformanceAuditCommand {
 
 const CONFORMANCE_PRETTIER: &str = "docs/conformance_prettier.md";
 const CONFORMANCE_SVELTE: &str = "docs/conformance_svelte.md";
-
-/// Docs that participate in the dead-link check only — they sanction no fixture
-/// suffix, so the orphan and back-link checks have nothing to ask of them, but
-/// their relative paths and cross-doc anchors rot exactly like the others'. The
-/// compiler pair cross-links each other, the checklists, and repo-root
-/// `CLAUDE.md`, and nothing else was resolving those.
-///
-/// Only Markdown *links* (`[text](target)`) are checked; a backticked path such
-/// as `` `../../svelte/packages/…` `` is a code span, not a link, so the
-/// out-of-repo source references these docs cite are never visited.
-const LINK_CHECKED_DOCS: &[&str] = &[
-    "docs/conformance_svelte_compiler.md",
-    "docs/checklist_svelte_compiler.md",
-    "docs/compile_validation_ratchet.md",
-];
 
 /// Non-divergence fixtures that deliberately keep a README because it documents a
 /// real parser/spec/contrast fact that cannot live as an `input.*` comment. Every
@@ -84,13 +72,26 @@ impl ConformanceAuditCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
         let all = super::walk_fixtures_or_fail()?;
 
-        // Read each conformance doc once; reuse its content for the orphan scan and
-        // the link/heading parse (primed into the cache so anchors resolve for free).
+        // Every repo doc is link-checked; the two conformance docs additionally
+        // drive the orphan and back-link checks. Read each doc once, priming the
+        // cache so anchors into it resolve for free.
+        let docs = enumerate_docs()?;
         let mut cache = DocCache::new();
-        let prettier_src = read_doc(CONFORMANCE_PRETTIER)?;
-        let svelte_src = read_doc(CONFORMANCE_SVELTE)?;
-        cache.prime(CONFORMANCE_PRETTIER, &prettier_src);
-        cache.prime(CONFORMANCE_SVELTE, &svelte_src);
+        let mut prettier_src = None;
+        let mut svelte_src = None;
+        for doc in &docs {
+            let src = read_doc(doc)?;
+            cache.prime(doc, &src);
+            if doc.as_path() == Path::new(CONFORMANCE_PRETTIER) {
+                prettier_src = Some(src);
+            } else if doc.as_path() == Path::new(CONFORMANCE_SVELTE) {
+                svelte_src = Some(src);
+            }
+        }
+        let (Some(prettier_src), Some(svelte_src)) = (prettier_src, svelte_src) else {
+            eprintln!("Error: docs/ is missing {CONFORMANCE_PRETTIER} or {CONFORMANCE_SVELTE}");
+            return Err(CliError::Failed);
+        };
 
         let orphans = [
             run_orphan_audit(
@@ -118,13 +119,16 @@ impl ConformanceAuditCommand {
             })
             .collect();
 
-        let dead_links = run_link_audit(&readmes, &mut cache);
+        let (dead_links, links_checked) = run_link_audit(&docs, &readmes, &mut cache);
         let missing_backlinks = run_backlink_audit(&readmes, &mut cache);
         let stray_readmes = run_readme_audit(&readmes);
 
         let report = Report {
             orphans,
             dead_links,
+            docs_checked: docs.len(),
+            readmes_checked: readmes.len(),
+            links_checked,
             missing_backlinks,
             stray_readmes,
         };
@@ -144,11 +148,33 @@ impl ConformanceAuditCommand {
 }
 
 /// Read a doc file, returning [`CliError::Failed`] (after a message) on failure.
-fn read_doc(path: &str) -> Result<String, CliError> {
+fn read_doc(path: &Path) -> Result<String, CliError> {
     std::fs::read_to_string(path).map_err(|e| {
-        eprintln!("Error reading {path}: {e}");
+        eprintln!("Error reading {}: {e}", path.display());
         CliError::Failed
     })
+}
+
+/// Enumerate every `docs/*.md` (sorted). Computed rather than hand-listed so a new
+/// doc is link-checked by existing; an empty result is a failure (wrong cwd), not a
+/// vacuous pass.
+fn enumerate_docs() -> Result<Vec<PathBuf>, CliError> {
+    let entries = std::fs::read_dir("docs").map_err(|e| {
+        eprintln!("Error reading docs/: {e}");
+        CliError::Failed
+    })?;
+    let mut docs: Vec<PathBuf> = entries
+        .filter_map(|entry| {
+            let path = entry.ok()?.path();
+            (path.extension().is_some_and(|ext| ext == "md") && path.is_file()).then_some(path)
+        })
+        .collect();
+    docs.sort();
+    if docs.is_empty() {
+        eprintln!("Error: docs/ holds no .md files — running from the repo root?");
+        return Err(CliError::Failed);
+    }
+    Ok(docs)
 }
 
 //
@@ -241,26 +267,28 @@ struct DeadLink {
     reason: String,
 }
 
-/// Sources to link-check: the two conformance docs, the link-checked-only docs
-/// ([`LINK_CHECKED_DOCS`]), and every fixture README.
+/// Sources to link-check: every `docs/*.md` plus every fixture README. Returns the
+/// dead links and the total link count checked (so a green pass reports its own
+/// coverage instead of reading identically to a vacuous one).
 fn run_link_audit(
+    docs: &[PathBuf],
     readmes: &[(&fixtures::Fixture, PathBuf)],
     cache: &mut DocCache,
-) -> Vec<DeadLink> {
-    let mut sources: Vec<PathBuf> = vec![CONFORMANCE_PRETTIER.into(), CONFORMANCE_SVELTE.into()];
-    sources.extend(LINK_CHECKED_DOCS.iter().map(PathBuf::from));
+) -> (Vec<DeadLink>, usize) {
+    let mut sources: Vec<PathBuf> = docs.to_vec();
     sources.extend(readmes.iter().map(|(_, p)| p.clone()));
 
     let mut dead = Vec::new();
+    let mut checked = 0usize;
     for source in &sources {
         // Clone the parsed links so we can borrow the cache mutably while resolving.
         let links = match cache.get(source) {
             Some(doc) => doc.links.clone(),
             // A README that vanished between the walk and here is a race we ignore,
-            // but a *named* source that can't be read is a mis-wired audit, not a
+            // but an enumerated doc that can't be read is a mis-wired audit, not a
             // clean run — report it rather than silently checking nothing.
             None => {
-                if LINK_CHECKED_DOCS.iter().any(|d| Path::new(d) == source) {
+                if docs.iter().any(|d| d == source) {
                     dead.push(DeadLink {
                         source: source.display().to_string(),
                         line: 0,
@@ -271,6 +299,7 @@ fn run_link_audit(
                 continue;
             }
         };
+        checked += links.len();
         for link in links {
             if let Err(reason) = resolve_link(source, &link.target, cache) {
                 dead.push(DeadLink {
@@ -282,11 +311,12 @@ fn run_link_audit(
             }
         }
     }
-    dead
+    (dead, checked)
 }
 
 /// Resolve a single Markdown link target against the filesystem. External schemes
-/// are out of scope (we never fetch); everything else must resolve on disk.
+/// and targets that climb out of the repo (sibling checkouts, machine-dependent)
+/// are out of scope; everything else must resolve on disk.
 fn resolve_link(source: &Path, target: &str, cache: &mut DocCache) -> Result<(), String> {
     if target.starts_with("http://")
         || target.starts_with("https://")
@@ -309,6 +339,9 @@ fn resolve_link(source: &Path, target: &str, cache: &mut DocCache) -> Result<(),
 
     let base = source.parent().unwrap_or_else(|| Path::new("."));
     let resolved = base.join(path_part);
+    if escapes_repo(&resolved) {
+        return Ok(());
+    }
     if !resolved.exists() {
         return Err(format!("path not found: {path_part}"));
     }
@@ -319,6 +352,28 @@ fn resolve_link(source: &Path, target: &str, cache: &mut DocCache) -> Result<(),
         return resolve_anchor(&resolved, a, cache);
     }
     Ok(())
+}
+
+/// Lexically resolve `path` (relative to the repo root, i.e. the cwd) and report
+/// whether it climbs out of the repo. `..` past the root means a sibling-checkout
+/// target (e.g. `../../ecma262/…`) — present only where that checkout is, so
+/// checking it would make the gate machine-dependent. Lexical on purpose: the
+/// target may not exist, so it can't be canonicalized.
+fn escapes_repo(path: &Path) -> bool {
+    let mut depth: usize = 0;
+    for component in path.components() {
+        match component {
+            std::path::Component::ParentDir => match depth.checked_sub(1) {
+                Some(d) => depth = d,
+                None => return true,
+            },
+            std::path::Component::Normal(_) => depth += 1,
+            std::path::Component::CurDir => {}
+            // An absolute target never escapes lexically; the existence check speaks.
+            std::path::Component::RootDir | std::path::Component::Prefix(_) => return false,
+        }
+    }
+    false
 }
 
 fn resolve_anchor(md_path: &Path, anchor: &str, cache: &mut DocCache) -> Result<(), String> {
@@ -545,9 +600,9 @@ impl DocCache {
     }
 
     /// Seed the cache with an already-read doc (avoids a second read of the
-    /// conformance docs, which the orphan scan has in hand).
-    fn prime(&mut self, path: &str, content: &str) {
-        let key = canonical_key(Path::new(path));
+    /// docs the run loop has in hand).
+    fn prime(&mut self, path: &Path, content: &str) {
+        let key = canonical_key(path);
         self.map
             .entry(key)
             .or_insert_with(|| Some(parse_markdown(content)));
@@ -577,6 +632,9 @@ fn canonical_key(path: &Path) -> PathBuf {
 struct Report {
     orphans: [OrphanAudit; 2],
     dead_links: Vec<DeadLink>,
+    docs_checked: usize,
+    readmes_checked: usize,
+    links_checked: usize,
     missing_backlinks: Vec<MissingBacklink>,
     stray_readmes: Vec<String>,
 }
@@ -611,7 +669,10 @@ impl Report {
         }
 
         if self.dead_links.is_empty() {
-            println!("✓ all Markdown links resolve (conformance + compiler docs, fixture READMEs)");
+            println!(
+                "✓ all {} Markdown links resolve ({} docs/*.md + {} fixture READMEs)",
+                self.links_checked, self.docs_checked, self.readmes_checked
+            );
         } else {
             eprintln!("✗ {} dead link(s):", self.dead_links.len());
             for d in &self.dead_links {
@@ -788,6 +849,20 @@ mod tests {
         );
 
         std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn escapes_repo_flags_only_targets_climbing_past_the_root() {
+        // Stays inside: `..` never outruns the preceding components.
+        assert!(!escapes_repo(Path::new("docs/../CLAUDE.md")));
+        assert!(!escapes_repo(Path::new(
+            "tests/fixtures/css/x/../../../../docs/conformance_prettier.md"
+        )));
+        // Climbs out: a sibling-checkout target (machine-dependent, skipped).
+        assert!(escapes_repo(Path::new("docs/../../ecma262/CLAUDE.md")));
+        assert!(escapes_repo(Path::new("../prettier/src")));
+        // Absolute targets are left to the existence check.
+        assert!(!escapes_repo(Path::new("/etc/passwd")));
     }
 
     #[test]

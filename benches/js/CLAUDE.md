@@ -796,14 +796,14 @@ deno task bench:deno:run -- --compare-baseline  # Compare against saved baseline
 deno task bench:clean
 
 # Environment variables (apply to any runtime's :run)
-BENCH_LIMIT=5 deno task bench:deno:run
-BENCH_FILTER=zzz deno task bench:deno:run
-BENCH_DURATION=10000 deno task bench:deno:run
-BENCH_WARMUP=10 deno task bench:deno:run
-BENCH_MODE=union deno task bench:deno:run
-BENCH_CORPUS=conformance deno task bench:deno:run
-BENCH_STALE_OK=1 deno task bench:deno:run
-BENCH_FORCED_ASYNC=1 deno task bench:deno:run
+BENCH_LIMIT=5 deno task bench:deno:run         # Limit files per language (default: all)
+BENCH_FILTER=zzz deno task bench:deno:run      # Filter by path pattern (default: none)
+BENCH_DURATION=10000 deno task bench:deno:run  # Duration per benchmark in ms (default: 5000; conformance mode: 15000)
+BENCH_WARMUP=10 deno task bench:deno:run       # Warmup iterations (default: 3; slow >5s-per-sweep tasks tier to 1 unless set explicitly)
+BENCH_MODE=union deno task bench:deno:run      # Per-impl iteration (default: intersection)
+BENCH_CORPUS=conformance deno task bench:deno:run  # Corpus/surface selector (default: perf)
+BENCH_STALE_OK=1 deno task bench:deno:run      # Run despite stale artifacts (default: off)
+BENCH_FORCED_ASYNC=1 deno task bench:deno:run  # Add tsv-forced-async control row (diagnostic; default: off)
 ```
 
 ## Artifact Freshness Guard

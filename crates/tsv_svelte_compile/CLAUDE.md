@@ -1066,5 +1066,5 @@ count in a separate `comment_position` bucket so the tolerance is never silent.
   (`GeneratedNameCollision`, `MemberCallAmbiguousRoot`, `DerivedReadShadowed`,
   `SnippetHoistAmbiguous`, `BlockScopeShadowsDerived`, `StoreScopedSubscription`) is
   inherently two-name: the port is **name-based where the oracle is scope-sensitive**. See
-  [../../CLAUDE.md §Debug Tooling](../../CLAUDE.md#debug-tooling).
+  [../../docs/compile_tooling.md](../../docs/compile_tooling.md).
 - `tsv_ts` `format_canonical` — the intent-erased reprint entry point this crate drives
