@@ -506,4 +506,27 @@ impl<'a> Printer<'a> {
             doc
         }
     }
+
+    /// [`Self::prepend_removed_paren_comments`] for a **keyword→operand** gap, routing
+    /// through [`Printer::build_keyword_operand_comments_opt`] so a single-line block
+    /// trails inline instead of keeping the author's break. Used for `new`→callee;
+    /// `await` calls the emitter directly. The other `prepend_removed_paren_comments`
+    /// callers (call/member chains, binary chains, conditionals, tagged templates) are
+    /// deliberately NOT routed here — each is its own gap with its own gate, and the
+    /// same cycle at those sites wants its own fixture first.
+    #[inline]
+    pub(crate) fn prepend_keyword_operand_comments(
+        &self,
+        outer_start: u32,
+        inner_start: u32,
+        doc: DocId,
+    ) -> DocId {
+        if outer_start < inner_start
+            && let Some(comments) =
+                self.build_keyword_operand_comments_opt(outer_start, inner_start)
+        {
+            return self.d().concat(&[comments, doc]);
+        }
+        doc
+    }
 }

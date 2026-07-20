@@ -587,6 +587,49 @@ impl<'a> Printer<'a> {
         self.build_leading_comment_run_opt(start, end, LeadingGlue::Adjacent)
     }
 
+    /// The **keyword→operand** gap emitter: `await`→operand, `new`→callee.
+    ///
+    /// One question, one predicate — the gate
+    /// ([`Printer::comments_force_own_line_between`], i.e. the shared
+    /// `comment_hangs_next`) picks the emitter, so the two cannot answer differently:
+    ///
+    /// - It **hangs** (a line comment, or a multiline block the author broke after) →
+    ///   [`Self::build_rhs_comments_opt`], keeping the author's break and its
+    ///   authored separators.
+    /// - Otherwise — a **single-line block in ANY authored position** (glued,
+    ///   trailing the keyword, or on its own line) → the inline emitter. Nothing
+    ///   forces it off the line, so it trails inline and the author's break is
+    ///   reflowed: the keyword→value rule its `as`/`satisfies`, `export =`, and
+    ///   module-header siblings follow. See conformance_prettier.md §Authored breaks
+    ///   in value position.
+    ///
+    /// ⚠️ Emitting the second case through `build_rhs_comments_opt` reads as the
+    /// obvious code and is the bug this replaced: that builder picks each separator
+    /// from the comment's AUTHORED position, so an own-line comment kept a hardline
+    /// while the concat glued it to the keyword. The result — comment pulled up,
+    /// break kept — *is* the glued authoring, which reflows inline on the next pass,
+    /// so the format was not idempotent on its own output. Swapping to
+    /// [`Self::build_rhs_comments_glued_opt`] does not fix it either: no
+    /// [`LeadingGlue`] variant collapses an own-line comment, and it regresses the
+    /// authored-blank case. The routing is the fix, not the glue.
+    ///
+    /// ⚠️ **Do not merge this with `gap_comment_continuation_tail`** (the module-header
+    /// gap emitter) on the strength of their matching gate→{hang, inline} shape. The
+    /// resemblance is structural, not semantic — the *gates differ on purpose* for a
+    /// **glued multiline block** (`kw /* …⏎… */ v`): this gate
+    /// ([`Printer::comment_hangs_next`]) collapses it inline, while the header gap's
+    /// `has_multiline_block_comments_on_page_between` hangs *any* multiline block, glued
+    /// or not — its own doc calls that "this gap's deliberate difference from its
+    /// `build_keyword_to_name_continuation` twin". Unifying them would silently change
+    /// one family or the other.
+    pub(crate) fn build_keyword_operand_comments_opt(&self, start: u32, end: u32) -> Option<DocId> {
+        if self.comments_force_own_line_between(start, end) {
+            self.build_rhs_comments_opt(start, end)
+        } else {
+            self.build_inline_comments_between_doc_trailing_space_opt(start, end)
+        }
+    }
+
     /// Like `build_rhs_comments_opt`, but an author blank line after a glued block's
     /// `*/` yields with the soft `line` instead of forcing the comment onto its own
     /// line — [`LeadingGlue::AdjacentValueGap`], the head→value gap rule. Use at a
