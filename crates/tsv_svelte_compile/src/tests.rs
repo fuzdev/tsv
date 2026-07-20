@@ -6618,6 +6618,91 @@ fn compile_does_not_apply_the_attribute_name_rule_to_components() {
     let _ = compile_js("<script>import F from './F.svelte';</script><F 3aa=\"abc\" />");
 }
 
+#[test]
+fn compile_refuses_an_event_handler_without_an_expression_value() {
+    // The oracle's `attribute_invalid_event_handler`
+    // (`2-analyze/visitors/shared/element.js:64`): an `on…` attribute is legal only
+    // with a SINGLE-expression value. Each shape below is live-verified
+    // oracle-REJECTED.
+
+    // A text value — the sample the ratchet pinned.
+    assert_unsupported("<button onclick=\"foo\">x</button>", "event handler");
+    // ⚠️ A BARE handler too (`value === true` fails `is_expression_attribute`), which
+    // reads as legal and is not.
+    assert_unsupported("<button onclick>x</button>", "event handler");
+    // A MULTI-chunk value is not a single expression either.
+    assert_unsupported("<button onclick=\"{a}{b}\">x</button>", "event handler");
+    // ⚠️ The name test is `length > 2`, so a 3-character name is the boundary.
+    assert_unsupported("<button onx>x</button>", "event handler");
+    // `<svelte:element>` shares `validate_element`, so it is in scope too.
+    assert_unsupported(
+        "<svelte:element this=\"button\" onclick=\"foo\" />",
+        "event handler",
+    );
+}
+
+#[test]
+fn compile_accepts_event_handlers_the_oracle_allows() {
+    // ⚠️ The over-refusal half. All live-verified oracle-ACCEPTED.
+
+    // The ordinary shape.
+    let _ = compile_js("<script>let f = () => {};</script><button onclick={f}>x</button>");
+    // ⭐ `on` alone is LEGAL — the oracle's `length > 2` guard. Writing the rule as a
+    // bare `starts_with(\"on\")` refuses this, and only this test catches it.
+    let _ = compile_js("<button on>x</button>");
+    // ⚠️ A COMPONENT is exempt: `validate_element` is never reached from the
+    // Component visitor, so a prop named `onbar` may carry a text value.
+    let _ = compile_js("<script>import F from './F.svelte';</script><F onbar=\"bar\" />");
+}
+
+#[test]
+fn compile_refuses_an_unparenthesized_sequence_expression_attribute() {
+    // The oracle's `attribute_invalid_sequence_expression`
+    // (`2-analyze/visitors/shared/element.js:52`, `shared/component.js:174`). It
+    // scans the source BACKWARD from the sequence's start: `{` first means bare,
+    // `(` first means parenthesized. Every shape live-verified oracle-REJECTED.
+
+    assert_unsupported("<span foo={x, y, z} />", "sequence expression");
+    // Whitespace between the delimiter and the sequence does not rescue it.
+    assert_unsupported("<span foo={ x, y } />", "sequence expression");
+    // A quoted single-expression value is still a single expression.
+    assert_unsupported("<span foo=\"{x, y}\" />", "sequence expression");
+    // ⚠️ Parenthesizing the FIRST ELEMENT is not parenthesizing the sequence: the
+    // node starts at that `(`, so the scan steps past it and still finds `{`.
+    assert_unsupported("<span foo={(x), y} />", "sequence expression");
+    // ⚠️ Unlike the two rules above, this one is NOT element-only — a component
+    // reaches it through its own visitor.
+    assert_unsupported(
+        "<script>import F from './F.svelte';</script><F foo={x, y} />",
+        "sequence expression",
+    );
+    // ⭐ And the component half additionally covers `{@attach}`, which the element
+    // half does not — see the accepting counterpart below. Both live-probed.
+    assert_unsupported(
+        "<script>import F from './F.svelte';</script><F {@attach a, b} />",
+        "sequence expression",
+    );
+}
+
+#[test]
+fn compile_accepts_parenthesized_sequence_expressions() {
+    // ⚠️ The over-refusal half — a sequence is perfectly legal when parenthesized,
+    // and refusing these would reject ordinary code. All oracle-ACCEPTED.
+
+    let _ = compile_js("<script>let x, y, z;</script><span foo={(x, y, z)} />");
+    let _ = compile_js("<script>let x, y;</script><span foo={((x, y))} />");
+    // A NESTED sequence: it starts at `y`, so the scan finds its own `(` at once.
+    let _ = compile_js("<script>let x, y, z;</script><span foo={[x, (y, z)]} />");
+    let _ = compile_js("<script>let f, x, y;</script><span foo={f((x, y))} />");
+    // Only the TOP-level attribute expression is tested, so a sequence nested in a
+    // larger expression is never reached regardless of parens.
+    let _ = compile_js("<script>let a, b, c, d;</script><span foo={a ? (b, c) : d} />");
+    // ⭐ The element/component asymmetry, in the direction that ACCEPTS: the element
+    // visitor has no `{@attach}` sequence check, so this compiles where the
+    // component form above refuses. Collapsing the two sites breaks this.
+    let _ = compile_js("<script>let a, b;</script><span {@attach a, b} />");
+}
+
 /// A component import, so a `<N>` below is a Component rather than an unknown tag.
 const SLOT_IMPORT: &str = "<script>import N from './N.svelte';</script>";
 

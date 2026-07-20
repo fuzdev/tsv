@@ -47,8 +47,10 @@ use crate::html_tree::{is_tag_valid_with_ancestor, is_tag_valid_with_parent};
 use crate::refusal::Refusal;
 use crate::transform_server::unsupported;
 use tsv_svelte::ast::internal::{
-    AttributeNode, ElementKind, Fragment, FragmentNode, Root, SpecialElementKind,
+    Attribute, AttributeNode, AttributeValue, ElementKind, Fragment, FragmentNode, Root,
+    SpecialElementKind,
 };
+use tsv_ts::ast::internal::Expression;
 
 /// The oracle's `root_only_meta_tags` (`phases/1-parse/state/element.js:45`) —
 /// the meta tags legal only as a direct child of the component root, and legal at
@@ -167,14 +169,29 @@ impl<'s> Validator<'s> {
         match node {
             FragmentNode::Element(element) => {
                 refuse_duplicate_attributes(element.attributes, self.source)?;
-                if element.kind == ElementKind::Html {
-                    self.validate_element(element.attributes)?;
-                    self.refuse_invalid_element_placement(element.name_span.extract(self.source))?;
+                match element.kind {
+                    ElementKind::Html => {
+                        self.validate_element(element.attributes)?;
+                        self.refuse_invalid_element_placement(
+                            element.name_span.extract(self.source),
+                        )?;
+                    }
+                    ElementKind::Component => self.validate_component(element.attributes)?,
                 }
             }
             FragmentNode::SpecialElement(special) => {
-                if matches!(special.kind, SpecialElementKind::SvelteElement { .. }) {
-                    self.validate_element(special.attributes)?;
+                match special.kind {
+                    SpecialElementKind::SvelteElement { .. } => {
+                        self.validate_element(special.attributes)?;
+                    }
+                    // `visit_component`'s other two callers. `<svelte:component>`
+                    // and `<svelte:self>` are deliberate fences, so this arm is
+                    // unreachable today — written out rather than folded into the
+                    // catch-all so it stays correct if either is ever un-fenced.
+                    SpecialElementKind::SvelteComponent { .. } | SpecialElementKind::SvelteSelf => {
+                        self.validate_component(special.attributes)?;
+                    }
+                    _ => {}
                 }
                 if let Some(tag) = root_only_meta_tag(&special.kind) {
                     // The oracle raises placement BEFORE duplicate at the same site,
@@ -275,16 +292,63 @@ impl<'s> Validator<'s> {
     /// The attribute rules of the oracle's `validate_element`
     /// (`2-analyze/visitors/shared/element.js:29`).
     ///
-    /// ⚠️ The pairing is the point: these two fire together because they are two
-    /// checks inside ONE oracle function, whose only callers are `RegularElement.js`
-    /// and `SvelteElement.js`. So a **component** is exempt from both — its visitor
+    /// ⚠️ The grouping is the point: these fire together because they are checks
+    /// inside ONE oracle function, whose only callers are `RegularElement.js`
+    /// and `SvelteElement.js`. So a **component** is exempt from them — its visitor
     /// never reaches here, which is why `<F 3aa="abc" />` is legal while
-    /// `<p 3aa="abc">` is not. Adding a third check from that function belongs here,
-    /// not at either call site.
+    /// `<p 3aa="abc">` is not, and `<Button onbar="bar" />` is legal while
+    /// `<button onbar="bar" />` is not. Adding a further check from that function
+    /// belongs here, not at either call site.
+    ///
+    /// ⚠️ The sequence-expression rule is the ONE exception, and it is deliberately
+    /// not folded in: the component visitor applies its own copy, so it lives in
+    /// [`refuse_unparenthesized_sequence`] and is called from both paths. See
+    /// [`Self::validate_component`] for the half that does not correspond.
     fn validate_element(&self, attributes: &[AttributeNode<'_>]) -> Result<(), CompileError> {
         refuse_invalid_attribute_names(attributes, self.source)?;
+        for attribute in attributes {
+            let AttributeNode::Attribute(a) = attribute else {
+                continue;
+            };
+            // The oracle orders the sequence check BEFORE the event-handler one
+            // within its single attribute loop, so a `foo={x, y}` sitting on an
+            // element that ALSO carries a bad handler reports the sequence. The
+            // order is preserved because the bucket a corpus file lands in is
+            // observable.
+            if let Some(expression) = expression_attribute_value(a) {
+                refuse_unparenthesized_sequence(expression, self.source)?;
+            }
+            refuse_invalid_event_handler(a, self.source)?;
+        }
         if has_plain_attribute(attributes, self.source, "slot") {
             self.refuse_invalid_slot_placement()?;
+        }
+        Ok(())
+    }
+
+    /// The attribute rules of the oracle's `visit_component`
+    /// (`2-analyze/visitors/shared/component.js:78-117`), for the subset tsv
+    /// reaches — a `<Foo>`, `<svelte:component>` or `<svelte:self>`.
+    ///
+    /// ⚠️ This is NOT `validate_element`'s rule set with the element bits removed;
+    /// the two oracle functions overlap only on the sequence-expression check, and
+    /// even there they differ in REACH. The component half additionally applies it
+    /// to an `{@attach}` expression (`:115`), which the element half does not — so
+    /// `<span {@attach a, b} />` compiles and `<Foo {@attach a, b} />` does not.
+    /// Both directions live-probed; collapsing the two sites breaks one of them.
+    fn validate_component(&self, attributes: &[AttributeNode<'_>]) -> Result<(), CompileError> {
+        for attribute in attributes {
+            match attribute {
+                AttributeNode::Attribute(a) => {
+                    if let Some(expression) = expression_attribute_value(a) {
+                        refuse_unparenthesized_sequence(expression, self.source)?;
+                    }
+                }
+                AttributeNode::AttachTag(attach) => {
+                    refuse_unparenthesized_sequence(&attach.expression, self.source)?;
+                }
+                _ => {}
+            }
         }
         Ok(())
     }
@@ -536,6 +600,80 @@ fn refuse_invalid_attribute_names(
             return Err(unsupported(Refusal::AttributeInvalidName {
                 name: name.to_string(),
             }));
+        }
+    }
+    Ok(())
+}
+
+/// The oracle's `is_expression_attribute` + `get_attribute_expression`
+/// (`utils/ast.js:43,59`) as one operation: the attribute's value when it is a
+/// SINGLE expression, `None` otherwise.
+///
+/// The three `None` shapes are all real inputs and all distinct: a BARE attribute
+/// (`onclick`, the oracle's `value === true`), a text value (`onclick="foo"`), and
+/// a multi-chunk value (`onclick="{a}{b}"`). Every one of them is a rejected event
+/// handler, which is why the event-handler rule keys on this returning `None`
+/// rather than testing for a text value.
+fn expression_attribute_value<'a>(attribute: &'a Attribute<'a>) -> Option<&'a Expression<'a>> {
+    match attribute.value {
+        Some([AttributeValue::ExpressionTag(tag)]) => Some(&tag.expression),
+        _ => None,
+    }
+}
+
+/// The oracle's `attribute_invalid_event_handler`
+/// (`2-analyze/visitors/shared/element.js:62-66`).
+///
+/// ⚠️ `length > 2` is load-bearing and is NOT a guard against a short slice: the
+/// bare attribute `on` is LEGAL and `onx` is not (both live-probed). Writing it as
+/// `starts_with("on")` alone silently refuses a valid `<button on>`.
+fn refuse_invalid_event_handler(
+    attribute: &Attribute<'_>,
+    source: &str,
+) -> Result<(), CompileError> {
+    let name = attribute.name_span.extract(source);
+    if name.starts_with("on") && name.len() > 2 && expression_attribute_value(attribute).is_none() {
+        return Err(unsupported(Refusal::AttributeInvalidEventHandler {
+            name: name.to_string(),
+        }));
+    }
+    Ok(())
+}
+
+/// The oracle's `disallow_unparenthesized_sequences`
+/// (`2-analyze/visitors/shared/component.js:168-178`, duplicated inline at
+/// `shared/element.js:48-56`).
+///
+/// ⚠️ The backward SOURCE scan is reproduced rather than replaced by a span test,
+/// because the two are not equivalent. A parenthesized sequence is not a distinct
+/// AST node — ESTree drops the parens — so the only record that the author wrote
+/// `{(x, y)}` rather than `{x, y}` is the byte before the sequence's start. The
+/// scan walks back to the first `(` (legal — parenthesized) or `{` (illegal — bare
+/// against the attribute delimiter), skipping whitespace and anything else.
+///
+/// The `(`-first case is what makes a NESTED sequence legal: in `{[x, (y, z)]}` the
+/// inner sequence starts at `y` and the scan immediately finds its `(`. Verified
+/// against tsv's own spans at three shapes, including `{(x), y}` — where the
+/// sequence starts at the `(` of its first element, so the scan correctly steps
+/// PAST that paren to the `{` and rejects.
+fn refuse_unparenthesized_sequence(
+    expression: &Expression<'_>,
+    source: &str,
+) -> Result<(), CompileError> {
+    let Expression::SequenceExpression(sequence) = expression else {
+        return Ok(());
+    };
+    // The oracle's `while (--i > 0)`: start one byte before the sequence and stop
+    // before index 0, so byte 0 is never examined. A `{` can never sit at byte 0 of
+    // a component that reached here anyway.
+    let bytes = source.as_bytes();
+    let mut i = sequence.span.start as usize;
+    while i > 1 {
+        i -= 1;
+        match bytes[i] {
+            b'(' => return Ok(()),
+            b'{' => return Err(unsupported(Refusal::AttributeInvalidSequenceExpression)),
+            _ => {}
         }
     }
     Ok(())

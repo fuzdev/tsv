@@ -492,6 +492,23 @@ project-wide conventions.
   a `{:catch}` compiled. A rule whose inputs are not emission state belongs here, not
   at an emitter.
 
+  Plus the attribute rules of the oracle's single `validate_element` loop —
+  `attribute_invalid_name`, `attribute_invalid_event_handler` (an `on…` attribute
+  needs a SINGLE-expression value; the name test is `startsWith('on') && length > 2`,
+  so a bare `on` is legal and `onx` is not, and a BARE `onclick` is rejected along
+  with `onclick="foo"`) and `slot_attribute_invalid_placement`. That loop's only
+  callers are `RegularElement.js` / `SvelteElement.js`, so a **component** is exempt
+  from all three. ⚠️ `attribute_invalid_sequence_expression` is the one attribute rule
+  that is NOT element-only — a component reaches it through its own visitor
+  (`shared/component.js:174`), which ALSO applies it to an `{@attach}` expression
+  where the element half does not, so `<span {@attach a, b} />` compiles and
+  `<Foo {@attach a, b} />` refuses. It therefore lives in a shared
+  `refuse_unparenthesized_sequence` called from both paths rather than folded into
+  either. Its parenthesization test is the oracle's backward SOURCE scan, not a span
+  comparison: ESTree drops parens, so the byte before the sequence's start is the only
+  record of them — which is why a nested `{[x, (y, z)]}` is legal while `{(x), y}` is
+  not.
+
   Plus the analysis-phase `node_invalid_placement` (the HTML content model), for
   which the walk carries a `path` of `PathEntry`s — the oracle's `context.path`
   reduced to what its ancestor loop reads. Three distinct node roles, and collapsing

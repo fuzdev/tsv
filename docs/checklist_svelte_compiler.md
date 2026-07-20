@@ -397,7 +397,10 @@ and then `node_invalid_placement`, see
 clusters in the ratchet, both ported into `validate.rs` beside `attribute_duplicate`
 — they are two checks inside the oracle's single `validate_element` /
 `validate_slot_attribute` pair, whose callers are `RegularElement.js` and
-`SvelteElement.js` only, so a **component** is exempt from both.)
+`SvelteElement.js` only, so a **component** is exempt from both. Then
+`attribute_invalid_event_handler` and `attribute_invalid_sequence_expression`, two
+further checks in that same `validate_element` loop — see
+[The attribute-value rules](#the-attribute-value-rules--closed).)
 
 ⚠️ `slot_attribute_invalid_placement` is NOT the named-slot fence. The oracle
 *accepts* a `slot="…"` on a component's direct child, which tsv declines as the
@@ -508,6 +511,48 @@ Corpus cost: **zero**. No oracle-accepted file in the ~2996-file compile corpus 
 this refusal; the two files it does catch (`AppControlsTable.svelte`,
 `Action_History.svelte`, both `<th>` directly inside `<thead>`) are oracle-rejected
 already, for an unrelated `legacy_export_invalid`. Both carry genuine invalid markup.
+
+#### The attribute-value rules — closed
+
+**Closed.** Two more checks from the oracle's `validate_element` loop, ported into
+`validate.rs` beside `attribute_invalid_name`:
+
+- **Refused**: `` `{name}` event handler needs an expression value (the oracle rejects
+  it) `` — `attribute_invalid_event_handler` (`shared/element.js:64`). An `on…`
+  attribute is legal only with a SINGLE-expression value.
+- **Refused**: `unparenthesized sequence expression in an attribute (the oracle rejects
+  it)` — `attribute_invalid_sequence_expression` (`shared/element.js:52`,
+  `shared/component.js:174`).
+
+Three properties are load-bearing, each live-probed rather than read off the source:
+
+- **The event-handler name test is `startsWith('on') && length > 2`.** A bare `on` is
+  LEGAL and `onx` is not. Writing the rule as `starts_with("on")` alone silently
+  refuses a valid `<button on>`.
+- **A BARE `on…` attribute is rejected, not just a text-valued one.** `is_expression_
+  attribute` fails on the oracle's `value === true`, so `<button onclick>` is invalid
+  along with `onclick="foo"` and the multi-chunk `onclick="{a}{b}"`. Only `{expr}` is
+  legal.
+- ⚠️ **The sequence rule is NOT element-only, and the two sites are not identical.**
+  Unlike every other rule in this group a component reaches it through its own
+  visitor — and the component half ALSO applies it to an `{@attach}` expression while
+  the element half does not, so `<span {@attach a, b} />` compiles and
+  `<Foo {@attach a, b} />` refuses. Collapsing the two sites breaks one direction; a
+  test pins both.
+
+⚠️ **The parenthesization test is a backward SOURCE scan, not a span comparison, and
+the two are not equivalent.** A parenthesized sequence is not a distinct AST node —
+ESTree drops the parens — so the only record that the author wrote `{(x, y)}` rather
+than `{x, y}` is the byte before the sequence's start. The oracle walks back to the
+first `(` (legal) or `{` (illegal). This makes a NESTED sequence legal (`{[x, (y, z)]}`
+starts at `y` and finds its own `(` at once) while `{(x), y}` is NOT — parenthesizing
+the first *element* is not parenthesizing the sequence, so the node starts at that `(`,
+the scan steps past it and still reaches `{`. tsv's own `SequenceExpression` spans were
+verified against the oracle's at those three shapes before the scan was ported.
+
+Corpus cost: **zero**, measured the substitution-immune way — neither bucket appears in
+a corpus run's `refusal_reasons`, which holds only oracle-ACCEPTED files, so a bucket
+substitution would be visible there. Parity and refused counts both unmoved.
 
 #### The `validate_assignment` family — closed
 

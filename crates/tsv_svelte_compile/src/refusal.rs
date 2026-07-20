@@ -866,6 +866,41 @@ pub enum Refusal {
         /// The offending attribute name.
         name: String,
     },
+    /// An `on…` attribute whose value is not a single expression — the oracle's
+    /// `attribute_invalid_event_handler`
+    /// (`2-analyze/visitors/shared/element.js:64`). `onclick="foo"`, a
+    /// multi-chunk `onclick="{a}{b}"`, and a BARE `onclick` all qualify; only
+    /// `onclick={expr}` is legal.
+    ///
+    /// ⚠️ Two boundaries, both live-probed rather than read off the source. The
+    /// name test is `startsWith('on') && length > 2`, so `on` alone is legal
+    /// while `onx` is not. And like [`Self::AttributeInvalidName`] this rule sits
+    /// in `validate_element`, whose only callers are `RegularElement.js` /
+    /// `SvelteElement.js` — so `<Button onbar="bar" />` is legal where
+    /// `<button onbar="bar" />` is not.
+    #[error("`{name}` event handler needs an expression value (the oracle rejects it)")]
+    AttributeInvalidEventHandler {
+        /// The offending attribute name.
+        name: String,
+    },
+    /// An attribute value that is an UNPARENTHESIZED sequence expression —
+    /// `foo={x, y}` — the oracle's `attribute_invalid_sequence_expression`
+    /// (`2-analyze/visitors/shared/element.js:52`,
+    /// `2-analyze/visitors/shared/component.js:174`).
+    ///
+    /// The oracle discriminates by scanning the source BACKWARD from the
+    /// sequence's start: a `(` first means the author parenthesized it and it is
+    /// legal; a `{` first means the sequence is bare against the attribute
+    /// delimiter and it is not. See `refuse_unparenthesized_sequence` for why the
+    /// scan is reproduced verbatim rather than replaced by a span test.
+    ///
+    /// ⚠️ Unlike the two rules above this one is NOT element-only — a component
+    /// reaches it through its own visitor. But the two sites are not identical:
+    /// the component visitor ALSO applies it to an `{@attach}` expression and the
+    /// element visitor does not, so `{@attach a, b}` is legal on `<span>` and
+    /// rejected on `<Foo>` (live-probed both ways).
+    #[error("unparenthesized sequence expression in an attribute (the oracle rejects it)")]
+    AttributeInvalidSequenceExpression,
     /// A `slot="…"` attribute whose slot OWNER is not its direct parent — the
     /// oracle's `slot_attribute_invalid_placement`
     /// (`2-analyze/visitors/shared/attribute.js:90,123`).
@@ -1237,6 +1272,12 @@ impl Refusal {
             Self::AttributeInvalidName { .. } => {
                 Cow::Borrowed("invalid attribute name `{name}` (the oracle rejects it)")
             }
+            Self::AttributeInvalidEventHandler { .. } => Cow::Borrowed(
+                "`{name}` event handler needs an expression value (the oracle rejects it)",
+            ),
+            Self::AttributeInvalidSequenceExpression => Cow::Borrowed(
+                "unparenthesized sequence expression in an attribute (the oracle rejects it)",
+            ),
             Self::SlotAttributeInvalidPlacement => {
                 Cow::Borrowed("misplaced slot=\"…\" attribute (the oracle rejects it)")
             }
@@ -1514,6 +1555,10 @@ impl Refusal {
             Self::AttributeInvalidName {
                 name: "{name}".to_string(),
             },
+            Self::AttributeInvalidEventHandler {
+                name: "{name}".to_string(),
+            },
+            Self::AttributeInvalidSequenceExpression,
             Self::SlotAttributeInvalidPlacement,
             Self::DuplicateAttribute {
                 name: "{name}".to_string(),
