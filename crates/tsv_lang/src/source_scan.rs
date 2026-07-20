@@ -222,6 +222,38 @@ pub fn find_char_skipping_comments(
     find_char(bytes, start, end, target, TriviaProfile::COMMENTS)
 }
 
+/// Find the **last** occurrence of `target` in `bytes[start..end]`, skipping comments.
+/// Returns the byte's position, or `None`.
+///
+/// The single-byte counterpart of [`rfind_keyword`], and a forward scan for the same
+/// reason: only a forward walk can skip trivia, so it is what yields the rightmost match
+/// that is **not** inside a comment. A plain reverse `rfind` would happily return a byte
+/// written inside a trailing comment.
+///
+/// `target` must not itself be a trivia-introducing byte (`/`, `'`, `"`, `` ` ``)
+/// — those are consumed as trivia and would never match.
+#[inline]
+pub fn rfind_char_skipping_comments(
+    bytes: &[u8],
+    start: usize,
+    end: usize,
+    target: u8,
+) -> Option<usize> {
+    let mut found = None;
+    let mut i = start;
+    while i < end {
+        if let Some(past) = skip_trivia(bytes, i, end, TriviaProfile::COMMENTS) {
+            i = past;
+            continue;
+        }
+        if bytes[i] == target {
+            found = Some(i);
+        }
+        i += 1;
+    }
+    found
+}
+
 /// Whether `keyword` occurs at `i` as a **whole word** — present byte-for-byte
 /// and not flanked by a JS/TS identifier byte (alphanumeric, `_`, or `$`), so
 /// `export` does not match inside `exported` or `$export`. The boundary check is
@@ -713,6 +745,28 @@ mod tests {
         );
         // ...but a string-borne comma is found (strings are not trivia here).
         assert_eq!(find_char_skipping_comments(b"',',x", 0, 5, b','), Some(1));
+    }
+
+    #[test]
+    fn rfind_char_skipping_comments_takes_the_last_real_occurrence() {
+        // Two real occurrences: the LAST wins (where `find` would take the first).
+        assert_eq!(rfind_char_skipping_comments(b"a)b);", 0, 5, b')'), Some(3));
+        assert_eq!(find_char_skipping_comments(b"a)b);", 0, 5, b')'), Some(1));
+        // A comment-borne occurrence never wins, even though it is last...
+        assert_eq!(
+            rfind_char_skipping_comments(b"a) /* ) */ ;", 0, 12, b')'),
+            Some(1)
+        );
+        // ...which is exactly what a reverse byte scan would get wrong (it lands on the
+        // `)` at index 6, inside the comment).
+        assert_eq!(b"a) /* ) */ ;".iter().rposition(|&b| b == b')'), Some(6));
+        // No occurrence outside a comment.
+        assert_eq!(
+            rfind_char_skipping_comments(b"a /* ) */ b", 0, 11, b')'),
+            None
+        );
+        // Empty range.
+        assert_eq!(rfind_char_skipping_comments(b"a)b", 1, 1, b')'), None);
     }
 
     #[test]

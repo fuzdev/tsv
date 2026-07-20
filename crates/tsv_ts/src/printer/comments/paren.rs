@@ -57,11 +57,13 @@ impl<'a> Printer<'a> {
         (doc, force_break)
     }
 
-    /// Append trailing comments from stripped grouping parens to a parts vec.
+    /// Append the trailing comments in an operand's closing gap to a parts vec.
     ///
-    /// When the parser strips grouping parens (e.g., `await (x /* c */)` → arg is `x`),
-    /// comments between the argument end and the expression span end are orphaned.
-    /// This method emits them with appropriate layout:
+    /// The gap holds comments that belong to no node, so some caller has to place them.
+    /// It arises both ways round: the parser *strips* grouping parens (`await (x /* c */)`
+    /// → the arg is `x`, orphaning `/* c */` before the expression's span end), and the
+    /// restricted-production hanging layout *retains* them (the comment prints inside the
+    /// parens, bounded by the `)` rather than the span end). Layout by kind:
     /// - Same-line block comments: inline with leading space (`x /* c */`)
     /// - Line comments: deferred via `line_suffix` to appear after the semicolon (`x; // c`)
     /// - Own-line block comments: deferred via `line_suffix` with hardline (`x;\n/* c */`)
@@ -69,9 +71,12 @@ impl<'a> Printer<'a> {
     /// Keeps a same-line block comment with its operand (before any terminator) — the
     /// expression-level operand callers (await, yield, binary, sequence) where the
     /// comment is inside the stripped operand parens, plus `export =` (which, like
-    /// `import =`, keeps a same-line trailing block before the `;`). Statement
-    /// terminators that move the block *after* the `;` (return/throw, `export default`)
-    /// use `split_terminator_gap_comments` instead.
+    /// `import =`, keeps a same-line trailing block before the `;`).
+    ///
+    /// Statement terminators that move the block *after* the `;` — `export default`, and
+    /// return/throw's non-hanging paths — use `split_terminator_gap_comments` instead.
+    /// return/throw's hanging layout uses **both**: this method for the region inside the
+    /// retained parens, then that one for anything past the `)`.
     pub(crate) fn append_trailing_paren_comments(
         &self,
         parts: &mut DocBuf,
