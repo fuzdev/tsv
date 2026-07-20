@@ -3,6 +3,7 @@
 // for-loop header layout (init/test/update clauses with comment placement),
 // for-in/for-of left/right printing.
 
+use super::super::ControlFlowGap;
 use crate::ast::internal::{self, Expression, Statement};
 use crate::printer::{CommentVec, LeadingGlue, Printer};
 use smallvec::smallvec;
@@ -1288,6 +1289,7 @@ impl<'a> Printer<'a> {
                         &inline_prev,
                         &own_line_lines,
                         effective_prev_end,
+                        ControlFlowGap::HeaderToBody,
                     );
                     tail.push(d.hardline());
                     tail.push(body_doc);
