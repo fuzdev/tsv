@@ -54,7 +54,7 @@ use crate::text_class::js_trim;
 use crate::transform_server::unsupported;
 use tsv_lang::SharedInterner;
 use tsv_svelte::ast::internal::{
-    Attribute, AttributeNode, AttributeValue, ElementKind, Fragment, FragmentNode, Root,
+    Attribute, AttributeNode, AttributeValue, EachBlock, ElementKind, Fragment, FragmentNode, Root,
     SpecialElementKind,
 };
 use tsv_ts::ast::internal::{
@@ -82,6 +82,38 @@ fn root_only_meta_tag(kind: &SpecialElementKind<'_>) -> Option<&'static str> {
         SpecialElementKind::SvelteDocument => Some("svelte:document"),
         _ => None,
     }
+}
+
+/// The oracle's `each_key_without_as` (`EachBlock.js:26-34`): an `{#each}` with a
+/// `(key)` but no `as` clause, when the block is **keyed**.
+///
+/// `keyed = key.type !== 'Identifier' || !index || key.name !== index`
+/// (`EachBlock.js:28-29`), so `{#each x, i (i)}` — the key IS the index — is a
+/// plain indexed block and compiles, while a member/expression key, a missing
+/// index, or an identifier key naming something other than the index is keyed. An
+/// escaped key identifier reads as unnamed and is treated as keyed: a **safe
+/// over-refusal** (the direction is opposite to the module-default check's — here
+/// a missed decode over-refuses rather than under-refuses), so no interner is
+/// threaded through this walk.
+fn refuse_each_key_without_as(each: &EachBlock<'_>, source: &str) -> Result<(), CompileError> {
+    let Some(key) = &each.key else {
+        return Ok(());
+    };
+    if each.context.is_some() {
+        return Ok(());
+    }
+    let keyed = match key {
+        Expression::Identifier(id) => match (each.index, plain_identifier_name(id, source)) {
+            (Some(index), Some(name)) => index != name,
+            // No index, or an escaped key name this port can't compare — keyed.
+            _ => true,
+        },
+        _ => true,
+    };
+    if keyed {
+        return Err(unsupported(Refusal::EachKeyWithoutAs));
+    }
+    Ok(())
 }
 
 /// Run every emission-independent validation rule over the whole document.
@@ -248,6 +280,7 @@ impl<'s> Validator<'s> {
             // An `{expression}` is checked with no whitespace test — the oracle
             // cannot know what it renders to, so it assumes text.
             FragmentNode::ExpressionTag(_) => self.refuse_invalid_text_placement()?,
+            FragmentNode::EachBlock(each) => refuse_each_key_without_as(each, self.source)?,
             _ => {}
         }
 

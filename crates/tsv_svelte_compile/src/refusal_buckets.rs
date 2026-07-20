@@ -230,6 +230,9 @@ impl Refusal {
             Self::NestedEach => {
                 Cow::Borrowed("nested {#each} (the nested emission path is not yet validated)")
             }
+            Self::EachKeyWithoutAs => {
+                Cow::Borrowed("{#each} with a key but no `as` clause (the oracle rejects it)")
+            }
             Self::SnippetSignatureUnparsed => {
                 Cow::Borrowed("{#snippet} signature the parser fell back to raw text for")
             }
@@ -491,6 +494,7 @@ impl Refusal {
             Self::ConstTagNonPlainName,
             Self::ConstTagOutsideBlock,
             Self::NestedEach,
+            Self::EachKeyWithoutAs,
             Self::SnippetSignatureUnparsed,
             Self::SnippetEscapedName,
             Self::SnippetRestParameter,

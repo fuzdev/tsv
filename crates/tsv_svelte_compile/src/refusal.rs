@@ -481,6 +481,19 @@ pub enum Refusal {
     /// statement that parity is unreachable.
     #[error("nested {{#each}} (the nested emission path is not yet validated)")]
     NestedEach,
+    /// An `{#each}` carrying a `(key)` but no `as` clause, when the block is
+    /// **keyed** — the oracle's `each_key_without_as` (`EachBlock.js:26-34`).
+    /// `keyed` is `key.type !== 'Identifier' || !index || key.name !== index`, so
+    /// `{#each x, i (i)}` (the key IS the index) is a plain indexed block and
+    /// compiles, while a member/expression key, a missing index, or an identifier
+    /// key naming something other than the index makes it keyed. tsv's parser
+    /// accepts the keyed-no-`as` shape — the `{#each x, i (key)}` comma-index form
+    /// (a bare `{#each x (k)}` parses as a call `x(k)` instead, so it never reaches
+    /// here) — so the compiler refuses rather than emit for a component the oracle
+    /// rejects. An escaped key identifier is treated as keyed (a safe over-refusal;
+    /// the oracle compares the decoded `.name`).
+    #[error("{{#each}} with a key but no `as` clause (the oracle rejects it)")]
+    EachKeyWithoutAs,
 
     // ── Snippets / render tags ─────────────────────────────────────────────
     /// A `{#snippet}` whose signature head (`<T>(params)`) the parser could not

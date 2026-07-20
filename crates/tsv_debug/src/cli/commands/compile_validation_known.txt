@@ -26,8 +26,7 @@
 # its buckets churn with every compiler slice.
 #
 # Format: KIND<TAB>ORACLE_CODE<TAB>PATH (path relative to its suite root)
-# shapes: 9
-OVER-ACCEPT	each_key_without_as	compiler-errors/samples/each-key-without-as/main.svelte
+# shapes: 8
 OVER-ACCEPT	invalid_arguments_usage	compiler-errors/samples/invalid-arguments-usage/main.svelte
 OVER-ACCEPT	js_parse_error	compiler-errors/samples/illegal-expression/main.svelte
 OVER-ACCEPT	props_illegal_name	compiler-errors/samples/runes-props-illegal-name-1/main.svelte

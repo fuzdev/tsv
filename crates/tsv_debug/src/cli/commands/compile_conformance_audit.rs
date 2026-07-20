@@ -397,6 +397,7 @@ mod tests {
         "use: directive on a load-error element (event-capture markup not implemented)",
         "value attribute on <{name}>",
         "module script exports {name}, which it does not declare (the oracle rejects it)",
+        "{#each} with a key but no `as` clause (the oracle rejects it)",
         "{#snippet children()} alongside other default content (the oracle rejects it)",
         "{#snippet} alongside a {@const}/<svelte:head> in the same fragment (hoist order)",
         "{#snippet} rest parameter (the oracle rejects it)",

@@ -317,6 +317,7 @@ The oracle's normalization (`3-transform/utils.js:126` `clean_nodes`, `escape_ht
 | `{#if}` / `{:else if}` / `{:else}` | Supported (flat chain, numbered anchors, synthesized terminal else) |
 | `{#each}` (with `{:else}`, authored index, sibling numbering) | Supported |
 | nested `{#each}` | **Refused**: `` nested {#each} (the nested emission path is not yet validated) `` |
+| `{#each}` with a `(key)` but no `as` clause, when keyed | **Refused**: `` {#each} with a key but no `as` clause (the oracle rejects it) `` — the oracle's `each_key_without_as` (`EachBlock.js:26-34`). `keyed = key.type !== 'Identifier' \|\| !index \|\| key.name !== index`, so the comma-index form `{#each x, i (key)}` refuses when the key is a member/expression, has no index, or names something other than the index; `{#each x, i (i)}` (key === index) is a plain indexed block and compiles. A bare `{#each x (k)}` parses as a call `x(k)`, so it never reaches the rule. |
 | `{#await}` / `{:then}` (`{:catch}` dropped, matching the oracle's server output) | Supported |
 | `{#key}` | Supported |
 | `{@const}` (hoisted to branch top, enters the evaluator) | Supported |
