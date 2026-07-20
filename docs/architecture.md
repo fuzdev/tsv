@@ -46,6 +46,24 @@ Each language crate separates these cleanly:
 
 TypeScript uses directories (`internal/`, `convert/`) due to complexity. CSS and Svelte use a single `internal.rs` for AST types and a directory for conversion.
 
+Worked example — the internal node is clean and semantic; the writer emits the wire JSON straight from it, applying the canonical quirks (here, `raw` reconstructed from source) with no intermediate typed tree:
+
+```rust
+// Internal - clean and semantic
+struct Literal {
+    value: LiteralValue,  // Fully decoded: "test\n" → "test<newline>"
+    span: Span,
+}
+
+fn write_literal(w: &mut JsonWriter, lit: &Literal, ctx: &Ctx) {
+    node_header(w, "Literal", lit.span, ctx);   // "type"/"start"/"end"/"loc"
+    // … "value" emitted from lit.value …
+    w.raw(",\"raw\":");
+    w.string(lit.span.extract(ctx.source));      // reconstruct from source
+    w.raw("}");
+}
+```
+
 ### Model Fidelity Principle
 
 The internal AST is the **spec-faithful model** every tool reads — the formatter today, and the linter / LSP / compiler / type-checker to come. Svelte's parse quirks and prettier's formatting choices live **only at the boundaries**: Svelte-JSON quirks in `ast/convert`, prettier layout choices in the printer. They are never baked into the internal model.

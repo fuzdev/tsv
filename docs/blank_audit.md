@@ -178,4 +178,4 @@ If a shape is genuinely pre-existing and merely newly *reached* by a fixture you
   injection introduced (output back to the pristine shape) — covered by `fuzz` / `roundtrip_audit`.
 
 Related: [Gap-Injection Audit](gap_audit.md) (the same substrate, for the dropped-comment class),
-[Comment Ledger Audit](../CLAUDE.md#debug-tooling) (invariant 5's detector).
+[Comment Ledger Audit](audits.md#comment-ledger-audit-commentsaudit) (invariant 5's detector).
