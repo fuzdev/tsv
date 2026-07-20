@@ -369,37 +369,12 @@ impl<'a> Printer<'a> {
 
             // Comments between } and "else"
             let before_else_end = else_start.unwrap_or(alternate_start);
-            if self.has_comments_to_emit_between(consequent_end, before_else_end) {
-                let (inline_prev, own_line, inline_next) =
-                    self.partition_comments_by_line(consequent_end, before_else_end);
-
-                // Merge inline_next (comments on same line as `else`) into own_line
-                // so they're emitted before the `else` keyword rather than dropped.
-                // e.g. `} \n /* b */ else {` → `}\n/* b */\nelse {`
-                let mut all_own_line = own_line;
-                all_own_line.extend(inline_next);
-
-                self.build_comments_between_parts(
-                    &mut parts,
-                    &inline_prev,
-                    &all_own_line,
-                    consequent_end,
-                );
-
-                let has_inline_line_comment = inline_prev.iter().any(|c| !c.is_block);
-                let is_block_consequent = matches!(stmt.consequent, Statement::BlockStatement(_));
-                if is_block_consequent && all_own_line.is_empty() && !has_inline_line_comment {
-                    parts.push(d.text(" "));
-                } else {
-                    parts.push(d.hardline());
-                }
-            } else if matches!(stmt.consequent, Statement::BlockStatement(_)) {
-                // Block body: `} else` on same line
-                parts.push(d.text(" "));
-            } else {
-                // Empty statement or non-block body: `else` on new line
-                parts.push(d.hardline());
-            }
+            self.push_block_to_keyword_gap(
+                &mut parts,
+                consequent_end,
+                before_else_end,
+                matches!(stmt.consequent, Statement::BlockStatement(_)),
+            );
 
             // Comments between "else" and alternate body
             if matches!(alternate, Statement::EmptyStatement(_)) {

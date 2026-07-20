@@ -151,7 +151,7 @@ let bytes = write_program_json(&program, source, LocationMapper { tracker: &trac
 
 ## Comment Utilities
 
-See [../../CLAUDE.md §Comment Handling](../../CLAUDE.md#comment-handling-detached-model) for the detached model rationale and the `Comment` struct.
+See [../../docs/comments.md](../../docs/comments.md) for the detached model rationale, the `Comment` struct, the ownership doctrine, and the leading-comment emitter rules; the always-loaded core is [../../CLAUDE.md §Comment Handling](../../CLAUDE.md#comment-handling-detached-model).
 
 ### Lookup Functions — three questions, three names
 

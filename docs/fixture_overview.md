@@ -481,7 +481,7 @@ render-equivalent — so it is a *regression guard*, not a discovery tool. The c
 that asks the same question of **real code** is `deno task render:audit <paths>` (same oracle,
 comparing a file against its own formatted output); it needs the Deno sidecar, so it runs at
 release cadence — a leg of `deno task conformance` over the pinned checkouts — rather than in
-`deno task check`. See the root CLAUDE.md §Debug Tooling.
+`deno task check`. See [audits.md §Render-Equivalence Audit](audits.md#render-equivalence-audit-renderaudit).
 
 **Invalid syntax validations (I)** - Syntax rejection tests:
 

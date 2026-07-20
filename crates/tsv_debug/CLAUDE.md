@@ -2,7 +2,7 @@
 
 > Developer tooling crate — fixtures, comparisons, corpus runs. Embeds a Deno sidecar for canonical JS tools.
 
-Unlike `tsv_cli` (pure Rust, production binary), `tsv_debug` exists to validate and debug `tsv` against external sources of truth: Prettier (formatting), Svelte's compiler (parsing), acorn-typescript (TS AST shape). The binary `tsv_debug` powers `deno task fixtures:*`, `deno task corpus:compare:format`, `deno task bench`, and friends. For the full command catalog and workflows, see [../../CLAUDE.md §Debug Tooling](../../CLAUDE.md#debug-tooling).
+Unlike `tsv_cli` (pure Rust, production binary), `tsv_debug` exists to validate and debug `tsv` against external sources of truth: Prettier (formatting), Svelte's compiler (parsing), acorn-typescript (TS AST shape). The binary `tsv_debug` powers `deno task fixtures:*`, `deno task corpus:compare:format`, `deno task bench`, and friends. For the command catalog see [../../CLAUDE.md §Debug Tooling](../../CLAUDE.md#debug-tooling); the audit gates are cataloged in [../../docs/audits.md](../../docs/audits.md), the profiling tools in [../../docs/performance.md](../../docs/performance.md).
 
 ## Architecture Position
 
