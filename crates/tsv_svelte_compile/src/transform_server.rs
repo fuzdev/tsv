@@ -462,41 +462,13 @@ fn analyze<'arena>(
     // module bindings join the table.
     let instance_binding_names: NameSet = bindings.names().map(str::to_string).collect();
 
-    // A module↔instance top-level binding-name COLLISION is a real MISMATCH: the
-    // shared table below overwrites (module analyzed second), so a template
-    // `{name}` read would fold the module value where the oracle resolves the
-    // instance (inner-scope) binding. The name-based port can't tell which scope a
-    // reference resolves to (a hoisted module-scope snippet may legitimately
-    // reference the module binding), so a plain analyze-order swap can't fix it —
-    // refuse the collision (zero corpus yield; the corpus has none). Detected on a
-    // throwaway table so the check runs before the shared table is mutated.
-    if !module_body.is_empty() {
-        let mut module_bindings = Bindings::empty();
-        let mut module_derived = NameSet::default();
-        analyze_script(
-            module_body,
-            source,
-            &mut module_bindings,
-            &mut module_derived,
-        )?;
-        for name in module_bindings.names() {
-            if instance_binding_names.contains(name) {
-                return Err(unsupported(Refusal::ModuleInstanceNameCollision {
-                    name: name.to_string(),
-                }));
-            }
-        }
-    }
-
-    // Module bindings join the shared table: they feed the evaluator (a module
-    // `const K = 5` folds `{K}`), the store-base set (a template `$c` on a module
-    // store), and `needs_context` (a module import member/call).
-    analyze_script(module_body, source, &mut bindings, &mut derived_names)?;
-
-    // Snippet hoist analysis: which top-level `{#snippet}`s go to module scope.
-    // Import locals don't disqualify hoisting — instance AND module imports — so
-    // the blocker set the analysis subtracts is the instance-binding table minus
-    // every import local.
+    // Every import local — instance AND module. The one set two consumers read:
+    // the top-level snippet duplicate check (an instance-script import is NOT an
+    // instance-scope declaration) and the snippet hoist analysis (an import does
+    // not disqualify hoisting). Both distinctions come from the same oracle rule,
+    // `Scope.declare` forwarding an `import` to the parent scope
+    // (`phases/scope.js:679-681`), so they share one set rather than each keeping
+    // its own.
     let import_names: NameSet = instance_body
         .iter()
         .chain(module_body.iter())
@@ -515,7 +487,74 @@ fn analyze<'arena>(
             plain_identifier_name(local, source)
         })
         .collect();
+
+    // `declaration_duplicate` for a TOP-LEVEL `{#snippet}` whose name the instance
+    // script also declares (`2-analyze/visitors/SnippetBlock.js:34`). It reads the
+    // instance scope's declarations, so it runs here rather than in
+    // `validate_document`'s structural walk — which places it BEFORE the
+    // module↔instance collision check below. That is what a component tripping
+    // both reports: `SnippetDeclarationDuplicate` wins over
+    // `ModuleInstanceNameCollision`. Nothing makes one order more oracle-faithful
+    // than the other — the latter is a tsv over-refusal, not a ported oracle
+    // rule — so this is bucket ATTRIBUTION only, no accept/reject change. Pinned
+    // by `tests/snippets.rs::snippet_script_duplicate_precedes_module_refusals`
+    // so a future reorder is loud rather than a silent corpus re-bucketing.
+    crate::validate::validate_top_level_snippets(
+        root,
+        source,
+        &instance_binding_names,
+        &import_names,
+    )?;
+
+    // A module↔instance top-level binding-name COLLISION is a real MISMATCH: the
+    // shared table below overwrites (module analyzed second), so a template
+    // `{name}` read would fold the module value where the oracle resolves the
+    // instance (inner-scope) binding. The name-based port can't tell which scope a
+    // reference resolves to (a hoisted module-scope snippet may legitimately
+    // reference the module binding), so a plain analyze-order swap can't fix it —
+    // refuse the collision (zero corpus yield; the corpus has none). Detected on a
+    // throwaway table so the check runs before the shared table is mutated.
+    if !module_body.is_empty() {
+        let mut module_bindings = Bindings::empty();
+        let mut module_derived = NameSet::default();
+        analyze_script(
+            module_body,
+            source,
+            &mut module_bindings,
+            &mut module_derived,
+        )?;
+        // `Bindings` is a `HashMap`, so the FIRST collision it yields varies across
+        // processes; take the lexicographic minimum instead, so a component with
+        // two colliding names reports the same one every run. (The bucket key
+        // templates the name away, so no gate turns on this — only the message a
+        // person reads.)
+        if let Some(name) = module_bindings
+            .names()
+            .filter(|name| instance_binding_names.contains(*name))
+            .min()
+        {
+            return Err(unsupported(Refusal::ModuleInstanceNameCollision {
+                name: name.to_string(),
+            }));
+        }
+    }
+
+    // Module bindings join the shared table: they feed the evaluator (a module
+    // `const K = 5` folds `{K}`), the store-base set (a template `$c` on a module
+    // store), and `needs_context` (a module import member/call).
+    analyze_script(module_body, source, &mut bindings, &mut derived_names)?;
+
+    // Snippet hoist analysis: which top-level `{#snippet}`s go to module scope.
+    // Import locals don't disqualify hoisting — instance AND module imports — so
+    // the blocker set the analysis subtracts is the instance-binding table minus
+    // every import local (`import_names`, frozen above).
     let snippets = analyze_snippets(root, source, &instance_binding_names, &import_names)?;
+
+    // `snippet_invalid_export` / `export_undefined` for the module script's
+    // `export { … }` specifiers (`2-analyze/index.js:823-836`). It reads the
+    // hoist decision (a hoistable snippet's binding lands in module scope), so it
+    // runs after `analyze_snippets`.
+    crate::validate::validate_module_exports(module_body, source, &snippets)?;
 
     // Every top-level binding name — instance AND module — is a candidate store
     // base: a `$name` reference is a store auto-subscription iff `name` is a

@@ -383,17 +383,20 @@ fn guard_dropped_presence(fragment: &Fragment<'_>) -> Result<(), CompileError> {
 /// construct; the validations are whole-component, so they are only visible in
 /// combination.
 ///
-/// ⚠️ **Two known open holes on axis 2**, both pre-existing, neither
-/// corpus-reachable, both over-acceptances (tsv compiles what the oracle rejects):
+/// ⚠️ **One known open hole on axis 2**, pre-existing, not corpus-reachable, an
+/// over-acceptance (tsv compiles what the oracle rejects): `{$$slots.x}` in a
+/// dropped region + an emitted `{@render}` → `slot_snippet_conflict`.
 ///
-/// - `{$$slots.x}` in a dropped region + an emitted `{@render}` →
-///   `slot_snippet_conflict`;
-/// - `{#snippet}` in a dropped region + `export { … }` of it from a module script →
-///   `snippet_invalid_export`.
+/// Closing it means porting the oracle's whole-component validation rather than
+/// widening this match, because `$$slots` is not fenced — separate work, tracked in
+/// `docs/checklist_svelte_compiler.md`.
 ///
-/// Closing them means porting the oracle's whole-component validations rather than
-/// widening this match, because neither `$$slots` nor `{#snippet}` is fenced —
-/// separate work, tracked in `docs/checklist_svelte_compiler.md`.
+/// Its former sibling — a dropped `{#snippet}` plus `export { … }` of it from a
+/// module script — is closed by `validate.rs`'s `validate_module_exports`. ⚠️ Note
+/// the rule is narrower than that phrasing suggested: an exported snippet is an
+/// error only when the oracle cannot HOIST it, which a dropped one never can be,
+/// while a plain top-level `{#snippet s()}` beside `export { s }` compiles on both
+/// sides.
 ///
 /// The rest keep compiling in a dropped region: `<svelte:component>`,
 /// `<svelte:self>` (in a nesting the oracle allows, e.g. under an `{#if}`),

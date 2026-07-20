@@ -344,9 +344,16 @@ fn collect<'arena>(
         push_unsupported(found, err);
     }
     // A module↔instance top-level binding-name collision (a real MISMATCH — see
-    // `transform_server::analyze`). Best-effort over the raw module body (name
-    // collection is TypeScript-insensitive); `bindings` here is the instance-only
-    // name set.
+    // `transform_server::analyze`). `bindings` here is the instance-only name set.
+    //
+    // ⚠️ A DELIBERATE exception to `Analysis`'s "NOTHING may read
+    // `root.module.content.body`" rule, and safe only because this is the
+    // collect-don't-bail census rather than the compile path: what it wants is a
+    // BINDING-NAME set, which type erasure cannot change (erasure drops type-only
+    // declarations and annotations, never a value binding's name), and the census
+    // has no erased module body to read — it erases the instance script only. A
+    // type-only declaration surviving here can at most over-report one co-blocker
+    // in a diagnostic count; it can never reach output.
     if let Some(module) = root.module {
         let mut module_bindings = Bindings::empty();
         let mut discard = NameSet::default();
@@ -357,7 +364,12 @@ fn collect<'arena>(
             &mut discard,
         )
         .is_ok()
-            && let Some(name) = module_bindings.names().find(|n| bindings.contains(n))
+            // `.min()`, not `.find()`, mirroring `compile_server`: `Bindings` is a
+            // `HashMap`, so the first collision it yields varies across processes,
+            // and a census that named a different binding than `compile` does for
+            // the same component reads as a second rule. Diagnostic either way —
+            // the bucket key templates the name away.
+            && let Some(name) = module_bindings.names().filter(|n| bindings.contains(n)).min()
         {
             found.push(Refusal::ModuleInstanceNameCollision {
                 name: name.to_string(),

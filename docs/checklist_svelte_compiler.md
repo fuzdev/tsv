@@ -341,14 +341,15 @@ The line between the last two bullets is **"can it affect the result from here"*
 
 ⚠️ An isolated probe answers the **emission** axis only. A construct that compiles byte-identically with and without it, measured alone, may still be on the validation axis — those checks are whole-component, so they need a *second* construct elsewhere to fire. Do not read "inert in isolation" as "inert".
 
-**Known open holes** on the validation axis — both over-acceptances (tsv compiles what the oracle rejects), neither reachable from the real-component corpus (`compile_fuzz` reaches both, which is what an adversarial generator is for):
+**Known open hole** on the validation axis — an over-acceptance (tsv compiles what the oracle rejects), not reachable from the real-component corpus (`compile_fuzz` reaches it, which is what an adversarial generator is for):
 
 | Dropped construct | Emitted partner | Oracle error |
 | --- | --- | --- |
 | `{$$slots.x}` | `{@render …}` | `slot_snippet_conflict` |
-| `{#snippet s()}` | `export { s }` from a module script | `snippet_invalid_export` |
 
-Neither `$$slots` nor `{#snippet}` is a fence — tsv intends to support both — so closing these means porting the oracle's whole-component validations, not widening the presence match. That is separate work from the dropped-region walk.
+`$$slots` is not a fence — tsv intends to support it — so closing this means porting the oracle's whole-component validation, not widening the presence match. That is separate work from the dropped-region walk.
+
+The sibling hole, a dropped `{#snippet s()}` plus `export { s }` from a module script, is **closed**: the export rule is ported in `validate.rs` (see [Snippet declaration and export](#snippet-declaration-and-export--closed)). ⚠️ Its former statement here was also imprecise — a `{#snippet}` exported from a module script is *only* an error when the oracle cannot **hoist** it, which a dropped one never can be. A plain top-level `{#snippet s()}` beside `export { s }` compiles on both sides.
 
 **Everything else keeps compiling** in a dropped `{:catch}`: `<svelte:component>`, `<svelte:self>` (under an `{#if}`), `<svelte:fragment>` and a `slot="…"` component child (both as a component's children), plus the unfenced `<svelte:element>` and `<svelte:boundary>` (the latter with one open exception, below). That set is clean on both axes — verified by reading the writers, not by probing: the whole-component fields a phase-2 validation reads (`slot_names`, `uses_slots`, `uses_render_tags`, `event_directive_node`, `uses_event_attributes`, `snippets`) are written only by `SlotElement` / an `$$slots` `Identifier` / `RenderTag` / `OnDirective` / an event `Attribute` / `SnippetBlock`, and none of those constructs is one of them. Refusing them to make the fence uniform would trade correct output for nothing. `let:` is likewise on neither axis (its only check, `let_directive_invalid_placement`, is local to its parent) but refuses anyway, to keep the fenced `on:`/`let:` pair in one census bucket. Only the placement-restricted metas (`<svelte:head>`, `<svelte:window>`, `<svelte:body>`, `<svelte:document>`) are unreachable, rejected by the oracle inside any block.
 
@@ -388,7 +389,7 @@ Marking an element emission never reaches is safe: `element_scope` is a span loo
 
 ### The wider validation surface
 
-The two rows above are the dropped-region slice of a **general** hole: tsv's compiler
+The row above is the dropped-region slice of a **general** hole: tsv's compiler
 implements the oracle's *emission*, not its *analysis*, so a component the oracle's
 analyzer rejects can still compile. Each row below is an over-acceptance with a
 standalone repro, none of them dropped-region-specific:
@@ -405,12 +406,22 @@ standalone repro, none of them dropped-region-specific:
 
 | Repro | Oracle error |
 | --- | --- |
-| `<Foo><p>c</p>{#snippet children()}<p>d</p>{/snippet}</Foo>` | `snippet_conflict` |
 | `{#await Promise.resolve(1)}<i>p</i>{:catch e}<Foo class:a={true} />{/await}` | `component_invalid_directive` |
 
-Together with `declaration_duplicate`, `snippet_invalid_export`, and
-`slot_snippet_conflict`, that leaves **five** distinct oracle rules tsv does not
-enforce. (`dollar_prefix_invalid` was enforced first, and the three-rule
+⚠️ This table and `compile_validation_known.txt` are **different populations, and they
+are disjoint** — neither is a superset of the other, so no count derived from one
+describes the other. The table holds over-acceptances found by *reading the oracle*,
+which the validation suites do not reach: the row above plus `slot_snippet_conflict`
+(§The dropped-region hole). The ratchet holds the *suite-reachable* ones, a set that
+today shares no oracle error code with the table. So this section deliberately states
+**no total** of "rules tsv does not enforce": the honest total is the union of two
+independently-maintained lists, and nothing mechanizes the join
+(`compile_conformance_audit` checks checklist ↔ `Refusal` drift, not this). A count
+hand-maintained here against a file that changes every slice has now been wrong three
+times; read the ratchet for its own count (it stamps `shapes: N` in its header) and
+read this table for its own rows.
+
+(`dollar_prefix_invalid` was enforced first, and the three-rule
 `validate_assignment` family — `constant_assignment`, `each_item_invalid_assignment`,
 `snippet_parameter_assignment` — after it; see below and the `$`-prefixed bindings rule
 above. Then `attribute_duplicate`, `svelte_meta_invalid_placement` and
@@ -424,7 +435,11 @@ clusters in the ratchet, both ported into `validate.rs` beside `attribute_duplic
 `SvelteElement.js` only, so a **component** is exempt from both. Then
 `attribute_invalid_event_handler`, `attribute_invalid_sequence_expression`, and
 `attribute_unquoted_sequence`, three further checks in that same `validate_element`
-loop — see [The attribute-value rules](#the-attribute-value-rules--closed).)
+loop — see [The attribute-value rules](#the-attribute-value-rules--closed). Most
+recently the five snippet/export rules — `declaration_duplicate` (both of its oracle
+call sites), `snippet_shadowing_prop`, `snippet_conflict`, `snippet_invalid_export`
+and `export_undefined` — see
+[Snippet declaration and export](#snippet-declaration-and-export--closed).)
 
 ⚠️ `slot_attribute_invalid_placement` is NOT the named-slot fence. The oracle
 *accepts* a `slot="…"` on a component's direct child, which tsv declines as the
@@ -447,8 +462,8 @@ Each is implemented in phase 2 over the Svelte AST, in Svelte-domain terms:
 
 | Rule | Site in `packages/svelte/src/compiler` |
 | --- | --- |
-| `snippet_conflict` | `phases/2-analyze/visitors/SnippetBlock.js:77` |
 | `component_invalid_directive` | `phases/2-analyze/visitors/shared/component.js:81` |
+| `slot_snippet_conflict` | `phases/2-analyze/index.js:862` |
 
 The clearest case is the one now closed, `dollar_prefix_invalid`: it is literally
 `node.name.startsWith('$')` on a binding — a **reserved-prefix** rule Svelte owns, not
@@ -457,10 +472,15 @@ what is really an error](../CLAUDE.md#strict-mode-only) — accepts it under `--
 Nothing in the deferred set (duplicate parameter names, reserved words as identifiers,
 octal escapes, `delete` of a plain name) reaches any of these rules.
 
-The single genuine overlap is `declaration_duplicate`, and Svelte says so itself at
-`phases/scope.js:689` ("declaring function twice is also caught by acorn in the parse
-phase"). That one row — and only that one — is arguably not tsv's to fix. The other eight
-are analysis tsv has not ported.
+The one rule with any overlap at all is `declaration_duplicate`, and Svelte says so
+itself at `phases/scope.js:688` ("declaring function twice is also caught by acorn in
+the parse phase"). ⚠️ That caveat is **narrower than the rule**, and reading it as a
+reason to skip the rule was wrong: it covers only a JS-level duplicate declaration.
+Neither pinned shape was one. `<script>let foo = 1;</script>{#snippet foo()}…{/snippet}`
+collides a *snippet* with a script binding, and
+`<div>{#snippet a}…{/snippet}{#snippet a}…{/snippet}</div>` collides two snippets in one
+fragment — acorn sees neither, because neither is a JS declaration. Both are ported (see
+below); the caveat retains no live consequence.
 
 #### The parse-time rules — closed
 
@@ -599,6 +619,112 @@ verified against the oracle's at those three shapes before the scan was ported.
 Corpus cost: **zero**, measured the substitution-immune way — neither bucket appears in
 a corpus run's `refusal_reasons`, which holds only oracle-ACCEPTED files, so a bucket
 substitution would be visible there. Parity and refused counts both unmoved.
+
+#### Snippet declaration and export — closed
+
+**Closed.** Five pinned over-acceptances, from two oracle sites, all ported into
+`validate.rs` — three from `phases/2-analyze/visitors/SnippetBlock.js` and two from
+the single `if`/`else` at `phases/2-analyze/index.js:823-836`.
+
+The three `SnippetBlock` rules are **mutually exclusive per snippet**, and the reason
+is worth stating because it is what lets them share one walk: `declaration_duplicate`
+requires `is_top_level` (`path.length === 1 && path[0].type === 'Fragment'`), while the
+other two read `path.at(-2)` and return early when it is absent. A top-level snippet has
+no `at(-2)`, so at most one of the three can fire.
+
+- **Refused**: `{#snippet} {name} is already declared by the instance script (the
+  oracle rejects it)` — `declaration_duplicate` at `SnippetBlock.js:34`. Fires only for
+  a direct child of the ROOT fragment whose name is in
+  `analysis.instance.scope.declarations`. Ported after the binding table
+  (`validate_top_level_snippets`), since that set is its input. ⚠️ The `is_top_level`
+  gate is real: `<script>let foo = 1;</script><div>{#snippet foo()}…{/snippet}</div>`
+  compiles on both sides. ⚠️ An **import** local is not an instance-scope declaration
+  and must not fire it: `Scope.declare` forwards an `import` to the parent scope
+  (`phases/scope.js:679-681`) and the instance scope's parent is the module scope, so
+  `<script>import C from './C.svelte';</script>{#snippet C()}…{/snippet}` compiles
+  (live-probed, all four import forms). The port subtracts the same import-name set
+  `snippet.rs`'s hoist analysis subtracts, rather than keeping a second one.
+- **Refused**: `duplicate {#snippet} {name} (the oracle rejects it)` —
+  `declaration_duplicate`'s **second** oracle call site, `Scope.declare`
+  (`phases/scope.js:684-691`, reached from the `SnippetBlock` scope visitor at
+  `:1335`). ⚠️ The scope is the enclosing **fragment**, not the component: every
+  `Fragment` visitor opens a child scope and `declare` forwards to the parent only for
+  `var`/`import`, so two `{#snippet a}` siblings collide while
+  `<div>{#snippet a}…{/snippet}</div>` plus a root-level `{#snippet a}` do not. tsv
+  previously enforced only the root-level slice of this, in `snippet.rs`; the rule now
+  rides `validate.rs`'s per-fragment walk and `snippet.rs` carries none of it.
+- **Refused**: `nested {#snippet} {name} shares a top-level snippet's name (the hoist
+  decision is name-keyed)` — **not** an oracle rule but a port gap. The oracle compiles
+  `<div>{#snippet a()}x{/snippet}</div>{#snippet a()}y{/snippet}{@render a()}`: a
+  fragment is a fresh scope, so it places the two declarations independently.
+  `SnippetAnalysis::hoistable` is keyed by NAME and cannot tell them apart, so tsv can
+  place neither reliably. Two emission bugs motivate it, failing in
+  opposite ways. When the top-level name **hoists**, the nested snippet inherits its
+  `is_hoisted` and hoists too — two module-scope `function a` declarations, a
+  `SyntaxError` in an ES module. When it does **not** hoist, both land in the component
+  body, which is legal JS, but tsv emits them in the OPPOSITE order from the oracle;
+  function declarations are last-wins, so `{@render a()}` resolves to a different body
+  on each side — a silent MISMATCH, reachable both directly
+  (`<script>let v = 1;</script><div>{#snippet a()}nested{/snippet}</div>{#snippet
+  a()}{v}{/snippet}{@render a()}`) and through the hoist fixpoint (a top-level snippet
+  hoistable but for its dependency on a non-hoistable one). MISMATCH = 0 is the hard
+  bar, so the check is deliberately NOT gated on hoistability; over-refusal is safe and
+  neither alternative is. ⚠️ The rule is deliberately **broader** than those two bugs,
+  and the gap is structural rather than an unenumerated third case: it keys on a name
+  **collision**, a property of the SOURCE, while both bugs are properties of where the
+  two snippets are **placed**. A collision in a region that emits nothing — a nested
+  snippet inside a dropped `{:catch}`, which NEITHER side emits
+  (`{#snippet a()}top{/snippet}{#await p}w{:catch e}{#snippet a()}dead{/snippet}{/await}{@render a()}`)
+  — is therefore refused for uniformity, not because it would mis-emit. Narrowing to the
+  placements that actually mis-emit is not the fix. **The proper fix is keying the hoist
+  map by snippet identity rather than name**, which retires the refusal entirely; it is
+  the safe interim.
+- **Refused**: `{#snippet} {name} shadows the component prop of the same name (the
+  oracle rejects it)` — `snippet_shadowing_prop` (`SnippetBlock.js:59`). ⚠️ Two
+  narrownesses, both live-probed and both easy to widen by mistake. The parent must be
+  a `Component` **exactly** — unlike its sibling below, which also accepts
+  `SvelteComponent`/`SvelteSelf`; do not harmonize the two parent sets. And it does not
+  fire at DEPTH: `path.at(-2)` is the parent of the snippet's own containing fragment,
+  so `<C title=""><div>{#snippet title()}…{/snippet}</div></C>` compiles. The matching
+  attribute may be a plain `Attribute` **or** a `BindDirective`; no other directive
+  kind counts.
+- **Refused**: `{#snippet children()} alongside other default content (the oracle
+  rejects it)` — `snippet_conflict` (`SnippetBlock.js:77`). Requires the name
+  `children` exactly, a `Component`/`SvelteComponent`/`SvelteSelf` parent, and at least
+  one sibling that is not a `SnippetBlock`, not a `Comment`, and not whitespace-only
+  `Text`. ⚠️ The oracle scans ALL of the parent's fragment nodes, not just the ones
+  preceding the snippet.
+- **Refused**: `exported {#snippet} {name} is not module-hoistable (the oracle rejects
+  it)` / `module script exports {name}, which it does not declare (the oracle rejects
+  it)` — `snippet_invalid_export` / `export_undefined` (`index.js:830-834`), the one
+  `if`/`else` over every `export { … }` specifier in the module script.
+
+⚠️ **The hoist interaction is the whole trap in that last pair, and it inverts the
+obvious order.** `SnippetBlock.js:40-44` writes a HOISTABLE top-level snippet's binding
+INTO `analysis.module.scope.declarations`, so `module.scope.get(name)` succeeds for it
+and there is no error at all. The port therefore checks **module scope first, snippet
+names second**: `<script module>export { foo };</script>{#snippet foo()}static{/snippet}`
+compiles, while the same export of a snippet that references the INSTANCE script — or
+one nested below the root fragment, which can never hoist — is `snippet_invalid_export`.
+A port that consulted the snippet set first would reject every valid exported snippet.
+Two further gates come from the oracle verbatim: `export { x } from 'y'` is exempt
+(`node.source == null`), and an instance-script declaration does **not** satisfy the
+export, because the instance scope is a CHILD of the module scope and `scope.get` never
+walks down. A type-only export never reaches the rule — `erase.rs` drops it, exactly as
+the oracle's own phase-1 `remove_typescript_nodes` does.
+
+The hoist decision the export rule reads is `snippet.rs`'s existing name-based port of
+`can_hoist_snippet` (`SnippetBlock.js:86-118`), written for emission and now
+load-bearing for a *verdict*. The two agree on every input that reaches here: the
+oracle's `function_depth === 0` continue-arm is module scope (module declarations,
+imports, hoisted snippets), which is exactly the set tsv does not treat as a blocker,
+and its `binding.blocker` arm is the async/top-level-`await` machinery
+(`index.js:954`), unreachable in a component tsv compiles at all since top-level
+`await` refuses upstream.
+
+Corpus cost: **zero**, measured the substitution-immune way — none of the five new
+buckets appears in a corpus run's `refusal_reasons`, which holds only oracle-ACCEPTED
+files, so a bucket substitution would be visible there.
 
 #### The `validate_assignment` family — closed
 
@@ -1109,13 +1235,15 @@ not with `emit_boundary`:
 | --- | --- | --- |
 | `<svelte:head>` / `<svelte:options>` inside a boundary | `svelte_meta_invalid_placement` | `<div><svelte:head>…`, `{#if true}<svelte:head>…`, `<div><svelte:options …>` |
 | `<svelte:boundary onerror={a} onerror={b}>` | `attribute_duplicate` | `<div onclick={a} onclick={b}>` |
-| two `{#snippet failed}` (or `pending`) in one boundary | `declaration_duplicate` | `<div>{#snippet a}…{/snippet}{#snippet a}…{/snippet}</div>` |
+| ~~two `{#snippet failed}` (or `pending`) in one boundary~~ — **closed** | `declaration_duplicate` | `<div>{#snippet a}…{/snippet}{#snippet a}…{/snippet}</div>` |
 
-The last one is why `emit_boundary`'s fragment split takes the first snippet of
-each name without refusing a second: the oracle's server visitor does pair
-`filter` with `find`, but it never has to choose — scope analysis has already
-rejected the duplicate. Scoping a refusal to the boundary would close an
-arbitrary sliver of a general hole.
+The last row was closed exactly where that reasoning predicted: not at
+`emit_boundary` but at the general rule, `validate.rs`'s per-fragment
+`declaration_duplicate` port (see
+[Snippet declaration and export](#snippet-declaration-and-export--closed)). It is why
+`emit_boundary`'s fragment split takes the first snippet of each name without refusing
+a second: the oracle's server visitor does pair `filter` with `find`, but it never has
+to choose — scope analysis has already rejected the duplicate, and now so has tsv's.
 
 ### select-family
 

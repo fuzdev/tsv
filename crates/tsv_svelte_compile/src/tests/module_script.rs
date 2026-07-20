@@ -136,3 +136,61 @@ fn compile_module_comment_before_instance_script_still_drops() {
         "a module comment before the instance script must drop: {js}"
     );
 }
+
+#[test]
+fn compile_rejects_exporting_a_non_hoistable_snippet() {
+    // `snippet_invalid_export` (`2-analyze/index.js:831`): the snippet references
+    // the INSTANCE script, so the oracle cannot hoist it into module scope and the
+    // export names nothing there.
+    assert_unsupported(
+        "<script module>export { foo };</script><script>let x = 42;</script>{#snippet foo()}{x}{/snippet}",
+        "exported {#snippet} foo is not module-hoistable",
+    );
+    // A snippet below the root fragment never hoists either — and the oracle still
+    // reports the SPECIFIC error, because `analysis.snippets` is unfiltered by
+    // top-level-ness.
+    assert_unsupported(
+        "<script module>export { foo };</script><div>{#snippet foo()}s{/snippet}</div>",
+        "exported {#snippet} foo is not module-hoistable",
+    );
+}
+
+#[test]
+fn compile_rejects_exporting_an_undeclared_name() {
+    // `export_undefined` (`2-analyze/index.js:833`).
+    assert_unsupported(
+        "<script module>export { blah };</script>",
+        "module script exports blah, which it does not declare",
+    );
+    // ⚠️ An INSTANCE declaration does not count: the instance scope is a CHILD of
+    // the module scope, and `scope.get` never walks down. Live-probed.
+    assert_unsupported(
+        "<script module>export { x };</script><script>let x = 1;</script>",
+        "module script exports x, which it does not declare",
+    );
+}
+
+#[test]
+fn compile_accepts_the_module_export_rule_s_exemptions() {
+    // ⚠️ The hoist interaction: a hoistable top-level snippet's binding is written
+    // INTO the module scope (`SnippetBlock.js:40-44`), so the export resolves and
+    // there is no error — the reason module scope must be consulted BEFORE the
+    // snippet-name set. Live-probed, and the case `checklist_svelte_compiler.md`
+    // previously described the wrong way round.
+    let _ = compile_js("<script module>export { foo };</script>{#snippet foo()}static{/snippet}");
+    // A snippet referencing only the MODULE script still hoists.
+    let _ = compile_js(
+        "<script module>export { foo };\nlet m = 1;</script>{#snippet foo()}{m}{/snippet}",
+    );
+    // Every ordinary module declaration form resolves.
+    let _ = compile_js("<script module>const a = 1;\nexport { a as b };</script>");
+    let _ = compile_js("<script module>function f() {}\nexport { f };</script>");
+    let _ = compile_js("<script module>import { q } from 'y';\nexport { q };</script>");
+    // `export … from 'y'` is exempt (the oracle's `node.source == null` gate).
+    let _ = compile_js("<script module>export { x } from 'y';</script>");
+    // A type-only export never reaches the rule: erasure drops it, exactly as the
+    // oracle's own phase-1 `remove_typescript_nodes` does.
+    let _ = compile_js("<script module lang=\"ts\">type Foo = 1;\nexport type { Foo };</script>");
+    let _ =
+        compile_js("<script module lang=\"ts\">interface Foo {}\nexport { type Foo };</script>");
+}

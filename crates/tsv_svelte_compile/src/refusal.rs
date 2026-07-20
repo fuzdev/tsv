@@ -507,10 +507,82 @@ pub enum Refusal {
     /// relative hoist order across kinds isn't reproduced.
     #[error("{{#snippet}} alongside a {{@const}}/<svelte:head> in the same fragment (hoist order)")]
     SnippetHoistOrder,
-    /// A duplicate top-level `{#snippet}` name (the oracle rejects it).
+    /// Two `{#snippet}`s of the same name in ONE fragment — the oracle's
+    /// `Scope.declare` same-scope collision (`phases/scope.js:684-691`, reached
+    /// from the `SnippetBlock` scope visitor at `:1335`). Every fragment gets its
+    /// own scope, so the rule is per-fragment, not per-component: a second
+    /// `{#snippet a}` one fragment deeper is legal.
     #[error("duplicate {{#snippet}} {name} (the oracle rejects it)")]
     DuplicateSnippetName {
         /// The duplicated snippet name.
+        name: String,
+    },
+    /// A NESTED `{#snippet}` sharing its name with a top-level `{#snippet}`.
+    /// Legal on both sides — a fragment is a fresh scope, so the oracle places
+    /// the two independently — but the hoist decision this port carries is keyed
+    /// by NAME (`SnippetAnalysis::hoistable`), which cannot tell the two
+    /// declarations apart, so tsv can place neither reliably. Two emission bugs
+    /// motivate it: when the top-level name hoists, the nested snippet inherits
+    /// `true` and hoists alongside it, emitting two module-scope `function`
+    /// declarations of one name (invalid JS); when it does not, both land in the
+    /// component body in the OPPOSITE order from the oracle, and function
+    /// declarations being last-wins, `{@render}` resolves to a different body on
+    /// each side (a MISMATCH). Hence the refusal is not gated on hoistability.
+    ///
+    /// The rule is deliberately BROADER than those two bugs: it keys on a name
+    /// COLLISION, a property of the source, while both bugs are properties of
+    /// where the snippets are PLACED — so a collision in a region neither side
+    /// emits (a nested snippet in a dropped `{:catch}`) is refused for
+    /// uniformity, not because it would mis-emit. The proper fix is keying the
+    /// hoist map by snippet identity rather than name, which retires the refusal
+    /// entirely.
+    #[error(
+        "nested {{#snippet}} {name} shares a top-level snippet's name \
+         (the hoist decision is name-keyed)"
+    )]
+    NestedSnippetNameCollision {
+        /// The colliding snippet name.
+        name: String,
+    },
+    /// A **top-level** `{#snippet}` whose name is also declared by the instance
+    /// script (`2-analyze/visitors/SnippetBlock.js:34`). A distinct rule from
+    /// [`Refusal::DuplicateSnippetName`]: this one is snippet-vs-*script*, and it
+    /// fires only for a direct child of the root fragment.
+    #[error(
+        "{{#snippet}} {name} is already declared by the instance script (the oracle rejects it)"
+    )]
+    SnippetDeclarationDuplicate {
+        /// The snippet name that collides with a script declaration.
+        name: String,
+    },
+    /// A `{#snippet}` directly inside a `<Component>` that also passes a plain
+    /// attribute or `bind:` of the same name
+    /// (`2-analyze/visitors/SnippetBlock.js:59`).
+    #[error(
+        "{{#snippet}} {name} shadows the component prop of the same name (the oracle rejects it)"
+    )]
+    SnippetShadowingProp {
+        /// The shadowed prop name.
+        name: String,
+    },
+    /// A `{#snippet children()}` inside a component that also has other
+    /// non-whitespace default content
+    /// (`2-analyze/visitors/SnippetBlock.js:77`).
+    #[error("{{#snippet children()}} alongside other default content (the oracle rejects it)")]
+    SnippetChildrenConflict,
+    /// `export { name }` from a module script naming a `{#snippet}` that does not
+    /// hoist to module scope (`2-analyze/index.js:831`).
+    #[error("exported {{#snippet}} {name} is not module-hoistable (the oracle rejects it)")]
+    SnippetInvalidExport {
+        /// The exported snippet name.
+        name: String,
+    },
+    /// `export { name }` from a module script naming something that script does
+    /// not declare (`2-analyze/index.js:833`). Instance-script declarations do
+    /// **not** count — the instance scope is a CHILD of the module scope.
+    #[error("module script exports {name}, which it does not declare (the oracle rejects it)")]
+    ExportUndefined {
+        /// The exported name.
         name: String,
     },
     /// A `{@render}` whose callee is neither a resolvable local snippet nor a

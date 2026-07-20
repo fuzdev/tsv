@@ -246,6 +246,24 @@ impl Refusal {
             Self::DuplicateSnippetName { .. } => {
                 Cow::Borrowed("duplicate {#snippet} {name} (the oracle rejects it)")
             }
+            Self::NestedSnippetNameCollision { .. } => Cow::Borrowed(
+                "nested {#snippet} {name} shares a top-level snippet's name (the hoist decision is name-keyed)",
+            ),
+            Self::SnippetDeclarationDuplicate { .. } => Cow::Borrowed(
+                "{#snippet} {name} is already declared by the instance script (the oracle rejects it)",
+            ),
+            Self::SnippetShadowingProp { .. } => Cow::Borrowed(
+                "{#snippet} {name} shadows the component prop of the same name (the oracle rejects it)",
+            ),
+            Self::SnippetChildrenConflict => Cow::Borrowed(
+                "{#snippet children()} alongside other default content (the oracle rejects it)",
+            ),
+            Self::SnippetInvalidExport { .. } => Cow::Borrowed(
+                "exported {#snippet} {name} is not module-hoistable (the oracle rejects it)",
+            ),
+            Self::ExportUndefined { .. } => Cow::Borrowed(
+                "module script exports {name}, which it does not declare (the oracle rejects it)",
+            ),
             Self::RenderTagUnsupportedCallee => {
                 Cow::Borrowed("{@render} callee is not a resolvable local snippet or snippet prop")
             }
@@ -478,6 +496,22 @@ impl Refusal {
             },
             Self::SnippetHoistOrder,
             Self::DuplicateSnippetName {
+                name: "{name}".to_string(),
+            },
+            Self::NestedSnippetNameCollision {
+                name: "{name}".to_string(),
+            },
+            Self::SnippetDeclarationDuplicate {
+                name: "{name}".to_string(),
+            },
+            Self::SnippetShadowingProp {
+                name: "{name}".to_string(),
+            },
+            Self::SnippetChildrenConflict,
+            Self::SnippetInvalidExport {
+                name: "{name}".to_string(),
+            },
+            Self::ExportUndefined {
                 name: "{name}".to_string(),
             },
             Self::RenderTagUnsupportedCallee,

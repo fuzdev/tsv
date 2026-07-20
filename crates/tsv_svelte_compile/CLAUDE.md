@@ -503,15 +503,15 @@ project-wide conventions.
   `dropped_presence_refusal`'s exhaustive `FragmentNode` / `SpecialElementKind` /
   `AttributeNode` matches are what force a new variant through **both** questions.
 
-  ⚠️ Two axis-2 holes are **open**, both over-acceptances, neither
-  corpus-reachable: `{$$slots.x}` in a dropped region + an emitted `{@render}`
-  (`slot_snippet_conflict`), and a dropped `{#snippet}` + `export { … }` of it from
-  a module script (`snippet_invalid_export`). Neither construct is fenced, so
-  closing them means porting the oracle's whole-component validations rather than
+  ⚠️ ONE axis-2 hole is **open**, an over-acceptance, not corpus-reachable:
+  `{$$slots.x}` in a dropped region + an emitted `{@render}`
+  (`slot_snippet_conflict`, `2-analyze/index.js:862`). `$$slots` is not fenced, so
+  closing it means porting the oracle's whole-component validation rather than
   widening the presence match — tracked in `../../docs/checklist_svelte_compiler.md`.
-  Both are genuinely whole-component (`2-analyze/index.js:831`/`:862`); their new home
-  is `validate.rs`, which already walks the whole document but currently carries only
-  per-node state.
+  Its former sibling, a dropped `{#snippet}` + `export { … }` of it from a module
+  script, is closed in `validate.rs` — and the rule is narrower than that phrasing:
+  the error needs a snippet the oracle cannot HOIST, which a dropped one never is,
+  while a top-level `{#snippet s()}` beside `export { s }` compiles on both sides.
 - `validate.rs` — the **emission-independent validation** pass: one walk over the
   whole document (riding `attr_refs`'s `each_child_fragment` seam), run at the top
   of `analyze()` before any emission decision. Home for the oracle rules that fire
@@ -525,6 +525,25 @@ project-wide conventions.
   from `fragment.rs`**: an emitter never runs on a dropped region, so one of them in
   a `{:catch}` compiled. A rule whose inputs are not emission state belongs here, not
   at an emitter.
+
+  Plus the five **snippet declaration/export** rules, from two oracle sites. Three ride
+  the same walk: `declaration_duplicate`'s `Scope.declare` call site
+  (`phases/scope.js:684-691`) as a per-**fragment** duplicate-snippet-name check — the
+  scope is the fragment, not the component, so `<div>{#snippet a}…{/snippet}</div>`
+  plus a root `{#snippet a}` is legal — and `snippet_shadowing_prop` /
+  `snippet_conflict` (`SnippetBlock.js:59`/`:77`), both checked from the snippet's
+  PARENT because the oracle's `path.at(-2)` is exactly "the node whose fragment holds
+  this snippet". ⚠️ The two parent sets deliberately DISAGREE: shadowing is `Component`
+  only, conflict also takes `<svelte:component>`/`<svelte:self>` — do not harmonize
+  them. Shadowing also does not fire at depth. Two more rules run LATER, from
+  `analyze()`, because their inputs are analysis products: `validate_top_level_snippets`
+  (`declaration_duplicate` at `SnippetBlock.js:34` — a ROOT-fragment snippet whose name
+  the instance script declares) after the binding table, and `validate_module_exports`
+  (`snippet_invalid_export` / `export_undefined`, `index.js:823-836`) after the hoist
+  analysis. ⚠️ That last one checks **module scope FIRST, snippet names second**: a
+  hoistable top-level snippet's binding is written INTO module scope
+  (`SnippetBlock.js:40-44`), so checking the snippet set first would reject every valid
+  exported snippet.
 
   Plus the attribute rules of the oracle's single `validate_element` loop —
   `attribute_invalid_name`, `attribute_invalid_event_handler` (an `on…` attribute

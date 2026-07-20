@@ -42,15 +42,21 @@
 //! `achievable`-parity denominator that the `fenced` subtraction operates on.
 
 use crate::CompileError;
+use crate::analyze::{NameSet, pattern_binding_names};
 use crate::attr_refs::each_child_fragment;
 use crate::html_tree::{is_tag_valid_with_ancestor, is_tag_valid_with_parent};
 use crate::refusal::Refusal;
+use crate::script_decls::{
+    ScriptDeclaration, VarScope, each_script_declaration, plain_identifier_name,
+};
+use crate::snippet::SnippetAnalysis;
+use crate::text_class::js_trim;
 use crate::transform_server::unsupported;
 use tsv_svelte::ast::internal::{
     Attribute, AttributeNode, AttributeValue, ElementKind, Fragment, FragmentNode, Root,
     SpecialElementKind,
 };
-use tsv_ts::ast::internal::Expression;
+use tsv_ts::ast::internal::{Expression, ModuleExportName, Statement};
 
 /// The oracle's `root_only_meta_tags` (`phases/1-parse/state/element.js:45`) —
 /// the meta tags legal only as a direct child of the component root, and legal at
@@ -159,6 +165,7 @@ impl<'s> Validator<'s> {
         fragment: &Fragment<'_>,
         at_root: bool,
     ) -> Result<(), CompileError> {
+        refuse_duplicate_snippet_names(fragment, self.source)?;
         for node in fragment.nodes {
             self.walk_node(node, at_root)?;
         }
@@ -229,6 +236,12 @@ impl<'s> Validator<'s> {
             FragmentNode::ExpressionTag(_) => self.refuse_invalid_text_placement()?,
             _ => {}
         }
+
+        // The two `SnippetBlock` rules that read the snippet's PARENT. Checked
+        // from the parent side because the oracle's `path.at(-2)` — the parent of
+        // the snippet's containing `Fragment` — is exactly "the node whose own
+        // fragment holds this snippet". See [`refuse_component_snippet_rules`].
+        refuse_component_snippet_rules(node, self.source)?;
 
         let entry = match node {
             FragmentNode::Element(element) => match element.kind {
@@ -496,6 +509,261 @@ impl<'s> Validator<'s> {
             _ => Ok(()),
         }
     }
+}
+
+/// The oracle's `Scope.declare` same-scope collision for snippet names
+/// (`phases/scope.js:684-691`, reached from the `SnippetBlock` scope visitor at
+/// `:1331-1335`, which declares into `state.scope` — the scope of the fragment
+/// the snippet sits in).
+///
+/// ⚠️ The scope is the **fragment**, not the component. Every `Fragment` visitor
+/// opens a child scope (`scope.js:1349`), and `declare` forwards to the parent
+/// only for `var` and `import` — a snippet declares `'function'` — so two
+/// `{#snippet a}` siblings collide while `<div>{#snippet a}{/snippet}</div>` +
+/// a root-level `{#snippet a}` do not. Both live-probed.
+///
+/// A snippet whose name this port cannot read (an escaped identifier) is skipped;
+/// `SnippetEscapedName` refuses such a component downstream anyway.
+fn refuse_duplicate_snippet_names(
+    fragment: &Fragment<'_>,
+    source: &str,
+) -> Result<(), CompileError> {
+    let mut seen: Vec<&str> = Vec::new();
+    for node in fragment.nodes {
+        let FragmentNode::SnippetBlock(snippet) = node else {
+            continue;
+        };
+        let Some(name) = crate::snippet::snippet_name(snippet, source) else {
+            continue;
+        };
+        if seen.contains(&name) {
+            return Err(unsupported(Refusal::DuplicateSnippetName {
+                name: name.to_string(),
+            }));
+        }
+        seen.push(name);
+    }
+    Ok(())
+}
+
+/// The oracle's `snippet_shadowing_prop` and `snippet_conflict`
+/// (`2-analyze/visitors/SnippetBlock.js:51-79`), applied to the direct
+/// `{#snippet}` children of `node`'s own fragment.
+///
+/// Both read `path.at(-2)` — the parent of the snippet's containing `Fragment`,
+/// i.e. the node this function is called with — so checking from the parent side
+/// is the same question asked once per parent instead of once per snippet.
+///
+/// ⚠️ The two rules take **different** parent sets and harmonizing them is a bug:
+/// shadowing is `Component` **only**, while conflict also accepts
+/// `<svelte:component>` / `<svelte:self>`. Both special elements are deliberate
+/// runes-only fences in tsv, so they refuse at emission — but this walk runs
+/// *before* emission, so the conflict arm genuinely reaches them and is not dead
+/// code.
+///
+/// The rules are mutually exclusive with `declaration_duplicate`
+/// ([`validate_top_level_snippets`]): that one requires `is_top_level`, i.e. no
+/// `path.at(-2)` at all.
+fn refuse_component_snippet_rules(
+    node: &FragmentNode<'_>,
+    source: &str,
+) -> Result<(), CompileError> {
+    // `Component` proper, and the two special elements the conflict rule adds.
+    let (attributes, fragment, is_component) = match node {
+        FragmentNode::Element(element) if matches!(element.kind, ElementKind::Component) => {
+            (element.attributes, &element.fragment, true)
+        }
+        FragmentNode::SpecialElement(special)
+            if matches!(
+                special.kind,
+                SpecialElementKind::SvelteComponent { .. } | SpecialElementKind::SvelteSelf
+            ) =>
+        {
+            (special.attributes, &special.fragment, false)
+        }
+        _ => return Ok(()),
+    };
+
+    for child in fragment.nodes {
+        let FragmentNode::SnippetBlock(snippet) = child else {
+            continue;
+        };
+        let Some(name) = crate::snippet::snippet_name(snippet, source) else {
+            continue;
+        };
+
+        // `snippet_shadowing_prop` — a plain `Attribute` OR a `BindDirective` of
+        // the same name. A directive of any other kind (`class:`, `on:`, …) is
+        // deliberately absent from the oracle's `some(…)` predicate.
+        if is_component
+            && attributes.iter().any(|attribute| match attribute {
+                AttributeNode::Attribute(a) => a.name_span.extract(source) == name,
+                AttributeNode::BindDirective(d) => d.name_span.extract(source) == name,
+                _ => false,
+            })
+        {
+            return Err(unsupported(Refusal::SnippetShadowingProp {
+                name: name.to_string(),
+            }));
+        }
+
+        // `snippet_conflict` — reached only when shadowing did not fire, and only
+        // for the exact name `children`.
+        if name != "children" {
+            continue;
+        }
+        // ⚠️ The oracle scans ALL of the parent's fragment nodes, not just the
+        // ones preceding the snippet.
+        if fragment.nodes.iter().any(|sibling| match sibling {
+            FragmentNode::SnippetBlock(_) | FragmentNode::Comment(_) => false,
+            FragmentNode::Text(text) => !js_trim(&text.data(source)).is_empty(),
+            _ => true,
+        }) {
+            return Err(unsupported(Refusal::SnippetChildrenConflict));
+        }
+    }
+    Ok(())
+}
+
+/// The oracle's `declaration_duplicate` at `2-analyze/visitors/SnippetBlock.js:34`
+/// — a **top-level** `{#snippet}` (a direct child of the root fragment) whose name
+/// the instance script also declares.
+///
+/// ⚠️ A different rule from [`refuse_duplicate_snippet_names`], which ports the
+/// *other* call site of the same oracle error code (`Scope.declare`). This one is
+/// snippet-vs-script and top-level-only: `<script>let foo = 1</script><div>{#snippet
+/// foo()}…{/snippet}</div>` is legal (live-probed), because the nested snippet
+/// declares into the `<div>`'s fragment scope rather than the instance scope.
+///
+/// ⚠️ An **import** local is not an instance-scope declaration and must NOT fire
+/// this rule: `Scope.declare` forwards an `import` to the PARENT scope
+/// (`phases/scope.js:679-681`), and the instance scope's parent is the module
+/// scope — so an instance-script `import C from './C.svelte'` lands in
+/// `module.scope.declarations` and is never in the `instance.scope.declarations`
+/// this rule tests. `import_names` is therefore subtracted, exactly as
+/// [`crate::snippet::analyze_snippets`] subtracts it from its own blocker set.
+/// A module-script declaration never reaches here either (the same parent-scope
+/// argument), and `instance_binding_names` holds only instance bindings.
+///
+/// Runs after the binding table rather than inside [`validate_document`]'s walk
+/// because `analysis.instance.scope.declarations` is its input.
+pub(crate) fn validate_top_level_snippets(
+    root: &Root<'_>,
+    source: &str,
+    instance_binding_names: &NameSet,
+    import_names: &NameSet,
+) -> Result<(), CompileError> {
+    for node in root.fragment.nodes {
+        let FragmentNode::SnippetBlock(snippet) = node else {
+            continue;
+        };
+        let Some(name) = crate::snippet::snippet_name(snippet, source) else {
+            continue;
+        };
+        if instance_binding_names.contains(name) && !import_names.contains(name) {
+            return Err(unsupported(Refusal::SnippetDeclarationDuplicate {
+                name: name.to_string(),
+            }));
+        }
+    }
+    Ok(())
+}
+
+/// The oracle's module-export check (`2-analyze/index.js:823-836`): every
+/// `export { … }` specifier in the **module** script must name something the
+/// module scope holds.
+///
+/// ⚠️ **Module scope FIRST, snippet names second.** A hoistable top-level snippet
+/// has its binding written INTO the module scope
+/// (`SnippetBlock.js:40-44`), so `<script module>export {foo}</script>{#snippet
+/// foo()}static{/snippet}` is valid and must NOT report `snippet_invalid_export`.
+/// Only a snippet the oracle could not hoist — one referencing the instance script,
+/// or one nested below the root fragment — reaches the error. Both directions
+/// live-probed.
+///
+/// `export { x } from 'y'` is exempt (`node.source == null` in the oracle), and a
+/// type-only export never reaches here: it is dropped by [`crate::erase`], exactly
+/// as the oracle's own phase-1 `remove_typescript_nodes` drops it before analysis.
+///
+/// Returns `Ok` without checking anything when a module declaration carries a name
+/// this port cannot read (an escaped identifier) — the module scope would be
+/// under-populated and the check would refuse a valid export.
+pub(crate) fn validate_module_exports(
+    module_body: &[Statement<'_>],
+    source: &str,
+    snippets: &SnippetAnalysis,
+) -> Result<(), CompileError> {
+    let Some(module_declared) = collect_module_declared(module_body, source) else {
+        return Ok(());
+    };
+
+    for stmt in module_body {
+        let Statement::ExportNamedDeclaration(export) = stmt else {
+            continue;
+        };
+        if export.source.is_some() {
+            continue;
+        }
+        for specifier in export.specifiers {
+            // The oracle's `specifier.local.type !== 'Identifier'` skip — a string
+            // local is only reachable in a re-export, which already `continue`d.
+            let ModuleExportName::Identifier(local) = &specifier.local else {
+                continue;
+            };
+            let Some(name) = plain_identifier_name(local, source) else {
+                continue;
+            };
+            // The oracle's `analysis.module.scope.get(name)` — the module script's
+            // own declarations PLUS every hoisted snippet's binding.
+            if module_declared.contains(&name) || snippets.is_hoisted(&name) {
+                continue;
+            }
+            if snippets.names.contains(&name) {
+                return Err(unsupported(Refusal::SnippetInvalidExport { name }));
+            }
+            return Err(unsupported(Refusal::ExportUndefined { name }));
+        }
+    }
+    Ok(())
+}
+
+/// Every name the module script declares at module scope, or `None` when one of
+/// them is unreadable to this port (see [`validate_module_exports`]).
+///
+/// Rides [`each_script_declaration`], the crate's single answer to "what does this
+/// script declare", with `WithHoistedVars` because a `var` in a nested block is
+/// function-scoped and so reaches module scope exactly like a top-level one.
+fn collect_module_declared(module_body: &[Statement<'_>], source: &str) -> Option<NameSet> {
+    let mut declared = NameSet::default();
+    let mut opaque = false;
+    let result: Result<(), CompileError> =
+        each_script_declaration(module_body, VarScope::WithHoistedVars, &mut |decl| {
+            match decl {
+                ScriptDeclaration::Declarator { declarator, .. } => {
+                    let mut names = Vec::new();
+                    if pattern_binding_names(&declarator.id, source, &mut names).is_err() {
+                        opaque = true;
+                    } else {
+                        declared.extend(names);
+                    }
+                }
+                ScriptDeclaration::Function(id)
+                | ScriptDeclaration::Class(id)
+                | ScriptDeclaration::Import { local: id, .. } => {
+                    match plain_identifier_name(id, source) {
+                        Some(name) => {
+                            declared.insert(name);
+                        }
+                        None => opaque = true,
+                    }
+                }
+            }
+            Ok(())
+        });
+    if result.is_err() || opaque {
+        return None;
+    }
+    Some(declared)
 }
 
 /// The name the oracle passes for a text node or an `{expression}`.

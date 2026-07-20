@@ -103,19 +103,10 @@ pub(crate) fn analyze_snippets(
         })
         .collect();
 
-    // Duplicate top-level names are oracle-rejected; refuse rather than emit two
-    // `function` declarations.
-    let mut seen = NameSet::default();
-    for snippet in &top_level {
-        if let Some(name) = snippet_name(snippet, source)
-            && !seen.insert(name.to_string())
-        {
-            return Err(unsupported(Refusal::DuplicateSnippetName {
-                name: name.to_string(),
-            }));
-        }
-    }
-
+    // A duplicate snippet name in one fragment (root-level included) is refused
+    // upstream by `validate.rs`'s `refuse_duplicate_snippet_names`, which ports the
+    // oracle's per-fragment scope rule rather than the root-only slice this pass
+    // used to carry — so two `function` declarations can never be emitted here.
     let top_level_names: NameSet = top_level
         .iter()
         .filter_map(|s| snippet_name(s, source).map(str::to_string))
@@ -193,6 +184,51 @@ pub(crate) fn analyze_snippets(
         }
         if !changed {
             break;
+        }
+    }
+
+    // ⚠️ `hoistable` is keyed by NAME, and `is_hoisted` is asked per emitted
+    // snippet — so a NESTED snippet sharing a top-level snippet's name is
+    // INDISTINGUISHABLE from it here. The two are distinct declarations the
+    // oracle places independently (a fragment is a fresh scope, so the shape is
+    // legal on both sides), and this port can place neither reliably.
+    //
+    // Two emission bugs motivate the refusal, and they fail in opposite ways:
+    //
+    // - the top-level name HOISTS: the nested snippet inherits `true` and hoists
+    //   to module scope alongside it — two `function` declarations of one name at
+    //   module scope, invalid JS;
+    // - the top-level name does NOT hoist: both land in the COMPONENT BODY, which
+    //   is legal JS, but tsv emits them in the opposite order from the oracle.
+    //   Function declarations are last-wins, so `{@render name()}` resolves to a
+    //   different body on each side — a silent MISMATCH, the worse of the two.
+    //
+    // ⚠️ The rule is deliberately BROADER than those two bugs, and the gap is
+    // structural rather than an unenumerated third case: the rule keys on a NAME
+    // COLLISION, a property of the SOURCE, while both bugs are properties of
+    // where the two snippets are PLACED. So a collision in a region that emits
+    // nothing — a nested snippet inside a dropped `{:catch}`, which NEITHER side
+    // emits — is refused for uniformity, not because it would mis-emit. Narrowing
+    // the rule to the placements that actually mis-emit is not the fix; keying the
+    // map by snippet IDENTITY rather than name is, and it retires the refusal
+    // entirely. Over-refusing meanwhile is safe; neither alternative is, which is
+    // also why the check is not gated on hoistability.
+    let mut nested_names = NameSet::default();
+    for node in root.fragment.nodes {
+        each_child_fragment(node, &mut |child| {
+            name_collector.collect_names(child, &mut nested_names);
+        });
+    }
+    // Iterated over the source-ordered top-level snippets, not over the nested
+    // name set, so the reported name is deterministic (`NameSet` is a `HashSet`).
+    for snippet in &top_level {
+        let Some(name) = snippet_name(snippet, source) else {
+            continue;
+        };
+        if nested_names.contains(name) {
+            return Err(unsupported(Refusal::NestedSnippetNameCollision {
+                name: name.to_string(),
+            }));
         }
     }
 
