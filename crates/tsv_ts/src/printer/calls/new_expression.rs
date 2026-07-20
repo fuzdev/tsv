@@ -71,7 +71,9 @@ impl<'a> Printer<'a> {
 
         // Check for comments between removed parentheses and callee
         // e.g., new (/* comment */ Foo)() has comments in the gap between 'new ' and 'Foo'
-        let callee = self.prepend_removed_paren_comments(
+        // The keyword→operand gap, shared with `await` — see
+        // `prepend_keyword_operand_comments`.
+        let callee = self.prepend_keyword_operand_comments(
             new_expr.span.start,
             new_expr.callee.span().start,
             callee,
