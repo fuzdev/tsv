@@ -30,7 +30,7 @@ use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::source_scan::find_char_skipping_comments;
+use tsv_lang::source_scan::{find_char_skipping_comments, rfind_char_skipping_comments};
 
 /// Strip only `as`/`satisfies` casts from the head of a statement expression,
 /// returning the innermost operand — but only if at least one cast was peeled.
@@ -377,16 +377,18 @@ impl<'a> Printer<'a> {
 
         let keyword_end = keyword_start + keyword.len() as u32;
 
-        // Trailing comments from stripped grouping parens: `return (x /* c */)` → `return x /* c */;`
-        let argument_end = arg.span().end;
-        let has_trailing_comments = self.has_comments_to_emit_between(argument_end, span_end);
-
         // A comment that must break takes the parenthesized form, which is what makes the
-        // break legal; there the comment keeps the line the author gave it.
+        // break legal; there the comment keeps the line the author gave it. That layout
+        // owns its own trailing gap (the parens are retained, so the `)` — not the span
+        // end — divides inside from outside), so it returns before the shared scan below.
         if self.argument_has_own_line_comment(keyword_start, arg) {
             let own_line_comments = self.build_rhs_comments_opt(keyword_end, arg.span().start);
             return self.build_comment_paren_doc(keyword, arg, span_end, own_line_comments);
         }
+
+        // Trailing comments from stripped grouping parens: `return (x /* c */)` → `return x /* c */;`
+        let argument_end = arg.span().end;
+        let has_trailing_comments = self.has_comments_to_emit_between(argument_end, span_end);
 
         // Every remaining comment is glued to the keyword with the value after it on some
         // line, so the value is pulled up onto the comment's line (`return /* c */⏎(v)` →
@@ -619,18 +621,16 @@ impl<'a> Printer<'a> {
         // production; omitting it here DROPPED the comment outright). A comment *past* the
         // `)` is outside them and follows the ordinary terminator rule, trailing the `;`.
         let argument_end = arg.span().end;
-        let (in_paren_end, after_start) = match self.retained_grouping_close(argument_end, span_end)
-        {
-            Some(close) => (close, close.saturating_add(1).min(span_end)),
-            None => (argument_end, argument_end),
-        };
-        if self.has_comments_to_emit_between(argument_end, in_paren_end) {
-            self.append_trailing_paren_comments(&mut body, argument_end, in_paren_end);
+        let boundary = self
+            .retained_grouping_close(argument_end, span_end)
+            .unwrap_or(argument_end);
+        if self.has_comments_to_emit_between(argument_end, boundary) {
+            self.append_trailing_paren_comments(&mut body, argument_end, boundary);
         }
 
         let mut parts: DocBuf = smallvec![self.build_hanging_paren_doc(keyword, d.concat(&body))];
-        let after = if self.has_comments_to_emit_between(after_start, span_end) {
-            self.split_terminator_gap_comments(&mut parts, after_start, span_end, false)
+        let after = if self.has_comments_to_emit_between(boundary, span_end) {
+            self.split_terminator_gap_comments(&mut parts, boundary, span_end, false)
         } else {
             DocBuf::new()
         };
@@ -652,16 +652,20 @@ impl<'a> Printer<'a> {
     /// pass. The scan skips comments because a `)` may sit inside one.
     ///
     /// `None` means no paren was authored — an own-line comment inside a chain forces the
-    /// break with none present — so there is no inside to speak of.
+    /// break with none present — so there is no inside to speak of, and the caller uses the
+    /// operand's end as the boundary instead.
+    ///
+    /// The returned position doubles as both bounds: the `)` byte itself can't start a
+    /// comment, so the in-paren scan (end-inclusive) and the past-paren scan
+    /// (start-inclusive) split the gap at it without overlapping.
     fn retained_grouping_close(&self, argument_end: u32, span_end: u32) -> Option<u32> {
-        let bytes = self.source.as_bytes();
-        let mut close = None;
-        let mut scan = argument_end as usize;
-        while let Some(found) = find_char_skipping_comments(bytes, scan, span_end as usize, b')') {
-            close = Some(found as u32);
-            scan = found + 1;
-        }
-        close
+        rfind_char_skipping_comments(
+            self.source.as_bytes(),
+            argument_end as usize,
+            span_end as usize,
+            b')',
+        )
+        .map(|close| close as u32)
     }
 
     /// The paren-wrapped layout a comment-forced break takes: `kw (⏎\tbody⏎close`.
