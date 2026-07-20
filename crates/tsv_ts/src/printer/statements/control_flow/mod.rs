@@ -23,6 +23,33 @@ use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{Comment, comments_to_emit_in_range};
 
+/// Which control-flow gap a run of own-line comments sits in — the one thing that
+/// decides whether an authored blank line *above the first* comment survives.
+///
+/// The two gaps merely share an emitter (`build_comments_between_parts`); they are
+/// different questions, so each names itself rather than being inferred.
+#[derive(Clone, Copy)]
+enum ControlFlowGap {
+    /// The header `)` → body gap (`if (a)⏎⏎// c⏎{`, and the `while`/`for` analogs).
+    /// The blank is dropped so a body block's `{` never sits below one — consistent
+    /// with tsv's own handling when `{` is on the header line (`if (a) {⏎⏎// c` also
+    /// collapses), and with prettier, which drops it here too.
+    HeaderToBody,
+    /// The `}` → continuation-keyword gap (`}⏎⏎// c⏎else`, `}⏎⏎// c⏎while (a);`).
+    /// The blank is preserved: there is no body `{` to sit below it, so it separates
+    /// two branches of a chain and is real authoring intent. Prettier agrees at
+    /// `else`; at a do-while's `while` it relocates the comment into the condition
+    /// parens instead, so it is no oracle there and tsv's own stance governs.
+    BlockToKeyword,
+}
+
+impl ControlFlowGap {
+    /// Whether an authored blank line *above the first* own-line comment survives.
+    fn keeps_leading_blank(self) -> bool {
+        matches!(self, Self::BlockToKeyword)
+    }
+}
+
 impl<'a> Printer<'a> {
     /// Build a control-flow *body* whose empty block form collapses (`do {} while (cond)`,
     /// C-style `for (…) {}`). The generic `build_statement_doc` dispatch EXPANDS a
@@ -137,9 +164,9 @@ impl<'a> Printer<'a> {
     ///
     /// Handles:
     /// - Inline comments: added with leading space on same line
-    /// - Own-line comments: added with hardline; the first hugs the previous
-    ///   token (a leading blank in the gap is dropped), while blank lines between
-    ///   subsequent comments are preserved
+    /// - Own-line comments: added with hardline; whether an authored blank line
+    ///   *above the first* comment survives is `gap`'s call (see [`ControlFlowGap`]),
+    ///   while blank lines between subsequent comments are always preserved
     ///
     /// Returns the end position after the last comment (for tracking).
     fn build_comments_between_parts(
@@ -148,6 +175,7 @@ impl<'a> Printer<'a> {
         inline_prev: &[&Comment],
         own_line: &[&Comment],
         prev_end: u32,
+        gap: ControlFlowGap,
     ) -> u32 {
         let d = self.d();
         // Trailing comments stay on same line
@@ -156,23 +184,16 @@ impl<'a> Printer<'a> {
             parts.push(self.build_comment_doc(comment));
         }
 
-        // Own-line comments: the *first* one hugs the previous token — an authored
-        // blank line in a control-flow gap before a body-leading comment is always
-        // dropped, so a body block's `{` never sits below a blank. Uniform across
-        // `if`/`while`/`for`/`do`/`else`/`try`/`catch`/`switch`/… and consistent
-        // with tsv's own handling when `{` is on the header line (`if (a) {\n\n// c`
-        // also collapses). Blanks *between* subsequent comments are preserved.
+        // Own-line comments: whether the *first* one hugs the previous token is
+        // `gap`'s call; blanks *between* subsequent comments are always preserved.
         let mut end = prev_end;
-        for comment in own_line {
-            let keep_blank =
-                end != prev_end && self.has_blank_line_between(end, comment.span.start);
-            if keep_blank {
+        for (i, comment) in own_line.iter().enumerate() {
+            let blank_allowed = i > 0 || gap.keeps_leading_blank();
+            if blank_allowed && self.has_blank_line_between(end, comment.span.start) {
                 // Blank line then comment: literalline (empty) + hardline (indented)
                 parts.push(d.literalline());
-                parts.push(d.hardline());
-            } else {
-                parts.push(d.hardline());
             }
+            parts.push(d.hardline());
             parts.push(self.build_comment_doc(comment));
             end = comment.span.end;
         }
@@ -253,6 +274,7 @@ impl<'a> Printer<'a> {
                 &inline_prev,
                 &own_line_lines,
                 effective_prev_end,
+                ControlFlowGap::HeaderToBody,
             );
 
             // Line comments force a hardline before body; block-only gets a space.

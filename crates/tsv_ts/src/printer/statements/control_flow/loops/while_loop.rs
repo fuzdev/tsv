@@ -3,6 +3,7 @@
 // Condition-group layout and body handling for while/do-while, including the
 // do-while comment-preservation divergence from Prettier.
 
+use super::super::ControlFlowGap;
 use crate::ast::internal::{self, Statement};
 use crate::printer::Printer;
 use smallvec::smallvec;
@@ -137,7 +138,13 @@ impl<'a> Printer<'a> {
             all_own_line.extend(inline_next);
 
             // Add comments preserving their position.
-            self.build_comments_between_parts(&mut parts, &inline_prev, &all_own_line, body_end);
+            self.build_comments_between_parts(
+                &mut parts,
+                &inline_prev,
+                &all_own_line,
+                body_end,
+                ControlFlowGap::BlockToKeyword,
+            );
 
             // While stays on same line only if: block body, no own-line comments, all inline are block comments
             let has_inline_line_comment = inline_prev.iter().any(|c| !c.is_block);
