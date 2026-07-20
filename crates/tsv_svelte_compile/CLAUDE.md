@@ -1073,6 +1073,29 @@ comment-position-divergent fixture records the *oracle's* placement in
 `expected_server.js`; ours is tolerated). The corpus runner surfaces the tolerated
 count in a separate `comment_position` bucket so the tolerance is never silent.
 
+## Tests
+
+`src/tests/` is one file per feature (the module map above is the naming guide);
+a new test goes in the file matching the feature it exercises, and reaches for an
+existing helper in `src/tests/support.rs` rather than minting a new assertion
+idiom. There is one helper per intent:
+
+- `compile_js` / `compile_css` — the component compiles. Both route through one
+  `compile_checked` seam asserting the whole acceptance contract (server output
+  **and** a canonicalize fixed point), so a test reading only the CSS still pins
+  the JS side; a bare `let _ = compile_js(src)` is the "this shape compiles" pin.
+- `assert_unsupported(source, reason)` — refuses, pinning WHICH refusal via a
+  substring of `Refusal`'s `Display`.
+- `assert_parse_rejected` — fails at the parse stage.
+- `assert_idempotent` / `assert_comments_lossless` — the canonicalizer's own
+  contract, independent of compilation.
+
+A refusal test always pins its reason. A bucket-agnostic "refuses somehow"
+assertion passes when the right shape refuses for the *wrong* reason — the
+general-rule-masking-a-specific-one failure mode — and it silently merges
+distinct refusals that happen to share a callsite. Derive the reason from the
+refusal the shape actually produces, never from the test's name.
+
 ## See Also
 
 - Root [`../../CLAUDE.md`](../../CLAUDE.md) — build, test, and workflow commands
