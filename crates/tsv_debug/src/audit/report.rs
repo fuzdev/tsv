@@ -137,6 +137,10 @@ pub(crate) struct GapDetail {
     /// the shape was not verified).
     pub(crate) verify_confirmed: Option<usize>,
     pub(crate) verify_total: Option<usize>,
+    /// Whether this shape is part of the RATCHET-GRADED set. `false` for the report-only
+    /// `SWALLOW` class, which prints but never gates — the same axis [`BlankDetail::gated`]
+    /// carries for `STRUCTURAL-DIVERGENCE`.
+    pub(crate) gated: bool,
 }
 
 /// `blank_audit`'s audit-specific detail — the per-shape aggregate the envelope carries
@@ -183,6 +187,16 @@ impl Finding {
         match &self.detail {
             Detail::Gap(d) => d.count,
             Detail::Blank(d) => d.count,
+        }
+    }
+
+    /// Whether the shape is part of its audit's ratchet-graded set. The report-only classes
+    /// (`gap_audit`'s `SWALLOW`, `blank_audit`'s `STRUCTURAL-DIVERGENCE`) answer `false`, so a
+    /// summary can speak for the graded invariants without counting them.
+    fn gated(&self) -> bool {
+        match &self.detail {
+            Detail::Gap(d) => d.gated,
+            Detail::Blank(d) => d.gated,
         }
     }
 }
@@ -242,11 +256,15 @@ fn print_header(s: &RunSummary) {
 /// under thousands of lines. `--report` brings them back.
 pub(crate) fn print_summary(s: &RunSummary, findings: &[Finding]) {
     print_header(s);
-    let total: usize = findings.iter().map(Finding::count).sum();
+    // Speak only for the GRADED shapes: the report-only classes are neither pinned nor
+    // gate-failing, so counting them here would call an ungraded shape "pinned". They get
+    // their own section from the audit that owns them.
+    let graded: Vec<&Finding> = findings.iter().filter(|f| f.gated()).collect();
+    let total: usize = graded.iter().map(|f| f.count()).sum();
     println!(
         "○ {total} finding(s) across {} known site shape(s) — all pinned; re-run with \
          --report for the per-shape detail",
-        findings.len()
+        graded.len()
     );
 }
 

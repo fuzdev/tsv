@@ -109,7 +109,9 @@ use argh::FromArgs;
 use std::collections::{BTreeMap, BTreeSet};
 
 use by_node::{by_node_json_sections, compute_by_node, report_by_node, report_rank, report_since};
-use snapshot::{KnownKey, count_panics, is_pinnable, known_shapes_path, ratchet, snapshot_keys};
+use snapshot::{
+    KnownKey, count_panics, count_soft, is_pinnable, known_shapes_path, ratchet, snapshot_keys,
+};
 use verify::{verify_example, victim_seed_offset};
 
 use crate::audit::node_edge::{NodeEdgeKey, node_edge_key_with_map};
@@ -126,6 +128,7 @@ use crate::audit::sites::{code_regions, injection_sites, site_shape, snippet};
 use crate::cli::CliError;
 use tsv_cli::cli::input::ParserType;
 use tsv_lang::comment_ledger::{self, CommentFindingKind};
+use tsv_lang::doc::swallow;
 
 use super::profile::{is_input_invalid_fixture, resolve_files};
 
@@ -277,6 +280,19 @@ impl Payload {
 enum Kind {
     Dropped,
     DoublePrinted,
+    /// A `//` line comment that swallows following content on the same output line —
+    /// [`swallow`](tsv_lang::doc::swallow)'s render-time finding, not the ledger's.
+    ///
+    /// The ledger is **structurally blind** to this class: a swallowing comment is printed
+    /// exactly once, so the print-once account balances and `comments:audit` reads CLEAN
+    /// while the swallowed token is silently lost. Arming the swallow check on the ledger's
+    /// existing format is what closes it — a second *detector* on one format, not a second
+    /// format (the reason this is affordable where a full `f1_check` was not).
+    ///
+    /// Held **report-only** ([`is_graded`](snapshot::is_graded)): the class is newly visible
+    /// here and its shapes have not been triaged, so it reports without grading rather than
+    /// pinning ~330 unreviewed claims into the ratchet.
+    Swallow,
     Panic,
 }
 
@@ -285,14 +301,20 @@ impl Kind {
         match self {
             Self::Dropped => "DROPPED",
             Self::DoublePrinted => "DOUBLE-PRINTED",
+            Self::Swallow => "SWALLOW",
             Self::Panic => "PANIC",
         }
     }
 
     fn from_label(s: &str) -> Option<Self> {
-        [Self::Dropped, Self::DoublePrinted, Self::Panic]
-            .into_iter()
-            .find(|k| k.label() == s)
+        [
+            Self::Dropped,
+            Self::DoublePrinted,
+            Self::Swallow,
+            Self::Panic,
+        ]
+        .into_iter()
+        .find(|k| k.label() == s)
     }
 }
 
@@ -659,7 +681,31 @@ fn audit_file(
                 }
                 // The injection isn't a legal comment here — the offset names no gap.
                 Formatted::Rejected => continue,
-                Formatted::Ok { findings, .. } => findings,
+                Formatted::Ok {
+                    findings, swallows, ..
+                } => {
+                    // A swallow is observed directly on the rendered output, so it is keyed at
+                    // the injection site — there is no bystander axis to map back (the ledger's
+                    // victim-span logic below has no analogue: the swallow tracker reports a
+                    // property of an output line, not of a registered comment).
+                    for report in swallows {
+                        tally.record(
+                            Hit {
+                                kind: Kind::Swallow,
+                                payload,
+                                path: &display,
+                                source: &source,
+                                injection_offset: offset,
+                                attribution_offset: offset,
+                                text: report.comment,
+                                injected: true,
+                                node_edge: key_node_edge(node_map.as_ref(), offset),
+                            },
+                            key_by_node,
+                        );
+                    }
+                    findings
+                }
             };
             tally.accepted += 1;
             for f in findings {
@@ -800,6 +846,10 @@ impl GapAuditCommand {
         // Process-global; the per-thread ledgers below are thread-local, so arming once
         // here covers every worker.
         comment_ledger::set_comment_check(true);
+        // Armed on the SAME format the ledger rides — no extra format, no extra parse. Both
+        // flags are process-global and both report sets are thread-local, so arming once here
+        // covers every worker. See `Kind::Swallow` for why the ledger cannot see this class.
+        swallow::set_swallow_check(true);
 
         // The audit provokes panics on purpose (a formatter crash IS a finding), so keep
         // the default hook from printing each one.
@@ -863,6 +913,13 @@ impl GapAuditCommand {
             let outcomes: Vec<((Kind, String), VerifyOutcome)> = total
                 .shapes
                 .iter()
+                // The verify pass's oracle is the multiset of comment CONTENTS, which answers
+                // the ledger's question ("was a comment lost?") and not the swallow check's
+                // ("did a `//` eat a following token?"). A swallowed token is not a comment, so
+                // the multiset is unchanged and every swallow shape would file a bogus
+                // UNCONFIRMED. It needs no verify anyway: a swallow is observed directly on the
+                // rendered output, like `blank_audit`'s F1/reparse kinds.
+                .filter(|((kind, _), _)| *kind != Kind::Swallow)
                 .map(|((kind, shape), agg)| {
                     let confirmed = agg
                         .examples
@@ -888,6 +945,7 @@ impl GapAuditCommand {
 
         std::panic::set_hook(prev_hook);
         comment_ledger::set_comment_check(false);
+        swallow::set_swallow_check(false);
 
         if self.update {
             // Read the pre-write snapshot so the yield line can distinguish RETIRED (a bug a
@@ -990,12 +1048,26 @@ impl GapAuditCommand {
             }
         }
 
-        // Off the default corpus the snapshot doesn't apply — every finding is news.
+        // The report-only class is never part of a grade — surface it on its own so a reader
+        // can't mistake a quiet ✓ for "no swallows".
+        let soft = count_soft(&total.shapes);
+        if soft > 0 {
+            eprintln!(
+                "\n○ {soft} SWALLOW shape(s) — a `//` comment swallowing following content on \
+                 its output line — reported, NOT gated. The print-once ledger is blind to this \
+                 class (the comment IS printed once), so these are invisible to \
+                 `comments:audit`. See docs/gap_audit.md."
+            );
+        }
+
+        // Off the default corpus the snapshot doesn't apply — every GRADED finding is news.
+        // The report-only class is excluded here for the same reason it is excluded from the
+        // ratchet: it reports, it never decides an exit status.
         if !default_paths {
-            return if total.shapes.is_empty() {
-                Ok(())
-            } else {
+            return if total.shapes.keys().any(|(k, _)| snapshot::is_graded(*k)) {
                 Err(CliError::Failed)
+            } else {
+                Ok(())
             };
         }
         // A narrowed default run reaches only part of the snapshot's shape set (or, under
@@ -1171,6 +1243,7 @@ fn build_report(total: &Tally, payloads: &[Payload]) -> (RunSummary, Vec<Finding
                     bystander_hits: agg.bystander_hits,
                     verify_confirmed: agg.verify.map(|v| v.confirmed),
                     verify_total: agg.verify.map(|v| v.total),
+                    gated: snapshot::is_graded(*kind),
                 }),
             }
         })
@@ -1179,11 +1252,12 @@ fn build_report(total: &Tally, payloads: &[Payload]) -> (RunSummary, Vec<Finding
 }
 
 /// A finding's [`Severity`]: a `PANIC` is an absolute break (gate-failing on its own); a
-/// drop / double-print is informational, its fatality decided by the ratchet.
+/// drop / double-print is informational, its fatality decided by the ratchet; a `SWALLOW` is
+/// informational and never fatal at all (report-only, see [`snapshot::is_graded`]).
 fn severity_of(kind: Kind) -> Severity {
     match kind {
         Kind::Panic => Severity::GateFailing,
-        Kind::Dropped | Kind::DoublePrinted => Severity::Informational,
+        Kind::Dropped | Kind::DoublePrinted | Kind::Swallow => Severity::Informational,
     }
 }
 
