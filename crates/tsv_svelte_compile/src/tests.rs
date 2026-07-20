@@ -4752,21 +4752,25 @@ fn compile_optional_chain_bind_target_refuses() {
 }
 
 #[test]
-fn compile_template_scoped_const_bind_target_over_accepts() {
-    // TRACKED over-acceptance, pre-existing and shared with the regular-element
-    // path: a `{@const}` name and a `{:then}`/`{:catch}` value are declared
-    // `declaration_kind: 'const'` (kind `'template'`, not `'each'`), so the oracle
-    // raises `constant_binding` — while `unassignable_names` sees top-level script
-    // statements only and tsv compiles. Pinned as a CURRENT-BEHAVIOR test so the
-    // gap is visible and flips loudly when template scopes are modeled.
-    for source in [
+fn compile_template_scoped_const_bind_target_refuses() {
+    // A `bind:` reaches the SAME validator as an assignment
+    // (`BindDirective.js:181`), so the template-scoped consts obey the rule there
+    // too — the oracle raises `constant_binding` on each of these (live-verified:
+    // "Cannot bind to constant"). This was a TRACKED over-acceptance until the
+    // template scopes were modeled; it is the bind half of
+    // `compile_template_scoped_const_assignment_refuses`.
+    assert_unsupported(
         "<script>let p = $state(0);</script>{#await p then v}<div bind:this={v}></div>{/await}",
+        "a constant",
+    );
+    assert_unsupported(
         "<script>let c = $state(0);</script>{#if c}{@const o = {}}<div bind:this={o}></div>{/if}",
-    ] {
-        compile(source, &CompileOptions::default()).unwrap_or_else(|err| {
-            panic!("over-acceptance closed — update the doc residuals: {err:?} for:\n{source}")
-        });
-    }
+        "a constant",
+    );
+    assert_unsupported(
+        "<script>let xs = [1];</script>{#each xs as x, i}<div bind:this={i}></div>{/each}",
+        "a constant",
+    );
 }
 
 #[test]
@@ -6127,6 +6131,131 @@ fn compile_each_item_assignment_refuses() {
         "<script>let arr = $state([1]);</script>\
          {#each arr as value}<p>a</p>{:else}<button onclick={() => value = 1}>x</button>{/each}",
         "an {#each} item",
+    );
+}
+
+#[test]
+fn compile_template_scoped_const_assignment_refuses() {
+    // The TEMPLATE-scoped consts: a `{@const}` name (`phases/scope.js:1205`, whose
+    // `declaration_kind` is the `VariableDeclaration`'s own `const`), a
+    // `{:then}`/`{:catch}` value (`:1310`/`:1324`) and an `{#each}` INDEX
+    // (`:1273`). All three are `declaration_kind: 'const'` to the oracle, so a
+    // write to one is `constant_assignment` — live-verified, the oracle rejects
+    // every case below with `Cannot assign to constant`.
+    //
+    // ⚠️ These are OVER-ACCEPTANCES when unrecorded, not over-refusals: the names
+    // are purely template-local, so nothing falls through to a component-level set
+    // and no rule fires at all.
+    //
+    // ⚠️ Two of the three write POSITIONS below are load-bearing. An assignment
+    // sitting directly in an emitted template expression (`{(c = 2)}`) also trips
+    // `mutation inside a template expression`, an unrelated general rule that fires
+    // whatever the target is (verified: a plain `let` write there refuses too,
+    // while the oracle ACCEPTS it) — so that position MASKS this rule and has
+    // already been mistaken for a refutation. The event-handler arrow and the
+    // dropped `{:catch}` are the unmasked positions, and each form is covered in
+    // both.
+    // Position 1: an event-handler arrow — dropped from SSR, still validated in
+    // phase 2.
+    assert_unsupported(
+        "{#if true}{@const c = 1}<button onclick={() => (c = 2)}>x</button>{/if}",
+        "a constant",
+    );
+    assert_unsupported(
+        "<script>let p = Promise.resolve(1);</script>\
+         {#await p then v}<button onclick={() => (v = 2)}>x</button>{/await}",
+        "a constant",
+    );
+    assert_unsupported(
+        "<script>let xs = [1];</script>\
+         {#each xs as x, i}<button onclick={() => (i = 2)}>{x}</button>{/each}",
+        "a constant",
+    );
+    // The same three forms written inside a dropped `{:catch}`, the second
+    // unmasked position: the branch never reaches SSR emission, so no emission
+    // refusal can fire there and the write is graded by this rule alone.
+    assert_unsupported(
+        "<script>let p = Promise.resolve(1);</script>\
+         {#await p}<i>w</i>{:catch e}{@const c = 1}{(c = 2)}{/await}",
+        "a constant",
+    );
+    assert_unsupported(
+        "<script>let p = Promise.resolve(1);</script>\
+         {#await p}<i>w</i>{:catch e}{(e = 2)}{/await}",
+        "a constant",
+    );
+    assert_unsupported(
+        "<script>let p = Promise.resolve(1); let xs = [1];</script>\
+         {#await p}<i>w</i>{:catch e}{#each xs as x, i}{(i = 2)}{x}{/each}{/await}",
+        "a constant",
+    );
+    // The oracle's scope PRE-PASS again (see
+    // `compile_nested_const_before_its_declaration_refuses`): a `{@const}` is
+    // declared into its fragment's scope before any node of that fragment is
+    // visited, so a write textually EARLIER still resolves to it. Live-verified.
+    assert_unsupported(
+        "{#if true}<button onclick={() => (c = 2)}>x</button>{@const c = 1}{/if}",
+        "a constant",
+    );
+    // A destructured `{@const}` binds each name the pattern declares.
+    assert_unsupported(
+        "<script>let o = {a: 1};</script>\
+         {#if true}{@const {a} = o}<button onclick={() => (a = 2)}>x</button>{/if}",
+        "a constant",
+    );
+}
+
+#[test]
+fn compile_each_index_is_not_an_each_item() {
+    // ⭐ The two bindings of ONE construct take DIFFERENT oracle rules, and
+    // conflating them is a bug in either direction. In `{#each xs as x, i}` the
+    // ITEM is declared `('each', 'const')` (`phases/scope.js:1244`) and
+    // `validate_no_const_assignment` EXCLUDES `kind === 'each'`, so it carries
+    // `each_item_invalid_assignment`; the INDEX is `('template' | 'static',
+    // 'const')` (`:1273`) and carries `constant_assignment`. Both live-verified
+    // against the oracle, which reports "Cannot reassign or bind to each block
+    // argument" for the first and "Cannot assign to constant" for the second.
+    assert_unsupported(
+        "<script>let xs = [1];</script>\
+         {#each xs as x, i}<button onclick={() => (x = 2)}>{i}</button>{/each}",
+        "an {#each} item",
+    );
+    assert_unsupported(
+        "<script>let xs = [1];</script>\
+         {#each xs as x, i}<button onclick={() => (i = 2)}>{x}</button>{/each}",
+        "a constant",
+    );
+}
+
+#[test]
+fn compile_template_scoped_const_boundary_accepts() {
+    // The acceptance half, so the new template-const scope cannot widen into an
+    // over-refusal. Each of these the oracle COMPILES (live-verified).
+    //
+    // A JS binding nests INSIDE the template scope, so a handler parameter of the
+    // same name shadows the `{@const}` and the write is to the parameter — which
+    // is why `js_scope` is consulted before the template-const set.
+    assert_compiles("{#if true}{@const c = 1}<button onclick={(c) => (c = 2)}>x</button>{/if}");
+    // A MEMBER target writes THROUGH the binding, matching no branch of the
+    // oracle's validator.
+    assert_compiles(
+        "<script>let o = {v: 1};</script>\
+         {#if true}{@const c = o}<button onclick={() => (c.v = 2)}>x</button>{/if}",
+    );
+    // The scopes END at their block: an `{#each}` index is out of scope after the
+    // block, a `{:then}` value is not in scope in the `{:catch}` branch, and a
+    // `{@const}` is confined to its own fragment.
+    assert_compiles(
+        "<script>let xs = [1];</script>\
+         {#each xs as x, idx}{x}{/each}<button onclick={() => (idx = 2)}>x</button>",
+    );
+    assert_compiles(
+        "<script>let p = Promise.resolve(1); let v = $state(0);</script>\
+         {#await p then v}{v}{:catch e}<button onclick={() => (v = 2)}>x</button>{/await}",
+    );
+    assert_compiles(
+        "<script>let c = $state(0);</script>\
+         {#if true}{@const c = 1}{c}{/if}<button onclick={() => (c = 2)}>x</button>",
     );
 }
 

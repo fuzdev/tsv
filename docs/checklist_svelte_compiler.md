@@ -371,8 +371,9 @@ standalone repro, none of them dropped-region-specific:
 
 > **This inventory is now GATED, not just described.** Svelte's own `compiler-errors` +
 > `validator` suites — 455 files, ~2/3 deliberately invalid — are a standing corpus behind
-> `deno task compile:validation`, a path-keyed known-bug ratchet over the 49
-> over-acceptances they currently expose across 25 oracle codes. A *new* over-acceptance
+> `deno task compile:validation`, a path-keyed known-bug ratchet over the
+> over-acceptances they expose (`compile_validation_known.txt` is the count — a figure
+> repeated in prose only goes stale, and this one had). A *new* over-acceptance
 > fails the gate; a pinned one that stops firing fails too, so closing a rule forces
 > removing its lines and the list cannot rot. The prose below stays the *diagnosis*; the
 > snapshot is the *measurement*. See
@@ -428,7 +429,7 @@ of those three positions across the instance script, the module script and the t
 dropped `{:catch}` branches and event handlers included, which is where two of the
 suite's samples put the write.
 
-- **Refused**: `assignment to a constant (a const declarator or import local — the oracle's constant_assignment)` — a write to a `const` declarator or import local: a top-level one in either script, and equally a NESTED one (a `const` in a block or function body, or a `for (const … of …)` head), since the oracle's `validate_no_const_assignment` resolves the target through the SCOPE CHAIN rather than against a top-level set. Keyed on the DECLARATION KEYWORD, exactly as the oracle is, so a reactive `const c = $state(0)` refuses too. Only the innermost binding of the name decides — a `let` nested inside a same-named `const` is an ordinary local and its write is accepted. The pattern recursion mirrors `validate_no_const_assignment` exactly: `ArrayPattern` elements and `ObjectPattern` property *values*, and nothing else — a `RestElement`, an `AssignmentPattern` default and a `MemberExpression` match no branch there and are **accepted**, a member target writing *through* the binding rather than rebinding it.
+- **Refused**: `assignment to a constant (a const declarator or import local — the oracle's constant_assignment)` — a write to a `const` declarator or import local: a top-level one in either script, equally a NESTED one (a `const` in a block or function body, or a `for (const … of …)` head), and equally a TEMPLATE-scoped one (a `{@const}` name, a `{:then}`/`{:catch}` value, an `{#each}` INDEX — see below), since the oracle's `validate_no_const_assignment` resolves the target through the SCOPE CHAIN rather than against a top-level set. Keyed on the DECLARATION KEYWORD, exactly as the oracle is, so a reactive `const c = $state(0)` refuses too. Only the innermost binding of the name decides — a `let` nested inside a same-named `const` is an ordinary local and its write is accepted. The pattern recursion mirrors `validate_no_const_assignment` exactly: `ArrayPattern` elements and `ObjectPattern` property *values*, and nothing else — a `RestElement`, an `AssignmentPattern` default and a `MemberExpression` match no branch there and are **accepted**, a member target writing *through* the binding rather than rebinding it.
 - **Refused**: `assignment to an {#each} item (the oracle's each_item_invalid_assignment)` — a write to an `{#each}` context binding. Block-scoped to the block's body and fallback (the oracle's child scope, `phases/scope.js:1244`/`:1280`), and checked only for a whole-`Identifier` target, both matching the oracle. Runes-only there; this compiler is unconditionally runes-only.
 - **Refused**: `assignment to a {#snippet} parameter (the oracle's snippet_parameter_assignment)` — a write to a `{#snippet}` parameter (`phases/scope.js:1342`). NOT runes-gated in the oracle.
 
@@ -492,29 +493,46 @@ not `const` — `phases/scope.js`'s `ClassDeclaration` visitor). The other direc
 must never occur is a binding OUTLIVING its scope, which would suppress a genuine refusal;
 the stack's truncation forecloses it.
 
-⚠️ **One residual stays open, an over-acceptance narrower than the rule**: the
-TEMPLATE-scoped consts — a `{@const}` name, a `{:then}`/`{:catch}` value, an
-`{#each}` INDEX, all `declaration_kind: 'const'` to the oracle — which are recorded in no
-set and so still compile when written to. They are the one remaining gap of the UNSAFE
-shape (`const` to the oracle, unrecorded here).
+**The TEMPLATE-scoped consts are closed too.** A `{@const}` name, a
+`{:then}`/`{:catch}` value and the `{#each}` INDEX are all
+`declaration_kind: 'const'` to the oracle (`phases/scope.js:1205` via the `ConstTag`
+parent test, `:1310`/`:1324`, `:1273`) and were recorded in no set, so a write to one
+compiled — the last gap of the UNSAFE shape (`const` to the oracle, unrecorded here;
+purely template-local, so nothing falls through to a component-level set and no rule
+fires at all). They now enter `Nc::template_consts`, block-scoped at the extent the
+oracle's own scope covers: a `{@const}` to its enclosing FRAGMENT (every `Fragment` gets
+a child scope, and a fragment holding a declaration tag is never porous —
+`1-parse/index.js:306`), a `{:then}`/`{:catch}` value to that branch's fragment, an
+`{#each}` index to body + fallback. A fragment's `{@const}` names enter BEFORE any of its
+nodes is walked, mirroring the oracle's scope pre-pass, so a write textually earlier than
+the `{@const}` refuses too. The set is consulted after `js_scope` (a JS scope always
+nests inside a template one, so a handler parameter shadowing a `{@const}` still wins)
+and before `each_items`/`snippet_params` — the safe order, since the const rule fires at
+any pattern depth while those two fire only on a whole-identifier target. The `bind:`
+half closed with it (`BindDirective.js:181` reaches the same validator): a
+`bind:this={v}` to a `{:then}` value or a `{@const}` name, previously pinned as a
+current-behavior over-acceptance, now refuses as the oracle's `constant_binding`.
 
-⚠️ **One write position MASKS it, and the masking has already been mistaken for a
+⚠️ **The `{#each}` INDEX and the ITEM beside it take DIFFERENT rules**, and conflating
+them is a bug in either direction. The item is declared `('each', 'const')` (`:1244`) and
+`validate_no_const_assignment` EXCLUDES `kind === 'each'`, so it carries
+`each_item_invalid_assignment`; the index is `('template' | 'static', 'const')` (`:1273`)
+and carries `constant_assignment`. Both live-verified: the oracle answers "Cannot
+reassign or bind to each block argument" for a write to `x` in `{#each xs as x, i}` and
+"Cannot assign to constant" for a write to `i` in the same block.
+
+⚠️ **One write position MASKS this rule, and the masking has already been mistaken for a
 refutation.** An assignment sitting directly in an emitted template expression
 (`{(c = 2)}`) refuses as `mutation inside a template expression` — an unrelated general
-rule that fires whatever the target is, `const` or not — so the most natural repro reads
-green while the residual is fully live. The two unmasked positions are an event-handler
-arrow (`onclick={() => (c = 2)}`) and a write inside a dropped `{:catch}`; both compile,
-for all three binding forms. Live-verified over nine probes (three forms × three
-positions): the oracle rejects all nine as `constant_assignment`, tsv over-accepts the
-six unmasked ones, and the nine write-free controls reach parity 9/9 — so the write is
-the only variable.
-
-The NESTED-script half of this residual (a
-`const` in a block or function body, whether or not it collides with a component-level
-name, and now including the cross-case and before-declaration orderings above) is
-**closed**: such a binding is on the scope stack with `is_const`, so the write
-refuses. Closing the template half means giving those three binding forms scope entries of
-their own, and is its own slice.
+rule that fires whatever the target is, `const` or not — so the most natural repro read
+green while the residual was fully live. That the rule is target-independent is itself
+live-verified: `<script>let n = 0;</script>{(n = 2)}` is COMPILED by the oracle and
+refused by tsv under that same message. The two unmasked positions are an event-handler
+arrow (`onclick={() => (c = 2)}`) and a write inside a dropped `{:catch}`. Measured over
+nine probes (three forms × three positions) before the fix: the oracle rejects all nine
+as `constant_assignment`, tsv over-accepted the six unmasked ones; after it, all nine
+refuse, and `compile_corpus_compare` now names the tsv-side reason on each, so "tsv also
+declines" can be told from "tsv declines for the reason under test" mechanically.
 
 **Closing the shadowing over-refusal did not move corpus parity, and the earlier claim that
 it would is falsified.** This section previously recorded that the family cost one parity
@@ -880,7 +898,7 @@ A **static** component invocation compiles to `Name($$renderer, props)` (`shared
 | `<svelte:head>` with attributes / sharing a fragment with `{@const}` | **Refused**: `attributes on <svelte:head>` / `<svelte:head> alongside a {@const} in the same fragment (hoist order)` |
 | `<title>` (a `TitleElement`, i.e. `<title>` inside `<svelte:head>`) → a `$$renderer.title(($$renderer) => { $$renderer.push(`<title>…children…</title>`) })` statement (`TitleElement.js`). Like `<svelte:head>` it is **hoisted** to its fragment's front (the oracle lists it in `clean_nodes`'s hoisted set and pushes to `state.init`), so it precedes its head siblings regardless of source order and never participates in surrounding whitespace normalization. Its children are `Text`/`ExpressionTag` only, emitted like a regular element's text content (a `{expr}` folds when statically known, else `$.escape(expr)`); its children are **not** whitespace-normalized (the oracle calls `process_children` directly, without `clean_nodes`). Analyzed on the emitted path, so a `new`/prop-rooted access in a title `{expr}` fires the `$$renderer.component` wrapper. | Supported |
 | `<title>` with an attribute / a non-text-or-`{expression}` child | **Refused**: `attribute on <title> (the oracle rejects it)` / `invalid <title> content (only text and {expression} — the oracle rejects it)` (`title_illegal_attribute` / `title_invalid_content` — input tsv's permissive parser accepts) |
-| `<svelte:window>` / `<svelte:body>` / `<svelte:document>` → emit **nothing** (SSR-inert: their events/binds are client-only, so the oracle produces no template output). A legal one carries only oracle-accepted attributes: a **modern event attribute** (`on*={expr}`), the no-op drop family (`class:`/`style:`/`use:`/`transition:`/`in:`/`out:`/`animate:`/`{@attach}`), and a **whitelisted `bind:`** — the name in the ported `binding_properties` list (`this`/`focused` on any; `innerWidth`/`innerHeight`/`outerWidth`/`outerHeight`/`scrollX`/`scrollY`/`online`/`devicePixelRatio` on window; `activeElement`/`fullscreenElement`/`pointerLockElement`/`visibilityState` on document) **and** its target a reassignable lvalue (`bind:this` any lvalue; every other bind a `$state`-rooted `Identifier`/member — the same fork regular elements use, over-refusing prop/plain-`let` targets as a safe over-refusal). A **top-level** `const`-declared or imported target refuses on every bind path alike (`constant_binding`), via the shared `reassignable_bind_target_root` — including a `const`-declared `$state` (`const c = $state(0)` + `bind:innerWidth={c}`) and a `const`/import `bind:this` target, since the oracle keys that rejection on the declaration keyword, not on reactivity. Writing THROUGH a const binding (`bind:value={o.v}`) stays legal — the oracle's rule tests a bare `Identifier` and lets a member chain fall through. An optional-chained target (`bind:this={o?.el}`) refuses too — acorn wraps such a chain in a `ChainExpression`, which the oracle's `bind_invalid_expression` test rejects. ⚠️ **Two over-acceptances stay open**, both pre-existing and shared with the regular-element path: a TEMPLATE-scoped const target — a `{@const}` name (`phases/scope.js:1099`/`1111`) or a `{:then}`/`{:catch}` value (`:1310`/`:1324`) — is declared `declaration_kind: 'const'`, kind `'template'` (not `'each'`), so the oracle raises `constant_binding` where tsv compiles. `unassignable_names` is keyed on top-level script statements and has no view of template scopes; closing it needs tsv to model them, its own slice.) Each surviving expression is guard-dropped (a stray rune / top-level `await` refuses) and still analyzed — a `new`/prop-rooted member/call in a bind or handler fires the `$$renderer.component` wrapper, and a `bind:` marks its target reassigned (a later read of a `$state` target stays dynamic, not folded to its init value). | Supported |
+| `<svelte:window>` / `<svelte:body>` / `<svelte:document>` → emit **nothing** (SSR-inert: their events/binds are client-only, so the oracle produces no template output). A legal one carries only oracle-accepted attributes: a **modern event attribute** (`on*={expr}`), the no-op drop family (`class:`/`style:`/`use:`/`transition:`/`in:`/`out:`/`animate:`/`{@attach}`), and a **whitelisted `bind:`** — the name in the ported `binding_properties` list (`this`/`focused` on any; `innerWidth`/`innerHeight`/`outerWidth`/`outerHeight`/`scrollX`/`scrollY`/`online`/`devicePixelRatio` on window; `activeElement`/`fullscreenElement`/`pointerLockElement`/`visibilityState` on document) **and** its target a reassignable lvalue (`bind:this` any lvalue; every other bind a `$state`-rooted `Identifier`/member — the same fork regular elements use, over-refusing prop/plain-`let` targets as a safe over-refusal). A **top-level** `const`-declared or imported target refuses on every bind path alike (`constant_binding`), via the shared `reassignable_bind_target_root` — including a `const`-declared `$state` (`const c = $state(0)` + `bind:innerWidth={c}`) and a `const`/import `bind:this` target, since the oracle keys that rejection on the declaration keyword, not on reactivity. Writing THROUGH a const binding (`bind:value={o.v}`) stays legal — the oracle's rule tests a bare `Identifier` and lets a member chain fall through. An optional-chained target (`bind:this={o?.el}`) refuses too — acorn wraps such a chain in a `ChainExpression`, which the oracle's `bind_invalid_expression` test rejects. A TEMPLATE-scoped const target — a `{@const}` name, a `{:then}`/`{:catch}` value (`phases/scope.js:1310`/`:1324`), or an `{#each}` index (`:1273`) — refuses on the same terms: each is `declaration_kind: 'const'`, kind `'template'`/`'static'` (not `'each'`), so the oracle raises `constant_binding`. `unassignable_names` is keyed on top-level script statements and has no view of template scopes, so the rule is applied instead by `needs_context`'s `template_consts` scope, which every `bind:` target routes through.) Each surviving expression is guard-dropped (a stray rune / top-level `await` refuses) and still analyzed — a `new`/prop-rooted member/call in a bind or handler fires the `$$renderer.component` wrapper, and a `bind:` marks its target reassigned (a later read of a `$state` target stays dynamic, not folded to its init value). | Supported |
 | `<svelte:window>` / `<svelte:body>` / `<svelte:document>` with **oracle-rejected input** — nested (legal only at the component root) / a duplicate of the same kind / children / a spread or a non-event plain attribute / a `bind:` outside the whitelist or with a non-lvalue/const/undefined target | **Refused**: `<{name}> must be a top-level element (the oracle rejects it)` / `duplicate <{name}> element (the oracle rejects it)` / `<{name}> cannot have children (the oracle rejects it)` / `invalid attribute on <{name}> (the oracle rejects it)` / `bind: directive {name}` (`svelte_meta_invalid_placement` / `svelte_meta_duplicate` / `svelte_meta_invalid_content` / `illegal_element_attribute` / `bind_invalid_target`\|`bind_invalid_name`\|`bind_invalid_expression`\|`constant_binding`\|`bind_invalid_value` — all input tsv's permissive parser accepts) |
 | `<svelte:window>` / `<svelte:body>` / `<svelte:document>` with a **legacy** `on:` event directive or `let:` | **Refused**: `legacy on: directive (runes-only fence)` / `legacy let: directive (runes-only fence)` (the oracle accepts a legacy `on:` here, but tsv declines it as a deliberate safe over-refusal, matching the regular-element path) |
 | `<svelte:element this={…}>` → a statement-level `$.element($$renderer, TAG, attrsFn?, childrenFn?)` call (splits the template push stream like a component; no trailing `<!---->`). **TAG**: `this="div"` → the `'div'` string literal (the parser collapses a mixed `this="a{b}"` to its first static chunk, matching the oracle's legacy warn-and-keep-first); `this={expr}` → the erased expression with a derived read (bare or nested) rewritten to `d()` (no static fold). **attrsFn** (`() => { $$renderer.push(…) }`): the exact regular-element attribute machinery — plain attributes, a `{...spread}` → `$.attributes({…}, css_hash?, classes?, styles?)` (**never** a `flags` argument — the name is always the literal `svelte:element`, so it is never `<input>`/custom), `class:`/`style:` → `$.attr_class`/`$.attr_style` — rendered into a parameterless closure over the enclosing `$$renderer`; elided when it would push nothing. **childrenFn** (`() => { … }`): the element's fragment, emitted like any element child (not text-first, not a component root); elided when empty. The `this={expr}` and every attribute expression are still analyzed — a `new`/prop-rooted access fires the `$$renderer.component` wrapper, and a `this={local}` inside a snippet body blocks module-hoist. | Supported |

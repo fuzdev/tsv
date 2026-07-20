@@ -1231,13 +1231,18 @@ fn is_get_set_pair(expr: &Expression<'_>) -> bool {
 /// otherwise accept a `const`/import target unchallenged.
 ///
 /// ⚠️ The set it consults ([`crate::transform_server::EmitEnv::unassignable_names`])
-/// is keyed on **top-level script statements only**, so the rule is closed for a
-/// top-level `const`/import and OPEN for a TEMPLATE-scoped one. A `{@const}` name
-/// (`scope.js:1099`/`1111`) and a `{:then}`/`{:catch}` value (`:1310`/`:1324`) are
-/// declared `declaration_kind: 'const'` with kind `'template'` — not `'each'` — so
-/// the oracle's `validate_no_const_assignment` rejects a bind to one exactly as it
-/// rejects a top-level `const`, while tsv compiles it. Closing that half needs tsv
-/// to model template scopes; see `../../docs/checklist_svelte_compiler.md`.
+/// is keyed on **top-level script statements only**, so this seam enforces the
+/// oracle's `constant_binding` for a top-level `const`/import and is BLIND to a
+/// TEMPLATE-scoped one — a `{@const}` name, a `{:then}`/`{:catch}` value
+/// (`scope.js:1310`/`:1324`), an `{#each}` index (`:1273`), each equally
+/// `declaration_kind: 'const'` (kind `'template'`/`'static'`, not `'each'`).
+///
+/// That blindness is no longer a gap, because this is not the only enforcement
+/// point: `needs_context`'s whole-component walk reaches every `bind:` too
+/// (`BindDirective.js:181` is the oracle's own third caller of the same validator)
+/// and applies the rule from its scoped `template_consts` set. So a bind to a
+/// template-scoped const refuses THERE, not here. Keep the two straight when
+/// changing either — a shape this seam accepts is not thereby accepted by tsv.
 fn reassignable_bind_target_root(env: &EmitEnv<'_, '_>, expr: &Expression<'_>) -> Option<String> {
     let name = bind_target_root(expr, env.source)?;
     // The rejection applies to a BARE identifier target only. The oracle's
@@ -1290,12 +1295,12 @@ fn emitted_bind_target<'arena>(
 /// shared [`reassignable_bind_target_root`], so a **top-level** `const`-declared or
 /// imported target refuses here exactly as it does on the regular-element path.
 ///
-/// ⚠️ That closes the top-level half only. A TEMPLATE-scoped const target — a
-/// `{@const}` name, or a `{:then}`/`{:catch}` value — is just as `const`-declared to
-/// the oracle (`constant_binding`) and still compiles here, because
-/// `unassignable_names` is built from top-level script statements alone. Two open
-/// over-acceptances, both pre-existing and shared with the regular-element path; see
-/// [`reassignable_bind_target_root`] and `../../docs/checklist_svelte_compiler.md`.
+/// That covers the top-level half only — `unassignable_names` is built from
+/// top-level script statements alone. A TEMPLATE-scoped const target (a `{@const}`
+/// name, a `{:then}`/`{:catch}` value, an `{#each}` index) is just as
+/// `const`-declared to the oracle and is refused instead by `needs_context`'s
+/// `template_consts` scope, which every `bind:` routes through; see
+/// [`reassignable_bind_target_root`].
 ///
 /// A failure refuses with the collapsing `Refusal::BindDirective { name }` bucket.
 pub(crate) fn validate_inert_bind_target<'arena>(

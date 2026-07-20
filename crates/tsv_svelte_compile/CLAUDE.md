@@ -285,9 +285,11 @@ project-wide conventions.
   (`phases/2-analyze/visitors/shared/utils.js:18`, itself one function reached from
   `AssignmentExpression`, `UpdateExpression` and `BindDirective` alike). One refusal,
   `Refusal::InvalidAssignmentTarget`, carries its three rules: `constant_assignment`
-  (a top-level `const` declarator or import local, from either script —
-  `collect_constant_names`, the same set the `bind:` gate reads as
-  `unassignable_names`), `each_item_invalid_assignment` (an `{#each}` context binding,
+  (any `const`-declared binding in scope at the write — a top-level declarator or
+  import local from either script via `collect_constant_names`, the set the `bind:`
+  gate also reads as `unassignable_names`; a NESTED script `const` via `js_scope`;
+  and a TEMPLATE-scoped one via `template_consts`, all three detailed below),
+  `each_item_invalid_assignment` (an `{#each}` context binding,
   block-scoped to body + fallback) and `snippet_parameter_assignment` (a `{#snippet}`
   parameter, block-scoped to its body; NOT runes-gated in the oracle). The pattern
   recursion mirrors `validate_no_const_assignment` exactly — `ArrayPattern` elements
@@ -322,11 +324,25 @@ project-wide conventions.
   statements are walked (the oracle's scope pre-pass), closing two over-acceptances. The
   hoist is deliberately `const`-only — hoisting a rule-free binding could only remove a
   refusal. The other unsafe direction is a binding OUTLIVING its scope, which would
-  suppress a genuine refusal; the stack's truncation forecloses it. One residual
-  over-acceptance stays open: the **template-scoped** consts
-  (`{@const}`, a `{:then}`/`{:catch}` value, an `{#each}` index) are `const` to the
-  oracle but are recorded nowhere, so a write to one still compiles. See
-  `../../docs/checklist_svelte_compiler.md` §The wider validation surface.
+  suppress a genuine refusal; the stack's truncation forecloses it.
+
+  The **template-scoped** consts — a `{@const}` name, a `{:then}`/`{:catch}` value,
+  and the `{#each}` INDEX, all `declaration_kind: 'const'` to the oracle — are
+  recorded in `js_scope`'s sibling `template_consts`, block-scoped at the extent the
+  oracle's own scope covers (a `{@const}` to its enclosing fragment, entered before
+  any of that fragment's nodes is walked so the oracle's scope pre-pass is mirrored;
+  a `{:then}`/`{:catch}` value to that branch; an index to body + fallback). It is
+  consulted after `js_scope` and before the each/snippet sets — the safe order, since
+  the const rule fires at any pattern depth while those two fire only on a
+  whole-identifier target. Because a `bind:` reaches the same validator, this is also
+  where a bind to a template-scoped const is refused; `unassignable_names` sees
+  top-level script statements only and is blind to them.
+
+  ⚠️ The `{#each}` INDEX and the ITEM beside it take DIFFERENT rules, and conflating
+  them is a bug in either direction: the item is `('each', 'const')` and
+  `validate_no_const_assignment` EXCLUDES `kind === 'each'` in favor of
+  `each_item_invalid_assignment`, while the index is `('template' | 'static',
+  'const')` and carries `constant_assignment`.
 - `store_rewrite.rs` — **store-access (and script-position `$derived` read)
   rewriting** for the instance script (the
   script analog of `fragment.rs`'s template value walk). A tree→tree pass over the

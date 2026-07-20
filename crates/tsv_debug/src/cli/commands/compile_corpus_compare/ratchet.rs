@@ -286,7 +286,7 @@ pub(super) fn keys(groups: &[GroupInfo], outcomes: &[FileOutcome]) -> BTreeSet<R
         match &o.bucket {
             Bucket::OracleRejected {
                 code,
-                tsv_over_accepts: true,
+                tsv_refusal: None,
             } => {
                 set.insert(RatchetKey {
                     kind: Kind::OverAcceptance,
@@ -311,7 +311,7 @@ pub(super) fn keys(groups: &[GroupInfo], outcomes: &[FileOutcome]) -> BTreeSet<R
             Bucket::Parity { .. }
             | Bucket::Refused { .. }
             | Bucket::OracleRejected {
-                tsv_over_accepts: false,
+                tsv_refusal: Some(_),
                 ..
             } => {}
         }
@@ -571,7 +571,7 @@ mod tests {
                     "../svelte/packages/svelte/tests/validator/samples/a/input.svelte",
                     Bucket::OracleRejected {
                         code: "constant_assignment".to_string(),
-                        tsv_over_accepts: true,
+                        tsv_refusal: None,
                     },
                 ),
                 // A plain oracle rejection is the expected case, not a finding.
@@ -580,7 +580,7 @@ mod tests {
                     "../svelte/packages/svelte/tests/validator/samples/b/input.svelte",
                     Bucket::OracleRejected {
                         code: "constant_assignment".to_string(),
-                        tsv_over_accepts: false,
+                        tsv_refusal: Some("css at-rule in <style>".to_string()),
                     },
                 ),
                 outcome(
@@ -620,7 +620,7 @@ mod tests {
                     "../svelte/packages/svelte/tests/validator/samples/a/input.svelte",
                     Bucket::OracleRejected {
                         code: "constant_assignment".to_string(),
-                        tsv_over_accepts: true,
+                        tsv_refusal: None,
                     },
                 ),
                 outcome(
@@ -773,7 +773,7 @@ mod tests {
                 path,
                 Bucket::OracleRejected {
                     code: "constant_assignment".to_string(),
-                    tsv_over_accepts: true,
+                    tsv_refusal: None,
                 },
             )
         };
@@ -917,7 +917,7 @@ mod tests {
                 "a.svelte",
                 Bucket::OracleRejected {
                     code: "constant_assignment".to_string(),
-                    tsv_over_accepts: true,
+                    tsv_refusal: None,
                 },
             )],
         );

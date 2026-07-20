@@ -26,7 +26,7 @@
 # its buckets churn with every compiler slice.
 #
 # Format: KIND<TAB>ORACLE_CODE<TAB>PATH (path relative to its suite root)
-# shapes: 41
+# shapes: 40
 OVER-ACCEPT	attribute_duplicate	compiler-errors/samples/attribute-unique-class/main.svelte
 OVER-ACCEPT	attribute_duplicate	compiler-errors/samples/attribute-unique-shorthand/main.svelte
 OVER-ACCEPT	attribute_duplicate	compiler-errors/samples/attribute-unique-style/main.svelte
@@ -39,7 +39,6 @@ OVER-ACCEPT	attribute_invalid_name	validator/samples/attribute-invalid-name-5/in
 OVER-ACCEPT	attribute_invalid_name	validator/samples/attribute-invalid-name/input.svelte
 OVER-ACCEPT	attribute_invalid_sequence_expression	compiler-errors/samples/attribute-sequence-expression-2/main.svelte
 OVER-ACCEPT	attribute_invalid_sequence_expression	compiler-errors/samples/attribute-sequence-expression/main.svelte
-OVER-ACCEPT	constant_binding	validator/samples/binding-await-catch/input.svelte
 OVER-ACCEPT	declaration_duplicate	validator/samples/snippet-already-declared/input.svelte
 OVER-ACCEPT	each_key_without_as	compiler-errors/samples/each-key-without-as/main.svelte
 OVER-ACCEPT	export_undefined	compiler-errors/samples/export-not-defined-module/main.svelte

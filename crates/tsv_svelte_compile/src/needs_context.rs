@@ -73,6 +73,30 @@ struct Nc<'a> {
     /// `{#snippet}` parameter names currently in scope — the oracle's
     /// `snippet_parameter_assignment` set. Block-scoped like `each_items`.
     snippet_params: NameSet,
+    /// TEMPLATE-scoped `const` names currently in scope — a `{@const}` name, a
+    /// `{:then}`/`{:catch}` value, and an `{#each}` INDEX. All three are
+    /// `declaration_kind: 'const'` to the oracle (`phases/scope.js:1205` via the
+    /// `ConstTag` parent test, `:1310`/`:1324`, `:1273`), so a write to one is
+    /// `constant_assignment` — unlike the each ITEM beside the index, which is
+    /// `kind: 'each'` and is EXCLUDED from that rule by
+    /// `validate_no_const_assignment` in favor of its own.
+    ///
+    /// Block-scoped like [`Nc::each_items`], at the extent the oracle's own scope
+    /// covers: a `{@const}` to its enclosing FRAGMENT (every `Fragment` gets a
+    /// child scope, and a fragment holding a declaration tag is never porous —
+    /// `1-parse/index.js:306`), a `{:then}`/`{:catch}` value to that branch's
+    /// fragment, an `{#each}` index to body + fallback.
+    ///
+    /// Consulted AFTER [`Nc::js_scope`] (a JS scope always nests inside a template
+    /// one, so a handler parameter shadowing a `{@const}` still wins) but BEFORE
+    /// `each_items`/`snippet_params`. That order is the SAFE one where the two
+    /// disagree: the const rule fires at any pattern depth while the each/snippet
+    /// rules fire only on a whole-identifier target, so consulting the const set
+    /// last could drop a refusal the oracle raises. The cost is only a mislabeled
+    /// refusal in the exotic shadowing case (a `{@const}` shadowed by an inner
+    /// `{#each}` item of the same name) — the oracle rejects that write too, just
+    /// under the other rule's message.
+    template_consts: NameSet,
     /// Names bound anywhere below the component's top-level instance scope.
     shadowed: NameSet,
     /// The JS bindings of the scopes currently OPEN around the walk — a function's
@@ -198,6 +222,7 @@ pub(crate) fn analyze_component(
         constants,
         each_items: NameSet::default(),
         snippet_params: NameSet::default(),
+        template_consts: NameSet::default(),
         shadowed: NameSet::default(),
         js_scope: Vec::new(),
         member_roots: NameSet::default(),
@@ -432,18 +457,25 @@ pub(crate) fn collect_constant_names(
 ///   because hoisting a rule-free binding could only REMOVE a refusal;
 /// - a class EXPRESSION's own name (`const C = class C { … }`) is not recorded —
 ///   only a class *declaration*'s is. SAFE: that name is `'let'` to the oracle
-///   (`phases/scope.js`'s `ClassDeclaration` visitor), not `const`;
-/// - ⚠️ the TEMPLATE-scoped consts — a `{@const}`, a `{:then}`/`{:catch}` value, an
-///   `{#each}` index — are not recorded at all. These ARE `const` to the oracle, so
-///   by the rule above a write to one is an OVER-ACCEPTANCE. It is the family's one
-///   open residual, and the one gap of this shape that is not safe. ⚠️ It is MASKED
-///   in exactly one write position: an assignment sitting directly in an emitted
-///   template expression (`{(c = 2)}`) refuses as `mutation inside a template
-///   expression`, an unrelated general rule that fires whatever the target is — so
-///   the most natural repro reads green and has already been mistaken for a
-///   refutation of this whole entry. Probe an event-handler arrow
-///   (`onclick={() => (c = 2)}`) or a write in a dropped `{:catch}` instead: those
-///   compile, for all three binding forms.
+///   (`phases/scope.js`'s `ClassDeclaration` visitor), not `const`.
+///
+/// The TEMPLATE-scoped consts — a `{@const}`, a `{:then}`/`{:catch}` value, an
+/// `{#each}` index — were the one gap of this shape that was NOT safe (`const` to
+/// the oracle, purely template-local, so an unrecorded one fell through to nothing
+/// at all and the write was accepted). They are now recorded in
+/// [`Nc::template_consts`], which the lookup below consults between `js_scope` and
+/// the two template-rule sets.
+///
+/// ⚠️ **One write position MASKS that rule**, and the masking has already been
+/// mistaken for a refutation of this whole entry. An assignment sitting directly in
+/// an emitted template expression (`{(c = 2)}`) refuses as `mutation inside a
+/// template expression`, an unrelated general rule that fires whatever the target
+/// is — verified target-independent, since a plain `let` write there refuses too
+/// while the oracle COMPILES it. So the most natural repro reads green either way,
+/// and a probe of this family must use an event-handler arrow
+/// (`onclick={() => (c = 2)}`) or a write in a dropped `{:catch}`. When something
+/// refuses, establish WHICH rule caught it — `compile_corpus_compare` reports the
+/// tsv-side reason on every oracle-rejected file for exactly this purpose.
 ///
 /// The one direction that must never occur is a binding that OUTLIVES its scope:
 /// it would suppress a genuine refusal and produce an over-acceptance.
@@ -475,6 +507,12 @@ fn refuse_invalid_assign_target(target: &Expression<'_>, nc: &mut Nc<'_>, top: b
                 binding
                     .is_const
                     .then_some(refusal::INVALID_ASSIGNMENT_CONSTANT)
+            } else if nc.template_consts.contains(name) {
+                // A `{@const}` name, a `{:then}`/`{:catch}` value, an `{#each}`
+                // INDEX: `declaration_kind: 'const'` to the oracle, so
+                // `constant_assignment` at ANY pattern depth — hence no `top`
+                // gate, unlike the two template rules below.
+                Some(refusal::INVALID_ASSIGNMENT_CONSTANT)
             } else if nc.each_items.contains(name) {
                 top.then_some(refusal::INVALID_ASSIGNMENT_EACH_ITEM)
             } else if nc.snippet_params.contains(name) {
@@ -531,6 +569,21 @@ fn exit_block_scope(set: &mut NameSet, added: Vec<String>) {
     for name in added {
         set.remove(&name);
     }
+}
+
+/// The names an optional template binding pattern declares, for
+/// [`Nc::template_consts`].
+///
+/// Deliberately NOT paired with the `enter_block_scope`/`exit_block_scope` calls
+/// in a single helper: the no-leak property rests on every enter having a visible
+/// exit on the same straight-line path, and folding the pair behind a function
+/// would move that audit off the page.
+fn template_const_names(pattern: Option<&Expression<'_>>, source: &str) -> Vec<String> {
+    let mut names = Vec::new();
+    if let Some(pattern) = pattern {
+        let _ = pattern_binding_names(pattern, source, &mut names);
+    }
+    names
 }
 
 /// Open a JS scope: the mark [`js_scope_restore`] rewinds to.
@@ -1110,9 +1163,21 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
 /// the block-local bindings (each item/index, `{:then}`/`{:catch}` values,
 /// `{@const}` names) that shadow the component scope.
 fn walk_fragment(fragment: &Fragment<'_>, nc: &mut Nc<'_>) {
+    // The `{@const}` names of this fragment enter scope BEFORE any of its nodes is
+    // walked, mirroring the oracle's scope PRE-PASS (`create_scopes` completes
+    // before any reference is validated), so a write textually earlier than the
+    // `{@const}` still resolves to it.
+    let mut names = Vec::new();
+    for node in fragment.nodes {
+        if let FragmentNode::ConstTag(tag) = node {
+            let _ = pattern_binding_names(&tag.id, nc.source, &mut names);
+        }
+    }
+    let added = enter_block_scope(&mut nc.template_consts, names);
     for node in fragment.nodes {
         walk_fragment_node(node, nc);
     }
+    exit_block_scope(&mut nc.template_consts, added);
 }
 
 fn walk_fragment_node(node: &FragmentNode<'_>, nc: &mut Nc<'_>) {
@@ -1317,13 +1382,20 @@ fn walk_each_block(block: &EachBlock<'_>, nc: &mut Nc<'_>) {
             each_added = enter_block_scope(&mut nc.each_items, names);
         }
     }
+    let mut index_added = Vec::new();
     if let Some(index) = block.index {
         nc.shadowed.insert(index.to_string());
+        // `('template' | 'static', 'const')` at `phases/scope.js:1273` — so unlike
+        // the ITEM beside it (`('each', 'const')`, excluded from the const rule),
+        // a write to the index is `constant_assignment`. Same extent as the item:
+        // the each block's child scope, covering body + fallback.
+        index_added = enter_block_scope(&mut nc.template_consts, vec![index.to_string()]);
     }
     walk_fragment(&block.body, nc);
     if let Some(fallback) = &block.fallback {
         walk_fragment(fallback, nc);
     }
+    exit_block_scope(&mut nc.template_consts, index_added);
     exit_block_scope(&mut nc.each_items, each_added);
 }
 
@@ -1343,14 +1415,23 @@ fn walk_await_block(block: &AwaitBlock<'_>, nc: &mut Nc<'_>) {
     if let Some(pending) = &block.pending {
         walk_fragment(pending, nc);
     }
+    // The `{:then}` value and the `{:catch}` error are each declared `'const'`
+    // into their OWN branch fragment's scope (`phases/scope.js:1310`/`:1324`), so
+    // a write to one is `constant_assignment`, scoped to that branch alone.
     if let Some(then) = &block.then {
+        let names = template_const_names(block.value.as_ref(), nc.source);
+        let added = enter_block_scope(&mut nc.template_consts, names);
         walk_fragment(then, nc);
+        exit_block_scope(&mut nc.template_consts, added);
     }
     if let Some(catch) = &block.catch {
+        let names = template_const_names(block.error.as_ref(), nc.source);
+        let added = enter_block_scope(&mut nc.template_consts, names);
         let prev = nc.in_dropped_catch;
         nc.in_dropped_catch = true;
         walk_fragment(catch, nc);
         nc.in_dropped_catch = prev;
+        exit_block_scope(&mut nc.template_consts, added);
     }
 }
 
