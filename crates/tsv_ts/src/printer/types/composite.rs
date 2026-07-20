@@ -61,8 +61,8 @@ impl<'a> Printer<'a> {
 
         // Check for comments that force breaking layout.
         // Line comments anywhere in the conditional force breaking (they end the line).
-        // Multiline block comments after ?/: force breaking.
-        // Comments before ? (between extends_type and ?) that are on own line force breaking.
+        // A multiline block between extends_type and ? forces breaking; a single-line
+        // block there rides the flat path and trails the extends type.
         // Block comments between true_type and : are trailing (don't force breaking).
         // Also: leading line comments inside stripped parens around extends_type
         // (e.g., `a extends (// c\n  b)`) — these are relocated to trail
@@ -81,22 +81,33 @@ impl<'a> Printer<'a> {
             c.false_type,
             TSType::Parenthesized(p) if self.paren_has_leading_line_comment(p),
         );
+        // In the `?`/`:`→branch gaps, only a comment that HANGS its branch breaks the
+        // layout: a line comment, or a multiline block the author broke after
+        // (`comments_force_own_line_between` — the shared keyword→value gate). A glued
+        // multiline block stays inline (`? /* …⏎… */ B`, the way prettier keeps it),
+        // and a single-line block in any position rides the inline path, whose
+        // branch-gap run preserves an authored break after the comment as a
+        // collapsible line (`build_branch_comment_run`). Before `?`, any multiline
+        // block still breaks (it trails the extends-type, a different gap).
         let has_breaking_comments_around_question = self
             .has_line_comments_between(extends_type_end, true_type_start)
-            || self.has_multiline_block_comments_on_page_between(extends_type_end, true_type_start)
-            || question_pos.is_some_and(|q| {
-                tsv_lang::has_comments_to_emit_in_range(self.comments, extends_type_end, q)
-            })
-            // A single-line block comment in the `?`→branch gap (own-line or trailing)
-            // collapses inline (`? /* c */ B`) — the branch loop pulls the comment to
-            // trail `?`, so an own-line block can't be kept distinct idempotently;
-            // matches prettier's fixed point. Only a line/multiline comment breaks.
+            || match question_pos {
+                Some(q) => {
+                    self.has_multiline_block_comments_on_page_between(extends_type_end, q)
+                        || self.comments_force_own_line_between(q + 1, true_type_start)
+                }
+                None => self.has_multiline_block_comments_on_page_between(
+                    extends_type_end,
+                    true_type_start,
+                ),
+            }
             || extends_paren_has_leading_line_comment
             || true_paren_has_leading_line_comment;
         let colon_end = colon_pos.map_or(true_type_end, |c| c + 1);
+        // `comments_force_own_line_between` also covers line comments (`!is_block`
+        // hangs), so no separate line-comment scan is needed for this gap.
         let has_breaking_comments_after_colon = self
-            .has_line_comments_between(colon_end, false_type_start)
-            || self.has_multiline_block_comments_on_page_between(colon_end, false_type_start)
+            .comments_force_own_line_between(colon_end, false_type_start)
             || false_paren_has_leading_line_comment;
         // Trailing line comments on true_type also force breaking (they end the line)
         let has_trailing_line_comment_on_true =
@@ -136,8 +147,23 @@ impl<'a> Printer<'a> {
             self.build_type_doc(c.false_type)
         };
 
+        // Comments trailing on extends_type (between extends_type and ?). The mirror
+        // of `trailing_on_true` below: this path assembles the conditional from its
+        // parts, so it must claim every gap on its own seam (`docs/comments.md`
+        // hazard 1). Only single-line blocks reach here — anything that hangs a
+        // branch took the breaking path above.
+        let trailing_on_extends = if let Some(q) = question_pos {
+            self.build_inline_comments_between_doc(extends_type_end, q)
+        } else {
+            d.empty()
+        };
+
         // Comments trailing on true_type (between true_type and :)
-        // These stay with the true branch, preserving user intent.
+        // These stay with the true branch, preserving user intent. Kept separate from
+        // `trailing_on_extends` above rather than folded into a shared helper: the
+        // expression printer's parallel pair differs (its `?` arm falls back to a
+        // scan when no `?` is located), so a common helper would either drop that
+        // fallback or grow a parameter for it. Each seam is canary-covered on its own.
         let trailing_on_true = if let Some(c) = colon_pos {
             self.build_inline_comments_between_doc(true_type_end, c)
         } else {
@@ -181,6 +207,7 @@ impl<'a> Printer<'a> {
             comments_before_extends,
             d.text(" extends"),
             extends_type_doc,
+            trailing_on_extends,
             d.indent(d.concat(&[d.line(), true_arm, trailing_on_true, d.line(), false_arm])),
         ])
     }
@@ -210,10 +237,13 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Assemble one conditional arm in the non-breaking layout: `?`/`:`, any
-    /// single-line block comments between the operator and the branch (the only
-    /// comment kind that reaches this path — they glue to the operator,
-    /// `? /* c */ …`), then the branch tail.
+    /// Assemble one conditional arm in the non-breaking layout: `?`/`:`, any block
+    /// comments between the operator and the branch (the only comment kind that
+    /// reaches this path — they trail the operator, `? /* c */ …`), then the
+    /// branch tail. The comments form a branch-gap run
+    /// (`build_branch_comment_run`): a glued comment keeps its branch on the
+    /// line, an authored break after a comment becomes a collapsible line that
+    /// holds while the conditional is broken.
     fn build_conditional_arm_doc(
         &self,
         op: &'static str,
@@ -223,14 +253,25 @@ impl<'a> Printer<'a> {
         branch_start: u32,
     ) -> DocId {
         let d = self.d();
-        let comments = match op_pos {
-            Some(p) => self.build_inline_comments_between_doc(p + 1, branch_start),
-            None => d.empty(),
-        };
+        let run = op_pos.and_then(|p| {
+            // A nested-conditional branch levels itself (see the Conditional arm of
+            // the tail), so its soft separator shifts only the first line
+            // (`indent(line)`); every other branch nests its run inside the branch's
+            // structural indent with a bare `line`. Built inside the closure so the
+            // comment-free path allocates nothing.
+            let soft_sep = if matches!(
+                self.unwrap_redundant_parens(branch_type),
+                TSType::Conditional(_)
+            ) {
+                d.indent(d.line())
+            } else {
+                d.line()
+            };
+            self.build_branch_comment_run(p + 1, branch_start, soft_sep)
+        });
         d.concat(&[
             d.text(op),
-            comments,
-            self.build_conditional_branch_tail_doc(branch_type, branch_doc, false),
+            self.build_conditional_branch_tail_doc(branch_type, branch_doc, false, run),
         ])
     }
 
@@ -252,13 +293,25 @@ impl<'a> Printer<'a> {
     /// `on_new_line` means a line or multiline block comment ended the operator's
     /// line (breaking layout only), so the branch starts on a fresh line instead —
     /// one level in (the first union member then taking its leading `| `).
+    ///
+    /// `run` is the operator's branch-gap comment run (inline layout only —
+    /// mutually exclusive with `on_new_line`), separators included; it rides
+    /// inside the branch's structural indent so a comment's collapsible break
+    /// lands the branch one level past the operator, except for a
+    /// nested-conditional branch, which levels itself (the run's own
+    /// `indent(line)` separator shifts only its first line).
     fn build_conditional_branch_tail_doc(
         &self,
         branch_type: &TSType<'_>,
         branch_doc: DocId,
         on_new_line: bool,
+        run: Option<DocId>,
     ) -> DocId {
         let d = self.d();
+        debug_assert!(
+            !(on_new_line && run.is_some()),
+            "the breaking layout emits its own comments"
+        );
         // Union and intersection branches share one hang: the inner doc sits one
         // level past the operator (`indent`) — on a fresh line after an
         // operator-line comment (`on_new_line`, first union member then taking its
@@ -267,9 +320,13 @@ impl<'a> Printer<'a> {
             if on_new_line {
                 d.indent(d.concat(&[d.hardline(), inner]))
             } else {
-                d.concat(&[d.text(" "), d.indent(inner)])
+                d.concat(&[d.text(" "), d.indent(self.prepend_opt(run, inner))])
             }
         };
+        // TODO: the Union/Intersection arms below rebuild their doc bare and ignore
+        // `branch_doc`, so the caller's pre-built `build_type_doc` subtree is dead
+        // for those branches — build the branch docs lazily (or match on the shape
+        // before building) to drop the double build
         match self.unwrap_redundant_parens(branch_type) {
             // `union_prints_hugged`, not the bare syntactic `union_hug_shape` — see
             // `build_conditional_check_doc`; here a bare ask left the members one indent
@@ -295,7 +352,7 @@ impl<'a> Printer<'a> {
                 if on_new_line {
                     d.concat(&[d.hardline(), d.text(INDENT), branch_doc])
                 } else {
-                    d.concat(&[d.text(" "), branch_doc])
+                    d.concat(&[d.text(" "), self.prepend_opt(run, branch_doc)])
                 }
             }
             _ => {
@@ -308,7 +365,7 @@ impl<'a> Printer<'a> {
                     // Prettier's `printBranch` = `indent(print(branch))` under
                     // useTabs: every non-conditional branch (tuple, mapped, object,
                     // function/constructor type, …) sits one level past the operator.
-                    d.concat(&[d.text(" "), d.indent(branch_doc)])
+                    d.concat(&[d.text(" "), d.indent(self.prepend_opt(run, branch_doc))])
                 }
             }
         }
@@ -531,6 +588,7 @@ impl<'a> Printer<'a> {
             c.true_type,
             true_type_doc,
             needs_indent_before_true,
+            None,
         ));
 
         // Comments trailing on true_type (between true_type and :) — preserve position.
@@ -557,6 +615,7 @@ impl<'a> Printer<'a> {
             c.false_type,
             false_type_doc,
             needs_indent_before_false,
+            None,
         ));
 
         // Comments between check_type and `extends` keyword (reuses extends_kw_start from above)
