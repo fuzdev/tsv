@@ -466,8 +466,8 @@ project-wide conventions.
   whole document (riding `attr_refs`'s `each_child_fragment` seam), run at the top
   of `analyze()` before any emission decision. Home for the oracle rules that fire
   wherever their construct sits — **including a region SSR drops** — so neither the
-  emitters nor `guard_dropped_presence` alone can host them. Currently the three
-  parse-time rules: `attribute_duplicate` (per-element, kind+name keyed with
+  emitters nor `guard_dropped_presence` alone can host them. Three parse-time rules:
+  `attribute_duplicate` (per-element, kind+name keyed with
   `bind:` normalized onto plain, `this` never recorded) and
   `svelte_meta_invalid_placement` / `svelte_meta_duplicate` over the oracle's
   `root_only_meta_tags` (`<svelte:head>` plus the SSR-inert three; `<svelte:options>`
@@ -475,6 +475,27 @@ project-wide conventions.
   from `fragment.rs`**: an emitter never runs on a dropped region, so one of them in
   a `{:catch}` compiled. A rule whose inputs are not emission state belongs here, not
   at an emitter.
+
+  Plus the analysis-phase `node_invalid_placement` (the HTML content model), for
+  which the walk carries a `path` of `PathEntry`s — the oracle's `context.path`
+  reduced to what its ancestor loop reads. Three distinct node roles, and collapsing
+  any two is a bug: a **`Barrier`** (a component, `<svelte:element>`, `{#snippet}`)
+  both resets `parent_element` and stops the walk; **`ParentReset`**
+  (`<svelte:fragment>` alone) resets but is transparent to the walk — the oracle's one
+  asymmetric node, unreachable today because the tag is fenced, modelled anyway; and
+  **`Block`** (`{#if}`/`{#each}`/`{#await}`/`{#key}`) downgrades the violation to a
+  WARNING, so tsv must NOT refuse below one. `<svelte:boundary>`, `<slot>`, `<title>`
+  and the root-only meta tags are transparent to all three and are not pushed. The
+  tables live in `html_tree.rs`.
+- `html_tree.rs` — a faithful port of the oracle's `src/html-tree-validation.js`:
+  the `disallowed_children` tables plus `is_tag_valid_with_parent` /
+  `is_tag_valid_with_ancestor`, returning the oracle's own message. Deliberately a
+  transcription, not a spec implementation — the oracle lists only what a browser
+  *repairs*, so the HTML spec's full content model would over-refuse. Two
+  transcription traps are called out in the module docs: the JS object spread
+  REPLACES the `tr`/`tbody`/`thead`/`tfoot` entries (they lose their `direct` list),
+  and the reset scan — including its custom-element short-circuit — is gated on
+  `reset_by` being present, so only `dt`/`dd` reset.
 - `transform_server.rs` — the SSR transform **orchestrator**: `compile_server`
   runs the phase-numbered pipeline (TypeScript erasure/gate, CSS scoping — the
   element census built and every selector chain matched against it **upfront** in

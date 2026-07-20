@@ -33,6 +33,7 @@ pub use census::{census, census_detected_buckets};
 /// compiler actually enforces, rather than a hand-rolled copy of it.
 pub use erase::next_token_pos;
 mod fragment;
+mod html_tree;
 mod namespace;
 mod needs_context;
 mod parity;

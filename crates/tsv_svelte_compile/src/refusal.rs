@@ -833,6 +833,20 @@ pub enum Refusal {
         /// The special-element tag (`svelte:window`, …).
         name: String,
     },
+    /// Markup a browser would REPAIR by moving, removing, or inserting elements —
+    /// the oracle's `node_invalid_placement` (`2-analyze/visitors/RegularElement.js`,
+    /// `Text.js`, `ExpressionTag.js`, over the tables in `src/html-tree-validation.js`).
+    /// tsv's parser imposes no HTML content model, so the compiler refuses rather
+    /// than emit output for a component the oracle rejects.
+    ///
+    /// The `message` is the oracle's own, so a refusal names the offending pair.
+    /// It does NOT vary the bucket key — every placement violation shares one
+    /// bucket.
+    #[error("{message} (the oracle rejects it)")]
+    NodeInvalidPlacement {
+        /// The oracle's message, e.g. "`<div>` cannot be a descendant of `<p>`".
+        message: String,
+    },
     /// Two attributes of the same kind and name on one element — the oracle's
     /// parse-time `attribute_duplicate` (`phases/1-parse/state/element.js:250`).
     /// tsv's parser is permissive here, so the compiler refuses rather than emit
@@ -1195,6 +1209,11 @@ impl Refusal {
             Self::DuplicateAttribute { .. } => Cow::Borrowed(
                 "duplicate `{name}` attribute on one element (the oracle rejects it)",
             ),
+            // The message names the offending tag pair, so it is collapsed away —
+            // every HTML content-model violation shares one corpus bucket.
+            Self::NodeInvalidPlacement { .. } => {
+                Cow::Borrowed("invalid HTML node placement (the oracle rejects it)")
+            }
             Self::SpecialElementChildren { .. } => {
                 Cow::Borrowed("<{name}> cannot have children (the oracle rejects it)")
             }
@@ -1460,6 +1479,11 @@ impl Refusal {
             },
             Self::DuplicateAttribute {
                 name: "{name}".to_string(),
+            },
+            // The key collapses this variant's parameter, so the value is
+            // irrelevant — it is never rendered into the catalog.
+            Self::NodeInvalidPlacement {
+                message: "{message}".to_string(),
             },
             Self::SpecialElementChildren {
                 name: "{name}".to_string(),

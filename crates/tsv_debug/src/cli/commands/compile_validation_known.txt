@@ -26,7 +26,7 @@
 # its buckets churn with every compiler slice.
 #
 # Format: KIND<TAB>ORACLE_CODE<TAB>PATH (path relative to its suite root)
-# shapes: 36
+# shapes: 30
 OVER-ACCEPT	attribute_invalid_event_handler	validator/samples/event-attribute/input.svelte
 OVER-ACCEPT	attribute_invalid_name	validator/samples/attribute-invalid-name-2/input.svelte
 OVER-ACCEPT	attribute_invalid_name	validator/samples/attribute-invalid-name-3/input.svelte
@@ -41,12 +41,6 @@ OVER-ACCEPT	export_undefined	compiler-errors/samples/export-not-defined-module/m
 OVER-ACCEPT	invalid_arguments_usage	compiler-errors/samples/invalid-arguments-usage/main.svelte
 OVER-ACCEPT	js_parse_error	compiler-errors/samples/illegal-expression/main.svelte
 OVER-ACCEPT	module_illegal_default_export	validator/samples/default-export-indirect/input.svelte
-OVER-ACCEPT	node_invalid_placement	validator/samples/invalid-node-placement-2/input.svelte
-OVER-ACCEPT	node_invalid_placement	validator/samples/invalid-node-placement-4/input.svelte
-OVER-ACCEPT	node_invalid_placement	validator/samples/invalid-node-placement-6/input.svelte
-OVER-ACCEPT	node_invalid_placement	validator/samples/invalid-node-placement-7/input.svelte
-OVER-ACCEPT	node_invalid_placement	validator/samples/invalid-node-placement-8/input.svelte
-OVER-ACCEPT	node_invalid_placement	validator/samples/invalid-node-placement/input.svelte
 OVER-ACCEPT	props_illegal_name	compiler-errors/samples/runes-props-illegal-name-1/main.svelte
 OVER-ACCEPT	props_illegal_name	compiler-errors/samples/runes-props-illegal-name-2/main.svelte
 OVER-ACCEPT	rune_invalid_spread	validator/samples/rune-invalid-spread-derived-by/input.svelte

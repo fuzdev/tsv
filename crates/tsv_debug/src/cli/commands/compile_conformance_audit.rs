@@ -334,6 +334,7 @@ mod tests {
         "dotted TS namespace A.B (the oracle crashes on it)",
         "duplicate <{name}> element (the oracle rejects it)",
         "duplicate `{name}` attribute on one element (the oracle rejects it)",
+        "invalid HTML node placement (the oracle rejects it)",
         "duplicate {#snippet} {name} (the oracle rejects it)",
         "dynamic <{name}> component (member or reactive binding)",
         "dynamic class attribute on a styled component",

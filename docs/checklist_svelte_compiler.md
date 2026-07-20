@@ -381,17 +381,18 @@ standalone repro, none of them dropped-region-specific:
 
 | Repro | Oracle error |
 | --- | --- |
-| `<h1><h1>t</h1></h1>` | `node_invalid_placement` |
 | `<Foo><p>c</p>{#snippet children()}<p>d</p>{/snippet}</Foo>` | `snippet_conflict` |
 | `{#await Promise.resolve(1)}<i>p</i>{:catch e}<Foo class:a={true} />{/await}` | `component_invalid_directive` |
 
 Together with `declaration_duplicate`, `snippet_invalid_export`, and
-`slot_snippet_conflict`, that leaves **six** distinct oracle rules tsv does not
+`slot_snippet_conflict`, that leaves **five** distinct oracle rules tsv does not
 enforce. (`dollar_prefix_invalid` was enforced first, and the three-rule
 `validate_assignment` family — `constant_assignment`, `each_item_invalid_assignment`,
 `snippet_parameter_assignment` — after it; see below and the `$`-prefixed bindings rule
 above. Then `attribute_duplicate`, `svelte_meta_invalid_placement` and
-`svelte_meta_duplicate` — see [The parse-time rules](#the-parse-time-rules--closed).)
+`svelte_meta_duplicate` — see [The parse-time rules](#the-parse-time-rules--closed) —
+and then `node_invalid_placement`, see
+[The HTML content model](#the-html-content-model--closed).)
 
 ⚠️ **An earlier form of this section claimed all nine were whole-component checks in
 `2-analyze`, and that claim was FALSE for three of them.** `attribute_duplicate`,
@@ -407,7 +408,6 @@ Each is implemented in phase 2 over the Svelte AST, in Svelte-domain terms:
 
 | Rule | Site in `packages/svelte/src/compiler` |
 | --- | --- |
-| `node_invalid_placement` | `phases/2-analyze/visitors/RegularElement.js:185` |
 | `snippet_conflict` | `phases/2-analyze/visitors/SnippetBlock.js:77` |
 | `component_invalid_directive` | `phases/2-analyze/visitors/shared/component.js:81` |
 
@@ -452,6 +452,50 @@ neither the emitters nor `guard_dropped_presence` alone can host them.
 which never runs on a dropped region, so one of them in a `{:catch}` compiled. That
 over-acceptance survived every gate until the differential fuzzer found it, and it is
 the concrete cost of siting an emission-independent rule at an emitter.
+
+#### The HTML content model — closed
+
+**Closed.** `node_invalid_placement` — markup a browser would REPAIR by moving,
+removing, or inserting elements, which breaks Svelte's assumptions about component
+structure. It is raised from three visitors (`RegularElement.js:183-199`, `Text.js:23`,
+`ExpressionTag.js:17`) over the tables in `src/html-tree-validation.js`, and tsv
+enforces all three in the same upfront `validate.rs` walk (which grew an ancestor
+path for it), with the tables ported to `html_tree.rs`.
+
+- **Refused**: `invalid HTML node placement (the oracle rejects it)` — one bucket for
+  every violation; the refusal *message* is the oracle's own, so it names the offending
+  tag pair.
+
+Four properties are load-bearing, and each is the oracle's rather than a simplification:
+
+- **A block DOWNGRADES the violation to a warning.** Under an `{#if}` / `{#each}` /
+  `{#await}` / `{#key}`, Svelte emits `node_invalid_placement_ssr` — a warning — because
+  each block compiles to its own template string and the markup works client-side. tsv
+  must not refuse there, and the test pins the discriminating pair: the same document
+  with and without the block.
+- **The tables are deliberately NARROWER than the HTML spec.** The oracle lists only
+  what a browser *repairs*; implementing the spec's content model would over-refuse.
+- **The reset scan is gated on `reset_by` being PRESENT**, and the custom-element
+  short-circuit lives inside that gate. Only `dt`/`dd` carry a `reset_by`, so a
+  `<foo-bar>` rescues a `dt` chain but does NOT rescue a `<p>` descendant. Hoisting the
+  short-circuit out of the guard silently under-refuses.
+- **Four keys are re-defined by the object spread.** `disallowed_children` is
+  `{ ...autoclosing_children, … }`, and `tr`/`tbody`/`thead`/`tfoot` appear in both — so
+  they keep only their `only` list and LOSE the `direct` list. Merging the two
+  over-refuses.
+
+⚠️ **The DIRECT parent violation is largely unreachable, and this shapes every test.**
+Both parsers apply HTML tag-omission, so `<p><div>` auto-closes the `<p>` and no
+parent/child relation ever forms (tsv then parse-errors on the stray `</p>`). That is
+why every one of the oracle's own samples puts an element in between and trips the
+ANCESTOR rule instead. The reachable direct-parent cases are the `only` allow-lists
+(`<table>`, `<tbody>`, `<head>`, …) and the fallback switch (`<caption>`, `<tbody>`,
+`<td>`, `<tr>` under a parent with no special parsing rule).
+
+Corpus cost: **zero**. No oracle-accepted file in the ~2996-file compile corpus reaches
+this refusal; the two files it does catch (`AppControlsTable.svelte`,
+`Action_History.svelte`, both `<th>` directly inside `<thead>`) are oracle-rejected
+already, for an unrelated `legacy_export_invalid`. Both carry genuine invalid markup.
 
 #### The `validate_assignment` family — closed
 

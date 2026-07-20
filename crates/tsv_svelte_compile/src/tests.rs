@@ -6486,3 +6486,86 @@ fn compile_root_only_meta_tag_placement_refuses() {
     // One at the root is of course still fine.
     let _ = compile_js("<svelte:head><title>a</title></svelte:head>");
 }
+
+#[test]
+fn compile_invalid_node_placement_refuses() {
+    // The oracle's `node_invalid_placement` — markup a browser would REPAIR, which
+    // breaks Svelte's assumptions about component structure. Every case below was
+    // confirmed oracle-REJECTED with `canonical_compile`.
+    // ⚠️ The DIRECT `<p><div>` case is unreachable: both parsers apply HTML
+    // tag-omission and auto-close the `<p>`, so no parent/child relation forms
+    // (tsv then parse-errors on the stray `</p>`). That is why every oracle sample
+    // puts an element in between and trips the ANCESTOR rule instead.
+    assert_unsupported("<div><p><span><div>x</div></span></p></div>", "descendant");
+    assert_unsupported(
+        "<a href=\"/x\"><div><a href=\"/y\">z</a></div></a>",
+        "descendant",
+    );
+    assert_unsupported("<div><tbody></tbody></div>", "must be the child of a");
+    // The fallback switch: a tag legal only under a special-parsing parent.
+    assert_unsupported("<div><caption>x</caption></div>", "cannot be a child of");
+    // `#text` and `{expression}` reach the parent test through their own visitors.
+    assert_unsupported(
+        "<table><tbody>text</tbody></table>",
+        "only allows these children",
+    );
+    assert_unsupported(
+        "<script>let v = 1;</script><table><tbody>{v}</tbody></table>",
+        "only allows these children",
+    );
+    // It fires in an SSR-DROPPED region too — the oracle validates before it
+    // decides what to emit.
+    assert_unsupported(
+        "{#await p}<i>x</i>{:catch e}<div><p><span><div>y</div></span></p></div>{/await}",
+        "descendant",
+    );
+}
+
+#[test]
+fn compile_invalid_node_placement_respects_the_oracle_s_escape_hatches() {
+    // ⚠️ The must-NOT-over-refuse half. Each case is oracle-ACCEPTED (verified with
+    // `canonical_compile`), and a plausible over-eager port breaks one of them.
+
+    // A block downgrades the violation to a WARNING (`node_invalid_placement_ssr`):
+    // Svelte compiles each block into its own template string, so it works
+    // client-side. A refusal here would reject ordinary real components. The
+    // control is the identical shape MINUS the block, asserted refused above —
+    // so this pair isolates the downgrade rather than merely finding a legal
+    // document.
+    let _ = compile_js("<div><p><span>{#if true}<div>y</div>{/if}</span></p></div>");
+
+    // A custom element may contain anything and go anywhere.
+    let _ = compile_js("<foo-bar><div>x</div></foo-bar>");
+    let _ = compile_js("<p><my-thing>x</my-thing></p>");
+
+    // `<template>`'s immediate children are exempt outright.
+    let _ = compile_js("<template><tbody></tbody></template>");
+
+    // `reset_by`: a `<dl>` (or a custom element) re-opens the `dt`/`dd` descendants.
+    let _ = compile_js("<dl><dd><dl><dt>x</dt></dl></dd></dl>");
+    let _ = compile_js("<dl><dd><foo-bar><dt>x</dt></foo-bar></dd></dl>");
+
+    // Whitespace-only text is not checked (`regex_not_whitespace` is the narrow
+    // `[^ \t\r\n]`, so only these four characters count as whitespace).
+    let _ = compile_js("<table><tbody> </tbody></table>");
+
+    // A valid table nest must survive the `only` allow-lists intact.
+    let _ = compile_js("<table><tbody><tr><td>x</td></tr></tbody></table>");
+
+    // A component BREAKS the ancestor walk and resets `parent_element`, so its
+    // children are validated against the component, not the outer `<p>`.
+    let _ = compile_js(
+        "<script>import Foo from './Foo.svelte';</script><p><Foo><div>x</div></Foo></p>",
+    );
+}
+
+#[test]
+fn compile_invalid_node_placement_gates_the_custom_element_reset_on_reset_by() {
+    // ⭐ The one transcription trap. The oracle gates its whole reset scan — and the
+    // custom-element short-circuit INSIDE it — on `reset_by` being PRESENT. Only
+    // `dt`/`dd` carry one, so a custom element rescues a `dt` chain (asserted above)
+    // but does NOT rescue a `<p>` descendant, whose entry has no `reset_by`.
+    // Hoisting that short-circuit out of the guard silently under-refuses this.
+    // Confirmed oracle-REJECTED.
+    assert_unsupported("<p><foo-bar><div>x</div></foo-bar></p>", "descendant");
+}
