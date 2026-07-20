@@ -25,8 +25,8 @@
 	{
 	}
 
-	// If - own-line block normalizes to inline
-	if (a) /* own line block */ {
+	// If - same-line block comment stays inline
+	if (a) /* same line block */ {
 	}
 
 	// While - block comment before non-block body
