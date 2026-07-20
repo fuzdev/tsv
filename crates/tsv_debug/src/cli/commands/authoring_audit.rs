@@ -579,6 +579,14 @@ impl AuthoringAuditCommand {
                 return Err(CliError::Failed);
             }
         };
+        // A scan with nothing in it must not read as a pass: the report renders its
+        // (empty) per-site tables and exits 0, so a typo'd path or a tree with no
+        // `.svelte` files would look identical to a clean converge. Fail loud instead,
+        // matching `render_audit`'s "No .svelte files found".
+        if files.is_empty() {
+            eprintln!("Error: no .svelte files found (searched {paths:?})");
+            return Err(CliError::Failed);
+        }
 
         let report = if self.prettier {
             let rt = super::create_runtime();

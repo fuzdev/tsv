@@ -28,7 +28,7 @@ deno task gaps:audit:update    # regenerate the snapshot after fixing a shape
 cargo run --profile corpus -p tsv_debug --features audits gap_audit ~/dev/zzz/src
 ```
 
-Build with **`--profile corpus`** (release + `panic = "unwind"`). Plain `--release` is
+Build with **`--profile corpus`** (optimized + `panic = "unwind"`). Plain `--release` is
 `panic = "abort"`, so a formatter panic would kill the run instead of being caught and
 reported as the finding it is.
 

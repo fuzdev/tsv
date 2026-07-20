@@ -343,6 +343,14 @@ impl RoundtripAuditCommand {
         };
         // Intentionally-invalid fixture inputs aren't round-trip subjects.
         files.retain(|p| !is_input_invalid_fixture(p));
+        // A scan with nothing in it must not read as a pass: `--gate` reports
+        // "no round-trip findings" and exits 0 on an empty set, so a typo'd path or
+        // a corpus that silently stopped resolving would look identical to a clean
+        // run. Fail loud instead, matching `gap_audit`/`blank_audit`/`fuzz`/`render_audit`.
+        if files.is_empty() {
+            eprintln!("Error: no round-trip subjects found (searched {paths:?})");
+            return Err(CliError::Failed);
+        }
         if self.limit > 0 {
             files.truncate(self.limit);
         }
