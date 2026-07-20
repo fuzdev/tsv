@@ -47,9 +47,16 @@ pub enum Refusal {
     DevMode,
 
     // ── Script shell / module scaffold ─────────────────────────────────────
-    /// An `export default` in a `<script module>`. The oracle errors
-    /// `module_illegal_default_export` (a component cannot have a default
-    /// export), so refusing is never an over-acceptance.
+    /// A default export in a `<script module>` — either `export default X` or an
+    /// `export { x as default }` specifier (identifier or string-literal
+    /// `as "default"`), the latter reached even for a re-export
+    /// `export { x as default } from 'y'`. The oracle's single
+    /// `module_illegal_default_export` rule fires from BOTH its
+    /// `ExportDefaultDeclaration` and `ExportNamedDeclaration` visitors (a
+    /// component cannot have a default export), and neither the named form nor its
+    /// re-export variant is gated on `node.source`, so refusing is never an
+    /// over-acceptance. The instance-script forms need no separate check —
+    /// [`Self::InstanceScriptExport`] already refuses every instance export.
     #[error("default export in <script module> (the oracle rejects it)")]
     ModuleDefaultExport,
     /// A top-level binding name declared in BOTH the module and instance scripts.

@@ -56,7 +56,9 @@ use tsv_svelte::ast::internal::{
     Attribute, AttributeNode, AttributeValue, ElementKind, Fragment, FragmentNode, Root,
     SpecialElementKind,
 };
-use tsv_ts::ast::internal::{Expression, ModuleExportName, Statement};
+use tsv_ts::ast::internal::{
+    ExportNamedDeclaration, Expression, LiteralValue, ModuleExportName, Statement,
+};
 
 /// The oracle's `root_only_meta_tags` (`phases/1-parse/state/element.js:45`) —
 /// the meta tags legal only as a direct child of the component root, and legal at
@@ -704,6 +706,19 @@ pub(crate) fn validate_module_exports(
     source: &str,
     snippets: &SnippetAnalysis,
 ) -> Result<(), CompileError> {
+    // `module_illegal_default_export` (`ExportNamedDeclaration.js:15-23`): an
+    // `export { x as default }` specifier. Runs FIRST — before the opaque
+    // early-return below and regardless of `export.source` — because the oracle
+    // gates neither on the module scope being readable nor on a re-export's
+    // `node.source`, unlike the snippet-export check that follows.
+    for stmt in module_body {
+        if let Statement::ExportNamedDeclaration(export) = stmt
+            && export_named_has_default_specifier(export, source)
+        {
+            return Err(unsupported(Refusal::ModuleDefaultExport));
+        }
+    }
+
     let Some(module_declared) = collect_module_declared(module_body, source) else {
         return Ok(());
     };
@@ -736,6 +751,38 @@ pub(crate) fn validate_module_exports(
         }
     }
     Ok(())
+}
+
+/// Whether an `export { … }` declaration carries a specifier exported *as*
+/// `default` — the trigger for the oracle's `module_illegal_default_export` from
+/// its `ExportNamedDeclaration` visitor. Shared by [`validate_module_exports`] (the
+/// compile path) and the sole-blocker census, so the rule lives once.
+pub(crate) fn export_named_has_default_specifier(
+    export: &ExportNamedDeclaration<'_>,
+    source: &str,
+) -> bool {
+    export
+        .specifiers
+        .iter()
+        .any(|specifier| module_export_name_is_default(&specifier.exported, source))
+}
+
+/// The oracle's `specifier.exported.type === 'Identifier' ? .name === 'default'
+/// : .value === 'default'` (`ExportNamedDeclaration.js:17-21`): an identifier
+/// `default` or a string-literal `"default"` export name. An escaped-identifier
+/// alias (`default`) reads as unnamed here and is not caught — a
+/// non-corpus-reachable under-refusal consistent with this port's escaped-name
+/// stance elsewhere; the far more plausible string-literal form decodes exactly.
+fn module_export_name_is_default(name: &ModuleExportName<'_>, source: &str) -> bool {
+    match name {
+        ModuleExportName::Identifier(id) => {
+            plain_identifier_name(id, source).as_deref() == Some("default")
+        }
+        ModuleExportName::Literal(lit) => match &lit.value {
+            LiteralValue::String(cooked) => cooked.resolve(lit.span, source) == "default",
+            _ => false,
+        },
+    }
 }
 
 /// Every name the module script declares at module scope, or `None` when one of

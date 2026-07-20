@@ -257,15 +257,19 @@ fn collect<'arena>(
     // hidden state — reproduced directly (a shared extraction would only wrap a
     // `.is_some()`), matching `compile_server`'s bails. A plain module script now
     // compiles, so the census flags only the cheaply-detectable module refusal:
-    // an `export default` (the oracle's `module_illegal_default_export`). The
-    // guard-based module refusals (runes / store reads / top-level `await`) are
-    // disclaimed — the corpus is module-rune-free, so they never fire in practice.
+    // a default export (the oracle's `module_illegal_default_export`) — either
+    // `export default X` or an `export { x as default }` specifier, the latter via
+    // the same shared predicate `validate_module_exports` uses. The guard-based
+    // module refusals (runes / store reads / top-level `await`) are disclaimed —
+    // the corpus is module-rune-free, so they never fire in practice.
     if let Some(module) = root.module
-        && module
-            .content
-            .body
-            .iter()
-            .any(|stmt| matches!(stmt, Statement::ExportDefaultDeclaration(_)))
+        && module.content.body.iter().any(|stmt| match stmt {
+            Statement::ExportDefaultDeclaration(_) => true,
+            Statement::ExportNamedDeclaration(export) => {
+                crate::validate::export_named_has_default_specifier(export, source)
+            }
+            _ => false,
+        })
     {
         found.push(Refusal::ModuleDefaultExport);
     }

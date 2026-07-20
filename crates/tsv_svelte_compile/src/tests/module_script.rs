@@ -13,6 +13,34 @@ fn compile_module_refuses_default_export() {
 }
 
 #[test]
+fn compile_module_refuses_export_as_default() {
+    // The oracle's single `module_illegal_default_export` fires from its
+    // `ExportNamedDeclaration` visitor too: an `export { x as default }` specifier
+    // (`ExportNamedDeclaration.js:15-23`). Identifier form.
+    assert_unsupported(
+        "<script module>\n\tlet answer = 42;\n\texport { answer as default };\n</script>\n<p>hi</p>",
+        "default export in <script module>",
+    );
+    // String-literal alias `as \"default\"` — the oracle's `.value === 'default'`
+    // arm. tsv's parser accepts the arbitrary-module-name form, so it must refuse.
+    assert_unsupported(
+        "<script module>\n\tlet answer = 42;\n\texport { answer as \"default\" };\n</script>\n<p>hi</p>",
+        "default export in <script module>",
+    );
+    // The named default check is NOT gated on `node.source`, so a re-export
+    // `export { x as default } from 'y'` refuses too — unlike the snippet-export
+    // rule, which exempts a re-export.
+    assert_unsupported(
+        "<script module>\n\texport { foo as default } from './y.js';\n</script>\n<p>hi</p>",
+        "default export in <script module>",
+    );
+    // Discriminating controls: a non-`default` alias compiles on both paths (the
+    // rule keys on the exported name being `default`, not on aliasing itself).
+    let _ = compile_js("<script module>let answer = 42;\nexport { answer as other };</script>");
+    let _ = compile_js("<script module>export { foo as bar } from './y.js';</script>");
+}
+
+#[test]
 fn compile_module_refuses_state_rune() {
     // v1 defers the oracle's module `$state`→v rewrite (the corpus is module-rune-
     // free), so a module-scope rune refuses via the guard — a safe over-refusal.
