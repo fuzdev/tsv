@@ -39,6 +39,10 @@
 //! lookup performed at emission, so an unemitted element is never queried and
 //! contributes nothing to the output.
 //!
+//! **Oracle phase**: the CSS pass of phase 2 (`phases/2-analyze/css/css-prune.js`),
+//! which runs before the transform decides what to emit — hence the wider-than-emitted
+//! descent above. See [the walk inventory](crate#the-walks-and-their-oracle-phases).
+//!
 //! # Boundaries the matcher refuses
 //!
 //! The census holds the whole in-component tree, so ancestor/sibling resolution
@@ -309,50 +313,77 @@ fn walk_fragment<'a>(
                 walk_fragment(block.body.nodes, Owner::Snippet, path, elements);
                 path.pop();
             }
-            // A `<svelte:element>` is both a scoping leaf and an owner of its
-            // children (an ancestor element). It descends like a regular element —
-            // only the leaf test differs (a type selector matches it
-            // unconditionally), which `CensusNode::Dynamic` carries.
-            FragmentNode::SpecialElement(special) if is_svelte_element(special) => {
-                path.push(frame);
-                let node = CensusNode::Dynamic(special);
-                elements.push(CensusElement {
-                    node,
-                    path: path.clone(),
-                });
-                walk_fragment(special.fragment.nodes, Owner::Element(node), path, elements);
-                path.pop();
-            }
-            // A `<svelte:boundary>` is descended UNCONDITIONALLY — including the
-            // children a `pending` snippet discards from the output. The oracle's
-            // CSS pass runs before it decides what to emit, so a selector matching
-            // only dropped boundary content is still KEPT and still scoped. This is
-            // the one place the census leaf set is deliberately WIDER than the
-            // emitted set; it is safe because `element_scope` is a span lookup at
-            // emission, so a marked-but-unemitted element contributes nothing.
-            FragmentNode::SpecialElement(special) if is_svelte_boundary(special) => {
-                path.push(frame);
-                walk_fragment(special.fragment.nodes, Owner::Boundary, path, elements);
-                path.pop();
-            }
-            FragmentNode::SpecialElement(special) if is_svelte_head(special) => {
-                path.push(frame);
-                walk_fragment(special.fragment.nodes, Owner::Head, path, elements);
-                path.pop();
-            }
-            // Other special elements refuse the compile elsewhere; not descended.
-            // Text / expression / comment / tag nodes hold no elements.
-            _ => {}
+            // ⚠️ Exhaustive on purpose, no catch-all — this match decides DESCENT,
+            // and a missed variant that carries a child fragment loses every element
+            // beneath it silently: `element_scope` is a span lookup, so an element
+            // absent from the census reads as unscoped and emits without its hash
+            // class (a MISMATCH, not an over-refusal). A new `FragmentNode` variant
+            // must fail compilation HERE and be classified deliberately.
+            //
+            // Contrast the sibling matches below (`scan_sibling` /
+            // `nested_over_fragments`), which keep a documented catch-all: those
+            // CLASSIFY rather than descend, and an unclassified variant is a safe
+            // under-approximation (never a false match).
+            FragmentNode::SpecialElement(special) => match &special.kind {
+                // A `<svelte:element>` is both a scoping leaf and an owner of its
+                // children (an ancestor element). It descends like a regular element
+                // — only the leaf test differs (a type selector matches it
+                // unconditionally), which `CensusNode::Dynamic` carries.
+                SpecialElementKind::SvelteElement { .. } => {
+                    path.push(frame);
+                    let node = CensusNode::Dynamic(special);
+                    elements.push(CensusElement {
+                        node,
+                        path: path.clone(),
+                    });
+                    walk_fragment(special.fragment.nodes, Owner::Element(node), path, elements);
+                    path.pop();
+                }
+                // A `<svelte:boundary>` is descended UNCONDITIONALLY — including the
+                // children a `pending` snippet discards from the output. The oracle's
+                // CSS pass runs before it decides what to emit, so a selector matching
+                // only dropped boundary content is still KEPT and still scoped. This is
+                // the one place the census leaf set is deliberately WIDER than the
+                // emitted set; it is safe because `element_scope` is a span lookup at
+                // emission, so a marked-but-unemitted element contributes nothing.
+                SpecialElementKind::SvelteBoundary => {
+                    path.push(frame);
+                    walk_fragment(special.fragment.nodes, Owner::Boundary, path, elements);
+                    path.pop();
+                }
+                SpecialElementKind::SvelteHead => {
+                    path.push(frame);
+                    walk_fragment(special.fragment.nodes, Owner::Head, path, elements);
+                    path.pop();
+                }
+                // Not descended, each for its own reason. The legacy slot system
+                // (`<slot>`, `<svelte:fragment>`, `<svelte:component>`,
+                // `<svelte:self>`) is a deliberate runes-only fence and the
+                // SSR-inert three (`<svelte:window>`/`<svelte:body>`/
+                // `<svelte:document>`) take no element children — both refuse the
+                // compile before any scope lookup runs. `<title>` holds text and
+                // expressions, never an element, so descending it would find none.
+                SpecialElementKind::SvelteWindow
+                | SpecialElementKind::SvelteBody
+                | SpecialElementKind::SvelteDocument
+                | SpecialElementKind::SvelteComponent { .. }
+                | SpecialElementKind::SvelteSelf
+                | SpecialElementKind::SlotElement
+                | SpecialElementKind::SvelteFragment
+                | SpecialElementKind::TitleElement => {}
+            },
+            // Leaves: these carry no child fragment at all (the set
+            // `attr_refs::each_child_fragment` yields nothing for).
+            FragmentNode::Text(_)
+            | FragmentNode::Comment(_)
+            | FragmentNode::ExpressionTag(_)
+            | FragmentNode::HtmlTag(_)
+            | FragmentNode::RenderTag(_)
+            | FragmentNode::DebugTag(_)
+            | FragmentNode::ConstTag(_)
+            | FragmentNode::DeclarationTag(_) => {}
         }
     }
-}
-
-fn is_svelte_head(special: &SpecialElement<'_>) -> bool {
-    matches!(special.kind, SpecialElementKind::SvelteHead)
-}
-
-fn is_svelte_boundary(special: &SpecialElement<'_>) -> bool {
-    matches!(special.kind, SpecialElementKind::SvelteBoundary)
 }
 
 fn is_svelte_element(special: &SpecialElement<'_>) -> bool {

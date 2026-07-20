@@ -26,6 +26,20 @@
 //! lives — e.g. the SSR-inert special elements' children / illegal-attribute /
 //! invalid-bind guards in `fragment.rs`. Their *placement* and *duplicate* rules
 //! used to live there too and were moved here for exactly the reason above.
+//!
+//! **Oracle phase**: phase 1's parse-time element rules
+//! (`phases/1-parse/state/element.js`) plus the phase-2 validations that fire on a
+//! node's presence anywhere in the component. Running first — before erasure and
+//! before the binding table — is what lets this walk take only `(root, source)`,
+//! and is why it is the designated home for the whole-component validations still
+//! open (see `../../docs/checklist_svelte_compiler.md`). See
+//! [the walk inventory](crate#the-walks-and-their-oracle-phases).
+//!
+//! Every rule here is a port of an oracle **error**, never a warning
+//! ([`Validator::report`] returns `Ok` on the `only_warn` path). So a component
+//! this walk refuses is one the oracle rejects too — it lands in a corpus run's
+//! `oracle_rejected` bucket, never in `oracle_accepted`, and therefore never in the
+//! `achievable`-parity denominator that the `fenced` subtraction operates on.
 
 use crate::CompileError;
 use crate::attr_refs::each_child_fragment;

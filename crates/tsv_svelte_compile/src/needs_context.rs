@@ -3,7 +3,11 @@
 //!
 //! Ports Svelte's phase-2 `needs_context` accumulation — the flag the server
 //! transform reads (`should_inject_context = dev || analysis.needs_context`) to
-//! decide whether to wrap the whole component body. The oracle sets it,
+//! decide whether to wrap the whole component body. This walk runs late by
+//! necessity, not by habit: it consumes the *erased* instance and module bodies,
+//! the binding table's `store_names`, and `unassignable_names`, none of which exist
+//! at the point the earlier walks run. See
+//! [the walk inventory](crate#the-walks-and-their-oracle-phases). The oracle sets it,
 //! monotonically, walking the **entire un-folded** instance + template AST, when
 //! it sees any of:
 //!

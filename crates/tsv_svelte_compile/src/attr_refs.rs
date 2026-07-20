@@ -6,8 +6,10 @@
 //! reference-bearing expression; the `each_*_attribute_expression` pair below is
 //! the per-element one it and the other analyses share; and [`each_child_fragment`]
 //! is the pure structural seam — "which sub-fragments does a node contain" — that
-//! the snippet-name collector and the element census ride, so the
-//! fragment-recursion shape lives in exactly one exhaustively-matched place.
+//! the whole-document validator, the snippet-name collector, the `$$index`
+//! allocator and the refusal census ride, so the fragment-recursion shape lives in
+//! exactly one exhaustively-matched place. (The element census descends a different
+//! node set and keeps its own exhaustive match; see [`each_child_fragment`].)
 //!
 //! Both the snippet hoist analysis (`snippet.rs`) and the `needs_context` walk
 //! (`needs_context.rs`) must see every attribute expression the compiled output
@@ -195,19 +197,29 @@ fn each_attribute_item<'a, 'arena>(
 /// The single, exhaustively-matched enumeration of a `FragmentNode`'s child
 /// fragments — "which sub-fragments does this node contain".
 ///
-/// Every purely-structural recursion that only needs to descend the fragment
-/// tree rides this one match: the snippet-name collector (`snippet.rs`) and the
-/// element census (`census.rs`). So a new `FragmentNode` variant — or a new child
-/// fragment on an existing variant — fails compilation HERE instead of silently
-/// drifting across hand-written copies.
+/// Every purely-structural recursion that only needs to descend the fragment tree
+/// rides this one match: the whole-document validator (`validate.rs`), the
+/// snippet-name collector (`snippet.rs`), the `$$index` name allocator
+/// (`blocks.rs`), and the sole-blocker refusal census (`census.rs`). So a new
+/// `FragmentNode` variant — or a new child fragment on an existing variant — fails
+/// compilation HERE instead of silently drifting across hand-written copies.
 ///
 /// This is fragment recursion *only*. A block's own condition/key expressions are
 /// not fragments and are out of scope; an expression-bearing walk uses
-/// [`each_template_item`]. The scope-tracking / dropped-`{:catch}` walks
-/// (`needs_context.rs`, `snippet.rs`'s free-variable collector) keep their own
-/// exhaustive matches, because their descent is entangled with per-node scope
-/// mutation and the emission-vs-dropped distinction this uniform enumeration
-/// cannot express without changing behavior.
+/// [`each_template_item`].
+///
+/// Three walks deliberately do **not** ride it, and the reasons differ:
+///
+/// - `needs_context.rs` and `snippet.rs`'s free-variable collector thread per-node
+///   scope bindings and fork on the emission-vs-dropped distinction, which this
+///   uniform enumeration cannot carry without changing behavior;
+/// - `element_census.rs` descends a deliberately *different* node set (wider than
+///   emitted at `<svelte:boundary>` and `{:catch}`, narrower at the fenced special
+///   elements), so it carries its own exhaustive match — no catch-all, since a
+///   variant missed there loses elements silently.
+///
+/// ⚠️ Riding this seam is the default; the three above state their reason in code.
+/// See [the walk inventory](crate#the-walks-and-their-oracle-phases).
 pub(crate) fn each_child_fragment<'a, 'arena>(
     node: &'a FragmentNode<'arena>,
     f: &mut impl FnMut(&'a Fragment<'arena>),

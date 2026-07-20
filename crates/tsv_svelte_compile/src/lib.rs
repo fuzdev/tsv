@@ -14,6 +14,45 @@
 //! The server transform (`transform_server`) covers a deliberately small
 //! language subset today; unhandled shapes surface as
 //! [`CompileError::Unsupported`] rather than guessed output.
+//!
+//! # The walks and their oracle phases
+//!
+//! The compile path makes several separate passes over the same document, and the
+//! organizing principle is **one walk per oracle phase**. They are not separate
+//! because separation is tidy, and not merely because their descent threads
+//! per-node scope state — they are separate because *the oracle's phase boundaries
+//! carry ordering semantics that are load-bearing for output parity*. A walk that
+//! spans two oracle phases can no longer be checked against either.
+//!
+//! The counterexample is concrete and was hit rather than theorized: the two
+//! `{#each}` generated names are minted in different oracle phases and therefore in
+//! different orders — `each_array` in the transform (pre-order), `$$index` in the
+//! scope-creation pass (post-order, over SSR-dropped regions too). Sharing one walk
+//! and one counter mis-numbers every document where one `{#each}` contains another
+//! or one sits in a `{:catch}`. See `blocks::assign_each_index_names`.
+//!
+//! | Walk | Oracle phase | Descent |
+//! | --- | --- | --- |
+//! | `validate::validate_document` | phase 1 parse-time rules + whole-component phase-2 validations | `attr_refs::each_child_fragment` |
+//! | `script_rewrite::refuse_template_typescript` | phase 1 (the TypeScript grammar gate) | `attr_refs::each_template_item` |
+//! | `element_census::build_census` | phase 2, CSS pass (`css-prune.js`) | own exhaustive match |
+//! | `snippet::analyze_snippets` | phase 2 (`can_hoist_snippet`) | seam + own scope-threaded match |
+//! | `needs_context::analyze_component` | phase 2 accumulation + `validate_assignment` | own scope-threaded match |
+//! | `blocks::assign_each_index_names` | the scope-creation pass (`phases/scope.js`) | `attr_refs::each_child_fragment` |
+//!
+//! Two consequences worth stating, because each has been a bug:
+//!
+//! - **Two walks being mechanically mergeable is not a reason to merge them.** Some
+//!   pairs share a seam, run unconditionally, and thread no conflicting state — and
+//!   still port different phases, so merging them trades a checkable correspondence
+//!   for one traversal. Every fragment walk together is ~1% of compile wall; the
+//!   traversal was never the cost.
+//! - **Riding the shared seam is the default, and opting out needs a reason in the
+//!   code.** `each_child_fragment` exists so a new `FragmentNode` variant fails
+//!   compilation rather than silently going undescended. A walk that hand-rolls its
+//!   descent must carry an exhaustive match instead (`element_census` does, and says
+//!   why); a catch-all is admissible only where an unhandled variant fails in the
+//!   *safe* direction, and must say which direction that is.
 
 mod analyze;
 mod attr_refs;

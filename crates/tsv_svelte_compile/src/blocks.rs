@@ -47,6 +47,10 @@ use crate::{CompileError, Refusal};
 /// `{#each}` contains another, so the counters cannot share a walk:
 /// `each_array` is allocated at emission, `$$index` upfront here.
 ///
+/// ⚠️ This pair is the crate's worked example of why walks track oracle *phases*
+/// rather than being merged for tidiness — two names, one construct, two phases,
+/// two orders. See [the walk inventory](crate#the-walks-and-their-oracle-phases).
+///
 /// Two consequences follow from this being the *scope* walk rather than the
 /// transform:
 ///
