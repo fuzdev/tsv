@@ -6427,3 +6427,62 @@ fn compile_each_item_assignment_refuses_the_checklist_repro() {
         "an {#each} item",
     );
 }
+
+#[test]
+fn compile_duplicate_attribute_refuses() {
+    // The oracle's parse-time `attribute_duplicate` (`1-parse/state/element.js:250`)
+    // — a rule tsv did not enforce, so these all compiled. Each of the three
+    // participating attribute kinds keys separately.
+    assert_unsupported("<div id=\"a\" id=\"b\"></div>", "duplicate");
+    assert_unsupported("<div class:a class:a></div>", "duplicate");
+    assert_unsupported(
+        "<div style:color=\"a\" style:color=\"b\"></div>",
+        "duplicate",
+    );
+    // A `bind:` normalizes onto `Attribute`, so it collides with the plain name.
+    assert_unsupported("<input value=\"1\" bind:value={v} />", "duplicate");
+    // It fires in an SSR-DROPPED region too: the oracle raises it at PARSE, long
+    // before it decides what to emit.
+    assert_unsupported(
+        "{#await p}<i>x</i>{:catch e}<div id=\"a\" id=\"b\"></div>{/await}",
+        "duplicate",
+    );
+}
+
+#[test]
+fn compile_duplicate_attribute_accepts_the_oracle_s_exemptions() {
+    // ⚠️ The must-NOT-over-refuse half. Each of these is legal to the oracle, and
+    // an over-eager port of the rule breaks one of them.
+    // Different KINDS of the same name are different keys.
+    let _ = compile_js("<div class:a style:a=\"1\" a=\"2\"></div>");
+    // Only Attribute/Bind/Style/Class participate — `use:` may legally repeat.
+    let _ = compile_js("<script>let x, y;</script><div use:x use:y></div>");
+    // `this` is never recorded, which is what makes this shape legal.
+    let _ = compile_js(
+        "<script>let el;</script><svelte:element this=\"div\" bind:this={el}></svelte:element>",
+    );
+    // The rule is per-element, not per-document.
+    let _ = compile_js("<div class:a></div><div class:a></div>");
+}
+
+#[test]
+fn compile_root_only_meta_tag_placement_refuses() {
+    // `svelte_meta_invalid_placement` / `svelte_meta_duplicate` for `<svelte:head>`
+    // — tsv already enforced both for the SSR-inert tags, but not for head.
+    assert_unsupported(
+        "<div><svelte:head><title>x</title></svelte:head></div>",
+        "top-level",
+    );
+    // Any container counts, including a `<svelte:boundary>` — the placement test is
+    // "direct child of Root", so a boundary between makes it invalid.
+    assert_unsupported(
+        "<svelte:boundary><svelte:head><title>x</title></svelte:head></svelte:boundary>",
+        "top-level",
+    );
+    assert_unsupported(
+        "<svelte:head><title>a</title></svelte:head><svelte:head><title>b</title></svelte:head>",
+        "duplicate",
+    );
+    // One at the root is of course still fine.
+    let _ = compile_js("<svelte:head><title>a</title></svelte:head>");
+}

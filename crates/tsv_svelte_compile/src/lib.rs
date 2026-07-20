@@ -44,6 +44,7 @@ mod snippet_emit;
 mod store_rewrite;
 mod text_class;
 mod transform_server;
+mod validate;
 
 pub use parity::{Parity, compare_canonical};
 pub use refusal::Refusal;

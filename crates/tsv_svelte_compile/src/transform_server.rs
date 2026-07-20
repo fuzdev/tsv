@@ -375,6 +375,10 @@ fn analyze<'arena>(
     if root.options.is_some() {
         return Err(unsupported(Refusal::SvelteOptions));
     }
+    // The emission-independent validation rules (the oracle's parse-time and
+    // whole-component checks) — one walk over the whole document, dropped regions
+    // included, before any emission decision is made. See `validate.rs`.
+    crate::validate::validate_document(root, source)?;
     // TypeScript erasure — the oracle's phase-1 `remove_typescript_nodes`, run
     // BEFORE every analysis pass (`analyze_script`, `analyze_snippets`,
     // `needs_context`) and before the codegen loop. `instance_body` is the

@@ -833,6 +833,15 @@ pub enum Refusal {
         /// The special-element tag (`svelte:window`, …).
         name: String,
     },
+    /// Two attributes of the same kind and name on one element — the oracle's
+    /// parse-time `attribute_duplicate` (`phases/1-parse/state/element.js:250`).
+    /// tsv's parser is permissive here, so the compiler refuses rather than emit
+    /// output for a component the oracle rejects.
+    #[error("duplicate `{name}` attribute on one element (the oracle rejects it)")]
+    DuplicateAttribute {
+        /// The repeated attribute/directive name.
+        name: String,
+    },
     /// A second `<svelte:window>`/`<svelte:body>`/`<svelte:document>` of the same
     /// kind in the component (the oracle errors `svelte_meta_duplicate`: a component
     /// may have at most one of each). tsv's parser accepts it, so the compiler
@@ -1183,6 +1192,9 @@ impl Refusal {
             Self::DuplicateSpecialElement { .. } => {
                 Cow::Borrowed("duplicate <{name}> element (the oracle rejects it)")
             }
+            Self::DuplicateAttribute { .. } => Cow::Borrowed(
+                "duplicate `{name}` attribute on one element (the oracle rejects it)",
+            ),
             Self::SpecialElementChildren { .. } => {
                 Cow::Borrowed("<{name}> cannot have children (the oracle rejects it)")
             }
@@ -1444,6 +1456,9 @@ impl Refusal {
                 name: "{name}".to_string(),
             },
             Self::DuplicateSpecialElement {
+                name: "{name}".to_string(),
+            },
+            Self::DuplicateAttribute {
                 name: "{name}".to_string(),
             },
             Self::SpecialElementChildren {

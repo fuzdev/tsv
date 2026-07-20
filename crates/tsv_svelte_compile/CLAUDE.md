@@ -459,6 +459,22 @@ project-wide conventions.
   a module script (`snippet_invalid_export`). Neither construct is fenced, so
   closing them means porting the oracle's whole-component validations rather than
   widening the presence match — tracked in `../../docs/checklist_svelte_compiler.md`.
+  Both are genuinely whole-component (`2-analyze/index.js:831`/`:862`); their new home
+  is `validate.rs`, which already walks the whole document but currently carries only
+  per-node state.
+- `validate.rs` — the **emission-independent validation** pass: one walk over the
+  whole document (riding `attr_refs`'s `each_child_fragment` seam), run at the top
+  of `analyze()` before any emission decision. Home for the oracle rules that fire
+  wherever their construct sits — **including a region SSR drops** — so neither the
+  emitters nor `guard_dropped_presence` alone can host them. Currently the three
+  parse-time rules: `attribute_duplicate` (per-element, kind+name keyed with
+  `bind:` normalized onto plain, `this` never recorded) and
+  `svelte_meta_invalid_placement` / `svelte_meta_duplicate` over the oracle's
+  `root_only_meta_tags` (`<svelte:head>` plus the SSR-inert three; `<svelte:options>`
+  is refused upstream). ⚠️ The inert three's placement/duplicate rules **moved here
+  from `fragment.rs`**: an emitter never runs on a dropped region, so one of them in
+  a `{:catch}` compiled. A rule whose inputs are not emission state belongs here, not
+  at an emitter.
 - `transform_server.rs` — the SSR transform **orchestrator**: `compile_server`
   runs the phase-numbered pipeline (TypeScript erasure/gate, CSS scoping — the
   element census built and every selector chain matched against it **upfront** in

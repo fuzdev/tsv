@@ -385,15 +385,21 @@ standalone repro, none of them dropped-region-specific:
 | `<Foo><p>c</p>{#snippet children()}<p>d</p>{/snippet}</Foo>` | `snippet_conflict` |
 | `{#await Promise.resolve(1)}<i>p</i>{:catch e}<Foo class:a={true} />{/await}` | `component_invalid_directive` |
 
-Together with `attribute_duplicate`, `declaration_duplicate`, `snippet_invalid_export`,
-`slot_snippet_conflict`, `svelte_meta_invalid_placement`, and `svelte_meta_duplicate`,
-that is **nine** distinct oracle rules tsv does not enforce — so the shape of this
-work is porting `2-analyze`'s whole-component checks, not patching rules one at a time.
-(`dollar_prefix_invalid` was enforced first, and the three-rule `validate_assignment`
-family — `constant_assignment`, `each_item_invalid_assignment`,
+Together with `declaration_duplicate`, `snippet_invalid_export`, and
+`slot_snippet_conflict`, that leaves **six** distinct oracle rules tsv does not
+enforce. (`dollar_prefix_invalid` was enforced first, and the three-rule
+`validate_assignment` family — `constant_assignment`, `each_item_invalid_assignment`,
 `snippet_parameter_assignment` — after it; see below and the `$`-prefixed bindings rule
-above. Both came out ahead of the rest because each is a **local** rule on a single node
-whose inputs a name-based port can supply, unlike the whole-component checks that remain.)
+above. Then `attribute_duplicate`, `svelte_meta_invalid_placement` and
+`svelte_meta_duplicate` — see [The parse-time rules](#the-parse-time-rules--closed).)
+
+⚠️ **An earlier form of this section claimed all nine were whole-component checks in
+`2-analyze`, and that claim was FALSE for three of them.** `attribute_duplicate`,
+`svelte_meta_invalid_placement` and `svelte_meta_duplicate` are raised in
+**`phases/1-parse/state/element.js`** — the parser, not the analyzer — and each reads
+only one element's attribute list or one tag's depth. Reading them as whole-component
+deferred three cheap, high-population rules behind an architecture they never needed.
+Check the oracle's *file path* before classifying a rule by the shape of the work.
 
 ⚠️ **These are Svelte *analysis-phase* rules, not deferred JS early errors** — do not
 file them under the parser's [deliberate early-error deferral](conformance_svelte.md).
@@ -416,6 +422,36 @@ The single genuine overlap is `declaration_duplicate`, and Svelte says so itself
 `phases/scope.js:689` ("declaring function twice is also caught by acorn in the parse
 phase"). That one row — and only that one — is arguably not tsv's to fix. The other eight
 are analysis tsv has not ported.
+
+#### The parse-time rules — closed
+
+**Closed.** Three oracle rules, all raised in `phases/1-parse/state/element.js`, all
+enforced by one upfront whole-document walk (`validate.rs`) run at the top of
+`analyze()`. They share a home not because they share inputs but because they share a
+*scope*: each fires wherever its construct sits, including a region SSR **drops**, so
+neither the emitters nor `guard_dropped_presence` alone can host them.
+
+- **Refused**: ``duplicate `{name}` attribute on one element (the oracle rejects it)`` —
+  the oracle's `attribute_duplicate` (`element.js:250`). Only `Attribute` /
+  `BindDirective` / `StyleDirective` / `ClassDirective` participate; the key is the
+  attribute kind joined to the name with `BindDirective` normalized onto `Attribute`
+  (so `bind:value` collides with `value`, while `class:x` and `x` legally co-exist);
+  and the name `this` is never recorded, which is what keeps
+  `<svelte:element bind:this this={…}>` legal.
+- **Refused**: `<{name}> must be a top-level element (the oracle rejects it)` and
+  `duplicate <{name}> element (the oracle rejects it)` — the oracle's
+  `svelte_meta_invalid_placement` / `svelte_meta_duplicate` over its
+  `root_only_meta_tags` set (`element.js:45,155-164`). Placement is a *direct*-child
+  test against the root, so any element, block or `<svelte:boundary>` in between makes
+  the tag invalid; placement is checked before duplicate, and a mis-placed tag never
+  joins the duplicate set. `<svelte:options>` is covered upstream by the unconditional
+  `SvelteOptions` refusal.
+
+⚠️ Both rules were already enforced for the SSR-inert three
+(`<svelte:window>`/`<svelte:body>`/`<svelte:document>`) — but at their **emitter**,
+which never runs on a dropped region, so one of them in a `{:catch}` compiled. That
+over-acceptance survived every gate until the differential fuzzer found it, and it is
+the concrete cost of siting an emission-independent rule at an emitter.
 
 #### The `validate_assignment` family — closed
 

@@ -342,10 +342,6 @@ pub(crate) fn emit_fragment<'arena>(
     // regardless of source order, and never participates in surrounding
     // whitespace normalization.
     let mut title_nodes: Vec<&'arena SpecialElement<'arena>> = Vec::new();
-    // The SSR-inert special-element tags (`svelte:window`/`svelte:body`/
-    // `svelte:document`) already seen among this fragment's direct children — the
-    // oracle allows at most one of each (`svelte_meta_duplicate`).
-    let mut seen_inert: Vec<&'static str> = Vec::new();
     for node in nodes {
         match node {
             // Every special-element kind is dispatched here. The kinds the transform
@@ -379,17 +375,11 @@ pub(crate) fn emit_fragment<'arena>(
                     | SpecialElementKind::SvelteBody
                     | SpecialElementKind::SvelteDocument) => {
                         let tag = se.kind.tag_name();
-                        if !ctx.is_component_root {
-                            return Err(unsupported(Refusal::SpecialElementInvalidPlacement {
-                                name: tag.to_string(),
-                            }));
-                        }
-                        if seen_inert.contains(&tag) {
-                            return Err(unsupported(Refusal::DuplicateSpecialElement {
-                                name: tag.to_string(),
-                            }));
-                        }
-                        seen_inert.push(tag);
+                        // Placement (`svelte_meta_invalid_placement`) and duplicate
+                        // (`svelte_meta_duplicate`) are NOT checked here: both fire in
+                        // a region SSR drops, which this emitter never visits, so they
+                        // live in the upfront whole-document pass (`validate.rs`). Only
+                        // the emission-state checks remain.
                         guard_inert_special_element(env, se, kind, tag)?;
                     }
                     // `<svelte:element this={…}>` compiles to a statement-level
