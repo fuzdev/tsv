@@ -544,6 +544,17 @@ project-wide conventions.
   REPLACES the `tr`/`tbody`/`thead`/`tfoot` entries (they lose their `direct` list),
   and the reset scan — including its custom-element short-circuit — is gated on
   `reset_by` being present, so only `dt`/`dd` reset.
+- `text_class.rs` — the **target** languages' lexical character classes
+  (`is_js_whitespace` / `js_trim` / `js_char_at` / `is_css_whitespace`), for the
+  source scans that reason about text without tokenizing it. ⚠️ Rust's
+  `char::is_whitespace` is the Unicode `White_Space` property, which differs from
+  ECMAScript `WhiteSpace` in **both** directions — `U+FEFF` is JS whitespace but
+  carries no `White_Space` property (so a Rust-classed scan **under**-reports, and
+  `static\u{FEFF}{…}` was invisible to `script_collision.rs`'s static-block fence),
+  while `U+0085` is the reverse (which only ever over-refuses). A scan whose
+  whitespace notion is the HOST language's rather than the TARGET's is a recurring
+  defect in this crate, so the class lives here once rather than being re-derived
+  per scan.
 - `transform_server.rs` — the SSR transform **orchestrator**: `compile_server`
   runs the phase-numbered pipeline (TypeScript erasure/gate, CSS scoping — the
   element census built and every selector chain matched against it **upfront** in
