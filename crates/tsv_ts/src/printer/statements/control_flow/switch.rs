@@ -36,13 +36,6 @@ impl<'a> Printer<'a> {
         // brace and dropping the comment.
         let body_open_brace = close_paren
             .and_then(|close| self.find_char_outside_comments(close + 1, stmt.span.end, b'{'));
-        let paren_brace_comments = match (close_paren, body_open_brace) {
-            (Some(close), Some(brace)) if self.has_comments_to_emit_between(close + 1, brace) => {
-                self.build_inline_comments_between_doc_opt(close + 1, brace)
-            }
-            _ => None,
-        };
-
         // Build condition group (handles breaking within discriminant and comments)
         let condition_group = if let (Some(open), Some(close)) = (open_paren, close_paren) {
             self.build_condition_group_with_comments(&stmt.discriminant, open, close)
@@ -145,11 +138,17 @@ impl<'a> Printer<'a> {
         let mut switch_parts: DocBuf = DocBuf::new();
         self.push_keyword_open_paren(&mut switch_parts, "switch", keyword_comments);
         switch_parts.push(condition_group);
-        switch_parts.push(d.text(")"));
-        if let Some(pbc) = paren_brace_comments {
-            switch_parts.push(pbc);
+        // `)` + its gap, then the body brace — the same `)`→block emitter `if` / `while` /
+        // for-in/of use. Emitting the gap run inline and then appending a bare `" {"` (the
+        // previous shape) let a `//` **swallow the opening brace** (`switch (a) // c {`),
+        // which does not reparse: content corruption, not a layout quirk.
+        match (close_paren, body_open_brace) {
+            (Some(close), Some(brace)) => {
+                self.append_close_paren_with_comments(&mut switch_parts, close + 1, brace);
+            }
+            _ => switch_parts.push(d.text(") ")),
         }
-        switch_parts.push(d.text(" {"));
+        switch_parts.push(d.text("{"));
         switch_parts.push(body_doc);
         switch_parts.push(d.text("}"));
         d.group(d.concat(&switch_parts))
