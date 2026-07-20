@@ -67,6 +67,12 @@ impl<'a> Printer<'a> {
     /// Check for a blank line after the first comma in `(prev_end, upper)`,
     /// accounting for stripped grouping parens.
     ///
+    /// The **array/tuple** blank rule — prettier's `isLineAfterElementEmpty`, which advances
+    /// to the comma before measuring. Its counterpart for params, call arguments, and object
+    /// properties is [`Self::is_next_line_empty`], which measures from the element's end; see
+    /// that doc for the table of where the two disagree, and
+    /// [`BlankRule`](super::BlankRule) for the enum that makes a list name which one it takes.
+    ///
     /// If no comma is found before `upper`, the check starts at `prev_end`.
     /// Callers must pass `prev_end <= upper`.
     pub(crate) fn has_blank_line_after_comma(&self, prev_end: u32, upper: u32) -> bool {
@@ -79,6 +85,58 @@ impl<'a> Printer<'a> {
         let check_start = self.blank_scan_start(after_comma, upper);
         let check_end = super::calls::skip_stripped_open_paren(self.source, check_start, upper);
         self.has_blank_line_between(check_start, check_end)
+    }
+
+    /// Whether the line on which the element ending at `from` ends is followed by a **blank
+    /// line** — the faithful port of prettier's `isNextLineEmpty`.
+    ///
+    /// This is the list-separator blank question for **params, call arguments, and object
+    /// properties**, where prettier emits a `hardline` (which forces the list to break) at a
+    /// blank. It deliberately differs from [`Self::has_blank_line_after_comma`], which is the
+    /// **array** question: prettier's array helper (`isLineAfterElementEmpty`) advances to the
+    /// comma *first* and measures from there, and arrays emit a `softline` that never forces a
+    /// break. Two different questions in prettier, so two here.
+    ///
+    /// The distinction is exactly where the comma sits relative to the blank:
+    ///
+    /// | authoring | this predicate | after-comma |
+    /// | --- | --- | --- |
+    /// | `a,⏎⏎b` | `true` | `true` |
+    /// | `a⏎⏎, b` | `true` | `false` |
+    /// | `a⏎,⏎⏎b` | **`false`** | `true` |
+    ///
+    /// The third row is the one worth stating: a blank *after* a comma the author pushed onto
+    /// its own line does **not** count, because the blank no longer begins on the line the
+    /// element ended. Prettier collapses `f(a⏎,⏎⏎b)` to `f(a, b)`, and so does this.
+    ///
+    /// Mirrors prettier's step order: skip same-line trailing/inline comments, skip the
+    /// `,; \t` run to end of line, require the very next byte to be the line break, consume
+    /// exactly one, then look for a second before any non-whitespace. Bounded by `upper` (the
+    /// next element's start), so it never reads past its own gap.
+    pub(crate) fn is_next_line_empty(&self, from: u32, upper: u32) -> bool {
+        let bytes = self.source.as_bytes();
+        let end = (upper as usize).min(bytes.len());
+        // `skipInlineComment` / `skipTrailingComment`: a comment on the element's own line is
+        // trivia, whichever side of the comma it sits on (`a /* c */, b` and `a, /* c */ b`).
+        let mut pos = (self.find_end_with_trailing_comments(from) as usize).min(end);
+        // `skipToLineEnd = skip(",; \t")` — the separator itself is trivia here, which is the
+        // whole reason a pre-comma blank is seen.
+        while pos < end && matches!(bytes[pos], b',' | b';' | b' ' | b'\t') {
+            pos += 1;
+        }
+        // `skipNewline`: consume exactly one line terminator. Landing on anything else means
+        // content follows on this line, so there is no empty next line.
+        let after_first = match bytes.get(pos) {
+            Some(b'\n') => pos + 1,
+            Some(b'\r') if bytes.get(pos + 1) == Some(&b'\n') => pos + 2,
+            Some(b'\r') => pos + 1,
+            _ => return false,
+        };
+        // `hasNewline`: a second terminator before the next non-whitespace makes the line blank.
+        bytes[after_first..end]
+            .iter()
+            .find(|b| !matches!(b, b' ' | b'\t'))
+            .is_some_and(|b| matches!(b, b'\n' | b'\r'))
     }
 
     /// Get the search start position for leading comments on list elements
