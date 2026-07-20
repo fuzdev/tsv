@@ -20,7 +20,8 @@ use crate::{CompileError, Refusal, erase};
 /// Both halves of the erasure — the instance script's `Program` and each
 /// template expression at its borrow point — run before this, so **any**
 /// survivor is a compiler bug: an erase case missed, or a borrow point that
-/// never called [`EmitEnv::erase`]. It is surfaced loudly as
+/// never called [`EmitEnv::erase`](crate::transform_server::EmitEnv::erase). It is
+/// surfaced loudly as
 /// [`CompileError::TypeErasureLeak`] rather than emitted.
 ///
 /// This is the check the output reparse cannot make: tsv's parser is
@@ -134,7 +135,8 @@ pub(crate) fn document_ts_flag(root: &Root<'_>, source: &str) -> Result<bool, Co
 /// so the decision has to be made explicitly here or the component is an
 /// over-acceptance.
 ///
-/// The borrow points ([`EmitEnv::erase`]) already erase every template expression
+/// The borrow points ([`EmitEnv::erase`](crate::transform_server::EmitEnv::erase))
+/// already erase every template expression
 /// that reaches **output**, so this sweep exists for the ones that do *not*: the
 /// SSR-dropped `{#each}` key, the `{#key}` expression, the `{:catch}` binding and
 /// its whole branch, and event-handler attributes. Their TypeScript never reaches

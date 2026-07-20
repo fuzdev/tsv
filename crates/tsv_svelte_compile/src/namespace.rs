@@ -5,7 +5,7 @@
 //! namespace decides whether collapsed inter-node whitespace is *removed*
 //! entirely (`svg`) or kept as a single space (`html`/`mathml`) — the svg case
 //! of the oracle's `clean_nodes` `can_remove_entirely`, alongside the
-//! `select`/`table`-family parents. See [`crate::fragment::normalize_whitespace`].
+//! `select`/`table`-family parents. See [`crate::fragment`]'s `normalize_whitespace`.
 //!
 //! `metadata.svg`/`metadata.mathml` are approximated by NAME
 //! ([`element_is_svg`] / [`element_is_mathml`]). The oracle's ancestor-inheriting

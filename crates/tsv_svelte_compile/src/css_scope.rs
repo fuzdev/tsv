@@ -221,7 +221,7 @@ impl CssScoping {
 /// Analyze a `<style>` for the supported shape and, when a census is present, match
 /// the selectors against it.
 ///
-/// `sink` is the [`census`](crate::census) collect seam: `None` bails at the first
+/// `sink` is the [`census`](mod@crate::census) collect seam: `None` bails at the first
 /// unsupported (parse-time) shape (the compile path); `Some` pushes each and
 /// continues. In collect mode the returned [`ScopeInfo`] is partial and unused.
 ///

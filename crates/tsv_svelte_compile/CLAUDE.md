@@ -64,10 +64,10 @@ project-wide conventions.
     non-spread path; a static-class token OR a `class:` directive name scopes),
     the `class:` directives ride the `classes` argument (the oracle's
     `b.init(name, expr)` — identifier keys, case-preserved, with the
-    object-shorthand collapse — `attribute::build_spread_class_object`), the
+    object-shorthand collapse — `attribute_class_style::build_spread_class_object`), the
     `style:` directives ride the `styles` argument (a **FLAT** object, **no**
     `|important` partitioning — the divergence from the non-spread
-    `$.attr_style` array — `attribute::build_spread_style_object`), and `<input>`
+    `$.attr_style` array — `attribute_class_style::build_spread_style_object`), and `<input>`
     / a custom element set the `flags` argument
     (trailing absent args elide, interior ones become `void 0`); a spread
     co-present with a legacy `on:`/`let:` refuses (`Refusal::RunesOnlyFence`),
@@ -77,13 +77,13 @@ project-wide conventions.
     directive on a **regular element without a spread** is
     instead **emitted** as the fused `$.attr_class(base, hash, {…})` /
     `$.attr_style(base, {…})` call (`element.rs` /
-    `attribute.rs`), and a `bind:` **core kind** on a regular element without a
+    `attribute_class_style.rs`), and a `bind:` **core kind** on a regular element without a
     spread is
-    **handled** by `attribute::emit_bind_directive` (`bind:this` omits;
+    **handled** by `attribute_bind::emit_bind_directive` (`bind:this` omits;
     `bind:value`/`bind:checked`/`bind:group` on `<input>` synthesize a
     `$.attr(...)` for a `$state`-rooted target; every other `bind:` refuses via
     `Refusal::BindDirective { name }`) — both the inline and spread `bind:` paths
-    share one `attribute::resolve_bind_directive` validity fork; the no-op drop
+    share one `attribute_bind::resolve_bind_directive` validity fork; the no-op drop
     family (`use:`/`transition:`/`in:`/`out:`/
     `animate:`/`{@attach}`) is instead **dropped** on a regular element, its
     expression still guarded (a stray rune / `await` refuses) and still walked for
@@ -133,16 +133,31 @@ project-wide conventions.
 - `refusal.rs` — the typed catalog of refusal reasons: every declined shape is
   a `Refusal` variant carried by `CompileError::Unsupported`, with a `Display`
   message (the human-readable reason `docs/checklist_svelte_compiler.md`
-  quotes) and a stable `bucket_key` the corpus runner groups by directly
-  (user-chosen names collapse to a `{placeholder}` so e.g. every event
-  attribute shares one bucket). The single source of truth for the refusal
-  contract. `Refusal::is_deliberate_fence` splits that catalog in two: a
+  quotes). The single source of truth for the refusal contract. The enum and its
+  `thiserror` messages are inseparable (the message rides a `#[error(…)]`
+  attribute per variant), so this file is the catalog and nothing else.
+- `refusal_buckets.rs` — the catalog's **accounting projections**, an
+  `impl Refusal` block in a sibling module (an inherent impl may live in any
+  module of the defining crate, so the split is physical, not an API change).
+  A stable `bucket_key` the corpus runner groups by directly (user-chosen names
+  collapse to a `{placeholder}` so e.g. every event attribute shares one bucket);
+  `every_variant` / `all_bucket_keys`, the enumerable bucket universe the
+  conformance audit reads; and `is_deliberate_fence`. They answer a different
+  question than the catalog does — not *what shape was declined and how it reads*
+  but *how refusals are COUNTED* — and their audience is the corpus runner and
+  `census.rs`, not a person reading an error. ⚠️ The decoupling is load-bearing,
+  and is why the two are worth separating rather than merely being large: a bucket
+  key is deliberately independent of `Display` **so a message can be reworded
+  without shifting corpus buckets**. Keeping them in one file invites the shortcut
+  of deriving one from the other, which would silently re-partition every
+  historical corpus comparison the next time a message is reworded.
+  `Refusal::is_deliberate_fence` splits the catalog in two: a
   **deliberate product fence**, which a runes-only compiler will never implement,
   versus an ordinary "not yet". The fenced set is the legacy **directive syntax**
   and the legacy **slot system**: `RunesOnlyFence` (a legacy `on:` event directive
   and `let:`), the legacy special-element tags `<slot>`, `<svelte:fragment>`,
   `<svelte:component>`, and `<svelte:self>`
-  (`fragment::SPECIAL_ELEMENT_FENCED_KINDS`), and `ComponentNamedSlot` (a `slot="…"`
+  (`special_element_kind::SPECIAL_ELEMENT_FENCED_KINDS`), and `ComponentNamedSlot` (a `slot="…"`
   on a component's child — the *consumer* half of the same slot system those first
   two tags *declare*). Each is deprecation-warned or superseded by the oracle in
   Svelte 5, the slot system by the snippets this compiler already emits.
@@ -253,12 +268,12 @@ project-wide conventions.
   includes a `$bindable(fallback?)` default at a top-level `$props()` property, a
   statement-position `$inspect(…)`, the `$state.snapshot(x)` and `$props.id()`
   declarator inits, a template-position `$state.snapshot(x)` (→ `$.snapshot`,
-  `fragment.rs`), and a **store access** (`$name` where the `$`-stripped base is a
+  `template_value.rs`), and a **store access** (`$name` where the `$`-stripped base is a
   binding and not a rune — a bare reference OR a call/new **callee root** `$fn()` /
   `$obj.m()` / `new $C()`, via `store_read_exemption` shared by the identifier,
   call, and new arms), which the guard now EXEMPTS in a script or dropped
   position when the caller opts in via `WalkCtx::allow_store_reads` (a
-  template-position store read is exempted by `fragment.rs`'s value walk before it
+  template-position store read is exempted by `template_value.rs`'s walk before it
   reaches the guard) — the store rewrite (`store_rewrite.rs`) or a dropped-region
   drop handles it. So the guard exempts those positions while still refusing every
   other `$bindable`/`$inspect`/`$state.snapshot`/`$props.id` (value/template
@@ -361,7 +376,7 @@ project-wide conventions.
   'const')` and carries `constant_assignment`.
 - `store_rewrite.rs` — **store-access (and script-position `$derived` read)
   rewriting** for the instance script (the
-  script analog of `fragment.rs`'s template value walk). A tree→tree pass over the
+  script analog of `template_value.rs`'s template value walk). A tree→tree pass over the
   FINAL synthetic body (after erasure + rune rewrites, so a read inside a
   `$.derived(() => …)` thunk is reached) with `erase.rs`'s `Option<T>`
   structural-sharing shape and exhaustive matches: a store **read** `$name` →
@@ -446,7 +461,7 @@ project-wide conventions.
   dropped node *is* — needs its own walk over node KINDS, because the oracle also
   keys some phase-2 facts on a node's mere **presence**, which dropping the region
   does not suppress. `guard_dropped_fragment` therefore runs
-  `guard_dropped_presence` (`fragment.rs`) alongside the expression walk, recursing
+  `guard_dropped_presence` (`dropped.rs`) alongside the expression walk, recursing
   through `each_child_fragment` and reaching each node's attribute list.
   Presence-read facts run on **two axes**, and the second is the one that is easy
   to miss:
@@ -937,13 +952,13 @@ functions by host.
   (`<name${$.attributes(…)}>`): `build_element_spread_object` builds the
   source-order object (plain attributes via `attribute::build_spread_object_property`,
   a `bind:` core kind's synthesized `value`/`checked` property at its slot via
-  `attribute::build_bind_object_property`, spreads as `...expr`), the scope hash
+  `attribute_bind::build_bind_object_property`, spreads as `...expr`), the scope hash
   rides `css_hash` (the element is scoped when any scoped compound — type/id/
   class/attribute/universal — matches it, a lookup via `EmitEnv::element_scope` into
   the upfront-matched `CssScoping` table), the `class:` directives ride
-  `classes` (`attribute::build_spread_class_object` — identifier keys + shorthand)
+  `classes` (`attribute_class_style::build_spread_class_object` — identifier keys + shorthand)
   and the `style:` directives ride `styles`
-  (`attribute::build_spread_style_object` — a FLAT object, no `|important`
+  (`attribute_class_style::build_spread_style_object` — a FLAT object, no `|important`
   partition), `<input>` / a custom element (hyphenated tag or `is`
   attribute) set `flags` (`4` / `2`), and `elide_call_args` applies the oracle's
   `b.call` elision (trailing `void 0` dropped, interior padded). A co-present
@@ -951,10 +966,10 @@ functions by host.
   guarded-and-dropped. The non-spread path
   (`emit_plain_attributes`) pre-scans a
   regular element's `class:` and `style:` directives and defers them to
-  `attribute::emit_class_directives` / `attribute::emit_style_directives` (each
+  `attribute_class_style::emit_class_directives` / `attribute_class_style::emit_style_directives` (each
   fused at its authored-`class`/`style` slot, or after all plain attributes when
   synthetic — the synthetic `class` before the synthetic `style`), and handles a
-  `bind:` directive inline at its source slot via `attribute::emit_bind_directive`.
+  `bind:` directive inline at its source slot via `attribute_bind::emit_bind_directive`.
   A **`<svelte:element this={…}>`** compiles to a statement-level
   `$.element($$renderer, TAG, attrsFn?, childrenFn?)` call (`emit_svelte_element`,
   routed from `fragment.rs` like a component): the TAG is the `'div'` literal
@@ -966,7 +981,7 @@ functions by host.
   `build_element_spread_object` (so the two never drift): passing
   `name = "svelte:element"` makes the name-keyed guards fall through (never void /
   `<select>` / load-error / custom), and the only forks are the `bind:` handling (a
-  `<svelte:element>` validates a `bind:this` via `attribute::validate_dynamic_bind`
+  `<svelte:element>` validates a `bind:this` via `attribute_bind::validate_dynamic_bind`
   and refuses every other bind) and the spread `flags` argument (always absent — a
   dynamic tag is never `<input>`/custom). A `<svelte:element>` in a component with a
   scoping `<style>` is **CSS-scoped** like a regular element: the element census

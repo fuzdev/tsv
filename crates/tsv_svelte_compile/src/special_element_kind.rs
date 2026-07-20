@@ -2,8 +2,8 @@
 //! the per-kind refusal labels, their list, and the enum→label mapping.
 //!
 //! A **shared classification table**, not an emitter — it is consumed by
-//! [`crate::fragment`]'s dispatch (which refuses), by [`crate::census`] (which
-//! detects the same shapes as co-blockers), and by [`crate::refusal`] (whose
+//! [`crate::fragment`]'s dispatch (which refuses), by [`census`](mod@crate::census)
+//! (which detects the same shapes as co-blockers), and by [`crate::refusal`] (whose
 //! `is_deliberate_fence` reads [`SPECIAL_ELEMENT_FENCED_KINDS`]). It sits apart
 //! from the fragment walk because none of those three consumers is walking: they
 //! ask a question *about* a [`SpecialElementKind`], and keeping the table here

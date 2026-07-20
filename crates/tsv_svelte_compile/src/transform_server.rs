@@ -111,7 +111,7 @@ pub(crate) struct EmitEnv<'arena, 's> {
     /// Whether the component makes any valid `$name` store reference anywhere
     /// (read or write, emitted or dropped) — forces the `var $$store_subs;` /
     /// `if ($$store_subs) $.unsubscribe_stores($$store_subs);` component-body
-    /// injection. Computed upfront by [`needs_context::analyze_component`], the
+    /// injection. Computed upfront by [`needs_context::analyze_component`](crate::needs_context::analyze_component), the
     /// oracle's analysis-driven store-subscription gate (so a store referenced
     /// only in a dropped handler still injects), NOT set at emission time.
     pub(crate) uses_stores: bool,

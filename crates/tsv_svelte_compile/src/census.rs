@@ -32,7 +32,7 @@
 //! no-`lang="ts"` gate; CSS selector/rule refusals; the instance-script rune
 //! rewrites, guards, exports, and invalid imports; the `needs_context`
 //! member/call classification; the snippet hoist analysis; the comment
-//! carry-through classes [`collect_script_comments`](crate::script_comments::collect_script_comments)
+//! carry-through classes [`collect_script_comments`]
 //! owns; and the template `TemplateNode` refusals (non-head `<svelte:*>` special
 //! elements, `{@debug}`, declaration tags) via the shared fragment seam.
 //! `{@render}` is **supported** (a handled arm, not a refusal), so it is

@@ -110,7 +110,7 @@ pub(crate) fn each_script_declaration<'arena, E>(
 /// hold means traversing every expression position of every statement, a
 /// hand-enumerated surface that has twice shipped with holes. The collision check
 /// handles the whole family with a lexical fence instead
-/// ([`crate::script_collision::script_contains_static_block`]), so this walk
+/// ([`crate::script_collision`]'s `script_contains_static_block`), so this walk
 /// deliberately stops at a class body and no consumer depends on it descending.
 fn script_declarations_of<'arena, E>(
     stmt: &'arena Statement<'arena>,
