@@ -1,0 +1,200 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 905,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 616,
+				"data": " A wide inline element whose own content overflows, SANDWICHED (a text sibling precedes it)\n     and followed by TERMINAL trailing text with a space boundary. tsv wraps the content within\n     printWidth (both tags intact) and the space-authored terminal text hugs the closing tag\n     (`</tag> tail`) — a preceding sibling does not change that terminal trailing text hugs, since\n     nothing follows it (the first-child case is inline_wide_content_trailing_long). Prettier keeps\n     this block-style form, but a single-line authoring it dangles instead (prettier_variant_compact).\n     Covers <strong>/<a>. "
+			},
+			{
+				"type": "Text",
+				"start": 616,
+				"end": 617,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 617,
+				"end": 760,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 618
+					},
+					"end": {
+						"line": 8,
+						"column": 2,
+						"character": 619
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 620,
+							"end": 635,
+							"raw": "\n\ttext1 text2\n\t",
+							"data": "\n\ttext1 text2\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 635,
+							"end": 750,
+							"name": "strong",
+							"name_loc": {
+								"start": {
+									"line": 10,
+									"column": 2,
+									"character": 636
+								},
+								"end": {
+									"line": 10,
+									"column": 8,
+									"character": 642
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 643,
+										"end": 741,
+										"raw": "\n\t\talpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november oscar\n\t",
+										"data": "\n\t\talpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november oscar\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 750,
+							"end": 756,
+							"raw": " tail\n",
+							"data": " tail\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 760,
+				"end": 762,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 762,
+				"end": 904,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 15,
+						"column": 1,
+						"character": 763
+					},
+					"end": {
+						"line": 15,
+						"column": 2,
+						"character": 764
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 765,
+							"end": 780,
+							"raw": "\n\ttext1 text2\n\t",
+							"data": "\n\ttext1 text2\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 780,
+							"end": 894,
+							"name": "a",
+							"name_loc": {
+								"start": {
+									"line": 17,
+									"column": 2,
+									"character": 781
+								},
+								"end": {
+									"line": 17,
+									"column": 3,
+									"character": 782
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 783,
+									"end": 791,
+									"name": "href",
+									"name_loc": {
+										"start": {
+											"line": 17,
+											"column": 4,
+											"character": 783
+										},
+										"end": {
+											"line": 17,
+											"column": 8,
+											"character": 787
+										}
+									},
+									"value": [
+										{
+											"start": 789,
+											"end": 790,
+											"type": "Text",
+											"raw": "#",
+											"data": "#"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 792,
+										"end": 890,
+										"raw": "\n\t\tnovember oscar papa quebec romeo sierra tango uniform victor whiskey xray yankee zulu abcdefg\n\t",
+										"data": "\n\t\tnovember oscar papa quebec romeo sierra tango uniform victor whiskey xray yankee zulu abcdefg\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 894,
+							"end": 900,
+							"raw": " tail\n",
+							"data": " tail\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

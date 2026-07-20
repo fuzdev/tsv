@@ -72,6 +72,13 @@ pub struct DocContext {
     /// the next line rather than hugging the dropped child's `>`. Off for every other fill (text
     /// word-wrap and CSS value lists pack greedily after a dropped item), so the flag never affects
     /// them.
+    ///
+    /// Exception: a *block-style* dropped element (its own content doesn't fit flat, so it wraps
+    /// intact and dangles its `>` low) with *terminal* trailing text yields to
+    /// [`Self::hug_terminal_after_break`] — the tail hugs the dangled `>` when it fits, the same as
+    /// the first-child case, since nothing follows the tail (the hug stays convergent). The render
+    /// loop skips this unconditional break in that case; the plain dropped-*whole* case (the element
+    /// stays flat on its own line) still owns its line.
     pub break_after_dropped_first: bool,
 
     /// When set, the fill's trailing separator (its terminal `line`, the only one reaching the

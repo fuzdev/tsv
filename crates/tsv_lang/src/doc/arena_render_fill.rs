@@ -116,7 +116,20 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
         // the fill pack from there. A wide inline child that drops owns its line; trailing text
         // wraps to the next line rather than hugging the child's `>`. Scoped by the context flag so
         // greedy fills (text word-wrap, CSS value lists) are unaffected.
-        if offset == 0 && context.break_after_dropped_first && offset + 1 < parts.len() {
+        //
+        // Exception: a block-style element (its own content doesn't fit flat, so it wraps intact
+        // and dangles its `>` low) with *terminal* trailing text is the `hug_terminal_after_break`
+        // shape — the tail should hug the dangled `>` when it fits there, exactly as the first-child
+        // case (`inline_wide_content_trailing_long`) does; a preceding sibling doesn't change that,
+        // since nothing follows the tail (the hug stays convergent). Skip the unconditional break
+        // here and let Case 3's at-line-start arm run its `hug_terminal_after_break` decision, which
+        // hugs only when the tail actually fits and breaks otherwise. The plain dropped-whole case
+        // (`content_fits`) is unaffected and still owns its line.
+        if offset == 0
+            && context.break_after_dropped_first
+            && offset + 1 < parts.len()
+            && (content_fits || !context.hug_terminal_after_break)
+        {
             let line_start_pos = line_start_column(indent_level, render, embed);
             if *pos == line_start_pos {
                 let content_mode = if content_fits {
