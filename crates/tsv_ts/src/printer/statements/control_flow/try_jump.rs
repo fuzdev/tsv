@@ -28,11 +28,19 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Append ` keyword`, preserving any comments in the gap before it: a block
-    /// comment stays inline (`} /* c */ catch`), a line comment forces a hardline.
-    /// The keyword-preceding mirror of `append_keyword_to_body_comments`, shared by
-    /// the `catch` and `finally` heads (`gap_start` = previous block end,
-    /// `keyword_pos` = the comment-skipping keyword position).
+    /// Append ` keyword`, preserving where the author put any comments in the gap
+    /// before it: one that trailed the previous `}` stays trailing, one on its own
+    /// line keeps its own line. The keyword-preceding mirror of
+    /// `append_keyword_to_body_comments`, shared by the `catch` and `finally` heads
+    /// (`gap_start` = previous block end, `keyword_pos` = the comment-skipping
+    /// keyword position).
+    ///
+    /// This is the `}`→continuation-keyword gap, so it partitions by line exactly as
+    /// the `}`→`else` path does — the authored position is the whole signal, and a
+    /// blank line above an own-line comment is authoring intent
+    /// ([`ControlFlowGap::BlockToKeyword`]). Prettier is no oracle here: it relocates
+    /// these comments into the following block's body, which it does *not* do at
+    /// `else`. See `conformance_prettier.md` §Comment relocation.
     fn append_comments_then_keyword(
         &self,
         parts: &mut DocBuf,
@@ -40,15 +48,9 @@ impl<'a> Printer<'a> {
         keyword_pos: u32,
         keyword: &'static str,
     ) {
-        let d = self.d();
-        if self.has_comments_to_emit_between(gap_start, keyword_pos) {
-            let has_line = self.has_line_comments_between(gap_start, keyword_pos);
-            parts.push(self.build_inline_comments_between_doc(gap_start, keyword_pos));
-            parts.push(if has_line { d.hardline() } else { d.text(" ") });
-        } else {
-            parts.push(d.text(" "));
-        }
-        parts.push(d.text(keyword));
+        // A `try`/`catch` body is always a block, so the keyword can hug `}`.
+        self.push_block_to_keyword_gap(parts, gap_start, keyword_pos, true);
+        parts.push(self.d().text(keyword));
     }
 
     pub(in crate::printer::statements) fn build_try_statement_doc(

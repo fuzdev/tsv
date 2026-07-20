@@ -160,6 +160,63 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Emit a `}`→continuation-keyword gap: its comments, then the separator before
+    /// the keyword. The caller pushes the keyword itself.
+    ///
+    /// The single place that question is answered, for every keyword that continues a
+    /// construct across a `}` — `else`, `catch`, `finally`, and a do-while's `while`.
+    /// Comments keep their authored position (trailing stays trailing, own-line keeps
+    /// its own line, a blank above an own-line comment survives — see
+    /// [`ControlFlowGap::BlockToKeyword`]), and the keyword hugs the `}` only when the
+    /// previous part was a block, every comment trailed it, and none was a `//` — a
+    /// line comment there would swallow the keyword.
+    ///
+    /// `prev_is_block` is false only for an `if` with a non-block consequent
+    /// (`if (a) expr;⏎else …`); a `try`/`catch` block and a do-while body block are
+    /// always blocks.
+    fn push_block_to_keyword_gap(
+        &self,
+        parts: &mut DocBuf,
+        gap_start: u32,
+        keyword_start: u32,
+        prev_is_block: bool,
+    ) {
+        let d = self.d();
+        if !self.has_comments_to_emit_between(gap_start, keyword_start) {
+            parts.push(if prev_is_block {
+                d.text(" ")
+            } else {
+                d.hardline()
+            });
+            return;
+        }
+
+        let (inline_prev, own_line, inline_next) =
+            self.partition_comments_by_line(gap_start, keyword_start);
+
+        // Merge `inline_next` (comments sharing the keyword's line) into the own-line
+        // run so they're emitted before the keyword rather than dropped.
+        // e.g. `} \n /* b */ else {` → `}\n/* b */\nelse {`
+        let mut all_own_line = own_line;
+        all_own_line.extend(inline_next);
+
+        self.build_comments_between_parts(
+            parts,
+            &inline_prev,
+            &all_own_line,
+            gap_start,
+            ControlFlowGap::BlockToKeyword,
+        );
+
+        let keyword_hugs_brace =
+            prev_is_block && all_own_line.is_empty() && inline_prev.iter().all(|c| c.is_block);
+        parts.push(if keyword_hugs_brace {
+            d.text(" ")
+        } else {
+            d.hardline()
+        });
+    }
+
     /// Build docs for comments between statement parts (e.g., between `}` and `else`).
     ///
     /// Handles:

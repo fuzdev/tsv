@@ -3,7 +3,6 @@
 // Condition-group layout and body handling for while/do-while, including the
 // do-while comment-preservation divergence from Prettier.
 
-use super::super::ControlFlowGap;
 use crate::ast::internal::{self, Statement};
 use crate::printer::Printer;
 use smallvec::smallvec;
@@ -124,34 +123,14 @@ impl<'a> Printer<'a> {
         let test_start = stmt.test.span().start;
         let while_pos = self.find_keyword_in_range(body_end, test_start, "while");
 
-        // Check for comments between } and while, determine if while stays on same line
-        let while_on_same_line = if let Some(while_start) = while_pos
-            && self.has_comments_to_emit_between(body_end, while_start)
-        {
-            let (inline_prev, own_line, inline_next) =
-                self.partition_comments_by_line(body_end, while_start);
-
-            // Merge inline_next (comments on same line as `while`) into own_line
-            // so they're emitted before the `while` keyword rather than dropped.
-            // e.g. `} \n /* c */ while (cond);` → `}\n/* c */\nwhile (cond);`
-            let mut all_own_line = own_line;
-            all_own_line.extend(inline_next);
-
-            // Add comments preserving their position.
-            self.build_comments_between_parts(
-                &mut parts,
-                &inline_prev,
-                &all_own_line,
-                body_end,
-                ControlFlowGap::BlockToKeyword,
-            );
-
-            // While stays on same line only if: block body, no own-line comments, all inline are block comments
-            let has_inline_line_comment = inline_prev.iter().any(|c| !c.is_block);
-            is_block && all_own_line.is_empty() && !has_inline_line_comment
+        // The `}`→`while` gap: its comments and the separator before the keyword.
+        // Emitted here, ahead of the paren bookkeeping below, which computes without
+        // pushing; the `while` keyword itself follows it.
+        if let Some(while_start) = while_pos {
+            self.push_block_to_keyword_gap(&mut parts, body_end, while_start, is_block);
         } else {
-            is_block
-        };
+            parts.push(if is_block { d.text(" ") } else { d.hardline() });
+        }
 
         // Find paren positions for comment handling
         let open_paren = while_pos.and_then(|p| self.find_open_paren_after(p));
@@ -166,12 +145,7 @@ impl<'a> Printer<'a> {
             None
         };
 
-        if while_on_same_line {
-            parts.push(d.text(" while"));
-        } else {
-            parts.push(d.hardline());
-            parts.push(d.text("while"));
-        }
+        parts.push(d.text("while"));
         if let Some(kc) = keyword_comments {
             parts.push(kc);
             parts.push(d.text("("));
