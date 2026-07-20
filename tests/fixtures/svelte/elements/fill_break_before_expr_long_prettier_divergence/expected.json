@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 521,
+	"end": 573,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -173,31 +173,31 @@
 			{
 				"type": "Comment",
 				"start": 306,
-				"end": 406,
-				"data": " One character shorter: the whole fill stays on a single block-style line (both formatters). "
+				"end": 457,
+				"data": " One character shorter: prettier keeps the whole fill on one line (105), tsv breaks the\n     trailing word off to hold the line at exactly 100. "
 			},
 			{
 				"type": "Text",
-				"start": 406,
-				"end": 407,
+				"start": 457,
+				"end": 458,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 407,
-				"end": 520,
+				"start": 458,
+				"end": 572,
 				"name": "p",
 				"name_loc": {
 					"start": {
-						"line": 9,
+						"line": 10,
 						"column": 1,
-						"character": 408
+						"character": 459
 					},
 					"end": {
-						"line": 9,
+						"line": 10,
 						"column": 2,
-						"character": 409
+						"character": 460
 					}
 				},
 				"attributes": [],
@@ -206,26 +206,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 410,
-							"end": 412,
+							"start": 461,
+							"end": 463,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 412,
-							"end": 434,
+							"start": 463,
+							"end": 485,
 							"expression": {
 								"type": "Identifier",
-								"start": 413,
-								"end": 433,
+								"start": 464,
+								"end": 484,
 								"loc": {
 									"start": {
-										"line": 10,
+										"line": 11,
 										"column": 2
 									},
 									"end": {
-										"line": 10,
+										"line": 11,
 										"column": 22
 									}
 								},
@@ -234,26 +234,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 434,
-							"end": 446,
+							"start": 485,
+							"end": 497,
 							"raw": " bbbb cccc, ",
 							"data": " bbbb cccc, "
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 446,
-							"end": 468,
+							"start": 497,
+							"end": 519,
 							"expression": {
 								"type": "Identifier",
-								"start": 447,
-								"end": 467,
+								"start": 498,
+								"end": 518,
 								"loc": {
 									"start": {
-										"line": 10,
+										"line": 11,
 										"column": 36
 									},
 									"end": {
-										"line": 10,
+										"line": 11,
 										"column": 56
 									}
 								},
@@ -262,26 +262,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 468,
-							"end": 485,
+							"start": 519,
+							"end": 536,
 							"raw": " eeee ffff gggg (",
 							"data": " eeee ffff gggg ("
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 485,
-							"end": 493,
+							"start": 536,
+							"end": 544,
 							"expression": {
 								"type": "Identifier",
-								"start": 486,
-								"end": 492,
+								"start": 537,
+								"end": 543,
 								"loc": {
 									"start": {
-										"line": 10,
+										"line": 11,
 										"column": 75
 									},
 									"end": {
-										"line": 10,
+										"line": 11,
 										"column": 81
 									}
 								},
@@ -290,26 +290,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 493,
-							"end": 500,
+							"start": 544,
+							"end": 551,
 							"raw": " iii), ",
 							"data": " iii), "
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 500,
-							"end": 510,
+							"start": 551,
+							"end": 561,
 							"expression": {
 								"type": "Identifier",
-								"start": 501,
-								"end": 509,
+								"start": 552,
+								"end": 560,
 								"loc": {
 									"start": {
-										"line": 10,
+										"line": 11,
 										"column": 90
 									},
 									"end": {
-										"line": 10,
+										"line": 11,
 										"column": 98
 									}
 								},
@@ -318,10 +318,10 @@
 						},
 						{
 							"type": "Text",
-							"start": 510,
-							"end": 516,
-							"raw": " kkkk\n",
-							"data": " kkkk\n"
+							"start": 561,
+							"end": 568,
+							"raw": "\n\tkkkk\n",
+							"data": "\n\tkkkk\n"
 						}
 					]
 				}

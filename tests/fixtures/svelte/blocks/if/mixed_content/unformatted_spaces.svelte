@@ -5,4 +5,4 @@
    {  expr  }
    <Comp  />
    <!-- comment -->
-{/if}
+{/if }

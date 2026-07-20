@@ -14,9 +14,9 @@ export /* c */ default 1;    export default /* c */ 1;
 instead of splitting it on the follower. A keyword's words are not a *pure separator* (the one
 sanctioned reason to trail), so the position is one an author can mean.
 
-The value-side gaps are separate fixtures:
-[default_value_same_line_comment](../default_value_same_line_comment_prettier_divergence/) and
-[default_value_own_line_comment](../default_value_own_line_comment_prettier_divergence/). The line
+The value-side gap is a separate fixture:
+[default_value_same_line_comment](../default_value_same_line_comment_prettier_divergence/)
+(which carries every authoring of that gap as variants). The line
 form is [default_keyword_line_comment](../default_keyword_line_comment_prettier_divergence/); the
 decorated-class path is
 [default_keyword_decorator_comment](../default_keyword_decorator_comment_prettier_divergence/).

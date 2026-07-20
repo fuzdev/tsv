@@ -509,7 +509,15 @@ impl<'a> Printer<'a> {
     /// unconditional paren wrapping.
     ///
     /// Matches Prettier's `returnArgumentHasLeadingComment` (function.js:290-318).
-    fn argument_has_own_line_comment(&self, keyword_start: u32, arg: &Expression<'_>) -> bool {
+    ///
+    /// Shared with `build_yield_doc`: `yield`/`yield*` are restricted productions
+    /// like `return`/`throw`, so they ask the same question and must not answer it
+    /// differently — one question, one predicate.
+    pub(in crate::printer) fn argument_has_own_line_comment(
+        &self,
+        keyword_start: u32,
+        arg: &Expression<'_>,
+    ) -> bool {
         // Own-line comment before the argument itself (`return (\n// c\nexpr)`).
         if self.has_leading_own_line_comment_in_range(
             GapStart::Keyword(keyword_start),
@@ -602,12 +610,33 @@ impl<'a> Printer<'a> {
         } else {
             expr_doc
         };
+        self.build_hanging_paren_doc(keyword, rhs_doc, ");")
+    }
+
+    /// The paren-wrapped layout a comment-forced break takes: `kw (⏎\tbody⏎close`.
+    ///
+    /// Shared by the three **restricted productions** — `return`/`throw` (via
+    /// [`Self::build_comment_paren_doc`]) and `yield`/`yield*` (via
+    /// `build_yield_doc`). All three are `kw [no LineTerminator here] operand`, so a
+    /// break between the keyword and its operand is ASI, not layout; the parens are
+    /// what make the author's break legal. One layout, two terminators — the
+    /// statements close with `);`, the yield expression with `)`.
+    ///
+    /// `body` is the already-assembled operand doc, including any leading comment
+    /// run and any trailing comment that stays inside the parens.
+    pub(in crate::printer) fn build_hanging_paren_doc(
+        &self,
+        keyword: &'static str,
+        body: DocId,
+        close: &'static str,
+    ) -> DocId {
+        let d = self.d();
         d.concat(&[
             d.text(keyword),
             d.text(" ("),
-            d.indent(d.concat(&[d.hardline(), rhs_doc])),
+            d.indent(d.concat(&[d.hardline(), body])),
             d.hardline(),
-            d.text(");"),
+            d.text(close),
         ])
     }
 

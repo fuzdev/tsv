@@ -14,7 +14,7 @@ use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::doc::{DocBuf, GroupId};
 
-use super::helpers::{each_expr_comment_end, indent_body};
+use super::helpers::each_expr_comment_end;
 
 // Opening-tag literals for control-flow blocks. Every offset that locates the
 // embedded expression past the opening tag derives from `.len()` of these, so
@@ -52,54 +52,23 @@ struct AwaitPieces {
     catch_body: Option<DocId>,
 }
 
-/// Build one `{#await}` section body (`pending` / `then` / `catch`).
+/// Build one `{#await}` section body (`pending` / `then` / `catch`) for the
+/// newline-authored tail.
 ///
-/// `expand` is the construct-wide boundary decision (see `Printer::body_boundaries_break`):
-/// every section's boundaries break together, so a section authored inline still drops to
-/// its own line once any sibling section went multiline. Keying it per-section on that
-/// section's own authored whitespace would let a render-free character weld one section's
-/// body to its keyword while the others break.
+/// `expand` is construct-wide (hug is all-or-nothing — see
+/// `Printer::fragment_inline_authored`): every section's boundaries break together, so
+/// a section authored inline still drops to its own line once any sibling section went
+/// multiline. Keying it per-section on that section's own authored whitespace would
+/// let a render-free character weld one section's body to its keyword while the others
+/// break. (`expand` is false only for a section-less await, where every fragment is
+/// empty — the non-expand arm builds nothing.)
 fn build_await_section_body(printer: &Printer<'_>, fragment: &Fragment<'_>, expand: bool) -> DocId {
     let body_doc = if expand {
         printer.build_nodes_doc_multiline(fragment.nodes)
     } else {
         printer.build_fragment_doc(fragment)
     };
-    indent_body(printer, body_doc, expand)
-}
-
-/// Whether a fragment carries **printable content** — any node that is not whitespace-only
-/// text. An empty (or whitespace-only) section has no content, so it has no authored
-/// boundary whitespace worth preserving: its separators are `softline`s, which glue it
-/// inline and open it to a blank line once the construct breaks.
-fn fragment_has_printable(fragment: &Fragment<'_>) -> bool {
-    fragment.nodes.iter().any(|n| !n.is_whitespace_only_text())
-}
-
-/// The space-only await boundary separator — the **one rule** both a body's leading edge
-/// (`indent_body_soft`) and the separator before the following marker / `{/await}` follow:
-/// a `line` (a space inline, a newline on break) when the boundary was **authored with
-/// whitespace**, else a `softline` (glued inline, still a newline on break).
-///
-/// Preserving the authored boundary — instead of always synthesizing a space — keeps a
-/// glued content body glued (`}x{`) and a spaced one spaced (`} x {`), matching prettier and
-/// killing the cross-section authoring-dependence (a render-free space in one section no
-/// longer re-spaces another section's body — the boundary is render-free, see
-/// `Printer::body_boundaries_break`). Either way both forms become a newline on break, so
-/// the whole construct still expands as a unit.
-fn boundary_sep(printer: &Printer<'_>, authored_ws: bool) -> DocId {
-    let d = printer.d();
-    if authored_ws { d.line() } else { d.softline() }
-}
-
-/// Build `indent([<sep>, body_doc])` for a space-only await section body, where `<sep>` is
-/// [`boundary_sep`] keyed on the body's authored **leading** boundary whitespace: a space
-/// (fits) / newline (break) when authored with leading whitespace, glued (fits) / newline
-/// (break) when authored glued.
-fn indent_body_soft(printer: &Printer<'_>, body_doc: DocId, leading_ws: bool) -> DocId {
-    let sep = boundary_sep(printer, leading_ws);
-    let inner = printer.d().concat(&[sep, body_doc]);
-    printer.d().indent(inner)
+    printer.indent_body_expand(body_doc, expand)
 }
 
 /// Split a raw parameter string at top-level commas, returning trimmed param strings.
@@ -434,9 +403,7 @@ impl<'a> Printer<'a> {
     /// - **cannot break** (no line at all, e.g. an empty `{#await p}{/await}` with a short head)
     ///   → always inline, so hug statically.
     ///
-    /// `None` (every non-dangle caller) is a no-op. Distinct from the space-only tail, which
-    /// needs its `group` **unconditionally** (its section separators break under it) and so
-    /// folds the `>` at its own return rather than here.
+    /// `None` (every non-dangle caller) is a no-op.
     fn dangle_gt(&self, gt_prefix: Option<DocId>, doc: DocId) -> DocId {
         let d = self.d();
         match gt_prefix {
@@ -498,43 +465,17 @@ impl<'a> Printer<'a> {
         d.conditional_group(&[inline, expanded])
     }
 
-    /// Whether a block's body boundaries — the run between its head tag and its first
-    /// child, and between its last child and the close / next branch tag — must **break**
-    /// rather than hug, given whether every branch is inline-authored.
-    ///
-    /// A block branch is a **fragment**, and every fragment boundary in Svelte is
-    /// **render-free**: the compiler removes start/end-of-content whitespace (only
-    /// *inter-sibling* whitespace and `<pre>`/`<textarea>` are significant). So the
-    /// character at that boundary carries no authorship signal and must not select the
-    /// layout. Two consequences, both encoded here:
-    ///
-    /// - **Hug is all-or-nothing, per construct.** Keying each side on its own authored
-    ///   whitespace lets a render-free character weld the body to one tag while the other
-    ///   breaks (`{#if c}<div>a</div>⏎<div>b</div>{/if}`, `{#if c}⏎<div>a</div>{/if}`) —
-    ///   the block analogue of a delimiter dangle, and a *different stable form per
-    ///   authoring* of one document.
-    /// - **A branch that renders inline still breaks** once any sibling branch went
-    ///   multiline, so `{:else}` never welds its body while `{#if}` holds its own.
-    ///
-    /// The same invariant `ElementLayout::WithContent(BoundaryMode)` encodes for an
-    /// element's content boundary. See conformance_prettier.md §Svelte: Inline content
-    /// block-style. `<pre>`/`<textarea>` never reach here — they are dispatched to the
-    /// whitespace-sensitive builder, where the boundary is literal and the hug mandatory.
-    fn body_boundaries_break(all_branches_inline: bool) -> bool {
-        !all_branches_inline
-    }
-
     /// Whether every if-block branch (consequent, each `{:else if}` consequent,
     /// `{:else}`) is inline-authored — the precondition for the body-expand fast path.
-    fn if_branches_all_inline(&self, block: &internal::IfBlock<'_>, imc: bool) -> bool {
-        let mut all_inline = self.fragment_inline_authored(&block.consequent, imc);
+    fn if_branches_all_inline(&self, block: &internal::IfBlock<'_>) -> bool {
+        let mut all_inline = self.fragment_inline_authored(&block.consequent);
         let mut alt = block.alternate.as_ref();
         while let Some(a) = alt {
             if let Some(else_if) = Self::get_flattenable_else_if(a) {
-                all_inline &= self.fragment_inline_authored(&else_if.consequent, imc);
+                all_inline &= self.fragment_inline_authored(&else_if.consequent);
                 alt = else_if.alternate.as_ref();
             } else {
-                all_inline &= self.fragment_inline_authored(a, imc);
+                all_inline &= self.fragment_inline_authored(a);
                 alt = None;
             }
         }
@@ -561,7 +502,7 @@ impl<'a> Printer<'a> {
     /// form (a per-form build would rebuild it twice, compounding to O(2^depth)).
     fn build_if_pieces(&self, block: &internal::IfBlock<'_>) -> Vec<IfPiece> {
         let mut pieces = vec![IfPiece::Consequent(
-            self.build_fragment_doc(&block.consequent),
+            self.build_section_body_doc(&block.consequent),
         )];
         let mut alt = block.alternate.as_ref();
         while let Some(a) = alt {
@@ -577,11 +518,11 @@ impl<'a> Printer<'a> {
                     else_if.opening_tag_span.end - 1,
                     self.block_dangle_allowed(),
                 );
-                let body = self.build_fragment_doc(&else_if.consequent);
+                let body = self.build_section_body_doc(&else_if.consequent);
                 pieces.push(IfPiece::ElseIf { head, body });
                 alt = else_if.alternate.as_ref();
             } else {
-                pieces.push(IfPiece::Else(self.build_nodes_doc(a.nodes)));
+                pieces.push(IfPiece::Else(self.build_section_body_doc(a)));
                 alt = None;
             }
         }
@@ -651,16 +592,6 @@ impl<'a> Printer<'a> {
             allow_wrapping || in_multiline_context,
         );
 
-        // Check leading/trailing whitespace, considering multiline context.
-        // Space-only whitespace (no newlines) also triggers expansion to match prettier.
-        // E.g., `{#if a} content {/if}` or `{#if a} content{/if}` → expand to multiline.
-        let (has_leading, has_trailing) =
-            self.fragment_ws_status(&block.consequent, in_multiline_context);
-        // Force non-inline when block elements among multiple children
-        // (matches prettier's forceBreakContent + breakParent)
-        let force_break = self.fragment_should_force_break_content(block.consequent.nodes);
-        let is_inline = !has_leading && !has_trailing && !force_break;
-
         let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
         let head_doc = self.build_block_head(
             IF_BLOCK_OPEN,
@@ -674,7 +605,7 @@ impl<'a> Printer<'a> {
         // Inline-authored block (consequent + every alternate branch): expand the
         // whole block — bodies, `{:else if}`/`{:else}` sections, and `{/if}` — onto
         // their own lines when the head wraps (or the construct overflows).
-        if self.if_branches_all_inline(block, in_multiline_context) {
+        if self.if_branches_all_inline(block) {
             let pieces = self.build_if_pieces(block);
             let inline_tail = self.compose_if_tail(&pieces, false);
             let multiline_tail = self.compose_if_tail(&pieces, true);
@@ -686,36 +617,23 @@ impl<'a> Printer<'a> {
             );
         }
 
-        // Any branch rendering multiline breaks *every* boundary — the consequent, each
-        // `{:else if}` / `{:else}`, and `{/if}`.
-        let expand =
-            Self::body_boundaries_break(self.if_branches_all_inline(block, in_multiline_context));
-
-        // Build the consequent body only on the non-fast path — the fast path above
-        // builds its own (shared) pieces, so building it eagerly made that path build the
-        // consequent twice, keeping the nested-block fanout exponential. For inline: the
-        // regular fragment doc (preserves spaces); for multiline: the multiline doc (line
-        // structure with hardlines). Always indent() for internal break indentation.
-        let body_doc = if is_inline {
-            self.build_fragment_doc(&block.consequent)
-        } else {
-            self.build_nodes_doc_multiline(block.consequent.nodes)
-        };
-        let indented_body = indent_body(self, body_doc, expand);
+        // A newline-authored branch breaks *every* boundary — the consequent, each
+        // `{:else if}` / `{:else}`, and `{/if}` (hug is all-or-nothing; this path is
+        // only reached when some branch is not inline-authored, so the construct always
+        // expands). The consequent body is built only here — the fast path above builds
+        // its own (shared) pieces, so building it eagerly made that path build the
+        // consequent twice, keeping the nested-block fanout exponential.
+        let body_doc = self.build_nodes_doc_multiline(block.consequent.nodes);
+        let indented_body = self.indent_body_expand(body_doc, true);
 
         let mut parts: DocBuf = smallvec![head_doc, indented_body];
 
         if let Some(alt) = &block.alternate {
-            if expand {
-                parts.push(d.hardline());
-            }
-            parts.push(self.build_if_alternate_doc(alt, expand, in_multiline_context));
-        }
-
-        if expand {
             parts.push(d.hardline());
+            parts.push(self.build_if_alternate_doc(alt, in_multiline_context));
         }
 
+        parts.push(d.hardline());
         parts.push(d.text("{/if}"));
         // Non-expanding tail (authored-multiline branch): fold a preceding sibling's `>`.
         self.dangle_gt(gt_prefix, d.concat(&parts))
@@ -780,32 +698,20 @@ impl<'a> Printer<'a> {
         )
     }
 
-    /// Build doc for if block alternate (else or else-if).
-    ///
-    /// `expand` is the construct-wide boundary decision (see `body_boundaries_break`) — it
-    /// is *not* re-derived per branch, because hug is all-or-nothing: a branch that renders
-    /// inline still drops to its own line once any sibling branch went multiline.
-    fn build_if_alternate_doc(
-        &self,
-        alt: &Fragment<'_>,
-        expand: bool,
-        in_multiline_context: bool,
-    ) -> DocId {
+    /// Build doc for if block alternate (else or else-if) on the expanded (non-fast)
+    /// path — every branch body carries multiline line structure and drops to its own
+    /// line. The expansion is construct-wide, *not* re-derived per branch, because hug
+    /// is all-or-nothing: a branch that renders inline still drops to its own line once
+    /// any sibling branch went multiline (see `fragment_inline_authored`).
+    fn build_if_alternate_doc(&self, alt: &Fragment<'_>, in_multiline_context: bool) -> DocId {
         let d = self.d();
         // Check if this can be flattened to {:else if ...}
         if let Some(else_if) = Self::get_flattenable_else_if(alt) {
             // {:else if condition}
             let expr_doc = self.build_else_if_expr_doc(else_if, in_multiline_context);
 
-            // Build the body inline only when the whole construct stays inline; once it
-            // expands, every branch body carries multiline line structure.
-            let body_doc = if expand {
-                self.build_nodes_doc_multiline(else_if.consequent.nodes)
-            } else {
-                self.build_fragment_doc(&else_if.consequent)
-            };
-
-            let indented_body = indent_body(self, body_doc, expand);
+            let body_doc = self.build_nodes_doc_multiline(else_if.consequent.nodes);
+            let indented_body = self.indent_body_expand(body_doc, true);
 
             // `build_else_if_expr_doc` builds the condition with `in_multiline_context`
             // as its wrapping flag, so the dangle keys on the same condition.
@@ -820,33 +726,26 @@ impl<'a> Printer<'a> {
             let mut parts: DocBuf = smallvec![head_doc, indented_body];
 
             if let Some(nested_alt) = &else_if.alternate {
-                if expand {
-                    parts.push(d.hardline());
-                }
-                parts.push(self.build_if_alternate_doc(nested_alt, expand, in_multiline_context));
+                parts.push(d.hardline());
+                parts.push(self.build_if_alternate_doc(nested_alt, in_multiline_context));
             }
 
             return d.concat(&parts);
         }
 
         // Plain {:else}
-        let body_doc = if expand {
-            self.build_nodes_doc_multiline(alt.nodes)
-        } else {
-            self.build_nodes_doc(alt.nodes)
-        };
-
-        let indented_body = indent_body(self, body_doc, expand);
+        let body_doc = self.build_nodes_doc_multiline(alt.nodes);
+        let indented_body = self.indent_body_expand(body_doc, true);
 
         d.concat(&[d.text("{:else}"), indented_body])
     }
 
     /// Whether the each block's body and its optional `{:else}` fallback are both
     /// inline-authored — the precondition for the body-expand fast path.
-    fn each_branches_all_inline(&self, block: &internal::EachBlock<'_>, imc: bool) -> bool {
-        let mut all_inline = self.fragment_inline_authored(&block.body, imc);
+    fn each_branches_all_inline(&self, block: &internal::EachBlock<'_>) -> bool {
+        let mut all_inline = self.fragment_inline_authored(&block.body);
         if let Some(fallback) = &block.fallback {
-            all_inline &= self.fragment_inline_authored(fallback, imc);
+            all_inline &= self.fragment_inline_authored(fallback);
         }
         all_inline
     }
@@ -856,8 +755,11 @@ impl<'a> Printer<'a> {
     /// [`Self::compose_each_tail`] — so a nested body is built once rather than once
     /// per form (a per-form build would rebuild it twice, compounding to O(2^depth)).
     fn build_each_pieces(&self, block: &internal::EachBlock<'_>) -> (DocId, Option<DocId>) {
-        let body = self.build_fragment_doc(&block.body);
-        let fallback = block.fallback.as_ref().map(|f| self.build_fragment_doc(f));
+        let body = self.build_section_body_doc(&block.body);
+        let fallback = block
+            .fallback
+            .as_ref()
+            .map(|f| self.build_section_body_doc(f));
         (body, fallback)
     }
 
@@ -954,14 +856,6 @@ impl<'a> Printer<'a> {
             (d.concat(&e), None)
         };
 
-        // Check leading/trailing whitespace, considering multiline context.
-        // Space-only whitespace (no newlines) also triggers expansion to match prettier.
-        let (has_leading, has_trailing) =
-            self.fragment_ws_status(&block.body, in_multiline_context);
-        // Force non-inline when block elements among multiple children
-        let force_break = self.fragment_should_force_break_content(block.body.nodes);
-        let is_inline = !has_leading && !has_trailing && !force_break;
-
         let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
         let head_doc = self.build_block_head(
             EACH_BLOCK_OPEN,
@@ -975,7 +869,7 @@ impl<'a> Printer<'a> {
         // Inline-authored block (body + `{:else}` fallback): expand the body,
         // `{:else}` section, and `{/each}` onto their own lines when the head wraps
         // (or the construct overflows).
-        if self.each_branches_all_inline(block, in_multiline_context) {
+        if self.each_branches_all_inline(block) {
             let (body, fallback) = self.build_each_pieces(block);
             let inline_tail = self.compose_each_tail(body, fallback, false);
             let multiline_tail = self.compose_each_tail(body, fallback, true);
@@ -987,57 +881,67 @@ impl<'a> Printer<'a> {
             );
         }
 
-        // Either branch rendering multiline breaks *every* boundary — the body, `{:else}`,
-        // and `{/each}`.
-        let expand =
-            Self::body_boundaries_break(self.each_branches_all_inline(block, in_multiline_context));
-
-        // Build the body only on the non-fast path (the fast path above builds its own
-        // shared pieces). For inline: regular fragment doc (preserves spacing); for
-        // multiline: the multiline doc (line structure with hardlines).
-        let body_doc = if is_inline {
-            self.build_fragment_doc(&block.body)
-        } else {
-            self.build_nodes_doc_multiline(block.body.nodes)
-        };
-        let indented_body = indent_body(self, body_doc, expand);
+        // A newline-authored branch breaks *every* boundary — the body, `{:else}`, and
+        // `{/each}` (hug is all-or-nothing; this path is only reached when some branch
+        // is not inline-authored, so the construct always expands). Bodies are built
+        // only here — the fast path above builds its own shared pieces, so building
+        // them eagerly would build each body twice (the nested-block fanout).
+        let body_doc = self.build_nodes_doc_multiline(block.body.nodes);
+        let indented_body = self.indent_body_expand(body_doc, true);
 
         let mut parts: DocBuf = smallvec![head_doc, indented_body];
 
         if let Some(fallback) = &block.fallback {
-            if expand {
-                parts.push(d.hardline());
-            }
-
-            parts.push(d.text("{:else}"));
-
-            let fallback_doc = if expand {
-                self.build_nodes_doc_multiline(fallback.nodes)
-            } else {
-                self.build_fragment_doc(fallback)
-            };
-
-            parts.push(indent_body(self, fallback_doc, expand));
-        }
-
-        if expand {
             parts.push(d.hardline());
+            parts.push(d.text("{:else}"));
+            let fallback_doc = self.build_nodes_doc_multiline(fallback.nodes);
+            parts.push(self.indent_body_expand(fallback_doc, true));
         }
 
+        parts.push(d.hardline());
         parts.push(d.text("{/each}"));
         // Non-expanding tail (authored-multiline body): fold a preceding sibling's `>`.
         self.dangle_gt(gt_prefix, d.concat(&parts))
     }
 
-    /// Whether a fragment is inline-authored (no leading/trailing whitespace — incl.
-    /// space-only — and no forced break) — the precondition for the body-expand fast
-    /// path on `{#if}` / `{#each}` / `{#await}` bodies, branches, and sections. Uses
-    /// the same `fragment_ws_status` the non-fast-path `is_inline` uses, so space-only
-    /// / newline-authored fragments fall through to the existing whitespace-respecting
-    /// paths.
-    fn fragment_inline_authored(&self, frag: &Fragment<'_>, in_multiline_context: bool) -> bool {
-        let (has_leading, has_trailing) = self.fragment_ws_status(frag, in_multiline_context);
-        !has_leading && !has_trailing && !self.fragment_should_force_break_content(frag.nodes)
+    /// Whether a fragment is inline-authored — no **newline-authored** boundary and no
+    /// forced break — the precondition for the body-expand fast path on `{#if}` /
+    /// `{#each}` / `{#await}` / `{#key}` / `{#snippet}` bodies, branches, and sections.
+    ///
+    /// A **space-only** boundary does NOT disqualify: it is render-free (the compiler
+    /// trims every fragment edge at compile; only *inter-sibling* whitespace and
+    /// `<pre>`/`<textarea>` are significant), so it neither survives inline nor selects
+    /// the layout — the fast path trims it away (`build_section_body_doc`). Only a
+    /// boundary whose whitespace run contains a newline keeps its meaning (the
+    /// construct stays multiline). See conformance_prettier.md §Svelte: Blocks.
+    ///
+    /// The verdict drives the whole construct, and the expansion it gates is
+    /// **all-or-nothing**: on the non-fast paths every branch body + marker + close
+    /// drops to its own line — keying each side on its own authored whitespace would
+    /// let a render-free character weld the body to one tag while the other breaks
+    /// (`{#if c}⏎<div>a</div>{/if}`), the block analogue of a delimiter dangle, and a
+    /// branch that renders inline still breaks once any sibling branch went multiline
+    /// (`{:else}` never welds its body while `{#if}` holds its own). The same
+    /// invariant `ElementLayout::WithContent(BoundaryMode)` encodes for an element's
+    /// content boundary — see conformance_prettier.md §Svelte: Inline content
+    /// block-style. `<pre>`/`<textarea>` never reach here — they are dispatched to
+    /// the whitespace-sensitive builder, where the boundary is literal and the hug
+    /// mandatory.
+    fn fragment_inline_authored(&self, frag: &Fragment<'_>) -> bool {
+        !self.fragment_boundary_newline(frag, true)
+            && !self.fragment_boundary_newline(frag, false)
+            && !self.fragment_should_force_break_content(frag.nodes)
+    }
+
+    /// Build a block-section body for the inline/expanding fast path: boundary
+    /// whitespace **trimmed** (a space-only section boundary is render-free, so it never
+    /// survives inline — see conformance_prettier.md §Svelte: Blocks), content otherwise
+    /// the shared prettier-shaped builder. One builder for a glued and a space-only
+    /// authoring of the same body, so both reach one fixed point by construction.
+    ///
+    fn build_section_body_doc(&self, fragment: &Fragment<'_>) -> DocId {
+        let nodes = fragment.nodes;
+        self.build_nodes_doc_trimmed(nodes, Self::nodes_have_breakable_expression(nodes), false)
     }
 
     /// The `{:then …}` keyword doc — `{:then value}` if a `then` value binds, else
@@ -1091,12 +995,16 @@ impl<'a> Printer<'a> {
 
     /// Build each present await section's body + the un-shorthanded `{:then}` / `{:catch}`
     /// keyword **once** (mode-agnostic), for composition into both expanding-construct
-    /// tails by [`Self::compose_await_tail`]. Bodies are the raw `build_fragment_doc`; the
-    /// per-mode indent wrapping is applied at composition.
+    /// tails by [`Self::compose_await_tail`]. Bodies are the boundary-trimmed
+    /// [`Self::build_section_body_doc`]; the per-mode indent wrapping is applied at
+    /// composition.
     fn build_await_pieces(&self, block: &internal::AwaitBlock<'_>) -> AwaitPieces {
         let (is_then_shorthand, is_catch_shorthand) = Self::await_shorthand_flags(block);
         AwaitPieces {
-            pending: block.pending.as_ref().map(|p| self.build_fragment_doc(p)),
+            pending: block
+                .pending
+                .as_ref()
+                .map(|p| self.build_section_body_doc(p)),
             then_kw: (!is_then_shorthand)
                 .then(|| self.await_then_keyword(block))
                 .flatten(),
@@ -1105,11 +1013,11 @@ impl<'a> Printer<'a> {
                 .then
                 .as_ref()
                 .filter(|_| then_has_content(block))
-                .map(|t| self.build_fragment_doc(t)),
+                .map(|t| self.build_section_body_doc(t)),
             catch_kw: (!is_catch_shorthand)
                 .then(|| self.await_catch_keyword(block))
                 .flatten(),
-            catch_body: block.catch.as_ref().map(|c| self.build_fragment_doc(c)),
+            catch_body: block.catch.as_ref().map(|c| self.build_section_body_doc(c)),
         }
     }
 
@@ -1147,79 +1055,10 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    /// Push a space-only section's body to `parts` and **report its authored trailing boundary
-    /// whitespace**, which the caller uses to pick the separator *after* it ([`boundary_sep`]).
-    ///
-    /// Every section pushes — there is no empty-section special case. A content section keeps
-    /// its own authored boundary (leading via `indent_body_soft`, trailing via the return), so
-    /// a body authored glued stays glued and a spaced one keeps its space. A section with no
-    /// printable content has nothing to preserve, so it takes `softline`s on both sides and
-    /// returns `false`: inline they collapse and its markers glue
-    /// (`{#await p}{:then v}{/await}`), and once the construct breaks they become newlines,
-    /// leaving the empty section its own blank line — the same shape the newline-authored tail
-    /// produces, so the two paths agree.
-    fn push_await_space_only_body(&self, parts: &mut DocBuf, fragment: &Fragment<'_>) -> bool {
-        if !fragment_has_printable(fragment) {
-            // Empty section: no content, so nothing to preserve — a `softline` on each side.
-            // Inline both collapse and the markers glue (`{:catch e}{/await}`); once the
-            // construct breaks they become newlines, leaving the section its blank line.
-            parts.push(indent_body_soft(self, self.d().empty(), false));
-            return false;
-        }
-        let leading_ws = self.fragment_has_any_leading_ws(fragment);
-        let trailing_ws = self.fragment_has_any_trailing_ws(fragment);
-        let body = self.build_nodes_doc_multiline(fragment.nodes);
-        parts.push(indent_body_soft(self, body, leading_ws));
-        trailing_ws
-    }
-
-    /// Build the await tail for the **space-only** layout. A content-bearing section body
-    /// (`indent_body_soft`, via `push_await_space_only_body`) is wrapped in single spaces, but
-    /// a **whitespace-only** section contributes no body and its markers **glue**
-    /// (`{#await p}{:then v}{/await}`): a separator `line` is emitted only after a section that
-    /// carried content, so an empty section collapses to `}{` exactly as every other empty
-    /// construct does — while the `{:then}` / `{:catch}` markers are kept (prettier instead
-    /// deletes the whole section; see `conformance_prettier.md` §Svelte: Blocks). The whole
-    /// construct still breaks together as a unit under the caller's `group`. Mirrors
-    /// `compose_await_tail`, but with **conditional** `line()` separators and soft-indented
-    /// bodies (the head is prepended + grouped by the caller).
-    fn build_await_tail_space_only(&self, block: &internal::AwaitBlock<'_>) -> DocId {
-        let d = self.d();
-        let (is_then_shorthand, is_catch_shorthand) = Self::await_shorthand_flags(block);
-        let mut parts: DocBuf = DocBuf::new();
-        // The authored trailing boundary whitespace of the section just emitted — picks the
-        // separator before the next marker / close (`line` when the author wrote whitespace
-        // there, else `softline`). An empty section reports `false`, so its markers glue
-        // inline and open to a blank line when the construct breaks.
-        let mut prev_trailing_ws = false;
-        if let Some(pending) = &block.pending {
-            prev_trailing_ws = self.push_await_space_only_body(&mut parts, pending);
-        }
-        if !is_then_shorthand && let Some(kw) = self.await_then_keyword(block) {
-            parts.push(boundary_sep(self, prev_trailing_ws));
-            parts.push(kw);
-            prev_trailing_ws = false;
-        }
-        if let Some(then_block) = &block.then {
-            prev_trailing_ws = self.push_await_space_only_body(&mut parts, then_block);
-        }
-        if !is_catch_shorthand && let Some(kw) = self.await_catch_keyword(block) {
-            parts.push(boundary_sep(self, prev_trailing_ws));
-            parts.push(kw);
-            prev_trailing_ws = false;
-        }
-        if let Some(catch_block) = &block.catch {
-            prev_trailing_ws = self.push_await_space_only_body(&mut parts, catch_block);
-        }
-        parts.push(boundary_sep(self, prev_trailing_ws));
-        parts.push(d.text("{/await}"));
-        d.concat(&parts)
-    }
-
     /// Build the await tail for the **newline-authored** layout: section bodies via
     /// `build_await_section_body`, with a `hardline` before each keyword and before
-    /// `{/await}` when the construct expands. Mirrors `compose_await_tail`; `expand` is the
-    /// construct-wide boundary decision (see `Self::body_boundaries_break`), so every
+    /// `{/await}` when the construct expands. Mirrors `compose_await_tail`; `expand` is
+    /// construct-wide (hug is all-or-nothing — see `fragment_inline_authored`), so every
     /// section boundary breaks together rather than keying on its own authored whitespace
     /// (the head is prepended by the caller).
     fn build_await_tail_newline(&self, block: &internal::AwaitBlock<'_>, expand: bool) -> DocId {
@@ -1311,24 +1150,24 @@ impl<'a> Printer<'a> {
         let has_section = sections
             .iter()
             .any(|f| f.as_ref().is_some_and(|f| !f.nodes.is_empty()));
-        // `fragment_inline_authored` (via `fragment_ws_status`) already treats a
-        // space-only section as non-inline, so space-only await blocks fall through to
-        // the `has_space_only` group path below.
+        // A space-only section is inline-authored (its boundary is render-free and gets
+        // trimmed by `build_section_body_doc`); only a newline-authored section falls
+        // through to the newline tail below.
         let all_sections_inline = sections
             .iter()
             .filter_map(|f| f.as_ref())
-            .all(|f| self.fragment_inline_authored(f, in_multiline_context));
+            .all(|f| self.fragment_inline_authored(f));
         // Uniform body-drop: when every present section is inline-authored, the body +
         // `{:then}`/`{:catch}` keywords + `{/await}` drop to their own lines on overflow.
         // Keyed on `can_wrap` — the same gate `{#if}`/`{#each}` use — so the body hugs in the
-        // inline-content/hug-both path (`can_wrap` false) but drops in the multiline-fragment
+        // inline-content path (`can_wrap` false) but drops in the multiline-fragment
         // path. A block-parent sibling routes await through the multiline path via
         // `has_control_flow_after_sibling` (so `can_wrap` is true there); an inline parent
         // keeps `can_wrap` false and hugs, matching `{#if}`/`{#each}`.
         // Shorthand clause lives in the head: `then v` / bare `then`, or `catch e` / bare
-        // `catch`; the full form has none. Built once, shared by the fast path, the
-        // space-only tail, and the newline-authored tail. Classified by `await_shorthand`,
-        // the same source `await_shorthand_flags` uses to skip the head-carried keyword.
+        // `catch`; the full form has none. Built once, shared by the fast path and the
+        // newline-authored tail. Classified by `await_shorthand`, the same source
+        // `await_shorthand_flags` uses to skip the head-carried keyword.
         let clause = match await_shorthand(block) {
             AwaitShorthand::Then => Some(match &block.value {
                 Some(value) => d.concat(&[d.text("then "), self.build_pattern_doc(value)]),
@@ -1368,34 +1207,12 @@ impl<'a> Printer<'a> {
             );
         }
 
-        // Space-only sections break together as one unit under a single `group` (the tail
-        // uses `line()` separators); newline-authored sections key hardlines on authored
-        // trailing whitespace. Both reuse the hoisted head + the shared tail builders.
-        let has_space_only = [&block.pending, &block.then, &block.catch].iter().any(|f| {
-            f.as_ref()
-                .is_some_and(|f| self.fragment_has_space_only_ws(f))
-        });
-        if has_space_only {
-            let tail = self.build_await_tail_space_only(block);
-            // This `group` can fit inline, so its break is a *render-time* decision that
-            // `will_break` (and thus `dangle_gt`) can't see. Fold a preceding sibling's
-            // split-off `>` (`gt_prefix`) *inside* the group with `if_break`, keyed on the
-            // group's own flat/break state: hug when it fits (`>{#await…}`), dangle onto its
-            // own line when it breaks (`⏎>{#await…}`). The `None` arm is a bare group,
-            // byte-identical to a block with no preceding sibling.
-            let group_body = d.concat(&[head_doc, tail]);
-            return match gt_prefix {
-                Some(gt) => {
-                    let folded_gt = d.if_break(d.concat(&[d.hardline(), gt]), gt);
-                    d.group(d.concat(&[folded_gt, group_body]))
-                }
-                None => d.group(group_body),
-            };
-        }
-
-        // Any section rendering multiline breaks *every* boundary — each section body, the
-        // `{:then}` / `{:catch}` keywords, and `{/await}`.
-        let expand = Self::body_boundaries_break(all_sections_inline);
+        // A newline-authored section breaks *every* boundary — each section body, the
+        // `{:then}` / `{:catch}` keywords, and `{/await}` (hug is all-or-nothing, see
+        // `fragment_inline_authored`). Here `!all_sections_inline` is false only for a
+        // section-less await (`{#await p}{/await}` — every fragment empty), which stays
+        // inline: nothing forces expansion.
+        let expand = !all_sections_inline;
         let tail = self.build_await_tail_newline(block, expand);
         // Non-expanding tail (newline-authored sections): fold a preceding sibling's `>`.
         self.dangle_gt(gt_prefix, d.concat(&[head_doc, tail]))
@@ -1429,26 +1246,6 @@ impl<'a> Printer<'a> {
             allow_wrapping || in_multiline_context,
         );
 
-        // Check leading/trailing whitespace, considering space-only patterns.
-        // Space-only whitespace (no newlines) also triggers expansion to match prettier.
-        let (has_leading, has_trailing) = self.fragment_ws_status(&block.fragment, false);
-        // Force non-inline when block elements among multiple children
-        let force_break = self.fragment_should_force_break_content(block.fragment.nodes);
-        let is_inline = !has_leading && !has_trailing && !force_break;
-
-        // A multiline body breaks both boundaries — the body and `{/key}`.
-        let expand = Self::body_boundaries_break(is_inline);
-
-        // For inline: use regular fragment doc (preserves inline spacing)
-        // For multiline: use multiline doc (preserves line structure with hardlines)
-        let body_doc = if is_inline {
-            self.build_fragment_doc(&block.fragment)
-        } else {
-            self.build_nodes_doc_multiline(block.fragment.nodes)
-        };
-
-        let indented_body = indent_body(self, body_doc, expand);
-
         let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
         let head_doc = self.build_block_head(
             KEY_BLOCK_OPEN,
@@ -1459,18 +1256,23 @@ impl<'a> Printer<'a> {
             can_wrap,
         );
         let close = d.text("{/key}");
-        if is_inline {
-            // Inline-authored body: expand it + `{/key}` when the head wraps.
+
+        // Inline-authored (no newline-authored boundary, no forced break; a space-only
+        // boundary is render-free and gets trimmed by the body builder): expand the
+        // body + `{/key}` when the head wraps (or the construct overflows).
+        if self.fragment_inline_authored(&block.fragment) {
+            let body_doc = self.build_section_body_doc(&block.fragment);
             return self.build_expanding_block(head_doc, body_doc, close, gt_prefix);
         }
 
-        let mut parts: DocBuf = smallvec![head_doc, indented_body];
-
-        if expand {
-            parts.push(d.hardline());
-        }
-
-        parts.push(close);
+        // Newline-authored body: it and `{/key}` each keep their own line.
+        let body_doc = self.build_nodes_doc_multiline(block.fragment.nodes);
+        let parts: DocBuf = smallvec![
+            head_doc,
+            self.indent_body_expand(body_doc, true),
+            d.hardline(),
+            close,
+        ];
         // Non-expanding tail (authored-multiline body): fold a preceding sibling's `>`.
         self.dangle_gt(gt_prefix, d.concat(&parts))
     }
@@ -1487,18 +1289,16 @@ impl<'a> Printer<'a> {
     /// its own width (its `BlockHead` group), and the body-drop is likewise decided by
     /// **width** (the `conditional_group` in `build_expanding_block`) — never by whether the
     /// head may wrap, which would let a render-free boundary select the layout (see
-    /// `body_boundaries_break`).
+    /// `fragment_inline_authored`).
     pub(crate) fn build_snippet_block_doc_with_full_context(
         &self,
         block: &internal::SnippetBlock<'_>,
         gt_prefix: Option<DocId>,
     ) -> DocId {
         let d = self.d();
-        // Check leading/trailing whitespace, considering space-only patterns.
-        // Space-only whitespace (no newlines) also triggers expansion to match prettier.
-        let (has_leading, has_trailing) = self.fragment_ws_status(&block.body, false);
-        let force_break = self.fragment_should_force_break_content(block.body.nodes);
-        let is_inline = !has_leading && !has_trailing && !force_break;
+        // Inline-authored = no newline-authored boundary and no forced break; a
+        // space-only boundary is render-free and gets trimmed by the body builder.
+        let is_inline = self.fragment_inline_authored(&block.body);
 
         // Type parameters (generics). Parsed nodes route through tsv_ts's type-parameter
         // printer (constraints, defaults, modifiers, interior comments, width-based
@@ -1579,32 +1379,24 @@ impl<'a> Printer<'a> {
             GroupId::BlockHead,
         );
 
-        // Body: inline hugs directly, multiline uses hardlines
-        let body_doc = if is_inline {
-            self.build_fragment_doc(&block.body)
-        } else {
-            self.build_nodes_doc_multiline(block.body.nodes)
-        };
-
-        // Inline-authored body: expand the body + `{/snippet}` onto their own lines
-        // when the construct overflows (params wrap, or head + body exceeds width) —
-        // uniformly, including paramless snippets. Keyed to the opening group above.
+        // Inline-authored body (boundary-trimmed): expand the body + `{/snippet}` onto
+        // their own lines when the construct overflows (params wrap, or head + body
+        // exceeds width) — uniformly, including paramless snippets. Keyed to the
+        // opening group above.
         if is_inline {
+            let body_doc = self.build_section_body_doc(&block.body);
             let close = d.text("{/snippet}");
             return self.build_expanding_block(opening_doc, body_doc, close, gt_prefix);
         }
 
-        // A multiline body breaks both boundaries — the body and `{/snippet}`.
-        let expand = Self::body_boundaries_break(is_inline);
-
-        let mut parts: DocBuf = smallvec![opening_doc];
-        parts.push(indent_body(self, body_doc, expand));
-
-        if expand {
-            parts.push(d.hardline());
-        }
-
-        parts.push(d.text("{/snippet}"));
+        // Newline-authored body: it and `{/snippet}` each keep their own line.
+        let body_doc = self.build_nodes_doc_multiline(block.body.nodes);
+        let parts: DocBuf = smallvec![
+            opening_doc,
+            self.indent_body_expand(body_doc, true),
+            d.hardline(),
+            d.text("{/snippet}"),
+        ];
         // Non-expanding tail (authored-multiline body): fold a preceding sibling's `>`.
         self.dangle_gt(gt_prefix, d.concat(&parts))
     }

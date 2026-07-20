@@ -22,7 +22,10 @@ that one is keyed on inter-sibling whitespace, which Svelte 5 *keeps*. See
 the `unformatted_ours_*` variants are other authorings of the same document that tsv likewise
 converges and prettier does not.
 
-Supersedes the former `expr_child_opening_newline` and `multi_expressions_opening_newline` fixtures,
-which pinned the dangle as tsv's own output.
+`unformatted_ours_newline_trailing_space` composes the lone break with a **render-free trailing
+space** (`{expr} </Comp>`): the space is trimmed, the break is still one-sided, so tsv collapses it
+the same. Prettier reads that space as a second broken boundary and **expands** instead of
+dangling — `variant_expanded` pins that expanded both-side-newline form, dual-stable (a
+newline-authored boundary on both sides keeps its layout meaning under both formatters).
 
 See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).

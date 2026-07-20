@@ -46,6 +46,40 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let tag_sym = element.name.to_u32();
+
+        // A void element has no closing tag — that is a fact about the TAG, not about the
+        // surrounding layout, so whitespace-sensitivity has no say in it. Without this the
+        // generic path below reached its `></tag>` close form and fabricated one
+        // (`<pre><br></pre>` → `<pre><br></br></pre>`), which is not valid HTML (a void element
+        // cannot have an end tag) and which tsv's own parser then rejects — a format that
+        // corrupts content and whose output will not reparse. Only the empty-with-attrs
+        // self-closing branch happened to escape it, so 3 of the 4 attrs × authored-`/`
+        // combinations were broken. Pinned by `elements/pre_void_element`.
+        let class = self.classify_tag(element);
+        if class.is_void {
+            let parts = self.element_parts(element, class);
+            return self.build_void_element_doc(&parts, &attr_docs, class.is_declaration);
+        }
+
+        // Whether an authored `/>` may survive — the SAME question the regular element path
+        // asks, for the same reason. Whitespace-sensitivity is about the literalness of
+        // CONTENT; it says nothing about how a tag serializes, and `<i />` → `<i></i>` adds no
+        // characters to the rendered text. Answering it locally here got it wrong in both
+        // directions, split by whether the element had attributes: the with-attrs branch below
+        // preserved `/>` for every kind (wrong for a plain `<i … />`, where the HTML spec makes
+        // the `/` a parse error the parser ignores), while the no-attrs case fell through to the
+        // generic close-tag path and expanded every kind (wrong for `<Comp />` and
+        // `<svg:rect />`, where the `/` is meaningful). Pinned by
+        // `elements/pre_self_closing_kinds_prettier_divergence`.
+        let can_self_close = class.kind.is_component() || class.is_foreign || class.is_namespaced;
+        if can_self_close
+            && element.fragment.nodes.is_empty()
+            && attr_docs.is_empty()
+            && self.span_was_self_closing(element.span)
+        {
+            return d.concat(&[d.text("<"), d.symbol(tag_sym), d.text(" />")]);
+        }
+
         // Deliberately NOT `ElementKind::is_inline` (and so not `classify_tag`): inside a
         // whitespace-preserving subtree a *component* counts as inline flow, where the shared
         // classifier splits `Component` out as its own kind. The two predicates agree on
@@ -233,7 +267,7 @@ impl<'a> Printer<'a> {
         // `else` branch below — prettier never breaks `>` there, tolerating overflow.)
         if is_inline && !has_content && !attr_docs.is_empty() {
             let attr_indent = d.indent(d.group(d.concat(&attr_docs)));
-            if self.span_was_self_closing(element.span) {
+            if can_self_close && self.span_was_self_closing(element.span) {
                 // line() is a space when flat (`<tag attrs />`), a newline when the outer
                 // group breaks. Mirrors build_void_element_doc.
                 return d.group(d.concat(&[

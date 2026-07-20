@@ -1,0 +1,86 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 288,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 171,
+				"data": " Multi-word tail: the break lands at the first separator that overflows, not the last —\n     a per-word greedy pack would leave the line at 101 and drop only `dd`. "
+			},
+			{
+				"type": "Text",
+				"start": 171,
+				"end": 172,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 172,
+				"end": 287,
+				"name": "li",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 173
+					},
+					"end": {
+						"line": 3,
+						"column": 3,
+						"character": 175
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 176,
+							"end": 262,
+							"raw": "\n\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ~",
+							"data": "\n\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ~"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 262,
+							"end": 274,
+							"expression": {
+								"type": "Identifier",
+								"start": 263,
+								"end": 273,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 86
+									},
+									"end": {
+										"line": 4,
+										"column": 96
+									}
+								},
+								"name": "xxxxxxxxxx"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 274,
+							"end": 282,
+							"raw": "\n\tcc dd\n",
+							"data": "\n\tcc dd\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -12,11 +12,11 @@
 {#each items as item}
 		{const   a   =   item_variant && !['aaaa', 'bbbb', 'cccc', 'dddd', 'eeeeeeeeee'].includes(item_variant)}
 	{a}
-{/each}
+{/each }
 
 
 <!-- declaration tag that wraps at = (101 chars triggers break) -->
 {#each items as item}
 		{let   a   =   item_variant && !['aaaa', 'bbbb', 'cccc', 'dddd', 'eeeeeeeeeeeee'].includes(item_variant)}
 	{a}
-{/each}
+{/each }
