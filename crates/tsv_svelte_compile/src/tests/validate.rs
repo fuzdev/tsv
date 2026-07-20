@@ -66,6 +66,34 @@ fn compile_root_only_meta_tag_placement_refuses() {
 }
 
 #[test]
+fn compile_unknown_svelte_meta_tag_refuses() {
+    // The oracle's parse-time `svelte_meta_invalid_tag` (`element.js:142`): a
+    // `svelte:`-prefixed element whose name is not a known meta tag. tsv's parser
+    // routes every known `svelte:` name to a `SpecialElementKind` (and
+    // `svelte:options` to `Root.options`), so an unknown one reaches a regular
+    // element and the compiler refuses it.
+    assert_unsupported("<svelte:selfdestructive x=\"a\" />", "meta tag");
+    assert_unsupported("<svelte:nope />", "meta tag");
+    // Fires wherever the tag sits — inside a block, and inside a region SSR DROPS
+    // (a `{:catch}` branch), the whole reason this rule lives in `validate.rs`
+    // rather than at an emitter.
+    assert_unsupported("{#if x}<svelte:selfdestructive />{/if}", "meta tag");
+    assert_unsupported(
+        "{#await p}a{:then v}b{:catch e}<svelte:nope />{/await}",
+        "meta tag",
+    );
+
+    // Controls — the rule is `svelte:`-specific and never touches a KNOWN meta tag.
+    // `<svelte:head>`/`<svelte:window>`/`<svelte:element>`/`<svelte:boundary>` all
+    // parse to special kinds, so they compile (or refuse for their OWN reasons, not
+    // this one); and a non-`svelte:` namespaced tag is an ordinary regular element.
+    let _ = compile_js("<svelte:window />");
+    let _ = compile_js("<svelte:element this=\"div\" />");
+    let _ = compile_js("<svelte:boundary>x</svelte:boundary>");
+    let _ = compile_js("<foo:bar />");
+}
+
+#[test]
 fn compile_invalid_node_placement_refuses() {
     // The oracle's `node_invalid_placement` — markup a browser would REPAIR, which
     // breaks Svelte's assumptions about component structure. Every case below was

@@ -862,6 +862,20 @@ pub enum Refusal {
     /// order can't be fixed.
     #[error("<svelte:head> alongside a {{@const}} in the same fragment (hoist order)")]
     SvelteHeadWithConstTag,
+    /// A `svelte:`-prefixed element whose name is not one of the known meta tags —
+    /// the oracle's parse-time `svelte_meta_invalid_tag`
+    /// (`phases/1-parse/state/element.js:142`, `tag.name.startsWith('svelte:') &&
+    /// !meta_tags.has(tag.name)`). tsv's parser routes every KNOWN `svelte:` name to
+    /// a `SpecialElementKind` (and `svelte:options` to `Root.options`), so a
+    /// `svelte:`-prefixed name that reaches a regular element is by construction an
+    /// unknown meta tag; the compiler refuses it rather than emit output for a
+    /// component the oracle rejects. The oracle raises this BEFORE its `tag_invalid_name`
+    /// (`:151`), so a `<svelte:foo>` is this refusal, never that one.
+    #[error("<{name}> is not a valid <svelte:...> meta tag (the oracle rejects it)")]
+    SvelteMetaInvalidTag {
+        /// The offending tag name (`svelte:selfdestructive`, …).
+        name: String,
+    },
     /// An SSR-inert special element (`<svelte:window>`/`<svelte:body>`/
     /// `<svelte:document>`) nested inside an element/block/snippet. These are legal
     /// only as a direct child of the component root; the oracle errors

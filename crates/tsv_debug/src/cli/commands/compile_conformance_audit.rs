@@ -280,6 +280,7 @@ mod tests {
         "<svelte:options>",
         "<{name}> cannot have children (the oracle rejects it)",
         "<{name}> component with both a children prop and default children",
+        "<{name}> is not a valid <svelte:...> meta tag (the oracle rejects it)",
         "<{name}> must be a top-level element (the oracle rejects it)",
         "<{name}> with children",
         "TS enum (the oracle rejects it)",

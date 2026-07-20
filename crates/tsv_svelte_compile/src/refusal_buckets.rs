@@ -317,6 +317,9 @@ impl Refusal {
             Self::SvelteHeadWithConstTag => Cow::Borrowed(
                 "<svelte:head> alongside a {@const} in the same fragment (hoist order)",
             ),
+            Self::SvelteMetaInvalidTag { .. } => {
+                Cow::Borrowed("<{name}> is not a valid <svelte:...> meta tag (the oracle rejects it)")
+            }
             Self::SpecialElementInvalidPlacement { .. } => {
                 Cow::Borrowed("<{name}> must be a top-level element (the oracle rejects it)")
             }
@@ -592,6 +595,9 @@ impl Refusal {
             Self::TitleAttributes,
             Self::TitleInvalidContent,
             Self::SvelteHeadWithConstTag,
+            Self::SvelteMetaInvalidTag {
+                name: "{name}".to_string(),
+            },
             Self::SpecialElementInvalidPlacement {
                 name: "{name}".to_string(),
             },

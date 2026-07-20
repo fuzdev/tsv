@@ -175,13 +175,24 @@ impl<'s> Validator<'s> {
     fn walk_node(&mut self, node: &FragmentNode<'_>, at_root: bool) -> Result<(), CompileError> {
         match node {
             FragmentNode::Element(element) => {
+                let name = element.name_span.extract(self.source);
+                // The oracle's parse-time `svelte_meta_invalid_tag`
+                // (`phases/1-parse/state/element.js:142`, before `attribute_duplicate`
+                // at `:250` and `tag_invalid_name` at `:151`). Every KNOWN `svelte:`
+                // name parses to a `SpecialElementKind` — and `svelte:options` to
+                // `Root.options` — so a `svelte:`-prefixed *regular* element is by
+                // construction an unknown meta tag. A component name cannot carry the
+                // prefix (it is lowercase), so `ElementKind::Html` is the only host.
+                if element.kind == ElementKind::Html && name.starts_with("svelte:") {
+                    return Err(unsupported(Refusal::SvelteMetaInvalidTag {
+                        name: name.to_string(),
+                    }));
+                }
                 refuse_duplicate_attributes(element.attributes, self.source)?;
                 match element.kind {
                     ElementKind::Html => {
                         self.validate_element(element.attributes)?;
-                        self.refuse_invalid_element_placement(
-                            element.name_span.extract(self.source),
-                        )?;
+                        self.refuse_invalid_element_placement(name)?;
                     }
                     ElementKind::Component => self.validate_component(element.attributes)?,
                 }

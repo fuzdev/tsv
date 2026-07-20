@@ -497,6 +497,14 @@ neither the emitters nor `guard_dropped_presence` alone can host them.
   (so `bind:value` collides with `value`, while `class:x` and `x` legally co-exist);
   and the name `this` is never recorded, which is what keeps
   `<svelte:element bind:this this={…}>` legal.
+- **Refused**: `<{name}> is not a valid <svelte:...> meta tag (the oracle rejects it)` —
+  the oracle's parse-time `svelte_meta_invalid_tag`
+  (`element.js:142`, `tag.name.startsWith('svelte:') && !meta_tags.has(tag.name)`). tsv's
+  parser routes every KNOWN `svelte:` name to a `SpecialElementKind` — and `svelte:options`
+  to `Root.options` — so a `svelte:`-prefixed name that reaches a *regular* element is by
+  construction an unknown meta tag. The oracle raises this BEFORE `tag_invalid_name`
+  (`:151`), so `<svelte:foo>` is this refusal, never that one; a non-`svelte:` namespaced
+  tag (`<foo:bar>`) is an ordinary regular element and compiles.
 - **Refused**: `<{name}> must be a top-level element (the oracle rejects it)` and
   `duplicate <{name}> element (the oracle rejects it)` — the oracle's
   `svelte_meta_invalid_placement` / `svelte_meta_duplicate` over its
