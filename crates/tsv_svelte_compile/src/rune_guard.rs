@@ -417,7 +417,7 @@ fn collect_nested_declared(pattern: &Expression<'_>, ctx: &mut WalkCtx<'_>) {
 ///
 /// ⚠️ A declarator's leaves are guarded on **two** paths, and both are needed:
 /// [`walk_variable_declaration`] here, for a declaration the guard walk owns,
-/// and `script_rewrite::rewrite_declaration`'s per-declarator loop, for a
+/// and `script_rewrite::rewrite_script_statement`'s per-declarator loop, for a
 /// top-level instance-script declaration the transform rewrites instead of
 /// walking. The transform path does not reach this rule through the walk at
 /// all — a rune declarator's id is never walked, and a non-rune one is walked
@@ -471,7 +471,7 @@ pub(crate) fn refuse_dollar_binding_pattern(
 /// validated OUTSIDE the guard walk that owns one: a top-level class
 /// declaration's id (`script_rewrite::rewrite_class_state_fields` intercepts the
 /// statement before `walk_statement` sees it) and an import specifier's local
-/// (`script_rewrite::refuse_runes_invalid_import`, the oracle's own import
+/// (`script_bindings::refuse_runes_invalid_import`, the oracle's own import
 /// visitor's analog). A new interception point must call this too.
 pub(crate) fn refuse_dollar_binding_name(
     id: &tsv_ts::ast::internal::Identifier<'_>,
@@ -506,7 +506,7 @@ pub(crate) fn refuse_dollar_binding_name(
 /// implemented for real.
 ///
 /// Two callers, because imports are validated on two paths: [`walk_statement`]
-/// here, and `script_rewrite::refuse_runes_invalid_import`, for the imports the
+/// here, and `script_bindings::refuse_runes_invalid_import`, for the imports the
 /// transform hoists out of the statement stream before the guard walk runs.
 pub(crate) fn refuse_dollar_import_locals(
     specifiers: &[ImportSpecifier<'_>],

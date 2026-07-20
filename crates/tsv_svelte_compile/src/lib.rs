@@ -34,7 +34,7 @@
 //! | Walk | Oracle phase | Descent |
 //! | --- | --- | --- |
 //! | `validate::validate_document` | phase 1 parse-time rules + whole-component phase-2 validations | `attr_refs::each_child_fragment` |
-//! | `script_rewrite::refuse_template_typescript` | phase 1 (the TypeScript grammar gate) | `attr_refs::each_template_item` |
+//! | `script_ts_gate::refuse_template_typescript` | phase 1 (the TypeScript grammar gate) | `attr_refs::each_template_item` |
 //! | `element_census::build_census` | phase 2, CSS pass (`css-prune.js`) | own exhaustive match |
 //! | `snippet::analyze_snippets` | phase 2 (`can_hoist_snippet`) | seam + own scope-threaded match |
 //! | `needs_context::analyze_component` | phase 2 accumulation + `validate_assignment` | own scope-threaded match |
@@ -78,7 +78,13 @@ mod needs_context;
 mod parity;
 mod refusal;
 mod rune_guard;
+mod script_bindings;
+mod script_collision;
+mod script_comments;
+mod script_decls;
+mod script_props;
 mod script_rewrite;
+mod script_ts_gate;
 mod snippet;
 mod snippet_emit;
 mod store_rewrite;

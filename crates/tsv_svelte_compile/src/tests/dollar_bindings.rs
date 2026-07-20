@@ -101,7 +101,7 @@ fn compile_refuses_dollar_prefixed_bindings() {
 
 #[test]
 fn compile_refuses_dollar_prefixed_binding_on_the_rewrite_path() {
-    // `script_rewrite::rewrite_declaration` rewrites a top-level instance-script
+    // `script_rewrite::rewrite_script_statement` rewrites a top-level instance-script
     // declaration instead of guard-walking it, so it needs the binding rule at
     // its OWN chokepoint — the guard walk never applies it here. Two halves,
     // both probe-verified oracle-rejected (`dollar_prefix_invalid`), both

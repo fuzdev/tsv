@@ -33,7 +33,7 @@ use crate::fragment::{
 use crate::namespace::{
     ChildNamespace, FragmentParent, Namespace, determine_namespace_for_children,
 };
-use crate::script_rewrite::plain_identifier_name;
+use crate::script_decls::plain_identifier_name;
 use crate::snippet_emit::build_snippet_function;
 use crate::transform_server::{EmitEnv, unsupported};
 use crate::{CompileError, Refusal};

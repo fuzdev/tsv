@@ -17,7 +17,7 @@ use crate::build::escape_template_text;
 use crate::css_scope::SCOPE_HASH_CLASS;
 use crate::fragment::{BodyBuilder, escape_html_attr, guard_dropped, wrap_value_expr};
 use crate::namespace::{Namespace, element_is_mathml, element_is_svg};
-use crate::script_rewrite::plain_identifier_name;
+use crate::script_decls::plain_identifier_name;
 use crate::text_class::js_trim;
 use crate::transform_server::{EmitEnv, unsupported};
 use crate::{CompileError, Refusal};

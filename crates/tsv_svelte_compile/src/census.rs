@@ -32,7 +32,7 @@
 //! no-`lang="ts"` gate; CSS selector/rule refusals; the instance-script rune
 //! rewrites, guards, exports, and invalid imports; the `needs_context`
 //! member/call classification; the snippet hoist analysis; the comment
-//! carry-through classes [`collect_script_comments`](crate::script_rewrite::collect_script_comments)
+//! carry-through classes [`collect_script_comments`](crate::script_comments::collect_script_comments)
 //! owns; and the template `TemplateNode` refusals (non-head `<svelte:*>` special
 //! elements, `{@debug}`, declaration tags) via the shared fragment seam.
 //! `{@render}` is **supported** (a handled arm, not a refusal), so it is
@@ -86,10 +86,11 @@ use crate::fragment::{
     SPECIAL_ELEMENT_REFUSAL_KINDS, fragment_node_kind, special_element_refusal_kind,
 };
 use crate::needs_context::{analyze_component, collect_constant_names};
-use crate::script_rewrite::{
-    analyze_script, collect_script_comments, document_ts_flag, plain_identifier_name,
-    refuse_runes_invalid_import, refuse_template_typescript, rewrite_script_statement,
-};
+use crate::script_bindings::{analyze_script, refuse_runes_invalid_import};
+use crate::script_comments::collect_script_comments;
+use crate::script_decls::plain_identifier_name;
+use crate::script_rewrite::rewrite_script_statement;
+use crate::script_ts_gate::{document_ts_flag, refuse_template_typescript};
 use crate::snippet::analyze_snippets;
 use crate::{CompileError, CompileOptions, Generate, Refusal, erase, refusal};
 

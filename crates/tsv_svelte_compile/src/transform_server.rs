@@ -66,11 +66,14 @@ use crate::element_census::build_census;
 use crate::fragment::{BodyBuilder, FragmentCtx, emit_fragment};
 use crate::namespace::{FragmentParent, Namespace, infer_namespace};
 use crate::needs_context::{ComponentContext, analyze_component, collect_constant_names};
-use crate::script_rewrite::{
-    BindableEntry, analyze_module_script, analyze_script, collect_script_comments,
-    document_ts_flag, identifier_binding_name, plain_identifier_name, refuse_rune_store_collision,
-    refuse_runes_invalid_import, refuse_template_typescript, rewrite_script_statement,
-    self_check_no_typescript,
+use crate::script_bindings::{analyze_module_script, analyze_script, refuse_runes_invalid_import};
+use crate::script_collision::refuse_rune_store_collision;
+use crate::script_comments::collect_script_comments;
+use crate::script_decls::{identifier_binding_name, plain_identifier_name};
+use crate::script_props::BindableEntry;
+use crate::script_rewrite::rewrite_script_statement;
+use crate::script_ts_gate::{
+    document_ts_flag, refuse_template_typescript, self_check_no_typescript,
 };
 use crate::snippet::{SnippetAnalysis, analyze_snippets};
 use crate::{CompileError, CompileOutput, Refusal, erase, store_rewrite};

@@ -28,7 +28,7 @@ use crate::fragment::{
     guard_pattern, wrap_single,
 };
 use crate::namespace::{ChildNamespace, FragmentParent, Namespace};
-use crate::script_rewrite::plain_identifier_name;
+use crate::script_decls::plain_identifier_name;
 use crate::snippet::snippet_name;
 use crate::snippet_emit::build_snippet_function;
 use crate::transform_server::{EmitEnv, unsupported};

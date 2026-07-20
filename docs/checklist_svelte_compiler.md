@@ -730,7 +730,7 @@ A post-fix fuzzer run showing `dollar_prefix_invalid = 0` across 20 000 mutants 
 as proof of closure. It was not: a fuzz **zero** is a statement about the generator in
 exactly the same way a fuzz **concentration** is, and this generator never crosses
 store-name × rune-init × dollar-declarator. Direct probing found the rule still open on
-the whole *transform* path — `script_rewrite::rewrite_declaration`, which rewrites a
+the whole *transform* path — `script_rewrite::rewrite_script_statement`, which rewrites a
 top-level instance-script declaration rather than guard-walking it. Two halves:
 
 - a declarator whose own init is **not** a rune, when a sibling declarator in the same

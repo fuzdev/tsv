@@ -557,19 +557,159 @@ project-wide conventions.
   The script store rewrite (`store_rewrite.rs`) runs over the instance body between
   the rune-rewrite loop and `EmitEnv` construction, using the `store_names` /
   `store_shadowed` sets frozen there.
-- `script_rewrite.rs` — the document-wide TypeScript flag and gate
-  (`document_ts_flag`/`refuse_template_typescript`), the whole-component
-  rune/store collision pre-pass (`refuse_rune_store_collision`, below), the
-  top-level binding-table analysis (`analyze_script`/`analyze_declarator`), and the
-  per-statement rune rewrites (`rewrite_script_statement`) — `$props()` →
-  `$$props` (span-stolen; a rest element in its pattern gains the oracle's
-  `$$slots, $$events` injection immediately before it, and a non-destructured
-  `let props = $props()` becomes `let { $$slots, $$events, ...props } =
-  $$props` — a plain destructure without a rest gets no injection), a
-  top-level `$props()` destructure default `= $bindable(fallback?)` → its
-  fallback (`void 0` argument-less) with the bindable prop collected in source
-  order for the trailing `$.bind_props($$props, { … })` (shorthand `{ key }`
-  when the key equals its local, else `{ key: local }`),
+The **script side** is seven modules, split along the line a second transform
+would need: five are target-independent (the oracle decides them before it
+chooses what to emit), two mint server-module syntax. They are listed here in
+pipeline order.
+
+- `script_ts_gate.rs` — the document-wide TypeScript flag and gate
+  (`document_ts_flag` / `refuse_template_typescript`) plus
+  `self_check_no_typescript`, the type-erasure self-check that closes the loop on
+  the finished program (see `erase.rs`). Oracle phase 1, target-independent:
+  Svelte decides TypeScript at *parse* time for the whole document at once, so
+  the decision belongs to the document, not to a `<script>` tag — both top-level
+  scripts are considered in source order and the FIRST lang-bearing one decides
+  (`lang === 'ts'` tested exactly, so `lang="typescript"` is plain JS to the
+  oracle and tsv refuses rather than guess). The template half exists for the
+  expressions that never reach output — the SSR-dropped `{#each}` key, the
+  `{#key}` expression, the `{:catch}` branch, event handlers — whose TypeScript
+  the erase self-check therefore cannot see. ⚠️ Both halves are sound only if
+  `tsv_svelte`'s parser PRESERVES every TypeScript node it parses: a node the
+  parser drops is one this cannot refuse (the block-pattern `: T` that was parsed
+  and thrown away is the precedent).
+- `script_decls.rs` — the **single exhaustive answer** to "what does this script
+  declare at script scope?" (`each_script_declaration`; `ScriptDeclaration` =
+  declarator / function / class / import-local, `VarScope` selecting whether a
+  function-scoped `var` hoisted out of a nested block or for-head is included),
+  plus the `plain_identifier_name` / `identifier_binding_name` helpers the script
+  analyses share. The script-side analog of `attr_refs.rs`: both the
+  binding-table analysis and the collision pre-pass route through it, so the
+  `Statement` enumeration exists once; the match is exhaustive on purpose, so a
+  new AST variant fails compilation instead of silently escaping a guard. Its
+  `top` flag is what encodes strict-mode scoping — below the script's own
+  statement list only a `var` reaches script scope — and its `porous` flag
+  records whether a porous scope sat on the way up, because the oracle re-declares
+  a hoisting `var` on the parent **without its initializer**
+  (`scope.js:673-681`), which `ScriptDeclaration::Declarator::initial_dropped`
+  carries to the consumer. A class body is deliberately **opaque** to it, and so
+  is every expression position: a class **static block** is the one nested
+  statement list that is not a scope at all in the oracle (`phases/scope.js` has
+  no `StaticBlock` visitor), so a `var` there does declare at script scope with
+  its initializer intact — but reaching every class body a script can hold means
+  enumerating every expression position of every statement, a surface that
+  shipped holes twice (a class expression in a for-head, in a `super_class`, in a
+  property initializer — which is NOT a function scope, there being no
+  `PropertyDefinition` visitor either — in a computed key, in a parameter
+  default), each hole a silent MISMATCH. `script_collision.rs` covers the whole
+  family with a lexical fence instead.
+- `script_bindings.rs` — the top-level binding-table analysis
+  (`analyze_script`/`analyze_declarator`), the module-script analysis
+  (`analyze_module_script`), and the runes-mode import rules
+  (`refuse_runes_invalid_import`). Oracle phase 2, target-independent: this
+  classifies what the script *declares* and what the evaluator may fold, not what
+  any transform emits. A `$state.snapshot` binding stays UNKNOWN to the evaluator
+  even though the server unwraps it — the unwrap is the emission form, not the
+  evaluation form: the oracle evaluates a rune declarator through its argument for
+  `$state` / `$state.raw` / `$derived` only, and every other rune falls to its
+  `default` arm and yields UNKNOWN (`phases/scope.js:469-503`), so a template read
+  never folds (`$.escape(s)`). That holds however the argument itself evaluates —
+  a plain `let` argument does not fold either. The duplicate-`$props()` flag is
+  per-SCRIPT state, scoped to one `analyze_script` call, mirroring the oracle's
+  fresh `has_props_rune` per script. v1 supports **plain** module scripts only: a
+  module-scope rune, a `$name` store read, or a top-level `await` refuses (the
+  corpus is rune-free, so a lossless over-refusal), and a supported module body
+  emits verbatim post-erase.
+- `script_collision.rs` — `refuse_rune_store_collision`, a pre-pass over the WHOLE
+  component, run before the binding table is built. A rune keyword whose
+  `$`-stripped stem is also a binding in scope at the instance script
+  (`import { state } from './store'` beside a `$state` reference) is read by the
+  oracle as a **store subscription**, not as the rune (`2-analyze/index.js`, the
+  "create synthetic bindings for store subscriptions" loop), and the reference is
+  deleted from `module.scope.references` before runes-mode inference — so the
+  collision can flip the whole component out of runes mode. tsv models neither, so
+  it refuses. The scope tested is the oracle's `instance.scope.get`, which walks
+  **up** into the module scope (`scope.js:748`; the instance scope's parent IS
+  `module.scope`) and never **down** — a function parameter, a block-scoped
+  `let`, and a name bound in a nested function body are child scopes and keep
+  compiling — plus the two nested forms that DO reach script scope, a hoisting
+  `var` (modelled exactly, via `script_decls.rs`) and a class static block. The
+  oracle's exemption (a binding whose `initial` *is* a rune call) is modelled,
+  which is why the common `let state = $state(0)` shapes are unaffected; it reads
+  the oracle's `binding.initial`, so a rune-initialized `var` that hoisted through
+  a porous scope is **not** exempt (its initializer was dropped).
+
+  Two deliberate imprecisions, both over-refusing on purpose — the direction
+  matters, since a missed binding is a MISMATCH while an extra refusal is a gap:
+
+  - the static-block **lexical fence** (`script_contains_static_block`): a
+    component containing any `static { … }` refuses on its first rune reference,
+    rather than traversing the expression positions a class body can hide in. The
+    scan is complete for a static block **exactly as far as its whitespace class
+    is ECMAScript's** — a static block is `static`, then trivia, then `{`, and its
+    token always sits inside a statement's span, so the only way to miss one is to
+    mis-classify the trivia. It therefore matches with
+    `text_class::is_js_whitespace`, never Rust's `char::is_whitespace`: the two
+    differ at `U+FEFF` (ECMAScript `WhiteSpace`, but not the Unicode `White_Space`
+    property), and `static\u{FEFF}{ … }` was invisible to the fence, compiling the
+    rune where the oracle emits a store read. Over-reporting stays harmless
+    (`static` in a comment or string, a `/` that is division, a `U+0085` that JS
+    would reject anyway) — measured at zero, no `.svelte` file in the ~4900-file
+    compile corpus contains a static block;
+  - the `$stem` REFERENCE test, a whole-document, boundary-checked source scan
+    rather than an AST walk: tsv recognizes a rune at half a dozen scattered sites
+    and a per-site check can miss one (an under-refusal = a MISMATCH), while one
+    scan cannot. Its cost is over-refusing a document that merely mentions `$state`
+    in a comment, a string, template text, or as a member/property NAME
+    (`obj.$state`). The boundary test decodes CHARACTERS, not bytes — a byte-level
+    shortcut reads NBSP's lead byte as identifier text and MISSES `$state (1)`
+    written with one.
+- `script_comments.rs` — `collect_script_comments`: which host comments carry into
+  the synthetic program. **Server-specific**, because every rule here reasons about
+  the *oracle's printer* (esrap) — where its single `comment_index` sits when a
+  given block opens, and which synthetic span windows a carried comment falls
+  into. Instance-script comments carry through (host-absolute spans; the imports
+  print in a separate comment-free program, and the oracle relocates a script
+  comment down into the component body — leading the first surviving statement —
+  which the carry reproduces). A comment past the last **surviving** statement has
+  no statement to lead and falls to the end of the synthetic function body (whose
+  block span runs `[content.start, rbrace_end)`, so it is captured exactly once)
+  while the oracle re-attaches it into the template — a position difference the bar
+  tolerates. The exception is `template_emits_nested_block`: the oracle's printer
+  walks one comment index, and opening a block with **no source `loc`** resets it
+  to the end, DROPPING every comment not yet written — while opening a block that
+  **has** a `loc` re-seeks that index absolutely, which can move it **backward**.
+  So a loc-less block annihilates the index and the next loc-bearing one RECOVERS
+  it. That recovery, not an exemption, carries the comment through the component
+  body: the body block is assigned the instance script's `loc`, and a
+  context-wrapped component reassigns the outer block to a fresh loc-less one
+  around it, so the wrapper annihilates and the inner block seeks back. A template
+  block gets no recovery — so a template emitting a nested block refuses
+  (`CommentAfterLastStatementWithBlock`), a blunt "does one exist anywhere" scan
+  that deliberately over-refuses the case where a loc-bearing head expression
+  flushes the comment first, and likewise the block-free special elements
+  (`<svelte:window>`, `<slot>`). The split is keyed to the pinned oracle's
+  `reset_comment_index` behavior (esrap 2.2.12) — re-probe it if that pin moves.
+  The same index recovery governs a **module-script** comment, which is why one is
+  DROPPED rather than carried only when the module script comes FIRST: the component
+  body block carries the instance script's `loc`, so opening it seeks forward past a
+  comment that precedes the instance script and BACKWARD onto one that follows it, and
+  a recovered comment is then flushed into the next loc-bearing node (a template
+  expression it has nothing to do with). tsv drops it either way, so the
+  module-second ordering refuses (`ModuleCommentAfterInstanceScript`). A second route
+  to the same recovery — a block-bearing statement EARLIER in the module body, no
+  instance script needed — is a known open mismatch; see
+  `../../docs/checklist_svelte_compiler.md` §The open half.
+  Divergent placement classes
+  also still refuse —
+  template-expression comments, comments inside dropped rune regions, and comments
+  alongside a rune rewrite that mints a **script-region** span a comment window
+  would sweep (`$derived` — the `$.derived(() => e)` thunk — and argument-less
+  `$state()`). A template block, a component invocation, an expression-valued
+  attribute, `{#snippet}`/`{@render}`, and hoisted imports emit **template-region**
+  spans only, so a carried comment window can't reach them and they compile.
+- `script_rewrite.rs` — the per-statement rune rewrites
+  (`rewrite_script_statement`). Oracle phase 3, **server**: `$props()` →
+  `$$props` (span-stolen),
   `$state(v)`/`$state.raw(v)` → `v` (`void 0` argument-less), `$derived(e)` →
   `$.derived(() => e)` — but the oracle's `b.thunk` runs `unthunk`, which
   collapses the arrow when its body is a call on a bare identifier whose
@@ -610,111 +750,29 @@ project-wide conventions.
   multi-declarator top-level declaration
   splitting into one declaration per declarator, source order (the oracle's
   shape; nested declarations and for-heads stay joined; comments alongside a
-  multi-declarator refuse — the oracle re-anchors them inside the split). Also
-  `collect_script_comments`: instance-script comments carry through into the
-  synthetic program (host-absolute spans; the imports print in a separate
-  comment-free program, and the oracle relocates a script comment down into the
-  component body — leading the first surviving statement — which the carry
-  reproduces). A comment past the last **surviving** statement has no statement to
-  lead and falls to the end of the synthetic function body (whose block span runs
-  `[content.start, rbrace_end)`, so it is captured exactly once) while the oracle
-  re-attaches it into the template — a position difference the bar tolerates. The
-  exception is `template_emits_nested_block`: the oracle's printer walks one comment
-  index, and opening a block with **no source `loc`** resets it to the end, DROPPING
-  every comment not yet written — while opening a block that **has** a `loc` re-seeks
-  that index absolutely, which can move it **backward**. So a loc-less block
-  annihilates the index and the next loc-bearing one RECOVERS it. That recovery, not
-  an exemption, carries the comment through the component body: the body block is
-  assigned the instance script's `loc`, and a context-wrapped component reassigns the
-  outer block to a fresh loc-less one around it, so the wrapper annihilates and the
-  inner block seeks back. A template block gets no recovery — so a template emitting
-  a nested block refuses (`CommentAfterLastStatementWithBlock`), a blunt "does one
-  exist anywhere" scan that deliberately over-refuses the case where a loc-bearing
-  head expression flushes the comment first, and likewise the block-free special
-  elements (`<svelte:window>`, `<slot>`). The split is keyed to the pinned oracle's
-  `reset_comment_index` behavior (esrap 2.2.12) — re-probe it if that pin moves.
-  The same index recovery governs a **module-script** comment, which is why one is
-  DROPPED rather than carried only when the module script comes FIRST: the component
-  body block carries the instance script's `loc`, so opening it seeks forward past a
-  comment that precedes the instance script and BACKWARD onto one that follows it, and
-  a recovered comment is then flushed into the next loc-bearing node (a template
-  expression it has nothing to do with). tsv drops it either way, so the
-  module-second ordering refuses (`ModuleCommentAfterInstanceScript`). A second route
-  to the same recovery — a block-bearing statement EARLIER in the module body, no
-  instance script needed — is a known open mismatch; see
-  `../../docs/checklist_svelte_compiler.md` §The open half.
-  Divergent placement classes
-  also still refuse —
-  template-expression comments, comments inside dropped rune regions, and comments
-  alongside a rune rewrite that mints a **script-region** span a comment window
-  would sweep (`$derived` — the `$.derived(() => e)` thunk — and argument-less
-  `$state()`). A template block, a component invocation, an expression-valued
-  attribute, `{#snippet}`/`{@render}`, and hoisted imports emit **template-region**
-  spans only, so a carried comment window can't reach them and they compile. Also
-  `self_check_no_typescript`, the type-erasure self-check that closes the
-  loop on the finished program (see `erase.rs`).
+  multi-declarator refuse — the oracle re-anchors them inside the split). The
+  `$props()` pattern itself is rewritten by `script_props.rs`, below.
 
-  Two whole-component pieces live here rather than in a per-statement path:
-
-  - `each_script_declaration` — the **single exhaustive answer** to "what does
-    this script declare at script scope?" (`ScriptDeclaration` = declarator /
-    function / class / import-local, `VarScope` selecting whether a
-    function-scoped `var` hoisted out of a nested block or for-head is included).
-    Both the binding-table analysis and the collision pre-pass route through it,
-    so the `Statement` enumeration exists once; the match is exhaustive on
-    purpose, so a new AST variant fails compilation instead of silently escaping
-    a guard. Its `top` flag is what encodes strict-mode scoping — below the script's
-    own statement list only a `var` reaches script scope — and its `porous` flag
-    records whether a porous scope sat on the way up, because the oracle re-declares
-    a hoisting `var` on the parent **without its initializer**
-    (`scope.js:673-681`), which `ScriptDeclaration::Declarator::initial_dropped`
-    carries to the consumer. A class body is deliberately **opaque** to it, and so
-    is every expression position: a class **static block** is the one nested
-    statement list that is not a scope at all in the oracle (`phases/scope.js` has
-    no `StaticBlock` visitor), so a `var` there does declare at script scope with
-    its initializer intact — but reaching every class body a script can hold means
-    enumerating every expression position of every statement, a surface that
-    shipped holes twice (a class expression in a for-head, in a `super_class`, in a
-    property initializer — which is NOT a function scope, there being no
-    `PropertyDefinition` visitor either — in a computed key, in a parameter
-    default), each hole a silent MISMATCH. `refuse_rune_store_collision` covers the
-    whole family with a lexical fence instead (`script_contains_static_block`): a
-    component containing any `static { … }` refuses on its first rune reference.
-    The scan is complete for a static block **exactly as far as its whitespace
-    class is ECMAScript's** — a static block is `static`, then trivia, then `{`,
-    and its token always sits inside a statement's span, so the only way to miss
-    one is to mis-classify the trivia. It therefore matches with
-    `text_class::is_js_whitespace`, never Rust's `char::is_whitespace`: the two
-    differ at `U+FEFF` (ECMAScript `WhiteSpace`, but not the Unicode `White_Space`
-    property), and `static\u{FEFF}{ … }` was invisible to the fence, compiling the
-    rune where the oracle emits a store read. Over-reporting stays harmless
-    (`static` in a comment or string, a `/` that is division, a `U+0085` that JS
-    would reject anyway) — measured at zero, no `.svelte` file in the ~4900-file
-    compile corpus contains a static block.
-  - `refuse_rune_store_collision` — a pre-pass over the WHOLE component, run
-    before the binding table is built. A rune keyword whose `$`-stripped stem is
-    also a binding in scope at the instance script (`import { state } from
-    './store'` beside a `$state` reference) is read by the oracle as a **store
-    subscription**, not as the rune (`2-analyze/index.js`, the "create synthetic
-    bindings for store subscriptions" loop), and the reference is deleted from
-    `module.scope.references` before runes-mode inference — so the collision can
-    flip the whole component out of runes mode. tsv models neither, so it
-    refuses. The scope tested is the oracle's `instance.scope.get`, which walks
-    **up** into the module scope (`scope.js:748`; the instance scope's parent IS
-    `module.scope`) and never **down** — a function parameter, a block-scoped
-    `let`, and a name bound in a nested function body are child scopes and keep
-    compiling — plus the two nested forms that DO reach script scope, a hoisting
-    `var` (modelled exactly) and a class static block (fenced, above). The oracle's exemption (a binding
-    whose `initial` *is* a rune call) is modelled, which is why the common
-    `let state = $state(0)` shapes are unaffected; it reads the oracle's
-    `binding.initial`, so a rune-initialized `var` that hoisted through a porous
-    scope is **not** exempt (its initializer was dropped). The `$stem` REFERENCE
-    test is a whole-document, boundary-checked source scan rather than an AST
-    walk: tsv recognizes a rune at half a dozen scattered sites and a per-site
-    check can miss one (an under-refusal = a MISMATCH), while one scan cannot;
-    its cost is over-refusing a document that merely mentions `$state` in a
-    comment, a string, template text, or as a member/property NAME
-    (`obj.$state`).
+  One shared helper, `script_walk_ctx`, builds the guard context every walk on
+  this path uses: store reads and `$derived` reads are EXEMPTED (the store rewrite
+  turns both into `$.store_get(…)` / `d()` after the loop) while both shadow
+  refusals are deferred — the store's needs the full nested-scope set, the
+  derived's is a whole-compile check in `compile_server`.
+- `script_props.rs` — the `$props()` binding-pattern rewrite. Oracle phase 3,
+  **server**: a rest element in the pattern gains the oracle's `$$slots,
+  $$events` injection immediately before it, and a non-destructured `let props =
+  $props()` becomes `let { $$slots, $$events, ...props } = $$props` — a plain
+  destructure without a rest gets no injection. A top-level destructure default
+  `= $bindable(fallback?)` becomes its fallback (`void 0` argument-less) with the
+  bindable prop collected in source order for the trailing `$.bind_props($$props,
+  { … })` (shorthand `{ key }` when the key equals its local, else `{ key:
+  local }`). A `$bindable` in any UNrecognized shape — a non-identifier key
+  (string/numeric/computed), a nested-pattern value, the wrong arity — survives
+  the rewrite for the guard walk to refuse, a safe over-refusal even for a
+  non-identifier-keyed prop the oracle would compile. When the component
+  references `$$slots` the injected sanitize_slots const owns that name, so the
+  destructured prop deconflicts by renaming (`$$slots: $$slots_` — the oracle's
+  always-`_`-suffix rule; `$$events` never renames).
 - `fragment.rs` — the per-fragment walk (`emit_fragment`) and its
   `BodyBuilder` accumulator (alternating static text and interpolation
   expressions, flushed into a `$$renderer.push(…)` statement). Static
