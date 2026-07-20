@@ -2,10 +2,12 @@
 //! the per-kind refusal labels, their list, and the enum→label mapping.
 //!
 //! A **shared classification table**, not an emitter — it is consumed by
-//! [`crate::fragment`]'s dispatch (which refuses), by [`census`](mod@crate::census)
-//! (which detects the same shapes as co-blockers), and by [`crate::refusal`] (whose
-//! `is_deliberate_fence` reads [`SPECIAL_ELEMENT_FENCED_KINDS`]). It sits apart
-//! from the fragment walk because none of those three consumers is walking: they
+//! [`crate::fragment`]'s dispatch (which refuses), by [`refusal_census`](mod@crate::refusal_census)
+//! (which detects the same shapes as co-blockers), by [`crate::refusal_buckets`]
+//! (whose `is_deliberate_fence` reads [`SPECIAL_ELEMENT_FENCED_KINDS`]), and by
+//! [`crate::dropped`] (which reads [`SPECIAL_ELEMENT_SLOT`] for the named-slot
+//! fence in a dropped region). It sits apart
+//! from the fragment walk because none of those four consumers is walking: they
 //! ask a question *about* a [`SpecialElementKind`], and keeping the table here
 //! stops the walk's size from hiding what is really a lookup.
 //!
@@ -50,7 +52,7 @@ macro_rules! special_element_kind_table {
         /// Every label [`special_element_refusal_kind`] can return.
         ///
         /// The labels live here so the census's detected-bucket declaration
-        /// ([`census_detected_buckets`](crate::census_detected_buckets)) can
+        /// ([`refusal_census_buckets`](crate::refusal_census_buckets)) can
         /// enumerate them without hand-copying a string — and, because both this
         /// list and the mapping expand from one table, without the two drifting.
         pub(crate) const SPECIAL_ELEMENT_REFUSAL_KINDS: &[&str] = &[$($label_const),+];

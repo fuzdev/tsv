@@ -145,7 +145,7 @@ project-wide conventions.
   conformance audit reads; and `is_deliberate_fence`. They answer a different
   question than the catalog does — not *what shape was declined and how it reads*
   but *how refusals are COUNTED* — and their audience is the corpus runner and
-  `census.rs`, not a person reading an error. ⚠️ The decoupling is load-bearing,
+  `refusal_census.rs`, not a person reading an error. ⚠️ The decoupling is load-bearing,
   and is why the two are worth separating rather than merely being large: a bucket
   key is deliberately independent of `Display` **so a message can be reworded
   without shifting corpus buckets**. Keeping them in one file invites the shortcut
@@ -181,7 +181,7 @@ project-wide conventions.
   regions, and a source regex over-counts comments — so the denominator stays
   deliberately too large and the parity rate a conservative under-estimate.
 
-  The `census` **sizes** that floor without moving it: the runner asks it, per
+  The `refusal_census` **sizes** that floor without moving it: the runner asks it, per
   refused file whose first refusal was not itself a fence, whether a fence is
   present anyway, and reports the count as a separate non-participating line
   (`≥N further refused files CONTAIN a fenced construct`). It is deliberately NOT
@@ -196,6 +196,18 @@ project-wide conventions.
   Together those would trade a rule that is exact and provably a floor for one
   that is neither statable nor provably signed — while raising the published
   parity rate with zero behavior change.
+- `refusal_census.rs` — the **sole-blocker refusal census** (`refusal_census` /
+  `refusal_census_buckets`, both public), a diagnostic, collect-don't-bail
+  companion to `compile`. `compile` bails at the FIRST unsupported construct, so a
+  corpus run's per-class counts are first-refusal-only and overstate what
+  unlocking any one class would yield; the census instead enumerates every class
+  it can independently detect per component, so the runner can price a class as
+  the *sole* blocker of N files versus a *co*-blocker. ⚠️ Every class it detects is
+  detected by **calling the same guard `compile` calls**, never a copy of the rule
+  — a second implementation would drift and mis-price. `refusal_census_buckets` is
+  the single source of truth for which bucket keys it attempts, so a class it
+  cannot reach independently is declared rather than silently scored as zero.
+  ⚠️ Unrelated to `element_census.rs` despite the name.
 - `parity.rs` — **the comment-position-tolerant parity comparator**
   (`compare_canonical` → `Parity`). The compiler's parity bar over two canonical JS
   strings: byte-exact, or tolerated when they differ ONLY in comment *position*
@@ -439,15 +451,22 @@ project-wide conventions.
     exhaustively-matched answer to "which sub-fragments does this node contain"
     (element/special-element fragments, `{#if}` branches, `{#each}` body+fallback,
     `{#await}` pending/then/catch, `{#key}` fragment, `{#snippet}` body). The
-    snippet-name collector and the element census recurse through it, so the
-    recursion shape has a single home. A new `FragmentNode` variant, or a new child
+    whole-document validator (`validate.rs`), the snippet-name collector
+    (`snippet.rs`), the `$$index` name allocator (`blocks.rs`), and the sole-blocker
+    refusal census (`refusal_census.rs`) recurse through it, so the recursion shape has a
+    single home. A new `FragmentNode` variant, or a new child
     fragment on an existing variant, fails compilation HERE rather than drifting
-    across hand-written copies. The
+    across hand-written copies. Three walks deliberately do NOT ride it, each
+    carrying its own exhaustive match (no catch-all) and stating why in code. The
     scope-tracking / dropped-`{:catch}` walks (`needs_context.rs`, `snippet.rs`'s
-    free-variable collector) keep their own exhaustive matches on purpose: their
+    free-variable collector) opt out because their
     descent is entangled with per-node scope binding, the emission-vs-dropped
     distinction, and the `{#await}`-catch flag toggle, which a uniform enumeration
-    can't carry without changing behavior.
+    can't carry without changing behavior. ⚠️ `element_census.rs` — NOT to be
+    confused with `refusal_census.rs`, which does ride the seam — opts out because it
+    descends a deliberately *different* node set (wider than emitted at
+    `<svelte:boundary>` and `{:catch}`, narrower at the fenced special elements)
+    while threading an ancestor `path` and `Owner` per frame.
   The SSR output **drops** four regions without visiting them — the `{#each}`
   key, the `{#key}` expression, an event-handler attribute, and the whole
   `{:catch}` branch — so no emission refusal can fire inside them. But the oracle
@@ -803,10 +822,12 @@ The **fragment walk and its shared primitives** are five modules. Unlike the
 script side, they cannot split along a target-independence line — the whole
 emission layer is server codegen — so the organizing principle is **role in the
 emission pipeline**: one walk plus four primitives it and every per-node emitter
-share. `fragment.rs` is the hub and the only module with an outgoing edge to the
-other four; none of them calls back into it, so the sole remaining cycle is the
-tree's own recursion (`emit_fragment` → `emit_element` → `emit_child_body`).
-They are listed here in dependency order, walk first.
+share. `fragment.rs` is the hub — the only module reaching all four primitives —
+and none of the four calls back into it, so the sole remaining cycle is the
+tree's own recursion (`emit_fragment` → `emit_element` → `emit_child_body`). The
+one other edge inside the group is `dropped.rs` → `special_element_kind.rs` (for
+the `SPECIAL_ELEMENT_SLOT` label); the primitives are otherwise mutually
+independent. They are listed here in dependency order, walk first.
 
 - `fragment.rs` — the per-fragment walk (`emit_fragment`). Static
   emission implements the oracle's normalization, derived from Svelte's own
@@ -827,8 +848,11 @@ They are listed here in dependency order, walk first.
   only `emit_fragment` reaches it).
 - `body_builder.rs` — the `BodyBuilder` accumulator: alternating static text and
   interpolation expressions, flushed into a `$$renderer.push(…)` statement. A pure
-  leaf shared by five consumers (`blocks`, `transform_server`, `snippet_emit`,
-  `attribute`, `element`). Single home of the oracle's
+  leaf: it imports only `build.rs`, and the orchestrator plus every per-node
+  emitter imports it, making it the most depended-on module in the emission layer.
+  (Deliberately stated as that invariant rather than as a consumer list — an
+  enumerated list here went stale at each of the emitter splits, since every new
+  emitter module inherits the dependency.) Single home of the oracle's
   `b.block([...state.init, ...build_template(state.template)])` shape — the
   init/template split `mark_init_end` / `push_init_statement` model — so no emitter
   reconstructs that ordering itself.
@@ -879,12 +903,19 @@ They are listed here in dependency order, walk first.
   handled-or-refused table: a label constant per refused kind, the
   `SPECIAL_ELEMENT_REFUSAL_KINDS` list, and the `special_element_refusal_kind`
   mapping, all from one set of rows, plus `SPECIAL_ELEMENT_FENCED_KINDS`. Read by
-  three consumers that are asking a question rather than walking — `fragment.rs`'s
-  dispatch (which refuses), `census.rs` (which detects the same shapes as
-  co-blockers), and `refusal.rs`'s `is_deliberate_fence`. It is a macro because only
+  four consumers that are asking a question rather than walking — `fragment.rs`'s
+  dispatch (which refuses), `refusal_census.rs` (which detects the same shapes as
+  co-blockers), `refusal_buckets.rs`'s `is_deliberate_fence`, and `dropped.rs`
+  (`SPECIAL_ELEMENT_SLOT`). It is a macro because only
   the mapping is checked by exhaustiveness: a hand-written list beside it keeps
   compiling when a sixth kind appears, silently dropping that kind's key from the
   census's declared buckets and quietly skewing its exposure accounting.
+
+The **block-level emitters** are two modules, riding the walk and primitives
+above rather than belonging to them: each owns a family of template constructs
+that splits the single template into multiple `$$renderer.push(…)` statements.
+Both recurse back into `fragment.rs` through `emit_child_body`.
+
 - `blocks.rs` — **control-flow blocks** split the single template into
   multiple `$$renderer.push(…)` statements, each block emitting its own
   statements between flushes and merging its closer/opener into the adjacent
@@ -1024,11 +1055,12 @@ functions by host.
 
 The **attribute emitters** are three modules, split by what an attribute *is*
 rather than by where it is emitted (each covers both the inline and spread paths,
-so the shared validity forks stay whole). The dependency is one-way:
-`attribute_class_style` borrows four value-shaping helpers from `attribute`,
-`attribute_bind` calls into neither, and nothing depends back on either. There is
-deliberately no `attribute_common.rs` — it would add a module for four small
-functions and obscure that the class/style half genuinely depends on the base.
+so the shared validity forks stay whole). The dependency is one-way, with
+`attribute` the base: `attribute_class_style` borrows five value-shaping helpers
+from it, `attribute_bind` borrows exactly one of those five (`escape_html_attr`)
+and calls `attribute_class_style` not at all, and neither is depended on back.
+There is deliberately no `attribute_common.rs` — it would add a module for five
+small functions and obscure that both halves genuinely depend on the base.
 
 - `attribute.rs` — plain attribute emission: dynamic and mixed attributes →
   `$.attr(name, expr[, true])` with
@@ -1054,11 +1086,12 @@ functions and obscure that the class/style half genuinely depends on the base.
   `build_spread_object_property` — one `key: value` object property from a plain
   attribute (key lowercased, `shorthand` on a same-named identifier value), `None`
   for a dropped attribute (a single-expression event handler — still guarded — and
-  `defaultValue`/`defaultChecked`). Hosts the four helpers the class/style half
-  shares (`collapse_attr_whitespace`, `preceded_by_quote`, `class_needs_clsx`,
-  `is_js_identifier`) plus `escape_html_attr`, the attribute-position sibling of
+  `defaultValue`/`defaultChecked`). Hosts the five helpers the class/style half
+  shares — `collapse_attr_whitespace`, `preceded_by_quote`, `class_needs_clsx`,
+  `is_js_identifier`, and `escape_html_attr`, the attribute-position sibling of
   the fragment walk's text escape (`[&"<]` vs `[&<]` — a `"` is content in text
-  and a delimiter here).
+  and a delimiter here). `escape_html_attr` is the only one `attribute_bind`
+  takes as well, and so the only edge from this module to both siblings.
 - `attribute_class_style.rs` — the `class:` / `style:` directive builders, on
   both the inline and spread paths. Single home of the class-vs-style asymmetry,
   which is easy to collapse by mistake and wrong in both directions: `class`
@@ -1129,6 +1162,18 @@ functions and obscure that the class/style half genuinely depends on the base.
   special element's bind. ⚠️ `build_companion_value` reimplements a subset of
   `attribute.rs`'s `build_attribute_value_expr` **deliberately** (no fold, no
   mixed) — deduping the two is a behavior change, not cleanup.
+
+The **CSS scoping** pair is two modules, layered one-way: `element_census.rs`
+builds the census and depends on nothing else in the crate, and `css_scope.rs`
+matches selector chains against it (both the navigation entry points and the
+`CensusNode` leaf type). Nothing points back — keeping the census a pure
+structural product of the fragment tree, independent of what any selector asks of
+it. Both run **upfront** in `analyze()`,
+before any emission decision, so emission only ever performs a span lookup
+(`EmitEnv::element_scope`) rather than matching. ⚠️ `element_census.rs` is
+unrelated to `refusal_census.rs` despite the name — that one enumerates refusal
+classes, this one enumerates scoping candidates.
+
 - `element_census.rs` — the **upfront element census** (`ElementCensus`): one
   top-down walk over `root.fragment`, run in `analyze()`, producing a
   `CensusElement` per scoping candidate — a regular HTML element or a

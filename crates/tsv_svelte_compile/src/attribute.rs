@@ -508,7 +508,7 @@ fn emit_mixed_attribute<'arena>(
 /// - a mixed text+expression value → a fully-folded string literal (the raw
 ///   concatenation, **not** HTML-escaped — the runtime escapes the object value)
 ///   or a `$.stringify` template literal.
-pub(crate) fn build_attribute_value_expr<'arena>(
+fn build_attribute_value_expr<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     name: &str,
     value: Option<&'arena [AttributeValue<'arena>]>,

@@ -62,15 +62,12 @@ mod attribute_class_style;
 mod blocks;
 mod body_builder;
 mod build;
-mod census;
 mod component;
 mod css_scope;
 mod dropped;
 mod element;
 mod element_census;
 mod erase;
-
-pub use census::{census, census_detected_buckets};
 
 /// The forward half of an erased TypeScript region's comment-refusal window (see
 /// `erase`). Exported so the `erase_comment_census` diagnostic sizes the rule the
@@ -83,6 +80,7 @@ mod needs_context;
 mod parity;
 mod refusal;
 mod refusal_buckets;
+mod refusal_census;
 mod rune_guard;
 mod script_bindings;
 mod script_collision;
@@ -102,6 +100,7 @@ mod validate;
 
 pub use parity::{Parity, compare_canonical};
 pub use refusal::Refusal;
+pub use refusal_census::{refusal_census, refusal_census_buckets};
 
 use tsv_ts::Goal;
 

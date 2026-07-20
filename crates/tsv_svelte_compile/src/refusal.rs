@@ -842,10 +842,6 @@ pub enum Refusal {
         /// The oracle's message, e.g. "`<div>` cannot be a descendant of `<p>`".
         message: String,
     },
-    /// Two attributes of the same kind and name on one element — the oracle's
-    /// parse-time `attribute_duplicate` (`phases/1-parse/state/element.js:250`).
-    /// tsv's parser is permissive here, so the compiler refuses rather than emit
-    /// output for a component the oracle rejects.
     /// An attribute name carrying a character the oracle forbids — its phase-2
     /// `attribute_invalid_name` (`2-analyze/visitors/shared/element.js:59`,
     /// `regex_illegal_attribute_character`). tsv's parser is permissive here, so
@@ -909,6 +905,10 @@ pub enum Refusal {
     /// denominator and flatter the parity rate.
     #[error("misplaced slot=\"…\" attribute (the oracle rejects it)")]
     SlotAttributeInvalidPlacement,
+    /// Two attributes of the same kind and name on one element — the oracle's
+    /// parse-time `attribute_duplicate` (`phases/1-parse/state/element.js:250`).
+    /// tsv's parser is permissive here, so the compiler refuses rather than emit
+    /// output for a component the oracle rejects.
     #[error("duplicate `{name}` attribute on one element (the oracle rejects it)")]
     DuplicateAttribute {
         /// The repeated attribute/directive name.

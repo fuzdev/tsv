@@ -200,7 +200,7 @@ fn each_attribute_item<'a, 'arena>(
 /// Every purely-structural recursion that only needs to descend the fragment tree
 /// rides this one match: the whole-document validator (`validate.rs`), the
 /// snippet-name collector (`snippet.rs`), the `$$index` name allocator
-/// (`blocks.rs`), and the sole-blocker refusal census (`census.rs`). So a new
+/// (`blocks.rs`), and the sole-blocker refusal census (`refusal_census.rs`). So a new
 /// `FragmentNode` variant — or a new child fragment on an existing variant — fails
 /// compilation HERE instead of silently drifting across hand-written copies.
 ///

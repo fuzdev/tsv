@@ -34,7 +34,7 @@ None of these run in `deno task check` — they need the Deno sidecar, and that 
 # behind an earlier refusal is equally unreachable but uncounted (no sound cheap detector: a node walk
 # over-counts component `on:`/`let:` and SSR-dropped `{:catch}` regions, a regex over-counts comments),
 # leaving `achievable` too large and the parity rate a conservative UNDER-estimate. The refusal
-# `census` SIZES that floor without moving it: per refused file whose first refusal was not itself a
+# `refusal_census` SIZES that floor without moving it: per refused file whose first refusal was not itself a
 # fence, it asks whether a fence is present anyway, reported as a separate NON-participating line
 # (`≥N further refused files CONTAIN a fenced construct`). Deliberately not subtracted — the census
 # reaches the fenced special-element TAGS but neither `RunesOnlyFence` nor `ComponentNamedSlot` (it

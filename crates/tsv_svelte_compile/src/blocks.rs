@@ -104,7 +104,6 @@ fn block_child_ns(ctx: &FragmentCtx<'_>) -> ChildNamespace {
     }
 }
 
-/// A single-declarator `let`/`const` declaration statement.
 /// The filename the deterministic oracle compiles under. `$.head`'s dedup hash
 /// is `hash(filename)` (`SvelteHead.js`), so a fixed filename makes it constant.
 const COMPILE_FILENAME: &str = "input.svelte";
@@ -427,6 +426,7 @@ fn guard_boundary_attributes<'arena>(
     Ok(())
 }
 
+/// A single-declarator `let`/`const` declaration statement.
 pub(crate) fn declaration_stmt<'arena>(
     b: &Builder<'arena>,
     kind: VariableDeclarationKind,

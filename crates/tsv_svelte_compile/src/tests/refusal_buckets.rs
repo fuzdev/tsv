@@ -50,6 +50,53 @@ fn variant_names_from_source() -> Vec<String> {
         .collect()
 }
 
+/// Every `Refusal` variant declared without a doc comment of its own, read from
+/// the enum's source.
+///
+/// A doc block attached to the wrong item is syntactically valid, so `cargo doc`
+/// reports nothing for it — the failure mode is silent by construction. It has
+/// bitten twice: a module split stranded `is_deliberate_fence`'s explanation onto
+/// `every_variant`, and `DuplicateAttribute`'s block ended up stacked above
+/// `AttributeInvalidName`, leaving the duplicate rule undocumented and the name
+/// rule reading with two descriptions.
+///
+/// The *orphan* is not detectable — two stacked doc blocks parse fine. The
+/// **victim** is: an undocumented variant among documented siblings. That is the
+/// signature this scans for, and in this catalog it carries no false positives.
+///
+/// ⚠️ Only a `///` at the enum's own four-space indent counts. A struct variant's
+/// FIELD docs sit one level deeper, and counting those would let a field doc mask
+/// the very next variant — the case that would matter most.
+fn undocumented_variants() -> Vec<String> {
+    const SOURCE: &str = include_str!("../refusal.rs");
+
+    let mut undocumented = Vec::new();
+    let mut has_doc = false;
+    for line in SOURCE
+        .lines()
+        .skip_while(|line| !line.starts_with("pub enum Refusal {"))
+        .skip(1)
+        .take_while(|line| *line != "}")
+    {
+        let Some(rest) = line.strip_prefix("    ") else {
+            continue;
+        };
+        if rest.starts_with("///") {
+            has_doc = true;
+        } else if rest.starts_with(|c: char| c.is_ascii_uppercase()) {
+            if !has_doc {
+                undocumented.push(
+                    rest.chars()
+                        .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                        .collect(),
+                );
+            }
+            has_doc = false;
+        }
+    }
+    undocumented
+}
+
 /// The variant name of a representative, via its `Debug` derive.
 ///
 /// `Debug` prints the variant name first for every shape — a unit variant is the
@@ -98,5 +145,27 @@ fn every_variant_covers_the_enum() {
     assert!(
         unknown.is_empty(),
         "the source scan missed variant(s) `every_variant` constructs: {unknown:#?}"
+    );
+}
+
+#[test]
+fn every_variant_is_documented() {
+    // Shares the vacuous-pass guard of the scan above: a layout change that made
+    // the scan read nothing would report zero undocumented variants and pass.
+    let declared = variant_names_from_source();
+    assert!(
+        declared.len() > 100,
+        "the source scan found only {} variant(s) — the enum's layout changed and \
+         the scan no longer reads it",
+        declared.len()
+    );
+
+    let undocumented = undocumented_variants();
+    assert!(
+        undocumented.is_empty(),
+        "`Refusal` variant(s) with no doc comment: {undocumented:#?}\n\
+         Every variant carries one, so a missing doc usually means a preceding \
+         variant's block was stranded onto the wrong item during a move — check \
+         whether the neighbour above now reads with two stacked descriptions."
     );
 }

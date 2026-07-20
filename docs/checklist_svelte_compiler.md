@@ -350,9 +350,33 @@ The line between the last two bullets is **"can it affect the result from here"*
 
 Neither `$$slots` nor `{#snippet}` is a fence — tsv intends to support both — so closing these means porting the oracle's whole-component validations, not widening the presence match. That is separate work from the dropped-region walk.
 
-**Everything else keeps compiling** in a dropped `{:catch}`: `<svelte:component>`, `<svelte:self>` (under an `{#if}`), `<svelte:fragment>` and a `slot="…"` component child (both as a component's children), plus the unfenced `<svelte:element>` and `<svelte:boundary>`. That set is clean on both axes — verified by reading the writers, not by probing: the whole-component fields a phase-2 validation reads (`slot_names`, `uses_slots`, `uses_render_tags`, `event_directive_node`, `uses_event_attributes`, `snippets`) are written only by `SlotElement` / an `$$slots` `Identifier` / `RenderTag` / `OnDirective` / an event `Attribute` / `SnippetBlock`, and none of those constructs is one of them. Refusing them to make the fence uniform would trade correct output for nothing. `let:` is likewise on neither axis (its only check, `let_directive_invalid_placement`, is local to its parent) but refuses anyway, to keep the fenced `on:`/`let:` pair in one census bucket. Only the placement-restricted metas (`<svelte:head>`, `<svelte:window>`, `<svelte:body>`, `<svelte:document>`) are unreachable, rejected by the oracle inside any block.
+**Everything else keeps compiling** in a dropped `{:catch}`: `<svelte:component>`, `<svelte:self>` (under an `{#if}`), `<svelte:fragment>` and a `slot="…"` component child (both as a component's children), plus the unfenced `<svelte:element>` and `<svelte:boundary>` (the latter with one open exception, below). That set is clean on both axes — verified by reading the writers, not by probing: the whole-component fields a phase-2 validation reads (`slot_names`, `uses_slots`, `uses_render_tags`, `event_directive_node`, `uses_event_attributes`, `snippets`) are written only by `SlotElement` / an `$$slots` `Identifier` / `RenderTag` / `OnDirective` / an event `Attribute` / `SnippetBlock`, and none of those constructs is one of them. Refusing them to make the fence uniform would trade correct output for nothing. `let:` is likewise on neither axis (its only check, `let_directive_invalid_placement`, is local to its parent) but refuses anyway, to keep the fenced `on:`/`let:` pair in one census bucket. Only the placement-restricted metas (`<svelte:head>`, `<svelte:window>`, `<svelte:body>`, `<svelte:document>`) are unreachable, rejected by the oracle inside any block.
 
 `dropped_fragments_are_walked` pins the expression halves; `dropped_fragment_refuses_presence_read_nodes` pins both presence axes **and** the must-not-over-refuse set beside them.
+
+**A third open hole, and it is a different shape from the two above.**
+`{#await p}x{:then v}y{:catch e}<svelte:boundary bogus={1}>z</svelte:boundary>{/await}`
+compiles; the oracle rejects it with `svelte_boundary_invalid_attribute`. The
+attribute-name check against the closed `onerror`/`failed`/`pending` set lives in
+`blocks.rs::guard_boundary_attributes`, reached only from `emit_boundary` — and an
+emitter never runs on a dropped region.
+
+Unlike the two rows above, this is **not** a whole-component validation: it reads
+one node's own attribute list and nothing else, so it fires in isolation and needs
+no emitted partner. That makes it the same class as the
+`svelte_meta_invalid_placement` / `svelte_meta_duplicate` rules that already **moved
+from `fragment.rs` into `validate.rs`** for exactly this reason — a rule whose inputs
+are not emission state belongs in the whole-document walk. Closing it is a
+relocation, not a validation port, and it is the only such rule left at an emitter:
+a probe battery over the sibling emitter-hosted refusals (`<title>` attributes and
+invalid children, void-element children, `<option>`, a populated `<select>`, a
+template-level `<script>`, and the `failed=`/`pending=` attribute *forms*) found the
+oracle **accepts** every one of them in a dropped `{:catch}`, so tsv accepting them
+there is correct rather than a hole.
+
+The reachability caveat that applies to the whole section applies here too: the
+shape is not corpus-reachable, since it needs an oracle-invalid attribute on a
+boundary inside a discarded branch.
 
 #### `analysis.elements` — presence-read, and the census follows it
 

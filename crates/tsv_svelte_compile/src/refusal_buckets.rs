@@ -9,7 +9,7 @@
 //! full bucket universe is ([`Refusal::every_variant`] /
 //! [`Refusal::all_bucket_keys`]), and which buckets sit outside the
 //! achievable-parity denominator ([`Refusal::is_deliberate_fence`]). The audiences
-//! are the corpus runner and [`census`](mod@crate::census), not a person reading an
+//! are the corpus runner and [`refusal_census`](mod@crate::refusal_census), not a person reading an
 //! error.
 //!
 //! **The decoupling is deliberate and load-bearing**, which is the whole reason

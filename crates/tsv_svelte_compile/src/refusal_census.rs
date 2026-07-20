@@ -3,7 +3,7 @@
 //!
 //! [`compile`](crate::compile) bails at the **first** unsupported construct, so a
 //! corpus run's per-refusal-class counts are first-refusal-only and overstate how
-//! much unlocking any one class would yield. [`census`] instead enumerates, per
+//! much unlocking any one class would yield. [`refusal_census`] instead enumerates, per
 //! component, **every** refusal class it can independently detect, so a caller can
 //! compute — per class — how many files it is the *sole* blocker of (unlocking it
 //! yields exactly that many new parity files) versus a *co*-blocker of.
@@ -68,7 +68,7 @@
 //!   comment carry — blocks, component invocations, expression attributes,
 //!   `{#snippet}`/`{@render}`, hoisted imports — now carry through.
 //!
-//! [`census_detected_buckets`] is the single source of truth for which
+//! [`refusal_census_buckets`] is the single source of truth for which
 //! [`bucket_key`](crate::Refusal::bucket_key)s the census attempts; the caller
 //! uses it to size the exposure line.
 
@@ -109,7 +109,10 @@ use crate::{CompileError, CompileOptions, Generate, Refusal, erase, refusal};
 /// # Errors
 ///
 /// [`CompileError::Parse`] when `source` is not a parseable Svelte component.
-pub fn census(source: &str, options: &CompileOptions) -> Result<Vec<Refusal>, CompileError> {
+pub fn refusal_census(
+    source: &str,
+    options: &CompileOptions,
+) -> Result<Vec<Refusal>, CompileError> {
     let mut found: Vec<Refusal> = Vec::new();
 
     // Compile-options guards — [`compile`](crate::compile)'s first two checks.
@@ -137,7 +140,7 @@ pub fn census(source: &str, options: &CompileOptions) -> Result<Vec<Refusal>, Co
 /// co-blocker) as the candidates whose first-refusal bucket key is **not** in this
 /// set.
 #[must_use]
-pub fn census_detected_buckets() -> Vec<Cow<'static, str>> {
+pub fn refusal_census_buckets() -> Vec<Cow<'static, str>> {
     // Representative instances — parameters collapse in the bucket key, so any
     // placeholder value is fine.
     let s = String::new;
@@ -556,7 +559,7 @@ mod tests {
     use crate::compile;
 
     fn bucket_set(source: &str) -> Vec<String> {
-        let mut keys: Vec<String> = census(source, &CompileOptions::default())
+        let mut keys: Vec<String> = refusal_census(source, &CompileOptions::default())
             .expect("census parses")
             .iter()
             .map(|r| r.bucket_key().into_owned())
@@ -707,7 +710,7 @@ mod tests {
     #[test]
     fn detected_buckets_are_unique() {
         // The exposure-line source of truth must have no duplicate keys.
-        let buckets = census_detected_buckets();
+        let buckets = refusal_census_buckets();
         let mut seen = HashSet::new();
         for b in &buckets {
             assert!(seen.insert(b.clone()), "duplicate detected bucket: {b}");

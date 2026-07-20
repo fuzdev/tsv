@@ -9,8 +9,8 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use tsv_cli::json_utils::to_json_with_tabs;
 use tsv_svelte_compile::{
-    CompileError, CompileOptions, Parity, Refusal, canonicalize_js, census,
-    census_detected_buckets, compare_canonical, compile,
+    CompileError, CompileOptions, Parity, Refusal, canonicalize_js, compare_canonical, compile,
+    refusal_census, refusal_census_buckets,
 };
 
 /// The `--ratchet` gate: the validation-suite snapshot, its key shape, and its verdict.
@@ -54,12 +54,12 @@ mod ratchet;
 /// sub-buckets above are first-refusal-only and overstate any one class's parity
 /// yield. `--census` re-prices them: over the same oracle-accepted, tsv-refused
 /// files, it unions each file's real first-refusal with
-/// [`census`](tsv_svelte_compile::census)'s independently-detected blocker set,
+/// [`refusal_census`](tsv_svelte_compile::refusal_census)'s independently-detected blocker set,
 /// then reports — per class — its **sole-blocker** count (files it is the *only*
 /// blocker of, so unlocking it yields exactly that many new parity files) and its
 /// **co-blocker** count. A mandatory **exposure** line counts candidates whose
 /// first-refusal is a class the census cannot detect independently
-/// ([`census_detected_buckets`](tsv_svelte_compile::census_detected_buckets)) —
+/// ([`refusal_census_buckets`](tsv_svelte_compile::refusal_census_buckets)) —
 /// those files may hide an undetected co-blocker, so their sole counts could be
 /// over-promised. Diagnostic only: it exits 0 unless a harness error occurs (2).
 ///
@@ -127,7 +127,7 @@ enum Bucket {
     /// measurement and the contract cannot drift.
     ///
     /// `fence_contained` is the DIAGNOSTIC companion, computed only when `fenced`
-    /// is false: does [`census`](tsv_svelte_compile::census) independently find a
+    /// is false: does [`refusal_census`](tsv_svelte_compile::refusal_census) independently find a
     /// fenced construct in a file whose FIRST refusal was something else? It sizes
     /// the gap between the fence-first count and the conceptually-right containment
     /// population — and it deliberately does **not** feed [`TargetSet`]. See
@@ -383,7 +383,7 @@ async fn classify_file(group: usize, path: PathBuf) -> FileOutcome {
 ///
 /// The diagnostic behind the fence-containment line. `compile` bails at the first
 /// refusal, so a file whose fence sits behind an earlier refusal is invisible to
-/// the fence-first count; [`census`](tsv_svelte_compile::census) enumerates every
+/// the fence-first count; [`refusal_census`](tsv_svelte_compile::refusal_census) enumerates every
 /// refusal class it can detect independently, so it sees that fence.
 ///
 /// ⚠️ **It sees only ONE of the three fence sources**, which is why this feeds a
@@ -397,7 +397,7 @@ async fn classify_file(group: usize, path: PathBuf) -> FileOutcome {
 /// parsed) reads as "no fence found": this is a diagnostic, so it must never
 /// promote a harness hiccup into a claim about the corpus.
 fn census_finds_fence(source: &str) -> bool {
-    census(source, &CompileOptions::default())
+    refusal_census(source, &CompileOptions::default())
         .is_ok_and(|found| found.iter().any(Refusal::is_deliberate_fence))
 }
 
@@ -719,7 +719,7 @@ struct Stats {
 ///
 /// # Why the census does not supply this denominator
 ///
-/// [`census`](tsv_svelte_compile::census) enumerates refusal classes independently
+/// [`refusal_census`](tsv_svelte_compile::refusal_census) enumerates refusal classes independently
 /// of first-refusal order, so it looks like the sound containment detector the list
 /// above says does not exist. It is not one, for two measured reasons — and the
 /// `fence_contained` line reports its finding precisely so the size of the gap is
@@ -1269,7 +1269,7 @@ async fn classify_census(source: &str) -> CensusOutcome {
 
     // Census pass. It parsed once already inside `compile()`, so a parse error is
     // impossible here — surface it loudly if it somehow occurs.
-    let detected = match census(source, &CompileOptions::default()) {
+    let detected = match refusal_census(source, &CompileOptions::default()) {
         Ok(d) => d,
         Err(e) => return CensusOutcome::Error("census", e.to_string()),
     };
@@ -1332,7 +1332,7 @@ struct CensusReport {
 
 impl CensusReport {
     fn build(outcomes: &[CensusOutcome]) -> Self {
-        let detected: std::collections::HashSet<String> = census_detected_buckets()
+        let detected: std::collections::HashSet<String> = refusal_census_buckets()
             .into_iter()
             .map(std::borrow::Cow::into_owned)
             .collect();
@@ -1462,7 +1462,7 @@ impl CensusReport {
             "Disclaimed classes (`*`) are the static-evaluator/overlay family, the emitter \
              refusals that read live per-emission state (styled-component attributes, \
              bind:/event/value attributes, block placement, component invocations), and the \
-             pipeline-inline comment-family refusals. See the tsv_svelte_compile::census module docs."
+             pipeline-inline comment-family refusals. See the tsv_svelte_compile::refusal_census module docs."
         );
 
         if self.errors > 0 {
@@ -1522,11 +1522,11 @@ mod tests {
         // The per-file exposure fix: a candidate is exposed iff the census did not
         // itself reproduce that file's real first-refusal (`first_confirmed`),
         // regardless of whether that class is globally detectable. This models a
-        // dual-position class whose bucket key IS in `census_detected_buckets()`
+        // dual-position class whose bucket key IS in `refusal_census_buckets()`
         // (so a global check would clear it) yet went unconfirmed on this file.
         let dual = "rune {name}".to_string(); // globally detected (script variant)
         assert!(
-            census_detected_buckets().iter().any(|b| b.as_ref() == dual),
+            refusal_census_buckets().iter().any(|b| b.as_ref() == dual),
             "precondition: the class is globally detectable"
         );
         let outcomes = vec![
