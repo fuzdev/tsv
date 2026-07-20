@@ -192,9 +192,35 @@ codegen-units = 1
 panic = "abort"
 strip = true
 
+# The audit / corpus-tool profile, and the ONE build world every `deno task check`
+# audit shares. `panic = "unwind"` is the reason it exists: the audits and the fuzzer
+# drive `catch_unwind`, so a formatter panic must be a reported finding rather than a
+# process kill (plain `--release` is `panic = "abort"`).
+#
+# `lto` / `codegen-units` are overridden back off the inherited `release` values. The
+# inherited `lto = true, codegen-units = 1` was incidental — nothing here wants it, and
+# measured head-to-head on one machine it is a loss on BOTH axes, not a trade:
+#
+#            lto=true,cgu=1   lto=false,cgu=16
+#   rebuild        79s              30s     (after touching tsv_ts; LTO links
+#   gap_audit      25s              19s      single-threaded, cgu=16 saturates
+#   blank_audit    40s              36s      the cores)
+#   fuzz 5000     2.6s             2.7s
+#
+# The audits run wide (`audit::parallel::run_pool` across every core), which is the
+# likely reason LTO's extra inlining does not pay here. Absolute numbers are
+# machine-specific; the ordering is what matters, so re-measure both columns before
+# reinstating LTO on the strength of the usual assumption that it must be faster.
+#
+# The cost of this being one world: the cheap audits (`scan:audit`, `fanout:audit`,
+# `conformance:audit`) now need an optimized build too, so running one of THEM alone
+# on a cold tree is slower than a debug build would have been. In `deno task check`,
+# where they always run alongside the rest, that build is already paid.
 [profile.corpus]
 inherits = "release"
 panic = "unwind"
+lto = false
+codegen-units = 16
 
 [profile.profiling]
 inherits = "release"
