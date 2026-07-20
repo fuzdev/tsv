@@ -822,6 +822,12 @@ pub(super) fn should_expand_first_arg(
     // expand-first path carries the inter-arg leading comment via
     // `build_after_comma_leading_comments`.
     //
+    // A JSDoc cast never reaches this gate, and must not be added to it: prettier keeps
+    // the cast's parens, so its `couldExpandArg` sees an opaque paren node rather than the
+    // collection inside, and it expands-first even for a non-empty one. The transparency a
+    // cast does get is in `is_hopefully_short_arg`, not here — pinned by
+    // `calls/expand_first_jsdoc_cast_second_arg`.
+    //
     // **on page** (both probes): prettier's `couldExpandArg` asks `hasComment(node)`, a
     // pure layout question — an owned annotation is on the page and blocks the hug just
     // like any other comment. Kept in lockstep with the twin guard in
