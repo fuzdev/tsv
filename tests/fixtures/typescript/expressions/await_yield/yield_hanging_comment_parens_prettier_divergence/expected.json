@@ -1,0 +1,801 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 582,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " glued single-line block — collapses inline, no parens needed",
+			"start": 28,
+			"end": 91,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 100,
+			"end": 107,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 8
+				},
+				"end": {
+					"line": 4,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " own-line block — parens retained, so the author's break stays legal",
+			"start": 119,
+			"end": 189,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 2
+				},
+				"end": {
+					"line": 6,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " (`yield` is a restricted production: a newline after it triggers ASI)",
+			"start": 192,
+			"end": 264,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 2
+				},
+				"end": {
+					"line": 7,
+					"column": 74
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 278,
+			"end": 285,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 3
+				},
+				"end": {
+					"line": 9,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment — always forces the break, so always retains the parens",
+			"start": 304,
+			"end": 375,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 2
+				},
+				"end": {
+					"line": 13,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 389,
+			"end": 393,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 3
+				},
+				"end": {
+					"line": 15,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " same in value position",
+			"start": 412,
+			"end": 437,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 2
+				},
+				"end": {
+					"line": 19,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 461,
+			"end": 468,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 3
+				},
+				"end": {
+					"line": 21,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the delegate form is restricted too",
+			"start": 487,
+			"end": 525,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 2
+				},
+				"end": {
+					"line": 25,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 550,
+			"end": 554,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 3
+				},
+				"end": {
+					"line": 27,
+					"column": 7
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 581,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 572,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 31,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 10,
+					"end": 571,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 30,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 20,
+						"end": 21,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 11
+							},
+							"end": {
+								"line": 2,
+								"column": 12
+							}
+						},
+						"name": "g"
+					},
+					"expression": false,
+					"generator": true,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 24,
+						"end": 571,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 15
+							},
+							"end": {
+								"line": 30,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 94,
+								"end": 115,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 23
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 94,
+									"end": 114,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 22
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "LogicalExpression",
+										"start": 108,
+										"end": 114,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 16
+											},
+											"end": {
+												"line": 4,
+												"column": 22
+											}
+										},
+										"left": {
+											"type": "Identifier",
+											"start": 108,
+											"end": 109,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 16
+												},
+												"end": {
+													"line": 4,
+													"column": 17
+												}
+											},
+											"name": "x"
+										},
+										"operator": "??",
+										"right": {
+											"type": "Identifier",
+											"start": 113,
+											"end": 114,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 21
+												},
+												"end": {
+													"line": 4,
+													"column": 22
+												}
+											},
+											"name": "y"
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 100,
+												"end": 107
+											}
+										]
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " glued single-line block — collapses inline, no parens needed",
+										"start": 28,
+										"end": 91
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 267,
+								"end": 300,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 4
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 267,
+									"end": 299,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 2
+										},
+										"end": {
+											"line": 11,
+											"column": 3
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "LogicalExpression",
+										"start": 289,
+										"end": 295,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 3
+											},
+											"end": {
+												"line": 10,
+												"column": 9
+											}
+										},
+										"left": {
+											"type": "Identifier",
+											"start": 289,
+											"end": 290,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 3
+												},
+												"end": {
+													"line": 10,
+													"column": 4
+												}
+											},
+											"name": "x"
+										},
+										"operator": "??",
+										"right": {
+											"type": "Identifier",
+											"start": 294,
+											"end": 295,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 8
+												},
+												"end": {
+													"line": 10,
+													"column": 9
+												}
+											},
+											"name": "y"
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 278,
+												"end": 285
+											}
+										]
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " own-line block — parens retained, so the author's break stays legal",
+										"start": 119,
+										"end": 189
+									},
+									{
+										"type": "Line",
+										"value": " (`yield` is a restricted production: a newline after it triggers ASI)",
+										"start": 192,
+										"end": 264
+									}
+								]
+							},
+							{
+								"type": "ExpressionStatement",
+								"start": 378,
+								"end": 408,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 4
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 378,
+									"end": 407,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 2
+										},
+										"end": {
+											"line": 17,
+											"column": 3
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "LogicalExpression",
+										"start": 397,
+										"end": 403,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 3
+											},
+											"end": {
+												"line": 16,
+												"column": 9
+											}
+										},
+										"left": {
+											"type": "Identifier",
+											"start": 397,
+											"end": 398,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 3
+												},
+												"end": {
+													"line": 16,
+													"column": 4
+												}
+											},
+											"name": "x"
+										},
+										"operator": "??",
+										"right": {
+											"type": "Identifier",
+											"start": 402,
+											"end": 403,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 8
+												},
+												"end": {
+													"line": 16,
+													"column": 9
+												}
+											},
+											"name": "y"
+										},
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 389,
+												"end": 393
+											}
+										]
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " line comment — always forces the break, so always retains the parens",
+										"start": 304,
+										"end": 375
+									}
+								]
+							},
+							{
+								"type": "VariableDeclaration",
+								"start": 440,
+								"end": 483,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 2
+									},
+									"end": {
+										"line": 23,
+										"column": 4
+									}
+								},
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 446,
+										"end": 482,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 8
+											},
+											"end": {
+												"line": 23,
+												"column": 3
+											}
+										},
+										"id": {
+											"type": "Identifier",
+											"start": 446,
+											"end": 447,
+											"loc": {
+												"start": {
+													"line": 20,
+													"column": 8
+												},
+												"end": {
+													"line": 20,
+													"column": 9
+												}
+											},
+											"name": "a"
+										},
+										"init": {
+											"type": "YieldExpression",
+											"start": 450,
+											"end": 482,
+											"loc": {
+												"start": {
+													"line": 20,
+													"column": 12
+												},
+												"end": {
+													"line": 23,
+													"column": 3
+												}
+											},
+											"delegate": false,
+											"argument": {
+												"type": "LogicalExpression",
+												"start": 472,
+												"end": 478,
+												"loc": {
+													"start": {
+														"line": 22,
+														"column": 3
+													},
+													"end": {
+														"line": 22,
+														"column": 9
+													}
+												},
+												"left": {
+													"type": "Identifier",
+													"start": 472,
+													"end": 473,
+													"loc": {
+														"start": {
+															"line": 22,
+															"column": 3
+														},
+														"end": {
+															"line": 22,
+															"column": 4
+														}
+													},
+													"name": "x"
+												},
+												"operator": "??",
+												"right": {
+													"type": "Identifier",
+													"start": 477,
+													"end": 478,
+													"loc": {
+														"start": {
+															"line": 22,
+															"column": 8
+														},
+														"end": {
+															"line": 22,
+															"column": 9
+														}
+													},
+													"name": "y"
+												},
+												"leadingComments": [
+													{
+														"type": "Block",
+														"value": " c ",
+														"start": 461,
+														"end": 468
+													}
+												]
+											}
+										}
+									}
+								],
+								"kind": "const",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " same in value position",
+										"start": 412,
+										"end": 437
+									}
+								]
+							},
+							{
+								"type": "VariableDeclaration",
+								"start": 528,
+								"end": 568,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 2
+									},
+									"end": {
+										"line": 29,
+										"column": 4
+									}
+								},
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 534,
+										"end": 567,
+										"loc": {
+											"start": {
+												"line": 26,
+												"column": 8
+											},
+											"end": {
+												"line": 29,
+												"column": 3
+											}
+										},
+										"id": {
+											"type": "Identifier",
+											"start": 534,
+											"end": 535,
+											"loc": {
+												"start": {
+													"line": 26,
+													"column": 8
+												},
+												"end": {
+													"line": 26,
+													"column": 9
+												}
+											},
+											"name": "b"
+										},
+										"init": {
+											"type": "YieldExpression",
+											"start": 538,
+											"end": 567,
+											"loc": {
+												"start": {
+													"line": 26,
+													"column": 12
+												},
+												"end": {
+													"line": 29,
+													"column": 3
+												}
+											},
+											"delegate": true,
+											"argument": {
+												"type": "CallExpression",
+												"start": 558,
+												"end": 563,
+												"loc": {
+													"start": {
+														"line": 28,
+														"column": 3
+													},
+													"end": {
+														"line": 28,
+														"column": 8
+													}
+												},
+												"callee": {
+													"type": "Identifier",
+													"start": 558,
+													"end": 561,
+													"loc": {
+														"start": {
+															"line": 28,
+															"column": 3
+														},
+														"end": {
+															"line": 28,
+															"column": 6
+														}
+													},
+													"name": "gen"
+												},
+												"arguments": [],
+												"optional": false,
+												"leadingComments": [
+													{
+														"type": "Line",
+														"value": " c",
+														"start": 550,
+														"end": 554
+													}
+												]
+											}
+										}
+									}
+								],
+								"kind": "const",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " the delegate form is restricted too",
+										"start": 487,
+										"end": 525
+									}
+								]
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

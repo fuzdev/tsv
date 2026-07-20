@@ -1085,7 +1085,7 @@ impl<'a> Printer<'a> {
         let keyword_end = await_expr.span.start + "await".len() as u32;
         let argument_start = await_expr.argument.span().start;
         let argument_end = await_expr.argument.span().end;
-        let comments_opt = self.build_rhs_comments_opt(keyword_end, argument_start);
+        let comments_opt = self.build_keyword_operand_comments_opt(keyword_end, argument_start);
 
         // Trailing comments from stripped grouping parens: `await (x /* c */)` → `await x /* c */`
         let has_trailing_comments =
@@ -1131,46 +1131,63 @@ impl<'a> Printer<'a> {
         yield_expr: &internal::YieldExpression<'_>,
     ) -> DocId {
         let d = self.d();
-        let mut parts = DocBuf::new();
-
-        if yield_expr.delegate {
-            parts.push(d.text("yield*"));
+        let keyword = if yield_expr.delegate {
+            "yield*"
         } else {
-            parts.push(d.text("yield"));
+            "yield"
+        };
+        let Some(arg) = yield_expr.argument else {
+            return d.text(keyword);
+        };
+
+        let keyword_end = yield_expr.span.start + keyword.len() as u32;
+        let argument_start = arg.span().start;
+        let argument_end = arg.span().end;
+
+        // Trailing comments from stripped grouping parens: `yield (x /* c */)` → `yield x /* c */`
+        let has_trailing_comments =
+            self.has_comments_to_emit_between(argument_end, yield_expr.span.end);
+
+        // A comment that forces the break takes the parenthesized form. `yield` is a
+        // restricted production (`yield [no LineTerminator here] AssignmentExpression`,
+        // ECMA-262 §15.5), so without the parens ASI ends the `yield` at the newline and
+        // the operand becomes a separate expression statement — the `yield` silently
+        // loses its argument. Same gate and same layout as its `return`/`throw` siblings;
+        // see `build_hanging_paren_doc` for the shared rule, and
+        // docs/conformance_prettier.md §Comment relocation for why prettier (whose own
+        // retention is scoped to those two) diverges here.
+        if self.argument_has_own_line_comment(yield_expr.span.start, arg) {
+            let mut body = DocBuf::new();
+            if let Some(comments) = self.build_rhs_comments_opt(keyword_end, argument_start) {
+                body.push(comments);
+            }
+            body.push(self.build_expression_doc(arg));
+            // The trailing comment stays INSIDE the parens, where it was written.
+            if has_trailing_comments {
+                self.append_trailing_paren_comments(&mut body, argument_end, yield_expr.span.end);
+            }
+            return self.build_hanging_paren_doc(keyword, d.concat(&body), ")");
         }
 
-        if let Some(arg) = yield_expr.argument {
-            parts.push(d.text(" "));
-            // Preserve comments from stripped grouping parens: `yield (/** @type {T} */ expr)`
-            let keyword_end = yield_expr.span.start
-                + if yield_expr.delegate {
-                    "yield*"
-                } else {
-                    "yield"
-                }
-                .len() as u32;
-            let argument_start = arg.span().start;
-            let argument_end = arg.span().end;
-            let leading_comments_opt = self.build_rhs_comments_opt(keyword_end, argument_start);
+        let mut parts: DocBuf = smallvec![d.text(keyword), d.text(" ")];
+        // Every remaining comment is glued to the keyword with the operand after it on
+        // some line, so the operand is pulled up onto the comment's line rather than
+        // keeping the author's break — the break would be ASI, not layout.
+        let leading_comments_opt = self.build_rhs_comments_glued_opt(keyword_end, argument_start);
 
-            // Trailing comments from stripped grouping parens: `yield (x /* c */)` → `yield x /* c */`
-            let has_trailing_comments =
-                self.has_comments_to_emit_between(argument_end, yield_expr.span.end);
-
-            if leading_comments_opt.is_some() || has_trailing_comments {
-                if let Some(comments) = leading_comments_opt {
-                    parts.push(comments);
-                }
-                parts.push(self.build_expression_doc(arg));
-                self.append_trailing_paren_comments(&mut parts, argument_end, yield_expr.span.end);
-            } else if self.needs_parens(arg, ParenContext::YieldArgument) {
-                // Assignment needs parens: `yield (x ??= y)`
-                parts.push(d.text("("));
-                parts.push(self.build_expression_doc(arg));
-                parts.push(d.text(")"));
-            } else {
-                parts.push(self.build_expression_doc(arg));
+        if leading_comments_opt.is_some() || has_trailing_comments {
+            if let Some(comments) = leading_comments_opt {
+                parts.push(comments);
             }
+            parts.push(self.build_expression_doc(arg));
+            self.append_trailing_paren_comments(&mut parts, argument_end, yield_expr.span.end);
+        } else if self.needs_parens(arg, ParenContext::YieldArgument) {
+            // Assignment needs parens: `yield (x ??= y)`
+            parts.push(d.text("("));
+            parts.push(self.build_expression_doc(arg));
+            parts.push(d.text(")"));
+        } else {
+            parts.push(self.build_expression_doc(arg));
         }
 
         d.concat(&parts)
