@@ -3,6 +3,7 @@
 // Entry point (`build_if_statement_doc`) plus the wrapping and
 // comment-handling variants, and else-clause layout helpers.
 
+use super::ControlFlowGap;
 use crate::ast::internal::{self, Statement};
 use crate::printer::Printer;
 use smallvec::smallvec;
@@ -384,6 +385,7 @@ impl<'a> Printer<'a> {
                     &inline_prev,
                     &all_own_line,
                     consequent_end,
+                    ControlFlowGap::BlockToKeyword,
                 );
 
                 let has_inline_line_comment = inline_prev.iter().any(|c| !c.is_block);
