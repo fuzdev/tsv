@@ -710,7 +710,7 @@ fn add_all<'a>(
 ///
 /// Case-**insensitive**, mirroring its oracle site: CSS pruning matches
 /// `attr.name.toLowerCase() === 'slot'` (`css-prune.js:1015`). ⚠️ Do NOT unify this
-/// with `element.rs`'s `child_slot_attribute` / `special_element_slot_attribute`,
+/// with `component.rs`'s `child_slot_attribute` / `special_element_slot_attribute`,
 /// which are case-**sensitive** because *their* oracle sites are
 /// (`server/visitors/shared/component.js:50`). The oracle is itself split, so each
 /// predicate faithfully mirrors its own site; deduplicating the three into one

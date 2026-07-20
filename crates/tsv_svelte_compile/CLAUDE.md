@@ -532,13 +532,19 @@ project-wide conventions.
   so a bare `on` is legal and `onx` is not, and a BARE `onclick` is rejected along
   with `onclick="foo"`) and `slot_attribute_invalid_placement`. That loop's only
   callers are `RegularElement.js` / `SvelteElement.js`, so a **component** is exempt
-  from all three. ⚠️ `attribute_invalid_sequence_expression` is the one attribute rule
-  that is NOT element-only — a component reaches it through its own visitor
-  (`shared/component.js:174`), which ALSO applies it to an `{@attach}` expression
-  where the element half does not, so `<span {@attach a, b} />` compiles and
-  `<Foo {@attach a, b} />` refuses. It therefore lives in a shared
-  `refuse_unparenthesized_sequence` called from both paths rather than folded into
-  either. Its parenthesization test is the oracle's backward SOURCE scan, not a span
+  from all three. The rules fire in the oracle's per-attribute order (one loop,
+  first error wins: unquoted-sequence → sequence → name → event handler → slot), so
+  a multi-error element reports the oracle's own bucket. ⚠️ TWO attribute rules are
+  NOT element-only. `attribute_unquoted_sequence`
+  (`refuse_unquoted_attribute_sequence` — an unquoted value of 2+ chunks like
+  `href=/{path}`; the quote test is the oracle's last-chunk-end vs attribute-end
+  span comparison) is `validate_attribute`, called from `shared/element.js:43` AND
+  `shared/component.js:93` alike. And `attribute_invalid_sequence_expression` — a
+  component reaches it through its own visitor (`shared/component.js:174`), which
+  ALSO applies it to an `{@attach}` expression where the element half does not, so
+  `<span {@attach a, b} />` compiles and `<Foo {@attach a, b} />` refuses. It
+  therefore lives in a shared `refuse_unparenthesized_sequence` called from both
+  paths rather than folded into either. Its parenthesization test is the oracle's backward SOURCE scan, not a span
   comparison: ESTree drops parens, so the byte before the sequence's start is the only
   record of them — which is why a nested `{[x, (y, z)]}` is legal while `{(x), y}` is
   not.
@@ -698,8 +704,8 @@ pipeline order.
     property), and `static\u{FEFF}{ … }` was invisible to the fence, compiling the
     rune where the oracle emits a store read. Over-reporting stays harmless
     (`static` in a comment or string, a `/` that is division, a `U+0085` that JS
-    would reject anyway) — measured at zero, no `.svelte` file in the ~4900-file
-    compile corpus contains a static block;
+    would reject anyway) — measured at zero, none of the ~4900 `.svelte` files
+    under the compile-corpus roots contains a static block;
   - the `$stem` REFERENCE test, a whole-document, boundary-checked source scan
     rather than an AST walk: tsv recognizes a rune at half a dozen scattered sites
     and a per-site check can miss one (an under-refusal = a MISMATCH), while one

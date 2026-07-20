@@ -96,7 +96,7 @@ enum StemInit {
 /// ([`script_contains_static_block`]): reaching every class body a script can
 /// hold means enumerating every expression position of every statement, which is
 /// the surface that shipped holes twice, and a static block in a Svelte component
-/// is vanishingly rare (zero files in the ~4900-file compile corpus contain one),
+/// is vanishingly rare (zero of the ~4900 `.svelte` files under the compile-corpus roots contain one),
 /// so the precision would buy nothing and cost correctness.
 ///
 /// tsv is a runes-only compiler and models neither the reclassification nor mode

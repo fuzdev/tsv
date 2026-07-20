@@ -234,6 +234,75 @@ fn compile_accepts_event_handlers_the_oracle_allows() {
 }
 
 #[test]
+fn compile_refuses_an_unquoted_multichunk_attribute_value() {
+    // The oracle's `attribute_unquoted_sequence` — the error half of
+    // `validate_attribute` (`2-analyze/visitors/shared/attribute.js:41-48`): an
+    // UNQUOTED value of two or more chunks must be quoted. Every shape below is
+    // live-verified oracle-REJECTED (compile_corpus_compare over a probe dir
+    // reported all as `attribute_unquoted_sequence` over-acceptances pre-fix).
+
+    // Text + expression — the common real-world shape (`href=/{path}`).
+    assert_unsupported(
+        "<script>let path = $state('a');</script><a href=/{path}>x</a>",
+        "must be quoted",
+    );
+    // Expression + expression.
+    assert_unsupported(
+        "<script>let a = $state('x');\n\tlet b = $state('y');</script><div data-x={a}{b}></div>",
+        "must be quoted",
+    );
+    // Expression + text.
+    assert_unsupported(
+        "<script>let a = $state('x');</script><img src={a}.png />",
+        "must be quoted",
+    );
+    // ⚠️ Unlike the name/event-handler rules this is NOT element-only:
+    // `validate_attribute` is called from the component visitor too
+    // (`shared/component.js:93`).
+    assert_unsupported(
+        "<script>import F from './F.svelte';\n\tlet b = $state('y');</script><F x=a{b} />",
+        "must be quoted",
+    );
+    // `<svelte:element>` shares `validate_element`, so it is in scope too.
+    assert_unsupported(
+        "<svelte:element this=\"a\" href=/{path}>x</svelte:element>",
+        "must be quoted",
+    );
+}
+
+#[test]
+fn compile_accepts_quoted_and_single_chunk_attribute_values() {
+    // ⚠️ The over-refusal half. All live-verified oracle-ACCEPTED (the two probe
+    // controls reached parity).
+
+    // The SAME multi-chunk value, quoted — the closing quote separates the last
+    // chunk's end from the attribute's end, which is the whole discriminator.
+    let _ = compile_js("<script>let path = $state('a');</script><a href=\"/{path}\">x</a>");
+    // A single-expression value is exempt however it is delimited — the oracle's
+    // `length === 1` early return ("unless the value only contains the
+    // expression").
+    let _ = compile_js("<script>let path = $state('a');</script><a href={path}>x</a>");
+    // A single-TEXT unquoted value is exempt the same way.
+    let _ = compile_js("<a href=/about>x</a>");
+}
+
+#[test]
+fn compile_orders_attribute_rules_per_attribute_like_the_oracle() {
+    // ⚠️ The oracle's `validate_element` is ONE loop over attributes, aborting on
+    // the first error — so on `<p foo={x, y} 3aa="1">` attribute 1's sequence
+    // error fires before attribute 2's name is ever inspected. A whole-list
+    // pre-pass for any single rule reorders that. The refusal REASON is the
+    // observable (the corpus runner buckets by it), so the interleaving is pinned.
+    assert_unsupported("<p foo={x, y} 3aa=\"1\">x</p>", "sequence expression");
+    // And within one attribute, the unquoted-sequence rule (`validate_attribute`)
+    // runs before the sequence scan.
+    assert_unsupported(
+        "<script>let a = $state(1);</script><p onx={a}{a}>x</p>",
+        "must be quoted",
+    );
+}
+
+#[test]
 fn compile_refuses_an_unparenthesized_sequence_expression_attribute() {
     // The oracle's `attribute_invalid_sequence_expression`
     // (`2-analyze/visitors/shared/element.js:52`, `shared/component.js:174`). It

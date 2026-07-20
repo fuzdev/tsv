@@ -4,7 +4,7 @@ use super::support::*;
 
 #[test]
 fn dropped_fragments_are_walked() {
-    // The M4 class, pinned. A fragment the emitter DISCARDS without visiting —
+    // A fragment the emitter DISCARDS without visiting —
     // today only `{:catch}`, plus an event handler's expression — must still be
     // walked for the things the oracle decides BEFORE it chooses what to emit.
     // Dropping the region cannot make the component valid.

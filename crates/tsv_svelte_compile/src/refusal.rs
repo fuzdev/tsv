@@ -874,6 +874,30 @@ pub enum Refusal {
         /// The offending attribute name.
         name: String,
     },
+    /// An UNQUOTED attribute value of two or more chunks — `href=/{path}`,
+    /// `data-x={a}{b}` — the oracle's `attribute_unquoted_sequence`, the error
+    /// half of `validate_attribute` (`2-analyze/visitors/shared/attribute.js:41-48`):
+    /// a value containing `{…}` must be quote-delimited unless it is exactly one
+    /// expression. tsv's parser is permissive here (it parses the multi-chunk
+    /// unquoted value happily), so the compiler refuses rather than emit output
+    /// for a component the oracle rejects.
+    ///
+    /// The quote test is the oracle's span comparison
+    /// (`attribute.value.at(-1).end !== attribute.end`): a quoted value's closing
+    /// quote sits between the last chunk's end and the attribute's end, so the
+    /// two being EQUAL means the value runs flush to the attribute — unquoted. A
+    /// bare attribute and a single-chunk value return early, whatever their
+    /// quoting.
+    ///
+    /// ⚠️ Unlike the name/event-handler rules this one is NOT element-only:
+    /// `validate_attribute` is called from `shared/element.js:43` AND
+    /// `shared/component.js:93`, so `<F x=a{b} />` is rejected exactly like
+    /// `<a href=/{path}>` (live-probed on both paths).
+    #[error("`{name}` attribute value with multiple parts must be quoted (the oracle rejects it)")]
+    AttributeUnquotedSequence {
+        /// The offending attribute name.
+        name: String,
+    },
     /// An attribute value that is an UNPARENTHESIZED sequence expression —
     /// `foo={x, y}` — the oracle's `attribute_invalid_sequence_expression`
     /// (`2-analyze/visitors/shared/element.js:52`,

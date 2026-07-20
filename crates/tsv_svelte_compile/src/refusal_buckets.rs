@@ -314,6 +314,9 @@ impl Refusal {
             Self::AttributeInvalidEventHandler { .. } => Cow::Borrowed(
                 "`{name}` event handler needs an expression value (the oracle rejects it)",
             ),
+            Self::AttributeUnquotedSequence { .. } => Cow::Borrowed(
+                "`{name}` attribute value with multiple parts must be quoted (the oracle rejects it)",
+            ),
             Self::AttributeInvalidSequenceExpression => Cow::Borrowed(
                 "unparenthesized sequence expression in an attribute (the oracle rejects it)",
             ),
@@ -571,6 +574,9 @@ impl Refusal {
                 name: "{name}".to_string(),
             },
             Self::AttributeInvalidEventHandler {
+                name: "{name}".to_string(),
+            },
+            Self::AttributeUnquotedSequence {
                 name: "{name}".to_string(),
             },
             Self::AttributeInvalidSequenceExpression,

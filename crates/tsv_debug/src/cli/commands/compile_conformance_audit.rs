@@ -335,6 +335,7 @@ mod tests {
         "duplicate <{name}> element (the oracle rejects it)",
         "duplicate `{name}` attribute on one element (the oracle rejects it)",
         "invalid attribute name `{name}` (the oracle rejects it)",
+        "`{name}` attribute value with multiple parts must be quoted (the oracle rejects it)",
         "`{name}` event handler needs an expression value (the oracle rejects it)",
         "unparenthesized sequence expression in an attribute (the oracle rejects it)",
         "misplaced slot=\"…\" attribute (the oracle rejects it)",

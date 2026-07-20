@@ -280,9 +280,8 @@ pub(crate) fn guard_pattern<'arena>(
 /// Guard a whole fragment the SSR output drops (the `{:catch}` branch) — the
 /// dropped-fragment analog of [`guard_dropped`], over `attr_refs`' shared
 /// traversals. Without it a rune anywhere inside a `{:catch}` compiles, which the
-/// oracle rejects: the M4 lesson (an emission-dropped fragment still needs
-/// refusal-equivalent walking), and the property `dropped_fragments_are_walked`
-/// pins.
+/// oracle rejects: an emission-dropped fragment still needs refusal-equivalent
+/// walking — the property `dropped_fragments_are_walked` pins.
 ///
 /// Two walks, because a dropped region carries two kinds of fact:
 ///

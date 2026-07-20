@@ -300,28 +300,33 @@ impl<'s> Validator<'s> {
     /// `<button onbar="bar" />` is not. Adding a further check from that function
     /// belongs here, not at either call site.
     ///
-    /// ⚠️ The sequence-expression rule is the ONE exception, and it is deliberately
-    /// not folded in: the component visitor applies its own copy, so it lives in
-    /// [`refuse_unparenthesized_sequence`] and is called from both paths. See
+    /// ⚠️ TWO rules are exceptions shared with the component path, and both are
+    /// deliberately not folded in: the sequence-expression rule (the component
+    /// visitor applies its own copy — [`refuse_unparenthesized_sequence`], called
+    /// from both) and the unquoted-sequence rule (`validate_attribute` is called
+    /// from both callers — [`refuse_unquoted_attribute_sequence`]). See
     /// [`Self::validate_component`] for the half that does not correspond.
     fn validate_element(&self, attributes: &[AttributeNode<'_>]) -> Result<(), CompileError> {
-        refuse_invalid_attribute_names(attributes, self.source)?;
         for attribute in attributes {
             let AttributeNode::Attribute(a) = attribute else {
                 continue;
             };
-            // The oracle orders the sequence check BEFORE the event-handler one
-            // within its single attribute loop, so a `foo={x, y}` sitting on an
-            // element that ALSO carries a bad handler reports the sequence. The
-            // order is preserved because the bucket a corpus file lands in is
-            // observable.
+            // ONE loop in the oracle's own per-attribute order — unquoted-sequence
+            // (`validate_attribute`) → sequence-expression → name → event handler →
+            // slot placement. The order is preserved because the bucket a corpus
+            // file lands in is observable: `<p foo={x, y} 3aa="1">` reports the
+            // sequence, never the name — the oracle aborts on the first attribute's
+            // first error, so a whole-list pre-pass for any single rule would
+            // reorder multi-error elements.
+            refuse_unquoted_attribute_sequence(a, self.source)?;
             if let Some(expression) = expression_attribute_value(a) {
                 refuse_unparenthesized_sequence(expression, self.source)?;
             }
+            refuse_invalid_attribute_name(a, self.source)?;
             refuse_invalid_event_handler(a, self.source)?;
-        }
-        if has_plain_attribute(attributes, self.source, "slot") {
-            self.refuse_invalid_slot_placement()?;
+            if a.name_span.extract(self.source) == "slot" {
+                self.refuse_invalid_slot_placement()?;
+            }
         }
         Ok(())
     }
@@ -331,8 +336,9 @@ impl<'s> Validator<'s> {
     /// reaches — a `<Foo>`, `<svelte:component>` or `<svelte:self>`.
     ///
     /// ⚠️ This is NOT `validate_element`'s rule set with the element bits removed;
-    /// the two oracle functions overlap only on the sequence-expression check, and
-    /// even there they differ in REACH. The component half additionally applies it
+    /// the two oracle functions overlap only on `validate_attribute` (the
+    /// unquoted-sequence rule) and the sequence-expression check — and on the
+    /// latter they differ in REACH. The component half additionally applies it
     /// to an `{@attach}` expression (`:115`), which the element half does not — so
     /// `<span {@attach a, b} />` compiles and `<Foo {@attach a, b} />` does not.
     /// Both directions live-probed; collapsing the two sites breaks one of them.
@@ -340,6 +346,11 @@ impl<'s> Validator<'s> {
         for attribute in attributes {
             match attribute {
                 AttributeNode::Attribute(a) => {
+                    // The oracle's order: `validate_attribute` (the
+                    // unquoted-sequence rule — the ONE rule this path shares
+                    // with `validate_element` besides the sequence scan) runs
+                    // before the sequence check (`shared/component.js:93-100`).
+                    refuse_unquoted_attribute_sequence(a, self.source)?;
                     if let Some(expression) = expression_attribute_value(a) {
                         refuse_unparenthesized_sequence(expression, self.source)?;
                     }
@@ -587,20 +598,58 @@ fn has_plain_attribute(attributes: &[AttributeNode<'_>], source: &str, name: &st
 /// `{@attach}` carry their own grammar (`bind:`, `class:`, `on:` — every one of
 /// which contains a `:` that this class does not even list) and the oracle's loop
 /// guards on `attribute.type === 'Attribute'` before testing.
-fn refuse_invalid_attribute_names(
-    attributes: &[AttributeNode<'_>],
+fn refuse_invalid_attribute_name(
+    attribute: &Attribute<'_>,
     source: &str,
 ) -> Result<(), CompileError> {
-    for attribute in attributes {
-        let AttributeNode::Attribute(a) = attribute else {
-            continue;
-        };
-        let name = a.name_span.extract(source);
-        if has_illegal_attribute_character(name) {
-            return Err(unsupported(Refusal::AttributeInvalidName {
-                name: name.to_string(),
-            }));
-        }
+    let name = attribute.name_span.extract(source);
+    if has_illegal_attribute_character(name) {
+        return Err(unsupported(Refusal::AttributeInvalidName {
+            name: name.to_string(),
+        }));
+    }
+    Ok(())
+}
+
+/// The oracle's `attribute_unquoted_sequence` — the error half of
+/// `validate_attribute` (`2-analyze/visitors/shared/attribute.js:41-48`): a plain
+/// attribute whose value is TWO OR MORE chunks (`href=/{path}`, `data-x={a}{b}`)
+/// must be quote-delimited.
+///
+/// The quote test is the oracle's span comparison
+/// (`attribute.value.at(-1)?.end !== attribute.end`): a quoted value's closing
+/// quote sits between the last chunk's end and the attribute's end, so EQUALITY
+/// means the value runs flush to the attribute — unquoted. The early returns are
+/// the oracle's own (`value === true || !Array.isArray(value) || length === 1`):
+/// a bare attribute and a single-chunk value are exempt whatever their quoting —
+/// the single-expression carve-out is what keeps the ubiquitous `href={path}`
+/// legal.
+///
+/// ⚠️ Reached from BOTH paths — `validate_attribute` is called from
+/// `shared/element.js:43` AND `shared/component.js:93` — unlike the
+/// name/event-handler rules, which are element-only. Its warning half
+/// (`w.attribute_quoted`) gates nothing and is not ported.
+fn refuse_unquoted_attribute_sequence(
+    attribute: &Attribute<'_>,
+    source: &str,
+) -> Result<(), CompileError> {
+    let Some(chunks) = attribute.value else {
+        return Ok(());
+    };
+    let Some(last) = chunks.last() else {
+        return Ok(());
+    };
+    if chunks.len() == 1 {
+        return Ok(());
+    }
+    let last_end = match last {
+        AttributeValue::Text(text) => text.span.end,
+        AttributeValue::ExpressionTag(tag) => tag.span.end,
+    };
+    if last_end == attribute.span.end {
+        return Err(unsupported(Refusal::AttributeUnquotedSequence {
+            name: attribute.name_span.extract(source).to_string(),
+        }));
     }
     Ok(())
 }
@@ -680,7 +729,7 @@ fn refuse_unparenthesized_sequence(
 }
 
 /// `regex_illegal_attribute_character` as a predicate — see
-/// [`refuse_invalid_attribute_names`] for why the two alternatives stay separate.
+/// [`refuse_invalid_attribute_name`] for why the two alternatives stay separate.
 fn has_illegal_attribute_character(name: &str) -> bool {
     // The ANCHORED alternative, `(^[0-9-.])`. Byte-wise is sound: every member is
     // ASCII, so a multi-byte leading char simply does not match.

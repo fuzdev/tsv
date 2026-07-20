@@ -156,8 +156,8 @@ fn compile_refuses_a_static_block_that_declares_nothing() {
     // The deliberate over-refusal the fence buys, pinned so it is a choice rather
     // than a surprise: this static block binds no rune stem at all and the oracle
     // compiles it fine, but the fence cannot tell without traversing the positions
-    // it exists to avoid traversing. Measured cost: zero — no `.svelte` file in the
-    // ~4900-file compile corpus contains a static block.
+    // it exists to avoid traversing. Measured cost: zero — none of the ~4900
+    // `.svelte` files under the compile-corpus roots contains a static block.
     assert_unsupported(
         "<script>\n\tclass C {\n\t\tstatic {\n\t\t\tconsole.log('hi');\n\t\t}\n\t}\n\tconst x = $state(1);\n</script>\n<p>{x}{C}</p>",
         "rune $state whose base is also an instance binding",
