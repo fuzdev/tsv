@@ -352,37 +352,6 @@ impl Refusal {
         }
     }
 
-    /// Whether this refusal is a **deliberate product fence** rather than an
-    /// unimplemented feature.
-    ///
-    /// tsv's Svelte compiler is runes-only by choice, so the legacy authoring
-    /// syntax it declines will never be implemented — it is not a gap, and a file
-    /// containing one is not an achievable parity target. Measurement uses this to
-    /// keep the fenced population out of the parity denominator; every other
-    /// refusal is a "not yet" that counts against it.
-    ///
-    /// The fenced set is the legacy **slot system** and the legacy **directive
-    /// syntax**, both superseded in Svelte 5:
-    ///
-    /// - [`RunesOnlyFence`](Refusal::RunesOnlyFence) — a legacy `on:` event
-    ///   directive and `let:`, on a regular or special element;
-    /// - the legacy special-element tags
-    ///   (`special_element_kind::SPECIAL_ELEMENT_FENCED_KINDS`)
-    ///   — `<slot>`, `<svelte:fragment>`, `<svelte:component>`, `<svelte:self>`; and
-    /// - [`ComponentNamedSlot`](Refusal::ComponentNamedSlot) — a `slot="…"` on a
-    ///   component's child, the *consumer* half of the same slot system whose
-    ///   `<slot>` / `<svelte:fragment>` *declaration* half is fenced above.
-    ///   Snippets supersede it, and this compiler already emits them.
-    ///
-    /// Each is deprecation-warned or superseded by the oracle in Svelte 5, so
-    /// counting them as future work books work that will never be done.
-    ///
-    /// Deliberately **outside** the set: `<svelte:boundary>` (a first-class Svelte 5
-    /// feature and a real gap), and
-    /// [`ComponentDirective`](Refusal::ComponentDirective) — which a legacy `on:` /
-    /// `let:` on a *component* raises instead of `RunesOnlyFence`, but whose bucket
-    /// mixes those with unimplemented `class:` / `use:` / `transition:` directives,
-    /// so it cannot be fenced wholesale.
     /// One representative of every [`Refusal`] variant, for enumerating the
     /// bucket-key catalog.
     ///
@@ -394,8 +363,15 @@ impl Refusal {
     /// ⚠️ Hand-maintained, and **not** compiler-enforced — a new variant compiles
     /// fine while missing here (unlike [`bucket_key`](Refusal::bucket_key), whose
     /// match is exhaustive). `compile_conformance_audit`'s drift check reads this
-    /// list, so an omission silently narrows that audit's oracle. Add the variant
-    /// here in the same change.
+    /// list, so an omission would silently narrow that audit's oracle. Add the
+    /// variant here in the same change.
+    ///
+    /// The omission is caught at test time rather than compile time, from the
+    /// enum's own source: `tests::refusal_buckets::every_variant_covers_the_enum`
+    /// derives the variant list from `refusal.rs` and diffs it against this one.
+    /// That guard exists because the downstream pin cannot see an omission —
+    /// `compile_conformance_audit`'s `EXPECTED_BUCKET_KEYS` is a snapshot of what
+    /// this list *produces*, so a variant absent from both changes no key.
     #[must_use]
     pub fn every_variant() -> Vec<Self> {
         vec![
@@ -637,6 +613,37 @@ impl Refusal {
             .collect()
     }
 
+    /// Whether this refusal is a **deliberate product fence** rather than an
+    /// unimplemented feature.
+    ///
+    /// tsv's Svelte compiler is runes-only by choice, so the legacy authoring
+    /// syntax it declines will never be implemented — it is not a gap, and a file
+    /// containing one is not an achievable parity target. Measurement uses this to
+    /// keep the fenced population out of the parity denominator; every other
+    /// refusal is a "not yet" that counts against it.
+    ///
+    /// The fenced set is the legacy **slot system** and the legacy **directive
+    /// syntax**, both superseded in Svelte 5:
+    ///
+    /// - [`RunesOnlyFence`](Refusal::RunesOnlyFence) — a legacy `on:` event
+    ///   directive and `let:`, on a regular or special element;
+    /// - the legacy special-element tags
+    ///   (`special_element_kind::SPECIAL_ELEMENT_FENCED_KINDS`)
+    ///   — `<slot>`, `<svelte:fragment>`, `<svelte:component>`, `<svelte:self>`; and
+    /// - [`ComponentNamedSlot`](Refusal::ComponentNamedSlot) — a `slot="…"` on a
+    ///   component's child, the *consumer* half of the same slot system whose
+    ///   `<slot>` / `<svelte:fragment>` *declaration* half is fenced above.
+    ///   Snippets supersede it, and this compiler already emits them.
+    ///
+    /// Each is deprecation-warned or superseded by the oracle in Svelte 5, so
+    /// counting them as future work books work that will never be done.
+    ///
+    /// Deliberately **outside** the set: `<svelte:boundary>` (a first-class Svelte 5
+    /// feature and a real gap), and
+    /// [`ComponentDirective`](Refusal::ComponentDirective) — which a legacy `on:` /
+    /// `let:` on a *component* raises instead of `RunesOnlyFence`, but whose bucket
+    /// mixes those with unimplemented `class:` / `use:` / `transition:` directives,
+    /// so it cannot be fenced wholesale.
     #[must_use]
     pub fn is_deliberate_fence(&self) -> bool {
         match self {

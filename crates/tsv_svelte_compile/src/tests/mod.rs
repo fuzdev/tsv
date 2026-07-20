@@ -22,6 +22,7 @@ mod element_refusals;
 mod element_spread;
 mod errors;
 mod module_script;
+mod refusal_buckets;
 mod rune_store_collision;
 mod runes_derived;
 mod runes_misc;
