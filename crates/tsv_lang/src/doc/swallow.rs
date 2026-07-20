@@ -123,6 +123,15 @@ impl SwallowTracker {
     /// (for the line-context snippet). Records a swallow when a pending comment is
     /// followed by non-newline content on the same line; an empty emit keeps the
     /// `//` dangling.
+    ///
+    /// ⚠️ `&mut self` is deliberate and the lint is wrong about it. The observation
+    /// *does* mutate state — `PENDING` — but that state lives in a `thread_local!`
+    /// the lint cannot see through, so it reads the receiver as unused. Keeping the
+    /// exclusive borrow states the real contract (an observation is a mutation, and
+    /// two of these must not interleave), matches the `SwallowTracker` trait methods
+    /// that forward here, and is what the signature must be anyway if `PENDING` ever
+    /// moves off the thread-local into the struct.
+    #[allow(clippy::needless_pass_by_ref_mut)]
     pub(crate) fn on_text(&mut self, is_line_comment: bool, text: &str, output: &str) {
         PENDING.with(|p| {
             let mut pending = p.borrow_mut();
@@ -141,6 +150,10 @@ impl SwallowTracker {
     }
 
     /// Observe a line break: a real newline (`emitted`) ends the comment's line.
+    ///
+    /// `&mut self` for the same reason as [`Self::on_text`] — the mutation is real,
+    /// it just lands in the `thread_local!`.
+    #[allow(clippy::needless_pass_by_ref_mut)]
     #[inline]
     pub(crate) fn on_newline(&mut self, emitted: bool) {
         if emitted {

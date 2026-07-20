@@ -329,7 +329,7 @@ deno task conformance:all              # the full drop-in conformance gate = `co
 deno task divergence:audit         # audit divergence pattern coverage (--json for machine-readable)
 ```
 
-The corpus comparison builds with `--profile corpus` (release + `panic = "unwind"`) so panics in our code are caught and reported as errors instead of crashing the process. Benchmarks use `--release` (with `panic = "abort"`) for maximum performance.
+The corpus comparison builds with `--profile corpus` (optimized + `panic = "unwind"`, no LTO) so panics in our code are caught and reported as errors instead of crashing the process. `corpus` is also the single build world every `deno task check` audit runs under, so it trades LTO for build time — measurably free at runtime, see the profile's own comment in `Cargo.toml`. Benchmarks use `--release` (with `panic = "abort"`, LTO on) for maximum performance.
 
 Divergence detection identifies known differences documented in `conformance_prettier.md` (safety checks, pattern detection, traceability). See ./benches/js/CLAUDE.md and ./docs/divergence_detector.md.
 
@@ -938,15 +938,15 @@ deno task metrics                          # shorthand
 # any `//` line comment followed by content on the same output line (silent
 # content loss). Pure Rust, no Deno. Defaults to tests/fixtures; pass dirs/files
 # to audit real code. Exits 1 on any finding.
-cargo run -p tsv_debug --features audits swallow_audit                 # audit all fixtures
-cargo run -p tsv_debug --features audits swallow_audit ~/dev/zzz/src   # audit a real codebase
+cargo run --profile corpus -p tsv_debug --features audits swallow_audit                # audit all fixtures
+cargo run --profile corpus -p tsv_debug --features audits swallow_audit ~/dev/zzz/src  # audit a real codebase
 # Also: --json. The check lives in tsv_lang::doc::swallow behind the `swallow_check`
 # cargo feature — off by default, so it's compiled out of prod wasm/cli/ffi AND
 # default tsv_debug builds (profile/perf sessions measure production-shaped render
 # code). The `swallow:audit` deno task builds it via the `audits` umbrella feature
-# (swallow_check + comment_check), so it shares one binary with comments:audit,
-# gaps:audit, and blanks:audit; `--features swallow_check` alone still works for a targeted run. Gated
-# in `deno task check` (via `swallow:audit`) over tests/fixtures.
+# (swallow_check + comment_check) under `--profile corpus`, the single build world
+# EVERY `deno task check` audit shares; `--features swallow_check` alone still works
+# for a targeted run. Gated in `deno task check` (via `swallow:audit`) over tests/fixtures.
 #
 # Coverage is every render that appends to the output buffer — the main loop AND
 # its sub-renders (fill segments, the line-suffix flush), all driving one
@@ -966,15 +966,15 @@ cargo run -p tsv_debug --features audits swallow_audit ~/dev/zzz/src   # audit a
 # structural guard on the detached comment model: nothing else forces a comment that the
 # parser produced to actually reach the output. Pure Rust, no Deno. Defaults to
 # tests/fixtures; pass dirs/files to audit real code. Exits 1 on any finding.
-cargo run -p tsv_debug --features audits comment_audit                 # audit all fixtures
-cargo run -p tsv_debug --features audits comment_audit ~/dev/zzz/src   # audit a real codebase
+cargo run --profile corpus -p tsv_debug --features audits comment_audit                # audit all fixtures
+cargo run --profile corpus -p tsv_debug --features audits comment_audit ~/dev/zzz/src  # audit a real codebase
 # Also: --json. The ledger lives in tsv_lang::comment_ledger behind the `comment_check`
 # cargo feature — off by default, so it's compiled out of prod wasm/cli/ffi AND default
 # tsv_debug builds (profile/perf sessions measure production-shaped code). The
 # `comments:audit` deno task builds it via the `audits` umbrella feature (swallow_check +
-# comment_check), sharing one binary with swallow:audit, gaps:audit, and blanks:audit; `--features
-# comment_check` alone still works for a targeted run. Gated in `deno task check` (via
-# `comments:audit`) over tests/fixtures.
+# comment_check) under `--profile corpus`, the single build world EVERY `deno task check`
+# audit shares; `--features comment_check` alone still works for a targeted run. Gated in
+# `deno task check` (via `comments:audit`) over tests/fixtures.
 #
 # Model. A format entry point (`tsv_ts::format_in`, `tsv_css`'s `format_css*`,
 # `tsv_svelte`'s `format_svelte*`) REGISTERS the comment list it is about to print — that
@@ -1010,7 +1010,7 @@ cargo run -p tsv_debug --features audits comment_audit ~/dev/zzz/src   # audit a
 cargo run --profile corpus -p tsv_debug --features audits gap_audit   # tests/fixtures
 cargo run --profile corpus -p tsv_debug --features audits gap_audit ~/dev/zzz/src
 # Also: --json, --jobs N, --limit N, --payload <one>, --all-bytes, --update.
-# Build with `--profile corpus` (release + panic=unwind): plain `--release` is
+# Build with `--profile corpus` (optimized + panic=unwind): plain `--release` is
 # panic=abort, so a formatter panic kills the process instead of being caught + reported.
 #
 # GATED as a RATCHET, not a green gate: `gap_audit_known.txt` is a machine-generated
@@ -1038,7 +1038,7 @@ ledger is the oracle, why five payloads) lives in the `gap_audit` module docs.
 cargo run --profile corpus -p tsv_debug --features audits blank_audit   # tests/fixtures
 cargo run --profile corpus -p tsv_debug --features audits blank_audit ~/dev/zzz/src
 # Also: --json, --report, --jobs N, --limit N, --update. Build with `--profile
-# corpus` (release + panic=unwind) so a formatter panic is caught + reported.
+# corpus` (optimized + panic=unwind) so a formatter panic is caught + reported.
 #
 # GATED as a RATCHET (like gap_audit): `blank_audit_known.txt` is a machine-generated
 # snapshot of the known-bug shapes, every line a bug, the file shrinking is the goal.
@@ -1325,7 +1325,7 @@ cargo run -p tsv_debug fuzz --iterations 0 ~/dev/zzz/src       # pristine pass o
 # Run at conformance cadence, or after any printer change.
 deno task idempotency:sweep
 # Absent corpus checkouts are skipped with a warning (not a failure); builds with
-# `--profile corpus` (release + panic=unwind) because the fuzzer needs catch_unwind.
+# `--profile corpus` (optimized + panic=unwind) because the fuzzer needs catch_unwind.
 ```
 
 ## Architectural Notes

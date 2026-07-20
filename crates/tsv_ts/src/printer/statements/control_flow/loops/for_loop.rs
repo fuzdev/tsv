@@ -204,7 +204,7 @@ impl<'a> Printer<'a> {
         let Some(close) = self.matching_close_paren(open) else {
             return d.concat(&[for_open, d.text(";;)")]);
         };
-        let (Some(s1), Some(s2)) = self.find_for_semicolons(open) else {
+        let (Some(s1), Some(s2)) = self.find_for_semicolons(stmt, open, Some(close)) else {
             return d.concat(&[for_open, d.text(";;)")]);
         };
 
@@ -336,8 +336,7 @@ impl<'a> Printer<'a> {
         }
 
         // Determine spans for each part
-        let init_end = stmt.init.as_ref().map(|i| self.get_for_init_span_end(i));
-        let test_end = stmt.test.as_ref().map(|t| t.span().end);
+        let (init_end, test_end) = self.for_clause_ends(stmt);
         let update_end = stmt.update.as_ref().map(|u| u.span().end);
 
         let spans = ForHeaderSpans {
@@ -398,7 +397,11 @@ impl<'a> Printer<'a> {
 
         // Find semicolon positions for proper comment boundary detection
         // The semicolons in `for (init; test; update)` are at specific positions in source
-        let (first_semi, second_semi) = self.find_for_semicolons(stmt.span.start);
+        // Anchored at the clause ends, not `stmt.span.start` — see `find_for_semicolons`.
+        // `open_paren` is only the fallback for an absent init, so a header with no open
+        // paren to find (already degenerate) keeps the previous keyword-relative behavior.
+        let (first_semi, second_semi) =
+            self.find_for_semicolons(stmt, open_paren.unwrap_or(stmt.span.start), close_paren);
 
         // Init part
         if let Some(init) = &stmt.init {
@@ -603,32 +606,51 @@ impl<'a> Printer<'a> {
         parts.extend(after);
     }
 
-    /// Find the two `;` separators in a for-header, scanning forward from
-    /// `scan_start`. Returns `(first_semi, second_semi)`; the second is only sought
-    /// once the first is found.
-    fn find_for_semicolons(&self, scan_start: u32) -> (Option<u32>, Option<u32>) {
-        // Skip any `;` inside a comment in a clause (`for (let i = 0 /* ; */; …)`).
+    /// Find the two `;` separators in a for-header. Returns `(first_semi,
+    /// second_semi)`; the second is only sought once the first is found.
+    ///
+    /// Each scan is anchored at the **end of the clause its separator follows**, taken
+    /// from the AST — never at the `for` keyword or the open paren. That is what makes
+    /// first-match correct: from a clause's own end, only trivia and closing parens can
+    /// precede the `;`, so the first hit is the separator. A scan anchored ahead of the
+    /// clause instead walks *through* its source, and `TriviaProfile::JS` skips comments
+    /// and strings but tracks **no brace depth** — so a `;` inside a nested block
+    /// (`for (let f = () => { a(); b(); } /* c */; …)`) reads as the header separator,
+    /// mis-binding that clause's trailing comments. It double-printed one. The anchor
+    /// does this work, not the profile; widening the profile would not help.
+    ///
+    /// A clause that is absent falls back to just past the preceding delimiter, where
+    /// the same adjacency holds (nothing but trivia sits between them).
+    ///
+    /// The search is bounded by `close_paren`, so a separator can never be picked up from
+    /// a *later statement*: both separators are inside the header by definition, and a
+    /// header missing one is degenerate, which every caller already handles. That also
+    /// keeps the scan O(header) rather than O(rest of file).
+    fn find_for_semicolons(
+        &self,
+        stmt: &internal::ForStatement<'_>,
+        open_paren: u32,
+        close_paren: Option<u32>,
+    ) -> (Option<u32>, Option<u32>) {
         let bytes = self.source.as_bytes();
-        let first_semi = find_char(
-            bytes,
-            scan_start as usize,
-            bytes.len(),
-            b';',
-            TriviaProfile::JS,
-        )
-        .map(|p| p as u32);
-        let second_semi = first_semi
-            .and_then(|p| {
-                find_char(
-                    bytes,
-                    (p + 1) as usize,
-                    bytes.len(),
-                    b';',
-                    TriviaProfile::JS,
-                )
-            })
-            .map(|p| p as u32);
+        let end = close_paren.map_or(bytes.len(), |c| c as usize);
+        let (init_end, test_end) = self.for_clause_ends(stmt);
+        let scan = |from: u32| {
+            find_char(bytes, from as usize, end, b';', TriviaProfile::JS).map(|p| p as u32)
+        };
+        let first_semi = scan(init_end.unwrap_or(open_paren + 1));
+        let second_semi = first_semi.and_then(|first| scan(test_end.unwrap_or(first + 1)));
         (first_semi, second_semi)
+    }
+
+    /// The end positions of the `init` and `test` clauses — the AST anchors the header's
+    /// `;` separators are located from (see [`Self::find_for_semicolons`]). Derived in one
+    /// place so the two scan call sites and the `ForHeaderSpans` build cannot disagree.
+    fn for_clause_ends(&self, stmt: &internal::ForStatement<'_>) -> (Option<u32>, Option<u32>) {
+        (
+            stmt.init.as_ref().map(|i| self.get_for_init_span_end(i)),
+            stmt.test.as_ref().map(|t| t.span().end),
+        )
     }
 
     /// Resolve where to start searching for a for-clause's leading comments: just

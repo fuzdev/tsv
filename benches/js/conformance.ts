@@ -114,7 +114,24 @@ async function run_render_audit(): Promise<void> {
 	}
 	const { status } = spawnSync(
 		'cargo',
-		['run', '--profile', 'corpus', '-q', '-p', 'tsv_debug', '--', 'render_audit', '--gate', ...dirs],
+		// `--features audits` is not needed by `render_audit` itself — it is how this
+		// leg shares the ONE `corpus` + `audits` build world every other audit uses,
+		// instead of forcing a second full compile of the same crates under a
+		// different feature set. The instrumentation it pulls in is inert unless armed.
+		[
+			'run',
+			'--profile',
+			'corpus',
+			'-q',
+			'-p',
+			'tsv_debug',
+			'--features',
+			'audits',
+			'--',
+			'render_audit',
+			'--gate',
+			...dirs,
+		],
 		{ stdio: 'inherit' },
 	);
 	if (status !== 0) Deno.exit(status ?? 1);

@@ -199,6 +199,14 @@ impl BindingAuditCommand {
         // TypeScript-family only; `.svelte`/`.css` (and intentionally-invalid
         // fixture inputs) aren't binding-audit subjects.
         files.retain(|p| is_ts_family(p) && !is_input_invalid_fixture(p));
+        // A scan with nothing in it must not read as a pass: `--gate` reports "no
+        // re-binding findings" and exits 0 on an empty set, so a typo'd path — or a
+        // tree with no TS-family files at all — would look identical to a clean run.
+        // Fail loud instead, matching `render_audit`'s "No .svelte files found".
+        if files.is_empty() {
+            eprintln!("Error: no TypeScript-family files found (searched {paths:?})");
+            return Err(CliError::Failed);
+        }
         if self.limit > 0 {
             files.truncate(self.limit);
         }
