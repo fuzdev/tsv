@@ -856,6 +856,22 @@ impl<'a> Printer<'a> {
         !comment.is_block || has_newline_before_position(self.source, comment.span.start)
     }
 
+    /// Whether a block comment in `(start, end)` sits **alone on its own physical
+    /// line** — a newline both before it ([`Self::is_own_line_comment`]) *and* after
+    /// it (toward the next comment, or `end` for the last). This is the idempotent key
+    /// for "keep the comment on its own line and break the value below it" across a
+    /// keyword/operator that itself breaks (the type-alias `=`): prettier preserves an
+    /// isolated own-line block (`type X =⏎/* c */⏎Y`) but **collapses** a block merely
+    /// glued to the value across the `=`-break (`type X =⏎/* c */ Y` → inline, then
+    /// width decides). Keying on the newline *before* alone ([`Self::is_own_line_comment`])
+    /// would spuriously force the break on already-broken output and lose idempotency —
+    /// the same hazard [`Self::comment_hangs_next`] documents.
+    pub(crate) fn block_comment_isolated_own_line_between(&self, start: u32, end: u32) -> bool {
+        self.any_comment_on_page_with_next(start, end, |c, next| {
+            c.is_block && self.is_own_line_comment(c) && self.has_newline_between(c.span.end, next)
+        })
+    }
+
     /// Whether a comment must occupy its own line rather than gluing inline to the
     /// operator that precedes it: a line comment, a multiline block, or an own-line
     /// block (a newline precedes it). This is exactly the negation of the single-line
