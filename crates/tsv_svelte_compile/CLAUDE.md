@@ -550,7 +550,13 @@ project-wide conventions.
   analysis. ⚠️ That last one checks **module scope FIRST, snippet names second**: a
   hoistable top-level snippet's binding is written INTO module scope
   (`SnippetBlock.js:40-44`), so checking the snippet set first would reject every valid
-  exported snippet.
+  exported snippet. `validate_module_exports` ALSO carries `module_illegal_default_export`
+  (`ExportNamedDeclaration.js:14-23` — an `export { x as default }` specifier, identifier
+  or string-literal, checked FIRST and NOT gated on `export.source`, unlike the snippet
+  check); the `export default X` half is refused upstream in `analyze_module_script`.
+
+  Plus `each_key_without_as` (`EachBlock.js:26-34` — an `{#each}` with a `(key)` but no
+  `as` clause, when keyed) via an `EachBlock` arm in the fragment walk.
 
   Plus the attribute rules of the oracle's single `validate_element` loop —
   `attribute_invalid_name`, `attribute_invalid_event_handler` (an `on…` attribute
@@ -640,7 +646,12 @@ chooses what to emit), two mint server-module syntax. They are listed here in
 pipeline order.
 
 - `script_ts_gate.rs` — the document-wide TypeScript flag and gate
-  (`document_ts_flag` / `refuse_template_typescript`) plus
+  (`document_ts_flag` / `refuse_template_typescript`), the
+  `<script>`-attribute-value rules (`refuse_invalid_script_attributes` — the oracle's
+  parse-time `script_invalid_context` and `script_invalid_attribute_value`, both raised
+  in ONE source-order attribute loop over both scripts, first-error-wins: a `context`
+  attribute that isn't a plain `context="module"`, and a `module` attribute carrying a
+  value — `module` must be a bare boolean), plus
   `self_check_no_typescript`, the type-erasure self-check that closes the loop on
   the finished program (see `erase.rs`). Oracle phase 1, target-independent:
   Svelte decides TypeScript at *parse* time for the whole document at once, so
