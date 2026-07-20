@@ -220,7 +220,7 @@ impl<'a> Printer<'a> {
             (None, None)
         };
 
-        // The four comment slots (before/after `?`, before/after `:`) are all empty on
+        // The operator-leading comment slots (before `?`, before `:`) are empty on
         // the comment-free common path — each gap ⊆ [test_end, alternate_start], so no
         // comment there means every slot builds to `empty()`. Build them only when the
         // ternary span carries a comment; otherwise skip the redundant per-gap scan (the
@@ -235,14 +235,6 @@ impl<'a> Printer<'a> {
                 self.build_inline_comments_between_doc(test_end, consequent_start)
             };
 
-            // Comments between ? and consequent (e.g., `b ? /* comment */ c`)
-            // Trailing space so the comment doesn't touch the consequent
-            let comments_after_question = if let Some(q) = question_pos {
-                self.build_inline_comments_between_doc_trailing_space(q + 1, consequent_start)
-            } else {
-                d.empty()
-            };
-
             // Comments between consequent and : (e.g., `b ? c /* comment */ : d`)
             let comments_before_colon = if let Some(c) = colon_pos {
                 self.build_inline_comments_between_doc(consequent_end, c)
@@ -250,20 +242,17 @@ impl<'a> Printer<'a> {
                 d.empty()
             };
 
-            // Comments between : and alternate (e.g., `c : /* comment */ d`)
-            let comments_after_colon = if let Some(c) = colon_pos {
-                self.build_inline_comments_between_doc_trailing_space(c + 1, alternate_start)
-            } else {
-                d.empty()
-            };
-
-            (
-                comments_before_question,
-                comments_after_question,
-                comments_before_colon,
-                comments_after_colon,
-            )
+            (comments_before_question, comments_before_colon)
         });
+
+        // Branch-gap comment runs (`? /* c */ b`, `: /* c */ c`): each comment's
+        // separator is keyed on the source after it — glued stays glued, an authored
+        // break becomes a collapsible line that holds while the ternary is broken and
+        // yields when it is flat (`build_branch_comment_run`). A nested-conditional
+        // branch levels itself, so its soft separator shifts only the first line
+        // (`indent(line)`); a normal branch's run rides inside the branch's own
+        // structural indent with a bare `line`, so the value and its continuations
+        // land one level past the operator.
 
         // Handle nested conditional in consequent specially:
         // - When flat: parens for parsing `a ? (b ? c : d) : e`
@@ -274,9 +263,13 @@ impl<'a> Printer<'a> {
         // conditionals handle their own indentation, so no extra wrapper.
         let consequent_doc =
             if let internal::Expression::ConditionalExpression(nested) = cond.consequent {
+                let run = question_pos.and_then(|q| {
+                    self.build_branch_comment_run(q + 1, consequent_start, d.indent(d.line()))
+                });
                 // Broken version: continue chain without parens
                 let broken_consequent =
                     self.build_conditional_doc_impl(nested, true, indent_binary_test);
+                let broken_consequent = self.prepend_opt(run, broken_consequent);
                 if d.will_break(consequent) {
                     // Consequent forces breaking (e.g., line comments produce hardlines).
                     // Skip if_break and use broken layout directly — the outer group
@@ -286,11 +279,14 @@ impl<'a> Printer<'a> {
                     broken_consequent
                 } else {
                     // Normal if_break: parens when flat, chain when broken
-                    let flat_consequent = d.parens(consequent);
+                    let flat_consequent = self.prepend_opt(run, d.parens(consequent));
                     d.if_break(broken_consequent, flat_consequent)
                 }
             } else {
-                d.indent(self.parenthesize_ternary_branch(cond.consequent, consequent))
+                let run = question_pos
+                    .and_then(|q| self.build_branch_comment_run(q + 1, consequent_start, d.line()));
+                let branch = self.parenthesize_ternary_branch(cond.consequent, consequent);
+                d.indent(self.prepend_opt(run, branch))
             };
 
         // Handle nested conditional in alternate: continue the chain
@@ -300,37 +296,36 @@ impl<'a> Printer<'a> {
         // - `??` needs parens for clarity: `a ? b : (c ?? d)`
         let alternate_doc =
             if let internal::Expression::ConditionalExpression(nested) = cond.alternate {
+                let run = colon_pos.and_then(|c| {
+                    self.build_branch_comment_run(c + 1, alternate_start, d.indent(d.line()))
+                });
                 // Recursively build as chained (no group wrapper, no parens)
                 // No indent wrapper - nested conditional has its own structure
-                self.build_conditional_doc_impl(nested, true, indent_binary_test)
+                let nested_doc = self.build_conditional_doc_impl(nested, true, indent_binary_test);
+                self.prepend_opt(run, nested_doc)
             } else {
+                let run = colon_pos
+                    .and_then(|c| self.build_branch_comment_run(c + 1, alternate_start, d.line()));
                 let alternate = self.build_ternary_branch_expr_doc(
                     cond.alternate,
                     indent_binary_test,
                     cond.span.end,
                 );
-                d.indent(self.parenthesize_ternary_branch(cond.alternate, alternate))
+                let branch = self.parenthesize_ternary_branch(cond.alternate, alternate);
+                d.indent(self.prepend_opt(run, branch))
             };
 
-        let inner = if let Some((
-            comments_before_question,
-            comments_after_question,
-            comments_before_colon,
-            comments_after_colon,
-        )) = comment_slots
-        {
+        let inner = if let Some((comments_before_question, comments_before_colon)) = comment_slots {
             d.concat(&[
                 test,
                 comments_before_question,
                 d.indent(d.concat(&[
                     d.line(),
                     d.text("? "),
-                    comments_after_question,
                     consequent_doc,
                     comments_before_colon,
                     d.line(),
                     d.text(": "),
-                    comments_after_colon,
                     alternate_doc,
                 ])),
             ])

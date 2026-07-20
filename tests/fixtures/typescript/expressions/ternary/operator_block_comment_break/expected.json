@@ -1,0 +1,1716 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1953,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Broken ternary: a block comment after `:` keeps its authored break; the value",
+			"start": 10,
+			"end": 90,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " stays on its own line at the branch indent",
+			"start": 92,
+			"end": 137,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 46
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 256,
+			"end": 263,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 4
+				},
+				"end": {
+					"line": 6,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Same on the `?` branch",
+			"start": 289,
+			"end": 314,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 374,
+			"end": 381,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 4
+				},
+				"end": {
+					"line": 11,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Glued control: a comment the author kept on the value's line stays glued",
+			"start": 466,
+			"end": 541,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 660,
+			"end": 667,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 4
+				},
+				"end": {
+					"line": 18,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " JSDoc @param before an arrow alternate: broken by the multiline body, not width",
+			"start": 690,
+			"end": 772,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @param {string} a ",
+			"start": 808,
+			"end": 832,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 4
+				},
+				"end": {
+					"line": 23,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Chained: a comment on the middle branch keeps its break",
+			"start": 879,
+			"end": 937,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
+					"column": 59
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 1056,
+			"end": 1063,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 4
+				},
+				"end": {
+					"line": 31,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A multiline block comment keeps its break; a glued multiline block keeps its value glued",
+			"start": 1173,
+			"end": 1264,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 1
+				},
+				"end": {
+					"line": 36,
+					"column": 92
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1\n\t c2 ",
+			"start": 1324,
+			"end": 1339,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 4
+				},
+				"end": {
+					"line": 39,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1\n\t c2 ",
+			"start": 1399,
+			"end": 1414,
+			"loc": {
+				"start": {
+					"line": 40,
+					"column": 4
+				},
+				"end": {
+					"line": 41,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Two comments: each picks its own separator from the source after it",
+			"start": 1440,
+			"end": 1510,
+			"loc": {
+				"start": {
+					"line": 44,
+					"column": 1
+				},
+				"end": {
+					"line": 44,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 1629,
+			"end": 1637,
+			"loc": {
+				"start": {
+					"line": 47,
+					"column": 4
+				},
+				"end": {
+					"line": 47,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 1641,
+			"end": 1649,
+			"loc": {
+				"start": {
+					"line": 48,
+					"column": 3
+				},
+				"end": {
+					"line": 48,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Nested consequent behind a breaking comment: chain breaks, parens drop",
+			"start": 1672,
+			"end": 1745,
+			"loc": {
+				"start": {
+					"line": 50,
+					"column": 1
+				},
+				"end": {
+					"line": 50,
+					"column": 74
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 1805,
+			"end": 1812,
+			"loc": {
+				"start": {
+					"line": 52,
+					"column": 4
+				},
+				"end": {
+					"line": 52,
+					"column": 11
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1952,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 1943,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 57,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 139,
+					"end": 286,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 22
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 145,
+							"end": 285,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 7,
+									"column": 21
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 145,
+								"end": 146,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 149,
+								"end": 285,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 11
+									},
+									"end": {
+										"line": 7,
+										"column": 21
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 149,
+									"end": 192,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 11
+										},
+										"end": {
+											"line": 4,
+											"column": 54
+										}
+									},
+									"name": "condAaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 197,
+									"end": 251,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 4
+										},
+										"end": {
+											"line": 5,
+											"column": 58
+										}
+									},
+									"name": "consequentBbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 267,
+									"end": 285,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 3
+										},
+										"end": {
+											"line": 7,
+											"column": 21
+										}
+									},
+									"name": "alternateCcccccccc",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 256,
+											"end": 263
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Broken ternary: a block comment after `:` keeps its authored break; the value",
+							"start": 10,
+							"end": 90
+						},
+						{
+							"type": "Line",
+							"value": " stays on its own line at the branch indent",
+							"start": 92,
+							"end": 137
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 316,
+					"end": 463,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 23
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 322,
+							"end": 462,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 7
+								},
+								"end": {
+									"line": 13,
+									"column": 22
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 322,
+								"end": 323,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 7
+									},
+									"end": {
+										"line": 10,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 326,
+								"end": 462,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 11
+									},
+									"end": {
+										"line": 13,
+										"column": 22
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 326,
+									"end": 369,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 11
+										},
+										"end": {
+											"line": 10,
+											"column": 54
+										}
+									},
+									"name": "condAaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 385,
+									"end": 439,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 3
+										},
+										"end": {
+											"line": 12,
+											"column": 57
+										}
+									},
+									"name": "consequentBbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 374,
+											"end": 381
+										}
+									]
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 444,
+									"end": 462,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 4
+										},
+										"end": {
+											"line": 13,
+											"column": 22
+										}
+									},
+									"name": "alternateCcccccccc"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Same on the `?` branch",
+							"start": 289,
+							"end": 314
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 543,
+					"end": 687,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 31
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 549,
+							"end": 686,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 7
+								},
+								"end": {
+									"line": 18,
+									"column": 30
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 549,
+								"end": 550,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 7
+									},
+									"end": {
+										"line": 16,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 553,
+								"end": 686,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 11
+									},
+									"end": {
+										"line": 18,
+										"column": 30
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 553,
+									"end": 596,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 11
+										},
+										"end": {
+											"line": 16,
+											"column": 54
+										}
+									},
+									"name": "condAaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 601,
+									"end": 655,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 4
+										},
+										"end": {
+											"line": 17,
+											"column": 58
+										}
+									},
+									"name": "consequentBbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 668,
+									"end": 686,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 12
+										},
+										"end": {
+											"line": 18,
+											"column": 30
+										}
+									},
+									"name": "alternateCcccccccc",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 660,
+											"end": 667
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Glued control: a comment the author kept on the value's line stays glued",
+							"start": 466,
+							"end": 541
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 774,
+					"end": 876,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 5
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 780,
+							"end": 875,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 7
+								},
+								"end": {
+									"line": 26,
+									"column": 4
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 780,
+								"end": 781,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 7
+									},
+									"end": {
+										"line": 21,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 784,
+								"end": 875,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 11
+									},
+									"end": {
+										"line": 26,
+										"column": 4
+									}
+								},
+								"test": {
+									"type": "MemberExpression",
+									"start": 784,
+									"end": 791,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 11
+										},
+										"end": {
+											"line": 21,
+											"column": 18
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 784,
+										"end": 786,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 11
+											},
+											"end": {
+												"line": 21,
+												"column": 13
+											}
+										},
+										"name": "fn"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 787,
+										"end": 791,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 14
+											},
+											"end": {
+												"line": 21,
+												"column": 18
+											}
+										},
+										"name": "prop"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"consequent": {
+									"type": "MemberExpression",
+									"start": 796,
+									"end": 803,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 4
+										},
+										"end": {
+											"line": 22,
+											"column": 11
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 796,
+										"end": 798,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 4
+											},
+											"end": {
+												"line": 22,
+												"column": 6
+											}
+										},
+										"name": "fn"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 799,
+										"end": 803,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 7
+											},
+											"end": {
+												"line": 22,
+												"column": 11
+											}
+										},
+										"name": "prop"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"alternate": {
+									"type": "ArrowFunctionExpression",
+									"start": 836,
+									"end": 875,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 3
+										},
+										"end": {
+											"line": 26,
+											"column": 4
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 837,
+											"end": 838,
+											"loc": {
+												"start": {
+													"line": 24,
+													"column": 4
+												},
+												"end": {
+													"line": 24,
+													"column": 5
+												}
+											},
+											"name": "a"
+										}
+									],
+									"body": {
+										"type": "BlockStatement",
+										"start": 843,
+										"end": 875,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 10
+											},
+											"end": {
+												"line": 26,
+												"column": 4
+											}
+										},
+										"body": [
+											{
+												"type": "ReturnStatement",
+												"start": 849,
+												"end": 870,
+												"loc": {
+													"start": {
+														"line": 25,
+														"column": 4
+													},
+													"end": {
+														"line": 25,
+														"column": 25
+													}
+												},
+												"argument": {
+													"type": "MemberExpression",
+													"start": 856,
+													"end": 869,
+													"loc": {
+														"start": {
+															"line": 25,
+															"column": 11
+														},
+														"end": {
+															"line": 25,
+															"column": 24
+														}
+													},
+													"object": {
+														"type": "CallExpression",
+														"start": 856,
+														"end": 867,
+														"loc": {
+															"start": {
+																"line": 25,
+																"column": 11
+															},
+															"end": {
+																"line": 25,
+																"column": 22
+															}
+														},
+														"callee": {
+															"type": "MemberExpression",
+															"start": 856,
+															"end": 864,
+															"loc": {
+																"start": {
+																	"line": 25,
+																	"column": 11
+																},
+																"end": {
+																	"line": 25,
+																	"column": 19
+																}
+															},
+															"object": {
+																"type": "Identifier",
+																"start": 856,
+																"end": 858,
+																"loc": {
+																	"start": {
+																		"line": 25,
+																		"column": 11
+																	},
+																	"end": {
+																		"line": 25,
+																		"column": 13
+																	}
+																},
+																"name": "fn"
+															},
+															"property": {
+																"type": "Identifier",
+																"start": 859,
+																"end": 864,
+																"loc": {
+																	"start": {
+																		"line": 25,
+																		"column": 14
+																	},
+																	"end": {
+																		"line": 25,
+																		"column": 19
+																	}
+																},
+																"name": "parse"
+															},
+															"computed": false,
+															"optional": false
+														},
+														"arguments": [
+															{
+																"type": "Identifier",
+																"start": 865,
+																"end": 866,
+																"loc": {
+																	"start": {
+																		"line": 25,
+																		"column": 20
+																	},
+																	"end": {
+																		"line": 25,
+																		"column": 21
+																	}
+																},
+																"name": "a"
+															}
+														],
+														"optional": false
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 868,
+														"end": 869,
+														"loc": {
+															"start": {
+																"line": 25,
+																"column": 23
+															},
+															"end": {
+																"line": 25,
+																"column": 24
+															}
+														},
+														"name": "b"
+													},
+													"computed": false,
+													"optional": false
+												}
+											}
+										]
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": "* @param {string} a ",
+											"start": 808,
+											"end": 832
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " JSDoc @param before an arrow alternate: broken by the multiline body, not width",
+							"start": 690,
+							"end": 772
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 939,
+					"end": 1170,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 1
+						},
+						"end": {
+							"line": 34,
+							"column": 18
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 945,
+							"end": 1169,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 7
+								},
+								"end": {
+									"line": 34,
+									"column": 17
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 945,
+								"end": 946,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 7
+									},
+									"end": {
+										"line": 29,
+										"column": 8
+									}
+								},
+								"name": "e"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 949,
+								"end": 1169,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 11
+									},
+									"end": {
+										"line": 34,
+										"column": 17
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 949,
+									"end": 992,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 11
+										},
+										"end": {
+											"line": 29,
+											"column": 54
+										}
+									},
+									"name": "condAaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 997,
+									"end": 1051,
+									"loc": {
+										"start": {
+											"line": 30,
+											"column": 4
+										},
+										"end": {
+											"line": 30,
+											"column": 58
+										}
+									},
+									"name": "consequentBbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+								},
+								"alternate": {
+									"type": "ConditionalExpression",
+									"start": 1067,
+									"end": 1169,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 3
+										},
+										"end": {
+											"line": 34,
+											"column": 17
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 1067,
+										"end": 1107,
+										"loc": {
+											"start": {
+												"line": 32,
+												"column": 3
+											},
+											"end": {
+												"line": 32,
+												"column": 43
+											}
+										},
+										"name": "condDddddddddddddddddddddddddddddddddddd"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 1113,
+										"end": 1151,
+										"loc": {
+											"start": {
+												"line": 33,
+												"column": 5
+											},
+											"end": {
+												"line": 33,
+												"column": 43
+											}
+										},
+										"name": "consequentEeeeeeeeeeeeeeeeeeeeeeeeeeee"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 1157,
+										"end": 1169,
+										"loc": {
+											"start": {
+												"line": 34,
+												"column": 5
+											},
+											"end": {
+												"line": 34,
+												"column": 17
+											}
+										},
+										"name": "alternateFff"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 1056,
+											"end": 1063
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Chained: a comment on the middle branch keeps its break",
+							"start": 879,
+							"end": 937
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1266,
+					"end": 1437,
+					"loc": {
+						"start": {
+							"line": 37,
+							"column": 1
+						},
+						"end": {
+							"line": 42,
+							"column": 22
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1272,
+							"end": 1436,
+							"loc": {
+								"start": {
+									"line": 37,
+									"column": 7
+								},
+								"end": {
+									"line": 42,
+									"column": 21
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1272,
+								"end": 1273,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 7
+									},
+									"end": {
+										"line": 37,
+										"column": 8
+									}
+								},
+								"name": "f"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 1276,
+								"end": 1436,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 11
+									},
+									"end": {
+										"line": 42,
+										"column": 21
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 1276,
+									"end": 1319,
+									"loc": {
+										"start": {
+											"line": 37,
+											"column": 11
+										},
+										"end": {
+											"line": 37,
+											"column": 54
+										}
+									},
+									"name": "condAaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 1340,
+									"end": 1394,
+									"loc": {
+										"start": {
+											"line": 39,
+											"column": 10
+										},
+										"end": {
+											"line": 39,
+											"column": 64
+										}
+									},
+									"name": "consequentBbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c1\n\t c2 ",
+											"start": 1324,
+											"end": 1339
+										}
+									]
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 1418,
+									"end": 1436,
+									"loc": {
+										"start": {
+											"line": 42,
+											"column": 3
+										},
+										"end": {
+											"line": 42,
+											"column": 21
+										}
+									},
+									"name": "alternateCcccccccc",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c1\n\t c2 ",
+											"start": 1399,
+											"end": 1414
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A multiline block comment keeps its break; a glued multiline block keeps its value glued",
+							"start": 1173,
+							"end": 1264
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1512,
+					"end": 1669,
+					"loc": {
+						"start": {
+							"line": 45,
+							"column": 1
+						},
+						"end": {
+							"line": 48,
+							"column": 31
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1518,
+							"end": 1668,
+							"loc": {
+								"start": {
+									"line": 45,
+									"column": 7
+								},
+								"end": {
+									"line": 48,
+									"column": 30
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1518,
+								"end": 1519,
+								"loc": {
+									"start": {
+										"line": 45,
+										"column": 7
+									},
+									"end": {
+										"line": 45,
+										"column": 8
+									}
+								},
+								"name": "g"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 1522,
+								"end": 1668,
+								"loc": {
+									"start": {
+										"line": 45,
+										"column": 11
+									},
+									"end": {
+										"line": 48,
+										"column": 30
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 1522,
+									"end": 1565,
+									"loc": {
+										"start": {
+											"line": 45,
+											"column": 11
+										},
+										"end": {
+											"line": 45,
+											"column": 54
+										}
+									},
+									"name": "condAaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 1570,
+									"end": 1624,
+									"loc": {
+										"start": {
+											"line": 46,
+											"column": 4
+										},
+										"end": {
+											"line": 46,
+											"column": 58
+										}
+									},
+									"name": "consequentBbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 1650,
+									"end": 1668,
+									"loc": {
+										"start": {
+											"line": 48,
+											"column": 12
+										},
+										"end": {
+											"line": 48,
+											"column": 30
+										}
+									},
+									"name": "alternateCcccccccc",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c1 ",
+											"start": 1629,
+											"end": 1637
+										},
+										{
+											"type": "Block",
+											"value": " c2 ",
+											"start": 1641,
+											"end": 1649
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Two comments: each picks its own separator from the source after it",
+							"start": 1440,
+							"end": 1510
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1747,
+					"end": 1942,
+					"loc": {
+						"start": {
+							"line": 51,
+							"column": 1
+						},
+						"end": {
+							"line": 56,
+							"column": 23
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1753,
+							"end": 1941,
+							"loc": {
+								"start": {
+									"line": 51,
+									"column": 7
+								},
+								"end": {
+									"line": 56,
+									"column": 22
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1753,
+								"end": 1754,
+								"loc": {
+									"start": {
+										"line": 51,
+										"column": 7
+									},
+									"end": {
+										"line": 51,
+										"column": 8
+									}
+								},
+								"name": "h"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 1757,
+								"end": 1941,
+								"loc": {
+									"start": {
+										"line": 51,
+										"column": 11
+									},
+									"end": {
+										"line": 56,
+										"column": 22
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 1757,
+									"end": 1800,
+									"loc": {
+										"start": {
+											"line": 51,
+											"column": 11
+										},
+										"end": {
+											"line": 51,
+											"column": 54
+										}
+									},
+									"name": "condAaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+								},
+								"consequent": {
+									"type": "ConditionalExpression",
+									"start": 1816,
+									"end": 1918,
+									"loc": {
+										"start": {
+											"line": 53,
+											"column": 3
+										},
+										"end": {
+											"line": 55,
+											"column": 17
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 1816,
+										"end": 1856,
+										"loc": {
+											"start": {
+												"line": 53,
+												"column": 3
+											},
+											"end": {
+												"line": 53,
+												"column": 43
+											}
+										},
+										"name": "condDddddddddddddddddddddddddddddddddddd"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 1862,
+										"end": 1900,
+										"loc": {
+											"start": {
+												"line": 54,
+												"column": 5
+											},
+											"end": {
+												"line": 54,
+												"column": 43
+											}
+										},
+										"name": "consequentEeeeeeeeeeeeeeeeeeeeeeeeeeee"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 1906,
+										"end": 1918,
+										"loc": {
+											"start": {
+												"line": 55,
+												"column": 5
+											},
+											"end": {
+												"line": 55,
+												"column": 17
+											}
+										},
+										"name": "alternateFff"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 1805,
+											"end": 1812
+										}
+									]
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 1923,
+									"end": 1941,
+									"loc": {
+										"start": {
+											"line": 56,
+											"column": 4
+										},
+										"end": {
+											"line": 56,
+											"column": 22
+										}
+									},
+									"name": "alternateCcccccccc"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Nested consequent behind a breaking comment: chain breaks, parens drop",
+							"start": 1672,
+							"end": 1745
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
