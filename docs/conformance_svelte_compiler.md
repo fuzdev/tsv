@@ -95,11 +95,42 @@ same component otherwise byte-for-byte — reaches full parity, the comment vani
 entirely rather than moving. Every occurrence found by `compile_fuzz` had the module
 script second.
 
-tsv's behavior (omitting the comment) is the more defensible one, and the parity bar's
+tsv's behavior (omitting the comment) is the more defensible one, but the parity bar's
 comment-position tolerance does not cover this — the comment crosses into an unrelated
 subtree, which is a comment *presence* difference in that subtree, not a position one.
-No fixture is proposed: the shape is an oracle print artifact, and pinning it would pin
-esrap's offset behavior rather than anything about tsv.
+So it is a MISMATCH, and "more defensible" does not exempt it: **tsv now refuses the
+whole ordering** (`Refusal::ModuleCommentAfterInstanceScript`) rather than emit differing
+output. Any comment inside a `<script module>` whose content starts after the instance
+`<script>`'s refuses, whatever the template does with it.
+
+The refusal is deliberately coarser than the mismatch. The true trigger also needs a
+loc-bearing emitted node *after* the comment for esrap to flush it into — established by
+probe: a document with no emitted template expression, one whose expression statically
+folds away, and one whose expression sits *before* the module script are each parity
+today. Modelling "an emitted, unfolded, loc-bearing expression at a later offset" would
+put an under-refusal (a MISMATCH) one emission change away, so the refusal keys on source
+order alone. Measured cost over the compile corpus: **zero** — the bucket appears in no
+file's refusal list and the parity / refused / fenced totals are unchanged.
+
+⚠️ This closes only the module→instance **ordering**, and it does **not** make two-script
+documents safe. The same esrap index-recovery fires on a **second, independent axis**: a
+**block-bearing statement earlier in the module body** re-seeks the index back over the
+comment. The refusal above keys on script ORDER; that axis keys on a PRECEDING BLOCK, and
+the two are orthogonal — a module script placed **first**, with an instance script
+present, still mismatches whenever a `function` / `class` / `if (1) {}` precedes the
+comment in the module body. Live-probed against the pinned oracle, with the instance
+script's own template holding a `{x}` read, a `$props()` member read, and **no expression
+at all** — all three mismatch, the oracle emitting `// c` that tsv drops. It is not a
+no-instance-script shape; it is a preceding-block shape that a second script neither
+causes nor prevents. Still open, with the probed boundary recorded in
+[checklist_svelte_compiler.md §The open half](checklist_svelte_compiler.md#the-open-half-a-module-comment-recovered-by-a-preceding-block).
+
+No fixture is proposed: a refusal is not expressible as a compile fixture (those require
+a successful compile), and the shape is an oracle print artifact — pinning its *output*
+would pin esrap's offset behavior rather than anything about tsv. The refusal and its
+parity-side mirror are pinned as unit tests
+(`compile_refuses_module_comment_after_instance_script`,
+`compile_module_comment_before_instance_script_still_drops`).
 
 ### `$`-prefixed class-expression id compiles to invalid JS
 

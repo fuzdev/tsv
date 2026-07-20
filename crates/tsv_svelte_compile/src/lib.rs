@@ -123,6 +123,14 @@ pub enum CompileError {
     /// instead of returning the mis-compiled module.
     #[error("TypeScript survived erasure into the generated JS (compiler bug) at {0:?}")]
     TypeErasureLeak(tsv_lang::Span),
+    /// A generated name the transform assigns upfront was missing from its table
+    /// at emission — the upfront walk lost a fragment the emission path reached.
+    /// Always a compiler bug. Surfaced loudly rather than falling back to the
+    /// unsuffixed name: a guessed generated name is *silently correct* whenever
+    /// the document happens to need only the first one, so the fallback would
+    /// hide the very table-population bug it is standing in for.
+    #[error("a generated name was not assigned upfront (compiler bug) at {0:?}")]
+    GeneratedNameMissing(tsv_lang::Span),
 }
 
 /// An error from [`canonicalize_js`].

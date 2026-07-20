@@ -54,20 +54,18 @@ use tsv_lang::{Comment, Span};
 use tsv_svelte::ast::internal::{Element, Root, SpecialElement};
 use tsv_ts::ast::internal::{
     BlockStatement, ExportDefaultDeclaration, ExportDefaultValue, Expression, ExpressionStatement,
-    FunctionDeclaration, ImportSpecifier, ObjectExpression, ObjectProperty, Property, PropertyKind,
-    Statement, VariableDeclaration, VariableDeclarationKind,
+    FunctionDeclaration, ObjectExpression, ObjectProperty, Property, PropertyKind, Statement,
+    VariableDeclaration, VariableDeclarationKind,
 };
 
-use crate::analyze::{
-    Bindings, NameSet, RuneInit, Scope, ScopeEntry, classify_rune_init, pattern_binding_names,
-};
-use crate::blocks::declaration_stmt;
+use crate::analyze::{Bindings, NameSet, RuneInit, Scope, ScopeEntry, classify_rune_init};
+use crate::blocks::{self, declaration_stmt};
 use crate::build::Builder;
 use crate::css_scope::{CssScoping, analyze_style, match_scope, splice_scoped_css};
 use crate::element_census::build_census;
 use crate::fragment::{BodyBuilder, FragmentCtx, emit_fragment};
 use crate::namespace::{FragmentParent, Namespace, infer_namespace};
-use crate::needs_context::{ComponentContext, analyze_component};
+use crate::needs_context::{ComponentContext, analyze_component, collect_constant_names};
 use crate::script_rewrite::{
     BindableEntry, analyze_module_script, analyze_script, collect_script_comments,
     document_ts_flag, identifier_binding_name, plain_identifier_name, refuse_rune_store_collision,
@@ -122,8 +120,10 @@ pub(crate) struct EmitEnv<'arena, 's> {
     /// Active block-scope overlays (each items/indexes, `{:then}` values,
     /// `{@const}` bindings), innermost last.
     pub(crate) overlays: Vec<HashMap<String, ScopeEntry<'arena>>>,
-    /// Inside an `{#each}` body — a nested each would need the oracle's
-    /// unique-name allocation order, which is not confidently reproducible.
+    /// Inside an `{#each}` body — a nested each refuses. Not because the oracle's
+    /// unique-name allocation order is unreachable (it is modelled; see
+    /// [`Refusal::NestedEach`]) but because the rest of the nested emission path
+    /// carries no coverage.
     pub(crate) in_each: bool,
     /// The one element position an `animate:` directive is legal: the span of the
     /// sole non-trivial child of the enclosing keyed `{#each}` body (decided in
@@ -131,11 +131,15 @@ pub(crate) struct EmitEnv<'arena, 's> {
     /// element's span against this to accept exactly that placement; every other
     /// `animate:` refuses (the oracle's phase-2 placement check).
     pub(crate) animate_host_span: Option<Span>,
-    /// Source-order counters for the oracle's per-each unique names
-    /// (`each_array`/`each_array_1`, `$$index`/`$$index_1`), advanced once per
-    /// each block regardless of an authored index.
+    /// Source-order counter for the oracle's per-each `each_array` name
+    /// (`each_array`/`each_array_1`), advanced once per emitted each block. The
+    /// oracle mints it in the transform, so emission order IS its order.
     each_array_count: usize,
-    index_count: usize,
+    /// The `$$index` name of every `{#each}` in the component, keyed by block
+    /// span. Assigned upfront by [`blocks::assign_each_index_names`] because the
+    /// oracle mints it in the **scope** pass — post-order, and over regions the
+    /// SSR transform drops — so emission order is the wrong order for it.
+    each_index_names: HashMap<(u32, u32), String>,
     /// The snippet hoist analysis: which top-level snippets go to module scope,
     /// and every snippet name (render-callee classification, name collisions).
     pub(crate) snippets: SnippetAnalysis,
@@ -244,15 +248,30 @@ impl<'arena> EmitEnv<'arena, '_> {
         }
     }
 
-    /// The `$$index` unique name for the next index-less `{#each}`.
-    pub(crate) fn next_index_name(&mut self) -> String {
-        let n = self.index_count;
-        self.index_count += 1;
-        if n == 0 {
-            "$$index".to_string()
-        } else {
-            format!("$$index_{n}")
-        }
+    /// The `$$index` name assigned upfront to the `{#each}` block at `span`.
+    ///
+    /// The upfront walk rides the exhaustive `each_child_fragment` seam, so every
+    /// `{#each}` the parse produced is in the table and a miss cannot happen for a
+    /// block reached through emission. A miss would mean the walk lost a fragment
+    /// kind — a compiler bug, surfaced as [`CompileError::GeneratedNameMissing`]
+    /// rather than guessed. Falling back to the unsuffixed `$$index` would be
+    /// *silently correct* in every single-`{#each}` document and a MISMATCH only
+    /// in a multi-each one, so the guess would hide the table-population bug in
+    /// exactly the documents most likely to be probed first.
+    ///
+    /// # Errors
+    ///
+    /// [`CompileError::GeneratedNameMissing`] when `span` is not in the table.
+    pub(crate) fn each_index_name(&self, span: Span) -> Result<String, CompileError> {
+        let key = (span.start, span.end);
+        debug_assert!(
+            self.each_index_names.contains_key(&key),
+            "every {{#each}} must have been assigned a $$index name upfront"
+        );
+        self.each_index_names
+            .get(&key)
+            .cloned()
+            .ok_or(CompileError::GeneratedNameMissing(span))
     }
 }
 
@@ -321,6 +340,10 @@ pub(crate) struct Analysis<'arena> {
     /// [`EmitEnv::erase`] borrow point and stays `EmitEnv`-only — see that
     /// field. Precomputing it is a deferred option, not this slice's.)
     pub(crate) erased_windows: Vec<Span>,
+    /// The `$$index` generated name of every `{#each}` in the component, keyed by
+    /// block span — the oracle's scope-pass, post-order allocation. See
+    /// [`blocks::assign_each_index_names`].
+    pub(crate) each_index_names: HashMap<(u32, u32), String>,
 }
 
 /// Run the component's order-independent analysis passes.
@@ -494,6 +517,8 @@ fn analyze<'arena>(
     // `compile_server` for the script guard / store rewrite / template walk).
     let store_names: NameSet = bindings.names().map(str::to_string).collect();
 
+    let unassignable_names = collect_constant_names(instance_body, module_body, source);
+
     // The whole-component analysis, over instance + module + template. Computed
     // here because the script rewrite needs its `uses_slots` (the `$props()` rest
     // injection renames its destructured `$$slots` to `$$slots_` when the injected
@@ -501,7 +526,14 @@ fn analyze<'arena>(
     // would be invalid JS). Its error is deliberately left UNRESOLVED (see
     // `Analysis::component`): the script-loop refusals must keep winning for
     // inputs that trip both.
-    let component = analyze_component(root, source, instance_body, module_body, &store_names);
+    let component = analyze_component(
+        root,
+        source,
+        instance_body,
+        module_body,
+        &store_names,
+        &unassignable_names,
+    );
 
     // Top-level `$state`/`$state.raw` binding names — a component named after one
     // is dynamic (see `component_dynamic`).
@@ -533,48 +565,6 @@ fn analyze<'arena>(
         }
     }
 
-    // The names a `bind:` may not write to. The oracle keys `constant_binding` on
-    // the DECLARATION KEYWORD, not on inferred reassignability — an `import` local,
-    // or a `const` binding whose kind is not `each`
-    // (`phases/2-analyze/visitors/shared/utils.js:82-105`) — so a
-    // `const c = $state(0)` is refused as a bind target despite being reactive.
-    // That is why this is its own set and not a filter on `state_names`.
-    //
-    // Spans BOTH bodies, like `import_names` above: the declaration keyword is what
-    // the rule reads, and a module-script `const`/import is exactly as unrebindable
-    // as an instance one.
-    let mut unassignable_names = NameSet::default();
-    for stmt in instance_body.iter().chain(module_body.iter()) {
-        match stmt {
-            Statement::VariableDeclaration(decl) if decl.kind == VariableDeclarationKind::Const => {
-                for declarator in decl.declarations {
-                    // Best-effort: a pattern this cannot enumerate is one
-                    // `analyze_declarator` refuses anyway, so nothing reaches a
-                    // bind gate unnamed.
-                    let mut names = Vec::new();
-                    if pattern_binding_names(&declarator.id, source, &mut names).is_ok() {
-                        for name in names {
-                            unassignable_names.insert(name);
-                        }
-                    }
-                }
-            }
-            Statement::ImportDeclaration(import) => {
-                for spec in import.specifiers {
-                    let local = match spec {
-                        ImportSpecifier::Default(s) => &s.local,
-                        ImportSpecifier::Named(s) => &s.local,
-                        ImportSpecifier::Namespace(s) => &s.local,
-                    };
-                    if let Some(name) = plain_identifier_name(local, source) {
-                        unassignable_names.insert(name);
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-
     Ok(Analysis {
         bindings,
         derived_names,
@@ -588,6 +578,7 @@ fn analyze<'arena>(
         module_body,
         script_comments,
         erased_windows,
+        each_index_names: blocks::assign_each_index_names(&root.fragment),
     })
 }
 
@@ -612,6 +603,7 @@ pub(crate) fn compile_server<'arena>(
         module_body,
         script_comments,
         erased_windows,
+        each_index_names,
     } = analyze(root, source, arena)?;
 
     // Every top-level binding name is a candidate store base: `$name` is a store
@@ -867,7 +859,7 @@ pub(crate) fn compile_server<'arena>(
         in_each: false,
         animate_host_span: None,
         each_array_count: 0,
-        index_count: 0,
+        each_index_names,
         snippets,
         hoisted_snippets: Vec::new(),
         erased_windows: Vec::new(),

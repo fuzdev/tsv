@@ -44,8 +44,21 @@ use crate::{CompileError, Refusal, erase};
 ///   emission of synthetic spans.
 ///
 /// A comment inside the **module** script's content span is DROPPED (skipped, not
-/// carried and not refused): the oracle drops every module-script comment, so
-/// emitting the module body comment-free reproduces the drop as parity.
+/// carried and not refused) when the module script comes **first**: the oracle's
+/// printer has already advanced its comment index past it, so emitting the module
+/// body comment-free reproduces the drop as parity. With the module script
+/// **second** the index is re-seeked backward onto the comment and the oracle
+/// re-attaches it into a template expression, so that ordering refuses
+/// ([`Refusal::ModuleCommentAfterInstanceScript`]).
+///
+/// ⚠️ That module-first drop is parity only while nothing ELSE re-seeks the index.
+/// A second, INDEPENDENT axis does: a block-bearing statement earlier in the module
+/// body carries a `loc`, so opening it seeks the index back over the comment and the
+/// oracle emits it. The refusal keys on script ORDER and does not cover this — a
+/// module-first document, with or without an instance script, still mismatches when
+/// a `function` / `class` / `if (1) {}` precedes the comment. See
+/// `docs/checklist_svelte_compiler.md` §The open half for the probed boundary; do not
+/// re-derive it from the ordering rule above.
 pub(crate) fn collect_script_comments(
     root: &Root<'_>,
     source: &str,
@@ -56,6 +69,12 @@ pub(crate) fn collect_script_comments(
     }
     // The oracle drops module-script comments — a comment fully within the module
     // content span never carries and never refuses.
+    // TODO: this unconditional skip is the open half of the module-script comment
+    // class. It holds only while no earlier module-body statement carries a `{ … }`
+    // block; one that does re-seeks esrap's comment index back over the comment and
+    // the oracle EMITS it, which tsv drops → MISMATCH. Orthogonal to the ordering
+    // refusal below and to instance-script presence. Boundary + corpus exposure:
+    // `docs/checklist_svelte_compiler.md` §The open half.
     let module_content = root.module.map(|module| module.content.span);
     let in_module = |comment: &tsv_lang::Comment| {
         module_content.is_some_and(|m| comment.span.start >= m.start && comment.span.end <= m.end)
@@ -71,6 +90,10 @@ pub(crate) fn collect_script_comments(
         return Ok(Vec::new());
     };
     let content = script.content.span;
+    // Source order of the two scripts — the whole trigger for
+    // [`Refusal::ModuleCommentAfterInstanceScript`] below. The tags cannot nest,
+    // so comparing content starts is a total order.
+    let module_after_instance = module_content.is_some_and(|m| m.start > content.start);
     // A comment at or past the last SURVIVING statement has no statement left to
     // lead — an `import` hoists to the comment-free module program and a
     // statement-position `$effect`/`$inspect` drops, so neither anchors one. The
@@ -112,9 +135,20 @@ pub(crate) fn collect_script_comments(
         .map_or(content.end, |stmt| stmt.span().start);
     let mut comments = Vec::with_capacity(root.comments.len());
     for comment in &root.comments {
-        // Module-script comments drop (the oracle drops them); the module body
-        // emits comment-free, so skipping here reproduces the drop as parity.
+        // A module-script comment drops — but ONLY when the module script comes
+        // FIRST. The oracle's drop is not a rule about module scripts; it is
+        // where esrap's single comment index happens to be. The component body
+        // block carries the instance script's `loc`, and opening it re-seeks that
+        // index ABSOLUTELY — forward past a comment that precedes the instance
+        // script (the drop tsv reproduces), but BACKWARD onto one that follows it.
+        // A recovered comment is then flushed into the next loc-bearing node the
+        // printer reaches, which is a template expression it has nothing to do
+        // with. tsv drops it either way, so the second ordering is a comment
+        // PRESENCE difference — a mismatch, not a tolerated position one.
         if in_module(comment) {
+            if module_after_instance {
+                return Err(unsupported(Refusal::ModuleCommentAfterInstanceScript));
+            }
             continue;
         }
         if comment.span.start < content.start || comment.span.end > content.end {

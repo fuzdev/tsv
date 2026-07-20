@@ -46,6 +46,7 @@ use crate::attr_refs::{
     each_attribute_expression, each_reference_bearing_attribute_expression,
     special_element_reference_expression,
 };
+use crate::refusal;
 use crate::snippet_emit::render_call_expression;
 use crate::{CompileError, Refusal};
 
@@ -60,6 +61,18 @@ struct Nc<'a> {
     /// the component needs the `$$store_subs` injection (the oracle's gate:
     /// `analysis.instance.scope.declarations` holds a `store_sub` binding).
     store_names: &'a NameSet,
+    /// Top-level `const` declarator + import-local names, from the instance
+    /// **and** module scripts — the oracle's `constant_assignment` /
+    /// `constant_binding` set (it keys on the DECLARATION KEYWORD, so a
+    /// `const c = $state(0)` is in here despite being reactive).
+    constants: &'a NameSet,
+    /// `{#each}` context binding names currently in scope — the oracle's
+    /// `each_item_invalid_assignment` set. Block-scoped: entered on the way into
+    /// an `{#each}` body and restored on the way out.
+    each_items: NameSet,
+    /// `{#snippet}` parameter names currently in scope — the oracle's
+    /// `snippet_parameter_assignment` set. Block-scoped like `each_items`.
+    snippet_params: NameSet,
     /// Names bound anywhere below the component's top-level instance scope.
     shadowed: NameSet,
     /// Context-root names observed as the root of a member/call access.
@@ -142,6 +155,7 @@ pub(crate) fn analyze_component(
     instance_body: &[Statement<'_>],
     module_body: &[Statement<'_>],
     store_names: &NameSet,
+    constants: &NameSet,
 ) -> Result<ComponentContext, CompileError> {
     let mut context_roots = NameSet::default();
     collect_context_roots(instance_body, source, &mut context_roots);
@@ -151,6 +165,9 @@ pub(crate) fn analyze_component(
         source,
         context_roots: &context_roots,
         store_names,
+        constants,
+        each_items: NameSet::default(),
+        snippet_params: NameSet::default(),
         shadowed: NameSet::default(),
         member_roots: NameSet::default(),
         needs: false,
@@ -246,6 +263,163 @@ fn collect_context_roots(instance_body: &[Statement<'_>], source: &str, out: &mu
             }
             _ => {}
         }
+    }
+}
+
+/// The names an assignment, an update, or a `bind:` may not write to — one set,
+/// because the oracle reaches ONE validator from all three positions
+/// (`validate_assignment`, `phases/2-analyze/visitors/shared/utils.js:18`).
+///
+/// It keys `constant_assignment` / `constant_binding` on the DECLARATION KEYWORD,
+/// not on inferred reassignability — an `import` local, or a `const` binding whose
+/// kind is not `each` (`:84-120`) — so a `const c = $state(0)` is in here despite
+/// being reactive. That is why it is its own set and not a filter on
+/// `state_names`.
+///
+/// Spans BOTH script bodies: the declaration keyword is what the rule reads, and a
+/// module-script `const`/import is exactly as unrebindable as an instance one.
+///
+/// ⚠️ **Top-level statements only.** A `const` in a nested block or function body,
+/// and every TEMPLATE-scoped const (a `{@const}` name, a `{:then}`/`{:catch}`
+/// value, an `{#each}` INDEX — all `declaration_kind: 'const'` to the oracle) are
+/// absent, so writing to one still compiles. A residual over-acceptance, tracked
+/// in `../../docs/checklist_svelte_compiler.md`.
+pub(crate) fn collect_constant_names(
+    instance_body: &[Statement<'_>],
+    module_body: &[Statement<'_>],
+    source: &str,
+) -> NameSet {
+    use tsv_ts::ast::internal::{ImportSpecifier, VariableDeclarationKind};
+
+    let mut out = NameSet::default();
+    for stmt in instance_body.iter().chain(module_body.iter()) {
+        match stmt {
+            Statement::VariableDeclaration(decl) if decl.kind == VariableDeclarationKind::Const => {
+                for declarator in decl.declarations {
+                    // Best-effort: a pattern this cannot enumerate is one
+                    // `analyze_declarator` refuses anyway, so nothing reaches a
+                    // write gate unnamed.
+                    let mut names = Vec::new();
+                    if pattern_binding_names(&declarator.id, source, &mut names).is_ok() {
+                        out.extend(names);
+                    }
+                }
+            }
+            Statement::ImportDeclaration(import) => {
+                for spec in import.specifiers {
+                    let local = match spec {
+                        ImportSpecifier::Default(s) => &s.local,
+                        ImportSpecifier::Named(s) => &s.local,
+                        ImportSpecifier::Namespace(s) => &s.local,
+                    };
+                    if let Some(name) = plain_name(local, source) {
+                        out.insert(name.to_string());
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
+/// Refuse an assignment / update / `bind:` target the oracle rejects outright —
+/// its `validate_assignment` family
+/// (`phases/2-analyze/visitors/shared/utils.js:18-120`, one function reached from
+/// `AssignmentExpression`, `UpdateExpression` and `BindDirective` alike, which is
+/// why one walk covers all three positions).
+///
+/// The oracle's shape is reproduced exactly, and the two halves recurse
+/// differently:
+///
+/// - `validate_no_const_assignment` (`:84`) recurses through **patterns** —
+///   `ArrayPattern` elements and `ObjectPattern` property *values*, and nothing
+///   else. A `RestElement` and an `AssignmentPattern` match no branch and fall
+///   through with **no** error, so `[...rest] = x` and `[c = 1] = x` are accepted
+///   even for a `const` `rest`/`c`; so is a `MemberExpression` target, which
+///   mutates through the binding rather than rebinding it.
+/// - the `each` / `snippet` rules (`:21-39`) test `argument.type === 'Identifier'`
+///   on the argument **itself** and never recurse — hence the `top` flag.
+///
+/// TypeScript wrappers are peeled because the oracle analyzes a type-stripped
+/// tree, where `(x as any) = 1` is simply `x = 1`; parentheses are peeled because
+/// ESTree has no paren node.
+///
+/// The set membership is **name-based** where the oracle is scope-sensitive.
+/// `each_items` / `snippet_params` are block-scoped (so an outer name is not
+/// consulted inside an unrelated block), but a *nested* re-declaration — a
+/// function parameter or a local `let` sharing a name with a component `const` —
+/// is not modelled, and over-refuses. Safe by the refusal contract; the residual
+/// is measured against the compile corpus.
+///
+/// Sets `nc.refuse` rather than returning: like every other refusal this walk
+/// raises, it is resolved late so the script-loop refusals keep winning for an
+/// input that trips both.
+fn refuse_invalid_assign_target(target: &Expression<'_>, nc: &mut Nc<'_>, top: bool) {
+    match target {
+        Expression::Identifier(id) => {
+            let Some(name) = plain_name(id, nc.source) else {
+                return;
+            };
+            // Innermost binding wins: an `{#each}` item / `{#snippet}` parameter
+            // SHADOWS a same-named script `const`, and its own rule is the one the
+            // oracle applies (an each binding is `declaration_kind: 'const'` too,
+            // but `validate_no_const_assignment` excludes `kind === 'each'`).
+            let reason = if nc.each_items.contains(name) {
+                top.then_some(refusal::INVALID_ASSIGNMENT_EACH_ITEM)
+            } else if nc.snippet_params.contains(name) {
+                top.then_some(refusal::INVALID_ASSIGNMENT_SNIPPET_PARAMETER)
+            } else if nc.constants.contains(name) {
+                Some(refusal::INVALID_ASSIGNMENT_CONSTANT)
+            } else {
+                None
+            };
+            if let Some(target) = reason
+                && nc.refuse.is_none()
+            {
+                nc.refuse = Some(Refusal::InvalidAssignmentTarget { target });
+            }
+        }
+        Expression::ArrayPattern(pattern) => {
+            for element in pattern.elements.iter().flatten() {
+                refuse_invalid_assign_target(element, nc, false);
+            }
+        }
+        Expression::ObjectPattern(pattern) => {
+            for prop in pattern.properties {
+                if let ObjectPatternProperty::Property(p) = prop {
+                    refuse_invalid_assign_target(&p.value, nc, false);
+                }
+            }
+        }
+        Expression::ParenthesizedExpression(p) => {
+            refuse_invalid_assign_target(p.expression, nc, top);
+        }
+        Expression::TSNonNullExpression(t) => refuse_invalid_assign_target(t.expression, nc, top),
+        Expression::TSAsExpression(t) => refuse_invalid_assign_target(t.expression, nc, top),
+        Expression::TSSatisfiesExpression(t) => refuse_invalid_assign_target(t.expression, nc, top),
+        Expression::TSTypeAssertion(t) => refuse_invalid_assign_target(t.expression, nc, top),
+        // A `MemberExpression` target (and everything else) matches no oracle
+        // branch — it writes THROUGH the binding, never rebinds it.
+        _ => {}
+    }
+}
+
+/// Enter a template block scope: add `names` to `set` and return the ones that
+/// were newly added, for [`exit_block_scope`] to remove on the way out. A name
+/// already present belongs to an enclosing block of the same kind and must
+/// survive the restore.
+fn enter_block_scope(set: &mut NameSet, names: Vec<String>) -> Vec<String> {
+    names
+        .into_iter()
+        .filter(|name| set.insert(name.clone()))
+        .collect()
+}
+
+/// Undo an [`enter_block_scope`].
+fn exit_block_scope(set: &mut NameSet, added: Vec<String>) {
+    for name in added {
+        set.remove(&name);
     }
 }
 
@@ -434,6 +608,7 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
         Expression::UnaryExpression(u) => walk_expr(u.argument, nc),
         Expression::UpdateExpression(u) => {
             crate::rune_guard::assign_target_roots(u.argument, nc.source, &mut nc.reassigned);
+            refuse_invalid_assign_target(u.argument, nc, true);
             walk_expr(u.argument, nc);
         }
         Expression::BinaryExpression(b) => {
@@ -456,6 +631,7 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
         Expression::SequenceExpression(s) => walk_exprs(s.expressions, nc),
         Expression::AssignmentExpression(a) => {
             crate::rune_guard::assign_target_roots(a.left, nc.source, &mut nc.reassigned);
+            refuse_invalid_assign_target(a.left, nc, true);
             walk_expr(a.left, nc);
             walk_expr(a.right, nc);
         }
@@ -786,6 +962,9 @@ fn walk_special_element(se: &SpecialElement<'_>, nc: &mut Nc<'_>) {
     for attr_node in se.attributes {
         if let AttributeNode::BindDirective(d) = attr_node {
             crate::rune_guard::assign_target_roots(&d.expression, nc.source, &mut nc.reassigned);
+            // A `bind:` reaches the SAME oracle validator as an assignment
+            // (`BindDirective.js:181`), so its target obeys the same three rules.
+            refuse_invalid_assign_target(&d.expression, nc, true);
         }
     }
     each_reference_bearing_attribute_expression(se.attributes, &mut |expr| walk_expr(expr, nc));
@@ -798,11 +977,18 @@ fn walk_special_element(se: &SpecialElement<'_>, nc: &mut Nc<'_>) {
 /// `needs_context`, and a `new` in a *hoistable* snippet body fires it too).
 fn walk_snippet_block(snippet: &SnippetBlock<'_>, nc: &mut Nc<'_>) {
     nc.fn_depth += 1;
+    // Parameters are `kind: 'snippet'` in the oracle (`phases/scope.js:1342`), so
+    // writing to one inside the body is `snippet_parameter_assignment` — and,
+    // unlike the each rule, it is NOT gated on runes mode.
+    let mut names = Vec::new();
     for param in snippet.parameters {
         declare_pattern(param, nc);
         walk_expr(param, nc);
+        let _ = pattern_binding_names(param, nc.source, &mut names);
     }
+    let added = enter_block_scope(&mut nc.snippet_params, names);
     walk_fragment(&snippet.body, nc);
+    exit_block_scope(&mut nc.snippet_params, added);
     nc.fn_depth -= 1;
 }
 
@@ -839,6 +1025,9 @@ fn walk_element(element: &Element<'_>, nc: &mut Nc<'_>) {
     for attr_node in element.attributes {
         if let AttributeNode::BindDirective(d) = attr_node {
             crate::rune_guard::assign_target_roots(&d.expression, nc.source, &mut nc.reassigned);
+            // A `bind:` reaches the SAME oracle validator as an assignment
+            // (`BindDirective.js:181`), so its target obeys the same three rules.
+            refuse_invalid_assign_target(&d.expression, nc, true);
         }
     }
     // The shared traversal (`attr_refs`) defines which attribute expressions are
@@ -880,9 +1069,21 @@ fn walk_each_block(block: &EachBlock<'_>, nc: &mut Nc<'_>) {
     if let Some(key) = &block.key {
         walk_expr(key, nc);
     }
+    // The context binding is `kind: 'each'` in the oracle (`phases/scope.js:1244`),
+    // so writing to it inside the block is `each_item_invalid_assignment`. Scoped
+    // to the block's body and fallback — the same extent the oracle's child scope
+    // covers. The INDEX binding is deliberately absent: it is `kind: 'template'` /
+    // `'static'` with `declaration_kind: 'const'` (`:1272`), so the oracle rejects
+    // a write to it as `constant_assignment` — a template-scoped const, part of
+    // the residual this slice leaves open (see the checklist).
+    let mut each_added = Vec::new();
     if let Some(context) = &block.context {
         declare_pattern(context, nc);
         walk_expr(context, nc);
+        let mut names = Vec::new();
+        if pattern_binding_names(context, nc.source, &mut names).is_ok() {
+            each_added = enter_block_scope(&mut nc.each_items, names);
+        }
     }
     if let Some(index) = block.index {
         nc.shadowed.insert(index.to_string());
@@ -891,6 +1092,7 @@ fn walk_each_block(block: &EachBlock<'_>, nc: &mut Nc<'_>) {
     if let Some(fallback) = &block.fallback {
         walk_fragment(fallback, nc);
     }
+    exit_block_scope(&mut nc.each_items, each_added);
 }
 
 fn walk_await_block(block: &AwaitBlock<'_>, nc: &mut Nc<'_>) {

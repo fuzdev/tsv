@@ -21,6 +21,7 @@ use tsv_ts::ast::internal::{
 };
 
 use crate::analyze::{Binding, BindingKind, Initial, ScopeEntry, pattern_binding_names};
+use crate::attr_refs::each_child_fragment;
 use crate::build::Builder;
 use crate::fragment::{
     BodyBuilder, FragmentCtx, emit_child_body, guard_dropped, guard_dropped_fragment,
@@ -32,6 +33,48 @@ use crate::snippet::snippet_name;
 use crate::snippet_emit::build_snippet_function;
 use crate::transform_server::{EmitEnv, unsupported};
 use crate::{CompileError, Refusal};
+
+/// Assign each `{#each}` block its `$$index` generated name, keyed by block span.
+///
+/// The oracle mints this name in the **scope-creation** pass, not the transform:
+/// `create_scopes`' `EachBlock` visitor assigns `node.metadata.index =
+/// scope.root.unique('$$index')` *after* recursing into the body and the
+/// fallback (`phases/scope.js`, the `node.metadata = { … }` assignment at the end
+/// of the visitor). So the allocation order is **post-order** over the fragment
+/// tree, while the transform's sibling name `each_array`
+/// (`state.scope.root.unique('each_array')`, minted at the top of the server
+/// `EachBlock` visitor) is **pre-order**. The two orders differ whenever one
+/// `{#each}` contains another, so the counters cannot share a walk:
+/// `each_array` is allocated at emission, `$$index` upfront here.
+///
+/// Two consequences follow from this being the *scope* walk rather than the
+/// transform:
+///
+/// - it visits regions the SSR transform drops — most importantly a `{:catch}`
+///   branch, which consumes a `$$index` while consuming no `each_array`;
+/// - it advances once per `{#each}` regardless of an authored index, since the
+///   name is minted before the visitor knows whether it will be used.
+pub(crate) fn assign_each_index_names(fragment: &Fragment<'_>) -> HashMap<(u32, u32), String> {
+    fn walk(fragment: &Fragment<'_>, names: &mut HashMap<(u32, u32), String>) {
+        for node in fragment.nodes {
+            // Post-order: descend first, so a nested `{#each}` takes the lower
+            // suffix — the oracle's visit-children-then-assign shape.
+            each_child_fragment(node, &mut |child| walk(child, names));
+            if let FragmentNode::EachBlock(block) = node {
+                let n = names.len();
+                let name = if n == 0 {
+                    "$$index".to_string()
+                } else {
+                    format!("$$index_{n}")
+                };
+                names.insert((block.span.start, block.span.end), name);
+            }
+        }
+    }
+    let mut names = HashMap::new();
+    walk(fragment, &mut names);
+    names
+}
 
 /// Refuse if a generated block name (`each_array`, `$$index`, `$$length`) would
 /// collide with a user binding — the oracle's component-scope name generation
@@ -602,7 +645,8 @@ fn animate_host_element<'arena>(
 /// binding `let CTX = each_array[IDX]`. Without `{:else}` the opener `<!--[-->`
 /// merges into the preceding template; with it, `each_array` hoists before an
 /// `if (each_array.length !== 0) { … } else { … }` whose openers are string
-/// pushes. Nested `{#each}` refuses (unique-name order not reproducible).
+/// pushes. Nested `{#each}` refuses (the nested emission path is unvalidated —
+/// see [`Refusal::NestedEach`]; the name orders themselves are modelled).
 pub(crate) fn emit_each_block<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     each: &'arena EachBlock<'arena>,
@@ -637,11 +681,13 @@ pub(crate) fn emit_each_block<'arena>(
     let collection_expr = env.erase(&each.expression)?;
     let collection = wrap_single(env, collection_expr)?;
 
-    // Unique names: both counters advance once per each block (lockstep with the
-    // oracle's per-each `scope.generate`, so `$$index` advances even when the
-    // index is authored). `$$length` is a fixed block-scoped name.
+    // Unique names. `each_array` is minted HERE, in emission (= transform) order,
+    // mirroring the oracle's `state.scope.root.unique('each_array')`. `$$index` is
+    // NOT: the oracle mints it in the scope pass, post-order and over dropped
+    // regions too, so it was assigned upfront by `assign_each_index_names` and is
+    // only looked up here. `$$length` is a fixed block-scoped name.
     let array_name = env.next_each_array_name();
-    let generated_index = env.next_index_name();
+    let generated_index = env.each_index_name(each.span)?;
     let index_name = match each.index {
         Some(i) => i.to_string(),
         None => generated_index,

@@ -315,7 +315,7 @@ The oracle's normalization (`3-transform/utils.js:126` `clean_nodes`, `escape_ht
 | --- | --- |
 | `{#if}` / `{:else if}` / `{:else}` | Supported (flat chain, numbered anchors, synthesized terminal else) |
 | `{#each}` (with `{:else}`, authored index, sibling numbering) | Supported |
-| nested `{#each}` | **Refused**: `` nested {#each} (the oracle's unique-name allocation order is not reproducible) `` |
+| nested `{#each}` | **Refused**: `` nested {#each} (the nested emission path is not yet validated) `` |
 | `{#await}` / `{:then}` (`{:catch}` dropped, matching the oracle's server output) | Supported |
 | `{#key}` | Supported |
 | `{@const}` (hoisted to branch top, enters the evaluator) | Supported |
@@ -381,17 +381,18 @@ standalone repro, none of them dropped-region-specific:
 | Repro | Oracle error |
 | --- | --- |
 | `<h1><h1>t</h1></h1>` | `node_invalid_placement` |
-| `<script>let b = 1;</script>{#each [0] as b}<button onclick={() => { b++; }}>x</button>{/each}` | `each_item_invalid_assignment` |
 | `<Foo><p>c</p>{#snippet children()}<p>d</p>{/snippet}</Foo>` | `snippet_conflict` |
 | `{#await Promise.resolve(1)}<i>p</i>{:catch e}<Foo class:a={true} />{/await}` | `component_invalid_directive` |
 
 Together with `attribute_duplicate`, `declaration_duplicate`, `snippet_invalid_export`,
 `slot_snippet_conflict`, `svelte_meta_invalid_placement`, and `svelte_meta_duplicate`,
-that is **ten** distinct oracle rules tsv does not enforce — so the shape of this
+that is **nine** distinct oracle rules tsv does not enforce — so the shape of this
 work is porting `2-analyze`'s whole-component checks, not patching rules one at a time.
-(`dollar_prefix_invalid` was the eleventh and is now **enforced** — see the
-`$`-prefixed bindings rule above. It came out one rule at a time because it is a
-*local* rule on a single binding node, unlike the whole-component checks below.)
+(`dollar_prefix_invalid` was enforced first, and the three-rule `validate_assignment`
+family — `constant_assignment`, `each_item_invalid_assignment`,
+`snippet_parameter_assignment` — after it; see below and the `$`-prefixed bindings rule
+above. Both came out ahead of the rest because each is a **local** rule on a single node
+whose inputs a name-based port can supply, unlike the whole-component checks that remain.)
 
 ⚠️ **These are Svelte *analysis-phase* rules, not deferred JS early errors** — do not
 file them under the parser's [deliberate early-error deferral](conformance_svelte.md).
@@ -400,7 +401,6 @@ Each is implemented in phase 2 over the Svelte AST, in Svelte-domain terms:
 | Rule | Site in `packages/svelte/src/compiler` |
 | --- | --- |
 | `node_invalid_placement` | `phases/2-analyze/visitors/RegularElement.js:185` |
-| `each_item_invalid_assignment` | `phases/2-analyze/visitors/shared/utils.js:33` |
 | `snippet_conflict` | `phases/2-analyze/visitors/SnippetBlock.js:77` |
 | `component_invalid_directive` | `phases/2-analyze/visitors/shared/component.js:81` |
 
@@ -413,8 +413,52 @@ octal escapes, `delete` of a plain name) reaches any of these rules.
 
 The single genuine overlap is `declaration_duplicate`, and Svelte says so itself at
 `phases/scope.js:689` ("declaring function twice is also caught by acorn in the parse
-phase"). That one row — and only that one — is arguably not tsv's to fix. The other nine
+phase"). That one row — and only that one — is arguably not tsv's to fix. The other eight
 are analysis tsv has not ported.
+
+#### The `validate_assignment` family — closed
+
+**Closed.** Three oracle rules, one refusal, because the oracle itself is one function:
+`validate_assignment` (`phases/2-analyze/visitors/shared/utils.js:18-40`, which calls
+`validate_no_const_assignment` at `:19`) is reached from `AssignmentExpression.js:11`,
+`UpdateExpression.js:11` **and** `BindDirective.js:181`, so an assignment, an update and
+a `bind:` ask the same question of the same binding table. tsv ports it in the
+whole-component `needs_context` walk (`needs_context.rs`), which already visits every one
+of those three positions across the instance script, the module script and the template —
+dropped `{:catch}` branches and event handlers included, which is where two of the
+suite's samples put the write.
+
+- **Refused**: `assignment to a constant (a const declarator or import local — the oracle's constant_assignment)` — a write to a top-level `const` declarator or import local, in either script. Keyed on the DECLARATION KEYWORD, exactly as the oracle is, so a reactive `const c = $state(0)` refuses too. The pattern recursion mirrors `validate_no_const_assignment` exactly: `ArrayPattern` elements and `ObjectPattern` property *values*, and nothing else — a `RestElement`, an `AssignmentPattern` default and a `MemberExpression` match no branch there and are **accepted**, a member target writing *through* the binding rather than rebinding it.
+- **Refused**: `assignment to an {#each} item (the oracle's each_item_invalid_assignment)` — a write to an `{#each}` context binding. Block-scoped to the block's body and fallback (the oracle's child scope, `phases/scope.js:1244`/`:1280`), and checked only for a whole-`Identifier` target, both matching the oracle. Runes-only there; this compiler is unconditionally runes-only.
+- **Refused**: `assignment to a {#snippet} parameter (the oracle's snippet_parameter_assignment)` — a write to a `{#snippet}` parameter (`phases/scope.js:1342`). NOT runes-gated in the oracle.
+
+⚠️ **Two residuals stay open, both over-acceptances, both narrower than the rule.** The
+constant set is built from **top-level script statements only**
+(`needs_context::collect_constant_names`), so a `const` in a nested block or function
+body, and every TEMPLATE-scoped const — a `{@const}` name, a `{:then}`/`{:catch}` value,
+an `{#each}` INDEX, all `declaration_kind: 'const'` to the oracle — still compile when
+written to. And the set membership is name-based where the oracle is scope-sensitive: a
+nested re-declaration that *shadows* one of these names is not modelled, which
+**over**-refuses (safe by the refusal contract) rather than under-refuses.
+
+⚠️ **That second residual is corpus-reachable, and closing this family cost one parity
+point.** The shape it over-refuses is ordinary — a helper function that reuses a
+component-level name for its own local — and it appears in Svelte's own test suite:
+`../svelte/packages/svelte/tests/runtime-runes/samples/mutation-local/main.svelte`
+declares `const x = localMutation(1)` beside a `function localMutation(input) { let x =
+input; … x = 2; … }`. The oracle's scope-sensitive lookup resolves that write to the
+function-local `let`; tsv's name-based set sees the top-level `const` and refuses. Probing
+the shape directly reproduces it on a function parameter, a block `let`, and an arrow
+parameter alike, each shadowing a component `const` or import.
+
+The cost is **measured, not assumed**: over the full `compile:corpus:compare` roots (2996
+files — parity 1370, refused 1041, 0 MISMATCH, 0 over-acceptance) the whole
+`InvalidAssignmentTarget` refusal has exactly **one** member, that file, and the other two
+rules have none. It is not a bucket substitution — renaming the inner local reaches parity
+byte-for-byte, so the file's only blocker is this rule, and the pre-family numbers were
+parity **1371** / refused **1040**. One parity point bought the family's three oracle
+rules; narrowing the over-refusal means modelling script scopes, which is its own slice
+(the arc deliberately refuses on ambiguity instead of building a scope resolver).
 
 #### `dollar_prefix_invalid` — closed, and wider than one carve-out
 
@@ -490,20 +534,106 @@ lexer, so it lands on the parser side rather than in this crate.
 
 ### Mismatch classes under mutation
 
-`compile_fuzz --seed 0 --iterations 20000` produces **26 mismatches in four classes**
-(independently classified from the dumped mutants; the partition is clean, no mutant
-carries two):
+`compile_fuzz --seed 0 --iterations 20000` produces **16 mismatches**, classified from
+the dumped mutants by diff signature.
 
-| Class | Count | Shape |
+⚠️ The count is not comparable across corpus edits. The seed corpus IS
+`tests/fixtures_compile`, so adding a fixture changes which mutants are generated;
+compare a run only against another run over the same corpus.
+
+**C1 — `{#each}` counter numbering — is CLOSED.** tsv and the oracle disagreed on
+which loop got `$$index` vs `$$index_1`/`$$index_2` because tsv allocated both
+generated each-block names from one emission-order counter. The oracle allocates them
+in two *different* passes, and therefore two different orders:
+
+| name | oracle pass | order | dropped `{:catch}` |
+| --- | --- | --- | --- |
+| `each_array` | 3-transform, server `EachBlock` visitor (`state.scope.root.unique`) | pre-order | not visited → consumes nothing |
+| `$$index` | scope creation, `EachBlock` visitor's trailing `node.metadata = { … }` | **post-order** (assigned *after* body + fallback) | visited → **consumes a name** |
+
+So an `{#each}` nested inside another one's fragment, or sitting in a dropped
+`{:catch}`, mis-numbered every later loop. `blocks::assign_each_index_names` now
+assigns `$$index` upfront in post-order over the whole fragment tree; `each_array`
+stays at emission. Fixtures: `blocks/each_fallback_nested_each`,
+`blocks/each_index_after_dropped_catch_each`.
+
+⚠️ Only two of those nestings are reachable today. An `{#each}` in another's **body**
+still refuses (`Refusal::NestedEach` — `env.in_each`, a separate gate on the
+unvalidated nested *emission* path), so the numbering fix is exercised by an `{#each}`
+in a `{:else}` fallback and by one in a dropped `{:catch}`, which is what the two
+fixtures cover. The body case is modelled but not yet reachable; it becomes so when
+`NestedEach` lifts.
+
+**C2 — the module→instance half of the module-script comment class — is CLOSED.** A
+comment in a `<script module>` placed *after* the `<script>` was emitted by the oracle
+(into an unrelated template expression) and dropped by tsv. That ordering now refuses
+(`Refusal::ModuleCommentAfterInstanceScript`); see
+[conformance_svelte_compiler.md](conformance_svelte_compiler.md#module-script-comment-teleported-into-the-instance-script)
+for the mechanism, the probed boundary, and why the refusal is coarser than the
+mismatch. Zero corpus parity cost.
+
+The residual 16 by diff signature (a clean partition this time — each mutant carries
+exactly one):
+
+| Signature | Count | Shape |
 | --- | --- | --- |
-| C1 | 13 | `{#each}` counter numbering — tsv and the oracle disagree on which loop gets `$$index` vs `$$index_1`/`$$index_2` |
-| C2 | 8 | a user `const $$props = 1` where the oracle emits `const $$sanitized_props = 1` (generated-name deconfliction) |
-| C3 | 1 | `$$renderer.component(…)` wrapper emitted where the oracle emits none |
-| C4 | 4 | a `<script module>` comment teleported into an instance-script expression — an **oracle** print artifact, [recorded as a divergence candidate](conformance_svelte_compiler.md#module-script-comment-teleported-into-the-instance-script), not a tsv bug |
+| `$$props` | 6 | a user `const $$props = 1` where the oracle emits `const $$sanitized_props = 1` (generated-name deconfliction) |
+| module-script comment (block-recovered) | 7 | the **other** half of the class, still open — see below |
+| generated-function order | 1 | a `<svelte:boundary>` `failed` snippet / hoisted snippet function emitted at a different point in the body than the oracle emits it |
+| wrapper | 1 | `$$renderer.component(…)` emitted where the oracle emits none |
+| static fold | 1 | tsv folds a `{b}` read the oracle keeps as `$.escape(b)` |
 
-So the tsv-side burn-down is C1–C3, **22 mutants across three classes**.
+#### The open half: a module comment recovered by a preceding block
 
-⚠️ **A fifth class exists but did not come from this run.** `<svelte:head>` ordering —
+Every one of the 7 residual module-comment mismatches is the **same mechanism** as the
+closed half — esrap's single comment index being re-seeked backward — reached by a
+different route. The trigger boundary, established by probe against the pinned oracle:
+
+> A `<script module>` comment is EMITTED by the oracle when some **earlier** statement in
+> the module body contains a `{ … }` block (which carries a `loc`, so opening it re-seeks
+> the index back over the comment) **and** some later printed node exists to flush it
+> into. tsv drops it → mismatch.
+
+⚠️ **This axis is INDEPENDENT of the closed half's.** The refusal keys on script ORDER
+(module after instance); this keys on a PRECEDING BLOCK-BEARING STATEMENT in the module
+body. Neither implies the other, so **a two-script document is not covered by the
+refusal** — a module script placed *first*, with an instance script present, still
+mismatches whenever a block-bearing statement precedes the comment. Live-probed with the
+instance template holding a `{x}` read, a `$props()` member read, and no expression at
+all; all three emit `// c` on the oracle side and drop it on tsv's. Instance-script
+presence is simply not on this axis — do not read the closed half's ordering rule as
+covering it.
+
+⚠️ The **flush target** is likewise looser than "a later printed *template* node". A
+document with a fully static template (`<p>hi</p>`) mismatches, the target being a later
+**module-body** statement (`export const a = 1`). What is confirmed is only that *some*
+later printed node is needed, not where it lives.
+
+Confirmed triggering (comment preceded by, and followed by, a statement): a `function`
+or `class` declaration, a `const f = function () {}`, a `const f = () => {}`, an object
+method `{ m() {} }`, an `if (1) {}`. Confirmed **not** triggering: a plain `const` /
+`let` / `var`, an object literal, an array literal, an `import`. A comment before the
+module body's **first** statement or after its **last** is also parity — but that was
+probed *without* an instance script, and the last-statement carve-out does **not** hold
+with one present: the same comment then lands inside the emitted function's parameter
+list (`function Input($$renderer // c)`), a mismatch of a different shape. Treat the two
+carve-outs as no-instance-script results only.
+
+**Corpus exposure.** A source scan over the `compile:corpus:compare` roots finds 22
+module scripts whose body opens a `{` before its first comment — the shape this axis
+needs. Spot-checks show them currently **masked**: a probed sample either refuses for an
+unrelated reason (a `generics` attribute, `template_emits_nested_block`) or is genuinely
+parity. So the corpus being green is evidence about the corpus, not about this hole: the
+shape is reachable in ordinary real code and merely shadowed today, and a refusal lifting
+elsewhere can unmask it.
+
+Closing it wants the same shape as `template_emits_nested_block` — a blunt
+"does any preceding module statement contain a block" scan that deliberately
+over-refuses. It is **not** done here: unlike the closed half (zero corpus cost), a
+module script holding a function or class beside a comment is ordinary real code, so the
+over-refusal's parity cost must be measured before the rule is chosen.
+
+⚠️ **A further class exists but did not come from this run.** `<svelte:head>` ordering —
 tsv emits `$.head(…)` *before* the hoisted snippet function where the oracle emits it
 after — is a real, hand-confirmed bug. No `--seed 0` mutant contains `<svelte:head>` at
 all, so it is tracked separately and must not be counted against a `compile_fuzz` run's

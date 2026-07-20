@@ -23,6 +23,20 @@ use std::collections::BTreeSet;
 
 use crate::fragment::SPECIAL_ELEMENT_FENCED_KINDS;
 
+/// The three [`Refusal::InvalidAssignmentTarget`] targets — one per oracle rule
+/// in the `validate_assignment` family. A closed set, so each is its own bucket
+/// key; naming them as constants keeps the refusal sites, the bucket-key catalog
+/// (`Refusal::every_variant`) and the checklist document quoting one string.
+pub(crate) const INVALID_ASSIGNMENT_CONSTANT: &str =
+    "a constant (a const declarator or import local — the oracle's constant_assignment)";
+/// See [`INVALID_ASSIGNMENT_CONSTANT`]. Runes-only in the oracle, which this
+/// runes-only compiler is unconditionally.
+pub(crate) const INVALID_ASSIGNMENT_EACH_ITEM: &str =
+    "an {#each} item (the oracle's each_item_invalid_assignment)";
+/// See [`INVALID_ASSIGNMENT_CONSTANT`].
+pub(crate) const INVALID_ASSIGNMENT_SNIPPET_PARAMETER: &str =
+    "a {#snippet} parameter (the oracle's snippet_parameter_assignment)";
+
 /// A component shape the Svelte-to-JS compiler declines to emit, with a stable
 /// corpus bucket key.
 ///
@@ -376,6 +390,19 @@ pub enum Refusal {
         "comment after the last script statement in a template that emits a nested block (the oracle drops it)"
     )]
     CommentAfterLastStatementWithBlock,
+    /// A comment inside a `<script module>` that sits AFTER the instance
+    /// `<script>` in source. The oracle drops a module comment only when its
+    /// printer's comment index has already advanced past it; with the module
+    /// second, the component body block (which carries the instance script's
+    /// `loc`) re-seeks the index BACKWARD over the comment, and esrap then
+    /// re-attaches it to the next loc-bearing node it reaches — a template
+    /// expression the comment has nothing to do with. tsv drops it either way, so
+    /// this ordering is a comment PRESENCE difference the parity bar grades as a
+    /// mismatch.
+    #[error(
+        "comment in a module script placed after the instance script (the oracle re-attaches it into the template)"
+    )]
+    ModuleCommentAfterInstanceScript,
     /// A leading comment glued to the `<script>` line.
     #[error("leading comment glued to the <script> line (no newline before it)")]
     LeadingCommentGluedToScript,
@@ -439,8 +466,18 @@ pub enum Refusal {
     /// `{@const}` outside a block scope.
     #[error("{{@const}} outside a block scope")]
     ConstTagOutsideBlock,
-    /// A nested `{#each}` (unique-name allocation order is not reproducible).
-    #[error("nested {{#each}} (the oracle's unique-name allocation order is not reproducible)")]
+    /// A nested `{#each}` — the emission path is not yet validated.
+    ///
+    /// This refusal originally read "the oracle's unique-name allocation order is
+    /// not reproducible". That claim is **false** and was retired: the two orders
+    /// are now both modelled (`each_array` pre-order at emission, `$$index`
+    /// post-order upfront — see `blocks::assign_each_index_names`), and a nested
+    /// `{#each}` probes at parity. What remains unvalidated is the rest of the
+    /// nested emission surface (a keyed inner each, `animate:` placement,
+    /// `{@const}` overlay nesting), which carries no fixture coverage — so this
+    /// stays a deliberate, safe over-refusal until that coverage exists, NOT a
+    /// statement that parity is unreachable.
+    #[error("nested {{#each}} (the nested emission path is not yet validated)")]
     NestedEach,
 
     // ── Snippets / render tags ─────────────────────────────────────────────
@@ -490,6 +527,30 @@ pub enum Refusal {
     BlockScopeShadowsDerived {
         /// The shadowing binding name.
         name: String,
+    },
+
+    /// An assignment / update / `bind:` whose target the oracle rejects outright
+    /// — its `validate_assignment` family
+    /// (`phases/2-analyze/visitors/shared/utils.js:18-120`, reached from
+    /// `AssignmentExpression`, `UpdateExpression`, and `BindDirective`). Three
+    /// oracle rules share one refusal because they share one call site and one
+    /// question ("may this name be written?"): `constant_assignment` (a `const`
+    /// declarator or import local), `each_item_invalid_assignment` (an `{#each}`
+    /// context binding, runes-only), and `snippet_parameter_assignment` (a
+    /// `{#snippet}` parameter). A closed set, so each keeps its own bucket key.
+    ///
+    /// ⚠️ The rule is **name-based** where the oracle is scope-sensitive, so a
+    /// local that merely shares a name with an immutable binding over-refuses.
+    /// Safe by the refusal contract, and corpus-reachable rather than
+    /// theoretical: it costs one parity point over the compile corpus (a helper
+    /// function reusing a component-level name). See
+    /// `../../docs/checklist_svelte_compiler.md` §The `validate_assignment`
+    /// family.
+    #[error("assignment to {target}")]
+    InvalidAssignmentTarget {
+        /// What the target is — a closed set of three phrases, one per oracle
+        /// rule.
+        target: &'static str,
     },
 
     // ── Template expressions ───────────────────────────────────────────────
@@ -865,7 +926,8 @@ impl Refusal {
             // Closed-set feature discriminants — the key is the full message.
             Self::TemplateNode { .. }
             | Self::BindingPatternShape { .. }
-            | Self::RunesOnlyFence { .. } => Cow::Owned(self.to_string()),
+            | Self::RunesOnlyFence { .. }
+            | Self::InvalidAssignmentTarget { .. } => Cow::Owned(self.to_string()),
             // Parameterized reasons — the user-chosen value collapses away.
             Self::LangInstanceScript { .. } => Cow::Borrowed("lang=\"{lang}\" script"),
             Self::GeneratedNameCollision { .. } => {
@@ -998,6 +1060,9 @@ impl Refusal {
             Self::CommentAfterLastStatementWithBlock => Cow::Borrowed(
                 "comment after the last script statement in a template that emits a nested block (the oracle drops it)",
             ),
+            Self::ModuleCommentAfterInstanceScript => Cow::Borrowed(
+                "comment in a module script placed after the instance script (the oracle re-attaches it into the template)",
+            ),
             Self::LeadingCommentGluedToScript => {
                 Cow::Borrowed("leading comment glued to the <script> line (no newline before it)")
             }
@@ -1037,9 +1102,9 @@ impl Refusal {
             }
             Self::ConstTagNonPlainName => Cow::Borrowed("{@const} with a non-plain binding name"),
             Self::ConstTagOutsideBlock => Cow::Borrowed("{@const} outside a block scope"),
-            Self::NestedEach => Cow::Borrowed(
-                "nested {#each} (the oracle's unique-name allocation order is not reproducible)",
-            ),
+            Self::NestedEach => {
+                Cow::Borrowed("nested {#each} (the nested emission path is not yet validated)")
+            }
             Self::SnippetSignatureUnparsed => {
                 Cow::Borrowed("{#snippet} signature the parser fell back to raw text for")
             }
@@ -1263,6 +1328,7 @@ impl Refusal {
             Self::CommentsWithStore,
             Self::CommentInRewrittenRuneRegion,
             Self::CommentAfterLastStatementWithBlock,
+            Self::ModuleCommentAfterInstanceScript,
             Self::LeadingCommentGluedToScript,
             Self::CommentsWithTemplateBeforeScript,
             Self::CommentsWithArglessState,
@@ -1309,6 +1375,15 @@ impl Refusal {
             Self::AnimateDirectiveInvalid,
             Self::RunesOnlyFence {
                 directive: "{directive}",
+            },
+            Self::InvalidAssignmentTarget {
+                target: INVALID_ASSIGNMENT_CONSTANT,
+            },
+            Self::InvalidAssignmentTarget {
+                target: INVALID_ASSIGNMENT_EACH_ITEM,
+            },
+            Self::InvalidAssignmentTarget {
+                target: INVALID_ASSIGNMENT_SNIPPET_PARAMETER,
             },
             Self::SpreadOnSelect,
             Self::SpreadOnLoadErrorElement,

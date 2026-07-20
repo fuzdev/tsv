@@ -17,11 +17,16 @@
 # different future harness error still fails. Caveat: an errored file gets no oracle
 # verdict, so tsv is never probed on it — a pinned one could hide an over-acceptance.
 #
+# ORACLE-ERROR is the ONLY pinnable harness failure. Every other one — a tsv compiler
+# self-check, a tsv parse over-rejection, a canonicalizer failure, an unreadable file,
+# a dead sidecar — is tsv's or the machine's, never upstream's, so it is UNPINNABLE
+# and fails the gate outright rather than appearing here.
+#
 # Refusal / fenced counts are deliberately NOT pinned: a refusal is not a defect, and
 # its buckets churn with every compiler slice.
 #
 # Format: KIND<TAB>ORACLE_CODE<TAB>PATH (path relative to its suite root)
-# shapes: 50
+# shapes: 41
 OVER-ACCEPT	attribute_duplicate	compiler-errors/samples/attribute-unique-class/main.svelte
 OVER-ACCEPT	attribute_duplicate	compiler-errors/samples/attribute-unique-shorthand/main.svelte
 OVER-ACCEPT	attribute_duplicate	compiler-errors/samples/attribute-unique-style/main.svelte
@@ -34,16 +39,8 @@ OVER-ACCEPT	attribute_invalid_name	validator/samples/attribute-invalid-name-5/in
 OVER-ACCEPT	attribute_invalid_name	validator/samples/attribute-invalid-name/input.svelte
 OVER-ACCEPT	attribute_invalid_sequence_expression	compiler-errors/samples/attribute-sequence-expression-2/main.svelte
 OVER-ACCEPT	attribute_invalid_sequence_expression	compiler-errors/samples/attribute-sequence-expression/main.svelte
-OVER-ACCEPT	constant_assignment	compiler-errors/samples/legacy-no-const-assignment/main.svelte
-OVER-ACCEPT	constant_assignment	compiler-errors/samples/legacy-no-const-update/main.svelte
-OVER-ACCEPT	constant_assignment	compiler-errors/samples/runes-no-const-assignment/main.svelte
-OVER-ACCEPT	constant_assignment	compiler-errors/samples/runes-no-const-update/main.svelte
-OVER-ACCEPT	constant_assignment	validator/samples/assignment-to-const-5/input.svelte
-OVER-ACCEPT	constant_assignment	validator/samples/assignment-to-const-7/input.svelte
 OVER-ACCEPT	constant_binding	validator/samples/binding-await-catch/input.svelte
 OVER-ACCEPT	declaration_duplicate	validator/samples/snippet-already-declared/input.svelte
-OVER-ACCEPT	each_item_invalid_assignment	compiler-errors/samples/runes-invalid-each-binding-this/main.svelte
-OVER-ACCEPT	each_item_invalid_assignment	compiler-errors/samples/runes-invalid-each-mutation/main.svelte
 OVER-ACCEPT	each_key_without_as	compiler-errors/samples/each-key-without-as/main.svelte
 OVER-ACCEPT	export_undefined	compiler-errors/samples/export-not-defined-module/main.svelte
 OVER-ACCEPT	invalid_arguments_usage	compiler-errors/samples/invalid-arguments-usage/main.svelte
@@ -66,7 +63,6 @@ OVER-ACCEPT	slot_attribute_invalid_placement	validator/samples/component-slotted
 OVER-ACCEPT	slot_attribute_invalid_placement	validator/samples/slot-attribute-invalid/input.svelte
 OVER-ACCEPT	snippet_conflict	compiler-errors/samples/snippet-children-conflict/main.svelte
 OVER-ACCEPT	snippet_invalid_export	compiler-errors/samples/snippet-invalid-export/main.svelte
-OVER-ACCEPT	snippet_parameter_assignment	compiler-errors/samples/invalid-snippet-mutation/main.svelte
 OVER-ACCEPT	snippet_shadowing_prop	validator/samples/snippet-shadowing-prop/input.svelte
 OVER-ACCEPT	svelte_meta_invalid_tag	compiler-errors/samples/svelte-selfdestructive/main.svelte
 OVER-ACCEPT	tag_invalid_name	compiler-errors/samples/component-invalid-name/main.svelte

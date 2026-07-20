@@ -3116,9 +3116,15 @@ fn compile_refuses_invalid_ssr_inert_special_elements() {
         "<svelte:window bind:innerWidth={5} />",
         "bind: directive innerWidth",
     );
+    // A `const` target now refuses one step EARLIER, in the whole-component
+    // `validate_assignment` port (which reaches every `bind:` the oracle's own
+    // validator does, dropped regions included) — so it carries the sharper
+    // `constant_assignment` bucket rather than the bind-shaped one. The
+    // reassignable-lvalue rule in the bind path is unchanged and still stands
+    // behind it.
     assert_unsupported(
         "<script>\n\tconst c = 1;\n</script>\n<svelte:window bind:innerWidth={c} />",
-        "bind: directive innerWidth",
+        "a constant",
     );
     assert_unsupported(
         "<svelte:window bind:innerWidth={undefinedVar} />",
@@ -5457,6 +5463,42 @@ fn compile_module_before_instance_comment_carries() {
     );
 }
 
+#[test]
+fn compile_refuses_module_comment_after_instance_script() {
+    // A module script placed AFTER the instance script puts its comments at
+    // offsets the oracle's printer re-seeks BACKWARD over (the component body
+    // block carries the instance script's `loc`), so esrap re-attaches them into
+    // whatever loc-bearing node it reaches next — a template expression it has
+    // nothing to do with. tsv drops the comment, which is a comment PRESENCE
+    // difference the parity bar grades as a MISMATCH. Refuse.
+    for source in [
+        // The minimal shape: instance script, module script, template expression.
+        "<script>function w(x){return x;}</script><script module>\n// MYC\nconst K = 5;\n</script>{w(1)}",
+        // A block comment lands the same way.
+        "<script>function w(x){return x;}</script><script module>\n/* MYC */\nconst K = 5;\n</script>{w(1)}",
+        // The comment past the module body's last statement lands the same way.
+        "<script>function w(x){return x;}</script><script module>\nconst K = 5;\n// MYC\n</script>{w(1)}",
+        // An import-only instance script still supplies the `loc` that seeks back.
+        "<script>import {a} from './a.js';</script><script module>\n// MYC\nconst K = 5;\n</script>{a}",
+    ] {
+        assert_unsupported(source, "module script placed after the instance script");
+    }
+}
+
+#[test]
+fn compile_module_comment_before_instance_script_still_drops() {
+    // The mirror of the refusal above: with the module script FIRST, the body
+    // block's seek moves FORWARD past the module comment, so the oracle drops it
+    // too — tsv's drop is parity and must keep compiling.
+    let js = compile_js(
+        "<script module>\n// MYC\nconst K = 5;\n</script><script>function w(x){return x;}</script>{w(1)}",
+    );
+    assert!(
+        !js.contains("MYC"),
+        "a module comment before the instance script must drop: {js}"
+    );
+}
+
 // ── <svelte:boundary> ──────────────────────────────────────────────────────
 
 #[test]
@@ -5939,5 +5981,130 @@ fn compile_attr_whitespace_collapse_trims_the_js_class_not_the_narrow_one() {
     assert!(
         js.contains("class=\"a\u{a0}b\""),
         "interior U+00A0 must survive the narrow collapse:\n{js}"
+    );
+}
+
+// ── Invalid assignment targets (the oracle's `validate_assignment` family) ──
+
+#[test]
+fn compile_constant_assignment_refuses() {
+    // `validate_no_const_assignment` (`shared/utils.js:84`): a write to a `const`
+    // declarator or an import local is `constant_assignment`, keyed on the
+    // DECLARATION KEYWORD — so a reactive `const a = $state(0)` is refused too.
+    // Both operator forms reach it (`AssignmentExpression.js:11`,
+    // `UpdateExpression.js:11`).
+    assert_unsupported("<script>const a = c(); a += 1;</script>", "a constant");
+    assert_unsupported("<script>const a = c(); a++;</script>", "a constant");
+    assert_unsupported(
+        "<script>const a = $state(0); a += 1;</script>",
+        "a constant",
+    );
+    assert_unsupported("<script>const a = $state(0); a++;</script>", "a constant");
+    assert_unsupported(
+        "<script>import {a} from './m.js'; a = 1;</script>",
+        "a constant",
+    );
+    // A module-script const is unassignable on the same terms.
+    assert_unsupported(
+        "<script module>const a = 1;</script><script>a = 2;</script>",
+        "a constant",
+    );
+    // Inside a dropped event handler too — the oracle validates in phase 2,
+    // before it decides what SSR emits.
+    assert_unsupported(
+        "<script>const a = $state(0);</script><button onclick={() => a++}>x</button>",
+        "a constant",
+    );
+    // Destructuring assignment: the rule recurses through ArrayPattern elements
+    // and ObjectPattern property VALUES (`validator/samples/assignment-to-const-5`
+    // and `-7`).
+    assert_unsupported(
+        "<script>const arr = [1, 2]; [arr, arr[1]] = [arr[1], arr[0]];</script>",
+        "a constant",
+    );
+    assert_unsupported(
+        "<script>const arr = [1]; ({a: {arr}} = x);</script>",
+        "a constant",
+    );
+}
+
+#[test]
+fn compile_each_item_assignment_refuses() {
+    // `validate_assignment` (`shared/utils.js:33`): a write to an `{#each}`
+    // context binding is `each_item_invalid_assignment` in runes mode, which this
+    // compiler unconditionally is. Reached from an assignment, an update, and a
+    // `bind:` alike (`BindDirective.js:181`).
+    assert_unsupported(
+        "<script>let arr = $state([1]);</script>\
+         {#each arr as value}<button onclick={() => value += 1}>x</button>{/each}",
+        "an {#each} item",
+    );
+    assert_unsupported(
+        "<script>let arr = $state([1]);</script>\
+         {#each arr as value}<button onclick={() => value++}>x</button>{/each}",
+        "an {#each} item",
+    );
+    assert_unsupported(
+        "<script>let arr = $state([{element: null}]);</script>\
+         {#each arr as {element}}<input bind:this={element} />{/each}",
+        "an {#each} item",
+    );
+    // The fallback shares the block's scope (`scope.js:1280`).
+    assert_unsupported(
+        "<script>let arr = $state([1]);</script>\
+         {#each arr as value}<p>a</p>{:else}<button onclick={() => value = 1}>x</button>{/each}",
+        "an {#each} item",
+    );
+}
+
+#[test]
+fn compile_snippet_parameter_assignment_refuses() {
+    // `validate_assignment` (`shared/utils.js:37`): a write to a `{#snippet}`
+    // parameter is `snippet_parameter_assignment` — and, unlike the each rule,
+    // NOT gated on runes mode.
+    assert_unsupported(
+        "{#snippet foo(value)}<button onclick={() => value += 1}>x</button>{/snippet}",
+        "a {#snippet} parameter",
+    );
+}
+
+#[test]
+fn compile_invalid_assignment_boundary_accepts() {
+    // The acceptance half of the rule, so a widening over-refusal is caught.
+    //
+    // A MEMBER target writes THROUGH the binding and never rebinds it — it
+    // matches no branch of the oracle's validator.
+    assert_compiles(
+        "<script>const o = $state({v: 1});</script><button onclick={() => o.v = 2}>x</button>",
+    );
+    assert_compiles(
+        "<script>let arr = $state([{v: 1}]);</script>\
+         {#each arr as item}<button onclick={() => item.v = 2}>x</button>{/each}",
+    );
+    // A `let` is not a constant, and the block scopes END at their block.
+    assert_compiles("<script>let a = $state(0);</script><button onclick={() => a++}>x</button>");
+    assert_compiles(
+        "<script>let a = $state(0); let arr = $state([1]);</script>\
+         {#each arr as a}<p>{a}</p>{/each}<button onclick={() => a++}>x</button>",
+    );
+    assert_compiles(
+        "{#snippet foo(v)}<p>{v}</p>{/snippet}<script>let v = $state(0);</script>\
+         <button onclick={() => v++}>x</button>",
+    );
+    // The pattern recursion stops exactly where the oracle's does: a RestElement
+    // and an AssignmentPattern match no branch, so a const there is accepted.
+    assert_compiles(
+        "<script>const a = 1;</script><button onclick={() => { [...a] = x; }}>x</button>",
+    );
+}
+
+#[test]
+fn compile_each_item_assignment_refuses_the_checklist_repro() {
+    // The exact repro `docs/checklist_svelte_compiler.md` carried as an open
+    // over-acceptance until this rule landed — pinned so the doc's claim that the
+    // row is closed cannot silently rot.
+    assert_unsupported(
+        "<script>let b = 1;</script>{#each [0] as b}<button onclick={() => { b++; }}>x</button>{/each}",
+        "an {#each} item",
     );
 }

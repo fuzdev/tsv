@@ -90,6 +90,13 @@ impl CompileProfileCommand {
                         path.display()
                     );
                 }
+                Ok(Outcome::GeneratedNameMissing(span)) => {
+                    corrupt += 1;
+                    eprintln!(
+                        "COMPILER BUG (GeneratedNameMissing) {}: a generated name was not assigned upfront at {span:?}",
+                        path.display()
+                    );
+                }
                 Err(err) => {
                     eprintln!("Error profiling {}: {err}", path.display());
                     arena.reset();
@@ -149,6 +156,9 @@ enum Outcome {
     CorruptOutput(tsv_lang::ParseError),
     /// The type-erasure self-check fired — a compiler bug, like `CorruptOutput`.
     TypeErasureLeak(tsv_lang::Span),
+    /// An upfront-assigned generated name was missing at emission — a compiler
+    /// bug, like `CorruptOutput`.
+    GeneratedNameMissing(tsv_lang::Span),
 }
 
 /// Timing results for one compiled file.
@@ -190,6 +200,9 @@ fn profile_compile_file(
         Err(CompileError::Parse(_)) => return Ok(Outcome::ParseFailed),
         Err(CompileError::CorruptOutput(err)) => return Ok(Outcome::CorruptOutput(err)),
         Err(CompileError::TypeErasureLeak(span)) => return Ok(Outcome::TypeErasureLeak(span)),
+        Err(CompileError::GeneratedNameMissing(span)) => {
+            return Ok(Outcome::GeneratedNameMissing(span));
+        }
     }
 
     let mut compile_times = Vec::with_capacity(iterations);

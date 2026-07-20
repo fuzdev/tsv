@@ -705,6 +705,7 @@ mod tests {
             "tsv-parse",
             "tsv-corrupt-output",
             "tsv-type-erasure-leak",
+            "tsv-generated-name-missing",
             "canonicalize-oracle",
             "oracle-non-idempotent",
             "oracle-recanonicalize",

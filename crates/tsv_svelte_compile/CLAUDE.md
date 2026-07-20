@@ -102,8 +102,9 @@ project-wide conventions.
     whose base is bound in a nested scope (`store_invalid_scoped_subscription`)
     still refuse) — return `CompileError::Unsupported` with a
     clear description, never
-    guessed output. Within the supported blocks, nested `{#each}` (unreproducible
-    unique-name order), a root-level `{@const}`, a destructured `{@const}`, a
+    guessed output. Within the supported blocks, nested `{#each}` (the nested
+    emission path is unvalidated — the unique-name orders themselves ARE modelled),
+    a root-level `{@const}`, a destructured `{@const}`, a
     `{@const}` shadowing a `$derived` binding, a member/call rooted at a
     prop/import that is also shadowed in a nested scope (`needs_context`
     classification ambiguous), and a leading comment glued to the `<script>` line
@@ -278,6 +279,26 @@ project-wide conventions.
   write, emitted or dropped — an event handler, `{:catch}`) sets it, so the
   `var $$store_subs;` / `$.unsubscribe_stores(…)` injection fires for a store used
   only in a dropped handler too. It is decided here, NOT at emission time.
+  Because this is the one walk that reaches **every** assignment, update and `bind:`
+  in the component — both scripts, the template, and the dropped regions — it also
+  hosts the port of the oracle's `validate_assignment` family
+  (`phases/2-analyze/visitors/shared/utils.js:18`, itself one function reached from
+  `AssignmentExpression`, `UpdateExpression` and `BindDirective` alike). One refusal,
+  `Refusal::InvalidAssignmentTarget`, carries its three rules: `constant_assignment`
+  (a top-level `const` declarator or import local, from either script —
+  `collect_constant_names`, the same set the `bind:` gate reads as
+  `unassignable_names`), `each_item_invalid_assignment` (an `{#each}` context binding,
+  block-scoped to body + fallback) and `snippet_parameter_assignment` (a `{#snippet}`
+  parameter, block-scoped to its body; NOT runes-gated in the oracle). The pattern
+  recursion mirrors `validate_no_const_assignment` exactly — `ArrayPattern` elements
+  and `ObjectPattern` property *values* only, so a `RestElement`, an
+  `AssignmentPattern` default and a `MemberExpression` are accepted — while the
+  each/snippet rules test the whole argument, as the oracle does. Two residual
+  over-acceptances stay open, both narrower than the rule: a **nested** or
+  **template-scoped** const (`{@const}`, a `{:then}`/`{:catch}` value, an `{#each}`
+  index) is not in the constant set, and set membership is name-based where the
+  oracle is scope-sensitive, so a shadowing nested local **over**-refuses. See
+  `../../docs/checklist_svelte_compiler.md` §The wider validation surface.
 - `store_rewrite.rs` — **store-access (and script-position `$derived` read)
   rewriting** for the instance script (the
   script analog of `fragment.rs`'s template value walk). A tree→tree pass over the
@@ -498,6 +519,16 @@ project-wide conventions.
   head expression flushes the comment first, and likewise the block-free special
   elements (`<svelte:window>`, `<slot>`). The split is keyed to the pinned oracle's
   `reset_comment_index` behavior (esrap 2.2.12) — re-probe it if that pin moves.
+  The same index recovery governs a **module-script** comment, which is why one is
+  DROPPED rather than carried only when the module script comes FIRST: the component
+  body block carries the instance script's `loc`, so opening it seeks forward past a
+  comment that precedes the instance script and BACKWARD onto one that follows it, and
+  a recovered comment is then flushed into the next loc-bearing node (a template
+  expression it has nothing to do with). tsv drops it either way, so the
+  module-second ordering refuses (`ModuleCommentAfterInstanceScript`). A second route
+  to the same recovery — a block-bearing statement EARLIER in the module body, no
+  instance script needed — is a known open mismatch; see
+  `../../docs/checklist_svelte_compiler.md` §The open half.
   Divergent placement classes
   also still refuse —
   template-expression comments, comments inside dropped rune regions, and comments
@@ -615,7 +646,15 @@ project-wide conventions.
   synthesized when `{:else}` is absent) and a merge-forward `<!--]-->` closer;
   `{#each}` is `const each_array = $.ensure_array_like(expr)` + a `for` loop
   binding `let CTX = each_array[IDX]` (both `each_array`/`$$index` names
-  advance once per each block in source order, `$$length` fixed), the opener
+  advance once per each block but in **different orders**, so they are allocated by
+  different passes: the oracle mints `each_array` in the transform
+  (`state.scope.root.unique`, pre-order — so emission order IS its order, and a
+  dropped `{:catch}` consumes none), and `$$index` in the **scope-creation** pass,
+  *after* recursing into body + fallback — post-order, over dropped regions too. The
+  latter is therefore assigned upfront by `assign_each_index_names` and only looked
+  up at emission; sharing one emission-order counter mis-numbers every document
+  where one `{#each}` contains another or one sits in a `{:catch}`. `$$length` is
+  fixed), the opener
   `<!--[-->` merging backward without `{:else}` or, with it, `each_array`
   hoisting before an `if (each_array.length !== 0) { … } else { … }` whose
   openers are string pushes; `{#await}` is a 4-arg

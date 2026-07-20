@@ -85,13 +85,13 @@ use crate::css_scope::analyze_style;
 use crate::fragment::{
     SPECIAL_ELEMENT_REFUSAL_KINDS, fragment_node_kind, special_element_refusal_kind,
 };
-use crate::needs_context::analyze_component;
+use crate::needs_context::{analyze_component, collect_constant_names};
 use crate::script_rewrite::{
     analyze_script, collect_script_comments, document_ts_flag, plain_identifier_name,
     refuse_runes_invalid_import, refuse_template_typescript, rewrite_script_statement,
 };
 use crate::snippet::analyze_snippets;
-use crate::{CompileError, CompileOptions, Generate, Refusal, erase};
+use crate::{CompileError, CompileOptions, Generate, Refusal, erase, refusal};
 
 /// Enumerate every refusal class the census can independently detect for
 /// `source`, deduplicated by [`bucket_key`](Refusal::bucket_key).
@@ -195,12 +195,24 @@ pub fn census_detected_buckets() -> Vec<Cow<'static, str>> {
         // needs_context member/call classification.
         Refusal::MemberCallAmbiguousRoot { name: s() },
         Refusal::MemberCallEscapedRoot,
+        // needs_context `validate_assignment` family. A closed set of three, each
+        // its own bucket key, all three raised by the same whole-component walk.
+        Refusal::InvalidAssignmentTarget {
+            target: refusal::INVALID_ASSIGNMENT_CONSTANT,
+        },
+        Refusal::InvalidAssignmentTarget {
+            target: refusal::INVALID_ASSIGNMENT_EACH_ITEM,
+        },
+        Refusal::InvalidAssignmentTarget {
+            target: refusal::INVALID_ASSIGNMENT_SNIPPET_PARAMETER,
+        },
         // Snippet hoist analysis.
         Refusal::DuplicateSnippetName { name: s() },
         Refusal::SnippetHoistAmbiguous { name: s() },
         // Comment carry-through (the classes collect_script_comments owns).
         Refusal::TemplateComments,
         Refusal::CommentAfterLastStatementWithBlock,
+        Refusal::ModuleCommentAfterInstanceScript,
         Refusal::LeadingCommentGluedToScript,
         Refusal::MultilineBlockComment,
         Refusal::FormatIgnoreComment,
@@ -360,13 +372,15 @@ fn collect<'arena>(
     // The module body is not erased in the census (a diagnostic imprecision: a
     // module-triggered `needs_context` refusal isn't independently detected), so
     // `analyze_component` receives an empty module body here.
-    let uses_slots = match analyze_component(root, source, erased_body, &[], &store_names) {
-        Ok(ctx) => ctx.uses_slots,
-        Err(err) => {
-            push_unsupported(found, err);
-            false
-        }
-    };
+    let constants = collect_constant_names(erased_body, &[], source);
+    let uses_slots =
+        match analyze_component(root, source, erased_body, &[], &store_names, &constants) {
+            Ok(ctx) => ctx.uses_slots,
+            Err(err) => {
+                push_unsupported(found, err);
+                false
+            }
+        };
 
     // Snippet hoist analysis (reused verbatim). Its two inputs mirror
     // `compile_server`: the instance binding names and the subset that are imports.

@@ -185,6 +185,16 @@ impl Verdict {
         )
     }
 
+    /// A GENERATOR defect: the mutant's JS does not parse, so the oracle's
+    /// rejection says nothing about tsv. Never gated (see [`Self::is_hard`]) — but
+    /// it IS reported and dumped, because the tally alone conflates two very
+    /// different things: the generator emitting invalid syntax, and tsv *accepting*
+    /// invalid syntax (a real frontend over-acceptance). Only the mutant source
+    /// separates them, so the source has to reach a human.
+    fn is_harness_invalid_js(&self) -> bool {
+        matches!(self, Self::HarnessInvalidJs(_))
+    }
+
     fn label(&self) -> &'static str {
         match self {
             Self::Refused(_) => "refused",
@@ -407,7 +417,12 @@ impl CompileFuzzCommand {
             eprintln!("Error: cannot create dump dir {dir}: {e}");
             return Err(CliError::Errored);
         }
-        for g in graded.iter().filter(|g| g.verdict.is_hard()) {
+        // HARD findings plus the ungated `harness_invalid_js` bucket: an invalid-JS
+        // mutant is a harness defect, but it is only diagnosable from its source.
+        for g in graded
+            .iter()
+            .filter(|g| g.verdict.is_hard() || g.verdict.is_harness_invalid_js())
+        {
             let name = format!("finding_{:05}_{}.svelte", g.index, g.verdict.label());
             let path = PathBuf::from(dir).join(name);
             if let Err(e) = std::fs::write(&path, &g.source) {
@@ -458,6 +473,9 @@ async fn grade_source(source: &str) -> Verdict {
         }
         Err(CompileError::TypeErasureLeak(span)) => {
             return Verdict::SelfCheck("type_erasure_leak", format!("at {span:?}"));
+        }
+        Err(CompileError::GeneratedNameMissing(span)) => {
+            return Verdict::SelfCheck("generated_name_missing", format!("at {span:?}"));
         }
     };
 
@@ -748,6 +766,39 @@ impl Report {
             println!();
         }
 
+        let invalid_js: Vec<&Graded> = graded
+            .iter()
+            .filter(|g| g.verdict.is_harness_invalid_js())
+            .collect();
+        if !invalid_js.is_empty() {
+            let shown = if max_findings == 0 {
+                invalid_js.len()
+            } else {
+                max_findings.min(invalid_js.len())
+            };
+            println!(
+                "○ GENERATOR defects — mutants whose JS does not parse (NOT gated; fix the operator):\n"
+            );
+            for g in &invalid_js[..shown] {
+                println!(
+                    "  [harness_invalid_js] mutant {} · seed {} · ops {}",
+                    g.index,
+                    g.seed_path,
+                    g.ops.join(" → ")
+                );
+                for line in g.source.lines() {
+                    println!("      | {line}");
+                }
+                println!();
+            }
+            if shown < invalid_js.len() {
+                println!(
+                    "  … and {} more (raise --max-findings)\n",
+                    invalid_js.len() - shown
+                );
+            }
+        }
+
         let findings: Vec<&Graded> = graded.iter().filter(|g| g.verdict.is_hard()).collect();
         if !findings.is_empty() {
             println!("✗ HARD findings (each is a bug by the refusal contract):\n");
@@ -809,6 +860,30 @@ impl Report {
                 })
             })
             .collect();
+        // The ungated generator-defect bucket, carried with its source for the same
+        // reason the human report shows it: only the source tells a harness defect
+        // apart from tsv accepting invalid syntax.
+        let invalid_js: Vec<&Graded> = graded
+            .iter()
+            .filter(|g| g.verdict.is_harness_invalid_js())
+            .collect();
+        let invalid_js_shown = if max_findings == 0 {
+            invalid_js.len()
+        } else {
+            max_findings.min(invalid_js.len())
+        };
+        let invalid_js_json: Vec<serde_json::Value> = invalid_js[..invalid_js_shown]
+            .iter()
+            .map(|g| {
+                serde_json::json!({
+                    "index": g.index,
+                    "seed": g.seed_path,
+                    "ops": g.ops,
+                    "detail": g.verdict.detail(),
+                    "source": g.source,
+                })
+            })
+            .collect();
         let out = serde_json::json!({
             "total": self.total,
             "unparseable_seeds": self.unparseable_seeds,
@@ -828,6 +903,7 @@ impl Report {
             "pass_through_pct": self.pass_through_pct(),
             "operators": self.ops,
             "findings": findings_json,
+            "harness_invalid_js_findings": invalid_js_json,
         });
         match to_json_with_tabs(&out) {
             Ok(json) => {
@@ -914,6 +990,36 @@ mod tests {
         assert_eq!(report.over_acceptance, 0);
         // It DID cost an oracle round trip, so the pre-filter arithmetic must count it.
         assert_eq!(report.oracle_calls(), 1);
+    }
+
+    /// …but it must still be REPORTED. A silent tally cannot tell a generator defect
+    /// apart from tsv accepting invalid syntax (a real frontend over-acceptance) —
+    /// only the mutant source can, so it is dumped and printed like a finding while
+    /// staying outside [`Verdict::is_hard`] (and so outside the gate above).
+    #[test]
+    fn invalid_generated_js_is_reported_but_never_gated() {
+        let verdict = Verdict::HarnessInvalidJs("boom".to_string());
+        assert!(verdict.is_harness_invalid_js());
+        assert!(!verdict.is_hard(), "reporting it must not start gating it");
+
+        let dir = std::env::temp_dir().join(format!(
+            "tsv_compile_fuzz_dump_{}_{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        let mut cmd = command(0, 0);
+        cmd.dump_dir = Some(dir.to_string_lossy().into_owned());
+        let mut g = graded(verdict);
+        g.source = "<p>x</p>".to_string();
+        cmd.dump(&[g]).expect("dump");
+
+        let dumped = dir.join("finding_00000_harness_invalid_js.svelte");
+        assert_eq!(
+            std::fs::read_to_string(&dumped).expect("dumped file"),
+            "<p>x</p>"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// A command with everything defaulted except what a test sets.

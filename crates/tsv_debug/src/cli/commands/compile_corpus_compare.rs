@@ -406,6 +406,12 @@ async fn classify(source: &str) -> Bucket {
         Err(CompileError::TypeErasureLeak(span)) => {
             return Bucket::Error("tsv-type-erasure-leak", format!("at {span:?}"));
         }
+        // A generated name the transform assigns upfront was missing at emission
+        // — the upfront walk lost a fragment the emission path reached. Also
+        // always a compiler bug.
+        Err(CompileError::GeneratedNameMissing(span)) => {
+            return Bucket::Error("tsv-generated-name-missing", format!("at {span:?}"));
+        }
     };
 
     // Both compiled — compare the canonical reprints (the parity bar).
@@ -1114,6 +1120,9 @@ async fn classify_census(source: &str) -> CensusOutcome {
         }
         Err(CompileError::TypeErasureLeak(span)) => {
             return CensusOutcome::Error("tsv-type-erasure-leak", format!("at {span:?}"));
+        }
+        Err(CompileError::GeneratedNameMissing(span)) => {
+            return CensusOutcome::Error("tsv-generated-name-missing", format!("at {span:?}"));
         }
     };
 
