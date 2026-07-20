@@ -133,24 +133,22 @@ impl<'a> Printer<'a> {
         } else if let Some(else_end) = else_end
             && self.has_comments_to_emit_between(else_end, alt_start)
         {
-            // Comments between `else` and body
-            let has_line = self.has_line_comments_between(else_end, alt_start);
+            // The `else`→body gap is a header→body gap like `try`'s or `do`'s, so it
+            // routes through the shared emitter: a comment trailing `else` stays
+            // trailing, one on its own line keeps its own line, and a `//` forces the
+            // body down. Emitting the run inline relocated an own-line comment up onto
+            // the `else` line (`} else // c`) — the same defect the `try` family had.
+            // Prettier preserves here, so it is a clean oracle rather than a stance.
             let is_non_block_non_if = !matches!(
                 alternate,
                 Statement::BlockStatement(_) | Statement::IfStatement(_)
             );
             parts.push(d.text(" else"));
-            parts.push(self.build_inline_comments_between_doc(else_end, alt_start));
-            if has_line && is_non_block_non_if {
-                // Line comment + non-block body: comment stays on else line, body indented
-                // } else // c\n\texpr;
+            if is_non_block_non_if {
                 let body_doc = self.build_statement_doc(alternate, false);
-                parts.push(d.indent(d.concat(&[d.hardline(), body_doc])));
-            } else if has_line {
-                parts.push(d.hardline());
-                self.append_else_body_doc(parts, alternate);
+                self.push_indented_else_to_body_gap(parts, else_end, alt_start, body_doc);
             } else {
-                parts.push(d.text(" "));
+                self.push_header_to_body_gap(parts, else_end, alt_start);
                 self.append_else_body_doc(parts, alternate);
             }
         } else {
@@ -331,19 +329,19 @@ impl<'a> Printer<'a> {
 
             if self.has_comments_to_emit_between(paren_end, body_start) {
                 let has_line = self.has_line_comments_between(paren_end, body_start);
-                let comment_doc =
-                    self.build_inline_comments_between_doc_no_leading_space(paren_end, body_start);
                 parts.push(d.text(")"));
                 if has_line {
                     // Line comment forces break: if (cond)\n\t// comment\n\tbody;
-                    parts.push(d.indent(d.concat(&[
-                        d.hardline(),
-                        comment_doc,
-                        d.hardline(),
+                    self.push_indented_header_to_body_gap(
+                        &mut parts,
+                        paren_end,
+                        body_start,
                         consequent_doc,
-                    ])));
+                    );
                 } else {
                     // Block comment stays inline: if (cond) /* c */ body;
+                    let comment_doc = self
+                        .build_inline_comments_between_doc_no_leading_space(paren_end, body_start);
                     parts.push(d.text(" "));
                     parts.push(comment_doc);
                     parts.push(d.text(" "));
@@ -399,23 +397,24 @@ impl<'a> Printer<'a> {
             } else if let Some(else_e) = else_end
                 && self.has_comments_to_emit_between(else_e, alternate_start)
             {
-                let has_line = self.has_line_comments_between(else_e, alternate_start);
+                // The `else`→body gap — see the twin in `build_head_body_else_clause`.
+                // The two `if` paths differ only in the `}`→`else` gap that selects
+                // them, so this gap must answer identically in both.
                 let is_non_block_non_if = !matches!(
                     alternate,
                     Statement::BlockStatement(_) | Statement::IfStatement(_)
                 );
                 parts.push(d.text("else"));
-                parts.push(self.build_inline_comments_between_doc(else_e, alternate_start));
-                if has_line && is_non_block_non_if {
-                    // Line comment + non-block body: comment stays on else line, body indented
-                    // else // c\n\texpr;
+                if is_non_block_non_if {
                     let body_doc = self.build_statement_doc(alternate, false);
-                    parts.push(d.indent(d.concat(&[d.hardline(), body_doc])));
-                } else if has_line {
-                    parts.push(d.hardline());
-                    self.append_else_body_doc(&mut parts, alternate);
+                    self.push_indented_else_to_body_gap(
+                        &mut parts,
+                        else_e,
+                        alternate_start,
+                        body_doc,
+                    );
                 } else {
-                    parts.push(d.text(" "));
+                    self.push_header_to_body_gap(&mut parts, else_e, alternate_start);
                     self.append_else_body_doc(&mut parts, alternate);
                 }
             } else {

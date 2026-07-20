@@ -61,4 +61,75 @@
 
 	// Else - long block comment (exceeds short lookback)
 	if(a){}else/* very long block comment that exceeds twenty bytes easily */{}
+
+	// If - blank between two own-line comments, non-block body
+	if(a)
+	// c1
+
+	// c2
+	fn();
+
+	// While - blank between two own-line comments, non-block body
+	while(a)
+	// c1
+
+	// c2
+	fn();
+
+	// For-of - blank between two own-line comments, non-block body
+	for(a of b)
+	// c1
+
+	// c2
+	fn();
+
+	// For-in - blank between two own-line comments, non-block body
+	for(a in b)
+	// c1
+
+	// c2
+	fn();
+
+	// For - blank between two own-line comments, non-block body
+	for(;;)
+	// c1
+
+	// c2
+	fn();
+
+	// If - blank between two own-line comments, block body
+	if(a)
+	// c1
+
+	// c2
+	{}
+
+	// For - blank between two own-line comments, block body
+	for(;;)
+	// c1
+
+	// c2
+	{}
+
+	// Else - blank between two own-line comments, block body
+	if(a){}else
+	// c1
+
+	// c2
+	{}
+
+	// Else - blank between two own-line comments, non-block body
+	if(a){}else
+	// c1
+
+	// c2
+	fn();
+
+	// Do - blank between two own-line comments before the body
+	do
+	// c1
+
+	// c2
+	{fn();}while(a);
+
 </script>

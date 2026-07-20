@@ -1,0 +1,585 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 480,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Line comment on its own line between ) and the switch body brace",
+			"start": 10,
+			"end": 77,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 91,
+			"end": 96,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Line comment trailing ) stays trailing, brace drops to the next line",
+			"start": 125,
+			"end": 196,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 209,
+			"end": 214,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 12
+				},
+				"end": {
+					"line": 11,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Blank between two own-line comments is preserved",
+			"start": 243,
+			"end": 294,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 52
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 308,
+			"end": 313,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 316,
+			"end": 321,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Block comment normalizes to trailing ) with the brace on the same line",
+			"start": 350,
+			"end": 423,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 1
+				},
+				"end": {
+					"line": 27,
+					"column": 74
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c5 ",
+			"start": 436,
+			"end": 444,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 12
+				},
+				"end": {
+					"line": 28,
+					"column": 20
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 479,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 470,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 32,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "SwitchStatement",
+					"start": 79,
+					"end": 122,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 2
+						}
+					},
+					"discriminant": {
+						"type": "Identifier",
+						"start": 87,
+						"end": 88,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 9
+							},
+							"end": {
+								"line": 3,
+								"column": 10
+							}
+						},
+						"name": "a"
+					},
+					"cases": [
+						{
+							"type": "SwitchCase",
+							"start": 102,
+							"end": 119,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 2
+								},
+								"end": {
+									"line": 7,
+									"column": 9
+								}
+							},
+							"consequent": [
+								{
+									"type": "BreakStatement",
+									"start": 113,
+									"end": 119,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 3
+										},
+										"end": {
+											"line": 7,
+											"column": 9
+										}
+									},
+									"label": null
+								}
+							],
+							"test": {
+								"type": "Literal",
+								"start": 107,
+								"end": 108,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 8
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c1",
+									"start": 91,
+									"end": 96
+								}
+							]
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Line comment on its own line between ) and the switch body brace",
+							"start": 10,
+							"end": 77
+						}
+					]
+				},
+				{
+					"type": "SwitchStatement",
+					"start": 198,
+					"end": 240,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 2
+						}
+					},
+					"discriminant": {
+						"type": "Identifier",
+						"start": 206,
+						"end": 207,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 9
+							},
+							"end": {
+								"line": 11,
+								"column": 10
+							}
+						},
+						"name": "a",
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c2",
+								"start": 209,
+								"end": 214
+							}
+						]
+					},
+					"cases": [
+						{
+							"type": "SwitchCase",
+							"start": 220,
+							"end": 237,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 2
+								},
+								"end": {
+									"line": 14,
+									"column": 9
+								}
+							},
+							"consequent": [
+								{
+									"type": "BreakStatement",
+									"start": 231,
+									"end": 237,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 3
+										},
+										"end": {
+											"line": 14,
+											"column": 9
+										}
+									},
+									"label": null
+								}
+							],
+							"test": {
+								"type": "Literal",
+								"start": 225,
+								"end": 226,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 7
+									},
+									"end": {
+										"line": 13,
+										"column": 8
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Line comment trailing ) stays trailing, brace drops to the next line",
+							"start": 125,
+							"end": 196
+						}
+					]
+				},
+				{
+					"type": "SwitchStatement",
+					"start": 296,
+					"end": 347,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 2
+						}
+					},
+					"discriminant": {
+						"type": "Identifier",
+						"start": 304,
+						"end": 305,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 9
+							},
+							"end": {
+								"line": 18,
+								"column": 10
+							}
+						},
+						"name": "a"
+					},
+					"cases": [
+						{
+							"type": "SwitchCase",
+							"start": 327,
+							"end": 344,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 2
+								},
+								"end": {
+									"line": 24,
+									"column": 9
+								}
+							},
+							"consequent": [
+								{
+									"type": "BreakStatement",
+									"start": 338,
+									"end": 344,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 3
+										},
+										"end": {
+											"line": 24,
+											"column": 9
+										}
+									},
+									"label": null
+								}
+							],
+							"test": {
+								"type": "Literal",
+								"start": 332,
+								"end": 333,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 7
+									},
+									"end": {
+										"line": 23,
+										"column": 8
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c3",
+									"start": 308,
+									"end": 313
+								},
+								{
+									"type": "Line",
+									"value": " c4",
+									"start": 316,
+									"end": 321
+								}
+							]
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Blank between two own-line comments is preserved",
+							"start": 243,
+							"end": 294
+						}
+					]
+				},
+				{
+					"type": "SwitchStatement",
+					"start": 425,
+					"end": 469,
+					"loc": {
+						"start": {
+							"line": 28,
+							"column": 1
+						},
+						"end": {
+							"line": 31,
+							"column": 2
+						}
+					},
+					"discriminant": {
+						"type": "Identifier",
+						"start": 433,
+						"end": 434,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 9
+							},
+							"end": {
+								"line": 28,
+								"column": 10
+							}
+						},
+						"name": "a",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c5 ",
+								"start": 436,
+								"end": 444
+							}
+						]
+					},
+					"cases": [
+						{
+							"type": "SwitchCase",
+							"start": 449,
+							"end": 466,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 2
+								},
+								"end": {
+									"line": 30,
+									"column": 9
+								}
+							},
+							"consequent": [
+								{
+									"type": "BreakStatement",
+									"start": 460,
+									"end": 466,
+									"loc": {
+										"start": {
+											"line": 30,
+											"column": 3
+										},
+										"end": {
+											"line": 30,
+											"column": 9
+										}
+									},
+									"label": null
+								}
+							],
+							"test": {
+								"type": "Literal",
+								"start": 454,
+								"end": 455,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 7
+									},
+									"end": {
+										"line": 29,
+										"column": 8
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Block comment normalizes to trailing ) with the brace on the same line",
+							"start": 350,
+							"end": 423
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
