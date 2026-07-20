@@ -8,10 +8,21 @@ use crate::ast::internal::{self, Expression};
 /// than `isSimpleCallArgument`. Key differences:
 /// - Call expressions with > 1 argument are NOT short (even if structurally simple)
 /// - Binary expressions check both sides with depth=1
+/// - A JSDoc cast is transparent: the question is re-asked of the wrapped expression,
+///   so the rules above still fire through it (`is_simple_call_argument` has no such
+///   case, which is what keeps the transparency one level deep)
 ///
 /// Used to determine if tail args can stay inline after a function callback.
 fn is_hopefully_short_arg(expr: &Expression<'_>) -> bool {
     match expr {
+        // Prettier: if (node.type === "ParenthesizedExpression") recurse into node.expression.
+        // A JSDoc cast is prettier's retained `ParenthesizedExpression` — its annotation
+        // attaches to the INNER expression, so the wrapper is transparent here and the
+        // shortness question is asked of what it wraps. The recursion is one level deep on
+        // purpose: `is_simple_call_argument` has no paren case, so a cast nested inside
+        // another argument stays opaque, matching prettier.
+        Expression::JsdocCast(cast) => is_hopefully_short_arg(cast.inner),
+
         // Prettier: if (isCallLikeExpression(node) && getCallArguments(node).length > 1) return false
         Expression::CallExpression(call) if call.arguments.len() > 1 => false,
         Expression::NewExpression(new_expr) if new_expr.arguments.len() > 1 => false,

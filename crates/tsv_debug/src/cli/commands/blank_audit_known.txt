@@ -15,7 +15,7 @@
 # it is reported but never gated. It is excluded from this file by construction.
 #
 # Format: KIND<TAB>SHAPE
-# shapes: 174
+# shapes: 176
 NON-IDEMPOTENT	').⟨⟩IDENT
 NON-IDEMPOTENT	')⟨⟩.
 NON-IDEMPOTENT	(({⟨⟩IDENT
@@ -178,7 +178,9 @@ DROPPED	{}⟨⟩,
 DROPPED	})⟨⟩␣
 DROPPED	␣⟨⟩(
 DROPPED	␣⟨⟩()
+DROPPED	␣⟨⟩({}
 DROPPED	␣⟨⟩/*
+DROPPED	␣⟨⟩/**
 DROPPED	␣⟨⟩//
 DROPPED	␣⟨⟩IDENT
 DROPPED	␣⟨⟩['

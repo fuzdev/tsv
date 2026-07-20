@@ -1,7 +1,7 @@
 // Member-only chain handling
 //
-// Handles chains that contain only member accesses (no calls) using
-// fill() for greedy packing of segments.
+// Handles chains that contain only member accesses (no calls), giving each
+// lookup its own group — prettier's `printMemberExpression` shape.
 
 use super::super::printing::{
     ChainPrinter, node_comment_gap, print_node, print_node_inner, push_gap_comments_and_break,
@@ -9,12 +9,11 @@ use super::super::printing::{
 use super::super::types::{ChainGroup, ChainNode, ChainNodeRefVec};
 
 use crate::ast::internal::Expression;
-use smallvec::smallvec;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 
 /// True if a member-only chain has a line comment in any inter-member gap.
 ///
-/// Block-only comments stay on the fill path (they format inline without forcing a
+/// Block-only comments stay on the width-driven path (they format inline without forcing a
 /// break); a line comment must end its line, so it forces the chain to break to
 /// preserve the comment where the author wrote it — see
 /// [`build_member_only_chain_with_comments_doc`].
@@ -98,7 +97,7 @@ pub(super) fn build_member_only_chain_with_comments_doc<'a, P: ChainPrinter>(
     d.concat(&[first_doc, d.indent(d.concat(&rest))])
 }
 
-/// Whether a node opens a new fill segment — i.e. whether a break point may precede it.
+/// Whether a node opens a new segment — i.e. whether a break point may precede it.
 ///
 /// A `.prop` lookup may break onto its own line; a computed `[i]` / `?.[i]` lookup may
 /// NOT. Prettier's `printMemberExpression` (member.js) inlines every computed lookup
@@ -111,7 +110,8 @@ fn starts_segment(node: &ChainNode<'_>) -> bool {
     node.is_member() && !node.is_computed()
 }
 
-/// Build doc for member-only chains using fill for greedy packing
+/// Build doc for member-only chains: one group per lookup, mirroring prettier's
+/// `printMemberExpression`.
 ///
 /// Break points are ONLY at member access (`.foo`), not at non-null (`!`) and not at a
 /// computed lookup (`[i]` — see `starts_segment`). This ensures `.foo!` stays together as
@@ -148,20 +148,19 @@ pub(super) fn build_member_only_chain_doc<'a, P: ChainPrinter>(
 
     // Note: We intentionally do NOT check for blank lines here.
     // Blank lines in member-only chains are normalized (removed) - they don't
-    // affect the formatting output. The fill-based approach below handles
-    // line breaking based on width, which is the correct behavior.
+    // affect the formatting output. The per-lookup groups below handle line
+    // breaking based on width, which is the correct behavior.
 
     // For member-only chains, build first_doc from just the base identifier
     // and any immediately following non-null assertions (not the entire first group).
-    // This ensures all member accesses become fill segments that can be wrapped.
+    // This gives every member access its own segment, and so its own break point.
     //
     // The grouping logic puts almost all members in the first group (for the
-    // "short chain fits on one line" case), but for fill-based breaking we need
-    // each member access to be a separate segment.
+    // "short chain fits on one line" case), so the segments are re-derived here.
     let mut first_doc_end = 0;
     for (i, node) in all_nodes.iter().enumerate() {
         if starts_segment(node) {
-            // Stop at first member - that starts the fill segments
+            // Stop at first member - that starts the segments
             break;
         }
         first_doc_end = i + 1;
@@ -181,16 +180,15 @@ pub(super) fn build_member_only_chain_doc<'a, P: ChainPrinter>(
         return first_doc;
     }
 
-    // Build segments where each segment ENDS with a member access
-    // Break points are BEFORE each member access (softlines in fill)
+    // Build segments where each segment STARTS with a member access and carries the
+    // nodes glued to it (a trailing `!`, a computed `[i]`). Each gets its own break
+    // point, placed BEFORE the member access.
     //
     // Example: `a!.b!.c!` with nodes [Base(a), NonNull, Member(.b), NonNull, Member(.c), NonNull]
     //   first_doc = "a!"
     //   remaining nodes: [Member(.b), NonNull, Member(.c), NonNull]
     //   segments = [".b!", ".c!"]
-    //   result = group(first + indent(fill([.b!, softline, .c!])))
-    //
-    // Fill packs segments greedily - as many as fit on each line.
+    //   result = a! + group(indent(softline + .b!)) + group(indent(softline + .c!))
 
     // Build segments by collecting nodes until we see the NEXT member
     // Each segment includes everything up to and including a member (+ trailing non-null)
@@ -226,17 +224,12 @@ pub(super) fn build_member_only_chain_doc<'a, P: ChainPrinter>(
         return first_doc;
     }
 
-    // Single segment: identifier bases get flat concat (no break point),
-    // non-identifier bases (regex literals, etc.) get a breakable group so
-    // the dot can break when the line exceeds print width.
-    //
-    // Identifier bases stay flat to avoid regressions in fill contexts —
-    // a breakable `obj.prop` would split at the dot whenever remaining
-    // width on the current fill line is small.
-    if segments.len() == 1 {
-        let segment = segments[0];
-
-        let base_is_identifier = matches!(
+    // A lone `a.prop` off an identifier base gets no break point at all — prettier's
+    // `shouldInline` inlines the lookup when object and property are both identifiers
+    // and the whole thing isn't itself inside a member (member.js). Everything else
+    // falls through to the per-lookup groups below.
+    if segments.len() == 1
+        && matches!(
             all_nodes.first(),
             Some(ChainNode::Base {
                 expr: Expression::Identifier(_)
@@ -244,62 +237,32 @@ pub(super) fn build_member_only_chain_doc<'a, P: ChainPrinter>(
                     | Expression::Super(_),
                 ..
             })
-        );
-
-        if base_is_identifier {
-            return d.concat(&[first_doc, segment]);
-        }
-
-        let on_line = d.concat(&[first_doc, segment]);
-        let expanded = d.concat(&[first_doc, d.indent(d.concat(&[d.softline(), segment]))]);
-        return d.conditional_group(&[on_line, expanded]);
+        )
+    {
+        return d.concat(&[first_doc, segments[0]]);
     }
 
-    // For 2+ segments: use conditional_group([oneLine, expanded]).
-    // Short chains (≤2 segments): fill includes the base for greedy packing from
-    // the base position, allowing the fill to break after the base when needed.
-    // Long chains (3+ segments): fill starts after the base and packs greedily.
-
-    // Build on_line: everything concatenated flat
-    // Note: on_line does NOT need trailing_reserve because fits_with_lookahead
-    // already sees trailing content (comma, etc.) in rest_commands with the
-    // correct mode (Break → "," is counted).
-    let mut on_line_parts: DocBuf = smallvec![first_doc];
+    // Mirror prettier's `printMemberExpression`, which gives EACH lookup
+    // its own `group(indent([softline, lookup]))` and leaves the object doc beside it
+    // (member.js). Because a nested member's doc is `[objectDoc, lookupGroup]`, the
+    // groups appear innermost-first in the stream — so this is a left fold over the
+    // segments, each wrapping only its own break point.
+    //
+    // The one-group-per-lookup shape is what makes a base that breaks INTERNALLY hug
+    // its lookup: each group is measured from the column it starts at, and `fits` stops
+    // at the next `Line` reached in `Break` mode, so a lookup after a broken `]`/`}`/`)`
+    // is measured against a nearly-empty line and stays flat. A single conditional_group
+    // over the whole chain cannot express that — one verdict has to cover the base and
+    // every lookup at once, so the base's break spilled onto the first lookup
+    // (`chained/member_after_breaking_base`).
+    //
+    // Long chains fall out of the same rule rather than needing greedy packing: every
+    // lookup but the last is measured only as far as the next lookup's softline, so it
+    // fits and stays flat, and the last one — measured against the real tail — is the
+    // one that breaks (`alpha.bravo…papa⏎.quebec`).
+    let mut doc = first_doc;
     for &segment in &segments {
-        on_line_parts.push(segment);
+        doc = d.concat(&[doc, d.group(d.indent(d.concat(&[d.softline(), segment])))]);
     }
-    let on_line = d.concat(&on_line_parts);
-
-    if segments.len() <= 2 {
-        // Short trailing members (≤2 segments like `.right.start`): include the base
-        // as the first item of the fill, with softlines between base and segments.
-        // Fill packs greedily: keeps items on the same line if they fit, breaks to
-        // the next indented line when they don't.
-        //
-        // This correctly handles both:
-        // - Long base + comments consuming the line: fill breaks after base, packs
-        //   short segments together: `...labeled\n\t.right.start`
-        // - Short base + long last segment: fill packs first segment with base,
-        //   breaks before long segment: `ssss.data\n\t.fallbackBBBB...`
-        let mut fill_with_base_parts: DocBuf = smallvec![first_doc];
-        for &segment in &segments {
-            fill_with_base_parts.push(d.softline());
-            fill_with_base_parts.push(segment);
-        }
-        let fill_with_base = d.fill(&fill_with_base_parts);
-        let expanded = d.indent(fill_with_base);
-        d.conditional_group(&[on_line, expanded])
-    } else {
-        // Long chain (3+ segments): fill-based greedy packing after base
-        let mut fill_parts = DocBuf::new();
-        for &segment in &segments {
-            if !fill_parts.is_empty() {
-                fill_parts.push(d.softline());
-            }
-            fill_parts.push(segment);
-        }
-        let fill_doc = d.fill(&fill_parts);
-        let fill_expanded = d.concat(&[first_doc, d.indent(fill_doc)]);
-        d.conditional_group(&[on_line, fill_expanded])
-    }
+    doc
 }
