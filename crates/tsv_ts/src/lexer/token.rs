@@ -466,7 +466,7 @@ impl fmt::Display for TokenKind {
 // returns ≤16-byte integer aggregates in `rax:rdx` — no `Copy` needed) and store
 // straight into the parser's `current_*` fields, with no heap-owning field to
 // move. The rare decoded string (escapes only) lives out-of-band on the lexer
-// (`Lexer::decoded` / `take_decoded`), so the per-token value carried on the hot
+// (`Lexer::decode_scratch` / `decoded_str`), so the per-token value carried on the hot
 // pump is just classification + span. Left non-`Copy` (like the original) so
 // `TokenKind` can stay non-`Copy` and avoid a `trivially_copy_pass_by_ref` cascade
 // on the many `&TokenKind` params; moving an 8-byte `TokenKind` field is just as cheap.

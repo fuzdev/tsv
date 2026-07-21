@@ -48,8 +48,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         content: &str,
         tagged: bool,
     ) -> Result<TemplateCooked<'arena>, ParseError> {
-        match self.current_decoded() {
-            Some(decoded) => Ok(TemplateCooked::Decoded(self.alloc_str_in(decoded))),
+        match self.current_decoded {
+            Some(decoded) => Ok(TemplateCooked::Decoded(decoded)),
             None if content.contains('\\') => {
                 if tagged {
                     Ok(TemplateCooked::Invalid)
