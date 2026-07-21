@@ -39,6 +39,7 @@ use crate::attr_refs::{
     each_reference_bearing_attribute_expression, each_reference_bearing_directive_name,
     special_element_reference_expression,
 };
+use crate::script_decls::plain_identifier_str;
 use crate::{CompileError, Refusal};
 
 /// The snippet analysis product consumed by the server transform.
@@ -87,11 +88,7 @@ pub(crate) fn snippet_name<'s>(snippet: &SnippetBlock<'_>, source: &'s str) -> O
 
 /// The plain (non-escaped) name of an identifier, `None` for an escaped one.
 fn plain_name<'s>(id: &Identifier<'_>, source: &'s str) -> Option<&'s str> {
-    if id.escaped_name.is_some() {
-        return None;
-    }
-    let start = id.span.start as usize;
-    Some(&source[start..start + id.name_len as usize])
+    plain_identifier_str(id, source)
 }
 
 /// Analyze the component's snippets: collect every snippet name, and decide

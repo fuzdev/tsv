@@ -31,15 +31,14 @@ use tsv_ts::ast::internal::{
 };
 
 use crate::attribute::{
-    class_needs_clsx, collapse_attr_whitespace, escape_html_attr, is_js_identifier,
-    preceded_by_quote,
+    class_needs_clsx, collapse_attr_whitespace, escape_html_attr, preceded_by_quote,
 };
 use crate::body_builder::BodyBuilder;
 use crate::build::init_property;
 use crate::css_scope::SCOPE_HASH_CLASS;
 use crate::script_decls::plain_identifier_name;
 use crate::template_value::wrap_value_expr;
-use crate::text_class::js_trim;
+use crate::text_class::{is_js_identifier, js_trim};
 use crate::transform_server::{EmitEnv, unsupported};
 use crate::{CompileError, Refusal};
 

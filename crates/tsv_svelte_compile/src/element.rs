@@ -502,9 +502,7 @@ fn spread_element_flags(
     name: &str,
     inherited: Namespace,
 ) -> u32 {
-    if crate::namespace::element_is_svg(name, inherited)
-        || crate::namespace::element_is_mathml(name)
-    {
+    if crate::namespace::element_is_foreign(name, inherited) {
         3
     } else if is_custom_element_node(env, element, name) {
         2

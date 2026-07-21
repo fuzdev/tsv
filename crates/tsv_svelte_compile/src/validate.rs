@@ -384,6 +384,11 @@ impl<'s> Validator<'s> {
             }
             refuse_invalid_attribute_name(a, self.source)?;
             refuse_invalid_event_handler(a, self.source)?;
+            // Case-**sensitive** (`== "slot"`), mirroring this analyze-phase element
+            // rule's oracle site. ⚠️ NOT the census's case-INSENSITIVE test — see
+            // `element_census.rs::has_slot_attribute`, whose oracle (`css-prune.js`)
+            // lowercases while this one does not. The oracle is split, so do NOT
+            // fold this into a shared slot predicate with the census.
             if a.name_span.extract(self.source) == "slot" {
                 self.refuse_invalid_slot_placement()?;
             }

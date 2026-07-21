@@ -16,6 +16,7 @@ use crate::analyze::{ScopeEntry, pattern_binding_names};
 use crate::body_builder::BodyBuilder;
 use crate::fragment::emit_child_body;
 use crate::namespace::{ChildNamespace, FragmentParent, Namespace};
+use crate::script_decls::plain_identifier_str;
 use crate::snippet::snippet_name;
 use crate::template_value::wrap_single;
 use crate::transform_server::{EmitEnv, unsupported};
@@ -168,10 +169,7 @@ pub(crate) fn render_call_expression<'a, 'arena>(
 pub(crate) fn render_callee_name<'s>(expr: &Expression<'_>, source: &'s str) -> Option<&'s str> {
     let call = render_call_expression(expr)?;
     match call.callee {
-        Expression::Identifier(id) if id.escaped_name.is_none() => {
-            let start = id.span.start as usize;
-            Some(&source[start..start + id.name_len as usize])
-        }
+        Expression::Identifier(id) => plain_identifier_str(id, source),
         _ => None,
     }
 }

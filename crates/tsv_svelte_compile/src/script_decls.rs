@@ -291,15 +291,28 @@ fn script_declarations_of<'arena, E>(
     Ok(())
 }
 
-pub(crate) fn plain_identifier_name(
+/// The plain (non-escaped) name of an identifier as a borrow into `source`,
+/// `None` for a unicode-escaped identifier (`escaped_name` set). The single home
+/// of the escaped-bail + `name_len` slice idiom, which the analysis and emission
+/// walks each borrow (`rune_guard`, `snippet`, `needs_context`, `snippet_emit`);
+/// [`plain_identifier_name`] is its owned-`String` form. Centralized because the
+/// escaped-identifier handling here is a recurring bug class — one place to audit.
+pub(crate) fn plain_identifier_str<'s>(
     id: &tsv_ts::ast::internal::Identifier<'_>,
-    source: &str,
-) -> Option<String> {
+    source: &'s str,
+) -> Option<&'s str> {
     if id.escaped_name.is_some() {
         return None;
     }
     let start = id.span.start as usize;
-    Some(source[start..start + id.name_len as usize].to_string())
+    Some(&source[start..start + id.name_len as usize])
+}
+
+pub(crate) fn plain_identifier_name(
+    id: &tsv_ts::ast::internal::Identifier<'_>,
+    source: &str,
+) -> Option<String> {
+    plain_identifier_str(id, source).map(str::to_string)
 }
 
 pub(crate) fn identifier_binding_name(id: &Expression<'_>, source: &str) -> Option<String> {

@@ -1,5 +1,6 @@
-//! Character classes of the **target** languages' lexical grammars, for the
-//! source scans that reason about their text without tokenizing it.
+//! Character classes and token predicates of the **target** languages' lexical
+//! grammars, for the source scans and object-key shaping that reason about their
+//! text without tokenizing it.
 //!
 //! Rust's own `char::is_whitespace` is the Unicode `White_Space` property, which
 //! is NOT the same set, in **both** directions:
@@ -87,6 +88,25 @@ pub(crate) fn js_char_at(source: &str, pos: usize) -> Option<JsChar> {
         is_whitespace: is_js_whitespace(c),
         len: c.len_utf8(),
     })
+}
+
+/// Whether `name` matches the ECMAScript identifier grammar
+/// (`/^[a-zA-Z_$][a-zA-Z_$0-9]*$/`) — the oracle's `regex_is_valid_identifier`
+/// gate (`b.key`), which decides whether an object key (a `style:`/`class:`
+/// directive property, a component prop) prints as a bare identifier or a quoted
+/// string literal. `format_canonical` applies the same test when dropping quotes
+/// off a string-literal key, so a non-shorthand key can always be a string
+/// literal; the identifier form matters only for the object-shorthand `{ color }`
+/// a `style:color` shorthand builds. The single home of the check — it was
+/// duplicated character-for-character across the attribute and component
+/// emitters, two positions no one fixture exercises both of.
+pub(crate) fn is_js_identifier(name: &str) -> bool {
+    let mut chars = name.chars();
+    match chars.next() {
+        Some(c) if c.is_ascii_alphabetic() || c == '_' || c == '$' => {}
+        _ => return false,
+    }
+    chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
 }
 
 /// CSS `white-space` (CSS Syntax Level 3 §3.3 — newline, `U+0009`, `U+0020`,

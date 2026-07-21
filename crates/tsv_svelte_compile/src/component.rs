@@ -37,6 +37,7 @@ use crate::namespace::{ChildNamespace, FragmentParent, Namespace};
 use crate::script_decls::plain_identifier_name;
 use crate::snippet_emit::build_snippet_function;
 use crate::template_value::wrap_value_expr;
+use crate::text_class::is_js_identifier;
 use crate::transform_server::{EmitEnv, unsupported};
 use crate::{CompileError, Refusal};
 
@@ -250,18 +251,6 @@ fn component_has_named_attribute(env: &EmitEnv<'_, '_>, element: &Element<'_>, n
         let interner = env.b.interner.borrow();
         interner.resolve_infallible(attr.name) == name
     })
-}
-
-/// Whether `name` matches the ECMAScript identifier grammar Svelte's `b.key` uses
-/// (`regex_is_valid_identifier`, `/^[a-zA-Z_$][a-zA-Z_$0-9]*$/`) — an identifier
-/// key, otherwise a string-literal key.
-fn is_valid_js_identifier(name: &str) -> bool {
-    let mut chars = name.chars();
-    match chars.next() {
-        Some(c) if c.is_ascii_alphabetic() || c == '_' || c == '$' => {}
-        _ => return false,
-    }
-    chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
 }
 
 /// Emit `Name($$renderer, props)` for a component invocation (`<Foo … />`),
@@ -596,7 +585,7 @@ fn build_component_property<'arena>(
         let interner = env.b.interner.borrow();
         interner.resolve_infallible(attr.name).to_string()
     };
-    let key_is_ident = is_valid_js_identifier(&name);
+    let key_is_ident = is_js_identifier(&name);
     let key = if key_is_ident {
         Expression::Identifier(env.b.ident(&name))
     } else {

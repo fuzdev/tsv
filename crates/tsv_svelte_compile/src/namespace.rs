@@ -101,6 +101,15 @@ fn element_flags(env: &EmitEnv<'_, '_>, el: &Element<'_>, inherited: Namespace) 
     (element_is_svg(name, inherited), element_is_mathml(name))
 }
 
+/// The oracle's `get_attribute_name` namespace test: an svg/mathml element
+/// preserves its attribute-name case; every other element lowercases. `inherited`
+/// is the namespace the element sits in — the ancestor signal for the svg
+/// `<a>`/`<title>` rule ([`element_is_svg`]). Lives here beside the other element
+/// namespace classifiers rather than re-derived at the attribute emitter.
+pub(crate) fn element_is_foreign(element_name: &str, inherited: Namespace) -> bool {
+    element_is_svg(element_name, inherited) || element_is_mathml(element_name)
+}
+
 /// Port of Svelte's `determine_namespace_for_children`: the namespace an element's
 /// own children fragment is in, from the element's tag name (`foreignObject`
 /// resets to html even though it is an svg element). `inherited` is the namespace

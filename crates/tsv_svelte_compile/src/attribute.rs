@@ -29,10 +29,10 @@ use crate::body_builder::BodyBuilder;
 use crate::build::{escape_template_text, init_property};
 use crate::css_scope::SCOPE_HASH_CLASS;
 use crate::dropped::guard_dropped;
-use crate::namespace::{Namespace, element_is_mathml, element_is_svg};
+use crate::namespace::{Namespace, element_is_foreign};
 use crate::script_decls::plain_identifier_name;
 use crate::template_value::wrap_value_expr;
-use crate::text_class::js_trim;
+use crate::text_class::{is_js_identifier, js_trim};
 use crate::transform_server::{EmitEnv, unsupported};
 use crate::{CompileError, Refusal};
 
@@ -223,14 +223,6 @@ pub(crate) fn emit_attribute<'arena>(
             emit_mixed_attribute(env, emit_name, values, out)
         }
     }
-}
-
-/// The oracle's `get_attribute_name` namespace test: an svg/mathml element
-/// preserves its attribute-name case; every other element lowercases. `inherited`
-/// is the namespace the element sits in — the ancestor signal for the svg
-/// `<a>`/`<title>` rule (`namespace::element_is_svg`).
-fn element_is_foreign(element_name: &str, inherited: Namespace) -> bool {
-    element_is_svg(element_name, inherited) || element_is_mathml(element_name)
 }
 
 /// Whether the byte before `pos` is a quote — the same discriminant the wire
@@ -630,21 +622,6 @@ pub(crate) fn build_spread_object_property<'arena>(
         && matches!(&value, Expression::Identifier(id)
             if plain_identifier_name(id, env.source).as_deref() == Some(emit_name));
     Ok(Some(init_property(key, value, shorthand, key_span)))
-}
-
-/// Whether `name` is a valid JS identifier (`/^[a-zA-Z_$][a-zA-Z_$0-9]*$/`) — the
-/// oracle's `regex_is_valid_identifier` gate (`b.key`), which decides whether a
-/// style property key prints as a bare identifier or a quoted string. `format_canonical`
-/// applies the same test when dropping quotes off a string-literal key, so a
-/// non-shorthand key can always be a string literal; the identifier form matters
-/// only for the object-shorthand `{ color }` a `style:color` shorthand builds.
-pub(crate) fn is_js_identifier(name: &str) -> bool {
-    let mut chars = name.chars();
-    match chars.next() {
-        Some(c) if c.is_ascii_alphabetic() || c == '_' || c == '$' => {}
-        _ => return false,
-    }
-    chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
 }
 
 /// Collapse `[ \t\n\r\f]+` runs to one space without trimming (the mixed-value

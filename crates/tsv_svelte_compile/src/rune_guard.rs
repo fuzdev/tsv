@@ -43,6 +43,7 @@ use tsv_ts::ast::internal::{
 };
 
 use crate::analyze::{NameSet, expression_kind, pattern_binding_names};
+use crate::script_decls::plain_identifier_str;
 use crate::{CompileError, Refusal};
 
 /// The walk's shared state: the source names resolve against, the collection
@@ -178,11 +179,7 @@ fn identifier_name<'s>(
     id: &tsv_ts::ast::internal::Identifier<'_>,
     source: &'s str,
 ) -> Option<&'s str> {
-    if id.escaped_name.is_some() {
-        return None;
-    }
-    let start = id.span.start as usize;
-    Some(&source[start..start + id.name_len as usize])
+    plain_identifier_str(id, source)
 }
 
 /// The `$`-prefixed root-identifier name of a callee, peeled through member

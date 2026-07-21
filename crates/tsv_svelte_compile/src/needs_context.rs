@@ -52,6 +52,7 @@ use crate::attr_refs::{
     special_element_reference_expression,
 };
 use crate::refusal;
+use crate::script_decls::plain_identifier_str;
 use crate::snippet_emit::render_call_expression;
 use crate::{CompileError, Refusal};
 
@@ -322,11 +323,7 @@ fn unsupported(reason: Refusal) -> CompileError {
 /// The plain (non-escaped) name of an identifier, `None` for a unicode-escaped
 /// or synthetic identifier.
 fn plain_name<'s>(id: &tsv_ts::ast::internal::Identifier<'_>, source: &'s str) -> Option<&'s str> {
-    if id.escaped_name.is_some() {
-        return None;
-    }
-    let start = id.span.start as usize;
-    Some(&source[start..start + id.name_len as usize])
+    plain_identifier_str(id, source)
 }
 
 /// Collect the top-level prop (incl. rest-prop) and import names into
