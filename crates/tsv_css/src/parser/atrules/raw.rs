@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use super::{CssParser, is_boolean_operator};
 use crate::lexer::TokenKind;
 use crate::url::trim_url_raw;
@@ -156,15 +158,15 @@ pub(super) fn parse_raw_prelude_content<'arena>(
                 }
             }
             let raw = &parser.source()[url_start..url_end];
-            let part = if is_lowercase_url {
-                let trimmed = trim_url_raw(raw).unwrap_or_else(|| raw.to_string());
+            let part: Cow<'_, str> = if is_lowercase_url {
+                let trimmed = trim_url_raw(raw).unwrap_or(Cow::Borrowed(raw));
                 if normalize_quotes {
-                    normalize_url_string_quote(&trimmed)
+                    Cow::Owned(normalize_url_string_quote(&trimmed))
                 } else {
                     trimmed
                 }
             } else {
-                raw.to_string()
+                Cow::Borrowed(raw)
             };
             prelude.push_str(&part);
             trailing_spaces = 0;
