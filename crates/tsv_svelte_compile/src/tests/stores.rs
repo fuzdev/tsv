@@ -178,6 +178,134 @@ fn compile_derived_store_reads_call() {
 }
 
 #[test]
+fn compile_escaped_store_read_subscribes() {
+    // A `$count` store read written with a unicode escape (`$count` decodes to
+    // `$count`; `$` = `$`) is the SAME store auto-subscription the oracle sees
+    // — it decodes `node.name`, so the escaped spelling emits byte-identically to
+    // the plain one: `$.store_get(($$store_subs ??= {}), '$count', count)` plus the
+    // subscription scaffold. (Corpus-absent — nobody writes escaped identifiers — so
+    // no gate catches a divergence here; this pins the decode.)
+    let out = compile_checked(
+        "<script>\n\timport { count } from './s';\n</script>\n<p>{\\u0024count}</p>",
+    );
+    assert!(
+        out.js
+            .contains("$.store_get(($$store_subs ??= {}), '$count', count)"),
+        "escaped store read: {}",
+        out.js
+    );
+    assert!(out.js.contains("var $$store_subs;"), "subs var: {}", out.js);
+    assert!(
+        out.js
+            .contains("if ($$store_subs) $.unsubscribe_stores($$store_subs);"),
+        "unsubscribe: {}",
+        out.js
+    );
+    // CONTROL: the escaped spelling must compile byte-identically to the plain one
+    // — the decode must not perturb the hot store path.
+    let plain = compile_js("<script>\n\timport { count } from './s';\n</script>\n<p>{$count}</p>");
+    let escaped =
+        compile_js("<script>\n\timport { count } from './s';\n</script>\n<p>{\\u0024count}</p>");
+    assert_eq!(
+        plain, escaped,
+        "escaped `$count` must compile identically to plain `$count`"
+    );
+}
+
+#[test]
+fn compile_escaped_store_script_read_and_writes() {
+    // Script-position escaped reads / writes / updates lower exactly as the plain
+    // spellings: a read → `$.store_get`, a write → `$.store_set`, an update →
+    // `$.update_store`.
+    let read = compile_js(
+        "<script>\n\timport { count } from './s';\n\tconst x = \\u0024count;\n</script>\n<p>{x}</p>",
+    );
+    assert!(
+        read.contains("$.store_get(($$store_subs ??= {}), '$count', count)"),
+        "escaped script read: {read}"
+    );
+    let write = compile_js(
+        "<script>\n\timport { count } from './s';\n\tfunction f() { \\u0024count = 5; }\n</script>\n<button onclick={f}>{$count}</button>",
+    );
+    assert!(
+        write.contains("$.store_set(count, 5)"),
+        "escaped store write: {write}"
+    );
+    let update = compile_js(
+        "<script>\n\timport { count } from './s';\n\tfunction f() { \\u0024count++; }\n</script>\n<button onclick={f}>{$count}</button>",
+    );
+    assert!(
+        update.contains("$.update_store(($$store_subs ??= {}), '$count', count)"),
+        "escaped store update: {update}"
+    );
+}
+
+#[test]
+fn compile_escaped_store_write_scaffolds_subscription() {
+    // An escaped store WRITE in a DROPPED handler emits no `$.store_set` (SSR drops
+    // the handler) but still forces the `var $$store_subs;` / `$.unsubscribe_stores`
+    // scaffold via the analysis-driven `uses_stores` gate — which now counts the
+    // decoded escaped `$count` reference, exactly as the oracle's does.
+    let out = compile_checked(
+        "<script>\n\timport { count } from './s';\n</script>\n<button onclick={() => \\u0024count = 5}>go</button>",
+    );
+    assert!(
+        out.js.contains("var $$store_subs;"),
+        "escaped dropped write must scaffold subscription: {}",
+        out.js
+    );
+    assert!(
+        out.js
+            .contains("if ($$store_subs) $.unsubscribe_stores($$store_subs);"),
+        "unsubscribe: {}",
+        out.js
+    );
+}
+
+#[test]
+fn compile_escaped_store_destructuring_write_refuses() {
+    // An escaped destructuring store write (`[$count] = arr`) refuses as
+    // `StoreDestructuringWrite`, exactly as the plain `[$count] = arr` does — the
+    // pattern-target detection decodes the escaped leaf, so it never falls through
+    // to corrupt the assignment target (before the decode this silently MISMATCHED).
+    assert_unsupported(
+        "<script>\n\timport { count } from './s';\n\tfunction f(arr) { [\\u0024count] = arr; }\n</script>\n<button onclick={f}>x</button>",
+        "store destructuring write",
+    );
+}
+
+#[test]
+fn compile_escaped_shadowed_store_base_refuses() {
+    // An escaped store read whose decoded base is shadowed by a nested scope is the
+    // oracle's `store_invalid_scoped_subscription` — the decode makes `store_base`
+    // see the shadowed base, so it refuses exactly as the plain form does (rather
+    // than fall through and corrupt).
+    assert_unsupported(
+        "<script>\n\timport { writable } from 'svelte/store';\n\tlet count = writable(0);\n\tfunction f(count) { return \\u0024count; }\n</script>\n<p>{f}</p>",
+        "not a top-level component binding",
+    );
+}
+
+#[test]
+fn compile_escaped_slots_subscribes() {
+    // `$$slots` written with a unicode escape (`$$slots`) is the oracle's
+    // `uses_slots` reference — it decodes `node.name` — so it injects
+    // `const $$slots = $.sanitize_slots($$props)` and reads `$$slots`, matching the
+    // plain spelling.
+    let out = compile_checked("<script>\n\tlet x = 1;\n</script>\n{\\u0024\\u0024slots}");
+    assert!(
+        out.js.contains("$.sanitize_slots($$props)"),
+        "escaped $$slots must inject sanitize_slots: {}",
+        out.js
+    );
+    assert!(
+        out.js.contains("$.escape($$slots)"),
+        "escaped $$slots read: {}",
+        out.js
+    );
+}
+
+#[test]
 fn compile_shadowed_store_base_refuses() {
     // A store base shadowed by a block-local (`{#each}`/`{#await}`/snippet param) is
     // not a top-level store — the oracle errors `store_invalid_scoped_subscription`,

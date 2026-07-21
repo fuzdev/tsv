@@ -1003,17 +1003,25 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
             {
                 nc.refuse = Some(Refusal::InvalidArgumentsUsage);
             }
-            // `uses_slots` / `uses_stores` are EMISSION gates, not refusals, and
-            // stay span-identity — an escaped `$$slots`/store name is not a user
-            // reference the oracle's gate counts here.
-            if let Some(name) = plain_name(id, nc.source) {
-                if name == "$$slots" {
-                    nc.uses_slots = true;
-                } else if crate::analyze::store_read_base(name)
-                    .is_some_and(|base| nc.store_names.contains(base))
-                {
-                    nc.uses_stores = true;
-                }
+            // `uses_slots` / `uses_stores` are EMISSION gates (not refusals) that
+            // key on the DECODED identifier name — the oracle reads `node.name`,
+            // so an escaped `$$slots` or a `$name` store reference counts exactly
+            // as its plain spelling. The plain fast path stays a span slice; only
+            // an escaped identifier borrows the interner to decode (the `.to_string`
+            // releases the borrow before the flag write).
+            let decoded;
+            let name = if let Some(name) = plain_name(id, nc.source) {
+                name
+            } else {
+                decoded = id.name(nc.source, &nc.interner.borrow()).to_string();
+                &decoded
+            };
+            if name == "$$slots" {
+                nc.uses_slots = true;
+            } else if crate::analyze::store_read_base(name)
+                .is_some_and(|base| nc.store_names.contains(base))
+            {
+                nc.uses_stores = true;
             }
         }
         // Leaves — no children, no bindings.

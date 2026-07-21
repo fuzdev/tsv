@@ -129,6 +129,22 @@ fn compile_class_state_lone_store_arg_refuses() {
 }
 
 #[test]
+fn compile_class_state_lone_escaped_store_arg_refuses() {
+    // The escaped spelling of a lone store argument (`$state($count)`) must refuse
+    // exactly as the plain `$state($count)` does: the store rewrite now DECODES an
+    // escaped `$`-identifier, so the lone-argument check decodes too — otherwise the
+    // escaped argument slips the refusal and the store rewrite subscribes it
+    // (`$.store_get(…)`) where the oracle keeps the field bare (a MISMATCH).
+    let store = "import { writable } from 'svelte/store';\n\tconst count = writable(0);";
+    assert_unsupported(
+        &format!(
+            "<script>\n\t{store}\n\tclass C {{\n\t\tx = $state(\\u0024count);\n\t}}\n\tconst c = new C();\n</script>\n<p>{{c.x}}</p>"
+        ),
+        "lone store/$derived argument",
+    );
+}
+
+#[test]
 fn compile_class_state_lone_derived_arg_refuses() {
     // A class-field `$state(d)` / `$state.raw(d)` whose WHOLE argument is a lone
     // `$derived` read: the oracle keeps it bare (`x = d`), but tsv's store rewrite

@@ -63,7 +63,6 @@ use crate::CompileError;
 use crate::analyze::{NameSet, store_read_base};
 use crate::build::Builder;
 use crate::refusal::Refusal;
-use crate::rune_guard::assign_target_roots;
 
 /// Rewrite every store access (and script-position `$derived` read) in `stmts`,
 /// returning `None` when nothing changed (the caller keeps the original slice).
@@ -179,12 +178,22 @@ macro_rules! map_slice {
 impl<'arena> StoreRewriter<'_, 'arena> {
     // ── Store recognition ──────────────────────────────────────────────────
 
-    /// The `$`-stripped base of a plain `$name` identifier that resolves to a
-    /// top-level component binding (a store), else `None`. Mirrors
-    /// `template_value`'s `bare_store_read`.
+    /// The `$`-stripped base of a `$name` identifier that resolves to a top-level
+    /// component binding (a store), else `None`. Mirrors `template_value`'s
+    /// `bare_store_read`.
+    ///
+    /// The name is DECODED: a plain identifier is its span slice (the fast path —
+    /// the interner is never touched), while a unicode-escaped `$`-identifier
+    /// (`$count` written `$count`) resolves through the interner, so it is read
+    /// as the store the oracle sees (the oracle decodes `node.name`).
     fn store_base(&self, id: &Identifier<'_>) -> Option<String> {
         if id.escaped_name.is_some() {
-            return None;
+            // An escaped `$`-identifier decodes to a store name the oracle treats
+            // exactly as its plain spelling — resolve it via the interner.
+            let borrow = self.b.interner.borrow();
+            let name = id.name(self.source, &borrow);
+            let base = store_read_base(name)?;
+            return self.store_names.contains(base).then(|| base.to_string());
         }
         let start = id.span.start as usize;
         let name = &self.source[start..start + id.name_len as usize];
@@ -207,14 +216,36 @@ impl<'arena> StoreRewriter<'_, 'arena> {
         self.derived_names.contains(name)
     }
 
-    /// Whether any assignment-target root inside `left` is a store base — used to
-    /// detect a store buried in a destructuring pattern.
+    /// Whether any assignment-target binding leaf inside `left` is a store base —
+    /// used to detect a store buried in a destructuring pattern. Mirrors
+    /// [`assign_target_roots`](crate::rune_guard::assign_target_roots)'s pattern
+    /// recursion, but tests each leaf with [`store_base`](Self::store_base) so an
+    /// ESCAPED `$name` (`[$count] = …`) is decoded and detected — where the
+    /// span-identity `assign_target_roots` skips it. That makes an escaped
+    /// destructuring store write refuse (`StoreDestructuringWrite`) exactly as the
+    /// plain `[$count] = …` does, rather than fall through and corrupt the target.
+    /// The TypeScript assignment-target wrappers are absent here (this pass runs
+    /// over the post-erase body), so they need no arm.
     fn pattern_targets_store(&self, left: &Expression<'_>) -> bool {
-        let mut roots = NameSet::default();
-        assign_target_roots(left, self.source, &mut roots);
-        roots
-            .iter()
-            .any(|name| store_read_base(name).is_some_and(|base| self.store_names.contains(base)))
+        match left {
+            Expression::Identifier(id) => self.store_base(id).is_some(),
+            Expression::MemberExpression(m) => self.pattern_targets_store(m.object),
+            Expression::ParenthesizedExpression(p) => self.pattern_targets_store(p.expression),
+            Expression::ObjectPattern(obj) => obj.properties.iter().any(|prop| match prop {
+                ObjectPatternProperty::Property(p) => self.pattern_targets_store(&p.value),
+                ObjectPatternProperty::RestElement(rest) => {
+                    self.pattern_targets_store(rest.argument)
+                }
+            }),
+            Expression::ArrayPattern(arr) => arr
+                .elements
+                .iter()
+                .flatten()
+                .any(|element| self.pattern_targets_store(element)),
+            Expression::AssignmentPattern(a) => self.pattern_targets_store(a.left),
+            Expression::RestElement(r) => self.pattern_targets_store(r.argument),
+            _ => false,
+        }
     }
 
     // ── Statements ─────────────────────────────────────────────────────────

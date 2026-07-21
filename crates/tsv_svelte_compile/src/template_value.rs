@@ -22,6 +22,7 @@
 //! [`crate::store_rewrite`] for the *script*-position analog of this walk.
 
 use bumpalo::collections::Vec as BumpVec;
+use tsv_lang::SharedInterner;
 use tsv_ts::ast::internal::{
     ArrayExpression, BinaryExpression, CallExpression, ConditionalExpression, Expression,
     MemberExpression, NewExpression, ParenthesizedExpression, SequenceExpression, SpreadElement,
@@ -88,20 +89,37 @@ pub(crate) fn is_bare_derived_read(
     false
 }
 
-/// Whether `expr` is a bare read of a store binding — a plain (non-escaped)
-/// `$`-prefixed identifier whose `$`-stripped base is a top-level binding
-/// (`store_names`). Such a read rewrites to
-/// `$.store_get(($$store_subs ??= {}), '$name', name)` at every value position,
-/// at any depth. Returns the base store name (the `$`-stripped variable). A
-/// `$name` whose base is NOT a binding is the oracle's `global_reference_invalid`
-/// error, so it is left for the guard to refuse (a safe over-refusal); an escaped
-/// `$`-identifier is likewise left refused (its decoded base can't be read here).
-fn bare_store_read(source: &str, store_names: &NameSet, expr: &Expression<'_>) -> Option<String> {
+/// Whether `expr` is a read of a store binding — a `$`-prefixed identifier whose
+/// `$`-stripped base is a top-level binding (`store_names`). Such a read rewrites
+/// to `$.store_get(($$store_subs ??= {}), '$name', name)` at every value position,
+/// at any depth. Returns the base store name (the `$`-stripped variable).
+///
+/// The identifier name is DECODED: a plain identifier is its span slice (the fast
+/// path — the interner is never touched), while a unicode-escaped `$`-identifier
+/// (`$count` written `$count`) resolves through the interner, so it is read as
+/// the store the oracle sees (the oracle decodes `node.name`, treating the escaped
+/// spelling exactly as the plain one). A `$name` whose base is NOT a binding is the
+/// oracle's `global_reference_invalid` error; the PLAIN form is left for the guard
+/// to refuse (a safe over-refusal), while an escaped non-binding `$name` — which
+/// the guard's span-identity `dollar_identifier_name` can't read — is emitted
+/// verbatim, a pre-existing over-acceptance in the escaped-reference residual.
+fn bare_store_read(
+    source: &str,
+    store_names: &NameSet,
+    interner: &SharedInterner,
+    expr: &Expression<'_>,
+) -> Option<String> {
     let Expression::Identifier(id) = expr else {
         return None;
     };
     if id.escaped_name.is_some() {
-        return None;
+        // An escaped `$`-identifier decodes to a store name the oracle treats
+        // exactly as its plain spelling — resolve it and check the store base while
+        // the interner borrow is held (only escaped names pay the borrow).
+        let borrow = interner.borrow();
+        let name = id.name(source, &borrow);
+        let base = crate::analyze::store_read_base(name)?;
+        return store_names.contains(base).then(|| base.to_string());
     }
     let start = id.span.start as usize;
     let name = &source[start..start + id.name_len as usize];
@@ -129,7 +147,8 @@ fn rewrite_template_value<'arena>(
     // store — the oracle errors `store_invalid_scoped_subscription`, so it is left
     // for the guard to refuse (a safe refusal). A `$derived` base reads `d()` (the
     // store the derived currently holds).
-    if let Some(base) = bare_store_read(env.source, &env.store_names, expr)
+    let store_base = bare_store_read(env.source, &env.store_names, &env.b.interner, expr);
+    if let Some(base) = store_base
         && !env
             .overlays
             .iter()
@@ -149,7 +168,13 @@ fn rewrite_template_value<'arena>(
     // No rewrite target in this subtree: guard it whole and pass through borrowed
     // — the guarded fast path, so every target-free template expression keeps its
     // exact behavior (and does no extra allocation).
-    if !contains_rewrite_target(env.source, &env.derived_names, &env.store_names, expr) {
+    if !contains_rewrite_target(
+        env.source,
+        &env.derived_names,
+        &env.store_names,
+        &env.b.interner,
+        expr,
+    ) {
         guard_template_value(env, expr)?;
         return Ok(expr);
     }
@@ -210,19 +235,21 @@ fn contains_rewrite_target(
     source: &str,
     derived_names: &NameSet,
     store_names: &NameSet,
+    interner: &SharedInterner,
     expr: &Expression<'_>,
 ) -> bool {
     if is_bare_derived_read(source, derived_names, expr) {
         return true;
     }
-    if bare_store_read(source, store_names, expr).is_some() {
+    if bare_store_read(source, store_names, interner, expr).is_some() {
         return true;
     }
     if snapshot_call_arg(source, expr).is_some() {
         return true;
     }
-    let contains =
-        |e: &Expression<'_>| contains_rewrite_target(source, derived_names, store_names, e);
+    let contains = |e: &Expression<'_>| {
+        contains_rewrite_target(source, derived_names, store_names, interner, e)
+    };
     match expr {
         Expression::CallExpression(c) => contains(c.callee) || c.arguments.iter().any(&contains),
         Expression::NewExpression(n) => contains(n.callee) || n.arguments.iter().any(&contains),

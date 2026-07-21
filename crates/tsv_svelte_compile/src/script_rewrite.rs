@@ -546,7 +546,13 @@ fn rewrite_class_state_fields<'arena>(
                     // argument to `$.store_get(…)` / `d()` — a MISMATCH. A compound
                     // (`$state($count + 1)`) or a plain-variable argument is fine —
                     // the inner read there IS rewritten at parity.
-                    if is_lone_reactive_binding(arg, source, derived_names, store_names) {
+                    if is_lone_reactive_binding(
+                        arg,
+                        source,
+                        &b.interner,
+                        derived_names,
+                        store_names,
+                    ) {
                         return Err(unsupported(Refusal::ClassFieldStateReactiveArg));
                     }
                     walk_expression_guarded(arg, &mut ctx)?;
@@ -606,31 +612,42 @@ fn rewrite_class_state_fields<'arena>(
 
 /// Whether `arg` — the WHOLE argument of a class-field `$state(…)` /
 /// `$state.raw(…)` — is a lone reactive-binding identifier the store rewrite
-/// would otherwise rewrite: a **store read** (a plain `$name` whose `$`-stripped
-/// base is a store binding and not a rune) or a **`$derived` binding** read.
+/// would otherwise rewrite: a **store read** (a `$name` whose `$`-stripped base is
+/// a store binding and not a rune) or a **`$derived` binding** read.
 ///
-/// Mirrors `store_rewrite`'s `store_base` / `derived_read` decision (both skip
-/// escaped identifiers via `plain_identifier_name` — so an escaped lone argument
-/// is not caught here, matching the store rewrite, which would not rewrite it
-/// either; an escaped derived read is separately refused by the guard). The
-/// discriminant is exactly "would the store rewrite touch this lone identifier?",
-/// so the refusal covers precisely the shapes the oracle keeps bare and nothing
-/// wider — a compound argument (`$state($count + 1)` → `$.store_get(…) + 1`) or a
-/// plain-variable argument stays compiling.
+/// The discriminant is exactly "would a rewrite touch this lone identifier?", so
+/// it mirrors the two rewrites' escaped handling, which DIFFER: `store_rewrite`'s
+/// `store_base` DECODES an escaped `$`-identifier (so this decodes too, or an
+/// escaped lone store argument would slip the refusal and the store rewrite would
+/// subscribe it — `$.store_get(…)` — where the oracle keeps the field bare, a
+/// MISMATCH), while `store_rewrite`'s `derived_read` stays span-identity (an
+/// escaped derived read is refused by the guard, never rewritten) — so the derived
+/// branch is a PLAIN name only. The refusal thus covers precisely the shapes the
+/// oracle keeps bare and nothing wider — a compound argument
+/// (`$state($count + 1)` → `$.store_get(…) + 1`) or a plain-variable argument stays
+/// compiling.
 fn is_lone_reactive_binding(
     arg: &Expression<'_>,
     source: &str,
+    interner: &SharedInterner,
     derived_names: &NameSet,
     store_names: &NameSet,
 ) -> bool {
     let Expression::Identifier(id) = arg else {
         return false;
     };
-    let Some(name) = plain_identifier_name(id, source) else {
-        return false;
-    };
-    if derived_names.contains(&name) {
+    if id.escaped_name.is_some() {
+        // Escaped: the store rewrite decodes it, the derived rewrite does not — so
+        // decode and test the STORE branch alone.
+        let borrow = interner.borrow();
+        let name = id.name(source, &borrow);
+        return crate::analyze::store_read_base(name)
+            .is_some_and(|base| store_names.contains(base));
+    }
+    let start = id.span.start as usize;
+    let name = &source[start..start + id.name_len as usize];
+    if derived_names.contains(name) {
         return true;
     }
-    crate::analyze::store_read_base(&name).is_some_and(|base| store_names.contains(base))
+    crate::analyze::store_read_base(name).is_some_and(|base| store_names.contains(base))
 }

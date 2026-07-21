@@ -948,7 +948,9 @@ independent. They are listed here in dependency order, walk first.
   `$derived` binding — bare (`{d}`) or nested at any depth (`{d + 1}`, `{obj[d]}`,
   `{f(d)}`, `{d.x}`) — to `d()`, every `$state.snapshot(x)` sub-node to
   `$.snapshot(<processed x>)`, and every **store read** — a `$name` whose
-  `$`-stripped base is a binding and not a rune (`bare_store_read`), NOT shadowed by a
+  `$`-stripped base is a binding and not a rune (`bare_store_read`, which DECODES an
+  escaped `$`-identifier so an escaped `$count` reaches parity exactly as the plain
+  spelling — the oracle decodes `node.name`), NOT shadowed by a
   block-local overlay (a shadowed base is the oracle's
   `store_invalid_scoped_subscription`, left for the guard to refuse) — to
   `$.store_get(($$store_subs ??= {}), '$name', name)` (the store value reads `name()`
