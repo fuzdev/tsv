@@ -81,7 +81,7 @@ impl<'a> Printer<'a> {
             docs.push(d.literalline());
         }
         docs.push(d.hardline());
-        docs.extend(self.build_leading_comments_before(&leading_comments, member_start));
+        self.push_leading_comments_before(&mut docs, &leading_comments, member_start);
         docs
     }
 

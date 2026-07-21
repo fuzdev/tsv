@@ -411,7 +411,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             Rc::clone(&self.interner),
             self.arena,
         )?;
-        self.expression_comments.extend(comments);
+        self.expression_comments.extend_from_slice(comments);
         Ok(expr)
     }
 
@@ -429,7 +429,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             Rc::clone(&self.interner),
             self.arena,
         )?;
-        self.expression_comments.extend(comments);
+        self.expression_comments.extend_from_slice(comments);
         Ok((expr, end_pos))
     }
 
@@ -453,7 +453,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // that line, and the wire serializes them with the shifted columns.
         let pattern_on_first_line = !self.source[..base_offset].contains('\n');
         self.expression_comments
-            .extend(comments.into_iter().map(|mut c| {
+            .extend(comments.iter().copied().map(|mut c| {
                 if !pattern_on_first_line
                     && !self.source[base_offset..c.span.start as usize].contains('\n')
                 {
@@ -477,7 +477,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             Rc::clone(&self.interner),
             self.arena,
         )?;
-        self.expression_comments.extend(comments);
+        self.expression_comments.extend_from_slice(comments);
         Ok(stmt)
     }
 }

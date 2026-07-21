@@ -314,8 +314,7 @@ impl<'a> Printer<'a> {
                             stmt_parts.push(d.hardline());
                         }
                     }
-                    stmt_parts
-                        .extend(self.build_orphaned_comment_run(&leading_comments, search_end));
+                    self.push_orphaned_comment_run(&mut stmt_parts, &leading_comments, search_end);
                     parts.push(d.indent(d.concat(&stmt_parts)));
                     prev_stmt_end = Some(stmt_end);
                 }

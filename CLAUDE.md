@@ -752,7 +752,7 @@ See ./docs/conformance_test262.md (command interface; §Differential for the tsv
 ```bash
 cargo run -p tsv_debug profile ~/dev/zzz/src/lib                    # parse vs format phase timing (--iterations, --json)
 cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib  # FFI parse path: parse vs the wire-JSON write (§2)
-cargo run -p tsv_debug buffer_sizes ~/dev/zzz/src ~/dev/gro/src     # printer SmallVec/MultilineText sizing histograms (§8)
+cargo run -p tsv_debug buffer_sizes ~/dev/zzz/src ~/dev/gro/src     # printer SmallVec sizing histograms (§8)
 cargo run -p tsv_debug arena_stats ~/dev/zzz/src/lib                # DocArena node-population + memory audit (§7; --reuse, --list-errors)
 ```
 

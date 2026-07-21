@@ -329,21 +329,22 @@ impl<'a> Printer<'a> {
     ///
     /// Used by: class body members, interface/enum members, block statement bodies,
     /// type literals, expanded object patterns. The orphaned-comment sibling is
-    /// [`Self::build_orphaned_comment_run`].
-    pub(crate) fn build_leading_comments_before(
+    /// [`Self::push_orphaned_comment_run`]. Pushes into the caller's buffer
+    /// (usually pooled) rather than returning a fresh `DocBuf` — a long run
+    /// would spill the intermediate on every call just to be `extend`ed away.
+    pub(crate) fn push_leading_comments_before(
         &self,
+        parts: &mut DocBuf,
         comments: &[&internal::Comment],
         target_start: u32,
-    ) -> DocBuf {
-        let mut parts = DocBuf::new();
+    ) {
         self.push_leading_comment_run(
-            &mut parts,
+            parts,
             comments.iter().copied(),
             target_start,
             LeadingGlue::Adjacent,
             self.d().empty(),
         );
-        parts
     }
 
     /// Build the run for comments **orphaned by a dropped statement** — a bare `;`
@@ -360,19 +361,19 @@ impl<'a> Printer<'a> {
     /// leading run — so it routes through the shared emitter unchanged, and only the
     /// last comment is special-cased here.
     ///
-    /// A sibling of [`Self::build_leading_comments_before`] rather than a flag on it:
+    /// A sibling of [`Self::push_leading_comments_before`] rather than a flag on it:
     /// what differs is not a separator policy but whether the run has a target at all.
-    pub(crate) fn build_orphaned_comment_run(
+    pub(crate) fn push_orphaned_comment_run(
         &self,
+        parts: &mut DocBuf,
         comments: &[&internal::Comment],
         gap_end: u32,
-    ) -> DocBuf {
-        let mut parts = DocBuf::new();
+    ) {
         let Some((last, leading)) = comments.split_last() else {
-            return parts;
+            return;
         };
         self.push_leading_comment_run(
-            &mut parts,
+            parts,
             leading.iter().copied(),
             last.span.start,
             LeadingGlue::Adjacent,
@@ -382,7 +383,6 @@ impl<'a> Printer<'a> {
         if self.has_blank_line_between(last.span.end, gap_end) {
             parts.push(self.d().literalline());
         }
-        parts
     }
 
     /// Build docs for trailing comments at the end of a body (before closing `}`).
