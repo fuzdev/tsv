@@ -312,7 +312,22 @@ project-wide conventions.
   instance + template AST (exhaustive matches) and sets the flag on any `new`
   expression, or a member/call whose root (`is_safe_identifier`) is not a plain
   identifier or is a prop/import binding — a plain local, a global, and rune
-  bindings stay safe. A member/call rooted at a prop/import that is *also* bound
+  bindings stay safe. This same walk hosts the oracle's `props_illegal_name`
+  **reference-site** rule (`MemberExpression.js:11-16`): a
+  `rest_prop.$$…` member access refuses (`Refusal::PropsIllegalName`, shared with
+  the declare-site in `script_props.rs`) — a plain-Identifier object bound to a
+  `$props()` rest_prop (the whole-object `let props = $props()` or the rest element
+  of `let { a, ...rest } = $props()`; the collector reads the instance body only,
+  since a module `$props()` refuses upstream) and an Identifier property starting
+  with `$$`. The check matches the oracle's condition EXACTLY, with **no** `computed`
+  gate: a computed identifier key (`rest[$$slots]`) matches (its property is an
+  Identifier) and the oracle rejects it — and `$$slots` is exempt from tsv's own
+  `$$`-ref rule (`rune_guard.rs`, the legit sanitize_slots ref), so a `!computed`
+  gate here would leak it as an over-acceptance; a computed STRING key
+  (`rest['$$slots']`) is excluded on its own because its property is a Literal, not
+  an Identifier (the oracle also compiles it). It rides the analyze-phase walk
+  everywhere — script, template, snippet bodies, dropped handlers, dropped
+  `{:catch}`. Placed at the top of the `MemberExpression` arm, first-wins. A member/call rooted at a prop/import that is *also* bound
   in a nested scope is ambiguous for this name-based port and refuses, as does one
   rooted at an escaped identifier (classification not ported). Descends
   into `{#snippet}` bodies (a function-like subtree — a `new`/prop-rooted access

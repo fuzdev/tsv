@@ -60,6 +60,14 @@ struct Nc<'a> {
     source: &'a str,
     /// Prop + import names — the roots whose member/call access is unsafe.
     context_roots: &'a NameSet,
+    /// The instance script's `$props()` **rest_prop** binding names — the roots
+    /// whose `.$$…` member access the oracle rejects
+    /// (`props_illegal_name`, `MemberExpression.js:11-16`). A `$props()`
+    /// declarator produces a `rest_prop` in exactly two forms: the whole-object
+    /// `let props = $props()` and the REST element of `let { a, ...rest } =
+    /// $props()`; the named props are `prop`, not `rest_prop`. See
+    /// [`collect_rest_prop_names`].
+    rest_prop_names: &'a NameSet,
     /// Top-level component binding names — the store-subscription base set. Any
     /// `$name` reference whose `$`-stripped base is here is a store access, so
     /// the component needs the `$$store_subs` injection (the oracle's gate:
@@ -219,9 +227,16 @@ pub(crate) fn analyze_component(
     collect_context_roots(instance_body, source, &mut context_roots);
     collect_context_roots(module_body, source, &mut context_roots);
 
+    // The rest_prop roots are collected from the INSTANCE body only: a module
+    // `$props()` refuses upstream (`analyze_module_script`), so no rest_prop
+    // binding ever originates in the module script.
+    let mut rest_prop_names = NameSet::default();
+    collect_rest_prop_names(instance_body, source, &mut rest_prop_names);
+
     let mut nc = Nc {
         source,
         context_roots: &context_roots,
+        rest_prop_names: &rest_prop_names,
         store_names,
         constants,
         each_items: NameSet::default(),
@@ -330,6 +345,59 @@ fn collect_context_roots(instance_body: &[Statement<'_>], source: &str, out: &mu
                 }
             }
             _ => {}
+        }
+    }
+}
+
+/// Collect the instance script's `$props()` **rest_prop** binding names — the
+/// roots whose `.$$…` member access the oracle's `props_illegal_name`
+/// rejects (`MemberExpression.js:11-16`).
+///
+/// A `$props()` declarator produces a `rest_prop` binding in exactly two forms
+/// (`VariableDeclarator.js`):
+///
+/// - the whole-object `let props = $props()` — an Identifier `node.id`, whose
+///   binding becomes `rest_prop` (`:87-90`);
+/// - the REST element of a destructure `let { a, ...rest } = $props()` —
+///   `path.is_rest` (`:46-47`). The NAMED props (`a`) are `prop`/`bindable_prop`,
+///   NOT `rest_prop`, so they are deliberately excluded here (unlike
+///   [`collect_context_roots`], which takes every prop name).
+///
+/// An escaped identifier returns `None` from [`plain_name`] and falls through —
+/// the crate's standing escaped-identifier residual, same as the declare-site
+/// check (`script_props::rewrite_props_pattern`).
+fn collect_rest_prop_names(instance_body: &[Statement<'_>], source: &str, out: &mut NameSet) {
+    for stmt in instance_body {
+        let Statement::VariableDeclaration(decl) = stmt else {
+            continue;
+        };
+        for declarator in decl.declarations {
+            let is_props = declarator
+                .init
+                .as_ref()
+                .and_then(|init| classify_rune_init(init, source))
+                .is_some_and(|r| matches!(r, RuneInit::Props));
+            if !is_props {
+                continue;
+            }
+            match &declarator.id {
+                Expression::Identifier(id) => {
+                    if let Some(name) = plain_name(id, source) {
+                        out.insert(name.to_string());
+                    }
+                }
+                Expression::ObjectPattern(obj) => {
+                    for prop in obj.properties {
+                        if let ObjectPatternProperty::RestElement(rest) = prop
+                            && let Expression::Identifier(id) = rest.argument
+                            && let Some(name) = plain_name(id, source)
+                        {
+                            out.insert(name.to_string());
+                        }
+                    }
+                }
+                _ => {}
+            }
         }
     }
 }
@@ -823,6 +891,37 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
             walk_exprs(call.arguments, nc);
         }
         Expression::MemberExpression(member) => {
+            // The oracle's `props_illegal_name` REFERENCE-site rule
+            // (`MemberExpression.js:11-16`): a `rest_prop.$$…` access — a plain
+            // Identifier object bound to a `$props()` rest_prop, and an
+            // Identifier property whose name starts with `$$` (reserved for
+            // Svelte internals). One error code, shared with the declare-site
+            // `Refusal::PropsIllegalName`. Placed at the TOP of the arm,
+            // mirroring the oracle placing it above its own
+            // `is_safe_identifier`/`needs_context` check (the `check_root`
+            // analog below), and first-wins (`nc.refuse.is_none()`).
+            //
+            // This matches the oracle's condition EXACTLY — `node.object.type
+            // === 'Identifier' && node.property.type === 'Identifier'`, with NO
+            // `computed` gate. `computed` must NOT be gated: a computed
+            // IDENTIFIER key (`rest[$$slots]`) matches the oracle's condition
+            // (its property IS an Identifier) and the oracle rejects it, but
+            // `$$slots` is EXEMPT from tsv's own `$$`-ref rule
+            // (`rune_guard.rs`, `if name != "$$slots"` — the legit sanitize_slots
+            // reference), so gating on `!computed` here would suppress this rule
+            // and nothing else would fire → an OVER-ACCEPTANCE. A computed STRING
+            // key (`rest['$$slots']`) is excluded on its own: its property is a
+            // Literal, not an Identifier, so the `Expression::Identifier(prop)`
+            // arm fails — matching the oracle, which also compiles it.
+            if nc.refuse.is_none()
+                && let Expression::Identifier(obj) = member.object
+                && let Some(obj_name) = plain_name(obj, nc.source)
+                && nc.rest_prop_names.contains(obj_name)
+                && let Expression::Identifier(prop) = member.property
+                && plain_name(prop, nc.source).is_some_and(|p| p.starts_with("$$"))
+            {
+                nc.refuse = Some(Refusal::PropsIllegalName);
+            }
             check_root(expr, nc);
             walk_expr(member.object, nc);
             if member.computed {

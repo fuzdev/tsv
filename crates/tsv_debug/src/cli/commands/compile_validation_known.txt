@@ -26,10 +26,9 @@
 # its buckets churn with every compiler slice.
 #
 # Format: KIND<TAB>ORACLE_CODE<TAB>PATH (path relative to its suite root)
-# shapes: 6
+# shapes: 5
 OVER-ACCEPT	invalid_arguments_usage	compiler-errors/samples/invalid-arguments-usage/main.svelte
 OVER-ACCEPT	js_parse_error	compiler-errors/samples/illegal-expression/main.svelte
-OVER-ACCEPT	props_illegal_name	compiler-errors/samples/runes-props-illegal-name-2/main.svelte
 OVER-ACCEPT	tag_invalid_name	compiler-errors/samples/component-invalid-name/main.svelte
 OVER-ACCEPT	unexpected_reserved_word	validator/samples/dynamic-element-this/input.svelte
 ORACLE-ERROR	oracle-tool: An impossible situation occurred	validator/samples/silence-warnings-2/input.svelte

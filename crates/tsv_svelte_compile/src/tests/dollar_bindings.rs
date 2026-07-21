@@ -283,3 +283,67 @@ fn compile_refuses_props_illegal_name_declare_site() {
     let _ = compile_js("<script>let { '$$slots': a } = $props(); a;</script>\n<p>{a}</p>");
     let _ = compile_js("<script>let { a, ...rest } = $props(); a; rest;</script>\n<p>{a}</p>");
 }
+
+#[test]
+fn compile_refuses_props_illegal_name_member_site() {
+    // The oracle's `props_illegal_name` REFERENCE-site rule
+    // (`MemberExpression.js:11-16`): a non-computed `.$$…` access on a plain
+    // Identifier bound to a `$props()` rest_prop. A `rest_prop` arises from the
+    // whole-object `let props = $props()` (`VariableDeclarator.js:87-90`) and from
+    // the REST element of `let { a, ...rest } = $props()` (`:46-47`); the NAMED
+    // props are `prop`, never `rest_prop`.
+    for source in [
+        // The three declaration forms: destructure rest, whole-object, mixed.
+        "<script>let { ...rest } = $props(); const x = rest.$$slots; x;</script>\n<p>x</p>",
+        "<script>let props = $props(); const x = props.$$slots; x;</script>\n<p>x</p>",
+        "<script>let { a, ...rest } = $props(); a; const x = rest.$$slots; x;</script>\n<p>x</p>",
+        // Nested member — the INNER `rest.$$foo` fires (its object is the
+        // Identifier `rest`; the outer `.bar`'s object is a MemberExpression).
+        "<script>let { ...rest } = $props(); const x = rest.$$foo.bar; x;</script>\n<p>x</p>",
+        // Template position.
+        "<script>let { ...rest } = $props();</script>\n{rest.$$slots}",
+        // Optional chain: tsv's internal AST drops `ChainExpression`, so `rest?.$$foo`
+        // is a plain `MemberExpression{optional:true}` — the arm does NOT gate on
+        // `optional`, matching the oracle (which has no such gate).
+        "<script>let { ...rest } = $props(); const x = rest?.$$foo; x;</script>\n<p>x</p>",
+        // Bare `$$` property (`\"$$\".starts_with(\"$$\")` is true).
+        "<script>let { ...rest } = $props(); const x = rest.$$; x;</script>\n<p>x</p>",
+        // Snippet body — the walk descends into `{#snippet}` bodies.
+        "<script>let { ...rest } = $props();</script>\n{#snippet s()}{rest.$$foo}{/snippet}",
+        // Script arrow body.
+        "<script>let { ...rest } = $props(); const f = () => rest.$$foo; f;</script>\n<p>x</p>",
+        // Dropped event handler — the walk reaches dropped handlers.
+        "<script>let { ...rest } = $props();</script>\n<button onclick={() => rest.$$foo}>x</button>",
+        // Dropped `{:catch}` — the `in_dropped_catch` walk.
+        "<script>let { ...rest } = $props();</script>\n{#await p}a{:catch e}{rest.$$foo}{/await}",
+        // ⭐ Computed IDENTIFIER key `rest[$$slots]` / `props[$$slots]` — the
+        // oracle's condition is `node.property.type === 'Identifier'` (NO computed
+        // gate), so a computed identifier key matches. This is the case a `!computed`
+        // gate would LEAK: `$$slots` is exempt from tsv's own `$$`-ref rule
+        // (`rune_guard.rs`, the sanitize_slots ref), so nothing else would fire.
+        "<script>let { ...rest } = $props(); const x = rest[$$slots]; x;</script>\n<p>x</p>",
+        "<script>let props = $props(); const x = props[$$slots]; x;</script>\n<p>x</p>",
+    ] {
+        assert_unsupported(source, "prop name starting with `$$`");
+    }
+}
+
+#[test]
+fn compile_allows_member_access_that_is_not_rest_prop_illegal() {
+    // Controls that MUST keep compiling — the member-site rule must not over-refuse.
+    // A computed STRING key: the property is a Literal, not an Identifier, so the
+    // `Expression::Identifier(prop)` arm fails and it never matches — the oracle
+    // also compiles it. (Contrast the computed IDENTIFIER key `rest[$$slots]`,
+    // which DOES match and refuses — in the refuse test above.)
+    let _ = compile_js(
+        "<script>let { ...rest } = $props(); const x = rest['$$slots']; x;</script>\n<p>x</p>",
+    );
+    // A NAMED prop (`a` is `prop`, not `rest_prop`) — `a.$$foo` is legal; it wraps
+    // in `$$renderer.component` (prop-rooted member), matching the oracle.
+    let _ = compile_js("<script>let { a } = $props(); const x = a.$$foo; x;</script>\n<p>x</p>");
+    // A non-`$$` property on a rest_prop.
+    let _ =
+        compile_js("<script>let { ...rest } = $props(); const x = rest.foo; x;</script>\n<p>x</p>");
+    // A plain object, not a props binding.
+    let _ = compile_js("<script>let o = {}; const x = o.$$foo; x;</script>\n<p>x</p>");
+}
