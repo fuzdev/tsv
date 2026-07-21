@@ -14,10 +14,11 @@ pub type ChainNodeVec<'a> = SmallVec<[ChainNode<'a>; 8]>;
 
 /// Stack-friendly buffer for the grouped chain — `group_chain_nodes` builds this
 /// once per chain. `ChainGroup` is ~112 bytes (it embeds an inline `ChainNodeVec`),
-/// so the inline capacity is kept small at `2`: it covers the common short chain
-/// (member-only chains and short call chains are 1–2 groups) on the stack, while
-/// longer chains — which break anyway — spill to the heap.
-pub type ChainGroupVec<'a> = SmallVec<[ChainGroup<'a>; 2]>;
+/// so the inline capacity stays small at `4`: most chains are 1–2 groups, but a
+/// 3–4-group chain (`a.b().c()` and friends) is common in real code — a two-call
+/// chain is already 3 groups — so `4` keeps the common shapes on the stack while
+/// the genuinely long chains, which break anyway, spill to the heap.
+pub type ChainGroupVec<'a> = SmallVec<[ChainGroup<'a>; 4]>;
 
 /// Stack-friendly buffer of chain-node references — for the member-only and
 /// base-call flatten passes that collect `&ChainNode` before printing. `8` covers

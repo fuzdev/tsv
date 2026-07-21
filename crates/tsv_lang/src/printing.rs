@@ -652,37 +652,43 @@ pub fn strip_comment_indentation(source: &str, content: &str, comment_start: u32
 /// context indent is supplied separately by the layout). Non-indentable block
 /// comments are preserved verbatim instead.
 ///
-/// `lines` is the comment body *without* the `/*` / `*/` delimiters, already
-/// split on `'\n'` — the caller splits once and feeds the same lines to the
-/// indentable-comment builder, so the body isn't re-scanned per pass. Returns
+/// `lines` iterates the comment body *without* the `/*` / `*/` delimiters,
+/// split on `'\n'` (typically `content.split('\n')` fed directly) — no line
+/// buffer is materialized, so classification never heap-allocates. Returns
 /// `false` for single-line content. Mirrors prettier's `isIndentableBlockComment`.
 ///
 /// # Example
 /// ```
 /// use tsv_lang::printing::is_indentable_block_comment;
 ///
-/// let lines = |s: &'static str| s.split('\n').collect::<Vec<_>>();
-/// assert!(is_indentable_block_comment(&lines("*\n * text\n ")));     // /** … */
-/// assert!(is_indentable_block_comment(&lines("\n * text\n ")));      // /* * … */
-/// assert!(is_indentable_block_comment(&lines("*\n *\n * text\n "))); // blank `*` line
-/// assert!(!is_indentable_block_comment(&lines(" a\n   b "))); // a line lacks `*`
-/// assert!(!is_indentable_block_comment(&lines(" single line ")));    // single-line
+/// let lines = |s: &'static str| s.split('\n');
+/// assert!(is_indentable_block_comment(lines("*\n * text\n ")));     // /** … */
+/// assert!(is_indentable_block_comment(lines("\n * text\n ")));      // /* * … */
+/// assert!(is_indentable_block_comment(lines("*\n *\n * text\n "))); // blank `*` line
+/// assert!(!is_indentable_block_comment(lines(" a\n   b "))); // a line lacks `*`
+/// assert!(!is_indentable_block_comment(lines(" single line ")));    // single-line
 /// ```
-pub fn is_indentable_block_comment(lines: &[&str]) -> bool {
+pub fn is_indentable_block_comment<'s>(mut lines: impl Iterator<Item = &'s str>) -> bool {
     // The `*` of the `/*` opener attaches to the first line and the `*` of the
     // `*/` closer attaches to the last line, so the first line always qualifies
     // and an all-whitespace last line qualifies. Every other line must start
-    // with `*`. (Pattern fails for single-line content → `false`.)
-    let [_first, middle @ .., last] = lines else {
+    // with `*`.
+    if lines.next().is_none() {
+        return false;
+    }
+    // Lag one line behind so the final line gets the last-line rule.
+    let Some(mut prev) = lines.next() else {
         return false; // fewer than 2 lines → not a multi-line indentable comment
     };
-    for line in middle {
-        if !line.trim_start().starts_with('*') {
+    for next in lines {
+        // A successor exists, so `prev` is a middle line: it must be `*`-prefixed.
+        if !prev.trim_start().starts_with('*') {
             return false;
         }
+        prev = next;
     }
     // The last line qualifies when empty or `*`-prefixed.
-    let last = last.trim_start();
+    let last = prev.trim_start();
     last.is_empty() || last.starts_with('*')
 }
 
