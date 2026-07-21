@@ -362,7 +362,10 @@ impl<'a> Printer<'a> {
             return wrap_call_with_hard_breaks(d, callee_with_types, arg_parts);
         }
 
-        // Check for blank lines between arguments (forces expansion and preservation)
+        // Check for blank lines between arguments (forces expansion and preservation).
+        // Coarse over-check: a raw scan of every gap (it must catch a blank that sits
+        // *past* a same-line trailing comment, which the emitter's per-gap `blank_scan_end`
+        // measure would clamp away — so the two intentionally differ and are not shared).
         let has_blank_lines = new_expr
             .arguments
             .windows(2)
