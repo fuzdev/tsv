@@ -1702,7 +1702,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let paren_span = Span::new(paren_start as u32, paren_end as u32);
         let expr = if let Some(idx) = cast_comment_idx {
             self.comments[idx].owned_by_node = true;
-            let comment = self.comments[idx].clone();
+            let comment = self.comments[idx];
             self.alloc(Expression::JsdocCast(JsdocCast {
                 inner: parsed.expr,
                 span: paren_span,

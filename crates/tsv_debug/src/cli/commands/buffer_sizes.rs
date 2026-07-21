@@ -9,18 +9,32 @@ use tsv_lang::estimated_ast_arena_capacity;
 use tsv_ts::ast::internal::{ImportSpecifier, Statement};
 
 /// Histogram the print-time buffer-size distributions used to tune the TS
-/// printer's `SmallVec` inline capacities (`named_specs`, `CommentLines`) and to
-/// size the future context-indenting multiline-text doc node.
+/// printer's `SmallVec` inline capacities.
 ///
-/// Two metrics, both static properties of the AST (load-independent, no perf
-/// noise — the clean alternative to varying an inline `N` and re-reading
-/// heaptrack spill counts):
+/// Two parse-time metrics, both static properties of the AST (load-independent,
+/// no perf noise — the clean alternative to varying an inline `N` and
+/// re-reading heaptrack spill counts):
 ///
 /// - **import named-specifier count per import declaration** — sizes the
 ///   `named_specs` buffer in `statements/modules/mod.rs`.
-/// - **line count per multi-line block comment** — sizes the `CommentLines`
-///   buffer in `comments/render.rs`, and is the input distribution for the
-///   per-line-`String` lever (the dominant comment alloc).
+/// - **line count per multi-line block comment** — the population the parked
+///   line-offset scratch (`borrow_line_spans_scratch`) iterates in
+///   `comments/render.rs`.
+///
+/// With the **`buffer_stats` feature** (off by default — the record hooks sit
+/// in the chain printer's hot path), each file is additionally *formatted* and
+/// four printer-buffer populations are sampled at their construction
+/// chokepoints (`tsv_ts::printer::buffer_stats`), so inline-`N` claims about
+/// them are measured data rather than doc-comment prose:
+///
+/// - **`ChainNodeVec`** — nodes per linearized chain
+/// - **`ChainGroupVec`** — groups per `group_chain_nodes` call
+/// - **`ChainGroup.nodes`** — nodes per built chain group
+/// - **leading-comment `CommentVec`** — comments per
+///   `collect_leading_comments` call (the type's dominant site)
+///
+/// The report labels carry each type's *current* inline `N`, read from the
+/// types themselves (`tsv_ts::inline_capacities`) so they can't drift.
 ///
 /// Covers **both** standalone TypeScript (`.ts` / `.svelte.ts`) **and** Svelte
 /// `<script>` / `{expr}` content — the latter is formatted by the embedded TS
@@ -46,6 +60,9 @@ impl BufferSizesCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
         let (files, _skipped) = resolve_profile_files(&self.paths, |_| false)?;
 
+        #[cfg(feature = "buffer_stats")]
+        tsv_ts::set_buffer_stats(true);
+
         let mut named_specs: Vec<usize> = Vec::new();
         let mut comment_lines: Vec<usize> = Vec::new();
         let mut files_parsed = 0usize;
@@ -70,10 +87,27 @@ impl BufferSizesCommand {
         named_specs.sort_unstable();
         comment_lines.sort_unstable();
 
+        #[cfg(feature = "buffer_stats")]
+        let printer_stats = {
+            let mut stats = tsv_ts::take_buffer_stats();
+            stats.chain_nodes.sort_unstable();
+            stats.chain_groups.sort_unstable();
+            stats.group_nodes.sort_unstable();
+            stats.leading_comments.sort_unstable();
+            stats
+        };
+
         if self.json {
-            print_json(&named_specs, &comment_lines, files_parsed, parse_errors);
+            let fields = json_fields(&named_specs, &comment_lines, files_parsed, parse_errors);
+            #[cfg(feature = "buffer_stats")]
+            let fields = format!("{fields},{}", printer_stats_json_fields(&printer_stats));
+            println!("{{{fields}}}");
         } else {
             print_report(&named_specs, &comment_lines, files_parsed, parse_errors);
+            #[cfg(feature = "buffer_stats")]
+            print_printer_stats(&printer_stats);
+            #[cfg(not(feature = "buffer_stats"))]
+            eprintln!("\n(chain/comment printer-buffer histograms need `--features buffer_stats`)");
         }
         Ok(())
     }
@@ -94,7 +128,11 @@ fn collect_file(
         ParserType::TypeScript => {
             let ast = tsv_ts::parse(&source, &arena).map_err(|_| ())?;
             collect_imports(ast.body, named_specs);
-            collect_comments(&ast.comments, &source, comment_lines);
+            collect_comments(ast.comments, &source, comment_lines);
+            // Run the real printer so the armed buffer_stats hooks sample the
+            // actual chain/comment buffer populations. Output is discarded.
+            #[cfg(feature = "buffer_stats")]
+            drop(tsv_ts::format(&ast, &source));
         }
         ParserType::Svelte => {
             let root = tsv_svelte::parse(&source, &arena).map_err(|_| ())?;
@@ -108,10 +146,69 @@ fn collect_file(
                 collect_imports(script.content.body, named_specs);
             }
             collect_comments(&root.comments, &source, comment_lines);
+            #[cfg(feature = "buffer_stats")]
+            drop(tsv_svelte::format(&root, &source));
         }
         ParserType::Css => {}
     }
     Ok(())
+}
+
+/// Report the four printer-buffer populations sampled during the format runs.
+/// Each label's inline `N` is read from the buffer type itself, so a re-tuned
+/// capacity can't leave a stale label here.
+#[cfg(feature = "buffer_stats")]
+fn print_printer_stats(stats: &tsv_ts::BufferStats) {
+    let caps = tsv_ts::inline_capacities();
+    eprintln!();
+    print_metric(
+        &format!(
+            "ChainNodeVec (nodes per linearized chain; inline N={})",
+            caps.chain_nodes
+        ),
+        &stats.chain_nodes,
+        &[4, 8, 12, 16],
+    );
+    eprintln!();
+    print_metric(
+        &format!(
+            "ChainGroupVec (groups per group_chain_nodes call; inline N={})",
+            caps.chain_groups
+        ),
+        &stats.chain_groups,
+        &[2, 4, 6, 8],
+    );
+    eprintln!();
+    print_metric(
+        &format!(
+            "ChainGroup.nodes (nodes per built chain group; inline N={})",
+            caps.group_nodes
+        ),
+        &stats.group_nodes,
+        &[2, 4, 6, 8],
+    );
+    eprintln!();
+    print_metric(
+        &format!(
+            "CommentVec (comments per collect_leading_comments call; inline N={})",
+            caps.leading_comments
+        ),
+        &stats.leading_comments,
+        &[2, 4, 6, 8],
+    );
+}
+
+/// The printer-buffer populations as JSON object fields (no braces), merged
+/// into the single `--json` object after the parse-time fields.
+#[cfg(feature = "buffer_stats")]
+fn printer_stats_json_fields(stats: &tsv_ts::BufferStats) -> String {
+    format!(
+        "\"chain_nodes\":{},\"chain_groups\":{},\"group_nodes\":{},\"leading_comments\":{}",
+        metric_json(&stats.chain_nodes),
+        metric_json(&stats.chain_groups),
+        metric_json(&stats.group_nodes),
+        metric_json(&stats.leading_comments),
+    )
 }
 
 /// Count Named specifiers per import declaration in a statement body.
@@ -207,22 +304,26 @@ fn print_metric(title: &str, sorted: &[usize], inline_candidates: &[usize]) {
     }
 }
 
-fn print_json(named: &[usize], comments: &[usize], files: usize, parse_errors: usize) {
-    let metric_json = |sorted: &[usize]| {
-        format!(
-            "{{\"n\":{},\"p50\":{},\"p90\":{},\"p95\":{},\"p99\":{},\"max\":{},\"mean\":{:.4}}}",
-            sorted.len(),
-            percentile(sorted, 50),
-            percentile(sorted, 90),
-            percentile(sorted, 95),
-            percentile(sorted, 99),
-            sorted.last().copied().unwrap_or(0),
-            mean(sorted),
-        )
-    };
-    println!(
-        "{{\"files\":{files},\"parse_errors\":{parse_errors},\"named_specs\":{},\"comment_lines\":{}}}",
+/// One `{"n":…,"p50":…,…}` histogram-summary object for a sorted sample list.
+fn metric_json(sorted: &[usize]) -> String {
+    format!(
+        "{{\"n\":{},\"p50\":{},\"p90\":{},\"p95\":{},\"p99\":{},\"max\":{},\"mean\":{:.4}}}",
+        sorted.len(),
+        percentile(sorted, 50),
+        percentile(sorted, 90),
+        percentile(sorted, 95),
+        percentile(sorted, 99),
+        sorted.last().copied().unwrap_or(0),
+        mean(sorted),
+    )
+}
+
+/// The parse-time metrics as JSON object fields (no braces), so the
+/// feature-gated printer-buffer fields can merge into the same `--json` object.
+fn json_fields(named: &[usize], comments: &[usize], files: usize, parse_errors: usize) -> String {
+    format!(
+        "\"files\":{files},\"parse_errors\":{parse_errors},\"named_specs\":{},\"comment_lines\":{}",
         metric_json(named),
         metric_json(comments),
-    );
+    )
 }

@@ -214,7 +214,7 @@ fn glued_block_sites(source: &str) -> Vec<Site> {
     };
     let bytes = source.as_bytes();
     let mut sites = Vec::new();
-    for c in &program.comments {
+    for c in program.comments {
         if !c.is_block {
             continue;
         }

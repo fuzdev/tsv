@@ -71,7 +71,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         )?;
 
         // Add expression comments to the parser's collection for later inclusion in Root.comments
-        self.expression_comments.extend(comments);
+        self.expression_comments.extend_from_slice(comments);
 
         // The span end is right after the closing brace
         let end = expr_end + 1;

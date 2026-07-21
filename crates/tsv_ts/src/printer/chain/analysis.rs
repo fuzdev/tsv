@@ -125,6 +125,8 @@ type ParenGap = (usize, u32);
 fn finalize_chain_nodes(nodes: &mut [ChainNode<'_>], paren_gaps: &[ParenGap]) {
     apply_paren_gaps(nodes, paren_gaps);
     fix_callee_base_parens(nodes);
+    #[cfg(feature = "buffer_stats")]
+    crate::printer::buffer_stats::record_chain_nodes(nodes.len());
 }
 
 /// Re-evaluate the base node's parens under `Callee` context when it is the
@@ -462,6 +464,14 @@ pub fn group_chain_nodes<'a>(nodes: &[ChainNode<'a>]) -> ChainGroupVec<'a> {
     // Don't forget the last group
     if !current.is_empty() {
         groups.push(current);
+    }
+
+    #[cfg(feature = "buffer_stats")]
+    {
+        crate::printer::buffer_stats::record_chain_groups(groups.len());
+        for group in &groups {
+            crate::printer::buffer_stats::record_group_nodes(group.nodes.len());
+        }
     }
 
     groups

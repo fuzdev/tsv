@@ -26,6 +26,8 @@
 // 3. **Modularity**: Each module has single responsibility for future maintainability
 
 mod analysis;
+#[cfg(feature = "buffer_stats")]
+pub mod buffer_stats;
 mod calls;
 mod chain;
 mod class_common;
@@ -64,8 +66,7 @@ pub(crate) use types::unwrap_parenthesized;
 
 use crate::PrinterInputs;
 use crate::ast::internal;
-use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
+use std::cell::Cell;
 use std::rc::Rc;
 use tsv_lang::{
     EmbedContext, OutputBuffer, SharedInterner, Span, SymbolResolver, SymbolToU32, TAB_WIDTH,
@@ -195,23 +196,27 @@ pub struct Printer<'a> {
     /// `needs_parens` check (assignment RHS, ternary branches/test).
     /// Uses Cell for interior mutability so doc builders (&self) can set this.
     pub(crate) in_for_init: Cell<bool>,
-    /// Scoped argument-doc share map for member-chain building: an argument
-    /// expression's pointer → its already-built [`Self::build_arg_expression_doc`]
-    /// `DocId`. A member chain renders the same group **flat** (`print_group`) and
-    /// **expanded** (`print_group_expanded`) across `conditional_group` candidates;
-    /// without sharing, the recursive arg build runs once per candidate and a nested
-    /// chain in a call arg compounds to O(4^depth) — the member-chain rebuild blowup.
-    /// The flat and expanded builds differ in
-    /// Printer state **only** via `skip_arrow_chain` / `expand_last_arg_flat_params`
-    /// (the sole `.set` sites in `calls/chain_args.rs`); every other flag is
-    /// statement-constant during a chain or set identically by the shared AST
-    /// traversal, so a given node is reached under identical state in both candidates.
-    /// Hence the cache is consulted only when [`Self::chain_arg_share_eligible`]
-    /// (active + both of those flags clear), making a hit byte-identical to a rebuild.
-    /// Active only between `enter_chain_arg_share`/`exit_chain_arg_share` (the outermost
-    /// `build_chain_doc`); keyed by node pointer (stable — the AST arena is immutable
-    /// during formatting).
-    pub(crate) chain_arg_share: RefCell<HashMap<usize, DocId>>,
+    /// Whether the scoped argument-doc share map for member-chain building is
+    /// active: an argument expression's pointer → its already-built
+    /// [`Self::build_arg_expression_doc`] `DocId`. A member chain renders the same
+    /// group **flat** (`print_group`) and **expanded** (`print_group_expanded`)
+    /// across `conditional_group` candidates; without sharing, the recursive arg
+    /// build runs once per candidate and a nested chain in a call arg compounds to
+    /// O(4^depth) — the member-chain rebuild blowup. The flat and expanded builds
+    /// differ in Printer state **only** via `skip_arrow_chain` /
+    /// `expand_last_arg_flat_params` (the sole `.set` sites in
+    /// `calls/chain_args.rs`); every other flag is statement-constant during a
+    /// chain or set identically by the shared AST traversal, so a given node is
+    /// reached under identical state in both candidates. Hence the cache is
+    /// consulted only when [`Self::chain_arg_share_eligible`] (active + both of
+    /// those flags clear), making a hit byte-identical to a rebuild. Active only
+    /// between `enter_chain_arg_share`/`exit_chain_arg_share` (the outermost
+    /// `build_chain_doc`); keyed by node pointer (stable — the AST arena is
+    /// immutable during formatting). The map's *storage* is the doc arena's
+    /// parked [`DocArena::share_map_scratch`] (cleared at both enter and exit, so
+    /// between chains — and across printers sharing one arena — it is logically
+    /// empty and only its table capacity persists, killing the per-printer
+    /// `HashMap` resize chain).
     pub(crate) chain_arg_share_active: Cell<bool>,
     /// Expand-last-arg body reuse: `(body-expr span start, pre-built body DocId)`.
     /// The call/new expand-last paths build an arrow's call body **once** up front
@@ -230,7 +235,7 @@ pub struct Printer<'a> {
     /// Whether the member chain currently being built has any comment anywhere in its
     /// span. Set once per `build_chain_doc` (save/restore, so a nested chain in a call
     /// arg / base restores the parent's value on exit — re-entrancy-safe like
-    /// [`Self::chain_arg_share`]). The chain print path reads it to skip per-member
+    /// [`Self::chain_arg_share_active`]). The chain print path reads it to skip per-member
     /// comment classification when the whole chain is comment-free (the common case).
     /// Safe by construction: the flag only *enables* a skip whose soundness is
     /// span-containment (a member's comment gap ⊆ the chain span), so a stale value can
@@ -273,7 +278,6 @@ impl<'a> Printer<'a> {
             expr_stmt_paren_target: Cell::new(None),
             arrow_chain_context: Cell::new(ArrowChainContext::None),
             in_for_init: Cell::new(false),
-            chain_arg_share: RefCell::new(HashMap::new()),
             chain_arg_share_active: Cell::new(false),
             arrow_body_inject: Cell::new(None),
             chain_has_comments: Cell::new(true),
@@ -453,10 +457,10 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Whether `build_arg_expression_doc` may share its result via `chain_arg_share`.
+    /// Whether `build_arg_expression_doc` may share its result via the chain-arg share map.
     /// True only while a member chain is building (`chain_arg_share_active`) AND the two
     /// flags that make the flat vs expanded chain-group builds diverge are clear — see
-    /// the `chain_arg_share` field doc. When either is set we're building an arrow arg in
+    /// the `chain_arg_share_active` field doc. When either is set we're building an arrow arg in
     /// the expand-last / curried path, which the expanded candidate builds under different
     /// state, so it must not share.
     pub(crate) fn chain_arg_share_eligible(&self) -> bool {
@@ -465,24 +469,24 @@ impl<'a> Printer<'a> {
             && !self.expand_last_arg_flat_params.get()
     }
 
-    /// Activate `chain_arg_share` for the outermost `build_chain_doc` only. Returns the
+    /// Activate the chain-arg share map for the outermost `build_chain_doc` only. Returns the
     /// prior active state; nested chains observe `true` and become no-ops (the map
     /// persists across the whole top-level chain so every nesting level shares).
     pub(crate) fn enter_chain_arg_share(&self) -> bool {
         let was_active = self.chain_arg_share_active.get();
         if !was_active {
             self.chain_arg_share_active.set(true);
-            self.chain_arg_share.borrow_mut().clear();
+            self.arena.share_map_scratch().borrow_mut().clear();
         }
         was_active
     }
 
-    /// Deactivate + clear `chain_arg_share` when leaving the outermost `build_chain_doc`
+    /// Deactivate + clear the chain-arg share map when leaving the outermost `build_chain_doc`
     /// (`was_active` false). Nested exits are no-ops.
     pub(crate) fn exit_chain_arg_share(&self, was_active: bool) {
         if !was_active {
             self.chain_arg_share_active.set(false);
-            self.chain_arg_share.borrow_mut().clear();
+            self.arena.share_map_scratch().borrow_mut().clear();
         }
     }
 

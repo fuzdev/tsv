@@ -103,13 +103,14 @@ pub use expressions::{
 
 /// Program node - the root of the AST
 ///
-/// Returned by value from `parse`; `body` points into the caller-supplied
-/// `'arena`. `comments` is a root-level owned `Vec` (a single allocation, not
-/// the per-node arena target — every consumer borrows it as a `&[…]` slice).
+/// Returned by value from `parse`; `body` and `comments` point into the
+/// caller-supplied `'arena` (the parser gathers comments directly in the bump,
+/// so the warm binding loops never malloc for them; `Comment` is a `Copy` POD,
+/// satisfying bumpalo's no-`Drop` rule).
 #[derive(Debug, Clone)]
 pub struct Program<'arena> {
     pub body: &'arena [Statement<'arena>],
-    pub comments: Vec<Comment>,
+    pub comments: &'arena [Comment],
     pub span: Span,
     pub interner: std::rc::Rc<std::cell::RefCell<DefaultStringInterner>>,
     /// The goal symbol this program was parsed against. Drives the public AST's

@@ -120,7 +120,7 @@ pub trait ChainPrinter: SymbolLookup {
 
     /// Activate the chain arg-doc share for the outermost chain build; returns the prior
     /// active state to restore via [`Self::exit_chain_arg_share`]. See the `Printer`
-    /// `chain_arg_share` field doc.
+    /// `chain_arg_share_active` field doc.
     fn enter_chain_arg_share(&self) -> bool;
 
     /// Restore the chain arg-doc share state captured by [`Self::enter_chain_arg_share`].

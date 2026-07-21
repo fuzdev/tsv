@@ -215,14 +215,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Collect all comments from scripts and template expressions
         let mut comments = Vec::new();
         if let Some(script) = instance {
-            for ts_comment in &script.content.comments {
-                comments.push(ts_comment.clone());
-            }
+            comments.extend_from_slice(script.content.comments);
         }
         if let Some(script) = module {
-            for ts_comment in &script.content.comments {
-                comments.push(ts_comment.clone());
-            }
+            comments.extend_from_slice(script.content.comments);
         }
         // Add expression comments collected during template parsing
         // Currently extracted from: {@debug} tags (intentional divergence from prettier)
