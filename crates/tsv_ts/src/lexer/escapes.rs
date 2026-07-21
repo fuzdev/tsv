@@ -31,12 +31,16 @@ use tsv_lang::ParseError;
 ///
 /// # Examples:
 /// ```ignore
-/// assert_eq!(decode_string_escapes("test\\n")?, "test\n");
-/// assert_eq!(decode_string_escapes("\\u0041")?, "A");
-/// assert_eq!(decode_string_escapes("\\u{1F4A9}")?, "💩");
+/// let mut out = String::new();
+/// decode_string_escapes_into("test\\n", &mut out)?;
+/// assert_eq!(out, "test\n");
+/// decode_string_escapes_into("\\u{1F4A9}", &mut out)?;
+/// assert_eq!(out, "💩");
 /// ```
-pub fn decode_string_escapes(s: &str) -> Result<String, ParseError> {
-    let mut result = String::with_capacity(s.len());
+pub fn decode_string_escapes_into(s: &str, out: &mut String) -> Result<(), ParseError> {
+    out.clear();
+    out.reserve(s.len());
+    let result = out;
     let mut chars = s.chars().peekable();
 
     while let Some(ch) = chars.next() {
@@ -61,17 +65,17 @@ pub fn decode_string_escapes(s: &str) -> Result<String, ParseError> {
 
                 // Hex escape: \xHH
                 Some('x') => {
-                    let hex = read_hex_digits(&mut chars, 2)?;
-                    if let Ok(code) = u32::from_str_radix(&hex, 16) {
-                        if let Some(ch) = char::from_u32(code) {
-                            result.push(ch);
-                        } else {
-                            return Err(ParseError::InvalidSyntax {
-                                message: format!("Invalid hex escape: \\x{hex}"),
-                                position: 0,
-                                context: None,
-                            });
-                        }
+                    // 2 hex digits → 0..=0xFF, always a valid Unicode scalar (no
+                    // surrogate range), so `from_u32` never fails here.
+                    let code = read_hex_value(&mut chars, 2)?;
+                    if let Some(ch) = char::from_u32(code) {
+                        result.push(ch);
+                    } else {
+                        return Err(ParseError::InvalidSyntax {
+                            message: format!("Invalid hex escape: \\x{code:02X}"),
+                            position: 0,
+                            context: None,
+                        });
                     }
                 }
 
@@ -80,24 +84,33 @@ pub fn decode_string_escapes(s: &str) -> Result<String, ParseError> {
                     if chars.peek() == Some(&'{') {
                         // Codepoint escape: \u{X...XXXXXX}
                         chars.next(); // consume '{'
-                        let mut hex = String::new();
+                        let mut code: u32 = 0;
+                        let mut digits: usize = 0;
                         loop {
                             match chars.peek() {
                                 Some(&'}') => {
                                     chars.next(); // consume '}'
                                     break;
                                 }
-                                Some(&ch) if ch.is_ascii_hexdigit() => {
-                                    chars.next();
-                                    hex.push(ch);
-                                }
-                                Some(_) => {
-                                    return Err(ParseError::InvalidSyntax {
-                                        message: "Invalid unicode codepoint escape".to_string(),
-                                        position: 0,
-                                        context: None,
-                                    });
-                                }
+                                Some(&ch) => match ch.to_digit(16) {
+                                    Some(d) => {
+                                        chars.next();
+                                        // Accumulate the first 6 digits only; a 7th
+                                        // trips the length check below, so overlong
+                                        // input can't overflow `code`.
+                                        if digits < 6 {
+                                            code = code * 16 + d;
+                                        }
+                                        digits += 1;
+                                    }
+                                    None => {
+                                        return Err(ParseError::InvalidSyntax {
+                                            message: "Invalid unicode codepoint escape".to_string(),
+                                            position: 0,
+                                            context: None,
+                                        });
+                                    }
+                                },
                                 // End of input before the closing `}` — a `\u{…`
                                 // escape must be terminated (matches acorn).
                                 None => {
@@ -111,7 +124,7 @@ pub fn decode_string_escapes(s: &str) -> Result<String, ParseError> {
                             }
                         }
 
-                        if hex.is_empty() || hex.len() > 6 {
+                        if digits == 0 || digits > 6 {
                             return Err(ParseError::InvalidSyntax {
                                 message: "Invalid unicode codepoint escape length".to_string(),
                                 position: 0,
@@ -119,53 +132,47 @@ pub fn decode_string_escapes(s: &str) -> Result<String, ParseError> {
                             });
                         }
 
-                        if let Ok(code) = u32::from_str_radix(&hex, 16) {
-                            if let Some(ch) = char::from_u32(code) {
-                                result.push(ch);
-                            } else {
-                                return Err(ParseError::InvalidSyntax {
-                                    message: format!("Invalid unicode codepoint: U+{hex}"),
-                                    position: 0,
-                                    context: None,
-                                });
-                            }
+                        if let Some(ch) = char::from_u32(code) {
+                            result.push(ch);
+                        } else {
+                            return Err(ParseError::InvalidSyntax {
+                                message: format!("Invalid unicode codepoint: U+{code:X}"),
+                                position: 0,
+                                context: None,
+                            });
                         }
                     } else {
-                        // Standard unicode escape: \uXXXX (4 digits)
-                        let hex = read_hex_digits(&mut chars, 4)?;
-                        if let Ok(code) = u16::from_str_radix(&hex, 16) {
-                            // Handle surrogate pairs
-                            if (0xD800..=0xDBFF).contains(&code) {
-                                // High surrogate - check for low surrogate
-                                if chars.peek() == Some(&'\\') {
-                                    let saved_pos = chars.clone();
-                                    chars.next(); // consume '\\'
-                                    if chars.peek() == Some(&'u') {
-                                        chars.next(); // consume 'u'
-                                        if let Ok(low_hex) = read_hex_digits(&mut chars, 4)
-                                            && let Ok(low) = u16::from_str_radix(&low_hex, 16)
-                                            && (0xDC00..=0xDFFF).contains(&low)
-                                        {
-                                            // Valid surrogate pair
-                                            let codepoint = 0x10000
-                                                + ((code - 0xD800) as u32) * 0x400
-                                                + ((low - 0xDC00) as u32);
-                                            if let Some(ch) = char::from_u32(codepoint) {
-                                                result.push(ch);
-                                                continue;
-                                            }
+                        // Standard unicode escape: \uXXXX (4 digits → 0..=0xFFFF)
+                        let code = read_hex_value(&mut chars, 4)?;
+                        // Handle surrogate pairs
+                        if (0xD800..=0xDBFF).contains(&code) {
+                            // High surrogate - check for low surrogate
+                            if chars.peek() == Some(&'\\') {
+                                let saved_pos = chars.clone();
+                                chars.next(); // consume '\\'
+                                if chars.peek() == Some(&'u') {
+                                    chars.next(); // consume 'u'
+                                    if let Ok(low) = read_hex_value(&mut chars, 4)
+                                        && (0xDC00..=0xDFFF).contains(&low)
+                                    {
+                                        // Valid surrogate pair
+                                        let codepoint =
+                                            0x10000 + (code - 0xD800) * 0x400 + (low - 0xDC00);
+                                        if let Some(ch) = char::from_u32(codepoint) {
+                                            result.push(ch);
+                                            continue;
                                         }
                                     }
-                                    // Not a valid surrogate pair, restore position
-                                    chars = saved_pos;
                                 }
+                                // Not a valid surrogate pair, restore position
+                                chars = saved_pos;
                             }
-                            // Single UTF-16 code unit
-                            if let Some(ch) = char::from_u32(code as u32) {
-                                result.push(ch);
-                            } else {
-                                result.push(char::REPLACEMENT_CHARACTER);
-                            }
+                        }
+                        // Single UTF-16 code unit
+                        if let Some(ch) = char::from_u32(code) {
+                            result.push(ch);
+                        } else {
+                            result.push(char::REPLACEMENT_CHARACTER);
                         }
                     }
                 }
@@ -183,20 +190,19 @@ pub fn decode_string_escapes(s: &str) -> Result<String, ParseError> {
                 // Octal escapes (legacy, strict mode errors on non-zero octals)
                 // For now, we support them for compatibility
                 Some(ch @ '0'..='7') => {
-                    let mut octal = String::from(ch);
+                    let mut code = ch as u32 - '0' as u32;
                     // Read up to 2 more octal digits
                     for _ in 0..2 {
                         match chars.peek() {
-                            Some(&next_ch) if ('0'..='7').contains(&next_ch) => {
+                            Some(&next_ch @ '0'..='7') => {
                                 chars.next();
-                                octal.push(next_ch);
+                                code = code * 8 + (next_ch as u32 - '0' as u32);
                             }
                             _ => break,
                         }
                     }
-                    if let Ok(code) = u32::from_str_radix(&octal, 8)
-                        && let Some(ch) = char::from_u32(code)
-                    {
+                    // 1–3 octal digits → 0..=0o777 (511), always a valid scalar.
+                    if let Some(ch) = char::from_u32(code) {
                         result.push(ch);
                     }
                 }
@@ -217,28 +223,38 @@ pub fn decode_string_escapes(s: &str) -> Result<String, ParseError> {
         }
     }
 
-    Ok(result)
+    Ok(())
 }
 
-/// Read exactly N hex digits from the iterator
-fn read_hex_digits<I>(
-    chars: &mut std::iter::Peekable<I>,
-    count: usize,
-) -> Result<String, ParseError>
+/// Decode escapes into a freshly allocated `String` — the ergonomic wrapper over
+/// [`decode_string_escapes_into`] for tests and the cold template-error path.
+/// The hot lexer path calls `_into` directly against a parked scratch buffer.
+pub fn decode_string_escapes(s: &str) -> Result<String, ParseError> {
+    let mut out = String::new();
+    decode_string_escapes_into(s, &mut out)?;
+    Ok(out)
+}
+
+/// Read exactly N hex digits from the iterator, accumulating their value directly
+/// into a `u32` — no intermediate `String` + `from_str_radix` allocation. N is at
+/// most 4 (the `\xHH` / `\uXXXX` escapes), so the value never overflows.
+fn read_hex_value<I>(chars: &mut std::iter::Peekable<I>, count: usize) -> Result<u32, ParseError>
 where
     I: Iterator<Item = char>,
 {
-    let mut result = String::with_capacity(count);
+    let mut value: u32 = 0;
     for _ in 0..count {
         match chars.next() {
-            Some(ch) if ch.is_ascii_hexdigit() => result.push(ch),
-            Some(ch) => {
-                return Err(ParseError::InvalidSyntax {
-                    message: format!("Expected hex digit, found '{ch}'"),
-                    position: 0,
-                    context: None,
-                });
-            }
+            Some(ch) => match ch.to_digit(16) {
+                Some(d) => value = value * 16 + d,
+                None => {
+                    return Err(ParseError::InvalidSyntax {
+                        message: format!("Expected hex digit, found '{ch}'"),
+                        position: 0,
+                        context: None,
+                    });
+                }
+            },
             None => {
                 return Err(ParseError::InvalidSyntax {
                     message: "Unexpected end of string in escape sequence".to_string(),
@@ -248,7 +264,7 @@ where
             }
         }
     }
-    Ok(result)
+    Ok(value)
 }
 
 #[cfg(test)]
