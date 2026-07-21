@@ -19,7 +19,6 @@ units (search `◆` for every tag, `◆prettier_bug` for one category):
 - `◆prettier_bug` — Prettier is non-idempotent, emits invalid output, or changes meaning (e.g. strips required parens). tsv produces stable, valid, meaning-preserving output
 - `◆parser_compat` — Prettier's output breaks Svelte's parser. tsv produces Svelte-compatible output
 - `◆print_width` — Prettier allows lines to exceed printWidth. tsv breaks to stay within the limit
-- `◆tabs_only_indent` — Prettier mixes tabs and spaces under --use-tabs. tsv uses whole tabs only
 - `◆bom_stripping` — Prettier preserves byte-order marks. tsv strips them
 - `◆comment_preservation` — Prettier moves comments to a different syntactic position. tsv preserves comment position
 - `◆content_preservation` — Prettier silently drops user comments. tsv preserves all comments
@@ -61,7 +60,7 @@ Every `◆prettier_bug` — cases where Prettier produces output that is non-ide
 - Output that's valid and reasonable
 - Unclear which approach is "better"
 
-**When to differ:** any reason in [Reasons tsv Differs](#reasons-tsv-differs) above. The three cross-cutting principles — comment position, print width, and tabs-only indentation — are detailed below.
+**When to differ:** any reason in [Reasons tsv Differs](#reasons-tsv-differs) above. The two cross-cutting principles — comment position and print width — are detailed below.
 
 ### Comment Position Philosophy
 
@@ -262,24 +261,6 @@ Philosophy](#comment-position-philosophy), not by this rule.
 The benefit: predictable output that respects the configured line length. The tradeoff: some constructs may break where Prettier would keep them inline.
 
 **"When possible" has one systematic exception: whitespace-sensitive content.** Inside `<pre>` / `<textarea>` a line break *is* content, so print width yields to render semantics and an over-width line stands — those elements never reach the shared layout analysis (see [§Svelte: Inline content block-style](#svelte-inline-content-block-style)). Both formatters agree there, so it is not a divergence; it is pinned by [fill_tail_after_expr_pre](../tests/fixtures/svelte/elements/fill_tail_after_expr_pre_long/), whose two cases are the same overflowing fill in a `<pre>` and a `<textarea>`. Everywhere else, a line tsv *can* break is a line tsv *does* break.
-
-### Tabs-Only Indentation Philosophy
-
-**tsv renders all indentation as whole tabs and never mixes tabs with alignment spaces.**
-When breaking a union type, Prettier wraps each member's type doc in
-`align(2, …)` (`union-type.js`) to offset the 2-char `|` prefix. With
-`--use-tabs`, Prettier's indentation algorithm renders that 2-column offset as
-a **sub-tab alignment**: content that is further indented rounds the offset up
-to a whole tab, but a closing delimiter sitting at the offset column is emitted
-as `tabs + 2 spaces`. The result mixes tabs and spaces on a single indentation
-level.
-
-tsv rounds the 2-column offset up to one tab everywhere. At
-`tabWidth = 2` the two are the same visual width; only the representation
-differs (`⟨n+1 tabs⟩}` vs `⟨n tabs⟩··}`). This keeps indentation
-tab-width-agnostic: a reader viewing tabs at any width sees consistent
-structure, whereas Prettier's 2-space offset assumes the prefix is exactly 2
-columns wide. Cataloged in [Tabs-Only Alignment](#tabs-only-alignment).
 
 ---
 
@@ -744,28 +725,6 @@ and is rejected by acorn and tsv. Every other identifier-shaped word after
 `_svelte_divergence` fixtures (acorn has no `using` declarations at all); only
 the cast keywords diverge from tsc, in tsv's favor of the drop-in oracle.
 
-### Tabs-Only Alignment
-
-These fixtures exercise the [Tabs-Only Indentation Philosophy](#tabs-only-indentation-philosophy): Prettier's `align(2, …)` for broken union members emits `tabs + 2 spaces` under `--use-tabs`, while tsv rounds the 2-column offset up to a whole tab everywhere.
-
-Every entry here is a **representation** difference at the same visual width (`tabWidth = 2`), never a different layout — and there are no known exceptions; an entry whose two forms differ in *width* is a bug, not a member of this family. That is the line to hold when touching it, and it cuts both ways: *dropping* the offset — so the member sits two columns shallower than prettier — is not "tabs-only" but a second, unsanctioned divergence wearing the philosophy's name; *doubling* it is the same mistake mirrored. Both leading-comment entries below dropped it until `bug123`; the tell was their own READMEs asserting "the visual result is equivalent" while describing a member kept flush under the `|`, which cannot both be true.
-
-When a member is dropped onto its own line by a leading comment, the offset covers the **comment run and the member together** (prettier's `align(2, print())`, whose `print()` carries the leading comments) — offsetting only the member would leave its first line, which the run's `hardline` places, one level shallower than the member's own internal breaks. In tsv that is spelled by indenting the **run**, never the member doc: `build_union_member_offset_doc` owns the opt-outs — an object literal and a default-paren member each supply their own indent and decline the offset — so wrapping *its result* would double-indent exactly those two, pushing their body two columns past prettier and leaving their closing delimiter out of line with its opener. The two shapes are pinned as cases D and E of [union_intersection_parens_leading_line_comment](../tests/fixtures/typescript/types/union_intersection_parens_leading_line_comment_prettier_divergence/); a member with no internal breaks shows no offset at all, so the cases that match prettier byte-for-byte live in that fixture's [non-divergence sibling](../tests/fixtures/typescript/types/union_intersection_parens_leading_line_comment/).
-
-- Union object member — [union_object_member](../tests/fixtures/typescript/types/union_object_member_prettier_divergence/)
-- Union hugged object — [union_hug_object](../tests/fixtures/typescript/types/union_hug_object_prettier_divergence/)
-- Union parenthesized object — [union_parens_object](../tests/fixtures/typescript/types/union_parens_object_prettier_divergence/)
-- Union intersection trailing object — [union_intersection_object_long](../tests/fixtures/typescript/types/union_intersection_object_long_prettier_divergence/)
-- Union member nested generic — [nested_generic_member_long](../tests/fixtures/typescript/types/nested_generic_member_long_prettier_divergence/)
-- Union member function type — [union_fn_type_member_long](../tests/fixtures/typescript/types/union_fn_type_member_long_prettier_divergence/)
-- Union member break + line comment — [union_member_long_line_comment](../tests/fixtures/typescript/types/comments/union_member_long_line_comment_prettier_divergence/)
-- Union paren-union member — [union_paren_union_member_long](../tests/fixtures/typescript/types/union_paren_union_member_long_prettier_divergence/)
-- Union paren member + line comment — [union_paren_member_long_line_comment](../tests/fixtures/typescript/types/comments/union_paren_member_long_line_comment_prettier_divergence/)
-- Union member leading multi-line block comment — the block-comment sibling of the entry below; the run takes the offset the same way, which also aligns the comment's continuation `*` under its opening `/*` — [union_member_leading_block_comment](../tests/fixtures/typescript/types/comments/union_member_leading_block_comment_prettier_divergence/)
-- Union member leading line comment (dropped onto its own line; the offset covers the run + the member, including the object-literal and default-paren members that supply their own indent) — [union_intersection_parens_leading_line_comment](../tests/fixtures/typescript/types/union_intersection_parens_leading_line_comment_prettier_divergence/)
-- Union **hug** declined by a leading line comment — a `//` in the leading `|`→first-member gap of a `{ … } | null` union expands it (both formatters; the hug would otherwise drop the comment, since it emits that gap block-only and a `//` can't be inlined). Only the member alignment differs, exactly as in the entry above — [union_hug_leading_line_comment](../tests/fixtures/typescript/types/union_hug_leading_line_comment_prettier_divergence/)
-- Union first-member leading block-comment run — the run itself matches prettier (a glued pair stays glued, own-line blocks keep their lines); only the alignment differs — [union_first_member_glued_block_comment](../tests/fixtures/typescript/types/union_first_member_glued_block_comment_prettier_divergence/)
-
 ### TypeScript: Template Literals
 
 For **value-position** interpolations `${...}`, tsv follows Prettier's heuristic (`template-literal.js` `printTemplateExpression`): a `${...}` is kept **on one line** unless its *source* already spans multiple lines, or the expression would render with a newline anyway (a nested function / block body). When neither holds the expression is **atomized** — rendered flat, unable to break — so the interpolation stays inline even past print width, exactly as Prettier does. Only when the interpolation *does* span lines does tsv break it, and then by expression type:
@@ -1136,7 +1095,7 @@ The deliberate exclusions are constructs where the following token isn't part of
 
 **Retained paren union member comment**: a block comment inside a parenthesized union member whose parens are **retained** — because the member nests in an outer union or intersection (`a | (b | c /* c */)`, `(a | b /* c */) | c`, `a & (b | c /* c */)`) → Prettier hoists a **trailing** comment out of the parens to after `)` (`a | (b | c) /* c */`, `(a | b) /* c */ | c`, `a & (b | c) /* c */`), but leaves a **leading** comment inside (`a | (/* c */ b | c)` — a match with tsv). tsv keeps every such comment inside the parens, associating it with the parenthesized member. (Otherwise the comment is dropped entirely — content loss.) When the parens are redundant and stripped — a top-level or single-member union — both formatters keep the comment in place (no divergence; see `union_intersection_parens_comment`). The parenthesized-_intersection_-in-union member (`a | (b & c /* c */)`) already preserves in place through a separate path. Both positions are dual-stable in our formatter.**Retained paren union member line comment**: the line-comment analog of the above — a line comment trailing the last inner member of a retained parenthesized union (`(a | b // c) | c`, `a | (b | c // c) | d`) → Prettier hoists it out to trail the whole member and keeps the inner union inline (`| (a | b) // c`). tsv keeps it inside the parens; because a line comment must end its line, the parenthesized union expands to its broken form (one member per line) with `)` on its own line. (Otherwise the comment is dropped entirely — content loss.) Unlike the block-comment case — which stays inline because a block comment can — the line comment forces the expanded layout. Our expanded form is stable in tsv; Prettier's inline-with-relocated-comment form is its own stable shape.
 
-**Retained paren first-member leading line comment**: a **leading** line comment inside a retained parenthesized union member, when that member is the **first** member of the outer union (`(// c\n A | B) | C`) → Prettier moves the comment out of the parens to lead the member, keeping the inner union inline when it fits (`| // c\n (A | B)`). tsv keeps it inside the parens leading the inner union; because a line comment must end its line, the parenthesized union expands to its broken form with `)` on its own line. (Otherwise the comment is dropped entirely — content loss: the inner-leading line comment has no previous member to relocate onto.) This is the leading-comment counterpart of the trailing **Retained paren union member line comment** above, and mirrors its keep-inside behavior. A leading line comment inside a **later** member's parens instead relocates to trail the previous member, where both formatters agree (see the [Tabs-Only Alignment](#tabs-only-alignment) `union_paren_member_long_line_comment` fixture); only the first member, lacking a previous member, keeps the comment inside.
+**Retained paren first-member leading line comment**: a **leading** line comment inside a retained parenthesized union member, when that member is the **first** member of the outer union (`(// c\n A | B) | C`) → Prettier moves the comment out of the parens to lead the member, keeping the inner union inline when it fits (`| // c\n (A | B)`). tsv keeps it inside the parens leading the inner union; because a line comment must end its line, the parenthesized union expands to its broken form with `)` on its own line. (Otherwise the comment is dropped entirely — content loss: the inner-leading line comment has no previous member to relocate onto.) This is the leading-comment counterpart of the trailing **Retained paren union member line comment** above, and mirrors its keep-inside behavior. A leading line comment inside a **later** member's parens instead relocates to trail the previous member, where both formatters agree (see the [union_paren_member_long_line_comment](../tests/fixtures/typescript/types/comments/union_paren_member_long_line_comment/) fixture); only the first member, lacking a previous member, keeps the comment inside.
 
 **Retained paren intersection member comment**: the intersection counterpart of the retained-paren-union case — a block comment inside a parenthesized **intersection** member whose parens are retained because it nests in an outer union (`(a & b /* c */) | c`, `a | (/* c */ b & c)`, `a | (b & c /* c */)`) → Prettier hoists the comment out of the parens (trailing after `)`, leading before `(`: `(a & b) /* c */ | c`, `a | /* c */ (b & c)`). tsv keeps it inside the parens, associating it with the parenthesized member. (Unlike the union case this never dropped — it preserves through the paren-unwrapping path — but it is the same comment-position divergence and is pinned for completeness.)
 **A synthesized paren never lands between a comment and the token it is glued to** (`◆prettier_bug`, pinned by [pure_annotation_enclosing_parens](../tests/fixtures/typescript/syntax/comments/pure_annotation_enclosing_parens_prettier_divergence/)). Some comments are *bound to the token after them* — the whole point of `/* @__PURE__ */` is that it marks the call it precedes as side-effect-free, so rollup, esbuild and terser may drop the call when its result is unused. When the formatter adds a paren around an expression whose left edge is such a call, that paren must go **outside** the comment:
