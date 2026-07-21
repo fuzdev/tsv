@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 570,
+	"end": 555,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,31 +10,31 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 464,
-				"data": " A boundary break on ONE side is not an expansion signal. Content-boundary whitespace is\n     render-free under Svelte 5, and a component expands only when the author broke BOTH content\n     boundaries (see ../expr_child_multiline/). Authored with just the opening newline, the content\n     collapses back inline. Prettier keeps the half-authored break and dangles the closing tag to\n     hold the content against it — see prettier_variant_opening_newline. "
+				"end": 449,
+				"data": "\n\tA boundary break on ONE side is not an expansion signal. Content-boundary whitespace is\n\trender-free under Svelte 5, and a component expands only when the author broke BOTH content\n\tboundaries (see ../expr_child_multiline/). Authored with just the opening newline, the content\n\tcollapses back inline. Prettier keeps the half-authored break and dangles the closing tag to\n\thold the content against it — see prettier_variant_opening_newline.\n"
 			},
 			{
 				"type": "Text",
-				"start": 464,
-				"end": 465,
+				"start": 449,
+				"end": 450,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "Component",
-				"start": 465,
-				"end": 484,
+				"start": 450,
+				"end": 469,
 				"name": "Comp",
 				"name_loc": {
 					"start": {
-						"line": 6,
+						"line": 8,
 						"column": 1,
-						"character": 466
+						"character": 451
 					},
 					"end": {
-						"line": 6,
+						"line": 8,
 						"column": 5,
-						"character": 470
+						"character": 455
 					}
 				},
 				"attributes": [],
@@ -43,19 +43,19 @@
 					"nodes": [
 						{
 							"type": "ExpressionTag",
-							"start": 471,
-							"end": 477,
+							"start": 456,
+							"end": 462,
 							"expression": {
 								"type": "Identifier",
-								"start": 472,
-								"end": 476,
+								"start": 457,
+								"end": 461,
 								"loc": {
 									"start": {
-										"line": 6,
+										"line": 8,
 										"column": 7
 									},
 									"end": {
-										"line": 6,
+										"line": 8,
 										"column": 11
 									}
 								},
@@ -67,39 +67,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 484,
-				"end": 486,
+				"start": 469,
+				"end": 471,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 486,
-				"end": 532,
+				"start": 471,
+				"end": 517,
 				"data": " Same with several expression children "
 			},
 			{
 				"type": "Text",
-				"start": 532,
-				"end": 533,
+				"start": 517,
+				"end": 518,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "Component",
-				"start": 533,
-				"end": 569,
+				"start": 518,
+				"end": 554,
 				"name": "Comp",
 				"name_loc": {
 					"start": {
-						"line": 9,
+						"line": 11,
 						"column": 1,
-						"character": 534
+						"character": 519
 					},
 					"end": {
-						"line": 9,
+						"line": 11,
 						"column": 5,
-						"character": 538
+						"character": 523
 					}
 				},
 				"attributes": [],
@@ -108,19 +108,19 @@
 					"nodes": [
 						{
 							"type": "ExpressionTag",
-							"start": 539,
-							"end": 546,
+							"start": 524,
+							"end": 531,
 							"expression": {
 								"type": "Identifier",
-								"start": 540,
-								"end": 545,
+								"start": 525,
+								"end": 530,
 								"loc": {
 									"start": {
-										"line": 9,
+										"line": 11,
 										"column": 7
 									},
 									"end": {
-										"line": 9,
+										"line": 11,
 										"column": 12
 									}
 								},
@@ -129,26 +129,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 546,
-							"end": 547,
+							"start": 531,
+							"end": 532,
 							"raw": " ",
 							"data": " "
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 547,
-							"end": 554,
+							"start": 532,
+							"end": 539,
 							"expression": {
 								"type": "Identifier",
-								"start": 548,
-								"end": 553,
+								"start": 533,
+								"end": 538,
 								"loc": {
 									"start": {
-										"line": 9,
+										"line": 11,
 										"column": 15
 									},
 									"end": {
-										"line": 9,
+										"line": 11,
 										"column": 20
 									}
 								},
@@ -157,26 +157,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 554,
-							"end": 555,
+							"start": 539,
+							"end": 540,
 							"raw": " ",
 							"data": " "
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 555,
-							"end": 562,
+							"start": 540,
+							"end": 547,
 							"expression": {
 								"type": "Identifier",
-								"start": 556,
-								"end": 561,
+								"start": 541,
+								"end": 546,
 								"loc": {
 									"start": {
-										"line": 9,
+										"line": 11,
 										"column": 23
 									},
 									"end": {
-										"line": 9,
+										"line": 11,
 										"column": 28
 									}
 								},

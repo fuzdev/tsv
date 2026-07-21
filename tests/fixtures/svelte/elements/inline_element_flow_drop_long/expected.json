@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 662,
+	"end": 651,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,31 +10,31 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 373,
-				"data": " Flowing paragraph text with inline <a> elements. When an inline element does not fit after\n     the preceding text it drops to its own line whole (its own tag never breaks in place), and the\n     glued trailing text hugs the closing tag. The space- and newline-authored boundaries before the\n     element converge to this one form — see the unformatted_* variants. "
+				"end": 362,
+				"data": "\n\tFlowing paragraph text with inline <a> elements. When an inline element does not fit after\n\tthe preceding text it drops to its own line whole (its own tag never breaks in place), and the\n\tglued trailing text hugs the closing tag. The space- and newline-authored boundaries before the\n\telement converge to this one form — see the unformatted_* variants.\n"
 			},
 			{
 				"type": "Text",
-				"start": 373,
-				"end": 374,
+				"start": 362,
+				"end": 363,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 374,
-				"end": 661,
+				"start": 363,
+				"end": 650,
 				"name": "p",
 				"name_loc": {
 					"start": {
-						"line": 5,
+						"line": 7,
 						"column": 1,
-						"character": 375
+						"character": 364
 					},
 					"end": {
-						"line": 5,
+						"line": 7,
 						"column": 2,
-						"character": 376
+						"character": 365
 					}
 				},
 				"attributes": [],
@@ -43,50 +43,50 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 377,
-							"end": 483,
+							"start": 366,
+							"end": 472,
 							"raw": "\n\talpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november oscar\n\tbuilt on ",
 							"data": "\n\talpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november oscar\n\tbuilt on "
 						},
 						{
 							"type": "RegularElement",
-							"start": 483,
-							"end": 524,
+							"start": 472,
+							"end": 513,
 							"name": "a",
 							"name_loc": {
 								"start": {
-									"line": 7,
+									"line": 9,
 									"column": 11,
-									"character": 484
+									"character": 473
 								},
 								"end": {
-									"line": 7,
+									"line": 9,
 									"column": 12,
-									"character": 485
+									"character": 474
 								}
 							},
 							"attributes": [
 								{
 									"type": "Attribute",
-									"start": 486,
-									"end": 514,
+									"start": 475,
+									"end": 503,
 									"name": "href",
 									"name_loc": {
 										"start": {
-											"line": 7,
+											"line": 9,
 											"column": 13,
-											"character": 486
+											"character": 475
 										},
 										"end": {
-											"line": 7,
+											"line": 9,
 											"column": 17,
-											"character": 490
+											"character": 479
 										}
 									},
 									"value": [
 										{
-											"start": 492,
-											"end": 513,
+											"start": 481,
+											"end": 502,
 											"type": "Text",
 											"raw": "https://aaa.fuz.dev/a",
 											"data": "https://aaa.fuz.dev/a"
@@ -99,8 +99,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 515,
-										"end": 520,
+										"start": 504,
+										"end": 509,
 										"raw": "first",
 										"data": "first"
 									}
@@ -109,50 +109,50 @@
 						},
 						{
 							"type": "Text",
-							"start": 524,
-							"end": 571,
+							"start": 513,
+							"end": 560,
 							"raw": " and provides a documentation system built on\n\t",
 							"data": " and provides a documentation system built on\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 571,
-							"end": 624,
+							"start": 560,
+							"end": 613,
 							"name": "a",
 							"name_loc": {
 								"start": {
-									"line": 8,
+									"line": 10,
 									"column": 2,
-									"character": 572
+									"character": 561
 								},
 								"end": {
-									"line": 8,
+									"line": 10,
 									"column": 3,
-									"character": 573
+									"character": 562
 								}
 							},
 							"attributes": [
 								{
 									"type": "Attribute",
-									"start": 574,
-									"end": 613,
+									"start": 563,
+									"end": 602,
 									"name": "href",
 									"name_loc": {
 										"start": {
-											"line": 8,
+											"line": 10,
 											"column": 4,
-											"character": 574
+											"character": 563
 										},
 										"end": {
-											"line": 8,
+											"line": 10,
 											"column": 8,
-											"character": 578
+											"character": 567
 										}
 									},
 									"value": [
 										{
-											"start": 580,
-											"end": 612,
+											"start": 569,
+											"end": 601,
 											"type": "Text",
 											"raw": "https://aaa.fuz.dev/bbbbbbbbbbbb",
 											"data": "https://aaa.fuz.dev/bbbbbbbbbbbb"
@@ -165,8 +165,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 614,
-										"end": 620,
+										"start": 603,
+										"end": 609,
 										"raw": "second",
 										"data": "second"
 									}
@@ -175,8 +175,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 624,
-							"end": 657,
+							"start": 613,
+							"end": 646,
 							"raw": ". tail1 tail2 tail3 tail4 tail5.\n",
 							"data": ". tail1 tail2 tail3 tail4 tail5.\n"
 						}

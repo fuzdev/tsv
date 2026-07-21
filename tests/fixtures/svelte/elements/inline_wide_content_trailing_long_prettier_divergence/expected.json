@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 773,
+	"end": 754,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,31 +10,31 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 510,
-				"data": " A wide inline element whose own content (not its attributes) overflows, followed by\n     trailing text authored with a space boundary. tsv wraps the content within printWidth and\n     hugs the trailing text onto the line of the dangled closing `>` (respecting the author's\n     space); a newline-authored boundary instead keeps it on its own line (see the sibling\n     inline_wide_content_trailing_newline_long). Prettier keeps the content on one over-width\n     line. See README. Covers <strong>/<a>. "
+				"end": 491,
+				"data": "\n\tA wide inline element whose own content (not its attributes) overflows, followed by\n\ttrailing text authored with a space boundary. tsv wraps the content within printWidth and\n\thugs the trailing text onto the line of the dangled closing `>` (respecting the author's\n\tspace); a newline-authored boundary instead keeps it on its own line (see the sibling\n\tinline_wide_content_trailing_newline_long). Prettier keeps the content on one over-width\n\tline. See README. Covers <strong>/<a>.\n"
 			},
 			{
 				"type": "Text",
-				"start": 510,
-				"end": 511,
+				"start": 491,
+				"end": 492,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 511,
-				"end": 641,
+				"start": 492,
+				"end": 622,
 				"name": "p",
 				"name_loc": {
 					"start": {
-						"line": 7,
+						"line": 9,
 						"column": 1,
-						"character": 512
+						"character": 493
 					},
 					"end": {
-						"line": 7,
+						"line": 9,
 						"column": 2,
-						"character": 513
+						"character": 494
 					}
 				},
 				"attributes": [],
@@ -43,26 +43,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 514,
-							"end": 516,
+							"start": 495,
+							"end": 497,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 516,
-							"end": 631,
+							"start": 497,
+							"end": 612,
 							"name": "strong",
 							"name_loc": {
 								"start": {
-									"line": 8,
+									"line": 10,
 									"column": 2,
-									"character": 517
+									"character": 498
 								},
 								"end": {
-									"line": 8,
+									"line": 10,
 									"column": 8,
-									"character": 523
+									"character": 504
 								}
 							},
 							"attributes": [],
@@ -71,8 +71,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 524,
-										"end": 622,
+										"start": 505,
+										"end": 603,
 										"raw": "\n\t\talpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november oscar\n\t",
 										"data": "\n\t\talpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november oscar\n\t"
 									}
@@ -81,8 +81,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 631,
-							"end": 637,
+							"start": 612,
+							"end": 618,
 							"raw": " tail\n",
 							"data": " tail\n"
 						}
@@ -91,26 +91,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 641,
-				"end": 643,
+				"start": 622,
+				"end": 624,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 643,
-				"end": 772,
+				"start": 624,
+				"end": 753,
 				"name": "p",
 				"name_loc": {
 					"start": {
-						"line": 13,
+						"line": 15,
 						"column": 1,
-						"character": 644
+						"character": 625
 					},
 					"end": {
-						"line": 13,
+						"line": 15,
 						"column": 2,
-						"character": 645
+						"character": 626
 					}
 				},
 				"attributes": [],
@@ -119,50 +119,50 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 646,
-							"end": 648,
+							"start": 627,
+							"end": 629,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 648,
-							"end": 762,
+							"start": 629,
+							"end": 743,
 							"name": "a",
 							"name_loc": {
 								"start": {
-									"line": 14,
+									"line": 16,
 									"column": 2,
-									"character": 649
+									"character": 630
 								},
 								"end": {
-									"line": 14,
+									"line": 16,
 									"column": 3,
-									"character": 650
+									"character": 631
 								}
 							},
 							"attributes": [
 								{
 									"type": "Attribute",
-									"start": 651,
-									"end": 659,
+									"start": 632,
+									"end": 640,
 									"name": "href",
 									"name_loc": {
 										"start": {
-											"line": 14,
+											"line": 16,
 											"column": 4,
-											"character": 651
+											"character": 632
 										},
 										"end": {
-											"line": 14,
+											"line": 16,
 											"column": 8,
-											"character": 655
+											"character": 636
 										}
 									},
 									"value": [
 										{
-											"start": 657,
-											"end": 658,
+											"start": 638,
+											"end": 639,
 											"type": "Text",
 											"raw": "#",
 											"data": "#"
@@ -175,8 +175,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 660,
-										"end": 758,
+										"start": 641,
+										"end": 739,
 										"raw": "\n\t\tnovember oscar papa quebec romeo sierra tango uniform victor whiskey xray yankee zulu abcdefg\n\t",
 										"data": "\n\t\tnovember oscar papa quebec romeo sierra tango uniform victor whiskey xray yankee zulu abcdefg\n\t"
 									}
@@ -185,8 +185,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 762,
-							"end": 768,
+							"start": 743,
+							"end": 749,
 							"raw": " tail\n",
 							"data": " tail\n"
 						}

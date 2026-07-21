@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 775,
+	"end": 772,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,31 +10,31 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 183,
-				"data": " Fits: the inline span's line is exactly 100, so it stays on one line; the leading\n     newline before the first child is a render-free boundary run, trimmed (`<span>text1…`). "
+				"end": 180,
+				"data": "\n\tFits: the inline span's line is exactly 100, so it stays on one line; the leading\n\tnewline before the first child is a render-free boundary run, trimmed (`<span>text1…`).\n"
 			},
 			{
 				"type": "Text",
-				"start": 183,
-				"end": 184,
+				"start": 180,
+				"end": 181,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 184,
-				"end": 292,
+				"start": 181,
+				"end": 289,
 				"name": "p",
 				"name_loc": {
 					"start": {
-						"line": 3,
+						"line": 5,
 						"column": 1,
-						"character": 185
+						"character": 182
 					},
 					"end": {
-						"line": 3,
+						"line": 5,
 						"column": 2,
-						"character": 186
+						"character": 183
 					}
 				},
 				"attributes": [],
@@ -43,26 +43,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 187,
-							"end": 189,
+							"start": 184,
+							"end": 186,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 189,
-							"end": 287,
+							"start": 186,
+							"end": 284,
 							"name": "span",
 							"name_loc": {
 								"start": {
-									"line": 4,
+									"line": 6,
 									"column": 2,
-									"character": 190
+									"character": 187
 								},
 								"end": {
-									"line": 4,
+									"line": 6,
 									"column": 6,
-									"character": 194
+									"character": 191
 								}
 							},
 							"attributes": [],
@@ -71,50 +71,50 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 195,
-										"end": 260,
+										"start": 192,
+										"end": 257,
 										"raw": "text1 text2 text3 text4 text5 text6 text7 text8 text9abcdefghijk ",
 										"data": "text1 text2 text3 text4 text5 text6 text7 text8 text9abcdefghijk "
 									},
 									{
 										"type": "RegularElement",
-										"start": 260,
-										"end": 280,
+										"start": 257,
+										"end": 277,
 										"name": "a",
 										"name_loc": {
 											"start": {
-												"line": 4,
+												"line": 6,
 												"column": 73,
-												"character": 261
+												"character": 258
 											},
 											"end": {
-												"line": 4,
+												"line": 6,
 												"column": 74,
-												"character": 262
+												"character": 259
 											}
 										},
 										"attributes": [
 											{
 												"type": "Attribute",
-												"start": 263,
-												"end": 271,
+												"start": 260,
+												"end": 268,
 												"name": "href",
 												"name_loc": {
 													"start": {
-														"line": 4,
+														"line": 6,
 														"column": 75,
-														"character": 263
+														"character": 260
 													},
 													"end": {
-														"line": 4,
+														"line": 6,
 														"column": 79,
-														"character": 267
+														"character": 264
 													}
 												},
 												"value": [
 													{
-														"start": 269,
-														"end": 270,
+														"start": 266,
+														"end": 267,
 														"type": "Text",
 														"raw": "#",
 														"data": "#"
@@ -127,8 +127,8 @@
 											"nodes": [
 												{
 													"type": "Text",
-													"start": 272,
-													"end": 276,
+													"start": 269,
+													"end": 273,
 													"raw": "link",
 													"data": "link"
 												}
@@ -140,8 +140,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 287,
-							"end": 288,
+							"start": 284,
+							"end": 285,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -150,39 +150,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 292,
-				"end": 294,
+				"start": 289,
+				"end": 291,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 294,
-				"end": 659,
+				"start": 291,
+				"end": 656,
 				"data": " Breaks: one char longer (101), so the span lays out block-style — both tags intact, content on\n     its own indented line. The content ends by hugging `</span>` (an element child, no boundary\n     whitespace), but that hug is render-free and so does not select the layout; prettier lets it\n     dangle the closing `>` instead — see prettier_variant_dangle. "
 			},
 			{
 				"type": "Text",
-				"start": 659,
-				"end": 660,
+				"start": 656,
+				"end": 657,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 660,
-				"end": 774,
+				"start": 657,
+				"end": 771,
 				"name": "p",
 				"name_loc": {
 					"start": {
-						"line": 11,
+						"line": 13,
 						"column": 1,
-						"character": 661
+						"character": 658
 					},
 					"end": {
-						"line": 11,
+						"line": 13,
 						"column": 2,
-						"character": 662
+						"character": 659
 					}
 				},
 				"attributes": [],
@@ -191,26 +191,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 663,
-							"end": 665,
+							"start": 660,
+							"end": 662,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 665,
-							"end": 769,
+							"start": 662,
+							"end": 766,
 							"name": "span",
 							"name_loc": {
 								"start": {
-									"line": 12,
+									"line": 14,
 									"column": 2,
-									"character": 666
+									"character": 663
 								},
 								"end": {
-									"line": 12,
+									"line": 14,
 									"column": 6,
-									"character": 670
+									"character": 667
 								}
 							},
 							"attributes": [],
@@ -219,50 +219,50 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 671,
-										"end": 740,
+										"start": 668,
+										"end": 737,
 										"raw": "\n\t\ttext1 text2 text3 text4 text5 text6 text7 text8 text9abcdefghijkl ",
 										"data": "\n\t\ttext1 text2 text3 text4 text5 text6 text7 text8 text9abcdefghijkl "
 									},
 									{
 										"type": "RegularElement",
-										"start": 740,
-										"end": 760,
+										"start": 737,
+										"end": 757,
 										"name": "a",
 										"name_loc": {
 											"start": {
-												"line": 13,
+												"line": 15,
 												"column": 69,
-												"character": 741
+												"character": 738
 											},
 											"end": {
-												"line": 13,
+												"line": 15,
 												"column": 70,
-												"character": 742
+												"character": 739
 											}
 										},
 										"attributes": [
 											{
 												"type": "Attribute",
-												"start": 743,
-												"end": 751,
+												"start": 740,
+												"end": 748,
 												"name": "href",
 												"name_loc": {
 													"start": {
-														"line": 13,
+														"line": 15,
 														"column": 71,
-														"character": 743
+														"character": 740
 													},
 													"end": {
-														"line": 13,
+														"line": 15,
 														"column": 75,
-														"character": 747
+														"character": 744
 													}
 												},
 												"value": [
 													{
-														"start": 749,
-														"end": 750,
+														"start": 746,
+														"end": 747,
 														"type": "Text",
 														"raw": "#",
 														"data": "#"
@@ -275,8 +275,8 @@
 											"nodes": [
 												{
 													"type": "Text",
-													"start": 752,
-													"end": 756,
+													"start": 749,
+													"end": 753,
 													"raw": "link",
 													"data": "link"
 												}
@@ -285,8 +285,8 @@
 									},
 									{
 										"type": "Text",
-										"start": 760,
-										"end": 762,
+										"start": 757,
+										"end": 759,
 										"raw": "\n\t",
 										"data": "\n\t"
 									}
@@ -295,8 +295,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 769,
-							"end": 770,
+							"start": 766,
+							"end": 767,
 							"raw": "\n",
 							"data": "\n"
 						}

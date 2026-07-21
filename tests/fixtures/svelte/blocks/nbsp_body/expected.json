@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 228,
+	"end": 230,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,32 +10,32 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 170,
-				"data": " A non-breaking space (U+00A0) body is content, not boundary whitespace, so the\nblock stays inline and the NBSP is preserved (an ASCII-space body expands instead) "
+				"end": 172,
+				"data": "\n\tA non-breaking space (U+00A0) body is content, not boundary whitespace, so the\n\tblock stays inline and the NBSP is preserved (an ASCII-space body expands instead)\n"
 			},
 			{
 				"type": "Text",
-				"start": 170,
-				"end": 171,
+				"start": 172,
+				"end": 173,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "IfBlock",
 				"elseif": false,
-				"start": 171,
-				"end": 184,
+				"start": 173,
+				"end": 186,
 				"test": {
 					"type": "Identifier",
-					"start": 176,
-					"end": 177,
+					"start": 178,
+					"end": 179,
 					"loc": {
 						"start": {
-							"line": 3,
+							"line": 5,
 							"column": 5
 						},
 						"end": {
-							"line": 3,
+							"line": 5,
 							"column": 6
 						}
 					},
@@ -46,8 +46,8 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 178,
-							"end": 179,
+							"start": 180,
+							"end": 181,
 							"raw": " ",
 							"data": " "
 						}
@@ -57,26 +57,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 184,
-				"end": 185,
+				"start": 186,
+				"end": 187,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "EachBlock",
-				"start": 185,
-				"end": 211,
+				"start": 187,
+				"end": 213,
 				"expression": {
 					"type": "Identifier",
-					"start": 192,
-					"end": 197,
+					"start": 194,
+					"end": 199,
 					"loc": {
 						"start": {
-							"line": 4,
+							"line": 6,
 							"column": 7
 						},
 						"end": {
-							"line": 4,
+							"line": 6,
 							"column": 12
 						}
 					},
@@ -87,8 +87,8 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 203,
-							"end": 204,
+							"start": 205,
+							"end": 206,
 							"raw": " ",
 							"data": " "
 						}
@@ -97,44 +97,44 @@
 				"context": {
 					"type": "Identifier",
 					"name": "i",
-					"start": 201,
-					"end": 202,
+					"start": 203,
+					"end": 204,
 					"loc": {
 						"start": {
-							"line": 4,
+							"line": 6,
 							"column": 16,
-							"character": 201
+							"character": 203
 						},
 						"end": {
-							"line": 4,
+							"line": 6,
 							"column": 17,
-							"character": 202
+							"character": 204
 						}
 					}
 				}
 			},
 			{
 				"type": "Text",
-				"start": 211,
-				"end": 212,
+				"start": 213,
+				"end": 214,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "KeyBlock",
-				"start": 212,
-				"end": 227,
+				"start": 214,
+				"end": 229,
 				"expression": {
 					"type": "Identifier",
-					"start": 218,
-					"end": 219,
+					"start": 220,
+					"end": 221,
 					"loc": {
 						"start": {
-							"line": 5,
+							"line": 7,
 							"column": 6
 						},
 						"end": {
-							"line": 5,
+							"line": 7,
 							"column": 7
 						}
 					},
@@ -145,8 +145,8 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 220,
-							"end": 221,
+							"start": 222,
+							"end": 223,
 							"raw": " ",
 							"data": " "
 						}
