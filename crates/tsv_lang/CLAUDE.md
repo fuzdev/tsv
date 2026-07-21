@@ -84,22 +84,22 @@ arena_fits_with_lookahead()  — check if group fits in remaining width
 arena_print_doc*()           — render doc tree to formatted string
 ```
 
-**Rendering variants** (6, plus `_into` forms):
+**Rendering variants** (the `_resolved_*_into` forms are the production seam):
 
-- `arena_print_doc()` — standard (column 0, no resolver)
-- `arena_print_doc_flat_resolved()` — render in flat mode (no group breaking)
+- `arena_print_doc()` — standard (column 0, no source: for docs with no `SourceSpan`)
 - `arena_print_doc_at_column()` — mid-line start (for Svelte template expressions)
 - `arena_print_doc_with_indent()` — explicit indent level
-- `arena_print_doc_with_indent_resolved()` — full control
-- `arena_print_doc_with_indent_resolved_preserve_whitespace()` — for HTML pre/textarea
+- `arena_print_doc_with_indent_resolved_into()` — source-resolved render into a caller-provided buffer (full control)
+- `arena_print_doc_with_indent_resolved_preserve_whitespace_into()` — same, preserving last-line whitespace (HTML pre/textarea)
 
-The two `resolved` variants also have `*_into(…, output: &mut String)` forms that render into a caller-provided buffer (reserving `estimated_output_capacity` themselves) — the seam behind the arena-parked render scratch the per-piece writers use; the `String`-returning forms are thin wrappers over them.
+The `_resolved_*_into` forms thread the document `source` (so `DocText::SourceSpan` leaves resolve to their verbatim slice) and render into a caller-provided buffer, reserving `estimated_output_capacity` themselves — the seam behind the arena-parked render scratch the per-piece writers use. The non-`resolved` forms pass no source, since their docs contain no `SourceSpan`. (`arena_measure_doc_flat_resolved` renders flat for *measuring* only — never written to output.)
 
 **Below those entry points, the render path threads one `&RenderCtx`.** The mutually-recursive
 internals (`render_doc_iterative` → `render_doc_core` → `render_single_doc` /
 `render_fill_iterative`, plus the line-suffix flush) each need the same four invariants — the
-arena, the `RenderConfig`, the `EmbedContext`, and the resolver — so those are bundled into
-`RenderCtx` and every entry point constructs one. Each internal function destructures it back
+arena, the `RenderConfig`, the `EmbedContext`, and the document `source` (`Option<&str>`, for
+resolving `DocText::SourceSpan` leaves) — so those are bundled into `RenderCtx` and every entry
+point constructs one. Each internal function destructures it back
 into locals at entry, so the render logic reads unchanged.
 
 ⚠️ `RenderCtx` holds **only shared references, deliberately**. The mutable render state —
@@ -232,13 +232,12 @@ occupies (`source[span]`), never from a symbol table:
   No stored name field at all.
 
 The one render-time resolution the doc builder needs is [`DocText::SourceSpan`] →
-verbatim source slice, done through the single required trait method
-`TextResolver::resolve_source_span(span) -> &str`. A printer emitting `SourceSpan`
-wraps its source in `doc::SourceTextResolver { source }` and passes that to the
-resolved render entry points — this is how `source` reaches render without putting a
-lifetime on `DocArena` (the span lives in the lifetime-less arena; the source is
-supplied transiently at render). There is no symbol variant, no deferred symbol
-resolution, and no `string_interner` dependency.
+verbatim source slice (`span.extract(source)`). A printer emitting `SourceSpan` passes
+its `&str` source to the resolved render entry points (the `_resolved_*_into` forms),
+which thread it through the render path as `Option<&str>` — this is how `source` reaches
+render without putting a lifetime on `DocArena` (the span lives in the lifetime-less
+arena; the source is supplied transiently at render). There is no resolver trait, no
+symbol variant, no deferred symbol resolution, and no `string_interner` dependency.
 
 ## Config Types
 

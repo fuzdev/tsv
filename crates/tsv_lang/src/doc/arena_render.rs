@@ -359,30 +359,8 @@ pub fn arena_print_doc_with_indent(
     )
 }
 
-/// Convert an arena doc tree to a formatted string with column, indent, and source-span resolution.
-pub fn arena_print_doc_with_indent_resolved(
-    arena: &DocArena,
-    doc: DocId,
-    embed: &EmbedContext,
-    start_column: usize,
-    start_indent_level: usize,
-    source: &str,
-) -> String {
-    let mut output = String::new();
-    arena_print_doc_with_indent_resolved_into(
-        arena,
-        doc,
-        embed,
-        start_column,
-        start_indent_level,
-        source,
-        &mut output,
-    );
-    output
-}
-
-/// Like [`arena_print_doc_with_indent_resolved`], rendering into a
-/// caller-provided (empty) buffer — the seam behind the printers' pooled
+/// Render an arena doc tree (with column, indent, and source-span resolution)
+/// into a caller-provided (empty) buffer — the seam behind the printers' pooled
 /// render scratch ([`DocArena::take_render_scratch`]), so the per-statement
 /// output `String` reuses one warm allocation instead of alloc/free per call.
 /// Reserves [`DocArena::estimated_output_capacity`] itself (a no-op once the
@@ -416,33 +394,11 @@ pub fn arena_print_doc_with_indent_resolved_into(
     trim_last_line_in_place(output);
 }
 
-/// Convert an arena doc tree, preserving trailing whitespace on the last line
-/// (for HTML `<pre>`, `<textarea>`, etc.). Interior non-literal lines are still
-/// trimmed inline by `render_line_break`; only the final-line trim is skipped.
-pub fn arena_print_doc_with_indent_resolved_preserve_whitespace(
-    arena: &DocArena,
-    doc: DocId,
-    embed: &EmbedContext,
-    start_column: usize,
-    start_indent_level: usize,
-    source: &str,
-) -> String {
-    let mut output = String::new();
-    arena_print_doc_with_indent_resolved_preserve_whitespace_into(
-        arena,
-        doc,
-        embed,
-        start_column,
-        start_indent_level,
-        source,
-        &mut output,
-    );
-    output
-}
-
-/// Like [`arena_print_doc_with_indent_resolved_preserve_whitespace`],
-/// rendering into a caller-provided (empty) buffer — the pooled-scratch seam
-/// (see [`arena_print_doc_with_indent_resolved_into`]). Reserves
+/// Render an arena doc tree into a caller-provided (empty) buffer, preserving
+/// trailing whitespace on the last line (for HTML `<pre>`, `<textarea>`, etc.).
+/// Interior non-literal lines are still trimmed inline by `render_line_break`;
+/// only the final-line trim is skipped. The pooled-scratch seam (see
+/// [`arena_print_doc_with_indent_resolved_into`]); reserves
 /// [`DocArena::estimated_output_capacity`] itself.
 pub fn arena_print_doc_with_indent_resolved_preserve_whitespace_into(
     arena: &DocArena,
