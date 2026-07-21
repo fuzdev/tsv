@@ -508,6 +508,25 @@ pub(crate) fn has_multiline_content(expr: &internal::Expression<'_>, source: &st
     }
 }
 
+/// Necessary-condition container gate for [`has_multiline_content`].
+///
+/// A legacy line continuation is a `\` immediately before a newline, so a
+/// container whose entire source slice holds no backslash cannot have a
+/// multiline descendant — every per-element `has_multiline_content` walk would
+/// bail to `false`. When a caller enters the walk at the container's children
+/// (`obj.properties.iter().any(|p| has_multiline_content(&p.value, …))`) it pays
+/// one `contains('\\')` scan per element; this gate fuses them into a single
+/// contiguous scan of the whole container span, taken before the walk.
+///
+/// Over-inclusive by design: a `\` anywhere in the span — a key, a comment, a
+/// regex, a string escape — passes the gate and the exact per-element walk runs
+/// unchanged. Since the container span is a superset of every element span, a
+/// `false` here proves every element is backslash-free, so gating the walk on it
+/// is byte-identical to the walk alone.
+pub(crate) fn container_may_have_multiline_content(span: Span, source: &str) -> bool {
+    span.extract(source).contains('\\')
+}
+
 /// Build doc for TSEntityName (qualified names like `A.B.C`)
 ///
 /// Needs the printer for the name-emission seam (span-identity source slices,

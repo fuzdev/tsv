@@ -3,7 +3,9 @@
 // Contains the primary `build_call_doc_with_wrapping` function that handles
 // all the special cases for call expression formatting.
 
-use super::super::{ParenContext, Printer, has_multiline_content};
+use super::super::{
+    ParenContext, Printer, container_may_have_multiline_content, has_multiline_content,
+};
 use super::arg_comments::{
     PartitionedComments, any_comment_forces_expansion, build_after_comma_leading_comments,
     first_arg_has_any_comments, has_inter_argument_comments, has_trailing_comments_on_args,
@@ -237,10 +239,11 @@ pub(super) fn build_call_doc_with_wrapping(
 
     // Check if any argument has multiline content (e.g., line continuation strings)
     // Prettier expands calls containing multiline strings (recursively)
-    let has_multiline = call
-        .arguments
-        .iter()
-        .any(|arg| has_multiline_content(arg, printer.source));
+    let has_multiline = container_may_have_multiline_content(call.span, printer.source)
+        && call
+            .arguments
+            .iter()
+            .any(|arg| has_multiline_content(arg, printer.source));
 
     if has_multiline {
         // Force expansion with hardlines for multiline content

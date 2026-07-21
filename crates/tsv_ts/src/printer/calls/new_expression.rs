@@ -25,7 +25,9 @@ use crate::printer::calls::{
     should_force_expansion_for_comments, wrap_call_with_hard_breaks,
     wrap_call_with_will_break_guard,
 };
-use crate::printer::{CommentVec, ParenContext, Printer, has_multiline_content};
+use crate::printer::{
+    CommentVec, ParenContext, Printer, container_may_have_multiline_content, has_multiline_content,
+};
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -341,10 +343,11 @@ impl<'a> Printer<'a> {
         }
 
         // Check if any argument has multiline content
-        let has_multiline = new_expr
-            .arguments
-            .iter()
-            .any(|arg| has_multiline_content(arg, self.source));
+        let has_multiline = container_may_have_multiline_content(new_expr.span, self.source)
+            && new_expr
+                .arguments
+                .iter()
+                .any(|arg| has_multiline_content(arg, self.source));
 
         if has_multiline {
             // Force expansion with hardlines for multiline content
