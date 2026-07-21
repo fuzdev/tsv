@@ -164,9 +164,10 @@ spelling: an **escaped** id (`const C = class \u0024Foo {};`) reaches the refusa
 through `dollar_identifier_name` → `identifier_name`, which returns `None` whenever
 `escaped_name` is set, so tsv **compiles** it while the oracle emits the same
 ungrammatical `class $.store_get(…) {}` (probe-verified). That is not one of the six
-escaped over-acceptances tracked as the crate's escaped-identifier residual — the
-oracle *accepts* a class-expression id, so slipping past the refusal is parity on the
-rule — it lands on this oracle defect instead. Refusing the unescaped spelling is a
+escaped binding over-acceptances the escaped-identifier residual covered (now closed —
+those six decode via the interner and refuse); here the oracle *accepts* a
+class-expression id, so slipping past the refusal is parity on the rule — it lands on
+this oracle defect instead. Refusing the unescaped spelling is a
 deliberate over-refusal — the oracle compiles these, so refusing costs achievable parity — but the
 alternative is reproducing invalid output in one case and a phantom injection in the
 other. No fixture is proposed: a fixture would pin the oracle's defect as expected

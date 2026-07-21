@@ -275,7 +275,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
         // not walked at all, and the two that are walked go through
         // `walk_expression_guarded`, which sees a pattern as an expression and
         // takes the store-read exemption this `WalkCtx` enables.
-        refuse_dollar_binding_pattern(&declarator.id, source)?;
+        refuse_dollar_binding_pattern(&declarator.id, source, &b.interner)?;
         let rune = declarator
             .init
             .as_ref()
@@ -505,7 +505,7 @@ fn rewrite_class_state_fields<'arena>(
     // This path intercepts the statement before the guard walk's
     // `ClassDeclaration` arm, so it owns the class id's binding check.
     if let Some(id) = &class.id {
-        refuse_dollar_binding_name(id, source)?;
+        refuse_dollar_binding_name(id, source, &b.interner)?;
     }
     // Same exemptions as the surrounding script guard: a `$name` store read / a
     // `$derived` read inside a method body is rewritten later, not refused here.

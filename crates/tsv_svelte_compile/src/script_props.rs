@@ -188,14 +188,15 @@ pub(crate) fn rewrite_props_pattern<'arena>(
                     return Err(unsupported(Refusal::PropsInvalidPattern));
                 }
                 // 2. A non-computed Identifier key starting with `$$` — `props_illegal_name`
-                //    (reserved for Svelte internals). A `$$`-prefixed *binding* — a shorthand
-                //    `{ $$foo }` or default `{ $$foo = 1 }` — is refused upstream as
-                //    `DollarPrefixedBinding` (`script_rewrite.rs`, the oracle's
-                //    `dollar_prefix_invalid`, which fires first), so only `{ $$key: value }`
-                //    reaches here; an escaped key falls through (the crate's standing
-                //    escaped-identifier residual).
+                //    (reserved for Svelte internals). The name is DECODED via the interner
+                //    (`Identifier::name`), so an ESCAPED `$$` key (`{ $$x: a }` written
+                //    `$$x`) refuses too — the oracle reads the DECODED `node.name`.
+                //    A `$$`-prefixed *binding* — a shorthand `{ $$foo }` or default
+                //    `{ $$foo = 1 }` — is refused upstream as `DollarPrefixedBinding`
+                //    (`script_rewrite.rs`, the oracle's `dollar_prefix_invalid`, which fires
+                //    first), so only `{ $$key: value }` reaches here.
                 if let Expression::Identifier(key_id) = &p.key
-                    && plain_identifier_name(key_id, source).is_some_and(|k| k.starts_with("$$"))
+                    && key_id.name(source, &b.interner.borrow()).starts_with("$$")
                 {
                     return Err(unsupported(Refusal::PropsIllegalName));
                 }

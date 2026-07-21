@@ -433,7 +433,7 @@ fn collect<'arena>(
             continue;
         }
         if let Statement::ImportDeclaration(import) = stmt {
-            if let Err(err) = refuse_runes_invalid_import(import, source) {
+            if let Err(err) = refuse_runes_invalid_import(import, source, &root.interner) {
                 push_unsupported(found, err);
             }
             continue;

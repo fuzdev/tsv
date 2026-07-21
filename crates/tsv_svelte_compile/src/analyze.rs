@@ -900,7 +900,7 @@ pub(crate) fn pattern_binds_unnameable_identifier(pattern: &Expression<'_>) -> b
     }
 }
 
-fn expression_kind(expr: &Expression<'_>) -> &'static str {
+pub(crate) fn expression_kind(expr: &Expression<'_>) -> &'static str {
     // Only used for error messages on unusual pattern shapes.
     match expr {
         Expression::MemberExpression(_) => "member expression",

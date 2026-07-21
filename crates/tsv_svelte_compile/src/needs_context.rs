@@ -35,6 +35,7 @@
 //! `FragmentNode` variant fails compilation here instead of silently slipping
 //! past the analysis.
 
+use tsv_lang::SharedInterner;
 use tsv_svelte::ast::internal::{
     AttributeNode, AwaitBlock, ConstTag, EachBlock, Element, Fragment, FragmentNode, HtmlTag,
     IfBlock, KeyBlock, RenderTag, Root, SnippetBlock, SpecialElement, SpecialElementKind,
@@ -58,6 +59,10 @@ use crate::{CompileError, Refusal};
 #[allow(clippy::struct_excessive_bools)] // independent monotonic accumulator flags, not a state machine
 struct Nc<'a> {
     source: &'a str,
+    /// The parse's interner — to decode an escaped identifier's name where an
+    /// oracle rule reads the DECODED `node.name`: the `invalid_arguments_usage`
+    /// reference and the `props_illegal_name` reference-site property.
+    interner: &'a SharedInterner,
     /// Prop + import names — the roots whose member/call access is unsafe.
     context_roots: &'a NameSet,
     /// The instance script's `$props()` **rest_prop** binding names — the roots
@@ -248,6 +253,9 @@ pub(crate) fn analyze_component(
 
     let mut nc = Nc {
         source,
+        // `root` is already a parameter, so the interner is available without a new
+        // `analyze_component` argument.
+        interner: &root.interner,
         context_roots: &context_roots,
         rest_prop_names: &rest_prop_names,
         store_names,
@@ -377,9 +385,12 @@ fn collect_context_roots(instance_body: &[Statement<'_>], source: &str, out: &mu
 ///   NOT `rest_prop`, so they are deliberately excluded here (unlike
 ///   [`collect_context_roots`], which takes every prop name).
 ///
-/// An escaped identifier returns `None` from [`plain_name`] and falls through —
-/// the crate's standing escaped-identifier residual, same as the declare-site
-/// check (`script_props::rewrite_props_pattern`).
+/// An escaped rest-prop ROOT binding returns `None` from [`plain_name`] and falls
+/// through — a narrow residual left by DESIGN: `rest_prop_names` is a plain-name
+/// set, and the member-site check that reads it decodes only the PROPERTY name (the
+/// `$$…` half). The declare-site `$$`-key check
+/// (`script_props::rewrite_props_pattern`) now DECODES, so it is no longer paired
+/// with this one.
 fn collect_rest_prop_names(instance_body: &[Statement<'_>], source: &str, out: &mut NameSet) {
     for stmt in instance_body {
         let Statement::VariableDeclaration(decl) = stmt else {
@@ -927,12 +938,21 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
             // key (`rest['$$slots']`) is excluded on its own: its property is a
             // Literal, not an Identifier, so the `Expression::Identifier(prop)`
             // arm fails — matching the oracle, which also compiles it.
+            //
+            // The property NAME is DECODED via the interner (`Identifier::name`),
+            // so an escaped `$$` property (`rest.$$foo` written `$$foo`)
+            // refuses too — the oracle reads the DECODED `node.name`. The object
+            // ROOT stays span-identity (`plain_name`): `rest_prop_names` is a
+            // plain-name set, so an escaped rest-prop ROOT binding is a separate,
+            // narrower residual left by `collect_rest_prop_names`.
             if nc.refuse.is_none()
                 && let Expression::Identifier(obj) = member.object
                 && let Some(obj_name) = plain_name(obj, nc.source)
                 && nc.rest_prop_names.contains(obj_name)
                 && let Expression::Identifier(prop) = member.property
-                && plain_name(prop, nc.source).is_some_and(|p| p.starts_with("$$"))
+                && prop
+                    .name(nc.source, &nc.interner.borrow())
+                    .starts_with("$$")
             {
                 nc.refuse = Some(Refusal::PropsIllegalName);
             }
@@ -966,22 +986,27 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
         // `uses_slots`) and a `$name` store access (the store-subscription gate),
         // otherwise a leaf.
         Expression::Identifier(id) => {
+            // The oracle's `invalid_arguments_usage` (`Identifier.js:27-32`): a
+            // REFERENCE to `arguments` with no
+            // `FunctionDeclaration`/`FunctionExpression` ancestor. This arm is
+            // reached only for reference-position identifiers (the member-property /
+            // object-key walks are `computed`-gated), so the `is_reference` guard is
+            // satisfied by construction; the ancestor test is `nonarrow_fn_depth ==
+            // 0` (arrows / snippet bodies / class field inits / static blocks do NOT
+            // suppress it). The name is DECODED via the interner, so an escaped
+            // `arguments` reference outside a non-arrow function refuses too —
+            // the oracle reads the DECODED `node.name`. Resolved late, first-wins;
+            // the cheap gates short-circuit before the interner borrow.
+            if nc.nonarrow_fn_depth == 0
+                && nc.refuse.is_none()
+                && id.name(nc.source, &nc.interner.borrow()) == "arguments"
+            {
+                nc.refuse = Some(Refusal::InvalidArgumentsUsage);
+            }
+            // `uses_slots` / `uses_stores` are EMISSION gates, not refusals, and
+            // stay span-identity — an escaped `$$slots`/store name is not a user
+            // reference the oracle's gate counts here.
             if let Some(name) = plain_name(id, nc.source) {
-                // The oracle's `invalid_arguments_usage` (`Identifier.js:27-32`):
-                // a REFERENCE to `arguments` with no
-                // `FunctionDeclaration`/`FunctionExpression` ancestor. This arm is
-                // reached only for reference-position identifiers (the
-                // member-property / object-key walks are `computed`-gated), so the
-                // `is_reference` guard is satisfied by construction; the ancestor
-                // test is `nonarrow_fn_depth == 0` (arrows / snippet bodies / class
-                // field inits / static blocks do NOT suppress it). Resolved late
-                // like every other refusal, first-wins. An ESCAPED `arguments`
-                // returns `None` from `plain_name` and so never reaches this block —
-                // an over-acceptance, the crate's standing escaped-identifier
-                // residual (same class as `MemberCallEscapedRoot`).
-                if name == "arguments" && nc.nonarrow_fn_depth == 0 && nc.refuse.is_none() {
-                    nc.refuse = Some(Refusal::InvalidArgumentsUsage);
-                }
                 if name == "$$slots" {
                     nc.uses_slots = true;
                 } else if crate::analyze::store_read_base(name)

@@ -716,7 +716,7 @@ pub(crate) fn compile_server<'arena>(
             return Err(unsupported(Refusal::InstanceScriptExport));
         }
         if let Statement::ImportDeclaration(import) = stmt {
-            refuse_runes_invalid_import(import, source)?;
+            refuse_runes_invalid_import(import, source, &root.interner)?;
             user_imports.push(stmt.clone());
             continue;
         }

@@ -100,6 +100,61 @@ fn compile_refuses_dollar_prefixed_bindings() {
 }
 
 #[test]
+fn compile_refuses_escaped_reserved_bindings() {
+    // The crate's standing escaped-identifier residual, CLOSED. A `\u`-escaped
+    // identifier decodes to a reserved name the oracle rejects (it reads the
+    // DECODED `node.name`), but the name-extraction helpers were span-identity and
+    // bailed on `escaped_name`, so every guarded position over-accepted. Each rule
+    // now decodes via the interner (`Identifier::name`), matching the oracle.
+    //
+    // `dollar_prefix_invalid` across all six binding positions — `$` = `$`.
+    for (source, name) in [
+        // A declarator leaf (via the decode-aware pattern collector).
+        (
+            "<script>let \\u0024x = 1; \\u0024x;</script>\n<p>a</p>",
+            "$x",
+        ),
+        // A function-declaration id.
+        ("<script>function \\u0024f() {}</script>\n<p>a</p>", "$f"),
+        // A class-declaration id.
+        ("<script>class \\u0024C {}</script>\n<p>a</p>", "$C"),
+        // A function-expression id.
+        (
+            "<script>const f = function \\u0024g() {};</script>\n<p>a</p>",
+            "$g",
+        ),
+        // An import specifier's local.
+        (
+            "<script>import { \\u0024x } from './m.js'; \\u0024x;</script>\n<p>a</p>",
+            "$x",
+        ),
+        // A catch-clause parameter (via the decode-aware pattern collector).
+        (
+            "<script>let r = 0; try { r = 1; } catch (\\u0024x) { r = 2; }</script>\n<p>{r}</p>",
+            "$x",
+        ),
+    ] {
+        assert_unsupported(source, name);
+    }
+    // `props_illegal_name`, declare-site — an escaped `$$` key (`$$x`).
+    assert_unsupported(
+        "<script>let { \\u0024\\u0024x: a } = $props(); a;</script>\n<p>{a}</p>",
+        "prop name starting with `$$`",
+    );
+    // `props_illegal_name`, reference-site — an escaped `$$` property on a rest_prop.
+    assert_unsupported(
+        "<script>let { ...rest } = $props(); const x = rest.\\u0024\\u0024foo; x;</script>\n<p>x</p>",
+        "prop name starting with `$$`",
+    );
+    // `invalid_arguments_usage` — an escaped `arguments` (`arguments`) reference
+    // outside a function.
+    assert_unsupported(
+        "<script>const x = \\u0061rguments; x;</script>\n<p>x</p>",
+        "arguments referenced outside a function",
+    );
+}
+
+#[test]
 fn compile_refuses_dollar_prefixed_binding_on_the_rewrite_path() {
     // `script_rewrite::rewrite_script_statement` rewrites a top-level instance-script
     // declaration instead of guard-walking it, so it needs the binding rule at
