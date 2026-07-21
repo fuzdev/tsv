@@ -298,6 +298,189 @@ fn compile_module_comment_before_instance_script_still_drops() {
     );
 }
 
+// ── The "open half": a module comment the oracle KEEPS, recovered by esrap's
+// comment-index re-seek over a preceding block-bearing statement. The keep
+// condition (both must hold): (1) a `BlockStatement`/`ClassBody`/static block
+// STARTS before the comment; (2) a flush target exists — a non-empty module
+// statement extending past the comment, OR an instance script. Each case is
+// derived from `canonical_compile`, and paired with a discriminating drop so the
+// assertion cannot pass vacuously.
+
+#[test]
+fn compile_module_comment_after_block_carries() {
+    // A `function` declaration (its body block) precedes the comment, and a later
+    // module statement flushes it — the oracle keeps it, so tsv must too.
+    let js = compile_js(
+        "<script module>function f(){}\n// MODMARK\nexport const g = 2;\n</script><p>hi</p>",
+    );
+    assert!(
+        js.contains("// MODMARK"),
+        "a module comment after a block must carry: {js}"
+    );
+}
+
+#[test]
+fn compile_module_comment_before_block_drops() {
+    // The discriminating control for the case above: the SAME block, but the
+    // comment sits BEFORE it — so esrap's re-seek moves past the comment and the
+    // oracle drops it. tsv must drop too (dropping one the oracle keeps, or keeping
+    // one it drops, are both mismatches).
+    let js = compile_js(
+        "<script module>// MODMARK\nfunction f(){}\nexport const g = 2;\n</script><p>hi</p>",
+    );
+    assert!(
+        !js.contains("MODMARK"),
+        "a module comment before every block must drop: {js}"
+    );
+}
+
+#[test]
+fn compile_module_comment_no_block_drops() {
+    // No block at all (a plain `const` init): condition 1 fails, so the comment
+    // drops even with a flush target present.
+    let js = compile_js(
+        "<script module>const a = 1;\n// MODMARK\nexport const b = 2;\n</script><p>hi</p>",
+    );
+    assert!(
+        !js.contains("MODMARK"),
+        "a module comment with no preceding block must drop: {js}"
+    );
+}
+
+#[test]
+fn compile_module_comment_arrow_expression_drops() {
+    // An arrow with an EXPRESSION body has no `BlockStatement`, so it is not a
+    // block — the comment drops. (An arrow with a `{}` block body WOULD keep it.)
+    let js = compile_js(
+        "<script module>const f = () => 1;\n// MODMARK\nexport const g = f();\n</script><p>hi</p>",
+    );
+    assert!(
+        !js.contains("MODMARK"),
+        "an arrow expression body is not a block; the comment must drop: {js}"
+    );
+}
+
+#[test]
+fn compile_module_comment_switch_drops() {
+    // A `switch` has no `BlockStatement` node (its braces are syntactic), so it does
+    // not trigger the re-seek — the comment drops.
+    let js = compile_js(
+        "<script module>switch (1) { case 1: break; }\n// MODMARK\nexport const g = 2;\n</script><p>hi</p>",
+    );
+    assert!(
+        !js.contains("MODMARK"),
+        "a switch is not a block; the comment must drop: {js}"
+    );
+}
+
+#[test]
+fn compile_module_comment_class_body_carries() {
+    // A `ClassBody` — even a field-only class with no method body — is a block the
+    // oracle re-seeks on, so a following comment carries.
+    let js = compile_js(
+        "<script module>class C { x = 1; }\n// MODMARK\nexport const g = 2;\n</script><p>hi</p>",
+    );
+    assert!(
+        js.contains("// MODMARK"),
+        "a comment after a class body must carry: {js}"
+    );
+}
+
+#[test]
+fn compile_module_comment_inside_block_carries() {
+    // A comment INSIDE the only block, with no later statement and no instance:
+    // condition 1 holds (the `{` precedes it) and the block's closing `}` is the
+    // flush target — the oracle keeps it.
+    let js = compile_js("<script module>function f(){\n// MODMARK\n}\n</script><p>hi</p>");
+    assert!(
+        js.contains("// MODMARK"),
+        "a comment inside a block (flushed by its close) must carry: {js}"
+    );
+}
+
+#[test]
+fn compile_module_comment_after_last_no_flush_drops() {
+    // A block precedes the comment, but the comment is past the last module
+    // statement with NO instance script — no flush target, so it drops.
+    let js = compile_js("<script module>function f(){}\n// MODMARK\n</script><p>hi</p>");
+    assert!(
+        !js.contains("MODMARK"),
+        "a module comment past the last statement with no flush target must drop: {js}"
+    );
+}
+
+#[test]
+fn compile_module_comment_after_last_with_instance_carries() {
+    // The same after-last comment, but WITH an instance script present — the
+    // instance supplies the flush, so the oracle keeps it. The oracle re-attaches
+    // it into the component signature while tsv keeps it in the module body: a
+    // POSITION difference the parity bar tolerates, but the comment is present.
+    let js = compile_js(
+        "<script module>function f(){}\n// MODMARK\n</script><script>let x = 1;</script><p>{x}</p>",
+    );
+    assert!(
+        js.contains("// MODMARK"),
+        "an after-last module comment with an instance script must carry: {js}"
+    );
+}
+
+#[test]
+fn compile_module_comment_in_param_list_before_block_drops() {
+    // The block's `{` sits AFTER the comment (the comment is in the parameter
+    // list), so the re-seek anchors on the BLOCK's start, not the statement's — the
+    // oracle drops it. The discriminating control for `..._after_block_carries`.
+    let js = compile_js(
+        "<script module>function f(\n// MODMARK\n){}\nexport const g = 2;\n</script><p>hi</p>",
+    );
+    assert!(
+        !js.contains("MODMARK"),
+        "a comment before the block (in the param list) must drop: {js}"
+    );
+}
+
+#[test]
+fn compile_module_comment_multi_split_before_and_after_block() {
+    // Two comments, one before the block and one after: only the second carries.
+    // Confirms the per-comment independence of the keep rule.
+    let js = compile_js(
+        "<script module>// DROPMARK\nfunction f(){}\n// KEEPMARK\nexport const g = 2;\n</script><p>hi</p>",
+    );
+    assert!(
+        js.contains("// KEEPMARK") && !js.contains("DROPMARK"),
+        "the pre-block comment drops and the post-block comment carries: {js}"
+    );
+}
+
+#[test]
+fn compile_module_multiline_block_comment_refuses() {
+    // A KEPT module comment that would reprint divergently refuses (safe): esrap
+    // re-indents a multi-line block comment's interior lines.
+    assert_unsupported(
+        "<script module>function f(){}\n/* line one\n\t\tline two */\nexport const g = 2;\n</script><p>hi</p>",
+        "multi-line block comment",
+    );
+}
+
+#[test]
+fn compile_module_format_ignore_comment_refuses() {
+    // A KEPT module `prettier-ignore` refuses (would switch the printer to
+    // raw-source emission of the following statement).
+    assert_unsupported(
+        "<script module>function f(){}\n// prettier-ignore\nexport const g = 2;\n</script><p>hi</p>",
+        "format-ignore directive",
+    );
+}
+
+#[test]
+fn compile_module_comment_in_erased_region_refuses() {
+    // A KEPT module comment intersecting an erased TypeScript region refuses — the
+    // oracle's surviving placement there is an emergent stale-span artifact.
+    assert_unsupported(
+        "<script module lang=\"ts\">function f(){}\nexport const g: /* MODMARK */ number = 2;\n</script><p>hi</p>",
+        "erased TypeScript region",
+    );
+}
+
 #[test]
 fn compile_rejects_exporting_a_non_hoistable_snippet() {
     // `snippet_invalid_export` (`2-analyze/index.js:831`): the snippet references

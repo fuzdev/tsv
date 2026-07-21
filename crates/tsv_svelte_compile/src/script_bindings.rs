@@ -56,9 +56,9 @@ pub(crate) fn analyze_module_script<'arena>(
     source: &str,
     arena: &'arena bumpalo::Bump,
     ts_document: bool,
-) -> Result<&'arena [Statement<'arena>], CompileError> {
+) -> Result<(&'arena [Statement<'arena>], Vec<tsv_lang::Span>), CompileError> {
     let Some(script) = root.module else {
-        return Ok(&[]);
+        return Ok((&[], Vec::new()));
     };
     let erased = erase::erase_statements(arena, source, script.content.body)?;
     // The same document-wide TypeScript gate the instance body pays: without the
@@ -67,6 +67,11 @@ pub(crate) fn analyze_module_script<'arena>(
     if erased.typescript && !ts_document {
         return Err(unsupported(Refusal::TypeScriptWithoutLangTs));
     }
+    // The module's erased-region windows ride out alongside its body: a carried
+    // module-script comment intersecting one refuses, exactly as the instance
+    // path does (see `collect_module_script_comments`).
+    let body = erased.body;
+    let regions = erased.regions;
     // Scratch collection sinks — the guard walk's reassignment/shadow collection is
     // redundant here (the whole-component `analyze_component` covers module scope),
     // so only its REFUSAL is wanted. Derived reads are impossible in a module (no
@@ -75,7 +80,7 @@ pub(crate) fn analyze_module_script<'arena>(
     let mut updated = NameSet::default();
     let mut nested = NameSet::default();
     let derived = NameSet::default();
-    for stmt in erased.body {
+    for stmt in body {
         if matches!(stmt, Statement::ExportDefaultDeclaration(_)) {
             return Err(unsupported(Refusal::ModuleDefaultExport));
         }
@@ -91,7 +96,7 @@ pub(crate) fn analyze_module_script<'arena>(
         );
         walk_statement_guarded(stmt, &mut ctx, 0)?;
     }
-    Ok(erased.body)
+    Ok((body, regions))
 }
 
 /// Mirror the oracle's runes-mode import rules (its analyze-phase

@@ -1035,60 +1035,59 @@ exactly one):
 | Signature | Count | Shape |
 | --- | --- | --- |
 | `$$props` | 6 | a user `const $$props = 1` where the oracle emits `const $$sanitized_props = 1` (generated-name deconfliction) |
-| module-script comment (block-recovered) | 7 | the **other** half of the class, still open — see below |
+| module-script comment (block-recovered) | 7 | the **other** half of the class — now **CLOSED** (carried, not refused); see below |
 | generated-function order | 1 | a `<svelte:boundary>` `failed` snippet / hoisted snippet function emitted at a different point in the body than the oracle emits it |
 | wrapper | 1 | `$$renderer.component(…)` emitted where the oracle emits none |
 | static fold | 1 | tsv folds a `{b}` read the oracle keeps as `$.escape(b)` |
 
 #### The open half: a module comment recovered by a preceding block
 
-Every one of the 7 residual module-comment mismatches is the **same mechanism** as the
-closed half — esrap's single comment index being re-seeked backward — reached by a
-different route. The trigger boundary, established by probe against the pinned oracle:
+**Now CLOSED (carried, not refused).** The 7 residual module-comment mismatches are the
+**same mechanism** as the closed half —
+esrap's single comment index being re-seeked backward — reached by a different route.
+They are now **CARRIED, not refused**: unlike the closed half (a module-second comment
+lands in an unrelated template expression, unreproducible), a module-first comment the
+oracle keeps carries at its authored span, which the parity bar accepts (a byte match, or
+a comment-POSITION difference the oracle sometimes forces by re-attaching into the
+component signature). The keep set is computed in
+[`collect_module_script_comments`](../crates/tsv_svelte_compile/src/script_comments.rs).
 
-> A `<script module>` comment is EMITTED by the oracle when some **earlier** statement in
-> the module body contains a `{ … }` block (which carries a `loc`, so opening it re-seeks
-> the index back over the comment) **and** some later printed node exists to flush it
-> into. tsv drops it → mismatch.
+The requirement is **bidirectionally exact** — keeping one the oracle drops OVER-emits,
+dropping one it keeps UNDER-emits, both MISMATCHES with no safe direction — so the
+condition, probed against the pinned oracle (esrap 2.2.12), is stated precisely. A module
+comment `C` (inside the module content span) is **KEPT** iff BOTH:
 
-⚠️ **This axis is INDEPENDENT of the closed half's.** The refusal keys on script ORDER
-(module after instance); this keys on a PRECEDING BLOCK-BEARING STATEMENT in the module
-body. Neither implies the other, so **a two-script document is not covered by the
-refusal** — a module script placed *first*, with an instance script present, still
-mismatches whenever a block-bearing statement precedes the comment. Live-probed with the
-instance template holding a `{x}` read, a `$props()` member read, and no expression at
-all; all three emit `// c` on the oracle side and drop it on tsv's. Instance-script
-presence is simply not on this axis — do not read the closed half's ordering rule as
-covering it.
+1. **A block precedes it** — some `BlockStatement` / `ClassBody` / class static block
+   STARTS at a source position `< C.start`. Those are exactly the nodes esrap opens with
+   a `loc`-bearing `reset_comment_index`. Triggering (probe-confirmed): a `function` /
+   `class` declaration (even `class C {}`), `const f = function () {}`, `const f = () =>
+   {}` (BLOCK body), an object method `{ m() {} }`, `if (1) {}` / `for` / `while` /
+   `try`, a bare or labeled block, a getter/setter body, a static block, a block nested
+   in a call arg (`setTimeout(() => {}, 0)`). **Not** triggering: a plain `const`/`let`/
+   `var`, an arrow with an EXPRESSION body (`() => x`), an object/array literal, a
+   `switch` (its braces are not a `BlockStatement` node), an `import`. ⚠️ The anchor is
+   the BLOCK's start, not its statement's: a comment in a parameter list, before the body
+   block (`function f(\n// c\n){}`), DROPS.
+2. **A flush target exists** — some NON-empty module statement extends PAST the comment
+   (`span.end > C.end`: a later statement, OR the enclosing block's `}` for a comment
+   sitting inside a block), OR an instance `<script>` is present. ⚠️ The exported
+   component function is NOT a flush target (a loc-less reset discards the module comments
+   before it prints), so a comment after the last module statement drops *without* an
+   instance script and carries *with* one. A DROPPED TypeScript statement (an `interface`
+   / `type`, an `EmptyStatement` post-erase) is not a flush target either.
 
-⚠️ The **flush target** is likewise looser than "a later printed *template* node". A
-document with a fully static template (`<p>hi</p>`) mismatches, the target being a later
-**module-body** statement (`export const a = 1`). What is confirmed is only that *some*
-later printed node is needed, not where it lives.
+Otherwise `C` DROPS. Three kept-but-reprint-divergent classes refuse (safe — a gap, not a
+mismatch), mirroring the instance-side rules: a multi-line block comment (esrap re-indents
+interior lines), a comment intersecting an erased TypeScript region (emergent stale-span
+placement), and a format-ignore directive (raw-source reprint).
 
-Confirmed triggering (comment preceded by, and followed by, a statement): a `function`
-or `class` declaration, a `const f = function () {}`, a `const f = () => {}`, an object
-method `{ m() {} }`, an `if (1) {}`. Confirmed **not** triggering: a plain `const` /
-`let` / `var`, an object literal, an array literal, an `import`. A comment before the
-module body's **first** statement or after its **last** is also parity — but that was
-probed *without* an instance script, and the last-statement carve-out does **not** hold
-with one present: the same comment then lands inside the emitted function's parameter
-list (`function Input($$renderer // c)`), a mismatch of a different shape. Treat the two
-carve-outs as no-instance-script results only.
+Fixtures: `tests/fixtures_compile/module/comment_{after_block,earlier_block,
+after_last_with_instance}` (keep) and `module/comment_{before_block_dropped,
+arrow_expr_dropped,after_last_no_instance_dropped}` (drop); plus the fine-grained
+keep/drop/refuse matrix in `src/tests/module_script.rs`.
 
-**Corpus exposure.** A source scan over the `compile:corpus:compare` roots finds 22
-module scripts whose body opens a `{` before its first comment — the shape this axis
-needs. Spot-checks show them currently **masked**: a probed sample either refuses for an
-unrelated reason (a `generics` attribute, `template_emits_nested_block`) or is genuinely
-parity. So the corpus being green is evidence about the corpus, not about this hole: the
-shape is reachable in ordinary real code and merely shadowed today, and a refusal lifting
-elsewhere can unmask it.
-
-Closing it wants the same shape as `template_emits_nested_block` — a blunt
-"does any preceding module statement contain a block" scan that deliberately
-over-refuses. It is **not** done here: unlike the closed half (zero corpus cost), a
-module script holding a function or class beside a comment is ordinary real code, so the
-over-refusal's parity cost must be measured before the rule is chosen.
+⚠️ Keyed to the pinned oracle's `reset_comment_index` behavior — re-probe the keep
+condition if that pin moves.
 
 ⚠️ **A further class exists but did not come from this run.** `<svelte:head>` ordering —
 tsv emits `$.head(…)` *before* the hoisted snippet function where the oracle emits it

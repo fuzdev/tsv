@@ -112,17 +112,15 @@ put an under-refusal (a MISMATCH) one emission change away, so the refusal keys 
 order alone. Measured cost over the compile corpus: **zero** — the bucket appears in no
 file's refusal list and the parity / refused / fenced totals are unchanged.
 
-⚠️ This closes only the module→instance **ordering**, and it does **not** make two-script
-documents safe. The same esrap index-recovery fires on a **second, independent axis**: a
-**block-bearing statement earlier in the module body** re-seeks the index back over the
-comment. The refusal above keys on script ORDER; that axis keys on a PRECEDING BLOCK, and
-the two are orthogonal — a module script placed **first**, with an instance script
-present, still mismatches whenever a `function` / `class` / `if (1) {}` precedes the
-comment in the module body. Live-probed against the pinned oracle, with the instance
-script's own template holding a `{x}` read, a `$props()` member read, and **no expression
-at all** — all three mismatch, the oracle emitting `// c` that tsv drops. It is not a
-no-instance-script shape; it is a preceding-block shape that a second script neither
-causes nor prevents. Still open, with the probed boundary recorded in
+The refusal above closes only the module→instance **ordering**. The same esrap
+index-recovery fires on a **second, independent axis** — a **block-bearing statement
+earlier in the module body** re-seeks the index back over the comment — and that axis is a
+parity FIX, not a refusal: a module-FIRST comment the oracle keeps is **carried** at its
+authored span (byte-exact, or a comment-POSITION difference the parity bar tolerates),
+while the rest drop. The keep condition (a block STARTS before the comment, and a flush
+target exists) is bidirectionally exact against the pinned oracle; three reprint-divergent
+sub-classes still refuse (multi-line block comment, erased-region comment, format-ignore).
+Full condition and fixtures:
 [checklist_svelte_compiler.md §The open half](checklist_svelte_compiler.md#the-open-half-a-module-comment-recovered-by-a-preceding-block).
 
 No fixture is proposed: a refusal is not expressible as a compile fixture (those require

@@ -809,17 +809,16 @@ pipeline order.
   flushes the comment first, and likewise the block-free special elements
   (`<svelte:window>`, `<slot>`). The split is keyed to the pinned oracle's
   `reset_comment_index` behavior (esrap 2.2.12) — re-probe it if that pin moves.
-  The same index recovery governs a **module-script** comment, which is why one is
-  DROPPED rather than carried only when the module script comes FIRST: the component
-  body block carries the instance script's `loc`, so opening it seeks forward past a
-  comment that precedes the instance script and BACKWARD onto one that follows it, and
-  a recovered comment is then flushed into the next loc-bearing node (a template
-  expression it has nothing to do with). tsv drops it either way, so the
-  module-second ordering refuses (`ModuleCommentAfterInstanceScript`). A second route
-  to the same recovery — a block-bearing statement EARLIER in the module body, no
-  instance script needed — is a known open mismatch; see
-  `../../docs/checklist_svelte_compiler.md` §The open half.
-  Divergent placement classes
+  The same index recovery governs a **module-script** comment along TWO independent
+  axes, and `collect_script_comments` owns only the first: the module-AFTER-instance
+  ordering, where the component body block (carrying the instance script's `loc`)
+  seeks BACKWARD onto a comment that FOLLOWS the instance script and the oracle
+  re-attaches it into an unrelated template expression — unreproducible, so that
+  ordering refuses (`ModuleCommentAfterInstanceScript`). The second axis — a
+  block-bearing statement EARLIER in the module body re-seeking the index back over
+  the comment — is a parity FIX owned by `collect_module_script_comments` (below),
+  not a refusal: a module-FIRST comment the oracle keeps is CARRIED at its authored
+  span; the rest drop. Divergent placement classes
   also still refuse —
   template-expression comments, comments inside dropped rune regions, and comments
   alongside a rune rewrite that mints a **script-region** span a comment window
@@ -827,6 +826,22 @@ pipeline order.
   `$state()`). A template block, a component invocation, an expression-valued
   attribute, `{#snippet}`/`{@render}`, and hoisted imports emit **template-region**
   spans only, so a carried comment window can't reach them and they compile.
+
+  `collect_module_script_comments` is the module-scope sibling: the keep set for the
+  `<script module>` program (threaded to `module_program`), computed only for the
+  module-FIRST ordering (`collect_script_comments` refuses module-second first). A
+  module comment is KEPT iff BOTH a `BlockStatement`/`ClassBody`/static block STARTS
+  before it (`module_min_block_start` — the anchor is the BLOCK's start, exactly the
+  nodes esrap re-seeks its index on; a `switch`/object/array `{}`/`[]` is not one)
+  AND a flush target exists — a non-empty module statement extends PAST it, or an
+  instance script is present (the exported component function is NOT one). Otherwise
+  it drops. The rule is BIDIRECTIONALLY exact against the pinned oracle (no safe
+  direction: over-keep and under-keep are both mismatches), so
+  `module_min_block_start` only ever notes a genuine block — a missed descent can
+  under-report (leave a mismatch unclosed) but never keep a comment the oracle drops.
+  A kept comment whose reprint would diverge refuses (multi-line block comment,
+  erased-region comment, format-ignore), mirroring the instance-side rules. Full
+  condition + fixtures: `../../docs/checklist_svelte_compiler.md` §The open half.
 - `script_rewrite.rs` — the per-statement rune rewrites
   (`rewrite_script_statement`). Oracle phase 3, **server**: `$props()` →
   `$$props` (span-stolen),

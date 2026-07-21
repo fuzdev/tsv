@@ -69,7 +69,7 @@ use crate::namespace::{FragmentParent, Namespace, infer_namespace};
 use crate::needs_context::{ComponentContext, analyze_component, collect_constant_names};
 use crate::script_bindings::{analyze_module_script, analyze_script, refuse_runes_invalid_import};
 use crate::script_collision::refuse_rune_store_collision;
-use crate::script_comments::collect_script_comments;
+use crate::script_comments::{collect_module_script_comments, collect_script_comments};
 use crate::script_decls::{identifier_binding_name, plain_identifier_name};
 use crate::script_props::BindableEntry;
 use crate::script_rewrite::rewrite_script_statement;
@@ -332,13 +332,19 @@ pub(crate) struct Analysis<'arena> {
     /// tree still carries TypeScript.)
     pub(crate) instance_body: &'arena [Statement<'arena>],
     /// The type-erased module-script statement list (imports + declarations +
-    /// non-default exports, source order), emitted **verbatim** as a comment-free
-    /// module-scope program between the hoisted snippets and the component
-    /// function. Empty when there is no module script. (NOTHING may read
-    /// `root.module.content.body`: the un-erased tree still carries TypeScript.)
+    /// non-default exports, source order), emitted **verbatim** as a module-scope
+    /// program between the hoisted snippets and the component function — carrying
+    /// only the `module_comments` the oracle keeps (see that field). Empty when
+    /// there is no module script. (NOTHING may read `root.module.content.body`: the
+    /// un-erased tree still carries TypeScript.)
     pub(crate) module_body: &'arena [Statement<'arena>],
     /// Carried instance-script comments (threaded into the export program).
     pub(crate) script_comments: Vec<Comment>,
+    /// Carried module-script comments — the "open half": the ones the oracle keeps
+    /// (recovered by a preceding block), threaded into the module program at their
+    /// authored spans. Empty when the module drops them all. See
+    /// [`collect_module_script_comments`].
+    pub(crate) module_comments: Vec<Comment>,
     /// Comment-refusal windows of the regions erased from the **script**. (The
     /// template half is *not* here: it is accumulated lazily at each
     /// [`EmitEnv::erase`] borrow point and stays `EmitEnv`-only — see that
@@ -416,7 +422,8 @@ fn analyze<'arena>(
     // store reads, top-level await, and `export default` refuse). Its type-free
     // body emits verbatim at module scope. Runs before every analysis so the
     // module bindings feed the same passes the instance bindings do.
-    let module_body = analyze_module_script(root, source, arena, ts_document)?;
+    let (module_body, module_erased_windows) =
+        analyze_module_script(root, source, arena, ts_document)?;
     // The template half of the same document-wide gate. The borrow points
     // (`EmitEnv::erase`) already erase every template expression that reaches
     // output, so this sweep exists for the ones that DON'T — see
@@ -446,6 +453,13 @@ fn analyze<'arena>(
     // refuse — see `collect_script_comments`.
     let script_comments = collect_script_comments(root, source, instance_body)?;
     let has_comments = !script_comments.is_empty();
+    // A `<script module>` comment the oracle KEEPS — one recovered by esrap's
+    // comment-index re-seek over a preceding block-bearing statement (the "open
+    // half"); the rest drop. Bidirectionally exact against the pinned oracle. Runs
+    // AFTER `collect_script_comments`, which refuses the module-after-instance
+    // ordering first, so this only ever computes the module-first keep set.
+    let module_comments =
+        collect_module_script_comments(root, source, module_body, &module_erased_windows)?;
 
     // A rune keyword whose stem is also a binding in scope at the instance script
     // (`import { state } from './store'` + `$state`) is READ AS A STORE by the
@@ -629,6 +643,7 @@ fn analyze<'arena>(
         instance_body,
         module_body,
         script_comments,
+        module_comments,
         erased_windows,
         each_index_names: blocks::assign_each_index_names(&root.fragment),
     })
@@ -654,6 +669,7 @@ pub(crate) fn compile_server<'arena>(
         instance_body,
         module_body,
         script_comments,
+        module_comments,
         erased_windows,
         each_index_names,
     } = analyze(root, source, arena)?;
@@ -1160,17 +1176,20 @@ pub(crate) fn compile_server<'arena>(
         }
     });
 
-    // The module `<script>` body prints as its own comment-free module-scope
-    // program (imports + declarations + non-default exports, source order),
-    // between the hoisted snippets and the component function — the oracle's
-    // placement (the whole module block follows the hoisted snippets, NOT merged
-    // into the instance import group). Empty when there is no module script.
-    // Comment-free: the oracle drops module-script comments, so `comments:
-    // Vec::new()` reproduces the drop (`format_canonical` prints from the program's
-    // comment list, not by positional source lookup — the import program's model).
+    // The module `<script>` body prints as its own module-scope program (imports +
+    // declarations + non-default exports, source order), between the hoisted
+    // snippets and the component function — the oracle's placement (the whole
+    // module block follows the hoisted snippets, NOT merged into the instance
+    // import group). Empty when there is no module script.
+    //
+    // The oracle DROPS most module-script comments, but KEEPS the ones its printer
+    // recovers by re-seeking the comment index over a preceding block-bearing
+    // statement (see `collect_module_script_comments`). Those carry at their
+    // authored spans; `format_canonical` places them by span. `module_comments` is
+    // non-empty only when a block precedes it, so only when `module_body` is too.
     let module_program = (!module_body.is_empty()).then(|| tsv_ts::ast::internal::Program {
         body: module_body,
-        comments: Vec::new(),
+        comments: module_comments,
         span: Span::new(0, env.b.buffer.len() as u32),
         interner: std::rc::Rc::clone(&root.interner),
         goal: tsv_ts::Goal::Module,
