@@ -6,15 +6,16 @@
 
 use super::Printer;
 use crate::ast::internal;
-use smallvec::SmallVec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing;
 
-/// Stack buffer for a block comment's split lines — inline up to 16 (covers the
-/// common JSDoc/TSDoc) before spilling, so most multi-line comments split with
-/// no heap allocation.
-type CommentLines<'s> = SmallVec<[&'s str; 16]>;
+/// Slice one line out of a comment body by its `(start, end)` byte range — an
+/// entry of the arena's line-spans scratch, filled by `build_comment_doc`.
+#[inline]
+fn line_slice(content: &str, (start, end): (u32, u32)) -> &str {
+    &content[start as usize..end as usize]
+}
 
 impl<'a> Printer<'a> {
     /// Build a Doc for a single comment
@@ -32,14 +33,22 @@ impl<'a> Printer<'a> {
                 // so emit it as a source slice (no allocation).
                 d.source_span(comment.span, self.source)
             } else {
-                // Split once — the classifier and the indentable builder read
-                // the same lines. (The rare preserved path re-derives its own
-                // lines from the indentation-stripped body instead.)
-                let lines: CommentLines<'_> = content.split('\n').collect();
-                if printing::is_indentable_block_comment(&lines) {
-                    self.build_indentable_block_comment_doc(content, &lines)
+                // One `split('\n')` pass fills the arena-parked line-offset
+                // scratch (capacity retained across comments and files); the
+                // classifier and builder then iterate the lines slice-cheap
+                // with no per-comment line buffer.
+                let mut line_spans = d.borrow_line_spans_scratch();
+                let mut start = 0u32;
+                for line in content.split('\n') {
+                    let end = start + line.len() as u32;
+                    line_spans.push((start, end));
+                    start = end + 1; // step over the '\n'
+                }
+                let lines = line_spans.iter().map(|span| line_slice(content, *span));
+                if printing::is_indentable_block_comment(lines) {
+                    self.build_indentable_block_comment_doc(content, &line_spans)
                 } else {
-                    self.build_preserved_block_comment_doc(comment)
+                    self.build_preserved_block_comment_doc(content, &line_spans)
                 }
             }
         } else if comment.span.start == 0 && content.starts_with("#!") {
@@ -71,14 +80,19 @@ impl<'a> Printer<'a> {
     /// `*` — the context indent is supplied by the per-line hardline (here baked
     /// into a [`DocNode::MultilineText`]), and content after the `*` is
     /// untouched. Mirrors prettier's `printIndentableBlockComment`.
-    fn build_indentable_block_comment_doc(&self, content: &str, lines: &[&str]) -> DocId {
+    fn build_indentable_block_comment_doc(
+        &self,
+        content: &str,
+        line_spans: &[(u32, u32)],
+    ) -> DocId {
         let d = self.d();
         // ≥2 lines: `build_comment_doc` only routes newline-containing content
-        // here, pre-split (`lines` is `content.split('\n')`).
+        // here, with `line_spans` holding each line's byte range in `content`.
         #[allow(clippy::unreachable)] // content has a newline ⇒ split yields ≥2 lines
-        let [first, middle @ .., last] = lines else {
+        let [first, middle @ .., last] = line_spans else {
             unreachable!("multi-line comment");
         };
+        let line = |span: &(u32, u32)| line_slice(content, *span);
 
         // Frame the whole comment as one `\n`-separated body — the `/*<first>`
         // opener, each continuation line reindented to a single leading space,
@@ -90,20 +104,20 @@ impl<'a> Printer<'a> {
         // The reserve is an exact upper bound, so the push sequence never
         // reallocs: `content` already holds every line's text and the interior
         // `\n`s; framing adds `/*` + `*/` (4) and at most one leading space per
-        // line (`lines.len()`), and the per-line trims only ever remove bytes.
+        // line (`line_spans.len()`), and the per-line trims only ever remove bytes.
         let mut body = d.pool_writer();
-        body.reserve(content.len() + lines.len() + 4);
+        body.reserve(content.len() + line_spans.len() + 4);
         body.push_str("/*");
-        body.push_str(first.trim_end());
-        for line in middle {
+        body.push_str(line(first).trim_end());
+        for span in middle {
             body.push('\n');
             body.push(' ');
-            body.push_str(line.trim());
+            body.push_str(line(span).trim());
         }
         // The last line (before `*/`) keeps trailing content via `trim_start`.
         body.push('\n');
         body.push(' ');
-        body.push_str(last.trim_start());
+        body.push_str(line(last).trim_start());
         body.push_str("*/");
 
         body.finish_multiline_text()
@@ -123,16 +137,16 @@ impl<'a> Printer<'a> {
     /// comment in a `for(…)` header that breaks, the stripped amount and the
     /// re-applied context indent differ, so the interior grew a tab every pass — an
     /// F1 non-idempotency.)
-    fn build_preserved_block_comment_doc(&self, comment: &internal::Comment) -> DocId {
+    fn build_preserved_block_comment_doc(&self, content: &str, line_spans: &[(u32, u32)]) -> DocId {
         let d = self.d();
-        let content = comment.content(self.source);
 
-        // ≥2 lines: `build_comment_doc` only routes newline-containing content here.
-        let lines: CommentLines<'_> = content.split('\n').collect();
+        // ≥2 lines: `build_comment_doc` only routes newline-containing content
+        // here, with `line_spans` holding each line's byte range in `content`.
         #[allow(clippy::unreachable)] // content retains the newline ⇒ split yields ≥2 lines
-        let [first, middle @ .., last] = lines.as_slice() else {
+        let [first, middle @ .., last] = line_spans else {
             unreachable!("multi-line comment");
         };
+        let line = |span: &(u32, u32)| line_slice(content, *span);
 
         // Frame directly: the `/*<first>` opener, each continuation line preserved
         // verbatim at its authored column via a `literalline` (no context indent),
@@ -141,14 +155,14 @@ impl<'a> Printer<'a> {
         let mut docs = DocBuf::with_capacity((middle.len() + 1) * 2 + 2);
         let mut opener = d.pool_writer();
         opener.push_str("/*");
-        opener.push_str(first.trim_end());
+        opener.push_str(line(first).trim_end());
         docs.push(opener.finish_text());
-        for line in middle {
+        for span in middle {
             docs.push(d.literalline());
-            docs.push(d.text_pooled(line.trim_end()));
+            docs.push(d.text_pooled(line(span).trim_end()));
         }
         docs.push(d.literalline());
-        docs.push(d.text_pooled(last));
+        docs.push(d.text_pooled(line(last)));
         docs.push(d.text("*/"));
         d.concat(&docs)
     }
