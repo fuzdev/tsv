@@ -88,23 +88,27 @@ impl<'a> Printer<'a> {
         let do_end = stmt.span.start + "do".len() as u32;
         let body_start = stmt.body.span().start;
         let mut parts = if self.has_comments_to_emit_between(do_end, body_start) {
-            let has_line = self.has_line_comments_between(do_end, body_start);
-            let comment_doc =
-                self.build_inline_comments_between_doc_no_leading_space(do_end, body_start);
+            let gap_breaks = self.header_to_body_gap_breaks(do_end, body_start);
             let mut p = smallvec![d.text("do")];
-            if has_line && !is_block {
-                // Line comment with non-block body: indent comment + body
-                // do\n\t// c\n\texpr;
-                p.push(d.indent(d.concat(&[d.hardline(), comment_doc, d.hardline(), body_doc])));
-            } else if has_line {
-                // Line comment with block body: keep flat
-                p.push(d.text(" "));
-                p.push(comment_doc);
-                p.push(d.hardline());
+            if gap_breaks && !is_block {
+                // Non-block body: the comment run shares the body's indent, with a `//`
+                // normalized onto its own line — prettier does the same here, so there
+                // is nothing to preserve.
+                self.push_indented_header_to_body_gap(&mut p, do_end, body_start, body_doc);
+            } else if gap_breaks {
+                // Block body — the shared header→body gap, exactly as `try`/`catch`/
+                // `finally` use it: a comment trailing `do` stays trailing, one on its own
+                // line keeps it. Emitting the run inline after a bare space relocated an
+                // own-line comment up onto the `do` line (`do // c⏎{`), the same defect
+                // the `try` family had; prettier preserves here, so it is a clean oracle
+                // rather than a stance.
+                self.push_header_to_body_gap(&mut p, do_end, body_start);
                 p.push(body_doc);
             } else {
+                // Block comment(s) only — built here so the line-comment paths above
+                // don't compute a doc they discard.
                 p.push(d.text(" "));
-                p.push(comment_doc);
+                p.push(self.build_inline_comments_between_doc_no_leading_space(do_end, body_start));
                 p.push(d.text(" "));
                 p.push(body_doc);
             }

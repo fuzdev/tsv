@@ -12,16 +12,14 @@
 # the gate rather than being pinned.
 #
 # Format: KIND<TAB>SHAPE<TAB>PAYLOADS
-# shapes: 658
+# shapes: 636
 DROPPED	!)⟨⟩!.	annotation,block,jsdoc_cast
 DROPPED	#⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
 DROPPED	#⟨⟩\	annotation,block,jsdoc_cast,line,multiline
 DROPPED	#⟨⟩private	annotation,block,jsdoc_cast,line,multiline
-DROPPED	&⟨⟩{	annotation,block,jsdoc_cast,line,multiline
 DROPPED	&⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	')⟨⟩);	annotation,block,jsdoc_cast,line,multiline
 DROPPED	')⟨⟩];	annotation,block,jsdoc_cast,line,multiline
-DROPPED	')⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	',,⟨⟩,'	annotation,block,jsdoc_cast
 DROPPED	',⟨⟩()=	line
 DROPPED	',⟨⟩,'	annotation,block,jsdoc_cast
@@ -34,7 +32,6 @@ DROPPED	']⟨⟩/*	line
 DROPPED	']⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DROPPED	'},⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DROPPED	'⟨⟩));	annotation,block,jsdoc_cast,line,multiline
-DROPPED	'⟨⟩),	annotation,block,jsdoc_cast,line,multiline
 DROPPED	'⟨⟩);	annotation,block,jsdoc_cast,line,multiline
 DROPPED	'⟨⟩,	annotation,block,jsdoc_cast,line,multiline
 DROPPED	'⟨⟩,()	annotation,block,jsdoc_cast,line,multiline
@@ -81,7 +78,6 @@ DROPPED	(--⟨⟩IDENT	line
 DROPPED	(/)⟨⟩␣	annotation,block,jsdoc_cast
 DROPPED	(<⟨⟩IDENT	annotation,block,jsdoc_cast,multiline
 DROPPED	([(⟨⟩IDENT	line
-DROPPED	({}⟨⟩));	annotation,block,jsdoc_cast,line,multiline
 DROPPED	({⟨⟩IDENT	annotation,block,jsdoc_cast
 DROPPED	({⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	(⟨⟩'	line
@@ -109,7 +105,6 @@ DROPPED	(⟨⟩{	annotation,block,jsdoc_cast,line,multiline
 DROPPED	(⟨⟩{})	line
 DROPPED	(⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	)()⟨⟩)	annotation,block,jsdoc_cast,line,multiline
-DROPPED	)))⟨⟩))	annotation,block,jsdoc_cast,line,multiline
 DROPPED	)))⟨⟩[])	annotation,block,jsdoc_cast
 DROPPED	))[⟨⟩]);	annotation,block,jsdoc_cast,line,multiline
 DROPPED	))[⟨⟩];	annotation,block,jsdoc_cast,line,multiline
@@ -131,7 +126,6 @@ DROPPED	)⟨⟩!()	annotation,block,jsdoc_cast
 DROPPED	)⟨⟩!`	annotation,block,jsdoc_cast
 DROPPED	)⟨⟩)	annotation,block,jsdoc_cast,line,multiline
 DROPPED	)⟨⟩));	annotation,block,jsdoc_cast,line,multiline
-DROPPED	)⟨⟩),	annotation,block,jsdoc_cast,line,multiline
 DROPPED	)⟨⟩);	annotation,block,jsdoc_cast,line,multiline
 DROPPED	)⟨⟩)?]	annotation,block,jsdoc_cast,line,multiline
 DROPPED	)⟨⟩++;	annotation,block,jsdoc_cast
@@ -148,7 +142,6 @@ DROPPED	)⟨⟩}><	annotation,block,jsdoc_cast,line,multiline
 DROPPED	)⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	*#⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
 DROPPED	*/(⟨⟩IDENT	line,multiline
-DROPPED	*/)⟨⟩/*	jsdoc_cast
 DROPPED	*/,⟨⟩,	annotation,block,jsdoc_cast
 DROPPED	*/,⟨⟩,,]	annotation,block,jsdoc_cast
 DROPPED	*/,⟨⟩//	annotation,block,jsdoc_cast
@@ -256,7 +249,6 @@ DROPPED	IDENT⟨⟩!	annotation,block,jsdoc_cast
 DROPPED	IDENT⟨⟩!!;	annotation,block,jsdoc_cast
 DROPPED	IDENT⟨⟩!()	annotation,block,jsdoc_cast
 DROPPED	IDENT⟨⟩!.	annotation,block,jsdoc_cast
-DROPPED	IDENT⟨⟩&{	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩(	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩('	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩((	annotation,block,jsdoc_cast,line,multiline
@@ -270,27 +262,18 @@ DROPPED	IDENT⟨⟩({	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩)	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩)!(	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩)!`	annotation,block,jsdoc_cast,line,multiline
-DROPPED	IDENT⟨⟩)()	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩))	annotation,block,jsdoc_cast,line,multiline
-DROPPED	IDENT⟨⟩)))	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩)).	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩));	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩)++	annotation,block,jsdoc_cast,line,multiline
-DROPPED	IDENT⟨⟩)+=	annotation,block,jsdoc_cast,line,multiline
-DROPPED	IDENT⟨⟩),	annotation,block,jsdoc_cast,line,multiline
-DROPPED	IDENT⟨⟩).	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩):	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩);	annotation,block,jsdoc_cast,line,multiline
-DROPPED	IDENT⟨⟩);}	annotation,block,jsdoc_cast,line,multiline
-DROPPED	IDENT⟨⟩)<	annotation,block,jsdoc_cast,line,multiline
-DROPPED	IDENT⟨⟩)=	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩)=>	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩)>	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩)>=	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩)?	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩)|	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩)}	annotation,block,jsdoc_cast,line,multiline
-DROPPED	IDENT⟨⟩)}>	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩+	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩++	annotation,block,jsdoc_cast
 DROPPED	IDENT⟨⟩++)	annotation,block,jsdoc_cast
@@ -306,9 +289,8 @@ DROPPED	IDENT⟨⟩--	annotation,block,jsdoc_cast
 DROPPED	IDENT⟨⟩--)	annotation,block,jsdoc_cast
 DROPPED	IDENT⟨⟩--;	annotation,block,jsdoc_cast
 DROPPED	IDENT⟨⟩/	annotation,block,jsdoc_cast,line,multiline
-DROPPED	IDENT⟨⟩/*	jsdoc_cast,line,multiline
+DROPPED	IDENT⟨⟩/*	line,multiline
 DROPPED	IDENT⟨⟩/*,	multiline
-DROPPED	IDENT⟨⟩//	jsdoc_cast
 DROPPED	IDENT⟨⟩:	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩:[.	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩=	annotation,block,jsdoc_cast,line,multiline
@@ -415,8 +397,7 @@ DROPPED	]:⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DROPPED	][⟨⟩]);	annotation,block,jsdoc_cast,line,multiline
 DROPPED	][⟨⟩];	annotation,block,jsdoc_cast,line,multiline
 DROPPED	]⟨⟩)	annotation,block,jsdoc_cast,line,multiline
-DROPPED	]⟨⟩)*=	annotation,block,jsdoc_cast,line,multiline
-DROPPED	]⟨⟩);	annotation,block,jsdoc_cast,line,multiline
+DROPPED	]⟨⟩);	annotation,block,jsdoc_cast,multiline
 DROPPED	]⟨⟩++;	annotation,block,jsdoc_cast
 DROPPED	]⟨⟩/*	line
 DROPPED	]⟨⟩:	annotation,block,jsdoc_cast,line,multiline
@@ -453,13 +434,13 @@ DROPPED	require⟨⟩('	annotation,block,jsdoc_cast,line,multiline
 DROPPED	require⟨⟩('.	annotation,block,jsdoc_cast,line,multiline
 DROPPED	require⟨⟩(/*	annotation,block,jsdoc_cast,line,multiline
 DROPPED	require⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
-DROPPED	type⟨⟩)];	annotation,block,jsdoc_cast,line,multiline
 DROPPED	type⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	void⟨⟩␣	annotation,block,jsdoc_cast
 DROPPED	yield⟨⟩*	annotation,block,jsdoc_cast,line,multiline
 DROPPED	{#⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
 DROPPED	{(<⟨⟩IDENT	annotation,block,jsdoc_cast,multiline
 DROPPED	{++⟨⟩IDENT	line
+DROPPED	{})⟨⟩);	annotation,block,jsdoc_cast,multiline
 DROPPED	{},⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	{}⟨⟩);	annotation,block,jsdoc_cast,line,multiline
 DROPPED	{}⟨⟩,	annotation,block,jsdoc_cast,line,multiline
@@ -484,11 +465,10 @@ DROPPED	}⟨⟩))	annotation,block,jsdoc_cast,line,multiline
 DROPPED	}⟨⟩)).	annotation,block,jsdoc_cast,line,multiline
 DROPPED	}⟨⟩));	annotation,block,jsdoc_cast,multiline
 DROPPED	}⟨⟩).	annotation,block,jsdoc_cast,line,multiline
-DROPPED	}⟨⟩);	annotation,block,jsdoc_cast,line,multiline
-DROPPED	}⟨⟩)|	annotation,block,jsdoc_cast,line,multiline
+DROPPED	}⟨⟩);	annotation,block,jsdoc_cast,multiline
 DROPPED	}⟨⟩,	annotation,block,jsdoc_cast,multiline
 DROPPED	}⟨⟩,>(	annotation,block,jsdoc_cast,multiline
-DROPPED	}⟨⟩/*	jsdoc_cast,line
+DROPPED	}⟨⟩/*	line
 DROPPED	}⟨⟩:	annotation,block,jsdoc_cast,line,multiline
 DROPPED	}⟨⟩:{	annotation,block,jsdoc_cast,line,multiline
 DROPPED	}⟨⟩>(	annotation,block,jsdoc_cast,multiline
@@ -526,8 +506,6 @@ DROPPED	␣⟨⟩).	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩)//	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩);	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩);/	annotation,block,jsdoc_cast,multiline
-DROPPED	␣⟨⟩)?.	annotation,block,jsdoc_cast,line,multiline
-DROPPED	␣⟨⟩)[/	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩)}	annotation,block,jsdoc_cast,multiline
 DROPPED	␣⟨⟩)}'	annotation,block,jsdoc_cast,multiline
 DROPPED	␣⟨⟩)}`	annotation,block,jsdoc_cast,multiline

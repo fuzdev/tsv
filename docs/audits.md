@@ -55,6 +55,12 @@ cargo run --profile corpus -p tsv_debug --features audits swallow_audit ~/dev/zz
 # of scope.
 ```
 
+⚠️ **A green `swallow:audit` does not mean "no swallows"** — it formats each file **as
+authored**, so a swallow only reachable once a comment sits in some other gap is a swallow it
+never provokes. The [gap-injection audit](gap_audit.md) arms this same check on its injected
+formats and reports what that reaches, as its report-only
+[SWALLOW class](gap_audit.md#the-swallow-class).
+
 ## Comment Ledger Audit (`comments:audit`)
 
 The print-once comment ledger: every comment a document PARSES must be EMITTED exactly once. tsv's answer to prettier's `ensureAllCommentsPrinted`, and the structural guard on the [detached comment model](./comments.md): nothing else forces a comment that the parser produced to actually reach the output.

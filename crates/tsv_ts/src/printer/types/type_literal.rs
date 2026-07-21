@@ -169,10 +169,9 @@ impl<'a> Printer<'a> {
     /// Build type doc, wrapping in parentheses if the predicate returns true.
     ///
     /// Object-bearing members align via `build_aligned_object_literal_doc`:
-    /// properties are double-indented and the closing `})` is single-indented.
-    /// The plain default case only indents the inner type. (Prettier offsets
-    /// these closings by a 2-space sub-tab alignment; tsv uses whole tabs — see
-    /// `docs/conformance_prettier.md`.)
+    /// properties are double-indented and the closing `})` takes the member's
+    /// `align(2)` sub-tab offset (2 literal spaces), matching Prettier's
+    /// `align(2, …)`. The plain default case only indents the inner type.
     ///
     /// Special case: intersection with trailing object type builds a custom doc
     /// so that `})` can be aligned properly (one indent level past the base).
@@ -192,11 +191,12 @@ impl<'a> Printer<'a> {
     /// entirely from `printIntersectionType`'s own `indent([" &", line, …])` wrapper
     /// (or, for the first / object-adjacent member, none). So a parenthesized
     /// function / constructor / conditional member sits at the member indent, not one
-    /// level deeper. tsv's shared default `d.indent` (kept for other callers) is
-    /// double-duty: it correctly renders a **union** member's per-member `align(2)`
-    /// as a whole tab, and matches the depth in a conditional check/extends paren —
-    /// but for an **intersection** member it is a spurious extra level. Hence this
-    /// dedicated entry point for the intersection member sites only. Fixes bug141
+    /// level deeper. tsv's shared default `d.indent` (kept for other callers) matches
+    /// the depth in a conditional check/extends paren — but for an **intersection**
+    /// member it is a spurious extra level. (Union members take their `align(2)` offset
+    /// from `build_union_member_offset_doc`, which uses *this* bare variant and applies
+    /// the offset itself — so they don't route through the shared `d.indent` either.)
+    /// Hence this dedicated entry point for the intersection member sites only. Fixes bug141
     /// §Bug 2 case 3; guarded by `intersection_paren_constructor` /
     /// `intersection_paren_conditional`.
     pub(super) fn build_intersection_member_type_doc(
@@ -385,11 +385,9 @@ impl<'a> Printer<'a> {
     ///
     /// This requires separating `{` and `}` from the TypeLiteral so we can:
     /// - Print `{` inline with `(A &`
-    /// - Print members with double indent (4-tab alignment)
-    /// - Print `})` at base indent + one level (when breaking)
-    ///
-    /// (Prettier offsets `})` by a 2-space sub-tab alignment; tsv uses whole
-    /// tabs — see `docs/conformance_prettier.md`.)
+    /// - Print members with double indent (whole tabs)
+    /// - Print `})` at the base + the member's `align(2)` sub-tab offset (2 literal
+    ///   spaces) when breaking, matching Prettier's `align(2, …)`.
     fn build_parenthesized_intersection_trailing_object_doc(
         &self,
         intersection: &TSIntersectionType<'_>,
@@ -664,10 +662,10 @@ impl<'a> Printer<'a> {
     /// Build aligned object literal doc with custom opening/closing.
     ///
     /// Used for object literals in union types and parenthesized intersections.
-    /// Members are double-indented (aligning with the content after `{`) and the
-    /// closing delimiter is single-indented (aligning with `{`). Prettier offsets
-    /// the closing by a 2-space sub-tab alignment instead; tsv renders that
-    /// half-step as a whole tab — see `docs/conformance_prettier.md`.
+    /// Members are double-indented in whole tabs (aligning with the content after
+    /// `{`), and the closing delimiter takes the member's `align(2)` sub-tab offset —
+    /// 2 literal spaces under `{`, tab-width independent — matching Prettier's
+    /// `align(2, …)`.
     fn build_aligned_object_literal_doc(
         &self,
         obj: &TSTypeLiteral<'_>,
@@ -712,7 +710,12 @@ impl<'a> Printer<'a> {
         d.group(d.concat(&[
             opening,
             d.indent(d.indent(members_doc)),
-            d.indent(d.concat(&[line_doc, d.text(closing)])),
+            // The closing delimiter takes the union member's `align(2)` sub-tab
+            // offset (2 literal spaces), so it lands under its opener at any tab
+            // width — matching Prettier's `align(2, …)`. The members keep whole
+            // tabs (`align(2)` + `indent` rounds up), so only the closing line's
+            // representation changes.
+            d.align(2, d.concat(&[line_doc, d.text(closing)])),
         ]))
     }
 
@@ -722,8 +725,8 @@ impl<'a> Printer<'a> {
     /// ```text
     /// type T =
     ///   | {
-    ///       prop: A;  // double indent (aligns with content after "{ ")
-    ///     }           // single indent (aligns with "{")
+    ///       prop: A;  // double indent, whole tabs (aligns with content after "{ ")
+    ///     }           // align(2): base + 2 spaces (aligns under "{", any tab width)
     ///   | B;
     /// ```
     pub(super) fn build_union_member_object_literal_doc(&self, obj: &TSTypeLiteral<'_>) -> DocId {

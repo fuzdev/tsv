@@ -347,7 +347,8 @@ pub enum DocNode {
     Line(LineKind),                             // Normal, soft, hard, literal
     Indent(DocId),                              // Increase indent
     Dedent(DocId),                              // Decrease indent
-    Align { n, contents },                      // Absolute indentation
+    AlignRoot { n, contents },                  // Absolute tab level (template-literal root reset)
+    Align { n, contents },                      // Sub-tab align(n): literal spaces under useTabs
     Group { contents, expanded_states, id, should_break },  // All-or-nothing breaking
     IfBreak { break_doc, flat_doc },            // Conditional on parent
     IndentIfBreak { contents, group_id, negate },  // Conditional indent

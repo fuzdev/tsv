@@ -6,7 +6,7 @@
 		| (
 				// c
 				A | B
-			)
+		  )
 		| C;
 
 	// first member is a retained-paren intersection with a trailing object, which
@@ -16,7 +16,7 @@
 		| (// c
 			A & {
 				a: 1;
-			})
+		  })
 		| C;
 
 	// a leading line comment inside a LATER member's parens relocates to trail the

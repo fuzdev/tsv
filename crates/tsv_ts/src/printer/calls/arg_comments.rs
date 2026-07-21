@@ -156,24 +156,6 @@ pub(crate) fn skip_stripped_open_paren(source: &str, from: u32, to: u32) -> u32 
     to
 }
 
-/// Check for a blank line between two consecutive call arguments, accounting
-/// for stripped grouping parens on both sides.
-///
-/// Uses `find_comma_pos` to skip past the closing `)` gap after the previous arg,
-/// and `skip_stripped_open_paren` to skip past the opening `(` gap before the next arg.
-#[inline]
-pub(crate) fn has_blank_line_between_args(
-    source: &str,
-    line_breaks: &[u32],
-    prev_end: u32,
-    curr_start: u32,
-) -> bool {
-    let check_start =
-        find_comma_pos(source, prev_end, curr_start).map_or(prev_end, |c| c as u32 + 1);
-    let check_end = skip_stripped_open_paren(source, check_start, curr_start);
-    tsv_lang::printing::has_blank_line_between_fast(line_breaks, check_start, check_end)
-}
-
 /// Check if a comment is before the comma position
 #[inline]
 pub(crate) fn is_comment_before_comma(comment: &internal::Comment, comma_pos: usize) -> bool {

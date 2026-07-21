@@ -152,3 +152,22 @@ fn template_literal_newline_is_content_not_intent() {
         "template literal newline not preserved: {out:?}"
     );
 }
+
+#[test]
+fn blank_between_call_args_dropped() {
+    // A blank line between call arguments is authoring intent — the canonical
+    // reprint must erase it, exactly as it does between statements. Guards the
+    // canonical gate on `is_next_line_empty` (a raw-`source` blank detector that,
+    // ungated, would still see the authored blank on the canonical pass and force
+    // expansion — the exact break the main-merge resolution of #534 introduced).
+    let with_blank = canonicalize_js("f(a,\n\nb);\n").unwrap();
+    let without = canonicalize_js("f(a, b);\n").unwrap();
+    assert_eq!(
+        with_blank, without,
+        "blank between call args must be erased"
+    );
+    assert!(
+        !with_blank.contains("\n\n"),
+        "no blank line survives: {with_blank:?}"
+    );
+}

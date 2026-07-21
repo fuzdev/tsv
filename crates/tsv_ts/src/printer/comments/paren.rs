@@ -342,6 +342,52 @@ impl<'a> Printer<'a> {
         d.concat(&[inner, comments])
     }
 
+    /// The comments between an expression's end and a following `)`, as ready-to-append
+    /// separator+comment parts, plus whether they force the broken `(⏎\texpr // c⏎)` frame.
+    ///
+    /// **A printer that synthesizes its own `(`…`)` owns this gap** — no enclosing emitter
+    /// can see between those parens, so a comment left unclaimed here is DROPPED, not
+    /// relocated. Both such printers call this: the stripped-paren restorer below and
+    /// `build_jsdoc_cast_doc`, which lacked the gap entirely
+    /// (`parenthesized/jsdoc_cast_trailing_paren_comment`).
+    ///
+    /// The separator is newline-aware — a comment the author put on a new line relative to
+    /// the *previous item* (the expression, or the prior comment) breaks; otherwise it
+    /// trails inline. Tracking the previous item rather than `expr_end` keeps a same-line
+    /// group together (`x⏎ /* a */ // b`) while stopping a line comment that follows
+    /// another comment from being swallowed by it. In the inline case every comment is a
+    /// same-line block comment, so the rule collapses to a plain space.
+    ///
+    /// Returns `None` when the gap is empty, so callers keep their no-comment fast path.
+    pub(crate) fn trailing_paren_comment_parts(
+        &self,
+        expr_end: u32,
+        boundary_end: u32,
+    ) -> Option<(DocBuf, bool)> {
+        if !self.has_trailing_paren_comments(expr_end, boundary_end) {
+            return None;
+        }
+        let d = self.d();
+
+        // A line comment runs to end-of-line, and an own-line block comment was authored
+        // on its own line — either way the closing `)` can no longer share the line.
+        let needs_break = comments_to_emit_in_range(self.comments, expr_end, boundary_end)
+            .any(|c| !c.is_block || self.has_newline_between(expr_end, c.span.start));
+
+        let mut parts = DocBuf::new();
+        let mut prev_end = expr_end;
+        for comment in comments_to_emit_in_range(self.comments, expr_end, boundary_end) {
+            if self.has_newline_between(prev_end, comment.span.start) {
+                parts.push(d.hardline());
+            } else {
+                parts.push(d.text(" "));
+            }
+            parts.push(self.build_comment_doc(comment));
+            prev_end = comment.span.end;
+        }
+        Some((parts, needs_break))
+    }
+
     /// Build expression doc re-adding the stripped grouping parens around trailing
     /// comments, producing `(expr /* c */)` or `(\n\texpr // c\n)`.
     ///
@@ -359,36 +405,17 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let expr_end = expr.span().end;
 
-        if !self.has_trailing_paren_comments(expr_end, boundary_end) {
+        let Some((comment_parts, needs_break)) =
+            self.trailing_paren_comment_parts(expr_end, boundary_end)
+        else {
             return self.build_expression_doc(expr);
-        }
+        };
 
         let inner = self.build_expression_doc(expr);
 
-        // Determine if multiline layout is needed
-        let has_multiline = comments_to_emit_in_range(self.comments, expr_end, boundary_end)
-            .any(|c| !c.is_block || self.has_newline_between(expr_end, c.span.start));
-
-        if has_multiline {
-            let mut indent_parts: DocBuf = smallvec![d.hardline()];
-            indent_parts.push(inner);
-            // Break before a comment that starts on a new line relative to the
-            // previous item (the body or the prior comment); otherwise trail it
-            // inline. Tracking the previous item's end — not `expr_end` — keeps a
-            // same-line comment group together (`x⏎ /* a */ // b`) while forcing a
-            // line comment that follows another comment onto its own line. A line
-            // comment runs to end-of-line, so trailing a second comment after one
-            // (`x // a` then `// b`) would swallow it — this break prevents that.
-            let mut prev_end = expr_end;
-            for comment in comments_to_emit_in_range(self.comments, expr_end, boundary_end) {
-                if self.has_newline_between(prev_end, comment.span.start) {
-                    indent_parts.push(d.hardline());
-                } else {
-                    indent_parts.push(d.text(" "));
-                }
-                indent_parts.push(self.build_comment_doc(comment));
-                prev_end = comment.span.end;
-            }
+        if needs_break {
+            let mut indent_parts: DocBuf = smallvec![d.hardline(), inner];
+            indent_parts.extend(comment_parts);
             d.concat(&[
                 d.text("("),
                 d.indent(d.concat(&indent_parts)),
@@ -396,12 +423,8 @@ impl<'a> Printer<'a> {
                 d.text(")"),
             ])
         } else {
-            let mut parts: DocBuf = smallvec![d.text("(")];
-            parts.push(inner);
-            for comment in comments_to_emit_in_range(self.comments, expr_end, boundary_end) {
-                parts.push(d.text(" "));
-                parts.push(self.build_comment_doc(comment));
-            }
+            let mut parts: DocBuf = smallvec![d.text("("), inner];
+            parts.extend(comment_parts);
             parts.push(d.text(")"));
             d.concat(&parts)
         }

@@ -19,10 +19,10 @@ use crate::printer::calls::{
     PartitionedComments, build_args_joined_with_comments, build_args_split_last,
     build_arrow_call_body_states, build_arrow_sig_doc, build_break_body_state,
     build_expand_all_args, build_inline_args, build_inline_or_expand_all, could_expand_arrow_chain,
-    emit_first_arg_leading_comments, has_blank_line_between_args,
-    has_inter_argument_comments_slice, has_trailing_comments_slice,
-    has_trailing_line_comments_slice, last_two_args_same_type, prebuild_expand_last_break_body,
-    prepend_arrow_body_comments, should_force_expansion_for_comments, wrap_call_with_hard_breaks,
+    emit_first_arg_leading_comments, has_inter_argument_comments_slice,
+    has_trailing_comments_slice, has_trailing_line_comments_slice, last_two_args_same_type,
+    prebuild_expand_last_break_body, prepend_arrow_body_comments,
+    should_force_expansion_for_comments, wrap_call_with_hard_breaks,
     wrap_call_with_will_break_guard,
 };
 use crate::printer::{CommentVec, ParenContext, Printer, has_multiline_content};
@@ -360,14 +360,10 @@ impl<'a> Printer<'a> {
         }
 
         // Check for blank lines between arguments (forces expansion and preservation)
-        let has_blank_lines = new_expr.arguments.windows(2).any(|window| {
-            has_blank_line_between_args(
-                self.source,
-                self.layout_line_breaks,
-                window[0].span().end,
-                window[1].span().start,
-            )
-        });
+        let has_blank_lines = new_expr
+            .arguments
+            .windows(2)
+            .any(|window| self.is_next_line_empty(window[0].span().end, window[1].span().start));
 
         if has_blank_lines {
             let arg_doc = build_args_with_blank_lines(self, new_expr.arguments);

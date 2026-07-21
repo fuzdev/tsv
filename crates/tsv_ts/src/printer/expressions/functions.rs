@@ -1375,13 +1375,16 @@ impl<'a> Printer<'a> {
                 if force_break {
                     // Preserve a blank line the author left before this param's printed
                     // content — prettier keeps one blank line in the expanded list.
-                    // `search_start` is the previous param's end, so the gap spans the comma.
+                    // `search_start` is the previous param's end — the SAME `from` the break
+                    // gate (`has_blank_line_between_params`) measures from, through the SAME
+                    // predicate, so the gate and this emitter cannot disagree about whether a
+                    // blank is there. When they did, the list broke with the blank dropped and
+                    // the next pass collapsed it.
                     //
-                    // The scan stops at this param's content start, and
-                    // `has_blank_line_after_comma` steps its start past every comment inside
-                    // that range — so the previous param's trailing comment (`a, // x`) is
-                    // stepped over rather than treated as the boundary, and a blank line
-                    // *after* it still lands in the measured range.
+                    // The scan stops at this param's content start, and `is_next_line_empty`
+                    // steps past the previous param's same-line trailing comment (`a, // x`)
+                    // rather than treating it as the boundary, so a blank line *after* it
+                    // still counts.
                     let content_start = if comments_present {
                         self.param_content_start(
                             search_start,
@@ -1393,7 +1396,7 @@ impl<'a> Printer<'a> {
                     } else {
                         param_start
                     };
-                    if self.has_blank_line_after_comma(search_start, content_start) {
+                    if self.is_next_line_empty(search_start, content_start) {
                         inner_parts.push(d.literalline());
                     }
                     inner_parts.push(d.hardline());
@@ -1536,8 +1539,12 @@ impl<'a> Printer<'a> {
         d.concat(&result)
     }
 
-    /// Check if any param has a leading line comment on its own line
-    fn has_leading_own_line_comment_in_params(
+    /// Whether any param is led by a comment on its own line — the single answer to "does a
+    /// comment force this param list open?", shared by the value-level router
+    /// (`build_function_params_doc`) and the type-level one (`function_types`), so the two
+    /// cannot disagree about the same gap. See [`Self::has_own_line_comment_between`] for the
+    /// per-gap rule.
+    pub(in crate::printer) fn has_leading_own_line_comment_in_params(
         &self,
         params: &[internal::Expression<'_>],
         params_start: Option<u32>,
@@ -1578,6 +1585,12 @@ impl<'a> Printer<'a> {
     /// the param list to expand and the separator emission preserves it — matching
     /// prettier. Shared by regular function params and the type-level param lists
     /// (function/constructor types, method/call/construct signatures).
+    ///
+    /// This gate and the separator that *emits* the blank must answer **one** question:
+    /// they both route through [`Printer::is_next_line_empty`]. They did not always — the
+    /// gate measured the whole gap while the emitter measured only past the comma, so
+    /// `f(a⏎⏎, b)` broke the list and then dropped the blank, and the second pass (no blank
+    /// left to force the break) collapsed it again.
     pub(in crate::printer) fn has_blank_line_between_params(
         &self,
         params: &[internal::Expression<'_>],
@@ -1586,7 +1599,7 @@ impl<'a> Printer<'a> {
             // Measure to the next param's first decorator, not its binding — a
             // decorator written on its own line sits between the two bindings but
             // is not an author blank line.
-            self.has_blank_line_between(
+            self.is_next_line_empty(
                 pair[0].span().end,
                 self.param_start_with_decorators(&pair[1]),
             )

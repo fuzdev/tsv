@@ -5,9 +5,7 @@
 // - Meta properties: `import.meta`, `new.target`
 
 use super::super::Printer;
-use super::arg_comments::{
-    PartitionedComments, has_blank_line_between_args, should_force_expansion_for_comments,
-};
+use super::arg_comments::{PartitionedComments, should_force_expansion_for_comments};
 use super::arg_predicates::is_expandable_object;
 use crate::ast::internal;
 use smallvec::smallvec;
@@ -178,13 +176,8 @@ pub(super) fn build_import_expression_doc(
     let has_trailing_comments = printer.has_comments_to_emit_between(options_end, paren_close);
     // A blank line in the source→options gap (with no comment there) is preserved like
     // every other argument gap; the comment case re-derives it comment-aware below.
-    let inter_blank_no_comments = !has_inter_comments
-        && has_blank_line_between_args(
-            printer.source,
-            printer.layout_line_breaks,
-            source_end,
-            options_start,
-        );
+    let inter_blank_no_comments =
+        !has_inter_comments && printer.is_next_line_empty(source_end, options_start);
 
     // All comment cases — plus a blank-line gap — share one layout: a comment in the
     // inter-argument gap (source→options), which the rest of this function never

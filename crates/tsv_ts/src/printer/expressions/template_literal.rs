@@ -157,12 +157,12 @@ impl<'a> Printer<'a> {
                     // (prettier replaces the expression doc with its `printWidth: Infinity`
                     // rendering here).
                     //
-                    // `flatten_all_lines`, not `remove_lines`: this genuinely wants ONE
+                    // `atomize`, not `remove_lines`: this genuinely wants ONE
                     // line, hard lines included, which prettier's `removeLines` deliberately
                     // won't do. Sound only because the branches above already claimed every
                     // interpolation holding a comment or a source newline — so nothing that
                     // must break reaches here.
-                    d.flatten_all_lines(full_expr_doc)
+                    d.atomize(full_expr_doc)
                 };
 
                 // Apply alignment based on quasi indent (Prettier's addAlignmentToDoc).
@@ -174,7 +174,7 @@ impl<'a> Printer<'a> {
                 // 3. indent_size==0 && quasi doesn't end with \n: inline quasi (e.g. ", ")
                 //    — preserve code context indent, no wrapping.
                 let aligned = if indent_size == 0 && text.ends_with('\n') {
-                    d.align(0, inner)
+                    d.align_root(0, inner)
                 } else if indent_size > 0 {
                     self.add_alignment_to_doc(inner, indent_size)
                 } else {
@@ -240,7 +240,7 @@ impl<'a> Printer<'a> {
         // Reset to absolute indent 0. Uses align(0) not dedent because
         // dedent only decrements by 1 (saturating_sub), while we need
         // to reset to 0 regardless of the current indent depth.
-        d.align(0, result)
+        d.align_root(0, result)
     }
 
     /// Convert a string with newlines into a doc with literalline between parts.

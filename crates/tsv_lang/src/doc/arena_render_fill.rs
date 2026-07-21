@@ -5,7 +5,7 @@
 
 use smallvec::SmallVec;
 
-use super::arena::{ArenaCommand, DocId};
+use super::arena::{ArenaCommand, DocId, RenderIndent};
 use super::arena_fits::{arena_fits_multi, arena_fits_with_lookahead};
 use super::arena_render::{
     RenderCtx, line_start_column, render_single_doc, trim_trailing_whitespace, write_indentation,
@@ -22,7 +22,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
     parts: &[DocId],
     output: &mut String,
     pos: &mut usize,
-    indent_level: usize,
+    indent: RenderIndent,
     context: &DocContext,
     rest_commands: &[ArenaCommand],
     should_remeasure: &mut bool,
@@ -88,7 +88,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
             let mut with_sep: SmallVec<[ArenaCommand; 8]> =
                 SmallVec::from_slice(if is_final_segment { rest_commands } else { &[] });
             with_sep.push(ArenaCommand {
-                indent: indent_level,
+                indent,
                 mode: Mode::Flat,
                 doc: parts[offset + 1],
             });
@@ -116,8 +116,21 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
         // the fill pack from there. A wide inline child that drops owns its line; trailing text
         // wraps to the next line rather than hugging the child's `>`. Scoped by the context flag so
         // greedy fills (text word-wrap, CSS value lists) are unaffected.
-        if offset == 0 && context.break_after_dropped_first && offset + 1 < parts.len() {
-            let line_start_pos = line_start_column(indent_level, render, embed);
+        //
+        // Exception: a block-style element (its own content doesn't fit flat, so it wraps intact
+        // and dangles its `>` low) with *terminal* trailing text is the `hug_terminal_after_break`
+        // shape — the tail should hug the dangled `>` when it fits there, exactly as the first-child
+        // case (`inline_wide_content_trailing_long`) does; a preceding sibling doesn't change that,
+        // since nothing follows the tail (the hug stays convergent). Skip the unconditional break
+        // here and let Case 3's at-line-start arm run its `hug_terminal_after_break` decision, which
+        // hugs only when the tail actually fits and breaks otherwise. The plain dropped-whole case
+        // (`content_fits`) is unaffected and still owns its line.
+        if offset == 0
+            && context.break_after_dropped_first
+            && offset + 1 < parts.len()
+            && (content_fits || !context.hug_terminal_after_break)
+        {
+            let line_start_pos = line_start_column(indent, render, embed);
             if *pos == line_start_pos {
                 let content_mode = if content_fits {
                     Mode::Flat
@@ -129,7 +142,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                     content,
                     output,
                     pos,
-                    indent_level,
+                    indent,
                     content_mode,
                     should_remeasure,
                 );
@@ -138,7 +151,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                     parts[offset + 1],
                     output,
                     pos,
-                    indent_level,
+                    indent,
                     Mode::Break,
                     should_remeasure,
                 );
@@ -170,18 +183,18 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                     content,
                     output,
                     pos,
-                    indent_level,
+                    indent,
                     sep_mode,
                     should_remeasure,
                 );
                 break;
             }
             if !content_fits {
-                let line_start_pos = line_start_column(indent_level, render, embed);
+                let line_start_pos = line_start_column(indent, render, embed);
                 if *pos != line_start_pos {
                     trim_trailing_whitespace(output);
                     output.push('\n');
-                    write_indentation(output, indent_level, render, embed);
+                    write_indentation(output, indent, render, embed);
                     *pos = line_start_pos;
                 }
                 // Unmeasured flat render (tsv shape: prettier uses Break mode
@@ -194,7 +207,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                 content,
                 output,
                 pos,
-                indent_level,
+                indent,
                 Mode::Flat,
                 should_remeasure,
             );
@@ -226,7 +239,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                 content,
                 output,
                 pos,
-                indent_level,
+                indent,
                 content_mode,
                 should_remeasure,
             );
@@ -271,7 +284,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                     next.mode = Mode::Flat;
                 }
                 rest_with_sep.push(ArenaCommand {
-                    indent: indent_level,
+                    indent,
                     mode: Mode::Flat,
                     doc: separator,
                 });
@@ -293,7 +306,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                 separator,
                 output,
                 pos,
-                indent_level,
+                indent,
                 sep_mode,
                 should_remeasure,
             );
@@ -317,7 +330,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                 content,
                 output,
                 pos,
-                indent_level,
+                indent,
                 Mode::Flat,
                 should_remeasure,
             );
@@ -326,7 +339,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                 separator,
                 output,
                 pos,
-                indent_level,
+                indent,
                 Mode::Flat,
                 should_remeasure,
             );
@@ -336,7 +349,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                 content,
                 output,
                 pos,
-                indent_level,
+                indent,
                 Mode::Flat,
                 should_remeasure,
             );
@@ -345,12 +358,12 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                 separator,
                 output,
                 pos,
-                indent_level,
+                indent,
                 Mode::Break,
                 should_remeasure,
             );
         } else {
-            let line_start_pos = line_start_column(indent_level, render, embed);
+            let line_start_pos = line_start_column(indent, render, embed);
             let at_line_start = *pos == line_start_pos;
 
             if !at_line_start {
@@ -381,7 +394,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                         content,
                         output,
                         pos,
-                        indent_level,
+                        indent,
                         Mode::Break,
                         should_remeasure,
                     );
@@ -390,7 +403,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                         separator,
                         output,
                         pos,
-                        indent_level,
+                        indent,
                         Mode::Break,
                         should_remeasure,
                     );
@@ -417,7 +430,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                         content,
                         output,
                         pos,
-                        indent_level,
+                        indent,
                         Mode::Break,
                         should_remeasure,
                     );
@@ -426,7 +439,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                         separator,
                         output,
                         pos,
-                        indent_level,
+                        indent,
                         Mode::Flat,
                         should_remeasure,
                     );
@@ -436,7 +449,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
 
                 trim_trailing_whitespace(output);
                 output.push('\n');
-                write_indentation(output, indent_level, render, embed);
+                write_indentation(output, indent, render, embed);
                 *pos = line_start_pos;
 
                 if content_fits_at_start {
@@ -445,7 +458,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                         content,
                         output,
                         pos,
-                        indent_level,
+                        indent,
                         Mode::Flat,
                         should_remeasure,
                     );
@@ -454,7 +467,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                         separator,
                         output,
                         pos,
-                        indent_level,
+                        indent,
                         Mode::Break,
                         should_remeasure,
                     );
@@ -464,7 +477,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                         content,
                         output,
                         pos,
-                        indent_level,
+                        indent,
                         Mode::Break,
                         should_remeasure,
                     );
@@ -473,7 +486,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                         separator,
                         output,
                         pos,
-                        indent_level,
+                        indent,
                         Mode::Break,
                         should_remeasure,
                     );
@@ -489,7 +502,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                     content,
                     output,
                     pos,
-                    indent_level,
+                    indent,
                     Mode::Break,
                     should_remeasure,
                 );
@@ -518,7 +531,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                     separator,
                     output,
                     pos,
-                    indent_level,
+                    indent,
                     sep_mode,
                     should_remeasure,
                 );
