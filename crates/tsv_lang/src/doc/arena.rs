@@ -1148,6 +1148,30 @@ impl DocArena {
         )
     }
 
+    /// If `id` is an after-element fold — a `Fill` wrapped in a `WithContext` carrying
+    /// [`DocContext::hug_wide_first`], the marker `build_after_element_fold` always sets —
+    /// return the fold's LEAD item: the inline element the trailing text packs after. `None`
+    /// for any other node.
+    ///
+    /// The preceding text's flow-boundary measurement (`break_before_wide_flow`) uses this to
+    /// decide the element's drop by whether the *element* fits, mirroring prettier's pairwise
+    /// fill (`text, separator, element` — never the trailing text). A short lead then packs
+    /// after the text rather than the whole element+tail fold forcing it to its own line.
+    #[inline]
+    pub(crate) fn after_element_fold_lead(&self, id: DocId) -> Option<DocId> {
+        let nodes = self.nodes.borrow();
+        let DocNode::WithContext { doc, context } = &nodes[id.index()] else {
+            return None;
+        };
+        if !context.hug_wide_first {
+            return None;
+        }
+        let DocNode::Fill(range) = &nodes[doc.index()] else {
+            return None;
+        };
+        range.resolve(&self.children.borrow()).first().copied()
+    }
+
     /// Tag `id` as the doc node that emits the comment at `span` in `source`.
     ///
     /// The print-once comment ledger's build-side seam for a doc-based printer: the

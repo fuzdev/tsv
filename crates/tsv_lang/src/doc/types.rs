@@ -88,6 +88,12 @@ pub struct DocContext {
     /// the separator then forces the separator to break, dropping the element to its own line whole
     /// — rather than packing it onto the text line, where it would break its own tag in place.
     ///
+    /// When that following node is an *after-element fold* (an inline element + its trailing text,
+    /// carrying [`Self::hug_wide_first`]), only the fold's **lead element** is measured, not the whole
+    /// element+tail unit — the tail can wrap, so a short element packs after the last word instead of
+    /// dropping (prettier's fill is pairwise: last word, separator, element — never the tail). See
+    /// [`crate::doc::DocArena::after_element_fold_lead`].
+    ///
     /// Scoped to the Svelte text→flow-element boundary fill (a text run whose next sibling is a
     /// flowing inline element/component, ended with a trailing `line`). Off for every other fill, so
     /// a small element after text still packs and CSS/value-list fills are unaffected. This is the

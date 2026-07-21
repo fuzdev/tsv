@@ -281,6 +281,13 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                 if context.break_before_wide_flow
                     && let Some(next) = rest_with_sep.last_mut()
                 {
+                    // When the following node is an after-element fold (an inline element + its
+                    // trailing text), measure only the fold's LEAD element — the trailing text
+                    // can wrap, so a short element should pack after the last word instead of the
+                    // whole element+tail unit forcing a drop (prettier's fill is pairwise: last
+                    // word, separator, element — never the tail). A bare following element
+                    // (`after_element_fold_lead` → `None`) keeps the whole-flat measurement.
+                    next.doc = arena.after_element_fold_lead(next.doc).unwrap_or(next.doc);
                     next.mode = Mode::Flat;
                 }
                 rest_with_sep.push(ArenaCommand {

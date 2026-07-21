@@ -1,0 +1,248 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 970,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 623,
+				"data": " A SHORT inline element (its own content fits) sandwiched in a wrapping fill of text and inline\n     elements packs greedily and pairwise after the preceding word rather than being isolated onto\n     its own line: <code>example.dev</code> stays on the <code>preferences</code> run line. Prettier\n     keeps the run on one over-width line (the inline-content hug); tsv keeps printWidth a hard limit\n     and wraps at a word boundary. The two blocks pin the 100/101 boundary: the run packs to exactly\n     100 (`more` fits, `text` breaks), and one char more pushes `more` to 101 so it breaks instead.\n     See README. "
+			},
+			{
+				"type": "Text",
+				"start": 623,
+				"end": 624,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 624,
+				"end": 795,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 625
+					},
+					"end": {
+						"line": 8,
+						"column": 2,
+						"character": 626
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 627,
+							"end": 686,
+							"raw": "\n\talpha bravo charlie delta echo foxtrot golf hotel india\n\t",
+							"data": "\n\talpha bravo charlie delta echo foxtrot golf hotel india\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 686,
+							"end": 710,
+							"name": "code",
+							"name_loc": {
+								"start": {
+									"line": 10,
+									"column": 2,
+									"character": 687
+								},
+								"end": {
+									"line": 10,
+									"column": 6,
+									"character": 691
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 692,
+										"end": 703,
+										"raw": "preferences",
+										"data": "preferences"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 710,
+							"end": 719,
+							"raw": " and set ",
+							"data": " and set "
+						},
+						{
+							"type": "RegularElement",
+							"start": 719,
+							"end": 743,
+							"name": "code",
+							"name_loc": {
+								"start": {
+									"line": 10,
+									"column": 35,
+									"character": 720
+								},
+								"end": {
+									"line": 10,
+									"column": 39,
+									"character": 724
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 725,
+										"end": 736,
+										"raw": "example.dev",
+										"data": "example.dev"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 743,
+							"end": 791,
+							"raw": " as one exception here plus a little more\n\ttext\n",
+							"data": " as one exception here plus a little more\n\ttext\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 795,
+				"end": 797,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 797,
+				"end": 969,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 14,
+						"column": 1,
+						"character": 798
+					},
+					"end": {
+						"line": 14,
+						"column": 2,
+						"character": 799
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 800,
+							"end": 859,
+							"raw": "\n\talpha bravo charlie delta echo foxtrot golf hotel india\n\t",
+							"data": "\n\talpha bravo charlie delta echo foxtrot golf hotel india\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 859,
+							"end": 883,
+							"name": "code",
+							"name_loc": {
+								"start": {
+									"line": 16,
+									"column": 2,
+									"character": 860
+								},
+								"end": {
+									"line": 16,
+									"column": 6,
+									"character": 864
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 865,
+										"end": 876,
+										"raw": "preferences",
+										"data": "preferences"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 883,
+							"end": 893,
+							"raw": " and sett ",
+							"data": " and sett "
+						},
+						{
+							"type": "RegularElement",
+							"start": 893,
+							"end": 917,
+							"name": "code",
+							"name_loc": {
+								"start": {
+									"line": 16,
+									"column": 36,
+									"character": 894
+								},
+								"end": {
+									"line": 16,
+									"column": 40,
+									"character": 898
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 899,
+										"end": 910,
+										"raw": "example.dev",
+										"data": "example.dev"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 917,
+							"end": 965,
+							"raw": " as one exception here plus a little\n\tmore text\n",
+							"data": " as one exception here plus a little\n\tmore text\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
