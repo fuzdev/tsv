@@ -626,7 +626,7 @@ fn parse_function_value<'arena>(
 
     // Get function name (current token should be identifier)
     let name = if parser.check(TokenKind::Identifier) {
-        parser.alloc_str_in(parser.current_identifier())
+        parser.current_identifier_in_arena()
     } else {
         return Err(parser.error_expected("function name"));
     };

@@ -73,8 +73,7 @@ pub(crate) fn parse_atrule<'arena>(
     // Internal AST: use decoded value (spec-compliant). The name token's source
     // span is captured too — the printer emits the name from source (escape-
     // preserving), not from the decoded string (which may hold a raw control char).
-    let name_ident = parser.current_identifier();
-    let name = parser.alloc_str_in(name_ident);
+    let name = parser.current_identifier_in_arena();
     let name_span = Span {
         start: parser.span_pos(parser.current_start),
         end: parser.span_pos(parser.current_end),

@@ -101,9 +101,10 @@ impl fmt::Display for TokenKind {
 
 /// A lexed CSS token: a 16-byte POD (`kind` + two `u32` spans) returned by value
 /// from `next_token`. The decoded value of an escaped identifier is kept
-/// **out-of-band** on the `Lexer` (`take_decoded`) rather than inline here, so the
-/// common no-escape identifier costs no allocation and the hot token does not carry
-/// a `String`. `Clone` (not `Copy`) mirrors `tsv_ts::Token`.
+/// **out-of-band** on the `Lexer` (a reused `decode_scratch` buffer, borrowed via
+/// `decoded_str`) rather than inline here, so the common no-escape identifier costs
+/// no allocation and the hot token does not carry a `String`. `Clone` (not `Copy`)
+/// mirrors `tsv_ts::Token`.
 #[derive(Debug, Clone)]
 pub struct Token {
     pub kind: TokenKind,

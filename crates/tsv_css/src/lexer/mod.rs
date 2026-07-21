@@ -63,15 +63,24 @@ pub struct Lexer<'a> {
     /// Mirrors `tsv_ts`'s lexer.
     bytes: &'a [u8],
     pos: usize,
-    /// Out-of-band decoded value for the **last token produced**, set only when an
-    /// identifier actually contained an escape sequence (the no-escape common case
-    /// leaves it `None`, so the token's text is recovered as a verbatim source
-    /// slice). `advance`/`new` drain it with `take_decoded` right after lexing;
-    /// `peek` leaves it parked here for the matching `advance`-from-cache to claim,
-    /// so a peeked escaped identifier keeps its decode. `Box<String>` keeps the slot
-    /// pointer-sized. Mirrors `tsv_ts`'s lexer.
-    #[allow(clippy::box_collection)]
-    decoded: Option<Box<String>>,
+    /// Out-of-band decoded value for the **last token produced**, populated only when
+    /// an identifier actually contained an escape sequence (the no-escape common case
+    /// leaves `has_decoded` false, so the token's text is recovered as a verbatim
+    /// source slice). Mirrors `tsv_ts`'s lexer.
+    ///
+    /// The decoded bytes live in `decode_scratch`, a buffer parked on the lexer and
+    /// **reused across the file** (cleared per escape, capacity retained), so no
+    /// per-identifier `String` (plus its `Box`) allocates on the rare escape path.
+    /// `has_decoded` is the presence flag `decoded_str` reads; it is cleared at the
+    /// top of `next_token` (and by `seek`) so it reflects only the current token, and
+    /// set by the escaped-identifier path. `advance`/`new` copy the borrowed scratch
+    /// into the AST arena right after lexing; `peek` leaves it parked here for the
+    /// matching `advance`-from-cache to claim, so a peeked escaped identifier keeps
+    /// its decode (nothing re-lexes between the peek and its consume, so the scratch
+    /// is intact). The scratch is never read while `has_decoded` is false, so its
+    /// stale contents are inert.
+    decode_scratch: String,
+    has_decoded: bool,
 }
 
 impl<'a> Lexer<'a> {
@@ -88,16 +97,24 @@ impl<'a> Lexer<'a> {
             source,
             bytes: source.as_bytes(),
             pos,
-            decoded: None,
+            decode_scratch: String::new(),
+            has_decoded: false,
         }
     }
 
-    /// Take the decoded value of the most recently produced token, if it required
-    /// escape processing (only escaped identifiers do). Leaves the slot `None`.
-    #[allow(clippy::box_collection)]
+    /// The decoded value of the most recently produced token, if it required escape
+    /// processing (only escaped identifiers do); `None` for the common escape-free
+    /// token. Borrows the parked `decode_scratch` — valid until the next token is
+    /// lexed (which may overwrite it), so the parser copies it into its AST arena
+    /// immediately after each lex (`CssParser::decoded_to_arena`) rather than holding
+    /// the borrow.
     #[inline]
-    pub fn take_decoded(&mut self) -> Option<Box<String>> {
-        self.decoded.take()
+    pub fn decoded_str(&self) -> Option<&str> {
+        if self.has_decoded {
+            Some(&self.decode_scratch)
+        } else {
+            None
+        }
     }
 
     /// Reposition the cursor to an absolute byte offset (a char boundary of
@@ -108,7 +125,7 @@ impl<'a> Lexer<'a> {
     #[inline]
     pub(crate) fn seek(&mut self, pos: usize) {
         self.pos = pos;
-        self.decoded = None;
+        self.has_decoded = false;
     }
 
     /// The byte at the cursor, or `None` at EOF. Drives the hot `next_token`
@@ -172,9 +189,10 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    /// Lex an identifier, stashing any decoded escape value out-of-band in
-    /// `self.decoded`. Thin wrapper over the free `identifiers::read_identifier`
-    /// so both dispatch arms (`$`-prefixed and plain) share the handoff.
+    /// Lex an identifier, stashing any decoded escape value out-of-band in the
+    /// lexer's `decode_scratch`. Thin wrapper over the free
+    /// `identifiers::read_identifier` so both dispatch arms (`$`-prefixed and plain)
+    /// share the handoff.
     fn read_identifier(&mut self) -> Result<Token, Box<ParseError>> {
         let (token, decoded) = read_identifier(self.source, &mut self.pos)?;
         // css-syntax "consume an ident-like token": an ident whose value is an
@@ -183,19 +201,27 @@ impl<'a> Lexer<'a> {
         // to the matching `)` so an interior `/*`, `:`, `,` etc. is literal content, not
         // a comment / colon / separator. Quoted `url("…")` stays ident + `(` + string (a
         // function-token). Match the decoded value so an escaped spelling still counts.
-        let ident_text = decoded.as_deref().map_or(
-            &self.source[token.start as usize..token.end as usize],
-            |s| s.as_str(),
-        );
+        let ident_text = decoded
+            .as_deref()
+            .unwrap_or_else(|| &self.source[token.start as usize..token.end as usize]);
         if ident_text.eq_ignore_ascii_case("url")
             && self.cur_byte() == Some(b'(')
             && let Some(url) = self.consume_url_token(token.start)
         {
             // The url-token text is recovered verbatim from its span — no decode.
-            self.decoded = None;
+            self.has_decoded = false;
             return Ok(url);
         }
-        self.decoded = decoded;
+        // Escaped identifiers are near-zero in real code; funnel the rare local
+        // buffer into the parked scratch so `decoded_str` reads it uniformly.
+        match decoded {
+            Some(s) => {
+                self.decode_scratch.clear();
+                self.decode_scratch.push_str(&s);
+                self.has_decoded = true;
+            }
+            None => self.has_decoded = false,
+        }
         Ok(token)
     }
 
@@ -255,12 +281,11 @@ impl<'a> Lexer<'a> {
     }
 
     pub fn next_token(&mut self) -> Result<Token, Box<ParseError>> {
-        // Start each token with a clean decoded slot. Callers drain the prior
-        // token's decode (`advance`/`new` at once, `peek` via its matching
-        // `advance`-from-cache), so this is normally already `None` — cheap
-        // insurance that a stale decode can never leak onto a later token. Only an
-        // escaped identifier below sets it again.
-        self.decoded = None;
+        // Start each token with a clean decoded flag. Callers copy the prior token's
+        // decode out (`advance`/`new` at once, `peek` via its matching
+        // `advance`-from-cache), so a stale decode never leaks onto a later token.
+        // Only an escaped identifier below sets it again (reusing `decode_scratch`).
+        self.has_decoded = false;
 
         let start = self.pos;
         let Some(b) = self.cur_byte() else {

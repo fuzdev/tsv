@@ -712,7 +712,7 @@ fn scan_value_tokens(source: &str, value_start: usize) -> Result<ValueFacts, Par
     // token is zero-width at end-of-source, so the same field serves both exits.
     let (terminator, terminator_kind) = loop {
         let token = lexer.next_token().map_err(|err| *err)?;
-        let decoded = lexer.take_decoded();
+        let decoded = lexer.decoded_str();
         if token.kind == TokenKind::Eof {
             break (token.start as usize, TerminatorKind::Eof);
         }
@@ -739,9 +739,7 @@ fn scan_value_tokens(source: &str, value_start: usize) -> Result<ValueFacts, Par
             // An identifier can't be `!`; it can be `important` (case-insensitive), and an
             // escaped spelling counts — hence the decoded value.
             TokenKind::Identifier => {
-                let text = decoded
-                    .as_deref()
-                    .map_or(&source[start..end], |s| s.as_str());
+                let text = decoded.unwrap_or_else(|| &source[start..end]);
                 (false, text.eq_ignore_ascii_case("important"))
             }
             // A quoted string / number / percentage / dimension is never `!` or `important`.

@@ -196,8 +196,7 @@ pub(crate) fn parse_declaration<'arena>(
     }
     // Internal AST: use decoded value (spec-compliant)
     // Svelte quirk (raw value) will be applied in conversion layer
-    let property_ident = parser.current_identifier();
-    let property = parser.alloc_str_in(property_ident);
+    let property = parser.current_identifier_in_arena();
     parser.advance()?;
 
     let property_gap_comment = parser.skip_whitespace_and_comments()?;
