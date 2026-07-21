@@ -394,16 +394,11 @@ impl<'a> Printer<'a> {
         stmt_start: u32,
         prev_stmt_end: Option<u32>,
     ) -> CommentVec<'_> {
-        let comments: CommentVec<'_> =
-            comments_to_emit_in_range(self.comments, prev_end, stmt_start).collect();
-        if let Some(prev_stmt) = prev_stmt_end {
-            comments
-                .into_iter()
-                .filter(|c| !self.is_same_line(prev_stmt, c.span.start))
-                .collect()
-        } else {
-            comments
-        }
+        comments_to_emit_in_range(self.comments, prev_end, stmt_start)
+            .filter(|c| {
+                prev_stmt_end.is_none_or(|prev_stmt| !self.is_same_line(prev_stmt, c.span.start))
+            })
+            .collect()
     }
 
     /// Build a Doc for a block statement with outer comments moved inside
