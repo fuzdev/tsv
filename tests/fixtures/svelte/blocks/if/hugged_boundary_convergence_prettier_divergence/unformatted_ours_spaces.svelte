@@ -1,5 +1,7 @@
-<!-- Hug is all-or-nothing: a body welded to only the head, or only the tail, still lays
-	out block-style. The boundary is render-free, so it cannot select the layout. -->
+<!--
+	Hug is all-or-nothing: a body welded to only the head, or only the tail, still lays
+	out block-style. The boundary is render-free, so it cannot select the layout.
+-->
 {#if  a}
 	<span>{ value }</span>{/if}
 

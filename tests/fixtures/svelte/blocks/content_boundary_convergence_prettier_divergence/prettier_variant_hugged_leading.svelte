@@ -1,5 +1,7 @@
-<!-- A multiline block body lays out block-style: head and tail intact, body on its own
-	indented lines — regardless of how the author wrote the render-free boundary. -->
+<!--
+	A multiline block body lays out block-style: head and tail intact, body on its own
+	indented lines — regardless of how the author wrote the render-free boundary.
+-->
 {#if cond}<div>a</div>
 	<div>b</div>
 {/if}

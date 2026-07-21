@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 564,
+	"end": 561,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,31 +10,31 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 151,
-				"data": " Fits: the nested inline child's line is exactly 100, so it stays inline; the\n     trailing text (authored on its own line) keeps its own line. "
+				"end": 148,
+				"data": "\n\tFits: the nested inline child's line is exactly 100, so it stays inline; the\n\ttrailing text (authored on its own line) keeps its own line.\n"
 			},
 			{
 				"type": "Text",
-				"start": 151,
-				"end": 152,
+				"start": 148,
+				"end": 149,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 152,
-				"end": 271,
+				"start": 149,
+				"end": 268,
 				"name": "span",
 				"name_loc": {
 					"start": {
-						"line": 3,
+						"line": 5,
 						"column": 1,
-						"character": 153
+						"character": 150
 					},
 					"end": {
-						"line": 3,
+						"line": 5,
 						"column": 5,
-						"character": 157
+						"character": 154
 					}
 				},
 				"attributes": [],
@@ -43,50 +43,50 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 158,
-							"end": 160,
+							"start": 155,
+							"end": 157,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 160,
-							"end": 257,
+							"start": 157,
+							"end": 254,
 							"name": "span",
 							"name_loc": {
 								"start": {
-									"line": 4,
+									"line": 6,
 									"column": 2,
-									"character": 161
+									"character": 158
 								},
 								"end": {
-									"line": 4,
+									"line": 6,
 									"column": 6,
-									"character": 165
+									"character": 162
 								}
 							},
 							"attributes": [
 								{
 									"type": "Attribute",
-									"start": 166,
-									"end": 225,
+									"start": 163,
+									"end": 222,
 									"name": "class",
 									"name_loc": {
 										"start": {
-											"line": 4,
+											"line": 6,
 											"column": 7,
-											"character": 166
+											"character": 163
 										},
 										"end": {
-											"line": 4,
+											"line": 6,
 											"column": 12,
-											"character": 171
+											"character": 168
 										}
 									},
 									"value": [
 										{
-											"start": 173,
-											"end": 224,
+											"start": 170,
+											"end": 221,
 											"type": "Text",
 											"raw": "class1 class2 class3 class4 class5 class6 class7abc",
 											"data": "class1 class2 class3 class4 class5 class6 class7abc"
@@ -94,27 +94,27 @@
 									]
 								},
 								{
-									"start": 226,
-									"end": 243,
+									"start": 223,
+									"end": 240,
 									"type": "StyleDirective",
 									"name": "width",
 									"name_loc": {
 										"start": {
-											"line": 4,
+											"line": 6,
 											"column": 67,
-											"character": 226
+											"character": 223
 										},
 										"end": {
-											"line": 4,
+											"line": 6,
 											"column": 78,
-											"character": 237
+											"character": 234
 										}
 									},
 									"modifiers": [],
 									"value": [
 										{
-											"start": 239,
-											"end": 242,
+											"start": 236,
+											"end": 239,
 											"type": "Text",
 											"raw": "6ch",
 											"data": "6ch"
@@ -127,19 +127,19 @@
 								"nodes": [
 									{
 										"type": "ExpressionTag",
-										"start": 244,
-										"end": 250,
+										"start": 241,
+										"end": 247,
 										"expression": {
 											"type": "Identifier",
-											"start": 245,
-											"end": 249,
+											"start": 242,
+											"end": 246,
 											"loc": {
 												"start": {
-													"line": 4,
+													"line": 6,
 													"column": 86
 												},
 												"end": {
-													"line": 4,
+													"line": 6,
 													"column": 90
 												}
 											},
@@ -151,8 +151,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 257,
-							"end": 264,
+							"start": 254,
+							"end": 261,
 							"raw": "\n\ttext\n",
 							"data": "\n\ttext\n"
 						}
@@ -161,39 +161,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 271,
-				"end": 273,
+				"start": 268,
+				"end": 270,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 273,
-				"end": 442,
+				"start": 270,
+				"end": 439,
 				"data": " Breaks: one char longer (101), so the nested child wraps; the no-attr parent keeps its\n     open tag hugging the child and the trailing text keeps its own line. "
 			},
 			{
 				"type": "Text",
-				"start": 442,
-				"end": 443,
+				"start": 439,
+				"end": 440,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 443,
-				"end": 563,
+				"start": 440,
+				"end": 560,
 				"name": "span",
 				"name_loc": {
 					"start": {
-						"line": 10,
+						"line": 12,
 						"column": 1,
-						"character": 444
+						"character": 441
 					},
 					"end": {
-						"line": 10,
+						"line": 12,
 						"column": 5,
-						"character": 448
+						"character": 445
 					}
 				},
 				"attributes": [],
@@ -202,50 +202,50 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 449,
-							"end": 451,
+							"start": 446,
+							"end": 448,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 451,
-							"end": 549,
+							"start": 448,
+							"end": 546,
 							"name": "span",
 							"name_loc": {
 								"start": {
-									"line": 11,
+									"line": 13,
 									"column": 2,
-									"character": 452
+									"character": 449
 								},
 								"end": {
-									"line": 11,
+									"line": 13,
 									"column": 6,
-									"character": 456
+									"character": 453
 								}
 							},
 							"attributes": [
 								{
 									"type": "Attribute",
-									"start": 457,
-									"end": 517,
+									"start": 454,
+									"end": 514,
 									"name": "class",
 									"name_loc": {
 										"start": {
-											"line": 11,
+											"line": 13,
 											"column": 7,
-											"character": 457
+											"character": 454
 										},
 										"end": {
-											"line": 11,
+											"line": 13,
 											"column": 12,
-											"character": 462
+											"character": 459
 										}
 									},
 									"value": [
 										{
-											"start": 464,
-											"end": 516,
+											"start": 461,
+											"end": 513,
 											"type": "Text",
 											"raw": "class1 class2 class3 class4 class5 class6 class7abcd",
 											"data": "class1 class2 class3 class4 class5 class6 class7abcd"
@@ -253,27 +253,27 @@
 									]
 								},
 								{
-									"start": 518,
-									"end": 535,
+									"start": 515,
+									"end": 532,
 									"type": "StyleDirective",
 									"name": "width",
 									"name_loc": {
 										"start": {
-											"line": 11,
+											"line": 13,
 											"column": 68,
-											"character": 518
+											"character": 515
 										},
 										"end": {
-											"line": 11,
+											"line": 13,
 											"column": 79,
-											"character": 529
+											"character": 526
 										}
 									},
 									"modifiers": [],
 									"value": [
 										{
-											"start": 531,
-											"end": 534,
+											"start": 528,
+											"end": 531,
 											"type": "Text",
 											"raw": "6ch",
 											"data": "6ch"
@@ -286,19 +286,19 @@
 								"nodes": [
 									{
 										"type": "ExpressionTag",
-										"start": 536,
-										"end": 542,
+										"start": 533,
+										"end": 539,
 										"expression": {
 											"type": "Identifier",
-											"start": 537,
-											"end": 541,
+											"start": 534,
+											"end": 538,
 											"loc": {
 												"start": {
-													"line": 11,
+													"line": 13,
 													"column": 87
 												},
 												"end": {
-													"line": 11,
+													"line": 13,
 													"column": 91
 												}
 											},
@@ -310,8 +310,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 549,
-							"end": 556,
+							"start": 546,
+							"end": 553,
 							"raw": "\n\ttext\n",
 							"data": "\n\ttext\n"
 						}

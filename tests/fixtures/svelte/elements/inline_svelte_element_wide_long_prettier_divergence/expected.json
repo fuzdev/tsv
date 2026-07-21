@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 493,
+	"end": 486,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,31 +10,31 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 267,
-				"data": " A wide inline `<svelte:element>` too wide to share a line drops to its own line; the\n     preceding word (`and`) stays hugged on the text line. Pins that the flow boundary applies\n     to special elements too, the same as HTML inline elements and components. "
+				"end": 260,
+				"data": "\n\tA wide inline `<svelte:element>` too wide to share a line drops to its own line; the\n\tpreceding word (`and`) stays hugged on the text line. Pins that the flow boundary applies\n\tto special elements too, the same as HTML inline elements and components.\n"
 			},
 			{
 				"type": "Text",
-				"start": 267,
-				"end": 268,
+				"start": 260,
+				"end": 261,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 268,
-				"end": 492,
+				"start": 261,
+				"end": 485,
 				"name": "p",
 				"name_loc": {
 					"start": {
-						"line": 4,
+						"line": 6,
 						"column": 1,
-						"character": 269
+						"character": 262
 					},
 					"end": {
-						"line": 4,
+						"line": 6,
 						"column": 2,
-						"character": 270
+						"character": 263
 					}
 				},
 				"attributes": [],
@@ -43,50 +43,50 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 271,
-							"end": 368,
+							"start": 264,
+							"end": 361,
 							"raw": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 aaaaaaaaaaaaaa and\n\t",
 							"data": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 aaaaaaaaaaaaaa and\n\t"
 						},
 						{
 							"type": "SvelteElement",
-							"start": 368,
-							"end": 462,
+							"start": 361,
+							"end": 455,
 							"name": "svelte:element",
 							"name_loc": {
 								"start": {
-									"line": 6,
+									"line": 8,
 									"column": 2,
-									"character": 369
+									"character": 362
 								},
 								"end": {
-									"line": 6,
+									"line": 8,
 									"column": 16,
-									"character": 383
+									"character": 376
 								}
 							},
 							"attributes": [
 								{
 									"type": "Attribute",
-									"start": 395,
-									"end": 437,
+									"start": 388,
+									"end": 430,
 									"name": "class",
 									"name_loc": {
 										"start": {
-											"line": 6,
+											"line": 8,
 											"column": 28,
-											"character": 395
+											"character": 388
 										},
 										"end": {
-											"line": 6,
+											"line": 8,
 											"column": 33,
-											"character": 400
+											"character": 393
 										}
 									},
 									"value": [
 										{
-											"start": 402,
-											"end": 436,
+											"start": 395,
+											"end": 429,
 											"type": "Text",
 											"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 											"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -99,8 +99,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 438,
-										"end": 445,
+										"start": 431,
+										"end": 438,
 										"raw": "content",
 										"data": "content"
 									}
@@ -108,15 +108,15 @@
 							},
 							"tag": {
 								"type": "Identifier",
-								"start": 390,
-								"end": 393,
+								"start": 383,
+								"end": 386,
 								"loc": {
 									"start": {
-										"line": 6,
+										"line": 8,
 										"column": 23
 									},
 									"end": {
-										"line": 6,
+										"line": 8,
 										"column": 26
 									}
 								},
@@ -125,8 +125,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 462,
-							"end": 488,
+							"start": 455,
+							"end": 481,
 							"raw": "\n\ttail1 tail2 tail3 tail4\n",
 							"data": "\n\ttail1 tail2 tail3 tail4\n"
 						}

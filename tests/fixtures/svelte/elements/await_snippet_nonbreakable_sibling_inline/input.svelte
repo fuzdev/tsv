@@ -1,6 +1,8 @@
-<!-- A short {#await}/{#snippet} after a non-breakable sibling (plain text or a
-comment) stays fully inline — the parent element does not break. await/snippet
-are inline-transparent after such a sibling, matching prettier. -->
+<!--
+	A short {#await}/{#snippet} after a non-breakable sibling (plain text or a
+	comment) stays fully inline — the parent element does not break. await/snippet
+	are inline-transparent after such a sibling, matching prettier.
+-->
 
 <!-- text sibling + await -->
 <div>text {#await promise}loading{/await}</div>

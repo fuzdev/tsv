@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 244,
+	"end": 246,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,31 +10,31 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 178,
-				"data": " Non-breaking space (U+00A0) is element content, not collapsible whitespace: a\nwhitespace-only NBSP node is preserved (block) and not turned into a regular space (inline) "
+				"end": 180,
+				"data": "\n\tNon-breaking space (U+00A0) is element content, not collapsible whitespace: a\n\twhitespace-only NBSP node is preserved (block) and not turned into a regular space (inline)\n"
 			},
 			{
 				"type": "Text",
-				"start": 178,
-				"end": 179,
+				"start": 180,
+				"end": 181,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 179,
-				"end": 191,
+				"start": 181,
+				"end": 193,
 				"name": "div",
 				"name_loc": {
 					"start": {
-						"line": 3,
+						"line": 5,
 						"column": 1,
-						"character": 180
+						"character": 182
 					},
 					"end": {
-						"line": 3,
+						"line": 5,
 						"column": 4,
-						"character": 183
+						"character": 185
 					}
 				},
 				"attributes": [],
@@ -43,8 +43,8 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 184,
-							"end": 185,
+							"start": 186,
+							"end": 187,
 							"raw": " ",
 							"data": " "
 						}
@@ -53,26 +53,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 191,
-				"end": 192,
+				"start": 193,
+				"end": 194,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 192,
-				"end": 200,
+				"start": 194,
+				"end": 202,
 				"name": "p",
 				"name_loc": {
 					"start": {
-						"line": 4,
+						"line": 6,
 						"column": 1,
-						"character": 193
+						"character": 195
 					},
 					"end": {
-						"line": 4,
+						"line": 6,
 						"column": 2,
-						"character": 194
+						"character": 196
 					}
 				},
 				"attributes": [],
@@ -81,8 +81,8 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 195,
-							"end": 196,
+							"start": 197,
+							"end": 198,
 							"raw": " ",
 							"data": " "
 						}
@@ -91,26 +91,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 200,
-				"end": 201,
+				"start": 202,
+				"end": 203,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 201,
-				"end": 215,
+				"start": 203,
+				"end": 217,
 				"name": "span",
 				"name_loc": {
 					"start": {
-						"line": 5,
+						"line": 7,
 						"column": 1,
-						"character": 202
+						"character": 204
 					},
 					"end": {
-						"line": 5,
+						"line": 7,
 						"column": 5,
-						"character": 206
+						"character": 208
 					}
 				},
 				"attributes": [],
@@ -119,8 +119,8 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 207,
-							"end": 208,
+							"start": 209,
+							"end": 210,
 							"raw": " ",
 							"data": " "
 						}
@@ -129,26 +129,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 215,
-				"end": 216,
+				"start": 217,
+				"end": 218,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 216,
-				"end": 243,
+				"start": 218,
+				"end": 245,
 				"name": "div",
 				"name_loc": {
 					"start": {
-						"line": 6,
+						"line": 8,
 						"column": 1,
-						"character": 217
+						"character": 219
 					},
 					"end": {
-						"line": 6,
+						"line": 8,
 						"column": 4,
-						"character": 220
+						"character": 222
 					}
 				},
 				"attributes": [],
@@ -157,26 +157,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 221,
-							"end": 222,
+							"start": 223,
+							"end": 224,
 							"raw": " ",
 							"data": " "
 						},
 						{
 							"type": "RegularElement",
-							"start": 222,
-							"end": 236,
+							"start": 224,
+							"end": 238,
 							"name": "span",
 							"name_loc": {
 								"start": {
-									"line": 6,
+									"line": 8,
 									"column": 7,
-									"character": 223
+									"character": 225
 								},
 								"end": {
-									"line": 6,
+									"line": 8,
 									"column": 11,
-									"character": 227
+									"character": 229
 								}
 							},
 							"attributes": [],
@@ -185,8 +185,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 228,
-										"end": 229,
+										"start": 230,
+										"end": 231,
 										"raw": "x",
 										"data": "x"
 									}
@@ -195,8 +195,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 236,
-							"end": 237,
+							"start": 238,
+							"end": 239,
 							"raw": " ",
 							"data": " "
 						}

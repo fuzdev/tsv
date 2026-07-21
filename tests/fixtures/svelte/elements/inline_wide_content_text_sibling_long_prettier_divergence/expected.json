@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 707,
+	"end": 688,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,31 +10,31 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 567,
-				"data": " A wide inline element whose content overflows, followed by text and then ANOTHER inline\n     element. tsv wraps the content within print width (the printWidth-hard-limit divergence);\n     the text between (`mid`) takes its OWN line after the dangled `>`. Unlike the terminal case\n     (inline_wide_content_trailing_long, which hugs a space-authored tail), non-terminal text\n     stays on its own line — hugging it is non-convergent (it shifts the following element's fit).\n     prettier agrees on the `mid` line, so the divergence is purely the content wrap. "
+				"end": 548,
+				"data": "\n\tA wide inline element whose content overflows, followed by text and then ANOTHER inline\n\telement. tsv wraps the content within print width (the printWidth-hard-limit divergence);\n\tthe text between (`mid`) takes its OWN line after the dangled `>`. Unlike the terminal case\n\t(inline_wide_content_trailing_long, which hugs a space-authored tail), non-terminal text\n\tstays on its own line — hugging it is non-convergent (it shifts the following element's fit).\n\tprettier agrees on the `mid` line, so the divergence is purely the content wrap.\n"
 			},
 			{
 				"type": "Text",
-				"start": 567,
-				"end": 568,
+				"start": 548,
+				"end": 549,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 568,
-				"end": 706,
+				"start": 549,
+				"end": 687,
 				"name": "p",
 				"name_loc": {
 					"start": {
-						"line": 7,
+						"line": 9,
 						"column": 1,
-						"character": 569
+						"character": 550
 					},
 					"end": {
-						"line": 7,
+						"line": 9,
 						"column": 2,
-						"character": 570
+						"character": 551
 					}
 				},
 				"attributes": [],
@@ -43,50 +43,50 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 571,
-							"end": 573,
+							"start": 552,
+							"end": 554,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 573,
-							"end": 687,
+							"start": 554,
+							"end": 668,
 							"name": "a",
 							"name_loc": {
 								"start": {
-									"line": 8,
+									"line": 10,
 									"column": 2,
-									"character": 574
+									"character": 555
 								},
 								"end": {
-									"line": 8,
+									"line": 10,
 									"column": 3,
-									"character": 575
+									"character": 556
 								}
 							},
 							"attributes": [
 								{
 									"type": "Attribute",
-									"start": 576,
-									"end": 584,
+									"start": 557,
+									"end": 565,
 									"name": "href",
 									"name_loc": {
 										"start": {
-											"line": 8,
+											"line": 10,
 											"column": 4,
-											"character": 576
+											"character": 557
 										},
 										"end": {
-											"line": 8,
+											"line": 10,
 											"column": 8,
-											"character": 580
+											"character": 561
 										}
 									},
 									"value": [
 										{
-											"start": 582,
-											"end": 583,
+											"start": 563,
+											"end": 564,
 											"type": "Text",
 											"raw": "#",
 											"data": "#"
@@ -99,8 +99,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 585,
-										"end": 683,
+										"start": 566,
+										"end": 664,
 										"raw": "\n\t\talpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november oscar\n\t",
 										"data": "\n\t\talpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november oscar\n\t"
 									}
@@ -109,26 +109,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 687,
-							"end": 693,
+							"start": 668,
+							"end": 674,
 							"raw": "\n\tmid ",
 							"data": "\n\tmid "
 						},
 						{
 							"type": "RegularElement",
-							"start": 693,
-							"end": 701,
+							"start": 674,
+							"end": 682,
 							"name": "b",
 							"name_loc": {
 								"start": {
-									"line": 11,
+									"line": 13,
 									"column": 6,
-									"character": 694
+									"character": 675
 								},
 								"end": {
-									"line": 11,
+									"line": 13,
 									"column": 7,
-									"character": 695
+									"character": 676
 								}
 							},
 							"attributes": [],
@@ -137,8 +137,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 696,
-										"end": 697,
+										"start": 677,
+										"end": 678,
 										"raw": "x",
 										"data": "x"
 									}
@@ -147,8 +147,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 701,
-							"end": 702,
+							"start": 682,
+							"end": 683,
 							"raw": "\n",
 							"data": "\n"
 						}

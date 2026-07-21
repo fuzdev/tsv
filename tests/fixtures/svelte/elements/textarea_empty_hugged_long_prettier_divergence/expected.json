@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 947,
+	"end": 928,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,44 +10,44 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 502,
-				"data": " An EMPTY <textarea> hugged by an inline <label>. The whitespace-sensitive element has no\n     content, so nothing at the label's boundary is whitespace-significant: the <label> lays out\n     block-style like any other inline element, and only the <textarea>'s own attributes react to\n     print width. Prettier instead dangles the label's closing delimiter, and the `</label` suffix\n     it adds to the textarea line is what pushes the attributes over — see\n     prettier_variant_label_dangle. "
+				"end": 483,
+				"data": "\n\tAn EMPTY <textarea> hugged by an inline <label>. The whitespace-sensitive element has no\n\tcontent, so nothing at the label's boundary is whitespace-significant: the <label> lays out\n\tblock-style like any other inline element, and only the <textarea>'s own attributes react to\n\tprint width. Prettier instead dangles the label's closing delimiter, and the `</label` suffix\n\tit adds to the textarea line is what pushes the attributes over — see\n\tprettier_variant_label_dangle.\n"
 			},
 			{
 				"type": "Text",
-				"start": 502,
-				"end": 504,
+				"start": 483,
+				"end": 485,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 504,
-				"end": 570,
+				"start": 485,
+				"end": 551,
 				"data": " 100 chars: the textarea line fits, attributes stay inline "
 			},
 			{
 				"type": "Text",
-				"start": 570,
-				"end": 571,
+				"start": 551,
+				"end": 552,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 571,
-				"end": 717,
+				"start": 552,
+				"end": 698,
 				"name": "div",
 				"name_loc": {
 					"start": {
-						"line": 9,
+						"line": 11,
 						"column": 1,
-						"character": 572
+						"character": 553
 					},
 					"end": {
-						"line": 9,
+						"line": 11,
 						"column": 4,
-						"character": 575
+						"character": 556
 					}
 				},
 				"attributes": [],
@@ -56,26 +56,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 576,
-							"end": 578,
+							"start": 557,
+							"end": 559,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 578,
-							"end": 710,
+							"start": 559,
+							"end": 691,
 							"name": "div",
 							"name_loc": {
 								"start": {
-									"line": 10,
+									"line": 12,
 									"column": 2,
-									"character": 579
+									"character": 560
 								},
 								"end": {
-									"line": 10,
+									"line": 12,
 									"column": 5,
-									"character": 582
+									"character": 563
 								}
 							},
 							"attributes": [],
@@ -84,26 +84,26 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 583,
-										"end": 586,
+										"start": 564,
+										"end": 567,
 										"raw": "\n\t\t",
 										"data": "\n\t\t"
 									},
 									{
 										"type": "RegularElement",
-										"start": 586,
-										"end": 702,
+										"start": 567,
+										"end": 683,
 										"name": "label",
 										"name_loc": {
 											"start": {
-												"line": 11,
+												"line": 13,
 												"column": 3,
-												"character": 587
+												"character": 568
 											},
 											"end": {
-												"line": 11,
+												"line": 13,
 												"column": 8,
-												"character": 592
+												"character": 573
 											}
 										},
 										"attributes": [],
@@ -112,50 +112,50 @@
 											"nodes": [
 												{
 													"type": "Text",
-													"start": 593,
-													"end": 597,
+													"start": 574,
+													"end": 578,
 													"raw": "\n\t\t\t",
 													"data": "\n\t\t\t"
 												},
 												{
 													"type": "RegularElement",
-													"start": 597,
-													"end": 691,
+													"start": 578,
+													"end": 672,
 													"name": "textarea",
 													"name_loc": {
 														"start": {
-															"line": 12,
+															"line": 14,
 															"column": 4,
-															"character": 598
+															"character": 579
 														},
 														"end": {
-															"line": 12,
+															"line": 14,
 															"column": 12,
-															"character": 606
+															"character": 587
 														}
 													},
 													"attributes": [
 														{
 															"type": "Attribute",
-															"start": 607,
-															"end": 679,
+															"start": 588,
+															"end": 660,
 															"name": "data-attr",
 															"name_loc": {
 																"start": {
-																	"line": 12,
+																	"line": 14,
 																	"column": 13,
-																	"character": 607
+																	"character": 588
 																},
 																"end": {
-																	"line": 12,
+																	"line": 14,
 																	"column": 22,
-																	"character": 616
+																	"character": 597
 																}
 															},
 															"value": [
 																{
-																	"start": 618,
-																	"end": 678,
+																	"start": 599,
+																	"end": 659,
 																	"type": "Text",
 																	"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 																	"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -170,8 +170,8 @@
 												},
 												{
 													"type": "Text",
-													"start": 691,
-													"end": 694,
+													"start": 672,
+													"end": 675,
 													"raw": "\n\t\t",
 													"data": "\n\t\t"
 												}
@@ -180,8 +180,8 @@
 									},
 									{
 										"type": "Text",
-										"start": 702,
-										"end": 704,
+										"start": 683,
+										"end": 685,
 										"raw": "\n\t",
 										"data": "\n\t"
 									}
@@ -190,8 +190,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 710,
-							"end": 711,
+							"start": 691,
+							"end": 692,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -200,39 +200,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 717,
-				"end": 719,
+				"start": 698,
+				"end": 700,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 719,
-				"end": 794,
+				"start": 700,
+				"end": 775,
 				"data": " 101 chars: one longer, so the textarea's `>` drops to its own line "
 			},
 			{
 				"type": "Text",
-				"start": 794,
-				"end": 795,
+				"start": 775,
+				"end": 776,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 795,
-				"end": 946,
+				"start": 776,
+				"end": 927,
 				"name": "div",
 				"name_loc": {
 					"start": {
-						"line": 18,
+						"line": 20,
 						"column": 1,
-						"character": 796
+						"character": 777
 					},
 					"end": {
-						"line": 18,
+						"line": 20,
 						"column": 4,
-						"character": 799
+						"character": 780
 					}
 				},
 				"attributes": [],
@@ -241,26 +241,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 800,
-							"end": 802,
+							"start": 781,
+							"end": 783,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 802,
-							"end": 939,
+							"start": 783,
+							"end": 920,
 							"name": "div",
 							"name_loc": {
 								"start": {
-									"line": 19,
+									"line": 21,
 									"column": 2,
-									"character": 803
+									"character": 784
 								},
 								"end": {
-									"line": 19,
+									"line": 21,
 									"column": 5,
-									"character": 806
+									"character": 787
 								}
 							},
 							"attributes": [],
@@ -269,26 +269,26 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 807,
-										"end": 810,
+										"start": 788,
+										"end": 791,
 										"raw": "\n\t\t",
 										"data": "\n\t\t"
 									},
 									{
 										"type": "RegularElement",
-										"start": 810,
-										"end": 931,
+										"start": 791,
+										"end": 912,
 										"name": "label",
 										"name_loc": {
 											"start": {
-												"line": 20,
+												"line": 22,
 												"column": 3,
-												"character": 811
+												"character": 792
 											},
 											"end": {
-												"line": 20,
+												"line": 22,
 												"column": 8,
-												"character": 816
+												"character": 797
 											}
 										},
 										"attributes": [],
@@ -297,50 +297,50 @@
 											"nodes": [
 												{
 													"type": "Text",
-													"start": 817,
-													"end": 821,
+													"start": 798,
+													"end": 802,
 													"raw": "\n\t\t\t",
 													"data": "\n\t\t\t"
 												},
 												{
 													"type": "RegularElement",
-													"start": 821,
-													"end": 920,
+													"start": 802,
+													"end": 901,
 													"name": "textarea",
 													"name_loc": {
 														"start": {
-															"line": 21,
+															"line": 23,
 															"column": 4,
-															"character": 822
+															"character": 803
 														},
 														"end": {
-															"line": 21,
+															"line": 23,
 															"column": 12,
-															"character": 830
+															"character": 811
 														}
 													},
 													"attributes": [
 														{
 															"type": "Attribute",
-															"start": 831,
-															"end": 904,
+															"start": 812,
+															"end": 885,
 															"name": "data-attr",
 															"name_loc": {
 																"start": {
-																	"line": 21,
+																	"line": 23,
 																	"column": 13,
-																	"character": 831
+																	"character": 812
 																},
 																"end": {
-																	"line": 21,
+																	"line": 23,
 																	"column": 22,
-																	"character": 840
+																	"character": 821
 																}
 															},
 															"value": [
 																{
-																	"start": 842,
-																	"end": 903,
+																	"start": 823,
+																	"end": 884,
 																	"type": "Text",
 																	"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 																	"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -355,8 +355,8 @@
 												},
 												{
 													"type": "Text",
-													"start": 920,
-													"end": 923,
+													"start": 901,
+													"end": 904,
 													"raw": "\n\t\t",
 													"data": "\n\t\t"
 												}
@@ -365,8 +365,8 @@
 									},
 									{
 										"type": "Text",
-										"start": 931,
-										"end": 933,
+										"start": 912,
+										"end": 914,
 										"raw": "\n\t",
 										"data": "\n\t"
 									}
@@ -375,8 +375,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 939,
-							"end": 940,
+							"start": 920,
+							"end": 921,
 							"raw": "\n",
 							"data": "\n"
 						}

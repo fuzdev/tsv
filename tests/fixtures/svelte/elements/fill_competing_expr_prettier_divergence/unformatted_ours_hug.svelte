@@ -1,5 +1,7 @@
-<!-- Two breakable expressions compete for the same line in a fill that overflows. Only one needs
-     to break, so the layout has a choice to make — and it must make the same one every pass. -->
+<!--
+	Two breakable expressions compete for the same line in a fill that overflows. Only one needs
+	to break, so the layout has a choice to make — and it must make the same one every pass.
+-->
 <div>
 	<div>
 		<div>

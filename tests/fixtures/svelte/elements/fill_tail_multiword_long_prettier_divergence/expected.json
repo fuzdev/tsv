@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 288,
+	"end": 285,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,31 +10,31 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 171,
-				"data": " Multi-word tail: the break lands at the first separator that overflows, not the last —\n     a per-word greedy pack would leave the line at 101 and drop only `dd`. "
+				"end": 168,
+				"data": "\n\tMulti-word tail: the break lands at the first separator that overflows, not the last —\n\ta per-word greedy pack would leave the line at 101 and drop only `dd`.\n"
 			},
 			{
 				"type": "Text",
-				"start": 171,
-				"end": 172,
+				"start": 168,
+				"end": 169,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 172,
-				"end": 287,
+				"start": 169,
+				"end": 284,
 				"name": "li",
 				"name_loc": {
 					"start": {
-						"line": 3,
+						"line": 5,
 						"column": 1,
-						"character": 173
+						"character": 170
 					},
 					"end": {
-						"line": 3,
+						"line": 5,
 						"column": 3,
-						"character": 175
+						"character": 172
 					}
 				},
 				"attributes": [],
@@ -43,26 +43,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 176,
-							"end": 262,
+							"start": 173,
+							"end": 259,
 							"raw": "\n\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ~",
 							"data": "\n\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ~"
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 262,
-							"end": 274,
+							"start": 259,
+							"end": 271,
 							"expression": {
 								"type": "Identifier",
-								"start": 263,
-								"end": 273,
+								"start": 260,
+								"end": 270,
 								"loc": {
 									"start": {
-										"line": 4,
+										"line": 6,
 										"column": 86
 									},
 									"end": {
-										"line": 4,
+										"line": 6,
 										"column": 96
 									}
 								},
@@ -71,8 +71,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 274,
-							"end": 282,
+							"start": 271,
+							"end": 279,
 							"raw": "\n\tcc dd\n",
 							"data": "\n\tcc dd\n"
 						}

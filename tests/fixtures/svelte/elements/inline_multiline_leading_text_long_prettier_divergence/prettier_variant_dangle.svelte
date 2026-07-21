@@ -1,5 +1,7 @@
-<!-- Fits: the inline span's line is exactly 100, so it stays on one line; the leading
-     newline before the first child is a render-free boundary run, trimmed (`<span>text1…`). -->
+<!--
+	Fits: the inline span's line is exactly 100, so it stays on one line; the leading
+	newline before the first child is a render-free boundary run, trimmed (`<span>text1…`).
+-->
 <p>
 	<span>text1 text2 text3 text4 text5 text6 text7 text8 text9abcdefghijk <a href="#">link</a></span>
 </p>

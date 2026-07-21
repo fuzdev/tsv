@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 347,
+	"end": 348,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,32 +10,32 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 171,
-				"data": " Hug is all-or-nothing: a body welded to only the head, or only the tail, still lays\n\tout block-style. The boundary is render-free, so it cannot select the layout. "
+				"end": 172,
+				"data": "\n\tHug is all-or-nothing: a body welded to only the head, or only the tail, still lays\n\tout block-style. The boundary is render-free, so it cannot select the layout.\n"
 			},
 			{
 				"type": "Text",
-				"start": 171,
-				"end": 172,
+				"start": 172,
+				"end": 173,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "IfBlock",
 				"elseif": false,
-				"start": 172,
-				"end": 207,
+				"start": 173,
+				"end": 208,
 				"test": {
 					"type": "Identifier",
-					"start": 177,
-					"end": 178,
+					"start": 178,
+					"end": 179,
 					"loc": {
 						"start": {
-							"line": 3,
+							"line": 5,
 							"column": 5
 						},
 						"end": {
-							"line": 3,
+							"line": 5,
 							"column": 6
 						}
 					},
@@ -46,26 +46,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 179,
-							"end": 181,
+							"start": 180,
+							"end": 182,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 181,
-							"end": 201,
+							"start": 182,
+							"end": 202,
 							"name": "span",
 							"name_loc": {
 								"start": {
-									"line": 4,
+									"line": 6,
 									"column": 2,
-									"character": 182
+									"character": 183
 								},
 								"end": {
-									"line": 4,
+									"line": 6,
 									"column": 6,
-									"character": 186
+									"character": 187
 								}
 							},
 							"attributes": [],
@@ -74,19 +74,19 @@
 								"nodes": [
 									{
 										"type": "ExpressionTag",
-										"start": 187,
-										"end": 194,
+										"start": 188,
+										"end": 195,
 										"expression": {
 											"type": "Identifier",
-											"start": 188,
-											"end": 193,
+											"start": 189,
+											"end": 194,
 											"loc": {
 												"start": {
-													"line": 4,
+													"line": 6,
 													"column": 8
 												},
 												"end": {
-													"line": 4,
+													"line": 6,
 													"column": 13
 												}
 											},
@@ -98,8 +98,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 201,
-							"end": 202,
+							"start": 202,
+							"end": 203,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -109,27 +109,27 @@
 			},
 			{
 				"type": "Text",
-				"start": 207,
-				"end": 209,
+				"start": 208,
+				"end": 210,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "IfBlock",
 				"elseif": false,
-				"start": 209,
-				"end": 274,
+				"start": 210,
+				"end": 275,
 				"test": {
 					"type": "Identifier",
-					"start": 214,
-					"end": 215,
+					"start": 215,
+					"end": 216,
 					"loc": {
 						"start": {
-							"line": 7,
+							"line": 9,
 							"column": 5
 						},
 						"end": {
-							"line": 7,
+							"line": 9,
 							"column": 6
 						}
 					},
@@ -140,26 +140,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 216,
-							"end": 218,
+							"start": 217,
+							"end": 219,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 218,
-							"end": 238,
+							"start": 219,
+							"end": 239,
 							"name": "span",
 							"name_loc": {
 								"start": {
-									"line": 8,
+									"line": 10,
 									"column": 2,
-									"character": 219
+									"character": 220
 								},
 								"end": {
-									"line": 8,
+									"line": 10,
 									"column": 6,
-									"character": 223
+									"character": 224
 								}
 							},
 							"attributes": [],
@@ -168,19 +168,19 @@
 								"nodes": [
 									{
 										"type": "ExpressionTag",
-										"start": 224,
-										"end": 231,
+										"start": 225,
+										"end": 232,
 										"expression": {
 											"type": "Identifier",
-											"start": 225,
-											"end": 230,
+											"start": 226,
+											"end": 231,
 											"loc": {
 												"start": {
-													"line": 8,
+													"line": 10,
 													"column": 8
 												},
 												"end": {
-													"line": 8,
+													"line": 10,
 													"column": 13
 												}
 											},
@@ -192,8 +192,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 238,
-							"end": 239,
+							"start": 239,
+							"end": 240,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -204,26 +204,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 246,
-							"end": 248,
+							"start": 247,
+							"end": 249,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 248,
-							"end": 268,
+							"start": 249,
+							"end": 269,
 							"name": "span",
 							"name_loc": {
 								"start": {
-									"line": 10,
+									"line": 12,
 									"column": 2,
-									"character": 249
+									"character": 250
 								},
 								"end": {
-									"line": 10,
+									"line": 12,
 									"column": 6,
-									"character": 253
+									"character": 254
 								}
 							},
 							"attributes": [],
@@ -232,19 +232,19 @@
 								"nodes": [
 									{
 										"type": "ExpressionTag",
-										"start": 254,
-										"end": 261,
+										"start": 255,
+										"end": 262,
 										"expression": {
 											"type": "Identifier",
-											"start": 255,
-											"end": 260,
+											"start": 256,
+											"end": 261,
 											"loc": {
 												"start": {
-													"line": 10,
+													"line": 12,
 													"column": 8
 												},
 												"end": {
-													"line": 10,
+													"line": 12,
 													"column": 13
 												}
 											},
@@ -256,8 +256,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 268,
-							"end": 269,
+							"start": 269,
+							"end": 270,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -266,27 +266,27 @@
 			},
 			{
 				"type": "Text",
-				"start": 274,
-				"end": 276,
+				"start": 275,
+				"end": 277,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "IfBlock",
 				"elseif": false,
-				"start": 276,
-				"end": 346,
+				"start": 277,
+				"end": 347,
 				"test": {
 					"type": "Identifier",
-					"start": 281,
-					"end": 282,
+					"start": 282,
+					"end": 283,
 					"loc": {
 						"start": {
-							"line": 13,
+							"line": 15,
 							"column": 5
 						},
 						"end": {
-							"line": 13,
+							"line": 15,
 							"column": 6
 						}
 					},
@@ -297,26 +297,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 283,
-							"end": 285,
+							"start": 284,
+							"end": 286,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 285,
-							"end": 305,
+							"start": 286,
+							"end": 306,
 							"name": "span",
 							"name_loc": {
 								"start": {
-									"line": 14,
+									"line": 16,
 									"column": 2,
-									"character": 286
+									"character": 287
 								},
 								"end": {
-									"line": 14,
+									"line": 16,
 									"column": 6,
-									"character": 290
+									"character": 291
 								}
 							},
 							"attributes": [],
@@ -325,19 +325,19 @@
 								"nodes": [
 									{
 										"type": "ExpressionTag",
-										"start": 291,
-										"end": 298,
+										"start": 292,
+										"end": 299,
 										"expression": {
 											"type": "Identifier",
-											"start": 292,
-											"end": 297,
+											"start": 293,
+											"end": 298,
 											"loc": {
 												"start": {
-													"line": 14,
+													"line": 16,
 													"column": 8
 												},
 												"end": {
-													"line": 14,
+													"line": 16,
 													"column": 13
 												}
 											},
@@ -349,8 +349,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 305,
-							"end": 306,
+							"start": 306,
+							"end": 307,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -360,21 +360,21 @@
 					"type": "Fragment",
 					"nodes": [
 						{
-							"start": 306,
-							"end": 346,
+							"start": 307,
+							"end": 347,
 							"type": "IfBlock",
 							"elseif": true,
 							"test": {
 								"type": "Identifier",
-								"start": 316,
-								"end": 317,
+								"start": 317,
+								"end": 318,
 								"loc": {
 									"start": {
-										"line": 15,
+										"line": 17,
 										"column": 10
 									},
 									"end": {
-										"line": 15,
+										"line": 17,
 										"column": 11
 									}
 								},
@@ -385,26 +385,26 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 318,
-										"end": 320,
+										"start": 319,
+										"end": 321,
 										"raw": "\n\t",
 										"data": "\n\t"
 									},
 									{
 										"type": "RegularElement",
-										"start": 320,
-										"end": 340,
+										"start": 321,
+										"end": 341,
 										"name": "span",
 										"name_loc": {
 											"start": {
-												"line": 16,
+												"line": 18,
 												"column": 2,
-												"character": 321
+												"character": 322
 											},
 											"end": {
-												"line": 16,
+												"line": 18,
 												"column": 6,
-												"character": 325
+												"character": 326
 											}
 										},
 										"attributes": [],
@@ -413,19 +413,19 @@
 											"nodes": [
 												{
 													"type": "ExpressionTag",
-													"start": 326,
-													"end": 333,
+													"start": 327,
+													"end": 334,
 													"expression": {
 														"type": "Identifier",
-														"start": 327,
-														"end": 332,
+														"start": 328,
+														"end": 333,
 														"loc": {
 															"start": {
-																"line": 16,
+																"line": 18,
 																"column": 8
 															},
 															"end": {
-																"line": 16,
+																"line": 18,
 																"column": 13
 															}
 														},
@@ -437,8 +437,8 @@
 									},
 									{
 										"type": "Text",
-										"start": 340,
-										"end": 341,
+										"start": 341,
+										"end": 342,
 										"raw": "\n",
 										"data": "\n"
 									}
