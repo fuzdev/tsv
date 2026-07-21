@@ -244,3 +244,42 @@ fn compile_allows_dollar_member_names() {
              }\n"
     );
 }
+
+#[test]
+fn compile_refuses_props_illegal_name_declare_site() {
+    // The oracle's `props_illegal_name` (VariableDeclarator.js:94-103): a `$props()`
+    // destructure property whose non-computed Identifier key starts with `$$` is
+    // reserved for Svelte internals and rejected. Reaches the check even without a
+    // rest/bindable (the plain `{ $$slots: a }` form).
+    assert_unsupported(
+        "<script>let { $$slots: a } = $props(); a;</script>\n<p>{a}</p>",
+        "prop name starting with `$$`",
+    );
+    assert_unsupported(
+        "<script>let { $$foo: a } = $props(); a;</script>\n<p>{a}</p>",
+        "prop name starting with `$$`",
+    );
+    // Mixed with a normal prop — still caught.
+    assert_unsupported(
+        "<script>let { a, $$foo: b } = $props(); a; b;</script>\n<p>{a}{b}</p>",
+        "prop name starting with `$$`",
+    );
+    // ⭐ No reason-stealing: a `$$`-prefixed BINDING (shorthand / default) declares a
+    // `$$` binding, refused UPSTREAM as `DollarPrefixedBinding` (the oracle's
+    // `dollar_prefix_invalid`, which fires first) — NOT props_illegal_name.
+    assert_unsupported(
+        "<script>let { $$foo } = $props(); $$foo;</script>\n<p>x</p>",
+        "$-prefixed binding $$foo",
+    );
+    assert_unsupported(
+        "<script>let { $$foo = 1 } = $props(); $$foo;</script>\n<p>x</p>",
+        "$-prefixed binding $$foo",
+    );
+    // Discriminating controls, all COMPILE: a single-`$` key (not `$$`), a plain key,
+    // a string-literal `$$` key (the oracle's check is Identifier-only), and a plain
+    // rest destructure.
+    let _ = compile_js("<script>let { $foo: a } = $props(); a;</script>\n<p>{a}</p>");
+    let _ = compile_js("<script>let { foo: a } = $props(); a;</script>\n<p>{a}</p>");
+    let _ = compile_js("<script>let { '$$slots': a } = $props(); a;</script>\n<p>{a}</p>");
+    let _ = compile_js("<script>let { a, ...rest } = $props(); a; rest;</script>\n<p>{a}</p>");
+}

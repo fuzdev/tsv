@@ -169,6 +169,25 @@ pub(crate) fn rewrite_props_pattern<'arena>(
     let arena = b.arena;
     match id {
         Expression::ObjectPattern(obj) => {
+            // The oracle's `props_illegal_name` (VariableDeclarator.js:94-103): a
+            // `$props()` destructure property whose non-computed Identifier key starts
+            // with `$$` is reserved for Svelte internals and rejected. Checked before
+            // the rest/bindable short-circuit below so a plain `{ $$slots: a }` (no
+            // rest, no bindable) still reaches it. A `$$`-prefixed *binding* — a
+            // shorthand `{ $$foo }` or default `{ $$foo = 1 }` — is refused upstream as
+            // `DollarPrefixedBinding` (`script_rewrite.rs:278`, before this), so only
+            // the `{ $$key: value }` form reaches here; a computed `$$` key is the
+            // oracle's separate `props_invalid_pattern`; an escaped key falls through
+            // (the crate's standing escaped-identifier residual).
+            for prop in obj.properties {
+                if let ObjectPatternProperty::Property(p) = prop
+                    && !p.computed
+                    && let Expression::Identifier(key_id) = &p.key
+                    && plain_identifier_name(key_id, source).is_some_and(|k| k.starts_with("$$"))
+                {
+                    return Err(unsupported(Refusal::PropsIllegalName));
+                }
+            }
             let has_rest = obj
                 .properties
                 .iter()

@@ -154,6 +154,9 @@ impl Refusal {
             Self::PropsBindingPattern => Cow::Borrowed(
                 "$props() binding pattern (not an identifier or object pattern — the oracle rejects it)",
             ),
+            Self::PropsIllegalName => Cow::Borrowed(
+                "prop name starting with `$$` (reserved for Svelte internals — the oracle rejects it)",
+            ),
             Self::DestructuringState => Cow::Borrowed("destructuring a $state declarator"),
             Self::DestructuringStateSnapshot => {
                 Cow::Borrowed("destructuring a $state.snapshot declarator")
@@ -451,6 +454,7 @@ impl Refusal {
                 name: "{name}".to_string(),
             },
             Self::PropsBindingPattern,
+            Self::PropsIllegalName,
             Self::BindingPatternShape { kind: "{kind}" },
             Self::DestructuringState,
             Self::DestructuringStateSnapshot,

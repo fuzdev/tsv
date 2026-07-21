@@ -377,6 +377,7 @@ mod tests {
         "nested css rule in <style>",
         "nested {#each} (the nested emission path is not yet validated)",
         "non-expression value for <svelte:boundary> attribute {name} (the oracle rejects it)",
+        "prop name starting with `$$` (reserved for Svelte internals — the oracle rejects it)",
         "read of derived binding {name}",
         "read of derived binding {name} shadowed in a nested scope",
         "reserved <script> attribute {name} (the oracle rejects it)",
