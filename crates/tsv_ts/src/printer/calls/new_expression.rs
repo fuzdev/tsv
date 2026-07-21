@@ -25,7 +25,9 @@ use crate::printer::calls::{
     should_force_expansion_for_comments, wrap_call_with_hard_breaks,
     wrap_call_with_will_break_guard,
 };
-use crate::printer::{CommentVec, ParenContext, Printer, has_multiline_content};
+use crate::printer::{
+    CommentVec, ParenContext, Printer, container_may_have_multiline_content, has_multiline_content,
+};
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -341,10 +343,11 @@ impl<'a> Printer<'a> {
         }
 
         // Check if any argument has multiline content
-        let has_multiline = new_expr
-            .arguments
-            .iter()
-            .any(|arg| has_multiline_content(arg, self.source));
+        let has_multiline = container_may_have_multiline_content(new_expr.span, self.source)
+            && new_expr
+                .arguments
+                .iter()
+                .any(|arg| has_multiline_content(arg, self.source));
 
         if has_multiline {
             // Force expansion with hardlines for multiline content
@@ -359,7 +362,10 @@ impl<'a> Printer<'a> {
             return wrap_call_with_hard_breaks(d, callee_with_types, arg_parts);
         }
 
-        // Check for blank lines between arguments (forces expansion and preservation)
+        // Check for blank lines between arguments (forces expansion and preservation).
+        // Coarse over-check: a raw scan of every gap (it must catch a blank that sits
+        // *past* a same-line trailing comment, which the emitter's per-gap `blank_scan_end`
+        // measure would clamp away — so the two intentionally differ and are not shared).
         let has_blank_lines = new_expr
             .arguments
             .windows(2)
