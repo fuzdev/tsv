@@ -681,8 +681,8 @@ pub fn debug_token_stream(source: &str) -> String {
         match lexer.next_token() {
             Ok(token) => {
                 let _ = write!(out, "{:?} {}..{}", token.kind, token.start, token.end);
-                if let Some(decoded) = lexer.take_decoded() {
-                    let _ = write!(out, " decoded={:?}", &*decoded);
+                if let Some(decoded) = lexer.decoded_str() {
+                    let _ = write!(out, " decoded={decoded:?}");
                 }
                 out.push('\n');
                 if matches!(token.kind, TokenKind::Eof) {
