@@ -1109,7 +1109,7 @@ impl DocArena {
     /// [`Self::source_span`] for a slice the caller guarantees is newline-free
     /// (identifier names): skips the width precompute entirely — no source read
     /// at build. Width is measured on demand at the first `fits()` touch
-    /// (memoized) — the deferral kept only for identifier names and `Symbol`s
+    /// (memoized) — the deferral kept only for identifier names
     /// (high-frequency, rarely fits-measured); a non-ASCII name measures the
     /// same value lazily as eagerly, so output is unaffected. Do NOT use for
     /// text that can contain `\n` — the newline sentinel would be missed.

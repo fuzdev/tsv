@@ -275,30 +275,6 @@ impl<'arena> ObjectProperty<'arena> {
             ObjectProperty::SpreadElement(s) => s.argument.span().end,
         }
     }
-
-    /// Check if this is a shorthand property (only makes sense for Property)
-    pub fn is_shorthand(&self) -> bool {
-        match self {
-            ObjectProperty::Property(p) => p.shorthand,
-            ObjectProperty::SpreadElement(_) => false,
-        }
-    }
-
-    /// Get the property as a regular Property, if it is one
-    pub fn as_property(&self) -> Option<&Property<'arena>> {
-        match self {
-            ObjectProperty::Property(p) => Some(p),
-            ObjectProperty::SpreadElement(_) => None,
-        }
-    }
-
-    /// Get the spread element, if it is one
-    pub fn as_spread(&self) -> Option<&SpreadElement<'arena>> {
-        match self {
-            ObjectProperty::Property(_) => None,
-            ObjectProperty::SpreadElement(s) => Some(s),
-        }
-    }
 }
 
 /// Array literal expression: `[1, 2, 3]`

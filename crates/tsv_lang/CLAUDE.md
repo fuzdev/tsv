@@ -87,12 +87,10 @@ arena_print_doc*()           — render doc tree to formatted string
 **Rendering variants** (the `_resolved_*_into` forms are the production seam):
 
 - `arena_print_doc()` — standard (column 0, no source: for docs with no `SourceSpan`)
-- `arena_print_doc_at_column()` — mid-line start (for Svelte template expressions)
-- `arena_print_doc_with_indent()` — explicit indent level
 - `arena_print_doc_with_indent_resolved_into()` — source-resolved render into a caller-provided buffer (full control)
 - `arena_print_doc_with_indent_resolved_preserve_whitespace_into()` — same, preserving last-line whitespace (HTML pre/textarea)
 
-The `_resolved_*_into` forms thread the document `source` (so `DocText::SourceSpan` leaves resolve to their verbatim slice) and render into a caller-provided buffer, reserving `estimated_output_capacity` themselves — the seam behind the arena-parked render scratch the per-piece writers use. The non-`resolved` forms pass no source, since their docs contain no `SourceSpan`. (`arena_measure_doc_flat_resolved` renders flat for *measuring* only — never written to output.)
+The `_resolved_*_into` forms thread the document `source` (so `DocText::SourceSpan` leaves resolve to their verbatim slice) and render into a caller-provided buffer, reserving `estimated_output_capacity` themselves — the seam behind the arena-parked render scratch the per-piece writers use. `arena_print_doc` passes no source, since its docs contain no `SourceSpan`. (`arena_measure_doc_flat_resolved` renders flat for *measuring* only — never written to output.)
 
 **Below those entry points, the render path threads one `&RenderCtx`.** The mutually-recursive
 internals (`render_doc_iterative` → `render_doc_core` → `render_single_doc` /

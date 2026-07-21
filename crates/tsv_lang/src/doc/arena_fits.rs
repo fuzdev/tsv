@@ -418,7 +418,7 @@ mod break_mode_fits_tests {
     use super::arena_fits;
 
     /// Fit `doc` in `width` columns in Break mode, no source (these docs use
-    /// only `Static`/`Pooled` text, never `Symbol`).
+    /// only `Static`/`Pooled` text, never `SourceSpan`).
     fn fits_break(a: &DocArena, doc: DocId, width: usize) -> bool {
         arena_fits(a, doc, width, Mode::Break, None)
     }

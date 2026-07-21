@@ -116,8 +116,8 @@ fn render_text(
 /// Update position after rendering a text string, accounting for tab expansion.
 ///
 /// The overwhelmingly common input here is short ASCII with no newline — every
-/// interned identifier (`Symbol`) and every span-identity identifier name
-/// (`source_span_ident`) reaches this via `render_text`'s uncached-width arm
+/// span-identity identifier name (`source_span_ident`) reaches this via
+/// `render_text`'s uncached-width arm
 /// (statics carry an amortized cached width and skip it). For those the previous
 /// shape scanned the bytes three times (`rfind('\n')` + `visual_width`'s own
 /// `is_ascii` + tab count). The fast path below folds the newline reset, tab
@@ -287,7 +287,7 @@ fn process_indent_if_break(
 
 /// Convert an arena doc tree to a formatted string (starting at column 0).
 pub fn arena_print_doc(arena: &DocArena, doc: DocId, embed: &EmbedContext) -> String {
-    arena_print_doc_at_column(arena, doc, embed, 0)
+    arena_print_doc_with_indent_and_render(arena, doc, embed, 0, 0, &RenderConfig::default())
 }
 
 /// **Measure** a doc's flat-layout width: render at effectively infinite print width, so
@@ -329,34 +329,6 @@ pub fn arena_measure_doc_flat_resolved(
     );
 
     trim_last_line(output)
-}
-
-/// Convert an arena doc tree to a formatted string, starting at a specific column.
-pub fn arena_print_doc_at_column(
-    arena: &DocArena,
-    doc: DocId,
-    embed: &EmbedContext,
-    start_column: usize,
-) -> String {
-    arena_print_doc_with_indent(arena, doc, embed, start_column, 0)
-}
-
-/// Convert an arena doc tree to a formatted string with column and indent level.
-pub fn arena_print_doc_with_indent(
-    arena: &DocArena,
-    doc: DocId,
-    embed: &EmbedContext,
-    start_column: usize,
-    start_indent_level: usize,
-) -> String {
-    arena_print_doc_with_indent_and_render(
-        arena,
-        doc,
-        embed,
-        start_column,
-        start_indent_level,
-        &RenderConfig::default(),
-    )
 }
 
 /// Render an arena doc tree (with column, indent, and source-span resolution)
