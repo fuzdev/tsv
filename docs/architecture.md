@@ -127,7 +127,7 @@ dispatch), so it doesn't bear on the closed-scope/open-convention stance below.
 
 **Compile-Time Isolation** — Cargo prevents circular dependencies. CSS changes don't trigger TypeScript recompilation.
 
-**Clean API Boundaries** — Each language exports `parse()`, `format()`, and `convert_ast_json_bytes()` / `convert_ast_json_string()` (with `convert_ast_json()` a thin `Value` wrapper over the bytes). tsv_ts and tsv_css also provide embedding APIs (`parse_with_interner`, `parse_embedded`, expression formatting, `build_*_doc`) used by tsv_svelte for nested language support.
+**Clean API Boundaries** — Each language exports `parse()`, `format()`, and `convert_ast_json_bytes()` / `convert_ast_json_string()` (with `convert_ast_json()` a thin `Value` wrapper over the bytes). tsv_ts and tsv_css also provide embedding APIs (`parse_embedded`, expression formatting, `build_*_doc`) used by tsv_svelte for nested language support.
 
 **Scalability** — Easy to add new crates (`tsv_ffi`, `tsv_wasm` already done; `tsv_linter`/`tsv_lsp`/`tsv_md` planned).
 
@@ -279,7 +279,6 @@ Language-agnostic primitives shared across all implementations:
 - `config` — `PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` consts, `EmbedContext`, `LayoutMode` (no runtime config)
 - `comment` — Comment type and lookup utilities (see Comment Handling below)
 - `escapes` — Escape sequence handling
-- `interner` — String interner utilities (`SymbolResolver` trait)
 - `source_scan` — Trivia-aware source scanning: the `skip_trivia` cursor + delimiter/keyword/regex finders (used by AST conversion, printers, and the parsers)
 
 See [crates/tsv_lang/CLAUDE.md](../crates/tsv_lang/CLAUDE.md) for detailed module documentation.
@@ -305,7 +304,6 @@ What's shared through tsv_lang vs reimplemented per language, and why:
 - Escape handling (shared: No, should-be: No) — JS has 7 escape formats, CSS has hex escapes with Svelte quirks
 - Doc builder (shared: Yes, should-be: Yes) — Core formatting engine — the largest tsv_lang module, single renderer everywhere
 - Comment model (shared: Yes, should-be: Yes) — Detached model with O(log n) lookup, classification, batch helpers
-- String interning (shared: Yes, should-be: Yes) — Traits + shared interner across TS/Svelte in same file
 - Width / indent (shared: Yes, should-be: Yes) — Hardcoded as `PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` consts in `tsv_lang::config`
 - EmbedContext (shared: Yes, should-be: Yes) — Embedding knobs (base_indent_offset, first_line_offset, suffix_width, mode)
 - String formatting (shared: Yes, should-be: Yes) — Quote selection, escape swapping, visual width
@@ -342,7 +340,7 @@ Doc nodes are allocated in a contiguous `DocArena`. Each node is referenced by a
 
 ```rust
 pub enum DocNode {
-    Text(DocText),                              // Static, pooled, source-span, or symbol
+    Text(DocText),                              // Static, pooled, or source-span
     MultilineText { span, first_width },        // Pooled multi-line block-comment body
     Line(LineKind),                             // Normal, soft, hard, literal
     Indent(DocId),                              // Increase indent
@@ -369,22 +367,21 @@ pub enum DocNode {
 
 **Look-Ahead** — When checking if a group fits, examine what follows. `(longExpr)!.method()` needs to consider the suffix when deciding whether to break.
 
-### DocText: Static, Pooled, SourceSpan, Symbol
+### DocText: Static, Pooled, SourceSpan
 
 ```rust
 pub enum DocText {
     Static(&'static str, u16),  // Punctuation, keywords — no allocation
     Pooled(PoolSpan, u16),      // Built text — copied once into the arena text pool at doc-build time
     SourceSpan(Span, u16),      // Verbatim source slice — resolved at print time, no allocation
-    Symbol(u32),                // Interned identifier — resolved at print time
 }
 ```
 
-The `u16` is a cached visual width with two sentinel values (`TEXT_WIDTH_HAS_NEWLINE`, `TEXT_WIDTH_NOT_COMPUTED`). `Pooled`, `SourceSpan`, and `Static` text always precompute at build — a real width or the newline sentinel — so `fits()` answers from the node alone (never borrowing the pool; for `Pooled` only the render loop reads the bytes, through one pool borrow hoisted per render) and `render_text`'s column advance skips its per-text byte scan. For `Static` the precompute is amortized through the arena's direct-mapped static width cache — measured once per *unique* string per arena (the address is a link-time constant, so the slot hash folds per `text()` call site), never per node (both the per-node eager measure and an inline-pointer→table-index narrowing were measured losses). The exceptions defer to on-demand measurement: identifier names (`source_span_ident` — high-frequency, newline-free, rarely fits-measured, so the build-time scan costs more than it saves; measured both ways) and `Symbol`, which defers both resolution and width to print time.
+The `u16` is a cached visual width with two sentinel values (`TEXT_WIDTH_HAS_NEWLINE`, `TEXT_WIDTH_NOT_COMPUTED`). `Pooled`, `SourceSpan`, and `Static` text always precompute at build — a real width or the newline sentinel — so `fits()` answers from the node alone (never borrowing the pool; for `Pooled` only the render loop reads the bytes, through one pool borrow hoisted per render) and `render_text`'s column advance skips its per-text byte scan. For `Static` the precompute is amortized through the arena's direct-mapped static width cache — measured once per *unique* string per arena (the address is a link-time constant, so the slot hash folds per `text()` call site), never per node (both the per-node eager measure and an inline-pointer→table-index narrowing were measured losses). The exception defers to on-demand measurement: the name slices (`source_span_ident` — high-frequency, newline-free, rarely fits-measured, so the build-time scan costs more than it saves; measured both ways).
 
 The precompute itself (`pooled_text_width`) settles all three questions it needs — newline, ASCII, tab count — in **one** byte pass, because the text reaching it is overwhelmingly a short slice (a CSS property name, a value chunk) where three separate searchers cost more in *setup*, paid regardless of length, than one walk costs in total. Past a length threshold it flips to the searcher shape instead: there `contains('\n')` and `is_ascii` are SIMD and a tab count auto-vectorizes, so three vector passes beat one scalar walk. The gate is load-bearing rather than decorative — ungated, the fused walk is a measurable regression on TypeScript, whose text nodes run longer, while CSS never reaches it. **The correctness of this arithmetic is guarded by an exhaustive equivalence test beside the function and by nothing else**: a width only changes the output once it crosses the print width, so an error on a rare byte leaves every formatted file byte-identical and passes the fixture suite and any size of corpus diff. See [`crates/tsv_lang/CLAUDE.md`](../crates/tsv_lang/CLAUDE.md) and [`docs/performance.md`](performance.md#a-corpus-cannot-grade-arithmetic).
 
-`Pooled` stores its bytes in the arena-owned text pool (a `String` on `DocArena`, indexed by `PoolSpan { start, len }`), and `MultilineText` bodies live there too — so `DocNode` carries **no drop glue** (`const`-asserted via `needs_drop`), and `DocArena::reset()`/drop free the node store without walking every node to run destructors on the <1% of nodes that would otherwise own `String`s. A printer with a ready-made slice passes it to `text_pooled(&str)`; one that must *assemble* the text streams it through `DocArena::pool_writer()` instead of building a transient `String` — the returned `PoolTextWriter` owns a scratch buffer parked on the arena (capacity retained across uses and `reset()`), holds no pool borrow while open (interleaved arena calls stay correct by construction), and its consume-on-finish `finish_text()`/`finish_multiline_text()` moves the bytes into the pool atomically. `SourceSpan` is the same deferral keyed on a span instead of an interner id (identifier names use its `source_span_ident` constructor, which also skips the width precompute — names are newline-free — so identifiers allocate and scan nothing during doc building): it stores a `Span` into the document `source` and resolves to the verbatim slice at print time (via a source-aware `TextResolver`), so unmodified text — comments, template chunks, already-canonical literals (TS numbers/strings, CSS dimensions), Svelte markup text — emits with **no `String` allocation** and **no lifetime on `DocArena`** (the lifetime-free alternative to borrowing `&'src str` into the doc tree, which would forfeit the cross-file arena `reset()` reuse).
+`Pooled` stores its bytes in the arena-owned text pool (a `String` on `DocArena`, indexed by `PoolSpan { start, len }`), and `MultilineText` bodies live there too — so `DocNode` carries **no drop glue** (`const`-asserted via `needs_drop`), and `DocArena::reset()`/drop free the node store without walking every node to run destructors on the <1% of nodes that would otherwise own `String`s. A printer with a ready-made slice passes it to `text_pooled(&str)`; one that must *assemble* the text streams it through `DocArena::pool_writer()` instead of building a transient `String` — the returned `PoolTextWriter` owns a scratch buffer parked on the arena (capacity retained across uses and `reset()`), holds no pool borrow while open (interleaved arena calls stay correct by construction), and its consume-on-finish `finish_text()`/`finish_multiline_text()` moves the bytes into the pool atomically. `SourceSpan` defers text resolution to print time, keyed on a source span (identifier / element / attribute names use its `source_span_ident` constructor, which also skips the width precompute — names are newline-free — so identifiers allocate and scan nothing during doc building): it stores a `Span` into the document `source` and resolves to the verbatim slice at print time (via a source-aware `TextResolver`), so unmodified text — comments, template chunks, already-canonical literals (TS numbers/strings, CSS dimensions), Svelte markup text — emits with **no `String` allocation** and **no lifetime on `DocArena`** (the lifetime-free alternative to borrowing `&'src str` into the doc tree, which would forfeit the cross-file arena `reset()` reuse).
 
 ## Parser Architecture
 
@@ -457,7 +454,7 @@ element.rs         — Element parsing
 attribute.rs       — Attribute and directive parsing
 block.rs           — Control flow blocks ({#if}, {#each}, {#await}, {#key})
 expression_tag.rs  — {expr} → tsv_ts::parse_expression_with_comments()
-script.rs          — <script> → tsv_ts::parse_with_interner()
+script.rs          — <script> → tsv_ts::parse_embedded()
 style.rs           — <style> → tsv_css::parse_embedded()
 ```
 
@@ -465,7 +462,7 @@ Script/style tag content is extracted by **raw byte scanning** for closing delim
 
 ### Multi-Language Embedding
 
-The Svelte parser shares a single `Rc<RefCell<StringInterner>>` with tsv_ts, so identifiers are deduplicated across template expressions and script blocks. Each embedded region gets a fresh parser instance — reusing one would require `reset()` (bug-prone, error-unsafe) to save only a small fixed allocation per region.
+Every embedded region shares the Svelte document's one bump arena (so the whole component is one bump-allocated graph); each embedded region gets a fresh parser instance. There is no shared symbol table — all names are span-identity, recovered from source.
 
 Embedded parsers track `base_offset` so spans are absolute positions in the root source, not relative to tag content. Standalone parsing passes `base_offset = 0`.
 
@@ -687,11 +684,11 @@ Native tsv runs on the system allocator — no `#[global_allocator]`, no alterna
 
 **Lexing — spans, not strings.** Tokens store `u32` byte offsets (`start`, `end`) into the source, never slices or copies — `Token` is a 16-byte POD the byte cursor (`bytes: &[u8]` + `position`) emits and the parser unpacks in registers. The exception is deliberate: a string literal's decoded value is materialized only when it actually contains escape sequences, decoded into a **reused scratch buffer held out-of-band on the lexer** (`Lexer::decode_scratch`, borrowed via `decoded_str` and copied into the AST arena at receipt) so no per-literal `String` allocates and the per-token `Token` stays pointer-free. Comments are spans too — the token carries a `content_start` and the `Comment` node a `content_span`, recovered from source on demand and never copied.
 
-**Internal AST — bump-arena nested ownership, span-identity names, no raw text.** Nodes are allocated in a per-parse bump arena: recursive children are `&'arena T` and child collections `&'arena [T]` (not `Box`/`Vec`), with small children kept inline by value (see [Nested AST](#nested-ast-bump-arena-not-flatindexed) for the layout rationale). Identifier names are span-identity — an `IdentName` records the raw name-token length and the name is re-sliced from source; only the rare `\u`-escaped (or oversized) name interns its decoded form, and the interner is shared across embedded languages in a Svelte file (its main tenants are the Svelte parser's element/attribute names). Raw source text is never duplicated into the AST — printers re-slice via `span.extract(source)`; the few deliberate stored-raw caches are cataloged in [Source-Based Printing](#source-based-printing). What remains as owned data is genuinely decoded: string-literal values (only when escaped) and the like, arena-allocated as `&'arena str`.
+**Internal AST — bump-arena nested ownership, span-identity names, no raw text.** Nodes are allocated in a per-parse bump arena: recursive children are `&'arena T` and child collections `&'arena [T]` (not `Box`/`Vec`), with small children kept inline by value (see [Nested AST](#nested-ast-bump-arena-not-flatindexed) for the layout rationale). Identifier names are span-identity — an `IdentName` records the raw name-token length and the name is re-sliced from source; only the rare `\u`-escaped (or oversized) name carries its decoded form as an `&'arena str`. Svelte element/attribute names are span-identity too (`source[name_span]`, `.trim()` for the padded-`{ shorthand }` edge), so there is no shared symbol table anywhere. Raw source text is never duplicated into the AST — printers re-slice via `span.extract(source)`; the few deliberate stored-raw caches are cataloged in [Source-Based Printing](#source-based-printing). What remains as owned data is genuinely decoded: string-literal values (only when escaped) and the like, arena-allocated as `&'arena str`.
 
 **Svelte template nodes — contiguous storage.** Fragment children are an `&'arena [FragmentNode]` slice of enum values rather than boxed nodes, keeping siblings contiguous in arena memory for the printer's traversal loops.
 
-**Doc building — the doc arena.** All doc nodes live in a contiguous `DocArena` (two flat `Vec`s: nodes and child lists, plus the text pool and an inline direct-mapped static cache), referenced by `u32` `DocId`s — no per-node heap allocation, no drop glue (`DocNode` is trivially droppable, `const`-asserted). Static text is **interned per document**: the static cache maps a `&'static str`'s address to both its precomputed visual width and the current document's node for it, so repeated `text(",")` calls return one shared `DocId` instead of allocating per call (`empty()` interns through a dedicated cell) — sound because statics are position-free at render, nodes are append-only, and no consumer compares `DocId` identity. The stateless singleton nodes intern the same way through dedicated generation-gated cells (no hash): the four `Line` kinds (direct-indexed by `LineKind` discriminant), `LineSuffixBoundary`, and `BreakParent` — a `Line` node carries no mode or indent (both are supplied per visit by the enclosing render command), the layout analog of "statics are position-free", so every `line()` in a document is one node. `Symbol` nodes intern per document too, through a generation-gated table direct-indexed by the interner id (ids are small dense per-document integers, so no hash probe) — repeated `symbol(id)` calls for the same element/attribute name return one shared node. The single-shot `format()` path pre-sizes one arena from source length (~2 nodes per source byte, text pool at source/8; `DocArena::with_source_size_hint`) and drops it after rendering; multi-file drivers (the CLI dir-walk worker, the FFI/NAPI/WASM bindings) instead reuse one arena across calls via `DocArena::reset()` — clearing the node/child/text-pool/memo stores while retaining capacity (the static cache's width halves deliberately survive: they key on `'static` string addresses; the interned node halves are invalidated in O(1) by the reset's generation bump), the doc-IR analogue of the per-call AST `Bump::reset()` reuse — and the printers borrow `&DocArena` so the caller owns the reusable one (`format_in` is the borrowed-arena entry point). The builders' transient parts-lists are pooled the same way: wide-list builders (statement / object / array / parameter / specifier lists) draw a `DocBuf` from a recursion-safe arena free-list (`pooled_docbuf()`) rather than allocating a fresh `SmallVec` per call, so a document's many list-assembly spills collapse into a handful of long-lived reused buffers — byte-identical, allocation only. Embedded languages build doc nodes into the host file's arena rather than nesting their own. Identifier text never enters the doc tree: names emit as `DocText::SourceSpan` spans resolved at print time, and `DocText::Symbol` stores an interner ID (Svelte element/attribute names, escaped identifiers) resolved the same way (see [DocText](#doctext-static-pooled-sourcespan-symbol)); verbatim source text (comments, template chunks, Svelte markup text) is `SourceSpan` too — and built text a printer actually constructs is copied once into the arena text pool (`Pooled`, assembled piecewise via `DocArena::pool_writer()` when no ready-made slice exists), so nodes themselves never own strings.
+**Doc building — the doc arena.** All doc nodes live in a contiguous `DocArena` (two flat `Vec`s: nodes and child lists, plus the text pool and an inline direct-mapped static cache), referenced by `u32` `DocId`s — no per-node heap allocation, no drop glue (`DocNode` is trivially droppable, `const`-asserted). Static text is **interned per document**: the static cache maps a `&'static str`'s address to both its precomputed visual width and the current document's node for it, so repeated `text(",")` calls return one shared `DocId` instead of allocating per call (`empty()` interns through a dedicated cell) — sound because statics are position-free at render, nodes are append-only, and no consumer compares `DocId` identity. The stateless singleton nodes intern the same way through dedicated generation-gated cells (no hash): the four `Line` kinds (direct-indexed by `LineKind` discriminant), `LineSuffixBoundary`, and `BreakParent` — a `Line` node carries no mode or indent (both are supplied per visit by the enclosing render command), the layout analog of "statics are position-free", so every `line()` in a document is one node. The single-shot `format()` path pre-sizes one arena from source length (~2 nodes per source byte, text pool at source/8; `DocArena::with_source_size_hint`) and drops it after rendering; multi-file drivers (the CLI dir-walk worker, the FFI/NAPI/WASM bindings) instead reuse one arena across calls via `DocArena::reset()` — clearing the node/child/text-pool/memo stores while retaining capacity (the static cache's width halves deliberately survive: they key on `'static` string addresses; the interned node halves are invalidated in O(1) by the reset's generation bump), the doc-IR analogue of the per-call AST `Bump::reset()` reuse — and the printers borrow `&DocArena` so the caller owns the reusable one (`format_in` is the borrowed-arena entry point). The builders' transient parts-lists are pooled the same way: wide-list builders (statement / object / array / parameter / specifier lists) draw a `DocBuf` from a recursion-safe arena free-list (`pooled_docbuf()`) rather than allocating a fresh `SmallVec` per call, so a document's many list-assembly spills collapse into a handful of long-lived reused buffers — byte-identical, allocation only. Embedded languages build doc nodes into the host file's arena rather than nesting their own. Identifier text never enters the doc tree: names emit as `DocText::SourceSpan` spans resolved at print time (see [DocText](#doctext-static-pooled-sourcespan)); verbatim source text (comments, template chunks, Svelte markup text) is `SourceSpan` too — and built text a printer actually constructs is copied once into the arena text pool (`Pooled`, assembled piecewise via `DocArena::pool_writer()` when no ready-made slice exists), so nodes themselves never own strings.
 
 **Rendering — pre-sized output, stack-allocated scratch.** The per-render output `String` is reserved from arena node count (`DocArena::estimated_output_capacity`, clamped against pathological initial sizes), and the hot per-piece render-and-write seams (the TS/CSS printers' `write_arena_doc`, the Svelte printer's `render_doc_immediate` and `<script>`/`<style>` block renders) render through the `*_into` entry points into an arena-parked scratch buffer (`DocArena::take_render_scratch` / `park_render_scratch` — the render analog of `pool_writer()`'s parked scratch: one warm buffer per file instead of an alloc/free per rendered piece, with a fresh-fallback empty default so nested renders stay correct). `OutputBuffer` pre-allocates from source length for the Svelte printer's direct writes. The `fits()` lookahead and the render loop's own work-list both run on `SmallVec` stacks — the render command stack and its pending line-suffix buffer stay inline for the common small sub-render (the renderers run once per CSS declaration/value and per Svelte template expression, so each would otherwise allocate a fresh `Vec` from empty), and each top-level render additionally borrows the arena-pooled pair (`borrow_render_commands_scratch` / `borrow_line_suffix_scratch`) so their spill capacity warms once per arena instead of re-allocating per rendered piece (sub-renders keep their own inline locals and never take that borrow) — the per-render group-mode map is a fixed inline array keyed by the closed `GroupId` enum (no per-render `HashMap` allocation), and comment-classification buckets are `SmallVec`s sized for the common 0-2 comments case.
 
@@ -741,7 +738,7 @@ Scales at O(features) rather than O(tools × features).
 - Closed scope, open convention — Per-language ownership; concrete types end-to-end; no central registry
 - Separate lexers — Zero mode-switching overhead
 - Pratt parsing — Clean operator precedence for TS expressions
-- Shared interner — one per document for what still interns (Svelte element/attribute names, escaped identifiers); identifier names are span-identity
+- Span-identity names — no symbol table; identifier and element/attribute names are recovered from `source[span]`
 - Detached comments — Simple AST, O(log n) lookup, matches prettier
 - Doc builder — Prettier-style declarative formatting
 - Source threading — Preserve escapes without AST duplication
@@ -772,9 +769,10 @@ wholesale when the arena drops, with no per-node `Drop`:
 ```rust
 pub struct Program<'arena> {
     pub body: &'arena [Statement<'arena>],
-    pub comments: Vec<Comment>, // root-owned; not the per-node target
+    pub comments: &'arena [Comment], // arena-gathered; not the per-node target
     pub span: Span,
-    // …interner (Rc<RefCell<…>>, shared across embedded languages)
+    // no interner / symbol table — identifier names are span-identity, recovered
+    // from source[span]; the rare escaped name carries an &'arena str
 }
 
 pub enum Statement<'arena> {
@@ -787,9 +785,10 @@ pub enum Statement<'arena> {
 The caller owns the arena (`parse(source, &arena)`); the returned AST borrows it,
 and `format`/`convert` consume it into an owned `String`/JSON, so the arena never
 escapes the call (no self-referential ownership — `unsafe_code = "forbid"`, safe
-bumpalo API only). The interner stays `Rc<RefCell<…>>` (created before the arena,
-mutated during parse, shared across the Svelte→TS embedding boundary) — orthogonal
-to `'arena`.
+bumpalo API only). Identifier and element/attribute names are **span-identity** —
+recovered from `source[span]` at each consumer, with the rare escaped name carried
+as an `&'arena str` — so the arena is the *only* thing threaded through
+parse/format, and no name-table lifetime lands on the AST or the parser.
 
 **Inline-by-value layout, deliberately not size-minimized.** A node holds its
 children inline by value where they were owned inline before; only genuinely

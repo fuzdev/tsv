@@ -109,9 +109,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// ordinary elements rather than `SlotElement`s — mirrors Svelte's
     /// `parent_is_shadowroot_template` (`1-parse/state/element.js`).
     fn attrs_have_shadowrootmode(&self, attributes: &[AttributeNode<'arena>]) -> bool {
-        let interner = self.interner.borrow();
         attributes.iter().any(|attr| {
-            matches!(attr, AttributeNode::Attribute(a) if interner.resolve(a.name) == Some("shadowrootmode"))
+            matches!(attr, AttributeNode::Attribute(a) if a.name(self.source) == "shadowrootmode")
         })
     }
 
@@ -156,15 +155,15 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             return self.parse_special_element_body(start, name_span, special_tag);
         }
 
-        // Regular element or component
-        let tag_symbol = self.intern(tag_name);
+        // Regular element or component. The tag name is span-identity
+        // (`source[name_span]`), so nothing to intern here.
         let kind = if is_component_name(tag_name) {
             ElementKind::Component
         } else {
             ElementKind::Html
         };
 
-        self.parse_regular_element_body(start, tag_name, tag_symbol, kind, name_span)
+        self.parse_regular_element_body(start, tag_name, kind, name_span)
     }
 
     /// Parse a regular element (HTML or component)
@@ -172,7 +171,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         start: usize,
         tag_name: &'a str,
-        tag_symbol: string_interner::DefaultSymbol,
         kind: ElementKind,
         name_span: Span,
     ) -> Result<ParsedElement<'arena>, ParseError> {
@@ -237,7 +235,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             };
 
         Ok(ParsedElement::Element(Element {
-            name: tag_symbol,
             kind,
             facts: TagFacts::compute(tag_name),
             attributes: attributes.into_bump_slice(),
@@ -391,8 +388,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             match &attr {
                 AttributeNode::Attribute(a) => {
                     // Check for `this` attribute on svelte:element and svelte:component.
-                    // Compare the resolved name by borrow — no per-attribute `String`.
-                    if self.interner.borrow().resolve(a.name) == Some("this") {
+                    // Compare the span-identity name directly — no per-attribute `String`.
+                    if a.name(self.source) == "this" {
                         if tag == SpecialElementTag::SvelteElement {
                             // Extract expression from the attribute value
                             if let Some(values) = a.value {

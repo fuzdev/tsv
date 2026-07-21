@@ -16,7 +16,7 @@ use super::{
 pub enum Expression<'arena> {
     Literal(Literal<'arena>),
     Identifier(Identifier<'arena>),
-    PrivateIdentifier(PrivateIdentifier),
+    PrivateIdentifier(PrivateIdentifier<'arena>),
     ObjectExpression(ObjectExpression<'arena>),
     ArrayExpression(ArrayExpression<'arena>),
     UnaryExpression(UnaryExpression<'arena>),
