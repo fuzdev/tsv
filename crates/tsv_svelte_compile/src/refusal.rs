@@ -262,6 +262,18 @@ pub enum Refusal {
     /// shared with `DollarPrefixedBinding`).
     #[error("prop name starting with `$$` (reserved for Svelte internals — the oracle rejects it)")]
     PropsIllegalName,
+    /// A `$props()` ObjectPattern property that is COMPUTED (`{ [x]: a }`) or whose
+    /// value — after stripping an `= default` — is not a plain Identifier (a nested
+    /// pattern, `{ a: { b } }` / `{ a: [b] }`). The oracle's `props_invalid_pattern`
+    /// (`2-analyze/visitors/VariableDeclarator.js:97-110`). The three per-property
+    /// checks fire in source order, first-wins (the oracle's `e.*` throws): computed →
+    /// this, then a `$$` Identifier key → [`Self::PropsIllegalName`], then a
+    /// non-Identifier value → this. Independent of `$$`: a computed `$$` key
+    /// (`{ [$$x]: a }`) is this rule (computed wins), a non-computed `$$` key
+    /// (`{ $$x: a }`) is `props_illegal_name`, and a computed key BEFORE a `$$` key
+    /// reports this while a `$$` key BEFORE a computed one reports that.
+    #[error("$props() destructure with a computed key or nested pattern (the oracle rejects it)")]
+    PropsInvalidPattern,
     /// A binding pattern shape the analyzer does not classify.
     #[error("binding pattern shape ({kind})")]
     BindingPatternShape {

@@ -285,6 +285,69 @@ fn compile_refuses_props_illegal_name_declare_site() {
 }
 
 #[test]
+fn compile_refuses_props_invalid_pattern() {
+    // The oracle's `props_invalid_pattern` (VariableDeclarator.js:97-110): a `$props()`
+    // ObjectPattern property that is COMPUTED or whose value (after stripping a default)
+    // is not a plain Identifier. The three per-property checks fire in source order,
+    // first-wins (`e.*` throws): computed → props_invalid_pattern, then a `$$` key →
+    // props_illegal_name, then a non-Identifier value → props_invalid_pattern.
+    let reason = "$props() destructure with a computed key or nested pattern";
+    // Computed key.
+    assert_unsupported(
+        "<script>const x = 'k'; let { [x]: a } = $props(); a;</script>\n<p>{a}</p>",
+        reason,
+    );
+    // Computed key with a rest present (does not early-return; caught before the rewrite).
+    assert_unsupported(
+        "<script>const x = 'k'; let { [x]: a, ...rest } = $props(); a; rest;</script>\n<p>{a}</p>",
+        reason,
+    );
+    // Nested object-pattern value.
+    assert_unsupported(
+        "<script>let { a: { b } } = $props(); b;</script>\n<p>{b}</p>",
+        reason,
+    );
+    // Nested array-pattern value.
+    assert_unsupported(
+        "<script>let { a: [b] } = $props(); b;</script>\n<p>{b}</p>",
+        reason,
+    );
+    // Nested value carrying a default (the default is stripped, its `left` is the pattern).
+    assert_unsupported(
+        "<script>let { a: { b } = {} } = $props(); b;</script>\n<p>{b}</p>",
+        reason,
+    );
+    // Nested value with a `$bindable()` default — the value (default-stripped) is still an
+    // ObjectPattern, so props_invalid_pattern fires FIRST (before the guard sees $bindable).
+    assert_unsupported(
+        "<script>let { a: { b } = $bindable() } = $props(); b;</script>\n<p>{b}</p>",
+        reason,
+    );
+    // ⭐ Source-order first-wins. A computed key BEFORE a `$$` key → the computed check
+    // wins (props_invalid_pattern), matching the oracle.
+    assert_unsupported(
+        "<script>const k = 'z'; let { [k]: a, $$foo: b } = $props(); a; b;</script>\n<p>{a}{b}</p>",
+        reason,
+    );
+    // …but a `$$` key BEFORE a computed key → props_illegal_name wins (source order).
+    assert_unsupported(
+        "<script>const k = 'z'; let { $$foo: b, [k]: a } = $props(); a; b;</script>\n<p>{a}{b}</p>",
+        "prop name starting with `$$`",
+    );
+    // Discriminating controls, all COMPILE: plain, renamed, default, rest, and bindable
+    // (both plain and renamed) — every value is a plain Identifier after default-strip.
+    let _ = compile_js("<script>let { a, b } = $props(); a; b;</script>\n<p>{a}{b}</p>");
+    let _ = compile_js("<script>let { a: b } = $props(); b;</script>\n<p>{b}</p>");
+    let _ = compile_js("<script>let { a = 1 } = $props(); a;</script>\n<p>{a}</p>");
+    let _ = compile_js("<script>let { a, ...rest } = $props(); a; rest;</script>\n<p>{a}</p>");
+    let _ = compile_js(
+        "<script>let { value = $bindable() } = $props(); value;</script>\n<p>{value}</p>",
+    );
+    let _ =
+        compile_js("<script>let { value: v = $bindable(1) } = $props(); v;</script>\n<p>{v}</p>");
+}
+
+#[test]
 fn compile_refuses_props_illegal_name_member_site() {
     // The oracle's `props_illegal_name` REFERENCE-site rule
     // (`MemberExpression.js:11-16`): a non-computed `.$$…` access on a plain

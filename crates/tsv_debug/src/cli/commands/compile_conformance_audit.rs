@@ -270,6 +270,7 @@ mod tests {
         "$-prefixed binding {name}",
         "$-prefixed identifier {name}",
         "$props() binding pattern (not an identifier or object pattern — the oracle rejects it)",
+        "$props() destructure with a computed key or nested pattern (the oracle rejects it)",
         "$props() used more than once",
         "$props.id() outside a plain top-level variable declaration",
         "$props.id() used more than once",

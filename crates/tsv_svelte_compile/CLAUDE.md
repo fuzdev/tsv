@@ -882,14 +882,24 @@ pipeline order.
   **server**: a rest element in the pattern gains the oracle's `$$slots,
   $$events` injection immediately before it, and a non-destructured `let props =
   $props()` becomes `let { $$slots, $$events, ...props } = $$props` — a plain
-  destructure without a rest gets no injection. A top-level destructure default
+  destructure without a rest gets no injection. An ObjectPattern is first
+  validated per-property in the oracle's `VariableDeclarator.js:97-110` source
+  order, first-wins (`e.*` throws): a **computed** key (`{ [x]: a }`) →
+  `PropsInvalidPattern`, then a non-computed **`$$` Identifier key** →
+  `PropsIllegalName`, then a **value** that (after stripping an `= default`) is
+  not a plain Identifier — a nested pattern (`{ a: { b } }`) → `PropsInvalidPattern`.
+  The order decides a mixed list (a computed key before a `$$` key reports
+  `PropsInvalidPattern`, the reverse reports `PropsIllegalName`), and it runs BEFORE
+  the rest/bindable short-circuit so a plain destructure with neither is reached. A
+  top-level destructure default
   `= $bindable(fallback?)` becomes its fallback (`void 0` argument-less) with the
   bindable prop collected in source order for the trailing `$.bind_props($$props,
   { … })` (shorthand `{ key }` when the key equals its local, else `{ key:
-  local }`). A `$bindable` in any UNrecognized shape — a non-identifier key
-  (string/numeric/computed), a nested-pattern value, the wrong arity — survives
-  the rewrite for the guard walk to refuse, a safe over-refusal even for a
-  non-identifier-keyed prop the oracle would compile. When the component
+  local }`). A `$bindable` in a shape the per-property validation accepts but the
+  rewrite can't recognize — a non-identifier key (string/numeric) or the wrong
+  arity — survives the rewrite for the guard walk to refuse, a safe over-refusal
+  even for a non-identifier-keyed prop the oracle would compile (a computed key or
+  nested-pattern value already refused as `PropsInvalidPattern`). When the component
   references `$$slots` the injected sanitize_slots const owns that name, so the
   destructured prop deconflicts by renaming (`$$slots: $$slots_` — the oracle's
   always-`_`-suffix rule; `$$events` never renames).

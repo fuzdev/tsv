@@ -64,11 +64,12 @@ fn bindable_default<'arena>(
 /// default the transform can rewrite — a plain-identifier key, a plain-identifier
 /// destructure value, and a rewritable `$bindable(...)` right — return the entry,
 /// the `Property`, the `AssignmentPattern`, and the fallback argument. `None`
-/// otherwise: the property is emitted unchanged, and a `$bindable` in any
-/// unrecognized shape (a non-identifier key — string/numeric/computed —, a
-/// nested-pattern value, the wrong arity) survives the rewrite for the guard to
-/// refuse — a safe over-refusal, even for a non-identifier-keyed prop the oracle
-/// would compile.
+/// otherwise: the property is emitted unchanged, and a `$bindable` in a shape the
+/// per-property validation accepts but this cannot rewrite — a non-identifier key
+/// (string/numeric) or the wrong arity `$bindable(a, b)` — survives the rewrite for
+/// the guard to refuse (a safe over-refusal, even for a non-identifier-keyed prop
+/// the oracle would compile). A computed key or a nested-pattern value never reaches
+/// here — both already refused as [`Refusal::PropsInvalidPattern`].
 #[allow(clippy::type_complexity)]
 fn bindable_property<'arena>(
     prop: &'arena ObjectPatternProperty<'arena>,
@@ -151,7 +152,9 @@ fn rewrite_bindable_default<'arena>(
 /// non-identifier/non-object `$props()` pattern (the oracle rejects those —
 /// props_invalid_identifier) and both rewrites alongside carried comments (the
 /// minted appendix spans between host-span siblings would sweep host comments — a
-/// safe over-refusal).
+/// safe over-refusal). An ObjectPattern is first validated per-property in the
+/// oracle's source order (computed key or nested value → [`Refusal::PropsInvalidPattern`],
+/// a `$$` key → [`Refusal::PropsIllegalName`]) before any rewrite.
 ///
 /// When the component references `$$slots` (`uses_slots`), the injected
 /// sanitize_slots const owns that name, so the destructured prop deconflicts by
@@ -169,23 +172,44 @@ pub(crate) fn rewrite_props_pattern<'arena>(
     let arena = b.arena;
     match id {
         Expression::ObjectPattern(obj) => {
-            // The oracle's `props_illegal_name` (VariableDeclarator.js:94-103): a
-            // `$props()` destructure property whose non-computed Identifier key starts
-            // with `$$` is reserved for Svelte internals and rejected. Checked before
-            // the rest/bindable short-circuit below so a plain `{ $$slots: a }` (no
-            // rest, no bindable) still reaches it. A `$$`-prefixed *binding* — a
-            // shorthand `{ $$foo }` or default `{ $$foo = 1 }` — is refused upstream as
-            // `DollarPrefixedBinding` (`script_rewrite.rs:278`, before this), so only
-            // the `{ $$key: value }` form reaches here; a computed `$$` key is the
-            // oracle's separate `props_invalid_pattern`; an escaped key falls through
-            // (the crate's standing escaped-identifier residual).
+            // The oracle's per-property validation of a `$props()` destructure
+            // (`2-analyze/visitors/VariableDeclarator.js:97-110`): three checks in
+            // source order, first-wins (the oracle's `e.*` throws). Runs BEFORE the
+            // rest/bindable short-circuit below so a plain destructure with neither
+            // (`{ [x]: a }`, `{ $$slots: a }`, `{ a: { b } }`) still reaches it. A
+            // `RestElement` is skipped (the oracle's `property.type !== 'Property'`
+            // continue).
             for prop in obj.properties {
-                if let ObjectPatternProperty::Property(p) = prop
-                    && !p.computed
-                    && let Expression::Identifier(key_id) = &p.key
+                let ObjectPatternProperty::Property(p) = prop else {
+                    continue;
+                };
+                // 1. A computed key (`{ [x]: a }`, `{ [$$x]: a }`) — `props_invalid_pattern`.
+                if p.computed {
+                    return Err(unsupported(Refusal::PropsInvalidPattern));
+                }
+                // 2. A non-computed Identifier key starting with `$$` — `props_illegal_name`
+                //    (reserved for Svelte internals). A `$$`-prefixed *binding* — a shorthand
+                //    `{ $$foo }` or default `{ $$foo = 1 }` — is refused upstream as
+                //    `DollarPrefixedBinding` (`script_rewrite.rs`, the oracle's
+                //    `dollar_prefix_invalid`, which fires first), so only `{ $$key: value }`
+                //    reaches here; an escaped key falls through (the crate's standing
+                //    escaped-identifier residual).
+                if let Expression::Identifier(key_id) = &p.key
                     && plain_identifier_name(key_id, source).is_some_and(|k| k.starts_with("$$"))
                 {
                     return Err(unsupported(Refusal::PropsIllegalName));
+                }
+                // 3. A value that — after stripping an `= default` (`AssignmentPattern`) —
+                //    is not a plain Identifier: a nested pattern (`{ a: { b } }`,
+                //    `{ a: [b] }`, `{ a: { b } = {} }`) — `props_invalid_pattern`. A
+                //    `$bindable()` default's value is still checked here, so a nested
+                //    `{ a: { b } = $bindable() }` refuses BEFORE the guard sees `$bindable`.
+                let value = match &p.value {
+                    Expression::AssignmentPattern(assign) => assign.left,
+                    other => other,
+                };
+                if !matches!(value, Expression::Identifier(_)) {
+                    return Err(unsupported(Refusal::PropsInvalidPattern));
                 }
             }
             let has_rest = obj
