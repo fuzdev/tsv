@@ -1096,7 +1096,8 @@ impl DocArena {
     /// (the eager [`pooled_text_width`] policy: a real width or the newline
     /// sentinel, so fits and render never re-scan the text) and is **not**
     /// retained — the span lives in the lifetime-less arena and is re-resolved
-    /// at render via a [`super::SourceTextResolver`]. Identifier names use
+    /// at render against the document source threaded through the render entry
+    /// points (`resolve_text`). Identifier names use
     /// [`Self::source_span_ident`] instead (deferred width — the opposite
     /// tradeoff).
     #[inline]

@@ -54,22 +54,17 @@ impl<'a> Printer<'a> {
         // start_indent_level = 1 to account for the Svelte wrapper indent
         // Render into the arena-parked scratch (one warm buffer, no per-block alloc).
         let mut output = self.d().take_render_scratch();
-        {
-            // Source-aware resolver: the embedded TS doc carries `DocText::SourceSpan`
-            // leaves (comments etc.) whose spans are absolute into the host source.
-            let resolver = doc::SourceTextResolver {
-                source: self.source(),
-            };
-            doc::arena_print_doc_with_indent_resolved_into(
-                self.d(),
-                script_doc_id,
-                &embed,
-                TAB_WIDTH, // start column = 1 tab's visual width
-                1,         // start indent level = 1 (accounts for Svelte wrapper)
-                &resolver,
-                &mut output,
-            );
-        }
+        // Pass the document source: the embedded TS doc carries `DocText::SourceSpan`
+        // leaves (comments etc.) whose spans are absolute into the host source.
+        doc::arena_print_doc_with_indent_resolved_into(
+            self.d(),
+            script_doc_id,
+            &embed,
+            TAB_WIDTH, // start column = 1 tab's visual width
+            1,         // start indent level = 1 (accounts for Svelte wrapper)
+            self.source(),
+            &mut output,
+        );
 
         // Only write content if there is any (skip indent for empty scripts)
         // The output always ends with a hardline (\n), so non-empty content is at least "\n"
@@ -314,20 +309,15 @@ impl<'a> Printer<'a> {
         };
         // Render into the arena-parked scratch (one warm buffer, no per-tag alloc).
         let mut output = self.arena.take_render_scratch();
-        {
-            let resolver = doc::SourceTextResolver {
-                source: self.source(),
-            };
-            doc::arena_print_doc_with_indent_resolved_preserve_whitespace_into(
-                self.arena,
-                group,
-                &embed,
-                col,
-                self.indent_level,
-                &resolver,
-                &mut output,
-            );
-        }
+        doc::arena_print_doc_with_indent_resolved_preserve_whitespace_into(
+            self.arena,
+            group,
+            &embed,
+            col,
+            self.indent_level,
+            self.source(),
+            &mut output,
+        );
         self.write(&output);
         self.arena.park_render_scratch(output);
     }
