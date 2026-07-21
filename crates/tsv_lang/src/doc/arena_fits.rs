@@ -5,7 +5,9 @@ use crate::config::TAB_WIDTH;
 use crate::printing::visual_width;
 use smallvec::SmallVec;
 
-use super::arena::{ArenaCommand, DocArena, DocId, DocNode, FLAT_WIDTH_BREAKS, FLAT_WIDTH_UNKNOWN};
+use super::arena::{
+    ArenaCommand, DocArena, DocId, DocNode, FLAT_WIDTH_BREAKS, FLAT_WIDTH_UNKNOWN, RenderIndent,
+};
 use super::types::{CachedWidth, DocText, LineKind, Mode, TextResolver, resolve_text};
 
 /// Flat width of a text node, or `None` when the text contains a newline (the
@@ -93,7 +95,7 @@ fn flat_width_fill<R: TextResolver + ?Sized>(
         DocNode::Indent(inner) | DocNode::Dedent(inner) => {
             flat_width_memo(*inner, nodes, children, cache, resolver)
         }
-        DocNode::Align { contents, .. } => {
+        DocNode::AlignRoot { contents, .. } | DocNode::Align { contents, .. } => {
             flat_width_memo(*contents, nodes, children, cache, resolver)
         }
         DocNode::IndentIfBreak { contents, .. } => {
@@ -256,7 +258,7 @@ pub(super) fn arena_fits_with_lookahead<R: TextResolver + ?Sized>(
                     continue;
                 }
 
-                DocNode::Align { contents, .. } => {
+                DocNode::AlignRoot { contents, .. } | DocNode::Align { contents, .. } => {
                     current_id = *contents;
                     continue;
                 }
@@ -379,7 +381,7 @@ pub(super) fn arena_fits_multi<R: TextResolver + ?Sized>(
         .iter()
         .rev()
         .map(|&doc| ArenaCommand {
-            indent: 0,
+            indent: RenderIndent::default(),
             mode,
             doc,
         })
