@@ -1,7 +1,9 @@
-<!-- A component (inline) keeps a following short {#await}/{#snippet} inline regardless of
-sibling type — text, an inline element, or {@const}/{@debug} (valid inside a component,
-unlike inside a block element). Only block-element parents break; a component stays inline,
-matching prettier. -->
+<!--
+	A component (inline) keeps a following short {#await}/{#snippet} inline regardless of
+	sibling type — text, an inline element, or {@const}/{@debug} (valid inside a component,
+	unlike inside a block element). Only block-element parents break; a component stays inline,
+	matching prettier.
+-->
 
 <!-- {@const} sibling + await -->
 <Comp>{@const a = 1}{#await p}x{/await}</Comp>
