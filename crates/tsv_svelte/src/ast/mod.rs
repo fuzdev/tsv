@@ -1,6 +1,6 @@
 // Svelte AST module
 //
-// - internal: the parsed AST (string interning, compact representation)
+// - internal: the parsed AST (span-identity names, compact representation)
 // - convert: emits the public JSON-compatible wire format (matches Svelte
 //   parser output) directly from `internal` via the writer
 

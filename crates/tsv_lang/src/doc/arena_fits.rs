@@ -8,24 +8,24 @@ use smallvec::SmallVec;
 use super::arena::{
     ArenaCommand, DocArena, DocId, DocNode, FLAT_WIDTH_BREAKS, FLAT_WIDTH_UNKNOWN, RenderIndent,
 };
-use super::types::{CachedWidth, DocText, LineKind, Mode, TextResolver, resolve_text};
+use super::types::{CachedWidth, DocText, LineKind, Mode, resolve_text};
 
 /// Flat width of a text node, or `None` when the text contains a newline (the
 /// line ends inside it, so it has no single-line width). The one definition of
 /// the cached-or-measure fallback, backing [`flat_width_fill`]'s `Text` arm —
 /// its only caller, since the fits walk's `Text` arm reaches it via the memo.
 #[inline]
-fn text_flat_width<R: TextResolver + ?Sized>(t: &DocText, resolver: Option<&R>) -> Option<u32> {
+fn text_flat_width(t: &DocText, source: Option<&str>) -> Option<u32> {
     match t.cached_width() {
         CachedWidth::Width(w) => Some(u32::from(w)),
         CachedWidth::HasNewline => None,
         CachedWidth::NotComputed => {
-            // Only `SourceSpan` identifiers and `Symbol` texts can be
-            // `NotComputed` (`Pooled` and `Static` always precompute — see
-            // `pooled_text_width` / the arena's static width cache), so the
-            // resolve never needs the arena text pool; the empty pool passed
-            // here would panic loudly (slice OOB) if that invariant ever broke.
-            let s = resolve_text(t, resolver, "");
+            // Only `SourceSpan` identifier names can be `NotComputed` (`Pooled`
+            // and `Static` always precompute — see `pooled_text_width` / the
+            // arena's static width cache), so the resolve never needs the arena
+            // text pool; the empty pool passed here would panic loudly (slice
+            // OOB) if that invariant ever broke.
+            let s = resolve_text(t, source, "");
             if s.contains('\n') {
                 None
             } else {
@@ -45,15 +45,15 @@ fn text_flat_width<R: TextResolver + ?Sized>(t: &DocText, resolver: Option<&R>) 
 /// walk probes an already-warm slot far more often than it fills one, so the
 /// warm path is a load + compare at the call site instead of a full call.
 #[inline]
-fn flat_width_memo<R: TextResolver + ?Sized>(
+fn flat_width_memo(
     id: DocId,
     nodes: &[DocNode],
     children: &[DocId],
     cache: &mut [u32],
-    resolver: Option<&R>,
+    source: Option<&str>,
 ) -> Option<u32> {
     match cache[id.index()] {
-        FLAT_WIDTH_UNKNOWN => flat_width_fill(id, nodes, children, cache, resolver),
+        FLAT_WIDTH_UNKNOWN => flat_width_fill(id, nodes, children, cache, source),
         FLAT_WIDTH_BREAKS => None,
         w => Some(w),
     }
@@ -64,15 +64,15 @@ fn flat_width_memo<R: TextResolver + ?Sized>(
 /// probe so warm children never re-enter here.
 #[cold]
 #[inline(never)]
-fn flat_width_fill<R: TextResolver + ?Sized>(
+fn flat_width_fill(
     id: DocId,
     nodes: &[DocNode],
     children: &[DocId],
     cache: &mut [u32],
-    resolver: Option<&R>,
+    source: Option<&str>,
 ) -> Option<u32> {
     let result: Option<u32> = match &nodes[id.index()] {
-        DocNode::Text(t) => text_flat_width(t, resolver),
+        DocNode::Text(t) => text_flat_width(t, source),
         // Contains hardlines → no break-free flat width (like a newline-bearing
         // `Text` or a `Line(Hard)`); force the `arena_fits` walk.
         DocNode::MultilineText { .. } => None,
@@ -89,27 +89,27 @@ fn flat_width_fill<R: TextResolver + ?Sized>(
             if *should_break {
                 None
             } else {
-                flat_width_memo(*contents, nodes, children, cache, resolver)
+                flat_width_memo(*contents, nodes, children, cache, source)
             }
         }
         DocNode::Indent(inner) | DocNode::Dedent(inner) => {
-            flat_width_memo(*inner, nodes, children, cache, resolver)
+            flat_width_memo(*inner, nodes, children, cache, source)
         }
         DocNode::AlignRoot { contents, .. } | DocNode::Align { contents, .. } => {
-            flat_width_memo(*contents, nodes, children, cache, resolver)
+            flat_width_memo(*contents, nodes, children, cache, source)
         }
         DocNode::IndentIfBreak { contents, .. } => {
-            flat_width_memo(*contents, nodes, children, cache, resolver)
+            flat_width_memo(*contents, nodes, children, cache, source)
         }
         DocNode::IfBreak { flat_doc, .. } => {
-            flat_width_memo(*flat_doc, nodes, children, cache, resolver)
+            flat_width_memo(*flat_doc, nodes, children, cache, source)
         }
         DocNode::Concat(range) | DocNode::Fill(range) => {
             let kids = range.resolve(children);
             let mut sum: u32 = 0;
             let mut ok = true;
             for &kid in kids {
-                match flat_width_memo(kid, nodes, children, cache, resolver) {
+                match flat_width_memo(kid, nodes, children, cache, source) {
                     Some(w) => sum = sum.saturating_add(w),
                     None => {
                         ok = false;
@@ -120,7 +120,7 @@ fn flat_width_fill<R: TextResolver + ?Sized>(
             if ok { Some(sum) } else { None }
         }
         DocNode::WithContext { doc, context } => {
-            flat_width_memo(*doc, nodes, children, cache, resolver)
+            flat_width_memo(*doc, nodes, children, cache, source)
                 .map(|w| w.saturating_add(context.trailing_reserve as u32))
         }
         DocNode::LineSuffix(_) | DocNode::LineSuffixBoundary => Some(0),
@@ -138,14 +138,14 @@ fn flat_width_fill<R: TextResolver + ?Sized>(
 /// `embed` is currently unused — fits decisions only need the fixed
 /// [`crate::TAB_WIDTH`]. The parameter is threaded so internal callers from
 /// `arena_render` can pass it uniformly.
-pub(super) fn arena_fits_with_lookahead<R: TextResolver + ?Sized>(
+pub(super) fn arena_fits_with_lookahead(
     arena: &DocArena,
     doc: DocId,
     mode: Mode,
     rest_commands: &[ArenaCommand],
     remaining_width: isize,
     _embed: &EmbedContext,
-    resolver: Option<&R>,
+    source: Option<&str>,
 ) -> bool {
     if remaining_width == isize::MAX {
         return true;
@@ -185,7 +185,7 @@ pub(super) fn arena_fits_with_lookahead<R: TextResolver + ?Sized>(
                 &nodes,
                 &children_vec,
                 flat_cache.as_mut_slice(),
-                resolver,
+                source,
             )
         {
             remaining -= w as isize;
@@ -200,7 +200,7 @@ pub(super) fn arena_fits_with_lookahead<R: TextResolver + ?Sized>(
                     &nodes,
                     &children_vec,
                     flat_cache.as_mut_slice(),
-                    resolver,
+                    source,
                 ) {
                     Some(w) => remaining -= w as isize,
                     // Newline-bearing text ends the line — everything so far fit.
@@ -337,12 +337,12 @@ pub(super) fn arena_fits_with_lookahead<R: TextResolver + ?Sized>(
 /// Uses the production [`crate::TAB_WIDTH`] for visual width calculations.
 /// Internal callers that need look-ahead use [`arena_fits_with_lookahead`]
 /// directly.
-pub fn arena_fits<R: TextResolver + ?Sized>(
+pub fn arena_fits(
     arena: &DocArena,
     doc: DocId,
     width: usize,
     mode: Mode,
-    resolver: Option<&R>,
+    source: Option<&str>,
 ) -> bool {
     arena_fits_with_lookahead(
         arena,
@@ -351,7 +351,7 @@ pub fn arena_fits<R: TextResolver + ?Sized>(
         &[],
         width as isize,
         &EmbedContext::default(),
-        resolver,
+        source,
     )
 }
 
@@ -363,13 +363,13 @@ pub fn arena_fits<R: TextResolver + ?Sized>(
 /// Replaces what was a full copy of the fits walk that had drifted — it
 /// lacked the `flat_width_memo` fast path and its `Group` arm ignored
 /// `should_break`/`expanded_states`.
-pub(super) fn arena_fits_multi<R: TextResolver + ?Sized>(
+pub(super) fn arena_fits_multi(
     arena: &DocArena,
     doc_ids: &[DocId],
     width: usize,
     mode: Mode,
     embed: &EmbedContext,
-    resolver: Option<&R>,
+    source: Option<&str>,
 ) -> bool {
     if width == usize::MAX {
         return true;
@@ -393,7 +393,7 @@ pub(super) fn arena_fits_multi<R: TextResolver + ?Sized>(
         &rest_commands,
         width as isize,
         embed,
-        resolver,
+        source,
     )
 }
 
@@ -414,13 +414,13 @@ mod break_mode_fits_tests {
     //! watch one assertion flip.
     use super::super::DocContext;
     use super::super::arena::{DocArena, DocId};
-    use super::super::types::{Mode, TextResolver};
+    use super::super::types::Mode;
     use super::arena_fits;
 
-    /// Fit `doc` in `width` columns in Break mode, no resolver (these docs use
-    /// only `Static`/`Pooled` text, never `Symbol`).
+    /// Fit `doc` in `width` columns in Break mode, no source (these docs use
+    /// only `Static`/`Pooled` text, never `SourceSpan`).
     fn fits_break(a: &DocArena, doc: DocId, width: usize) -> bool {
-        arena_fits(a, doc, width, Mode::Break, None::<&dyn TextResolver>)
+        arena_fits(a, doc, width, Mode::Break, None)
     }
 
     /// The doc fits at `w` but not at `w - 1`: any off-by-one in a width arm flips

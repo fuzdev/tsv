@@ -314,9 +314,7 @@ impl<'a> Printer<'a> {
             &self.embed,
             current_col,
             self.indent_level,
-            &doc::SourceTextResolver {
-                source: self.source,
-            },
+            self.source,
             &mut output,
         );
         self.write(&output);
@@ -347,9 +345,7 @@ impl<'a> Printer<'a> {
             &embed,
             current_col,
             self.indent_level,
-            &doc::SourceTextResolver {
-                source: self.source,
-            },
+            self.source,
             &mut output,
         );
         self.write(&output);
