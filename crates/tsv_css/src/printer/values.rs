@@ -245,7 +245,7 @@ impl<'a> Printer<'a> {
             }
             // Deliberately pooled, not `source_span`: this arm is hot on CSS
             // corpora (every unparsed `url(...)`/empty-args function) and the
-            // span form's render-time resolver hop measured +0.07% instructions
+            // span form's render-time resolution hop measured +0.07% instructions
             // there for no allocation win (the pool is amortized).
             return d.text_pooled(raw);
         }

@@ -118,7 +118,7 @@ pub(super) fn build_call_doc_with_wrapping(
     // even if they exceed print width
     if is_test_call(call, printer) {
         // Build callee as a flat doc (no conditionalGroup) straight from the
-        // interned chain parts — this prevents breaking at `.skip` etc. even when
+        // span-identity chain parts — this prevents breaking at `.skip` etc. even when
         // very long, without materializing a throwaway callee `String`.
         let flat_callee = build_test_callee_flat_doc(call.callee, printer).unwrap_or(callee);
 

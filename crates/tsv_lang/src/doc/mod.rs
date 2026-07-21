@@ -30,10 +30,7 @@ pub mod swallow;
 mod types;
 
 // Types
-pub use types::{
-    CachedWidth, DocContext, DocText, GroupId, LineKind, Mode, PoolSpan, SourceTextResolver,
-    TextResolver,
-};
+pub use types::{CachedWidth, DocContext, DocText, GroupId, LineKind, Mode, PoolSpan};
 
 /// Stack buffer for assembling a node's doc parts before handing them to
 /// `DocArena::concat` / `fill`. Language printers build one such `Vec<DocId>` per
@@ -49,10 +46,7 @@ pub use swallow::{SwallowReport, set_swallow_check, swallow_check_enabled, take_
 
 // Arena render
 pub use arena_render::{
-    arena_measure_doc_flat_resolved, arena_print_doc, arena_print_doc_at_column,
-    arena_print_doc_with_indent, arena_print_doc_with_indent_resolved,
-    arena_print_doc_with_indent_resolved_into,
-    arena_print_doc_with_indent_resolved_preserve_whitespace,
+    arena_measure_doc_flat_resolved, arena_print_doc, arena_print_doc_with_indent_resolved_into,
     arena_print_doc_with_indent_resolved_preserve_whitespace_into,
 };
 
@@ -1071,10 +1065,10 @@ mod arena_tests {
     // that shortcuts a subtree that actually breaks) flips one of these assertions
     // rather than silently producing wrong layout.
 
-    /// Fit `doc` in `width` columns in Flat mode, with no resolver (the docs here
-    /// use only `Static`/`Pooled` text, never `Symbol`).
+    /// Fit `doc` in `width` columns in Flat mode, with no source (the docs here
+    /// use only `Static`/`Pooled` text, never `SourceSpan`).
     fn fits_flat(a: &DocArena, doc: DocId, width: usize) -> bool {
-        arena_fits(a, doc, width, Mode::Flat, None::<&dyn TextResolver>)
+        arena_fits(a, doc, width, Mode::Flat, None)
     }
 
     /// Assert the memoized flat width of `doc` is exactly `w`: it fits in `w` but

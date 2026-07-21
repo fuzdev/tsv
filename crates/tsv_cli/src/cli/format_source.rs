@@ -64,16 +64,14 @@ pub fn format_source_in_with_goal(
     doc_arena: &tsv_lang::doc::arena::DocArena,
 ) -> Result<String, String> {
     match parser_type {
-        ParserType::Svelte => match tsv_svelte::parse(source, arena) {
-            Ok(ast) => Ok(tsv_svelte::format_in(&ast, source, doc_arena)),
-            Err(e) => Err(e.to_string()),
-        },
+        ParserType::Svelte => tsv_svelte::parse(source, arena)
+            .map(|ast| tsv_svelte::format_in(&ast, source, doc_arena))
+            .map_err(|e| e.to_string()),
         ParserType::Css => tsv_css::parse(source, arena)
             .map(|ast| tsv_css::format_in(&ast, source, doc_arena))
             .map_err(|e| e.to_string()),
-        ParserType::TypeScript => match tsv_ts::parse_with_goal(source, goal, arena) {
-            Ok(ast) => Ok(tsv_ts::format_in(&ast, source, doc_arena)),
-            Err(e) => Err(e.to_string()),
-        },
+        ParserType::TypeScript => tsv_ts::parse_with_goal(source, goal, arena)
+            .map(|ast| tsv_ts::format_in(&ast, source, doc_arena))
+            .map_err(|e| e.to_string()),
     }
 }

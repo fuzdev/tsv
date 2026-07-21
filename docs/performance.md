@@ -189,7 +189,7 @@ grep fits_with_lookahead stacks.txt | head
 `perf annotate -s` matches the **exact demangled name** as shown in
 `perf report` — a substring silently annotates nothing. It also comes up
 empty for functions with multiple monomorphizations sharing one demangled
-name (e.g. `arena_fits_with_lookahead`, instantiated per `TextResolver`).
+name (e.g. `render_doc_core`, instantiated per `RenderPolicy`).
 For those, dump everything and search by source line instead:
 
 ```bash

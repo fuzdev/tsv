@@ -252,23 +252,18 @@ impl<'a> Printer<'a> {
         // Render into the arena-parked scratch: one warm buffer across the
         // document's root nodes instead of an alloc/free per node.
         let mut output = self.arena.take_render_scratch();
-        {
-            // Source-aware resolver: the doc tree's verbatim leaves — this
-            // printer's own markup text / comment slices plus any embedded
-            // `tsv_ts` docs — are `DocText::SourceSpan` (host-absolute spans).
-            let resolver = tsv_lang::doc::SourceTextResolver {
-                source: self.source,
-            };
-            tsv_lang::doc::arena_print_doc_with_indent_resolved_preserve_whitespace_into(
-                self.arena,
-                d,
-                &self.embed,
-                col,
-                self.indent_level,
-                &resolver,
-                &mut output,
-            );
-        }
+        // Pass the document source: the doc tree's verbatim leaves — this
+        // printer's own markup text / comment slices plus any embedded
+        // `tsv_ts` docs — are `DocText::SourceSpan` (host-absolute spans).
+        tsv_lang::doc::arena_print_doc_with_indent_resolved_preserve_whitespace_into(
+            self.arena,
+            d,
+            &self.embed,
+            col,
+            self.indent_level,
+            self.source,
+            &mut output,
+        );
         self.write(&output);
         self.arena.park_render_scratch(output);
     }

@@ -353,32 +353,24 @@ impl<'a> Printer<'a> {
         // file's renders (the whole program standalone; one per template
         // expression when Svelte-embedded) instead of an alloc/free per call.
         let mut output = self.arena.take_render_scratch();
-        {
-            // Source-aware resolver so `DocText::SourceSpan` nodes (verbatim
-            // comment/literal slices) resolve without a `DocArena` lifetime.
-            let resolver = doc::SourceTextResolver {
-                source: self.source,
-            };
-            doc::arena_print_doc_with_indent_resolved_into(
-                self.arena,
-                d,
-                &self.embed,
-                current_col,
-                self.indent_level,
-                &resolver,
-                &mut output,
-            );
-        }
+        // Pass the document source so `DocText::SourceSpan` nodes (verbatim
+        // comment/literal slices) resolve at render without a `DocArena` lifetime.
+        doc::arena_print_doc_with_indent_resolved_into(
+            self.arena,
+            d,
+            &self.embed,
+            current_col,
+            self.indent_level,
+            self.source,
+            &mut output,
+        );
         self.write(&output);
         self.arena.park_render_scratch(output);
     }
 
     /// Render an arena DocId to a flat string with effectively infinite width.
     pub(crate) fn render_arena_doc_flat(&self, d: DocId) -> String {
-        let resolver = doc::SourceTextResolver {
-            source: self.source,
-        };
-        doc::arena_measure_doc_flat_resolved(self.arena, d, &self.embed, &resolver)
+        doc::arena_measure_doc_flat_resolved(self.arena, d, &self.embed, self.source)
     }
 
     /// Get the formatted output

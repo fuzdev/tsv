@@ -1,7 +1,8 @@
 // Svelte internal AST types
 //
 // Internal representation optimized for manipulation and formatting.
-// Uses string interning for efficient storage and comparison of identifiers.
+// Element/attribute names are span-identity — recovered from `source[name_span]`
+// on demand, never stored (see `Element::name` / `Attribute::name`).
 //
 // ## Arena allocation
 //

@@ -556,7 +556,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// name constructor. Span-identity (`escaped: None`, name = the raw token
     /// bytes) unless the token carries a decoded unicode escape
     /// (`\u0066oo` → `foo`) or is too long for `raw_len` — only those rare
-    /// cases intern.
+    /// cases carry the arena-`&str` escape hatch.
     pub(super) fn current_ident_name(&self) -> IdentName<'arena> {
         if let Some(decoded) = self.current_decoded {
             IdentName {
@@ -683,10 +683,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// Like `try_ident_or_keyword_name` but uses `can_be_binding_name()`,
     /// which excludes `await`, `yield`, and `let` (not valid as parameter/variable names).
-    /// Whether the current token is binding-name-eligible — the non-interning
-    /// classification behind `try_binding_name().is_some()`. Pure `&self` (no
-    /// interning), so it is safe inside a `debug_assert!` (the name-building
-    /// path `try_binding_name` takes may intern).
+    /// Whether the current token is binding-name-eligible — the allocation-free
+    /// classification behind `try_binding_name().is_some()`, without building the
+    /// name. Pure `&self` (no allocation), so it is safe inside a `debug_assert!`
+    /// (the name-building path `try_binding_name` takes may arena-allocate an
+    /// escaped name).
     pub(super) fn at_binding_name(&self) -> bool {
         match self.current_kind() {
             TokenKind::Identifier => true,
