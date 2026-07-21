@@ -518,6 +518,20 @@ pub enum Refusal {
     /// A `format-ignore` directive comment in the script.
     #[error("format-ignore directive comment in script")]
     FormatIgnoreComment,
+    /// A comment in a string-named import/export **specifier**'s `as`-gap that the
+    /// alias drop skips. esrap prints an `as` clause only when both name sides are
+    /// plain identifiers, so a string-literal specifier name drops its alias to the
+    /// bare binding — but esrap KEEPS a comment sitting in that alias gap. tsv
+    /// reproduces the drop by collapsing the two name spans onto one
+    /// (`specifier_normalize.rs`), which makes the specifier printer's
+    /// `left.span() != right.span()` test fail and SKIP the gap, so the comment is
+    /// DROPPED — a content-loss divergence. Fires only for a comment the module
+    /// comment carry actually keeps (`module_comments`); a comment neither side emits
+    /// is dropped by both (parity) and does not refuse. The synthetic `$` import and
+    /// the hoisted instance imports print comment-free, so only the module-body
+    /// program is guarded.
+    #[error("comment in a string-specifier as-gap (the oracle keeps it when the alias drops)")]
+    CommentInDroppedSpecifierAlias,
     /// Comments in template markup (only instance-script comments carry through).
     #[error("template comments (only instance-script comments are carried through)")]
     TemplateComments,

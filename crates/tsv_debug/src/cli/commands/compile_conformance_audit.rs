@@ -310,6 +310,7 @@ mod tests {
         "client generation",
         "comment after the last script statement in a template that emits a nested block (the oracle drops it)",
         "comment in a module script placed after the instance script (the oracle re-attaches it into the template)",
+        "comment in a string-specifier as-gap (the oracle keeps it when the alias drops)",
         "comment inside a rewritten rune region (dropped by the transform)",
         "comment inside an erased TypeScript region",
         "comments in a script alongside a multi-declarator declaration (the oracle re-anchors comments inside the split)",

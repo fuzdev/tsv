@@ -234,6 +234,9 @@ impl Refusal {
                 "multi-line block comment in script (interior-line re-indentation not carried through)",
             ),
             Self::FormatIgnoreComment => Cow::Borrowed("format-ignore directive comment in script"),
+            Self::CommentInDroppedSpecifierAlias => Cow::Borrowed(
+                "comment in a string-specifier as-gap (the oracle keeps it when the alias drops)",
+            ),
             Self::TemplateComments => Cow::Borrowed(
                 "template comments (only instance-script comments are carried through)",
             ),
@@ -512,6 +515,7 @@ impl Refusal {
             Self::CommentsWithSlots,
             Self::MultilineBlockComment,
             Self::FormatIgnoreComment,
+            Self::CommentInDroppedSpecifierAlias,
             Self::TemplateComments,
             Self::TemplateNode { kind: "{kind}" },
             Self::ConstTagAtRoot,

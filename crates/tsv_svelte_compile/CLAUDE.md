@@ -640,6 +640,36 @@ project-wide conventions.
   whitespace notion is the HOST language's rather than the TARGET's is a recurring
   defect in this crate, so the class lives here once rather than being re-derived
   per scan.
+- `specifier_normalize.rs` — the import/export **specifier** alias-drop, a
+  tree→tree pass over a `&[Statement]` reproducing esrap's printing rule: esrap
+  prints an `as` clause only when both name sides are plain identifiers, so a
+  string-literal specifier name (`export { x as 'y' }`, `import { 'a-b' as loc }`)
+  drops the alias to the bare identifier binding (`export { x }`,
+  `import { loc }`). Run at program-construction time by `transform_server` over
+  BOTH the module-body imports + non-default exports AND the hoisted instance-script
+  imports; it collapses the two name sides onto one span (a clone of the surviving
+  binding) so the specifier printer's `left.span() != right.span()` gate takes its
+  bare-form path — no printer edit, no `esrap`-parity flag. `erase.rs`'s
+  `Option`-means-unchanged structural sharing, and a single exhaustive statement
+  classifier (`specifier_bearing`) shared by the collapse and the comment guard, so
+  a new specifier-bearing statement variant fails compilation rather than escaping
+  both; only a specifier's `exported`/`imported` sub-field is swapped, so the
+  declaration and specifier spans (and the comment windows keyed on them) are
+  untouched. An `ExportAllDeclaration` (`export * as 'str'`) keeps its name verbatim
+  — esrap's rule is specifier-only — and the identifier self-alias `x as x` is a
+  separate MAIN-owed gap this transform leaves alone (it fires only when a `Literal`
+  is involved). ⚠️ **The collapse has one lossy edge.** esrap DROPS the alias but
+  KEEPS a comment sitting in the `as`-gap, while the span collapse makes the printer
+  skip that gap — so the comment would be silently DROPPED. Only the module-body
+  program carries comments (the F1 keep set, `module_comments`); the `$` scaffold and
+  the hoisted instance imports print comment-free. So the module body goes through
+  `normalize_module_specifiers_checked`, which REFUSES
+  (`Refusal::CommentInDroppedSpecifierAlias`) when a KEPT comment falls in a
+  collapsing specifier's skipped as-gap (`[local.end, exported.start)` for an export,
+  `[imported.end, local.start)` for an import) — a safe over-refusal on a
+  corpus-absent shape. A comment neither side emits is dropped by both (parity) and
+  does NOT refuse; the plain `normalize_module_specifiers` stays infallible for the
+  comment-free instance path.
 - `transform_server.rs` — the SSR transform **orchestrator**: `compile_server`
   runs the phase-numbered pipeline (TypeScript erasure/gate, CSS scoping — the
   element census built and every selector chain matched against it **upfront** in
@@ -652,7 +682,10 @@ project-wide conventions.
   every `EmitEnv::erase` call collects. Module scaffold: `import * as $ from
   'svelte/internal/server'`, then any instance-script `import` declarations
   hoisted to module scope in source order (an import inside the component
-  function is invalid JS) + the exported component function. The whole body
+  function is invalid JS) + the exported component function. Both the hoisted
+  instance imports and the module-body imports + non-default exports pass through
+  `specifier_normalize` at program construction, reproducing esrap's alias-drop
+  for a string-literal specifier name (see that module below). The whole body
   wraps in `$$renderer.component(($$renderer) => { … })` whenever
   `needs_context` fires (a dropped effect, the new/member/call analysis in
   `needs_context.rs`, or a non-empty `$bindable` set), which also forces the
