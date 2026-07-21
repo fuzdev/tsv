@@ -26,15 +26,18 @@ pub fn decode_escape_sequences(source: &str) -> Cow<'_, str> {
         if ch == '\\' {
             if let Some(&next_ch) = chars.peek() {
                 if next_ch.is_ascii_hexdigit() {
-                    // Unicode escape sequence
-                    let mut hex_digits = String::new();
+                    // Unicode escape sequence — accumulate the 1-6 hex digits directly
+                    // into a `u32` (no throwaway `String` + `from_str_radix`). Six
+                    // digits max (0xFFFFFF), so `code_point` never overflows. The outer
+                    // `is_ascii_hexdigit` guard guarantees at least one digit is read.
+                    let mut code_point: u32 = 0;
                     for _ in 0..6 {
-                        match chars.peek() {
-                            Some(&digit) if digit.is_ascii_hexdigit() => {
-                                hex_digits.push(digit);
+                        match chars.peek().and_then(|d| d.to_digit(16)) {
+                            Some(d) => {
+                                code_point = code_point * 16 + d;
                                 chars.next();
                             }
-                            _ => break,
+                            None => break,
                         }
                     }
                     // Optional whitespace terminator — the same CSS whitespace set
@@ -45,9 +48,7 @@ pub fn decode_escape_sequences(source: &str) -> Cow<'_, str> {
                     {
                         chars.next();
                     }
-                    if let Ok(code_point) = u32::from_str_radix(&hex_digits, 16)
-                        && let Some(c) = char::from_u32(code_point)
-                    {
+                    if let Some(c) = char::from_u32(code_point) {
                         result.push(c);
                     }
                 } else {
