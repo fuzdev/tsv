@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 718,
+	"end": 699,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,31 +10,31 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 583,
-				"data": " A <slot> whose only child is an expanding block ({#if}/{#each}/{#key}) with no boundary\n     whitespace. The block forces the slot multiline, and it lays out block-style — both tags intact,\n     content on its own indented line — exactly like a regular element in the same shape\n     (../../../elements/inline_with_if_block_prettier_divergence/). The hugged boundary is render-free\n     under Svelte 5, so it does not select the layout; prettier reads it as an instruction to keep the\n     content glued to the tags and dangles both delimiters — see prettier_variant_dangle. "
+				"end": 564,
+				"data": "\n\tA <slot> whose only child is an expanding block ({#if}/{#each}/{#key}) with no boundary\n\twhitespace. The block forces the slot multiline, and it lays out block-style — both tags intact,\n\tcontent on its own indented line — exactly like a regular element in the same shape\n\t(../../../elements/inline_with_if_block_prettier_divergence/). The hugged boundary is render-free\n\tunder Svelte 5, so it does not select the layout; prettier reads it as an instruction to keep the\n\tcontent glued to the tags and dangles both delimiters — see prettier_variant_dangle.\n"
 			},
 			{
 				"type": "Text",
-				"start": 583,
-				"end": 584,
+				"start": 564,
+				"end": 565,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "SlotElement",
-				"start": 584,
-				"end": 619,
+				"start": 565,
+				"end": 600,
 				"name": "slot",
 				"name_loc": {
 					"start": {
-						"line": 7,
+						"line": 9,
 						"column": 1,
-						"character": 585
+						"character": 566
 					},
 					"end": {
-						"line": 7,
+						"line": 9,
 						"column": 5,
-						"character": 589
+						"character": 570
 					}
 				},
 				"attributes": [],
@@ -43,27 +43,27 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 590,
-							"end": 592,
+							"start": 571,
+							"end": 573,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "IfBlock",
 							"elseif": false,
-							"start": 592,
-							"end": 611,
+							"start": 573,
+							"end": 592,
 							"test": {
 								"type": "Identifier",
-								"start": 597,
-								"end": 601,
+								"start": 578,
+								"end": 582,
 								"loc": {
 									"start": {
-										"line": 8,
+										"line": 10,
 										"column": 6
 									},
 									"end": {
-										"line": 8,
+										"line": 10,
 										"column": 10
 									}
 								},
@@ -74,8 +74,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 602,
-										"end": 606,
+										"start": 583,
+										"end": 587,
 										"raw": "text",
 										"data": "text"
 									}
@@ -85,8 +85,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 611,
-							"end": 612,
+							"start": 592,
+							"end": 593,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -95,50 +95,50 @@
 			},
 			{
 				"type": "Text",
-				"start": 619,
-				"end": 621,
+				"start": 600,
+				"end": 602,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "SlotElement",
-				"start": 621,
-				"end": 680,
+				"start": 602,
+				"end": 661,
 				"name": "slot",
 				"name_loc": {
 					"start": {
-						"line": 11,
+						"line": 13,
 						"column": 1,
-						"character": 622
+						"character": 603
 					},
 					"end": {
-						"line": 11,
+						"line": 13,
 						"column": 5,
-						"character": 626
+						"character": 607
 					}
 				},
 				"attributes": [
 					{
 						"type": "Attribute",
-						"start": 627,
-						"end": 635,
+						"start": 608,
+						"end": 616,
 						"name": "name",
 						"name_loc": {
 							"start": {
-								"line": 11,
+								"line": 13,
 								"column": 6,
-								"character": 627
+								"character": 608
 							},
 							"end": {
-								"line": 11,
+								"line": 13,
 								"column": 10,
-								"character": 631
+								"character": 612
 							}
 						},
 						"value": [
 							{
-								"start": 633,
-								"end": 634,
+								"start": 614,
+								"end": 615,
 								"type": "Text",
 								"raw": "x",
 								"data": "x"
@@ -151,26 +151,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 636,
-							"end": 638,
+							"start": 617,
+							"end": 619,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "EachBlock",
-							"start": 638,
-							"end": 672,
+							"start": 619,
+							"end": 653,
 							"expression": {
 								"type": "Identifier",
-								"start": 645,
-								"end": 650,
+								"start": 626,
+								"end": 631,
 								"loc": {
 									"start": {
-										"line": 12,
+										"line": 14,
 										"column": 8
 									},
 									"end": {
-										"line": 12,
+										"line": 14,
 										"column": 13
 									}
 								},
@@ -181,19 +181,19 @@
 								"nodes": [
 									{
 										"type": "ExpressionTag",
-										"start": 659,
-										"end": 665,
+										"start": 640,
+										"end": 646,
 										"expression": {
 											"type": "Identifier",
-											"start": 660,
-											"end": 664,
+											"start": 641,
+											"end": 645,
 											"loc": {
 												"start": {
-													"line": 12,
+													"line": 14,
 													"column": 23
 												},
 												"end": {
-													"line": 12,
+													"line": 14,
 													"column": 27
 												}
 											},
@@ -205,26 +205,26 @@
 							"context": {
 								"type": "Identifier",
 								"name": "item",
-								"start": 654,
-								"end": 658,
+								"start": 635,
+								"end": 639,
 								"loc": {
 									"start": {
-										"line": 12,
+										"line": 14,
 										"column": 17,
-										"character": 654
+										"character": 635
 									},
 									"end": {
-										"line": 12,
+										"line": 14,
 										"column": 21,
-										"character": 658
+										"character": 639
 									}
 								}
 							}
 						},
 						{
 							"type": "Text",
-							"start": 672,
-							"end": 673,
+							"start": 653,
+							"end": 654,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -233,26 +233,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 680,
-				"end": 682,
+				"start": 661,
+				"end": 663,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "SlotElement",
-				"start": 682,
-				"end": 717,
+				"start": 663,
+				"end": 698,
 				"name": "slot",
 				"name_loc": {
 					"start": {
-						"line": 15,
+						"line": 17,
 						"column": 1,
-						"character": 683
+						"character": 664
 					},
 					"end": {
-						"line": 15,
+						"line": 17,
 						"column": 5,
-						"character": 687
+						"character": 668
 					}
 				},
 				"attributes": [],
@@ -261,26 +261,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 688,
-							"end": 690,
+							"start": 669,
+							"end": 671,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "KeyBlock",
-							"start": 690,
-							"end": 709,
+							"start": 671,
+							"end": 690,
 							"expression": {
 								"type": "Identifier",
-								"start": 696,
-								"end": 698,
+								"start": 677,
+								"end": 679,
 								"loc": {
 									"start": {
-										"line": 16,
+										"line": 18,
 										"column": 7
 									},
 									"end": {
-										"line": 16,
+										"line": 18,
 										"column": 9
 									}
 								},
@@ -291,8 +291,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 699,
-										"end": 703,
+										"start": 680,
+										"end": 684,
 										"raw": "text",
 										"data": "text"
 									}
@@ -301,8 +301,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 709,
-							"end": 710,
+							"start": 690,
+							"end": 691,
 							"raw": "\n",
 							"data": "\n"
 						}

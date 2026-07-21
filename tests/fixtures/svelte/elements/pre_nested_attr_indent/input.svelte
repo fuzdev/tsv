@@ -1,7 +1,9 @@
-<!-- Inside <pre>, an element's wrapped attributes (and its `/>`) indent off the
-element's nesting depth, which accumulates one level per enclosing container
-(element body, block body) exactly like prettier. The columns of the tags come
-from preserved text; only the attribute/`>` breaks are doc-driven. -->
+<!--
+	Inside <pre>, an element's wrapped attributes (and its `/>`) indent off the
+	element's nesting depth, which accumulates one level per enclosing container
+	(element body, block body) exactly like prettier. The columns of the tags come
+	from preserved text; only the attribute/`>` breaks are doc-driven.
+-->
 
 <!-- Self-closing component directly in <pre>: attrs at 2 tabs, `/>` at 1 -->
 <pre><Comp

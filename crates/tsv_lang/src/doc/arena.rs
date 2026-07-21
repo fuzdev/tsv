@@ -597,6 +597,12 @@ pub struct DocArena {
     /// borrow; capacity survives `reset()`.
     render_commands_scratch: RefCell<CmdStack>,
     line_suffix_scratch: RefCell<LineSuffixBuf>,
+    /// Parked line-offset scratch for the multi-line block-comment builders:
+    /// one `split('\n')` pass per comment fills it with each body line's
+    /// `(start, end)` byte range, so the classifier and builder iterate the
+    /// lines slice-cheap without materializing a per-comment line buffer.
+    /// Cleared at each borrow; capacity survives `reset()`.
+    line_spans_scratch: RefCell<Vec<(u32, u32)>>,
     /// Parked whole-source line-break table backing the per-file
     /// `build_line_breaks` in each `format_in` — taken (moved out), filled,
     /// and parked back cleared with capacity retained, like `render_scratch`.
@@ -765,6 +771,7 @@ impl DocArena {
             render_scratch: Cell::new(String::new()),
             render_commands_scratch: RefCell::new(SmallVec::new()),
             line_suffix_scratch: RefCell::new(SmallVec::new()),
+            line_spans_scratch: RefCell::new(Vec::new()),
             line_breaks_scratch: Cell::new(Vec::new()),
             docbuf_pool: RefCell::new(Vec::new()),
             will_break_cache: RefCell::new(Vec::new()),
@@ -815,6 +822,7 @@ impl DocArena {
             render_scratch: Cell::new(String::new()),
             render_commands_scratch: RefCell::new(SmallVec::new()),
             line_suffix_scratch: RefCell::new(SmallVec::new()),
+            line_spans_scratch: RefCell::new(Vec::new()),
             line_breaks_scratch: Cell::new(Vec::new()),
             docbuf_pool: RefCell::new(Vec::new()),
             // The fitting memos top out at `nodes.len()` (~= `estimated_nodes`),
@@ -1146,6 +1154,30 @@ impl DocArena {
             self.nodes.borrow()[id.index()],
             DocNode::Line(LineKind::Normal | LineKind::Soft)
         )
+    }
+
+    /// If `id` is an after-element fold — a `Fill` wrapped in a `WithContext` carrying
+    /// [`DocContext::hug_wide_first`], the marker `build_after_element_fold` always sets —
+    /// return the fold's LEAD item: the inline element the trailing text packs after. `None`
+    /// for any other node.
+    ///
+    /// The preceding text's flow-boundary measurement (`break_before_wide_flow`) uses this to
+    /// decide the element's drop by whether the *element* fits, mirroring prettier's pairwise
+    /// fill (`text, separator, element` — never the trailing text). A short lead then packs
+    /// after the text rather than the whole element+tail fold forcing it to its own line.
+    #[inline]
+    pub(crate) fn after_element_fold_lead(&self, id: DocId) -> Option<DocId> {
+        let nodes = self.nodes.borrow();
+        let DocNode::WithContext { doc, context } = &nodes[id.index()] else {
+            return None;
+        };
+        if !context.hug_wide_first {
+            return None;
+        }
+        let DocNode::Fill(range) = &nodes[doc.index()] else {
+            return None;
+        };
+        range.resolve(&self.children.borrow()).first().copied()
     }
 
     /// Tag `id` as the doc node that emits the comment at `span` in `source`.
@@ -2131,6 +2163,18 @@ impl DocArena {
             buf: self.acquire_docbuf(),
             arena: self,
         }
+    }
+
+    /// Borrow the pooled line-offset scratch (cleared here) — a multi-line
+    /// block-comment builder fills it with each body line's `(start, end)`
+    /// byte range from one `split('\n')` pass and drops the borrow before the
+    /// next comment builds. Held only within one builder call; nothing
+    /// downstream of the fill re-borrows it.
+    #[inline]
+    pub fn borrow_line_spans_scratch(&self) -> std::cell::RefMut<'_, Vec<(u32, u32)>> {
+        let mut scratch = self.line_spans_scratch.borrow_mut();
+        scratch.clear();
+        scratch
     }
 
     /// Borrow the pooled top-level render command stack (cleared here). Held

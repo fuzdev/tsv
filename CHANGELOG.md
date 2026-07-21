@@ -59,7 +59,8 @@ tsv has no config that changes its formatting style behavior, and none will be a
   [#250](https://github.com/fuzdev/tsv/pull/250), [#254](https://github.com/fuzdev/tsv/pull/254),
   [#290](https://github.com/fuzdev/tsv/pull/290), [#292](https://github.com/fuzdev/tsv/pull/292),
   [#300](https://github.com/fuzdev/tsv/pull/300), [#305](https://github.com/fuzdev/tsv/pull/305),
-  [#308](https://github.com/fuzdev/tsv/pull/308), [#309](https://github.com/fuzdev/tsv/pull/309))
+  [#308](https://github.com/fuzdev/tsv/pull/308), [#309](https://github.com/fuzdev/tsv/pull/309),
+  [#537](https://github.com/fuzdev/tsv/pull/537), [#538](https://github.com/fuzdev/tsv/pull/538))
 
 ## 0.1.0
 
