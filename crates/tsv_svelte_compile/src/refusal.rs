@@ -280,13 +280,25 @@ pub enum Refusal {
         /// A short description of the unrecognized pattern node.
         kind: &'static str,
     },
-    /// Destructuring a `$state(…)` declarator.
+    /// An UNSUPPORTED corner of a destructured `$state(…)` / `$state.raw(…)`
+    /// declarator. The common shape COMPILES: the oracle's
+    /// `create_state_declarators` lowers `let {a, b} = $state(o)` into a
+    /// temp-destructure (`let tmp = o, a = tmp.a, b = tmp.b`), which
+    /// `destructure::expand_destructured_state` reproduces. This refusal fires only
+    /// for the residual corners that lowering can't reach — an EXOTIC object key
+    /// (computed / string-literal / numeric / escaped) inside the pattern, or a
+    /// MULTI-declarator source declaration carrying the destructure — both safe
+    /// over-refusals absent from the gating Svelte corpus (which has identifier keys
+    /// and single-declarator sources only).
     #[error("destructuring a $state declarator")]
     DestructuringState,
-    /// Destructuring a `$state.snapshot(…)` declarator. The oracle lowers
-    /// `const {a} = $state.snapshot(x)` into a temp-destructure
-    /// (`const tmp = x, a = tmp.a`), a shape this transform does not reproduce (a
-    /// safe over-refusal); a plain-identifier target unwraps to the argument.
+    /// An UNSUPPORTED corner of a destructured `$state.snapshot(…)` declarator. Like
+    /// [`Self::DestructuringState`], the common shape COMPILES: the snapshot wrapper
+    /// is dropped and the declarator lowers exactly like `$state`
+    /// (`let {a} = $state.snapshot(x)` → `let tmp = x, a = tmp.a`), differing only in
+    /// that a snapshot leaf never folds (its binding stays UNKNOWN). This refusal
+    /// fires only for the same residual corners — an exotic object key, or a
+    /// multi-declarator source.
     #[error("destructuring a $state.snapshot declarator")]
     DestructuringStateSnapshot,
     /// Destructuring a `$derived(…)` declarator.
@@ -498,6 +510,16 @@ pub enum Refusal {
     /// [`Self::CommentsWithBindable`].
     #[error("comments in a script with a destructured $derived declarator")]
     CommentsWithDestructuredDerived,
+    /// Comments in a script with a destructured `$state`/`$state.raw`/
+    /// `$state.snapshot` declarator. Like [`Self::CommentsWithDestructuredDerived`],
+    /// the `create_state_declarators` lowering splits ONE source declarator into a
+    /// `tmp` plus N raw projections (and, for an array pattern, a `$$array`
+    /// intermediate), scattering the pattern leaves across synthetic spans whose
+    /// leading-comment windows would sweep a carried script comment. A safe
+    /// over-refusal (absent from the gating Svelte corpus but reachable in ecosystem
+    /// code), like [`Self::CommentsWithArglessState`].
+    #[error("comments in a script with a destructured $state declarator")]
+    CommentsWithDestructuredState,
     /// Comments in a script with a rest-element `$props()`.
     #[error("comments in a script with a rest-element $props() (injected $$slots/$$events)")]
     CommentsWithRestProps,

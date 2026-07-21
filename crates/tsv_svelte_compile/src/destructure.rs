@@ -1,52 +1,68 @@
-//! Destructured `$derived` / `$derived.by` declarators — the 1→N lowering.
+//! Destructured rune declarators — the 1→N lowering, shared by `$derived` /
+//! `$derived.by` and `$state` / `$state.raw` / `$state.snapshot`.
 //!
-//! Oracle phase 3, **server**: the `$derived`/`$derived.by` branch of
+//! Oracle phase 3, **server**: both branches of
 //! `packages/svelte/src/compiler/phases/3-transform/server/visitors/VariableDeclaration.js`
-//! (lines 87–134), backed by `utils/ast.js`'s `extract_paths` / `_extract_paths`
-//! (line 269) and `build_fallback` (line 585). A single source declarator like
-//! `let {a, b} = $derived(o)` lowers to N synthetic `$.derived(() => …)`
-//! declarators — one per destructuring leaf, projecting from the derived value:
+//! — the `$derived`/`$derived.by` branch (lines 87–134) and
+//! `create_state_declarators` (lines 229–247) — backed by the ONE shared
+//! `utils/ast.js` `extract_paths` / `_extract_paths` (line 269) and `build_fallback`
+//! (line 585). A single source declarator lowers to N synthetic declarators, one
+//! per destructuring leaf. The two lowerings share the extractor and differ only in
+//! how each leaf/array-intermediate is wrapped ([`Lowering`]):
 //!
 //! ```text
-//! let a = $.derived(() => o.a), b = $.derived(() => o.b);
+//! let {a, b} = $derived(o);   ->  let a = $.derived(() => o.a), b = $.derived(() => o.b);
+//! let {a, b} = $state(o);     ->  let tmp = o, a = tmp.a, b = tmp.b;
 //! ```
 //!
 //! The rule, mirrored from the oracle:
 //!
-//! 1. `value` is the rune argument (`$derived`) or the compute function
-//!    (`$derived.by`); `rhs = value`.
-//! 2. Mint an intermediate `$$d` when the rune is `$derived.by`, OR when it is
-//!    `$derived` and `value` is not a bare identifier. Then `rhs = $$d()` and a
-//!    `const $$d = $.derived(<init>)` leads the group — `<init>` reusing the exact
-//!    unthunk collapse of the identifier-target path (`$derived(getObj())` →
-//!    `$.derived(getObj)`). A bare-identifier `$derived(o)` projects directly from
-//!    `o` (no `$$d`), and a `$derived`/store read inside `o` is lowered by
-//!    [`store_rewrite`](crate::store_rewrite) afterward (`$derived(base)` →
-//!    `$.derived(() => base().x)`).
-//! 3. `extract_paths(id, rhs)` yields **inserts** (array `$.to_array` intermediates,
-//!    each a `$$derived_array` derived) and **paths** (leaf projections). Inserts are
-//!    emitted first, then paths — the oracle's declaration order.
+//! - **Derived** ([`Lowering::Derived`]): `value` is the rune argument (`$derived`)
+//!   or the compute function (`$derived.by`). Mint an intermediate `$$d` when the
+//!   rune is `$derived.by`, OR when it is `$derived` and `value` is not a bare
+//!   identifier; then `rhs = $$d()` and a `const $$d = $.derived(<init>)` leads the
+//!   group (`<init>` reusing the identifier path's unthunk collapse). A
+//!   bare-identifier `$derived(o)` projects directly from `o`. Each leaf is
+//!   `$.derived(() => access)`; each array intermediate a `$$derived_array` derived.
+//! - **State** ([`Lowering::State`]): ALWAYS mint a `tmp` holding the value
+//!   (`let tmp = value`, `value` being the argument — `void 0` for the argless
+//!   `$state()`, the argument for `$state.raw`/`$state.snapshot`, the snapshot
+//!   wrapper simply dropped). `rhs = tmp`, and each leaf is a RAW `name = access`
+//!   projection (no `$.derived` wrap); each array intermediate a RAW
+//!   `$$array = $.to_array(...)` (a plain `const`, not a derived). A store/`$derived`
+//!   read inside the value is lowered afterward by
+//!   [`store_rewrite`](crate::store_rewrite) (`let {a} = $state(d)` → `let tmp = d(),
+//!   a = tmp.a`), never special-cased here.
+//!
+//! `extract_paths(id, rhs)` yields **inserts** (array `$.to_array` intermediates)
+//! and **paths** (leaf projections). Inserts are emitted first, then paths — the
+//! oracle's declaration order.
 //!
 //! The `$$derived_array` intermediate is itself a derived binding, so every read of
-//! it is a call: the projections are built as `$$derived_array()[i]` /
+//! it is a call: the projections are `$$derived_array()[i]` /
 //! `$$derived_array().slice(i)` with the `()` baked in (the oracle relies on its
 //! visitor to add it; tsv bakes it because a synthetic identifier is invisible to
 //! the store rewrite's derived-read detection). `$$d` reads are likewise `$$d()`.
+//! The state `$$array` is a plain `const`, so its reads are BARE `$$array[i]` /
+//! `$$array.slice(i)` — no call.
 //!
 //! **Comment safety.** The lowering scatters the pattern leaves across N synthetic
-//! declarators and mints `$$d`/`$$derived_array` intermediates whose comment
-//! windows would sweep a carried script comment. Rather than reproduce the oracle's
-//! emergent placement, the caller refuses [`CommentsWithDestructuredDerived`](crate::Refusal::CommentsWithDestructuredDerived)
+//! declarators and mints `$$d`/`$$derived_array`/`tmp`/`$$array` intermediates whose
+//! comment windows would sweep a carried script comment. Rather than reproduce the
+//! oracle's emergent placement, the caller refuses
+//! [`CommentsWithDestructuredDerived`](crate::Refusal::CommentsWithDestructuredDerived)
+//! / [`CommentsWithDestructuredState`](crate::Refusal::CommentsWithDestructuredState)
 //! when the script carries comments — a safe over-refusal (absent from the gating
 //! Svelte corpus, though it occurs in ecosystem code), so every node built here
 //! runs in a comment-free script and may mint freely.
 //!
-//! **Names.** `$$d` and `$$derived_array` are allocated by [`GeneratedNames`],
-//! mirroring the oracle's `scope.generate`: a per-base counter plus a bump past any
-//! collision (`$$derived_array`, then `$$derived_array_1` for a second array). A
-//! `$$`-prefixed user binding is refused upstream (`dollar_prefix_invalid`), so a
-//! generated-vs-user collision is unreachable; the counter carries the
-//! generated-vs-generated case the corpus exercises.
+//! **Names.** `$$d`, `$$derived_array`, `tmp`, and `$$array` are allocated by
+//! [`GeneratedNames`], mirroring the oracle's `scope.generate`: a per-base counter
+//! plus a bump past any collision (`tmp`, then `tmp_1` for a second state
+//! destructure; `$$array`, then `$$array_1`). A `$$`-prefixed user binding is
+//! refused upstream (`dollar_prefix_invalid`), so a generated-vs-user collision is
+//! unreachable for the `$$` bases; `tmp` dedups against the frozen user binding set
+//! (`let tmp = 9` forces the generated one to `tmp_1`).
 
 use std::collections::HashMap;
 
@@ -110,6 +126,29 @@ impl<'a> GeneratedNames<'a> {
         self.counters.insert(base.to_string(), n);
         self.generated.insert(name.clone());
         name
+    }
+}
+
+/// Which rune family a destructure is being lowered for — the only axis on which
+/// the shared [`Extractor`] forks. `$derived` wraps every leaf in
+/// `$.derived(() => …)` and its array intermediates are themselves derived (read
+/// with a `()` call); `$state` emits RAW projections and plain-`const` array
+/// intermediates (read bare). `$.fallback` / `$.exclude_from_object` / object
+/// member projection are identical on both.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Lowering {
+    Derived,
+    State,
+}
+
+impl Lowering {
+    /// The array-intermediate base name the array pattern mints (`scope.generate`
+    /// base): `$$derived_array` (derived) vs `$$array` (state).
+    fn array_base(self) -> &'static str {
+        match self {
+            Lowering::Derived => "$$derived_array",
+            Lowering::State => "$$array",
+        }
     }
 }
 
@@ -185,6 +224,98 @@ pub(crate) fn expand_destructured_derived<'arena>(
         b,
         source,
         refusal,
+        mode: Lowering::Derived,
+        inserts: Vec::new(),
+        paths: Vec::new(),
+    };
+    extractor.extract(&declarator.id, rhs, names)?;
+    for decl in extractor.inserts {
+        declarations.push(decl);
+    }
+    for decl in extractor.paths {
+        declarations.push(decl);
+    }
+    Ok(())
+}
+
+/// Lower a destructured `$state` / `$state.raw` / `$state.snapshot` declarator into
+/// N declarators via the oracle's `create_state_declarators`
+/// (`VariableDeclaration.js:229-247`), pushed onto `declarations` (`tmp` first, then
+/// inserts, then paths — the oracle's order).
+///
+/// Unlike the derived branch this ALWAYS mints a `tmp` holding the value
+/// (`let tmp = value`) and projects raw from it (no `$.derived` wrap). `value` is
+/// the argument (`void 0` for the argless `$state()`); the `$state.snapshot`
+/// wrapper is simply dropped, its argument becoming `value` exactly like `$state`
+/// — the two differ only in the leaf `initial` the binding table assigns (snapshot
+/// never folds), decided upstream in `script_bindings`. A store/`$derived` read
+/// inside `value` is lowered afterward by [`store_rewrite`](crate::store_rewrite)
+/// (`let {a} = $state(d)` → `let tmp = d(), a = tmp.a`), never special-cased here.
+///
+/// The caller has already established the target is a pattern (not an identifier)
+/// and that the script carries no comments. `ctx` is the script-body guard context
+/// (store/derived reads exempt) reused to walk the pattern defaults and the rune
+/// argument for stray runes.
+pub(crate) fn expand_destructured_state<'arena>(
+    b: &mut Builder<'arena>,
+    ctx: &mut WalkCtx<'_>,
+    declarations: &mut BumpVec<'arena, VariableDeclarator<'arena>>,
+    declarator: &'arena VariableDeclarator<'arena>,
+    rune: RuneInit<'arena>,
+    source: &str,
+    names: &mut GeneratedNames<'_>,
+) -> Result<(), CompileError> {
+    // The pattern's defaults are real value expressions — walk them for a stray
+    // rune (`{a = $state(0)}`) or a top-level `await`. The binding leaves are
+    // exempt (`$`-prefixed leaves already refused by `refuse_dollar_binding_pattern`
+    // before this arm).
+    walk_expression_guarded(&declarator.id, ctx)?;
+
+    // `value` is the argument the `tmp` holds — `void 0` when argless. The rune's
+    // argument is guard-walked (a bare store/derived read is exempt — the store
+    // rewrite lowers it inside `let tmp = value` afterward). `$state.snapshot`'s
+    // wrapper is dropped, so its argument becomes `value` just like `$state`.
+    let (value, refusal): (Expression<'arena>, Refusal) = match rune {
+        RuneInit::State(Some(arg)) => {
+            walk_expression_guarded(arg, ctx)?;
+            (arg.clone(), Refusal::DestructuringState)
+        }
+        RuneInit::State(None) => (b.void_zero(), Refusal::DestructuringState),
+        RuneInit::StateSnapshot(arg) => {
+            walk_expression_guarded(arg, ctx)?;
+            (arg.clone(), Refusal::DestructuringStateSnapshot)
+        }
+        // Only the three state arms reach here (the caller matched them).
+        _ => return Err(unsupported(Refusal::DestructuringState)),
+    };
+
+    // `let tmp = value` leads the group. `tmp` is generated BEFORE `$$array` (the
+    // oracle's order: `scope.generate('tmp')` runs before `extract_paths`, whose
+    // `$$array` names the Extractor mints inline during the walk).
+    let tmp_name = names.generate("tmp");
+    // `tmp`'s init is the borrowed host `value` (not a mint), so — unlike the
+    // minted `$$d` / `$$array` inits — this declarator does NOT run forward: the
+    // id is a fresh appendix span (high) while `value` keeps its lower host span,
+    // so `id.start > init.end`. Safe anyway, because the printer's underflow-prone
+    // `callee.end - decl.span.start` (`variable.rs`) reads the reused host
+    // STATEMENT span (`rewrite_script_statement`'s `span: decl.span`), never this
+    // appendix id span.
+    let tmp_id = Expression::Identifier(b.ident(&tmp_name));
+    let tmp_span = tmp_id.span();
+    declarations.push(VariableDeclarator {
+        id: tmp_id,
+        init: Some(value),
+        definite: false,
+        span: tmp_span,
+    });
+    // Every leaf projects from a fresh `tmp` read (a plain `const`, so no `()`).
+    let rhs: &'arena Expression<'arena> = b.ident_expr(&tmp_name);
+
+    let mut extractor = Extractor {
+        b,
+        source,
+        refusal,
+        mode: Lowering::State,
         inserts: Vec::new(),
         paths: Vec::new(),
     };
@@ -214,8 +345,10 @@ fn derived_wrap<'arena>(
 struct Extractor<'b, 'arena> {
     b: &'b mut Builder<'arena>,
     source: &'b str,
-    /// The refusal for an unrecognized shape (`$derived` vs `$derived.by`).
+    /// The refusal for an unrecognized shape (per rune family).
     refusal: Refusal,
+    /// Which rune family — the only fork (leaf/array-intermediate wrapping).
+    mode: Lowering,
     inserts: Vec<VariableDeclarator<'arena>>,
     paths: Vec<VariableDeclarator<'arena>>,
 }
@@ -252,19 +385,27 @@ impl<'arena> Extractor<'_, 'arena> {
                 Ok(())
             }
             Expression::ArrayPattern(arr) => {
-                // `const $$derived_array = $.derived(() => $.to_array(expr[, len]))`.
-                // The length is omitted when the last element is a rest.
+                // Derived: `const $$derived_array = $.derived(() => $.to_array(expr[,
+                // len]))`. State: `const $$array = $.to_array(expr[, len])` (a plain
+                // `const`, no `$.derived` wrap). The length is omitted when the last
+                // element is a rest.
                 let has_rest =
                     matches!(arr.elements.last(), Some(Some(Expression::RestElement(_))));
                 let len = (!has_rest).then_some(arr.elements.len());
-                let name = names.generate("$$derived_array");
+                let name = names.generate(self.mode.array_base());
                 // Mint the id BEFORE the `$.to_array` / `$.derived` init so the
-                // declarator span runs forward (see `push_path`'s forward-span note).
+                // declarator span runs forward (see the `$$d` mint's forward-span
+                // note in `expand_destructured_derived`).
                 let id = Expression::Identifier(self.b.ident(&name));
                 let id_span = id.span();
                 let to_array = self.build_to_array(expr, len);
-                let value = &*self.b.arena.alloc(to_array);
-                let init = self.derived_of(value);
+                let init = match self.mode {
+                    Lowering::Derived => {
+                        let value = &*self.b.arena.alloc(to_array);
+                        self.derived_of(value)
+                    }
+                    Lowering::State => to_array,
+                };
                 self.inserts.push(VariableDeclarator {
                     id,
                     init: Some(init),
@@ -298,9 +439,13 @@ impl<'arena> Extractor<'_, 'arena> {
         }
     }
 
-    /// `const <node-clone> = $.derived(() => access)`.
+    /// A leaf projection: `$.derived(() => access)` (derived) or the RAW `access`
+    /// (state) as `const <node-clone> = <init>`.
     fn push_path(&mut self, node: &Expression<'arena>, access: &'arena Expression<'arena>) {
-        let init = self.derived_of(access);
+        let init = match self.mode {
+            Lowering::Derived => self.derived_of(access),
+            Lowering::State => access.clone(),
+        };
         let span = node.span();
         self.paths.push(VariableDeclarator {
             id: node.clone(),
@@ -407,20 +552,25 @@ impl<'arena> Extractor<'_, 'arena> {
         self.b.member_call("$", "to_array", args.into_bump_slice())
     }
 
-    /// `$$derived_array()` — the derived intermediate, read as a call.
+    /// The array intermediate read: `$$derived_array()` (derived — read as a call,
+    /// since the intermediate is itself a derived binding) or the BARE `$$array`
+    /// (state — a plain `const`).
     fn array_read(&mut self, name: &str) -> &'arena Expression<'arena> {
-        let callee = self.b.ident_expr(name);
-        &*self.b.arena.alloc(self.b.call_of(callee, &[], false))
+        let ident = self.b.ident_expr(name);
+        match self.mode {
+            Lowering::Derived => &*self.b.arena.alloc(self.b.call_of(ident, &[], false)),
+            Lowering::State => ident,
+        }
     }
 
-    /// `$$derived_array()[i]`.
+    /// `$$derived_array()[i]` / `$$array[i]`.
     fn array_index(&mut self, name: &str, i: usize) -> &'arena Expression<'arena> {
         let base = self.array_read(name);
         let index = &*self.b.arena.alloc(self.small_number(i));
         &*self.b.arena.alloc(self.b.member_computed(base, index))
     }
 
-    /// `$$derived_array().slice(i)`.
+    /// `$$derived_array().slice(i)` / `$$array.slice(i)`.
     fn array_rest(&mut self, name: &str, i: usize) -> &'arena Expression<'arena> {
         let base = self.array_read(name);
         let slice = &*self.b.arena.alloc(self.b.member_prop(base, "slice"));

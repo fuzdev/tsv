@@ -715,7 +715,7 @@ pub(crate) fn compile_server<'arena>(
     // `$$derived_array_1`. Its collision floor is the full top-level binding-name
     // set: `store_names` is `bindings.names()` (every binding a candidate store
     // base), so it doubles as the `scope.generate` dedup set here.
-    let mut generated_names = crate::derived_destructure::GeneratedNames::new(&store_names);
+    let mut generated_names = crate::destructure::GeneratedNames::new(&store_names);
     // `component` is the whole-component analysis, computed up front by `analyze`
     // (the script rewrite needs its `uses_slots`) but left UNRESOLVED: its error
     // must NOT win over the script-loop refusals below, so it is `?`-unwrapped
@@ -775,7 +775,7 @@ pub(crate) fn compile_server<'arena>(
         //
         // The split keys on the SOURCE declarator count, not the output's: a
         // single source declarator that expanded 1→N (a DESTRUCTURED `$derived`
-        // — `derived_destructure`) is emitted as ONE joined declaration
+        // or `$state` — `destructure`) is emitted as ONE joined declaration
         // (`let a = …, b = …;`), exactly the oracle's shape, so it must NOT be
         // split. A multi-declarator source carrying such an expansion would need
         // per-source-declarator grouping the flat accumulator has lost, so it

@@ -25,7 +25,7 @@ use tsv_ts::ast::internal::{
 
 use crate::analyze::{NameSet, RuneInit, classify_rune_init, is_effect_call, is_inspect_call};
 use crate::build::Builder;
-use crate::derived_destructure::{GeneratedNames, expand_destructured_derived};
+use crate::destructure::{GeneratedNames, expand_destructured_derived, expand_destructured_state};
 use crate::rune_guard::{
     WalkCtx, refuse_dollar_binding_name, refuse_dollar_binding_pattern, walk_class_member_guarded,
     walk_expression_guarded, walk_statement_guarded,
@@ -303,7 +303,8 @@ pub(crate) fn rewrite_script_statement<'arena>(
         }
 
         // A DESTRUCTURED `$derived` / `$derived.by` — the 1→N lowering
-        // (`derived_destructure`), unlike an identifier target's single rewrite.
+        // (`destructure::expand_destructured_derived`), unlike an identifier
+        // target's single rewrite.
         if matches!(rune, Some(RuneInit::Derived(_) | RuneInit::DerivedBy(_)))
             && identifier_binding_name(&declarator.id, source).is_none()
         {
@@ -335,6 +336,52 @@ pub(crate) fn rewrite_script_statement<'arena>(
                 unreachable!("guarded to a derived rune above")
             };
             expand_destructured_derived(
+                b,
+                &mut ctx,
+                &mut declarations,
+                declarator,
+                rune,
+                source,
+                names,
+            )?;
+            continue;
+        }
+
+        // A DESTRUCTURED `$state` / `$state.raw` / `$state.snapshot` — the 1→N
+        // lowering (`create_state_declarators`, `expand_destructured_state`),
+        // unlike an identifier target's single unwrap. `$state.snapshot` lowers
+        // identically to `$state` (the wrapper dropped); the two diverge only in the
+        // leaf `initial` the binding table already assigned (snapshot never folds).
+        if matches!(rune, Some(RuneInit::State(_) | RuneInit::StateSnapshot(_)))
+            && identifier_binding_name(&declarator.id, source).is_none()
+        {
+            // A multi-declarator source (`let x = 1, {a, b} = $state(o)`) expands
+            // 1→N, but the oracle keeps only THAT declarator's leaves joined while
+            // splitting the siblings off — a per-source grouping the flat
+            // accumulator has lost. Refuse rather than over-split (a safe
+            // over-refusal on a shape absent from the gating Svelte corpus; the
+            // oracle compiles it), exactly like the derived arm above.
+            if decl.declarations.len() > 1 {
+                return Err(unsupported(match rune {
+                    Some(RuneInit::StateSnapshot(_)) => Refusal::DestructuringStateSnapshot,
+                    _ => Refusal::DestructuringState,
+                }));
+            }
+            // The split scatters the pattern leaves and mints `tmp`/`$$array`
+            // intermediates whose leading-comment windows would sweep a carried
+            // script comment. Refuse rather than reproduce the oracle's emergent
+            // placement — a safe over-refusal, like the derived arm and the argless
+            // `$state` case.
+            if has_comments {
+                return Err(unsupported(Refusal::CommentsWithDestructuredState));
+            }
+            // `rune` is `Some(State | StateSnapshot)` by the `matches!` guard above;
+            // extract it to move into the expander.
+            #[allow(clippy::unreachable)] // the guard above proved the variant
+            let Some(rune) = rune else {
+                unreachable!("guarded to a state rune above")
+            };
+            expand_destructured_state(
                 b,
                 &mut ctx,
                 &mut declarations,

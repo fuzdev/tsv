@@ -419,3 +419,47 @@ fn compile_destructured_derived_refuses_in_multi_declarator() {
         "destructuring a $derived declarator",
     );
 }
+
+#[test]
+fn compile_destructured_derived_leaf_folds_through_scalar_arg() {
+    // A destructured-derived LEAF folds through the rune's argument, exactly like an
+    // identifier target — the oracle declares every leaf with the whole `$derived(…)`
+    // call as its initial (`scope.js:1204-1213`) and evaluates it through the arg. So
+    // with `d`→5 (a bounded scalar), `{a}` folds to the CONTAINER value `5` (ignoring
+    // the `.a` projection), NOT a dynamic `$.escape(a())`. This was the committed
+    // MISMATCH before the leaf-initial fix (leaves were wrongly `Initial::None`).
+    let out = compile_checked(
+        "<script>\n\tlet d = $derived(5);\n\tlet { a } = $derived(d);\n</script>\n<p>{a}</p>",
+    );
+    assert!(
+        out.js.contains("<p>5</p>"),
+        "destructured-derived scalar-arg leaf must fold to the container value: {}",
+        out.js
+    );
+    assert!(
+        !out.js.contains("$.escape"),
+        "the folded leaf read must not stay dynamic: {}",
+        out.js
+    );
+    // The transform still lowers each leaf to its own `$.derived(() => path)`; only
+    // the template READ folds.
+    assert!(
+        out.js.contains("let a = $.derived(() => d().a);"),
+        "leaf declarator must still be a projecting derived: {}",
+        out.js
+    );
+}
+
+#[test]
+fn compile_destructured_derived_object_arg_leaf_stays_dynamic() {
+    // The corpus-common case is UNCHANGED by the leaf-initial fix: an object/array
+    // argument evaluates to UNKNOWN, so the leaf does NOT fold and reads as `a()`.
+    let out = compile_checked(
+        "<script>\n\tlet o = { a: 1, b: 2 };\n\tlet { a, b } = $derived(o);\n</script>\n<p>{a}{b}</p>",
+    );
+    assert!(
+        out.js.contains("${$.escape(a())}${$.escape(b())}"),
+        "object-arg destructured-derived leaves must stay dynamic calls: {}",
+        out.js
+    );
+}

@@ -164,3 +164,152 @@ fn compile_class_state_lone_derived_arg_refuses() {
         "lone store/$derived argument",
     );
 }
+
+// ── Destructured `$state` / `$state.raw` / `$state.snapshot` ────────────────────
+// The 1→N `create_state_declarators` lowering. Durable coverage is the
+// `state_destructure/*` compile fixtures; these pin the shape + fold + refusals.
+
+#[test]
+fn compile_state_destructure_object_projects_from_tmp() {
+    // `let { a, b } = $state({…})` → `let tmp = {…}, a = tmp.a, b = tmp.b` (no
+    // `$.derived` wrap — the leaves are plain `let`s). An object arg is UNKNOWN, so
+    // the reads stay dynamic (`$.escape`), not folded.
+    let out = compile_checked(
+        "<script>\n\tlet { a, b } = $state({ a: 1, b: 2 });\n</script>\n<p>{a}{b}</p>",
+    );
+    assert!(
+        out.js
+            .contains("let tmp = { a: 1, b: 2 },\n\t\ta = tmp.a,\n\t\tb = tmp.b;"),
+        "state object destructure not lowered to a temp-destructure: {}",
+        out.js
+    );
+    assert!(
+        !out.js.contains("$state"),
+        "no $state may survive: {}",
+        out.js
+    );
+    assert!(
+        out.js.contains("${$.escape(a)}${$.escape(b)}"),
+        "object-arg leaves must stay dynamic: {}",
+        out.js
+    );
+}
+
+#[test]
+fn compile_state_destructure_array_uses_bare_array_reads() {
+    // `let [ a, b ] = $state([…])` mints a PLAIN-`const` `$$array = $.to_array(tmp,
+    // 2)`, and the reads are BARE `$$array[i]` — no `()` call (the state array
+    // intermediate is not a derived, unlike `$$derived_array()`).
+    let out =
+        compile_checked("<script>\n\tlet [ a, b ] = $state([ 1, 2 ]);\n</script>\n<p>{a}{b}</p>");
+    assert!(
+        out.js.contains("$$array = $.to_array(tmp, 2)"),
+        "state array intermediate must be a plain $.to_array: {}",
+        out.js
+    );
+    assert!(
+        out.js.contains("a = $$array[0]") && out.js.contains("b = $$array[1]"),
+        "state array reads must be bare (no call): {}",
+        out.js
+    );
+    assert!(
+        !out.js.contains("$$array()"),
+        "a state $$array read must never be a call: {}",
+        out.js
+    );
+}
+
+#[test]
+fn compile_state_snapshot_destructure_drops_wrapper() {
+    // `let { a } = $state.snapshot(obj)` lowers exactly like `$state` — the snapshot
+    // wrapper is dropped (`let tmp = obj, a = tmp.a`). The snapshot binding stays
+    // UNKNOWN, so `{a}` reads dynamically even for a known-ish arg.
+    let out = compile_checked(
+        "<script>\n\tlet obj = {};\n\tlet { a } = $state.snapshot(obj);\n</script>\n<p>{a}</p>",
+    );
+    assert!(
+        out.js.contains("let tmp = obj,\n\t\ta = tmp.a;"),
+        "snapshot destructure must drop the wrapper into a temp-destructure: {}",
+        out.js
+    );
+    assert!(
+        !out.js.contains("$.snapshot") && !out.js.contains("$state"),
+        "no snapshot/$state syntax may survive: {}",
+        out.js
+    );
+    assert!(
+        out.js.contains("${$.escape(a)}"),
+        "a snapshot leaf never folds: {}",
+        out.js
+    );
+}
+
+#[test]
+fn compile_state_destructure_leaf_folds_through_scalar_arg() {
+    // The oracle's over-fold: `let n = 5; let { a } = $state(n)` folds `{a}` to the
+    // CONTAINER value `5` (using `eval(arg)`, ignoring the `.a` projection) — every
+    // leaf takes the rune's computed initial (`Expr(n)` → 5). Reproduced byte-exact.
+    let out =
+        compile_checked("<script>\n\tlet n = 5;\n\tlet { a } = $state(n);\n</script>\n<p>{a}</p>");
+    assert!(
+        out.js.contains("<p>5</p>") && !out.js.contains("$.escape"),
+        "state scalar-arg leaf must fold to the container value: {}",
+        out.js
+    );
+}
+
+#[test]
+fn compile_state_destructure_default_and_rest() {
+    // `$.fallback` (default) and `$.exclude_from_object` (object rest) are shared
+    // with the derived lowering, byte-identical.
+    let dflt = compile_js(
+        "<script>\n\tlet obj = {};\n\tlet { a = 1 } = $state(obj);\n</script>\n<p>{a}</p>",
+    );
+    assert!(
+        dflt.contains("a = $.fallback(tmp.a, 1)"),
+        "state default must use $.fallback: {dflt}"
+    );
+    let rest = compile_js(
+        "<script>\n\tlet obj = {};\n\tlet { a, ...rest } = $state(obj);\n</script>\n<p>{a}</p>",
+    );
+    assert!(
+        rest.contains("rest = $.exclude_from_object(tmp, ['a'])"),
+        "state object rest must use $.exclude_from_object: {rest}"
+    );
+}
+
+#[test]
+fn compile_state_destructure_refuses_exotic_key() {
+    // A computed object key inside the pattern is a safe over-refusal (the corpus has
+    // identifier keys only). The extractor's `object_member` refuses.
+    assert_unsupported(
+        "<script>\n\tlet obj = {};\n\tlet key = 'a';\n\tlet { [key]: x } = $state(obj);\n</script>\n{x}",
+        "destructuring a $state declarator",
+    );
+    assert_unsupported(
+        "<script>\n\tlet obj = {};\n\tlet key = 'a';\n\tlet { [key]: x } = $state.snapshot(obj);\n</script>\n{x}",
+        "destructuring a $state.snapshot declarator",
+    );
+}
+
+#[test]
+fn compile_state_destructure_refuses_multi_declarator() {
+    // A destructured state alongside another declarator in one `let` needs
+    // per-source-declarator grouping tsv doesn't reproduce — refuse (the oracle
+    // compiles it; a safe over-refusal, mirroring the derived arm).
+    assert_unsupported(
+        "<script>\n\tlet o = {};\n\tlet x = 1,\n\t\t{ a, b } = $state(o);\n</script>\n{x}{a}{b}",
+        "destructuring a $state declarator",
+    );
+}
+
+#[test]
+fn compile_state_destructure_refuses_comments() {
+    // A carried script comment alongside a destructured state refuses — the 1→N
+    // split scatters leaves across `tmp`/`$$array` intermediates whose comment
+    // windows sweep. A safe over-refusal.
+    assert_unsupported(
+        "<script>\n\t// note\n\tlet { a } = $state({ a: 1 });\n</script>\n{a}",
+        "comments in a script with a destructured $state declarator",
+    );
+}

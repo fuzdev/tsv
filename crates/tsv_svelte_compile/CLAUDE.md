@@ -918,8 +918,25 @@ pipeline order.
   multi-declarator top-level declaration
   splitting into one declaration per declarator, source order (the oracle's
   shape; nested declarations and for-heads stay joined; comments alongside a
-  multi-declarator refuse — the oracle re-anchors them inside the split). The
-  `$props()` pattern itself is rewritten by `script_props.rs`, below.
+  multi-declarator refuse — the oracle re-anchors them inside the split). A
+  **destructured** (non-identifier) target of any state/derived rune —
+  `$state`/`$state.raw`/`$state.snapshot`/`$derived`/`$derived.by` — instead
+  dispatches to the shared 1→N lowering in `destructure.rs`
+  (`expand_destructured_state` / `expand_destructured_derived`): the oracle's
+  `create_state_declarators` (state) and `$derived` branch
+  (`VariableDeclaration.js:229-247` / `:87-134`) over ONE `extract_paths`
+  extractor, differing only in leaf/array-intermediate wrapping
+  (`Lowering{State,Derived}` — State projects RAW from a leading `let tmp = value`
+  [`$$array` a plain `const`, bare `$$array[i]` reads]; Derived wraps each leaf in
+  `$.derived(() => …)` and mints a `$$d`/`$$derived_array` derived read as a call).
+  Every leaf registers (`script_bindings.rs::register_destructured_leaves`) with the
+  rune's computed initial, so a destructured leaf FOLDS through the rune argument
+  exactly like an identifier target (`scope.js:1204-1213` — the oracle's over-fold
+  to the *container* value included: `let d=$derived(5); let {a}=$state(d)` folds
+  `{a}` to `5`). A carried script comment (`CommentsWithDestructured{State,Derived}`),
+  a multi-declarator source, or an exotic (computed/string-literal/numeric/escaped)
+  key refuses — all safe over-refusals on corpus-absent shapes. The `$props()`
+  pattern itself is rewritten by `script_props.rs`, below.
 
   One shared helper, `script_walk_ctx`, builds the guard context every walk on
   this path uses: store reads and `$derived` reads are EXEMPTED (the store rewrite

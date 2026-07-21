@@ -199,35 +199,56 @@ fn analyze_script_in<'arena>(
     })
 }
 
-/// Register every leaf of a destructured `$derived`/`$derived.by` pattern as a
-/// `Derived` binding with no foldable initial, and add each to `derived_names`
-/// so a `{name}` read lowers to `name()` (template value walk / store rewrite).
+/// Register every leaf of a destructured rune pattern into the binding table
+/// with the RUNE'S COMPUTED INITIAL — the same `initial`+`kind` the
+/// non-destructured arm of that rune assigns. One helper for all four
+/// destructured runes, so the destructure and non-destructure arms of a rune can
+/// never disagree on how a leaf folds.
 ///
-/// The transform (`derived_destructure`) reconstructs the same leaf set from the
-/// pattern nodes, so the two stay in step. An ESCAPED binding leaf can't be named
-/// from its source span ([`pattern_binding_names`] skips it), so a pattern binding
-/// one refuses (`unnameable`): registering the leaf is what makes its read a call,
-/// and a missed leaf would emit a bare `name` where the oracle emits `name()` — a
-/// MISMATCH. A safe over-refusal on a shape absent from the gating Svelte corpus.
-fn register_destructured_derived<'arena>(
+/// The fold rule is the oracle's `phases/scope.js:1204-1213`: it declares EVERY
+/// destructuring leaf with `initial = declarator.init` (the whole
+/// `$state(...)`/`$derived(...)` call), then evaluates that init through the
+/// rune's argument. So every leaf folds to the value the *non-destructured*
+/// binding of that rune would — a `let {a} = $state(d)` with `d`→5 folds `{a}` to
+/// `5` (the CONTAINER value, ignoring the `.a` projection: the fold uses
+/// `eval(arg)`, not the runtime `(5).a`). Passing the rune's computed initial to
+/// every leaf reproduces that byte-for-byte; a foldable scalar arg is
+/// corpus-absent, while an object/array arg stays UNKNOWN (no fold) — the
+/// corpus-common case, unchanged.
+///
+/// `kind` is `Derived` for `$derived`/`$derived.by` (each leaf added to
+/// `derived_names` so a `{name}` read lowers to `name()`) and `Normal` for
+/// `$state`/`$state.raw`/`$state.snapshot`. The transform (`destructure`)
+/// reconstructs the same leaf set from the pattern nodes, so the two stay in
+/// step. An ESCAPED binding leaf can't be named from its source span
+/// ([`pattern_binding_names`] skips it): registering the leaf is what gives it the
+/// fold initial (and, for a derived leaf, makes its read a call), and a missed
+/// leaf would MISMATCH, so a pattern binding one refuses (`unnameable`) — a safe
+/// over-refusal on a shape absent from the gating Svelte corpus.
+fn register_destructured_leaves<'arena>(
     id: &Expression<'arena>,
     source: &str,
     bindings: &mut Bindings<'arena>,
     derived_names: &mut NameSet,
+    kind: BindingKind,
+    initial: Initial<'arena>,
     unnameable: Refusal,
 ) -> Result<(), CompileError> {
     if crate::analyze::pattern_binds_unnameable_identifier(id) {
         return Err(unsupported(unnameable));
     }
+    let is_derived = kind == BindingKind::Derived;
     let mut names = Vec::new();
     pattern_binding_names(id, source, &mut names)?;
     for name in names {
-        derived_names.insert(name.clone());
+        if is_derived {
+            derived_names.insert(name.clone());
+        }
         bindings.insert(
             name,
             Binding {
-                kind: BindingKind::Derived,
-                initial: Initial::None,
+                kind,
+                initial,
                 updated: false,
             },
         );
@@ -297,16 +318,31 @@ fn analyze_declarator<'arena>(
             Ok(())
         }
         Some(RuneInit::State(arg)) => {
-            let name = identifier_binding_name(&declarator.id, source)
-                .ok_or_else(|| unsupported(Refusal::DestructuringState))?;
-            bindings.insert(
-                name,
-                Binding {
-                    kind: BindingKind::Normal,
-                    initial: arg.map_or(Initial::Undefined, Initial::Expr),
-                    updated: false,
-                },
-            );
+            // `$state(arg)` / `$state.raw(arg)`: the leaf folds through the
+            // argument (`Undefined` for the argless `$state()` — the oracle's
+            // argless value is `void 0`). A destructured target lowers 1→N via
+            // `create_state_declarators` (the transform's `expand_destructured_state`);
+            // every leaf takes this same initial.
+            let initial = arg.map_or(Initial::Undefined, Initial::Expr);
+            match identifier_binding_name(&declarator.id, source) {
+                Some(name) => bindings.insert(
+                    name,
+                    Binding {
+                        kind: BindingKind::Normal,
+                        initial,
+                        updated: false,
+                    },
+                ),
+                None => register_destructured_leaves(
+                    &declarator.id,
+                    source,
+                    bindings,
+                    derived_names,
+                    BindingKind::Normal,
+                    initial,
+                    Refusal::DestructuringState,
+                )?,
+            }
             Ok(())
         }
         Some(RuneInit::StateSnapshot(_)) => {
@@ -317,82 +353,98 @@ fn analyze_declarator<'arena>(
             // `$derived` only; every other rune, `$state.snapshot` included, falls
             // to the `default` arm and yields UNKNOWN, so a `{s}` read never folds
             // (`$.escape(s)`). That holds however the argument itself evaluates —
-            // a plain `let` argument does not fold either.
-            //
-            // A destructured target refuses — the oracle lowers
-            // `const {a} = $state.snapshot(x)` into a temp-destructure
-            // (`const tmp = x, a = tmp.a`), a shape this transform does not
-            // reproduce (a safe over-refusal).
-            let name = identifier_binding_name(&declarator.id, source)
-                .ok_or_else(|| unsupported(Refusal::DestructuringStateSnapshot))?;
-            bindings.insert(
-                name,
-                Binding {
-                    kind: BindingKind::Normal,
-                    initial: Initial::None,
-                    updated: false,
-                },
-            );
+            // a plain `let` argument does not fold either. Every destructured leaf
+            // inherits that `Initial::None` (a snapshot leaf never folds), so a
+            // destructured target lowers exactly like `$state` MINUS the fold.
+            match identifier_binding_name(&declarator.id, source) {
+                Some(name) => bindings.insert(
+                    name,
+                    Binding {
+                        kind: BindingKind::Normal,
+                        initial: Initial::None,
+                        updated: false,
+                    },
+                ),
+                None => register_destructured_leaves(
+                    &declarator.id,
+                    source,
+                    bindings,
+                    derived_names,
+                    BindingKind::Normal,
+                    Initial::None,
+                    Refusal::DestructuringStateSnapshot,
+                )?,
+            }
             Ok(())
         }
         Some(RuneInit::Derived(expr)) => {
-            if let Some(name) = identifier_binding_name(&declarator.id, source) {
-                derived_names.insert(name.clone());
-                bindings.insert(
-                    name,
-                    Binding {
-                        kind: BindingKind::Derived,
-                        initial: Initial::Expr(expr),
-                        updated: false,
-                    },
-                );
-                Ok(())
-            } else {
-                // A destructured `$derived` — the transform (`derived_destructure`)
-                // lowers it to one `$.derived(() => path)` per leaf, so every leaf
-                // binding is itself a derived read (`{name}` → `name()`). None of
-                // them has a foldable initial (the pattern projects from an UNKNOWN
-                // root), so each is `Initial::None` — probe-confirmed the oracle
-                // never folds a destructured-derived read.
-                register_destructured_derived(
+            // `$derived(expr)`: a leaf folds through the argument. The oracle's
+            // `scope.js` declares every destructured-derived leaf with the whole
+            // `$derived(...)` call as its initial and evaluates it through `expr`,
+            // exactly like an identifier target — so a `let {a} = $derived(d)` with
+            // `d`→5 folds `{a}` to `5` (probe-confirmed). The transform
+            // (`expand_destructured_derived`) still lowers each leaf to its own
+            // `$.derived(() => path)`; the initial only governs the fold.
+            let initial = Initial::Expr(expr);
+            match identifier_binding_name(&declarator.id, source) {
+                Some(name) => {
+                    derived_names.insert(name.clone());
+                    bindings.insert(
+                        name,
+                        Binding {
+                            kind: BindingKind::Derived,
+                            initial,
+                            updated: false,
+                        },
+                    );
+                }
+                None => register_destructured_leaves(
                     &declarator.id,
                     source,
                     bindings,
                     derived_names,
+                    BindingKind::Derived,
+                    initial,
                     Refusal::DestructuringDerived,
-                )
+                )?,
             }
+            Ok(())
         }
         Some(RuneInit::DerivedBy(f)) => {
-            if let Some(name) = identifier_binding_name(&declarator.id, source) {
-                derived_names.insert(name.clone());
-                // The oracle evaluates through an expression-bodied arrow.
-                use tsv_ts::ast::internal::ArrowFunctionBody;
-                let initial = match f {
-                    Expression::ArrowFunctionExpression(arrow) => match &arrow.body {
-                        ArrowFunctionBody::Expression(body) => Initial::Expr(body),
-                        ArrowFunctionBody::BlockStatement(_) => Initial::None,
-                    },
-                    _ => Initial::None,
-                };
-                bindings.insert(
-                    name,
-                    Binding {
-                        kind: BindingKind::Derived,
-                        initial,
-                        updated: false,
-                    },
-                );
-                Ok(())
-            } else {
-                register_destructured_derived(
+            // `$derived.by(fn)`: the oracle evaluates through an expression-bodied
+            // arrow's body (a block-bodied arrow is UNKNOWN). A destructured leaf
+            // folds through that same body.
+            use tsv_ts::ast::internal::ArrowFunctionBody;
+            let initial = match f {
+                Expression::ArrowFunctionExpression(arrow) => match &arrow.body {
+                    ArrowFunctionBody::Expression(body) => Initial::Expr(body),
+                    ArrowFunctionBody::BlockStatement(_) => Initial::None,
+                },
+                _ => Initial::None,
+            };
+            match identifier_binding_name(&declarator.id, source) {
+                Some(name) => {
+                    derived_names.insert(name.clone());
+                    bindings.insert(
+                        name,
+                        Binding {
+                            kind: BindingKind::Derived,
+                            initial,
+                            updated: false,
+                        },
+                    );
+                }
+                None => register_destructured_leaves(
                     &declarator.id,
                     source,
                     bindings,
                     derived_names,
+                    BindingKind::Derived,
+                    initial,
                     Refusal::DestructuringDerivedBy,
-                )
+                )?,
             }
+            Ok(())
         }
         None => {
             // Plain declarator: an Identifier id gets its init as the

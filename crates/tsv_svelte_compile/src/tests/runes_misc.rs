@@ -237,12 +237,11 @@ fn compile_state_snapshot_refuses_wrong_arity_and_deferred_positions() {
         "<script>\n\tlet o = $state({ a: 1 });\n</script>\n{$state.snapshot(o, 1)}",
         "$state",
     );
-    // A destructured declarator (the oracle's temp-destructure lowering) — a safe
-    // over-refusal.
-    assert_unsupported(
-        "<script>\n\tlet obj = $state({ a: 1 });\n\tconst { a } = $state.snapshot(obj);\n</script>\n<p>{a}</p>",
-        "$state.snapshot",
-    );
+    // A destructured `$state.snapshot` declarator now COMPILES via the oracle's
+    // temp-destructure lowering (`create_state_declarators`) — covered in
+    // `runes_state`; only the exotic-key / comment / multi-declarator corners still
+    // refuse there.
+    //
     // A script non-declarator position (deferred this slice) — the guard refuses it.
     assert_unsupported(
         "<script>\n\tlet x = $state(1);\n\tfunction f() {\n\t\treturn $state.snapshot(x);\n\t}\n</script>\n<p>text</p>",
