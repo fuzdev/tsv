@@ -814,7 +814,7 @@ stays out of `deno task check` (which is external-oracle-free).
 cargo run -p tsv_debug profile ~/dev/zzz/src/lib                    # parse vs format phase timing (--iterations, --json)
 cargo run -p tsv_debug profile --bind ~/dev/zzz/src                 # parse vs lower+bind timing (TS-only) + peak RSS (§1)
 cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib  # FFI parse path: parse vs the wire-JSON write (§2)
-cargo run -p tsv_debug buffer_sizes ~/dev/zzz/src ~/dev/gro/src     # printer SmallVec/MultilineText sizing histograms (§8)
+cargo run -p tsv_debug buffer_sizes ~/dev/zzz/src ~/dev/gro/src     # printer SmallVec sizing histograms (§8)
 cargo run -p tsv_debug arena_stats ~/dev/zzz/src/lib                # DocArena node-population + memory audit (§7; --reuse, --list-errors)
 ```
 
@@ -918,7 +918,7 @@ Worked example + full design: ./docs/architecture.md §Two-AST Design.
 ### Position Types: u32 vs usize
 
 - **Span**: `u32` for start/end (8 bytes total, 50% memory savings vs usize)
-- **`Token`**: `u32` for start/end — `Token` is a 16-byte `Copy`-free POD (`{kind, start: u32, end: u32}`) returned from `next_token` in registers; the decoded value (escapes only) lives out-of-band on the lexer (`Lexer::take_decoded`). A `const _: () = assert!(size_of::<Token>() == 16)` guards the size. See [docs/performance.md] and the lexer's byte cursor (`bytes: &[u8]` + `position: usize`).
+- **`Token`**: `u32` for start/end — `Token` is a 16-byte `Copy`-free POD (`{kind, start: u32, end: u32}`) returned from `next_token` in registers; the decoded value (escapes only) lives out-of-band on the lexer (a reused `Lexer::decode_scratch` buffer, borrowed via `decoded_str`). A `const _: () = assert!(size_of::<Token>() == 16)` guards the size. See [docs/performance.md] and the lexer's byte cursor (`bytes: &[u8]` + `position: usize`).
 - **Lexer/Parser positions**: `usize` (natural for `source[pos]` indexing); the lexer dispatches on raw bytes (`cur_byte`) and decodes a `char` only at non-ASCII branches.
 - **Conversions**: At boundaries only - `as u32` when creating Spans / `Token` fields, `as usize` when extracting
 - **Helpers**: Use `span.extract(source)` or `span.range()` instead of manual casts

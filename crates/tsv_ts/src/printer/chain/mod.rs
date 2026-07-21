@@ -45,3 +45,5 @@ pub use analysis::{
 pub use builder::build_chain_doc;
 pub use printing::ChainPrinter;
 pub use types::ChainNode;
+#[cfg(feature = "buffer_stats")]
+pub use types::{ChainGroupNodesVec, ChainGroupVec, ChainNodeVec};

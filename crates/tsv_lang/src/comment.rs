@@ -3,7 +3,7 @@ use crate::Span;
 use crate::printing;
 use smallvec::SmallVec;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 #[allow(clippy::struct_excessive_bools)] // independent flags + serializer hints, not a state machine
 pub struct Comment {
     /// Byte span of the comment's content (delimiters excluded), into the

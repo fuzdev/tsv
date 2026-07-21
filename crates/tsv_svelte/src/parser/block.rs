@@ -1092,8 +1092,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 Rc::clone(&self.interner),
                 self.arena,
             ) {
-                Ok(mut program) => {
-                    self.expression_comments.append(&mut program.comments);
+                Ok(program) => {
+                    self.expression_comments.extend_from_slice(program.comments);
                     if let Some(tsv_ts::Statement::FunctionDeclaration(func)) = program.body.first()
                     {
                         type_parameters.clone_from(&func.type_parameters);

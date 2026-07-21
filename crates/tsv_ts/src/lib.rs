@@ -198,7 +198,7 @@ pub fn format_in(program: &Program<'_>, source: &str, arena: &DocArena) -> Strin
     // `tsv_lang::comment_ledger`). A Svelte host registers its own `Root.comments`, so
     // an embedded `<script>` never reaches here.
     #[cfg(feature = "comment_check")]
-    tsv_lang::comment_ledger::register_parsed(source, &program.comments);
+    tsv_lang::comment_ledger::register_parsed(source, program.comments);
 
     // Fill the arena-parked line-break table (one warm table across a
     // multi-file driver's files instead of a fresh Vec per file).
@@ -207,7 +207,7 @@ pub fn format_in(program: &Program<'_>, source: &str, arena: &DocArena) -> Strin
     let inputs = PrinterInputs {
         source,
         interner: Rc::clone(&program.interner),
-        comments: &program.comments,
+        comments: program.comments,
         line_breaks: &line_breaks,
         has_owned_comments: program.comments.iter().any(|c| c.owned_by_node),
         has_format_ignore: program
@@ -369,7 +369,7 @@ pub fn parse_expression_with_comments<'arena>(
     base_offset: usize,
     interner: SharedInterner,
     arena: &'arena bumpalo::Bump,
-) -> Result<(Expression<'arena>, Vec<ast::Comment>)> {
+) -> Result<(Expression<'arena>, &'arena [ast::Comment])> {
     let mut parser = parser::Parser::with_interner(source, base_offset, interner, arena)?;
     parser
         .parse_expression_with_comments()
@@ -425,7 +425,7 @@ pub fn parse_pattern_with_comments<'arena>(
     base_offset: usize,
     interner: SharedInterner,
     arena: &'arena bumpalo::Bump,
-) -> Result<(Expression<'arena>, Vec<ast::Comment>)> {
+) -> Result<(Expression<'arena>, &'arena [ast::Comment])> {
     let mut parser = parser::Parser::with_interner(source, base_offset, interner, arena)?;
     let expr = parser
         .parse_expression_unbounded()
@@ -492,7 +492,7 @@ pub fn parse_expression_partial_with_comments<'arena>(
     base_offset: usize,
     interner: SharedInterner,
     arena: &'arena bumpalo::Bump,
-) -> Result<(Expression<'arena>, usize, Vec<ast::Comment>)> {
+) -> Result<(Expression<'arena>, usize, &'arena [ast::Comment])> {
     let mut parser = parser::Parser::with_interner(source, base_offset, interner, arena)?;
     let (expr, end_pos) = parser
         .parse_assignment_expression_partial()
@@ -511,7 +511,7 @@ pub fn parse_statement_with_comments<'arena>(
     base_offset: usize,
     interner: SharedInterner,
     arena: &'arena bumpalo::Bump,
-) -> Result<(Statement<'arena>, Vec<ast::Comment>)> {
+) -> Result<(Statement<'arena>, &'arena [ast::Comment])> {
     let mut parser = parser::Parser::with_interner(source, base_offset, interner, arena)?;
     let stmt = parser
         .parse_statement()
@@ -626,7 +626,7 @@ pub fn build_program_doc(
     let inputs = PrinterInputs {
         source,
         interner: Rc::clone(&program.interner),
-        comments: &program.comments,
+        comments: program.comments,
         line_breaks,
         has_owned_comments: program.comments.iter().any(|c| c.owned_by_node),
         has_format_ignore: program
@@ -642,6 +642,13 @@ pub fn build_program_doc(
 // mirrors Prettier's assignment layout selection and must apply the same
 // break-after-operator rules as our own assignment printer.
 pub use printer::{conditional_should_break_after_op, should_inline_logical_expression};
+
+/// Printer buffer-population sampling for `tsv_debug buffer_sizes`. Behind the
+/// `buffer_stats` feature (off in production builds).
+#[cfg(feature = "buffer_stats")]
+pub use printer::buffer_stats::{
+    BufferInlineCapacities, BufferStats, inline_capacities, set_buffer_stats, take_buffer_stats,
+};
 
 // Re-exports of types that appear in this crate's public function signatures
 // (`Program`, `Expression`, `TSTypeAnnotation`) or are named via the short
@@ -674,8 +681,8 @@ pub fn debug_token_stream(source: &str) -> String {
         match lexer.next_token() {
             Ok(token) => {
                 let _ = write!(out, "{:?} {}..{}", token.kind, token.start, token.end);
-                if let Some(decoded) = lexer.take_decoded() {
-                    let _ = write!(out, " decoded={:?}", &*decoded);
+                if let Some(decoded) = lexer.decoded_str() {
+                    let _ = write!(out, " decoded={decoded:?}");
                 }
                 out.push('\n');
                 if matches!(token.kind, TokenKind::Eof) {

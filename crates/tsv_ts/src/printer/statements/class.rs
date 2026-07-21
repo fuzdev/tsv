@@ -306,7 +306,7 @@ impl<'a> Printer<'a> {
             }
 
             // Process comments before this member (with blank line preservation)
-            member_parts.extend(self.build_leading_comments_before(&comments, member_start));
+            self.push_leading_comments_before(&mut member_parts, &comments, member_start);
 
             // A preceding format-ignore directive keeps the member's source verbatim.
             // The member span includes its trailing `;`.

@@ -96,17 +96,24 @@ pub struct Parser<'a, 'arena> {
     /// separate scalar fields. The rare decoded value rides out-of-band in
     /// `current_decoded` (escape paths only), mirroring the lexer's split.
     current: Token,
-    current_decoded: Option<String>, // Decoded string value (for strings with escapes)
+    /// Decoded string/identifier value for the current token (escape paths only),
+    /// copied into the AST arena at receipt so it is a `Copy` `&'arena str` rather
+    /// than an owned `String` — the lexer decodes into a reused scratch buffer and
+    /// the parser arena-copies it immediately, so no per-literal `String` survives.
+    current_decoded: Option<&'arena str>,
     /// Single-token lookahead slot, stored as the 16-byte `Token` POD with its
     /// decoded value out-of-band in `peek_decoded` (mirroring the `current` /
     /// `current_decoded` split). Consuming the peek is then a direct `Token` copy
-    /// into `current` with no intermediate lookahead struct / `Option<String>` to
-    /// reassemble.
+    /// into `current` with no intermediate lookahead struct to reassemble.
     peek: Option<Token>,
-    peek_decoded: Option<String>,
+    peek_decoded: Option<&'arena str>,
     interner: SharedInterner,
-    base_offset: usize,     // Offset in full source (for embedded expressions)
-    comments: Vec<Comment>, // Collected comments during parsing
+    base_offset: usize, // Offset in full source (for embedded expressions)
+    /// Comments collected during parsing, gathered directly in the AST arena
+    /// (`Comment` is a `Copy` POD, so bumpalo's no-`Drop` rule holds). Handed to
+    /// consumers as an `&'arena [Comment]` slice via `take_comments`, so the
+    /// warm binding loops (`reset()`-reused arenas) never malloc for comments.
+    comments: BumpVec<'arena, Comment>,
     /// True if a line terminator occurred between the previous token and current token.
     /// Used for ASI (Automatic Semicolon Insertion).
     had_line_terminator: bool,
@@ -247,13 +254,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         BumpVec::new_in(self.arena)
     }
 
-    /// Allocate a decoded string (escapes processed — not a verbatim source
-    /// slice) in the arena. One copy into the arena. (No-escape string literals
-    /// are a verbatim source slice and could instead carry a `Span`, avoiding
-    /// even this one copy.)
+    /// Copy the lexer's just-produced decoded value (escape paths only) into the
+    /// AST arena, yielding a `Copy` `&'arena str`. The lexer decodes into a reused
+    /// scratch that the next lex overwrites, so this runs immediately after each
+    /// lex; `None` for the common escape-free token. One copy into the arena — the
+    /// same copy the old owned-`String` path made when it stored the value, now the
+    /// only allocation on the escape path.
     #[inline]
-    fn alloc_str_in(&self, s: &str) -> &'arena str {
-        self.arena.alloc_str(s)
+    fn decoded_to_arena(&self) -> Option<&'arena str> {
+        self.lexer
+            .decoded_str()
+            .map(|s| -> &'arena str { self.arena.alloc_str(s) })
     }
 
     /// Allocate the binding `extra` for a typed identifier carrying `ta`: a type
@@ -296,10 +307,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> Result<Self, ParseError> {
         let mut lexer = Lexer::new(source);
         let mut current = lexer.next_token()?;
-        let mut decoded = lexer.take_decoded().map(|b| *b);
+        let mut decoded = lexer
+            .decoded_str()
+            .map(|s| -> &'arena str { arena.alloc_str(s) });
 
         // Collect leading comment tokens
-        let mut comments = Vec::new();
+        let mut comments = BumpVec::new_in(arena);
         while let TokenKind::Comment {
             is_block,
             content_start,
@@ -315,7 +328,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             );
             comments.push(comment);
             current = lexer.next_token()?;
-            decoded = lexer.take_decoded().map(|b| *b);
+            decoded = lexer
+                .decoded_str()
+                .map(|s| -> &'arena str { arena.alloc_str(s) });
         }
 
         Ok(Self {
@@ -378,7 +393,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // writes through `&mut self.current` (disjoint from `&mut self.lexer`), so
             // no intermediate `Token` is built/returned/scattered (no sret round-trip).
             self.lexer.next_token_into(&mut self.current)?;
-            self.current_decoded = self.lexer.take_decoded().map(|b| *b);
+            self.current_decoded = self.decoded_to_arena();
             self.had_line_terminator = self.lexer.had_line_terminator();
         }
 
@@ -471,7 +486,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.current = token;
         // `decoded` rides out-of-band on the lexer; the caller lexed `token` from
         // `self.lexer` immediately before this call, so drain it here.
-        self.current_decoded = self.lexer.take_decoded().map(|b| *b);
+        self.current_decoded = self.decoded_to_arena();
     }
 
     #[inline]
@@ -552,7 +567,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - Type analysis (analyzing string literal types)
     /// - Linting (analyzing string content for patterns)
     pub(super) fn current_decoded(&self) -> Option<&str> {
-        self.current_decoded.as_deref()
+        self.current_decoded
     }
 
     /// The current identifier token's name channel — the canonical identifier
@@ -561,7 +576,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// (`\u0066oo` → `foo`) or is too long for `raw_len` — only those rare
     /// cases intern.
     pub(super) fn current_ident_name(&self) -> IdentName {
-        if let Some(decoded) = self.current_decoded.as_deref() {
+        if let Some(decoded) = self.current_decoded {
             IdentName {
                 escaped: Some(self.intern(decoded)),
                 raw_len: 0,
@@ -858,8 +873,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// value (one copy). The quote char is no longer stored — recover it via
     /// `Literal::string_quote(source)`.
     pub(super) fn extract_string_cooked(&self) -> StringCooked<'arena> {
-        match self.current_decoded() {
-            Some(decoded) => StringCooked::Decoded(self.alloc_str_in(decoded)),
+        match self.current_decoded {
+            Some(decoded) => StringCooked::Decoded(decoded),
             None => StringCooked::Verbatim,
         }
     }
@@ -1020,7 +1035,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             continue;
                         }
                         self.peek = Some(token);
-                        self.peek_decoded = self.lexer.take_decoded().map(|b| *b);
+                        self.peek_decoded = self.decoded_to_arena();
                     }
                     Err(err) => {
                         // Store error to be returned on next advance() (unbox: the
@@ -1377,7 +1392,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }
                 let token = self.lexer.seek_and_next_token(new_start)?;
                 self.current = token;
-                self.current_decoded = self.lexer.take_decoded().map(|b| *b);
+                self.current_decoded = self.decoded_to_arena();
                 // Clear peek cache since token changed
                 self.peek = None;
                 self.peek_decoded = None;
@@ -1609,7 +1624,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         Ok(Program {
             body: body.into_bump_slice(),
-            comments: std::mem::take(&mut self.comments),
+            comments: self.take_comments(),
             span: Span::new(start as u32, end as u32),
             interner: Rc::clone(&self.interner),
             goal: self.goal,
@@ -1647,17 +1662,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// The expression must fill the whole slice (see `expect_end_of_input`).
     pub fn parse_expression_with_comments(
         &mut self,
-    ) -> Result<(Expression<'arena>, Vec<Comment>), ParseError> {
+    ) -> Result<(Expression<'arena>, &'arena [Comment]), ParseError> {
         let expr = self.parse_expression()?;
         self.expect_end_of_input()?;
         let comments = self.take_comments();
         Ok((expr, comments))
     }
 
-    /// Take ownership of collected comments.
+    /// Hand the collected comments to the caller as an arena slice.
     /// Used when parsing expressions that need to return comments to the caller.
-    pub fn take_comments(&mut self) -> Vec<Comment> {
-        std::mem::take(&mut self.comments)
+    pub fn take_comments(&mut self) -> &'arena [Comment] {
+        std::mem::replace(&mut self.comments, BumpVec::new_in(self.arena)).into_bump_slice()
     }
 
     /// Parse a single assignment expression and return position where parsing stopped.
