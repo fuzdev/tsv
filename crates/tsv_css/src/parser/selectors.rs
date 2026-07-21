@@ -672,7 +672,7 @@ pub(crate) fn parse_simple_selector<'arena>(
             // recovers its text verbatim from `span` at print time.
             if matches!(parser.peek_kind()?, TokenKind::Pipe) {
                 // Namespace prefix: identifier|element
-                let namespace = Some(parser.alloc_str_in(parser.current_identifier()));
+                let namespace = Some(parser.current_identifier_in_arena());
                 parser.advance()?; // consume the namespace identifier
                 parser.advance()?; // consume the pipe
 

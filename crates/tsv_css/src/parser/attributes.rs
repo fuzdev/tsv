@@ -40,7 +40,7 @@ pub(crate) fn parse_attribute_selector<'arena>(
             start: parser.span_pos(parser.current_start),
             end: parser.span_pos(parser.current_end),
         };
-        let maybe_namespace = parser.alloc_str_in(parser.current_identifier());
+        let maybe_namespace = parser.current_identifier_in_arena();
         parser.advance()?;
         parser.skip_whitespace()?;
 
@@ -221,10 +221,7 @@ fn parse_attribute_value<'arena>(
     let value =
         match &parser.current_kind {
             // Internal AST: use decoded value (spec-compliant)
-            TokenKind::Identifier => {
-                let v = parser.current_identifier();
-                Some(parser.alloc_str_in(v))
-            }
+            TokenKind::Identifier => Some(parser.current_identifier_in_arena()),
             TokenKind::String { .. } => {
                 // Extract content without quotes
                 Some(parser.alloc_str_in(
