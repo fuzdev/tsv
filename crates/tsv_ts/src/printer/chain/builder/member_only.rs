@@ -4,9 +4,10 @@
 // lookup its own group — prettier's `printMemberExpression` shape.
 
 use super::super::printing::{
-    ChainPrinter, node_comment_gap, print_node, print_node_inner, push_gap_comments_and_break,
+    node_comment_gap, print_node, print_node_inner, push_gap_comments_and_break,
 };
 use super::super::types::{ChainGroup, ChainNode, ChainNodeRefVec};
+use crate::printer::Printer;
 
 use crate::ast::internal::Expression;
 use tsv_lang::doc::{DocBuf, arena::DocId};
@@ -17,9 +18,9 @@ use tsv_lang::doc::{DocBuf, arena::DocId};
 /// break); a line comment must end its line, so it forces the chain to break to
 /// preserve the comment where the author wrote it — see
 /// [`build_member_only_chain_with_comments_doc`].
-pub(super) fn member_only_has_interior_line_comments<'a, P: ChainPrinter>(
+pub(super) fn member_only_has_interior_line_comments<'a>(
     groups: &[ChainGroup<'a>],
-    printer: &P,
+    printer: &Printer<'_>,
 ) -> bool {
     groups
         .iter()
@@ -46,9 +47,9 @@ pub(super) fn member_only_has_interior_line_comments<'a, P: ChainPrinter>(
 /// Prettier hoists the own-line comment before the whole expression and trails the
 /// rest; tsv preserves position. Documented divergence
 /// (`chained/member_only_interior_line_comment`).
-pub(super) fn build_member_only_chain_with_comments_doc<'a, P: ChainPrinter>(
+pub(super) fn build_member_only_chain_with_comments_doc<'a>(
     groups: &[ChainGroup<'a>],
-    printer: &P,
+    printer: &Printer<'_>,
 ) -> DocId {
     let d = printer.arena();
     let all_nodes: ChainNodeRefVec<'_, 'a> = groups.iter().flat_map(|g| g.nodes.iter()).collect();
@@ -128,9 +129,9 @@ fn starts_segment(node: &ChainNode<'_>) -> bool {
 ///     .b!
 ///     .c!
 /// ```
-pub(super) fn build_member_only_chain_doc<'a, P: ChainPrinter>(
+pub(super) fn build_member_only_chain_doc<'a>(
     groups: &[ChainGroup<'a>],
-    printer: &P,
+    printer: &Printer<'_>,
 ) -> DocId {
     let d = printer.arena();
     // NOTE: We intentionally do NOT add break_parent for line comments here.

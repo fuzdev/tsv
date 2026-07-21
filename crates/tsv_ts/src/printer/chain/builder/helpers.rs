@@ -4,28 +4,28 @@
 // - ChainPartsBuilder: Builder for constructing chain parts with comments
 
 use super::super::printing::{
-    ChainPrinter, group_comment_gap, print_group, print_group_expanded,
-    print_group_expanded_skip_first_comments, print_group_skip_first_comments,
-    push_gap_comments_and_break,
+    group_comment_gap, print_group, print_group_expanded, print_group_expanded_skip_first_comments,
+    print_group_skip_first_comments, push_gap_comments_and_break,
 };
 use super::super::types::ChainGroup;
+use crate::printer::Printer;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 
 /// Builder for constructing chain parts with proper comment handling.
 ///
 /// Encapsulates the logic for interleaving comments, line breaks, and groups
 /// when building the rest of a chain (everything after the first group).
-pub(crate) struct ChainPartsBuilder<'a, 'p, P: ChainPrinter> {
+pub(crate) struct ChainPartsBuilder<'a, 'p, 'pr> {
     parts: &'p mut DocBuf,
-    printer: &'a P,
+    printer: &'a Printer<'pr>,
     use_hardline: bool,
     use_expanded: bool,
 }
 
-impl<'a, 'p, P: ChainPrinter> ChainPartsBuilder<'a, 'p, P> {
+impl<'a, 'p, 'pr> ChainPartsBuilder<'a, 'p, 'pr> {
     pub(crate) fn new(
         parts: &'p mut DocBuf,
-        printer: &'a P,
+        printer: &'a Printer<'pr>,
         use_hardline: bool,
         use_expanded: bool,
         group_count: usize,
@@ -130,10 +130,10 @@ impl<'a, 'p, P: ChainPrinter> ChainPartsBuilder<'a, 'p, P> {
 /// Build rest parts with comments and blank line preservation
 /// Handles both trailing line comments (same line) and leading line comments (own line)
 /// Emits: [trailing_comments?, line_break, leading_comments?, group] for each rest group
-pub(crate) fn build_rest_parts_with_comments<'a, P: ChainPrinter>(
+pub(crate) fn build_rest_parts_with_comments<'a>(
     parts: &mut DocBuf,
     rest_groups: &[ChainGroup<'a>],
-    printer: &P,
+    printer: &Printer<'_>,
     use_hardline: bool,
     use_expanded: bool,
 ) {
@@ -182,10 +182,10 @@ pub(crate) fn build_rest_parts_with_comments<'a, P: ChainPrinter>(
 /// Build an expanded chain doc with first group(s) inline and rest indented
 ///
 /// Common pattern for expanded chains: first group(s) + hardline + indent(rest)
-pub(super) fn build_expanded_chain_doc<'a, P: ChainPrinter>(
+pub(super) fn build_expanded_chain_doc<'a>(
     groups: &[ChainGroup<'a>],
     split_at: usize,
-    printer: &P,
+    printer: &Printer<'_>,
 ) -> DocId {
     let d = printer.arena();
     if groups.is_empty() {
@@ -213,19 +213,19 @@ pub(super) fn build_expanded_chain_doc<'a, P: ChainPrinter>(
 }
 
 /// Build the expanded doc variant (first group(s) + indented rest)
-pub(super) fn build_expanded_doc<'a, P: ChainPrinter>(
+pub(super) fn build_expanded_doc<'a>(
     groups: &[ChainGroup<'a>],
     should_merge: bool,
-    printer: &P,
+    printer: &Printer<'_>,
 ) -> DocId {
     let split_at = if should_merge { 2 } else { 1 };
     build_expanded_chain_doc(groups, split_at, printer)
 }
 
 /// Build first groups doc (merged when should_merge)
-pub(super) fn build_first_groups_doc<'a, P: ChainPrinter>(
+pub(super) fn build_first_groups_doc<'a>(
     first_groups: &[ChainGroup<'a>],
-    printer: &P,
+    printer: &Printer<'_>,
 ) -> DocId {
     let d = printer.arena();
     let first_docs: DocBuf = first_groups
@@ -236,9 +236,9 @@ pub(super) fn build_first_groups_doc<'a, P: ChainPrinter>(
 }
 
 /// Build first groups doc with expanded calls
-pub(super) fn build_first_groups_expanded_doc<'a, P: ChainPrinter>(
+pub(super) fn build_first_groups_expanded_doc<'a>(
     first_groups: &[ChainGroup<'a>],
-    printer: &P,
+    printer: &Printer<'_>,
 ) -> DocId {
     let d = printer.arena();
     let first_docs: DocBuf = first_groups
