@@ -174,7 +174,7 @@ impl<'a> Printer<'a> {
                 // 3. indent_size==0 && quasi doesn't end with \n: inline quasi (e.g. ", ")
                 //    — preserve code context indent, no wrapping.
                 let aligned = if indent_size == 0 && text.ends_with('\n') {
-                    d.align(0, inner)
+                    d.align_root(0, inner)
                 } else if indent_size > 0 {
                     self.add_alignment_to_doc(inner, indent_size)
                 } else {
@@ -240,7 +240,7 @@ impl<'a> Printer<'a> {
         // Reset to absolute indent 0. Uses align(0) not dedent because
         // dedent only decrements by 1 (saturating_sub), while we need
         // to reset to 0 regardless of the current indent depth.
-        d.align(0, result)
+        d.align_root(0, result)
     }
 
     /// Convert a string with newlines into a doc with literalline between parts.

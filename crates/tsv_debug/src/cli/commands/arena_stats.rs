@@ -352,6 +352,7 @@ fn classify_node(n: &DocNode) -> &'static str {
         DocNode::Line(_) => "Line",
         DocNode::Indent(_) => "Indent",
         DocNode::Dedent(_) => "Dedent",
+        DocNode::AlignRoot { .. } => "AlignRoot",
         DocNode::Align { .. } => "Align",
         DocNode::Group { .. } => "Group",
         DocNode::IfBreak { .. } => "IfBreak",

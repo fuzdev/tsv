@@ -1,0 +1,784 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 513,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Multi-line leading block comment before a union member: member breaks",
+			"start": 20,
+			"end": 92,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " onto its own line (source has a newline after the comment's */).",
+			"start": 94,
+			"end": 161,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "\n   * doc1\n   ",
+			"start": 176,
+			"end": 198,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 4
+				},
+				"end": {
+					"line": 7,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Same, with a parenthesized member.",
+			"start": 214,
+			"end": 251,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 38
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "\n   * doc2\n   ",
+			"start": 266,
+			"end": 288,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 4
+				},
+				"end": {
+					"line": 15,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Member glued on the */ line (no source newline): stays glued.",
+			"start": 310,
+			"end": 374,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "\n   * doc3\n   ",
+			"start": 389,
+			"end": 411,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 4
+				},
+				"end": {
+					"line": 23,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Single-line leading block comment: stays inline.",
+			"start": 423,
+			"end": 474,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 52
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " doc4 ",
+			"start": 485,
+			"end": 495,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 10
+				},
+				"end": {
+					"line": 27,
+					"column": 20
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 512,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 503,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 28,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 163,
+					"end": 211,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 168,
+						"end": 169,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 6
+							},
+							"end": {
+								"line": 4,
+								"column": 7
+							}
+						},
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 174,
+						"end": 210,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 2
+							},
+							"end": {
+								"line": 9,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 203,
+								"end": 204,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 4
+									},
+									"end": {
+										"line": 8,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 203,
+									"end": 204,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 4
+										},
+										"end": {
+											"line": 8,
+											"column": 5
+										}
+									},
+									"name": "a"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "\n   * doc1\n   ",
+										"start": 176,
+										"end": 198
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 209,
+								"end": 210,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 4
+									},
+									"end": {
+										"line": 9,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 209,
+									"end": 210,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 4
+										},
+										"end": {
+											"line": 9,
+											"column": 5
+										}
+									},
+									"name": "b"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Multi-line leading block comment before a union member: member breaks",
+							"start": 20,
+							"end": 92
+						},
+						{
+							"type": "Line",
+							"value": " onto its own line (source has a newline after the comment's */).",
+							"start": 94,
+							"end": 161
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 253,
+					"end": 307,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 258,
+						"end": 259,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 6
+							},
+							"end": {
+								"line": 12,
+								"column": 7
+							}
+						},
+						"name": "B"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 264,
+						"end": 306,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 2
+							},
+							"end": {
+								"line": 17,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSParenthesizedType",
+								"start": 293,
+								"end": 300,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 4
+									},
+									"end": {
+										"line": 16,
+										"column": 11
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSUnionType",
+									"start": 294,
+									"end": 299,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 5
+										},
+										"end": {
+											"line": 16,
+											"column": 10
+										}
+									},
+									"types": [
+										{
+											"type": "TSTypeReference",
+											"start": 294,
+											"end": 295,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 5
+												},
+												"end": {
+													"line": 16,
+													"column": 6
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 294,
+												"end": 295,
+												"loc": {
+													"start": {
+														"line": 16,
+														"column": 5
+													},
+													"end": {
+														"line": 16,
+														"column": 6
+													}
+												},
+												"name": "c"
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 298,
+											"end": 299,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 9
+												},
+												"end": {
+													"line": 16,
+													"column": 10
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 298,
+												"end": 299,
+												"loc": {
+													"start": {
+														"line": 16,
+														"column": 9
+													},
+													"end": {
+														"line": 16,
+														"column": 10
+													}
+												},
+												"name": "d"
+											}
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "\n   * doc2\n   ",
+										"start": 266,
+										"end": 288
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 305,
+								"end": 306,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 4
+									},
+									"end": {
+										"line": 17,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 305,
+									"end": 306,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 4
+										},
+										"end": {
+											"line": 17,
+											"column": 5
+										}
+									},
+									"name": "e"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Same, with a parenthesized member.",
+							"start": 214,
+							"end": 251
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 376,
+					"end": 420,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 381,
+						"end": 382,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 6
+							},
+							"end": {
+								"line": 20,
+								"column": 7
+							}
+						},
+						"name": "C"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 387,
+						"end": 419,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 2
+							},
+							"end": {
+								"line": 24,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 412,
+								"end": 413,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 8
+									},
+									"end": {
+										"line": 23,
+										"column": 9
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 412,
+									"end": 413,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 8
+										},
+										"end": {
+											"line": 23,
+											"column": 9
+										}
+									},
+									"name": "f"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "\n   * doc3\n   ",
+										"start": 389,
+										"end": 411
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 418,
+								"end": 419,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 4
+									},
+									"end": {
+										"line": 24,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 418,
+									"end": 419,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 4
+										},
+										"end": {
+											"line": 24,
+											"column": 5
+										}
+									},
+									"name": "g"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Member glued on the */ line (no source newline): stays glued.",
+							"start": 310,
+							"end": 374
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 476,
+					"end": 502,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 27
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 481,
+						"end": 482,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 6
+							},
+							"end": {
+								"line": 27,
+								"column": 7
+							}
+						},
+						"name": "H"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 496,
+						"end": 501,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 21
+							},
+							"end": {
+								"line": 27,
+								"column": 26
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 496,
+								"end": 497,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 21
+									},
+									"end": {
+										"line": 27,
+										"column": 22
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 496,
+									"end": 497,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 21
+										},
+										"end": {
+											"line": 27,
+											"column": 22
+										}
+									},
+									"name": "i"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 500,
+								"end": 501,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 25
+									},
+									"end": {
+										"line": 27,
+										"column": 26
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 500,
+									"end": 501,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 25
+										},
+										"end": {
+											"line": 27,
+											"column": 26
+										}
+									},
+									"name": "j"
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " doc4 ",
+								"start": 485,
+								"end": 495
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Single-line leading block comment: stays inline.",
+							"start": 423,
+							"end": 474
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

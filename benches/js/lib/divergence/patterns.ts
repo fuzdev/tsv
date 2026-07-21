@@ -2849,62 +2849,6 @@ const jsdoc_type_cast_parens: DivergencePattern = {
 	},
 };
 
-/**
- * Tabs-only alignment: tsv renders Prettier's sub-tab alignment (a closing
- * delimiter at `tabs + 2 spaces`) as a whole tab instead. Same visual width at
- * `tab_width = 2`, so each changed line pairs a prettier `\t+ +X` (tabs then
- * spaces) with an identical-content ours `\t+X` (pure tabs). Surfaces wherever
- * Prettier's `align(2, …)` lands a delimiter at the alignment column — union
- * members with breaking object/generic types, parenthesized intersections, etc.
- */
-const tabs_only_alignment: DivergencePattern = {
-	id: 'tabs_only_alignment',
-	description: 'Sub-tab alignment rendered as whole tabs (no tabs+spaces mix)',
-	languages: ['typescript', 'svelte'],
-	conformance_sections: ['Tabs-Only Alignment (No Sub-Tab Spaces)'],
-	fixtures: [
-		'typescript/types/union_object_member_prettier_divergence',
-		'typescript/types/union_hug_object_prettier_divergence',
-		'typescript/types/union_parens_object_prettier_divergence',
-		'typescript/types/union_intersection_object_long_prettier_divergence',
-		'typescript/types/nested_generic_member_long_prettier_divergence',
-		'typescript/types/union_fn_type_member_long_prettier_divergence',
-		'typescript/types/union_paren_union_member_long_prettier_divergence',
-		'typescript/types/comments/union_member_long_line_comment_prettier_divergence',
-		'typescript/types/comments/union_paren_member_long_line_comment_prettier_divergence',
-	],
-	detect(ctx) {
-		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
-			// Whole hunk must be reindent-only: each prettier (removed) line pairs
-			// 1:1 with an ours (added) line of identical trailing content, where
-			// prettier's indent is tabs-then-spaces and ours is pure tabs of equal
-			// visual width. Requiring every pair avoids claiming mixed hunks.
-			if (
-				hunk.removed_lines.length === 0 ||
-				hunk.removed_lines.length !== hunk.added_lines.length
-			) {
-				return false;
-			}
-			return hunk.removed_lines.every((removed, i) => {
-				const added = hunk.added_lines[i];
-				if (removed.trimStart() !== added.trimStart()) return false;
-				const removed_lead = removed.slice(0, removed.length - removed.trimStart().length);
-				const added_lead = added.slice(0, added.length - added.trimStart().length);
-				// prettier: tabs then ≥1 space; ours: pure tabs (≥1)
-				if (!/^\t+ +$/.test(removed_lead) || !/^\t+$/.test(added_lead)) return false;
-				return visual_width(removed_lead) === visual_width(added_lead);
-			});
-		});
-		if (hunk_indices.length === 0) return null;
-		return {
-			pattern: 'tabs_only_alignment',
-			confidence: 'certain',
-			hunk_indices,
-			reason: 'Prettier sub-tab alignment (tabs + spaces) rendered as whole tabs',
-		};
-	},
-};
-
 // ─── Pattern Registry ───────────────────────────────────────────────────────
 //
 // Ordered: specific → broad. Specific patterns run first for best explanations.
@@ -2939,7 +2883,6 @@ export const PATTERNS: DivergencePattern[] = [
 	member_expression_call,
 	return_type_generic_union,
 	non_null_paren_base,
-	tabs_only_alignment,
 	forced_continuation_indent,
 
 	// 4. Svelte-specific patterns

@@ -5,7 +5,7 @@ use crate::config::TAB_WIDTH;
 use crate::printing::visual_width;
 use smallvec::SmallVec;
 
-use super::arena::{ArenaCommand, CmdStack, DocArena, DocId, DocNode, LineSuffixBuf};
+use super::arena::{ArenaCommand, CmdStack, DocArena, DocId, DocNode, LineSuffixBuf, RenderIndent};
 use super::arena_fits::arena_fits_with_lookahead;
 use super::arena_render_fill::render_fill_iterative;
 use super::render_config::RenderConfig;
@@ -194,7 +194,7 @@ pub(super) fn trim_trailing_whitespace(output: &mut String) {
 fn render_line_break(
     kind: LineKind,
     mode: Mode,
-    indent_level: usize,
+    indent: RenderIndent,
     output: &mut String,
     pos: &mut usize,
     render: &RenderConfig,
@@ -211,8 +211,8 @@ fn render_line_break(
             // (matches Prettier's trim() call before non-literal newlines)
             trim_trailing_whitespace(output);
             output.push('\n');
-            write_indentation(output, indent_level, render, embed);
-            *pos = line_start_column(indent_level, render, embed);
+            write_indentation(output, indent, render, embed);
+            *pos = line_start_column(indent, render, embed);
         }
         true
     } else if kind == LineKind::Normal {
@@ -701,7 +701,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
         doc,
         output,
         pos,
-        start_indent_level,
+        RenderIndent::level(start_indent_level),
         Mode::Break,
         &mut policy,
         &mut commands,
@@ -737,7 +737,7 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
     doc: DocId,
     output: &mut String,
     pos: &mut usize,
-    indent_level: usize,
+    indent: RenderIndent,
     mode: Mode,
     policy: &mut P,
     commands: &mut CmdStack,
@@ -753,11 +753,7 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
     // The loop's termination condition is `commands` draining back to empty,
     // so the caller-provided (pooled or local) stack must start empty.
     debug_assert!(commands.is_empty());
-    let mut cmd = ArenaCommand {
-        indent: indent_level,
-        mode,
-        doc,
-    };
+    let mut cmd = ArenaCommand { indent, mode, doc };
 
     // Hoist arena borrows out of the loop: the arena is read-only during
     // rendering, so a single immutable borrow held for the whole render
@@ -877,10 +873,17 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
                 continue;
             }
 
+            DocNode::AlignRoot { n, contents } => {
+                let n = *n;
+                let contents = *contents;
+                cmd = cmd.reset_to_level(n, contents);
+                continue;
+            }
+
             DocNode::Align { n, contents } => {
                 let n = *n;
                 let contents = *contents;
-                cmd = cmd.with_indent(n, contents);
+                cmd = cmd.aligned(n, contents);
                 continue;
             }
 
@@ -1125,7 +1128,7 @@ pub(super) fn render_single_doc<R: TextResolver + ?Sized>(
     doc: DocId,
     output: &mut String,
     pos: &mut usize,
-    indent_level: usize,
+    indent: RenderIndent,
     mode: Mode,
     should_remeasure: &mut bool,
 ) {
@@ -1135,7 +1138,7 @@ pub(super) fn render_single_doc<R: TextResolver + ?Sized>(
         doc,
         output,
         pos,
-        indent_level,
+        indent,
         mode,
         Some(&mut line_suffix),
         should_remeasure,
@@ -1164,7 +1167,7 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
     doc: DocId,
     output: &mut String,
     pos: &mut usize,
-    indent_level: usize,
+    indent: RenderIndent,
     mode: Mode,
     suffix_buffer: Option<&mut LineSuffixBuf>,
     should_remeasure: &mut bool,
@@ -1186,7 +1189,7 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
         doc,
         output,
         pos,
-        indent_level,
+        indent,
         mode,
         &mut policy,
         &mut commands,
@@ -1201,7 +1204,7 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
 
 pub(super) fn write_indentation(
     output: &mut String,
-    level: usize,
+    indent: RenderIndent,
     render: &RenderConfig,
     embed: &EmbedContext,
 ) {
@@ -1210,8 +1213,13 @@ pub(super) fn write_indentation(
     } else {
         0
     };
-    for _ in 0..(level + extra) {
+    for _ in 0..(indent.tabs() + extra) {
         output.push_str(render.indent);
+    }
+    // Sub-tab alignment is literal spaces, so a closing delimiter stays under
+    // its opener at any tab width (Prettier's `align` under `useTabs`).
+    for _ in 0..indent.trailing_align_spaces() {
+        output.push(' ');
     }
 }
 
@@ -1220,11 +1228,13 @@ fn indent_width(level: usize, render: &RenderConfig) -> usize {
 }
 
 pub(super) fn line_start_column(
-    indent_level: usize,
+    indent: RenderIndent,
     render: &RenderConfig,
     embed: &EmbedContext,
 ) -> usize {
-    indent_width(indent_level, render) + embed.base_indent_offset * TAB_WIDTH
+    indent_width(indent.tabs(), render)
+        + indent.trailing_align_spaces()
+        + embed.base_indent_offset * TAB_WIDTH
 }
 
 fn indent_str_width(indent: &str) -> usize {
@@ -1251,7 +1261,7 @@ mod column_arithmetic_tests {
     //! change here by breaking the arm and watching exactly one assertion fail.
     use super::RenderConfig;
     use super::{
-        effective_suffix_width, indent_str_width, indent_width, line_start_column,
+        RenderIndent, effective_suffix_width, indent_str_width, indent_width, line_start_column,
         update_pos_for_text,
     };
     use crate::EmbedContext;
@@ -1371,8 +1381,11 @@ mod column_arithmetic_tests {
         let tab = cfg("\t");
         // base_indent_offset 0: purely the indent width.
         let embed0 = EmbedContext::default();
-        assert_eq!(line_start_column(0, &tab, &embed0), 0);
-        assert_eq!(line_start_column(2, &tab, &embed0), 2 * TAB_WIDTH);
+        assert_eq!(line_start_column(RenderIndent::level(0), &tab, &embed0), 0);
+        assert_eq!(
+            line_start_column(RenderIndent::level(2), &tab, &embed0),
+            2 * TAB_WIDTH
+        );
         // base_indent_offset > 0 contributes base * TAB_WIDTH, ADDED (not
         // multiplied) to the indent width. Level 0 isolates the additive term
         // (a `+`→`*` flip reads 0 here instead of the offset); level 2 grades the
@@ -1381,10 +1394,19 @@ mod column_arithmetic_tests {
             base_indent_offset: 3,
             ..EmbedContext::default()
         };
-        assert_eq!(line_start_column(0, &tab, &embed), 3 * TAB_WIDTH);
         assert_eq!(
-            line_start_column(2, &tab, &embed),
+            line_start_column(RenderIndent::level(0), &tab, &embed),
+            3 * TAB_WIDTH
+        );
+        assert_eq!(
+            line_start_column(RenderIndent::level(2), &tab, &embed),
             2 * TAB_WIDTH + 3 * TAB_WIDTH
+        );
+        // A sub-tab align adds literal spaces on top of the whole-tab column,
+        // independent of TAB_WIDTH (the tab-width-agnostic alignment property).
+        assert_eq!(
+            line_start_column(RenderIndent::level(2).aligned(2), &tab, &embed0),
+            2 * TAB_WIDTH + 2
         );
     }
 

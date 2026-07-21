@@ -514,7 +514,7 @@ mod tests {
     #[test]
     fn since_movers_empty_when_identical() {
         let m: BTreeMap<(String, String), usize> =
-            [cluster("Call", "a→$", 100)].into_iter().collect();
+            std::iter::once(cluster("Call", "a→$", 100)).collect();
         assert!(since_movers(&m, &m).is_empty());
     }
 }
