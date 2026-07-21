@@ -368,6 +368,9 @@ pub(super) fn build_call_doc_with_wrapping(
     // Check for blank lines between arguments (forces expansion and preservation).
     // NOTE: This path is only reached when has_inter_arg_comments is false (the
     // comment-handling path above returns early). No comment handling needed here.
+    // Coarse over-check: a raw scan of every gap (it must catch a blank that sits
+    // *past* a same-line trailing comment, which the emitter's per-gap `blank_scan_end`
+    // measure would clamp away — so the two intentionally differ and are not shared).
     let has_blank_lines = call
         .arguments
         .windows(2)
