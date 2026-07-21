@@ -88,6 +88,55 @@ fn compile_refuses_valued_module_attribute() {
 }
 
 #[test]
+fn compile_refuses_reserved_script_attribute() {
+    // The oracle's parse-time `script_reserved_attribute` (read/script.js:49-51):
+    // the FIRST check in the attribute loop — a `<script>` attribute named
+    // server/client/worker/test/default is rejected. Each name is pinned to prove
+    // the carried `{name}` is faithful.
+    for name in ["server", "client", "worker", "test", "default"] {
+        assert_unsupported(
+            &format!("<script {name}>\n\tlet x = 1;\n</script>\n<p>{{x}}</p>"),
+            &format!("reserved <script> attribute {name}"),
+        );
+    }
+    // The check fires regardless of the attribute's VALUE — `server="x"` is still
+    // reserved (unlike `module`, where the value is the illegal part).
+    assert_unsupported(
+        "<script server=\"x\">\n\tlet x = 1;\n</script>\n<p>{x}</p>",
+        "reserved <script> attribute server",
+    );
+    // Reserved is checked on a MODULE-classified script too: the boolean `module`
+    // routes it to the module slot, but its `server` attribute still rejects.
+    assert_unsupported(
+        "<script module server>\n\tconst a = 1;\n</script>\n<p>x</p>",
+        "reserved <script> attribute server",
+    );
+    // First-error-wins ordering within a script: reserved BEFORE a valid module…
+    assert_unsupported(
+        "<script server module>\n\tconst a = 1;\n</script>\n<p>x</p>",
+        "reserved <script> attribute server",
+    );
+    // …but a source-earlier `module="x"` value error still reports first.
+    assert_unsupported(
+        "<script module=\"x\" server>\n\tconst a = 1;\n</script>\n<p>x</p>",
+        "<script module> attribute with a value",
+    );
+    // …and a source-earlier reserved name beats a later module value error.
+    assert_unsupported(
+        "<script server module=\"x\">\n\tconst a = 1;\n</script>\n<p>x</p>",
+        "reserved <script> attribute server",
+    );
+    // Discriminating controls, all COMPILE: an UNKNOWN attribute is only a warning
+    // (`script_unknown_attribute`), never the reserved error — the closed reserved
+    // set must not swallow it. `servers` is not `server`; `foo`/`foo="x"` are plain
+    // unknowns; the allowed `lang="ts"` is neither reserved nor unknown.
+    let _ = compile_js("<script servers>let x = 1;</script>\n<p>{x}</p>");
+    let _ = compile_js("<script foo>let x = 1;</script>\n<p>{x}</p>");
+    let _ = compile_js("<script foo=\"x\">let x = 1;</script>\n<p>{x}</p>");
+    let _ = compile_js("<script lang=\"ts\">let x: number = 1;</script>\n<p>{x}</p>");
+}
+
+#[test]
 fn compile_module_refuses_export_as_default() {
     // The oracle's single `module_illegal_default_export` fires from its
     // `ExportNamedDeclaration` visitor too: an `export { x as default }` specifier

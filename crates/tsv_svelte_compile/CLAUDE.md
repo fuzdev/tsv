@@ -647,11 +647,15 @@ pipeline order.
 
 - `script_ts_gate.rs` — the document-wide TypeScript flag and gate
   (`document_ts_flag` / `refuse_template_typescript`), the
-  `<script>`-attribute-value rules (`refuse_invalid_script_attributes` — the oracle's
-  parse-time `script_invalid_context` and `script_invalid_attribute_value`, both raised
-  in ONE source-order attribute loop over both scripts, first-error-wins: a `context`
-  attribute that isn't a plain `context="module"`, and a `module` attribute carrying a
-  value — `module` must be a bare boolean), plus
+  `<script>`-attribute rules (`refuse_invalid_script_attributes` — the oracle's
+  parse-time `script_reserved_attribute`, `script_invalid_context`, and
+  `script_invalid_attribute_value`, all raised in ONE source-order attribute loop over
+  both scripts, first-error-wins: a reserved attribute name
+  (`server`/`client`/`worker`/`test`/`default`, rejected regardless of value), a
+  `context` attribute that isn't a plain `context="module"`, and a `module` attribute
+  carrying a value — `module` must be a bare boolean; an *unknown* name like
+  `<script foo>` is only the oracle's `script_unknown_attribute` WARNING and still
+  compiles), plus
   `self_check_no_typescript`, the type-erasure self-check that closes the loop on
   the finished program (see `erase.rs`). Oracle phase 1, target-independent:
   Svelte decides TypeScript at *parse* time for the whole document at once, so

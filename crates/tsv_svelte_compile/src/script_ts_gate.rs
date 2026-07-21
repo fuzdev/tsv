@@ -126,9 +126,13 @@ pub(crate) fn document_ts_flag(root: &Root<'_>, source: &str) -> Result<bool, Co
     Ok(ts)
 }
 
-/// The oracle's parse-time `<script>` attribute-value rules, both raised in one
+/// The oracle's parse-time `<script>` attribute rules, all raised in one
 /// source-order loop (`1-parse/read/script.js:48-79`, first error wins):
 ///
+/// - **`script_reserved_attribute`** — the FIRST check: a `<script>` attribute
+///   named `server`, `client`, `worker`, `test`, or `default` (the oracle's
+///   `RESERVED_ATTRIBUTES`) is rejected regardless of its value (`<script server>`
+///   and `<script server="x">` both fail).
 /// - **`script_invalid_context`** — a `context` attribute is valid ONLY as a single
 ///   Text value `"module"` (the legacy spelling of `<script module>`). A boolean
 ///   `context`, an expression `context={x}`, a multi-chunk value, or any other text
@@ -137,17 +141,25 @@ pub(crate) fn document_ts_flag(root: &Root<'_>, source: &str) -> Result<bool, Co
 ///   BOOLEAN (`<script module>`); the oracle rejects `attribute.value !== true`, so
 ///   `module="foo"`, `module="module"`, `module=""`, and `module={x}` all fail.
 ///
+/// ⚠️ The oracle's `script_unknown_attribute` (any name outside the reserved five
+/// and the allowed `context`/`generics`/`lang`/`module`) is only a WARNING, so an
+/// unknown attribute (`<script foo>`) still COMPILES — this pass refuses only the
+/// closed reserved set, never an unknown name.
+///
 /// tsv's parser (`detect_script_context` in `tsv_svelte`) routes to the module slot
 /// only for `context="module"` or a value-less `module`, treating every other form
-/// as an ordinary instance script — so both invalid shapes reach here as an accepted
-/// component the oracle rejects, and both are refused. Checked on **both** scripts:
-/// `<script module context="foo">` is a module script to tsv, yet the oracle still
-/// rejects its `context="foo"`.
+/// as an ordinary instance script — so all three invalid shapes reach here as an
+/// accepted component the oracle rejects, and each is refused. Checked on **both**
+/// scripts: `<script module context="foo">` is a module script to tsv, yet the
+/// oracle still rejects its `context="foo"`, and a reserved attribute on either
+/// script rejects.
 ///
-/// The two rules share ONE per-attribute pass — not two — so the refusal REASON
-/// matches the oracle's first-error-wins order: `<script module="x" context="y">`
-/// reports the `module` value (source-first), `<script context="y" module="x">` the
-/// `context`.
+/// The rules share ONE per-attribute pass — not three — so the refusal REASON
+/// matches the oracle's first-error-wins order within a script: `<script server
+/// module="x">` reports the reserved `server` (source-first), `<script module="x"
+/// context="y">` the `module` value, `<script context="y" module="x">` the
+/// `context`. Reserved names are disjoint from `module`/`context`, so at most one
+/// rule fires per attribute.
 pub(crate) fn refuse_invalid_script_attributes(
     root: &Root<'_>,
     source: &str,
@@ -162,6 +174,11 @@ pub(crate) fn refuse_invalid_script_attributes(
                 interner.resolve_infallible(attr.name).to_string()
             };
             match name.as_str() {
+                // The oracle's FIRST check, fired before module/context and
+                // regardless of the attribute's value.
+                "server" | "client" | "worker" | "test" | "default" => {
+                    return Err(unsupported(Refusal::ScriptReservedAttribute { name }));
+                }
                 "context" => {
                     // The oracle's `is_text_attribute(attr) && attr.value[0].data ===
                     // 'module'` — a single Text node equal to "module". A boolean

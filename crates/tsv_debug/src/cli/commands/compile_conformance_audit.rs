@@ -379,6 +379,7 @@ mod tests {
         "non-expression value for <svelte:boundary> attribute {name} (the oracle rejects it)",
         "read of derived binding {name}",
         "read of derived binding {name} shadowed in a nested scope",
+        "reserved <script> attribute {name} (the oracle rejects it)",
         "rune {name}",
         "rune {name} whose base is also an instance binding",
         "runes-invalid import of {name} from svelte",

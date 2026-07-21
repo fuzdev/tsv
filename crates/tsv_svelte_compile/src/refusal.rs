@@ -124,6 +124,25 @@ pub enum Refusal {
     /// pass (`refuse_invalid_script_attributes`).
     #[error("<script module> attribute with a value (must be boolean — the oracle rejects it)")]
     ScriptInvalidAttributeValue,
+    /// A `<script>` carrying one of the oracle's `RESERVED_ATTRIBUTES` —
+    /// `server`, `client`, `worker`, `test`, or `default` — the oracle's
+    /// parse-time `script_reserved_attribute` (`1-parse/read/script.js:49-51`,
+    /// the FIRST check in the same attribute loop as [`Self::ScriptInvalidContext`]
+    /// and [`Self::ScriptInvalidAttributeValue`]). The check fires regardless of the
+    /// attribute's VALUE (`<script server>` and `<script server="x">` both reject).
+    /// tsv's parser routes only `module`/`context` to the module slot, so a
+    /// reserved-named attribute never affects slot classification and the script
+    /// carrying it (instance OR module — `<script module server>` is a module script
+    /// that still refuses) reaches the compiler as an accepted component; the compiler
+    /// refuses rather than emit for one the oracle rejects. ⚠️ The oracle's
+    /// `script_unknown_attribute` warning covers any *non-reserved* name outside
+    /// `context`/`generics`/`lang`/`module` and does NOT throw, so `<script foo>`
+    /// still COMPILES; only the closed reserved five above are an error.
+    #[error("reserved <script> attribute {name} (the oracle rejects it)")]
+    ScriptReservedAttribute {
+        /// The reserved attribute name (`server`/`client`/`worker`/`test`/`default`).
+        name: String,
+    },
     /// A `<script>` with a `lang` other than `ts`/`js`/empty (instance or module).
     /// The oracle's TypeScript flag tests `lang === 'ts'` **exactly**, so
     /// `lang="typescript"` and `lang="TS"` are not TypeScript to it; rather than
