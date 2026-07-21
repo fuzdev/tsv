@@ -26,7 +26,7 @@
 
 use super::super::internal;
 use super::{Schema, bigint_to_decimal};
-use tsv_lang::{Interner, LocationMapper, Position, Span};
+use tsv_lang::{LocationMapper, Position, Span};
 // The JSON-scalar substrate is shared across the three language writers (so the
 // Svelte writer can compose embedded TS/CSS emission into one buffer). Only the
 // TS-specific node emitters (`node_header`, field helpers, `Ctx`) live here.
@@ -65,11 +65,10 @@ pub fn write_program_json(
     program: &internal::Program<'_>,
     source: &str,
     loc: LocationMapper<'_>,
-    interner: &Interner,
     schema: Schema,
     locations: bool,
 ) -> Vec<u8> {
-    let mut ctx = Ctx::new(source, loc, interner);
+    let mut ctx = Ctx::new(source, loc);
     ctx.vanilla_acorn = schema.is_svelte_script();
     ctx.emit_loc = locations;
     let mut w = JsonWriter::with_capacity(tsv_lang::estimated_json_capacity(source.len()));
@@ -79,7 +78,7 @@ pub fn write_program_json(
 
 /// Emit an embedded TS expression's wire JSON into a caller-owned writer, for
 /// `tsv_svelte` composing template `{expr}` / directive / block expression
-/// emission into its own buffer. Shares the host document's interner and
+/// emission into its own buffer. Shares the host document's
 /// `LocationMapper` (spans are host-file coordinates); with a real map it emits
 /// final char-space positions directly.
 ///
@@ -92,11 +91,10 @@ pub fn write_expression_embedded(
     expr: &internal::Expression<'_>,
     source: &str,
     loc: LocationMapper<'_>,
-    interner: &Interner,
     comments: CommentMode<'_>,
     emit_loc: bool,
 ) {
-    let mut ctx = Ctx::new(source, loc, interner);
+    let mut ctx = Ctx::new(source, loc);
     ctx.comments = comments;
     ctx.emit_loc = emit_loc;
     expressions::write_expression(w, expr, &ctx);
@@ -104,19 +102,17 @@ pub fn write_expression_embedded(
 
 /// Emit an embedded standalone `VariableDeclaration`'s wire JSON, for
 /// `tsv_svelte`'s `{const …}` / `{let …}` declaration tag. Shares the host
-/// document's interner and
-/// `LocationMapper` (spans are host-file coordinates), emitting final char-space
+/// document's `LocationMapper` (spans are host-file coordinates), emitting final char-space
 /// positions directly. `comments` as in `write_expression_embedded`.
 pub fn write_variable_declaration_embedded(
     w: &mut JsonWriter,
     var_decl: &internal::VariableDeclaration<'_>,
     source: &str,
     loc: LocationMapper<'_>,
-    interner: &Interner,
     comments: CommentMode<'_>,
     emit_loc: bool,
 ) {
-    let mut ctx = Ctx::new(source, loc, interner);
+    let mut ctx = Ctx::new(source, loc);
     ctx.comments = comments;
     ctx.emit_loc = emit_loc;
     write_variable_declaration(w, var_decl, &ctx, false);
@@ -135,11 +131,10 @@ pub fn write_identifier_expression_with_character(
     expr: &internal::Expression<'_>,
     source: &str,
     loc: LocationMapper<'_>,
-    interner: &Interner,
     comments: CommentMode<'_>,
     emit_loc: bool,
 ) {
-    let mut ctx = Ctx::new(source, loc, interner);
+    let mut ctx = Ctx::new(source, loc);
     ctx.comments = comments;
     ctx.emit_loc = emit_loc;
     write_identifier_expression_with_character_in(w, expr, &ctx);
@@ -192,11 +187,10 @@ pub fn write_pattern_embedded(
     expr: &internal::Expression<'_>,
     source: &str,
     loc: LocationMapper<'_>,
-    interner: &Interner,
     comments: CommentMode<'_>,
     emit_loc: bool,
 ) {
-    let mut ctx = Ctx::new(source, loc, interner);
+    let mut ctx = Ctx::new(source, loc);
     ctx.comments = comments;
     ctx.emit_loc = emit_loc;
     // The pattern root's own annotation is the `read_context`-synthesized one
@@ -262,7 +256,7 @@ fn write_program(
 /// Emit an embedded `<script>` `Program`'s wire JSON into a caller-owned writer —
 /// for `tsv_svelte` composing a
 /// `<script>` block's `content` into its own buffer. Shares the host document's
-/// interner and `LocationMapper` (spans are host-file coordinates), threads the
+/// `LocationMapper` (spans are host-file coordinates), threads the
 /// `Schema`, and — unlike a standalone `Program` — emits the node's own `loc`
 /// from `loc_override` rather than deriving it from `program.span`.
 ///
@@ -280,13 +274,12 @@ pub fn write_program_embedded(
     program: &internal::Program<'_>,
     source: &str,
     loc: LocationMapper<'_>,
-    interner: &Interner,
     schema: Schema,
     loc_override: (Position, Position),
     comments: CommentMode<'_>,
     emit_loc: bool,
 ) {
-    let mut ctx = Ctx::new(source, loc, interner);
+    let mut ctx = Ctx::new(source, loc);
     ctx.vanilla_acorn = schema.is_svelte_script();
     ctx.comments = comments;
     ctx.emit_loc = emit_loc;
@@ -330,8 +323,8 @@ pub enum CommentMode<'a> {
     Record(&'a SkeletonRecorder),
 }
 
-/// The per-document environment every writer function shares (`source`, the
-/// `LocationMapper`, and the interner).
+/// The per-document environment every writer function shares (`source` and the
+/// `LocationMapper`).
 ///
 /// `pattern_line` / `pattern_ann_span` are the two Svelte block-pattern quirks
 /// (`write_pattern_embedded`): they are inert (`0` / the empty span) for every
@@ -341,7 +334,6 @@ pub enum CommentMode<'a> {
 pub(super) struct Ctx<'a> {
     pub(super) source: &'a str,
     pub(super) loc: LocationMapper<'a>,
-    pub(super) interner: &'a Interner,
     /// Block-pattern `read_pattern` `+1`-column quirk: the (1-based) line on
     /// which the pattern starts, or `0` when inactive. A node's `loc` column is
     /// bumped `+1` on this line only, reproducing `adjust_read_pattern_columns`.
@@ -375,11 +367,10 @@ pub(super) struct Ctx<'a> {
 impl<'a> Ctx<'a> {
     /// The base per-document context (no pattern quirks active).
     #[inline]
-    fn new(source: &'a str, loc: LocationMapper<'a>, interner: &'a Interner) -> Self {
+    fn new(source: &'a str, loc: LocationMapper<'a>) -> Self {
         Ctx {
             source,
             loc,
-            interner,
             pattern_line: 0,
             pattern_ann_span: Span::new(0, 0),
             comments: CommentMode::Off,
@@ -589,18 +580,18 @@ pub(super) fn kind_token(is_type: bool, schema: Schema) -> Option<&'static str> 
 
 /// Emit an identifier name — the single name-emission funnel. Span-identity
 /// names are the raw source slice (the leading `raw_len` bytes at
-/// `name_start`); escaped names resolve the interned decoded form (an escaped
+/// `name_start`); escaped names are the decoded `&'arena str` (an escaped
 /// identifier's `\u{78}` source form decodes to `x`). Both arms write the wire
 /// value directly; no allocation.
 #[inline]
 pub(super) fn write_name(
     w: &mut JsonWriter,
-    name: internal::IdentName,
+    name: internal::IdentName<'_>,
     name_start: u32,
     ctx: &Ctx<'_>,
 ) {
     match name.escaped {
-        Some(sym) => w.string(ctx.interner.resolve_infallible(sym)),
+        Some(s) => w.string(s),
         None => {
             let start = name_start as usize;
             w.string(&ctx.source[start..start + name.raw_len as usize]);
@@ -683,7 +674,7 @@ pub(super) fn write_literal(w: &mut JsonWriter, lit: &internal::Literal<'_>, ctx
 pub(super) fn write_identifier_parts(
     w: &mut JsonWriter,
     span: Span,
-    name: internal::IdentName,
+    name: internal::IdentName<'_>,
     optional: bool,
     type_annotation: Option<&internal::TSTypeAnnotation<'_>>,
     decorators: Option<&[internal::Decorator<'_>]>,
@@ -701,7 +692,7 @@ pub(super) fn write_identifier_parts(
 pub(super) fn write_identifier_parts_with_character(
     w: &mut JsonWriter,
     span: Span,
-    name: internal::IdentName,
+    name: internal::IdentName<'_>,
     optional: bool,
     type_annotation: Option<&internal::TSTypeAnnotation<'_>>,
     decorators: Option<&[internal::Decorator<'_>]>,
@@ -719,7 +710,7 @@ pub(super) fn write_identifier_parts_with_character(
 fn write_identifier_fields(
     w: &mut JsonWriter,
     span: Span,
-    name: internal::IdentName,
+    name: internal::IdentName<'_>,
     optional: bool,
     type_annotation: Option<&internal::TSTypeAnnotation<'_>>,
     decorators: Option<&[internal::Decorator<'_>]>,

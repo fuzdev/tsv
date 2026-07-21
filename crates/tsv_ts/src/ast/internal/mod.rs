@@ -1,9 +1,9 @@
 //! Internal AST - optimized for traversal and manipulation
 //!
 //! Identifier names are span-identity ([`IdentName`]): recovered from the
-//! source slice, with the interner as a rare escape hatch (unicode-escaped
-//! names). This is the primary AST representation used by the parser,
-//! formatter, and other tools.
+//! source slice, with an arena-allocated `&'arena str` as a rare escape hatch
+//! (unicode-escaped names). This is the primary AST representation used by the
+//! parser, formatter, and other tools.
 //!
 //! ## Arena allocation
 //!
@@ -11,14 +11,10 @@
 //! caller. Recursive children are `&'arena T<'arena>` (not `Box`), child
 //! collections are `&'arena [T<'arena>]` (not `Vec`), and decoded strings are
 //! `&'arena str` (not `String`) — so a whole parse is one bump-allocated graph,
-//! freed wholesale when the `Bump` drops, with no per-node `Drop`. Leaf nodes
-//! that hold only `Span`/`IdentName`/primitives (`PrivateIdentifier`,
-//! `RegexLiteral`, `ThisExpression`, `Super`, the operator enums) carry no
-//! lifetime. The AST stores only `Copy` symbol IDs ([`DefaultSymbol`]) for the
-//! rare escaped name — never a borrow into the interner — so `Program` holds no
-//! interner and carries no interner lifetime; the caller owns a [`Interner`]
-//! threaded through parse (`&mut`) and format/convert (`&`), orthogonal to
-//! `'arena`.
+//! freed wholesale when the `Bump` drops, with no per-node `Drop`. The rare
+//! escaped identifier name is one such `&'arena str` ([`IdentName::escaped`]),
+//! read directly at every consumer — the AST holds no interner and needs no
+//! interner lifetime.
 
 mod classes;
 mod declarations;
@@ -28,8 +24,6 @@ mod patterns;
 mod statements;
 mod types;
 
-use string_interner::DefaultSymbol;
-use tsv_lang::Interner;
 pub use tsv_lang::{Comment, Span};
 
 //
@@ -205,26 +199,29 @@ impl<'arena> Literal<'arena> {
 }
 
 /// The name channel of an identifier-like node: span-identity by default, with
-/// an interned escape hatch for the rare names the source can't recover.
+/// an arena-allocated escape hatch for the rare names the source can't recover.
 ///
 /// `escaped` is `Some` only when the name text differs from the leading
 /// `raw_len` bytes at the node's span start — a `\u` unicode escape
 /// (`foo` → `foo`), or a name too long for `raw_len` (> `u16::MAX`
-/// bytes). Otherwise (`None`, >99.99% of identifiers) the name is the raw
-/// source slice `span.start .. span.start + raw_len` — no interning at all.
+/// bytes). It then carries the decoded name as an `&'arena str` (the parser's
+/// `current_decoded`, already arena-allocated), read directly at every
+/// consumer — no interner round-trip. Otherwise (`None`, >99.99% of
+/// identifiers) the name is the raw source slice
+/// `span.start .. span.start + raw_len` — nothing stored at all.
 ///
 /// `raw_len` is the raw name-*token* byte length, fixed at token time: the
 /// owning node's span may later extend past the name (`?`, `!`, `: Type` —
 /// acorn parity), so the name is the leading `raw_len` bytes, never the whole
-/// span. When `escaped` is `Some`, `raw_len` is 0 and unused — resolve via
-/// the interner.
+/// span. When `escaped` is `Some`, `raw_len` is 0 and unused — read the
+/// `&'arena str` directly.
 #[derive(Debug, Clone, Copy)]
-pub struct IdentName {
-    pub escaped: Option<DefaultSymbol>,
+pub struct IdentName<'arena> {
+    pub escaped: Option<&'arena str>,
     pub raw_len: u16,
 }
 
-impl IdentName {
+impl<'arena> IdentName<'arena> {
     /// A verbatim name covering `span` exactly (keyword/synthetic sites where
     /// the token has already been consumed — the span is the name token).
     #[inline]
@@ -236,13 +233,18 @@ impl IdentName {
         }
     }
 
-    /// Resolve the name: the leading `raw_len` bytes at `span_start`, or the
-    /// interned decoded form. `source` must be the host document the spans
-    /// were recorded against.
+    /// Resolve the name: the decoded `&'arena str` for an escaped name, else
+    /// the leading `raw_len` bytes at `span_start`. `source` must be the host
+    /// document the spans were recorded against. `IdentName` is `Copy`, so it
+    /// is taken by value; the escaped arena string outlives `source`
+    /// (`'arena: 's`), so both arms unify at the source lifetime.
     #[inline]
-    pub fn resolve<'s>(&self, span_start: u32, source: &'s str, interner: &'s Interner) -> &'s str {
+    pub fn resolve<'s>(self, span_start: u32, source: &'s str) -> &'s str
+    where
+        'arena: 's,
+    {
         match self.escaped {
-            Some(sym) => interner.resolve_infallible(sym),
+            Some(s) => s,
             None => &source[span_start as usize..span_start as usize + self.raw_len as usize],
         }
     }
@@ -250,13 +252,14 @@ impl IdentName {
 
 #[derive(Debug, Clone)]
 pub struct Identifier<'arena> {
-    /// The [`IdentName`] channel's escape hatch: the interned decoded name,
-    /// `Some` only for `\u`-escaped or `raw_len`-oversized names. Stored
-    /// flattened (beside `name_len`) rather than as a nested [`IdentName`] —
-    /// the nested struct's tail padding would grow `Identifier` past 24 B,
-    /// and as an *inline* `Expression` variant its size drives
-    /// `sizeof(Expression)`. Read via [`Self::ident_name`].
-    pub escaped_name: Option<DefaultSymbol>,
+    /// The [`IdentName`] channel's escape hatch: the decoded name as an
+    /// `&'arena str`, `Some` only for `\u`-escaped or `raw_len`-oversized
+    /// names. Stored flattened (beside `name_len`) rather than as a nested
+    /// [`IdentName`] — the nested struct's tail padding would grow `Identifier`,
+    /// and it is an *inline* `Expression` variant. (`Expression` is dominated by
+    /// far larger variants, so the fat-pointer field does not move
+    /// `sizeof(Expression)`.) Read via [`Self::ident_name`].
+    pub escaped_name: Option<&'arena str>,
     /// The [`IdentName`] channel's `raw_len`: the raw name-token byte length
     /// (the node span may extend past the name — `?` / `!` / `: Type`).
     pub name_len: u16,
@@ -298,7 +301,7 @@ impl<'arena> Identifier<'arena> {
 
     /// The name channel, reassembled from the flattened fields.
     #[inline]
-    pub fn ident_name(&self) -> IdentName {
+    pub fn ident_name(&self) -> IdentName<'arena> {
         IdentName {
             escaped: self.escaped_name,
             raw_len: self.name_len,
@@ -307,18 +310,21 @@ impl<'arena> Identifier<'arena> {
 
     /// The name's sub-span: the leading `name_len` bytes at the span start (the
     /// node span may extend over `?` / `!` / `: Type`). Only meaningful when
-    /// `escaped_name` is `None` — resolve escaped names via the interner.
+    /// `escaped_name` is `None` — an escaped name reads its `&'arena str` directly.
     #[inline]
     pub fn name_span(&self) -> Span {
         Span::new(self.span.start, self.span.start + self.name_len as u32)
     }
 
     /// Resolve the identifier's name: the raw source slice (span-identity), or
-    /// the interned decoded form for escaped names. `source` must be the host
+    /// the decoded `&'arena str` for escaped names. `source` must be the host
     /// document the spans were recorded against.
     #[inline]
-    pub fn name<'s>(&self, source: &'s str, interner: &'s Interner) -> &'s str {
-        self.ident_name().resolve(self.span.start, source, interner)
+    pub fn name<'s>(&self, source: &'s str) -> &'s str
+    where
+        'arena: 's,
+    {
+        self.ident_name().resolve(self.span.start, source)
     }
 
     /// Create a simple identifier (a reference): no optional flag, no binding extra.
@@ -327,7 +333,7 @@ impl<'arena> Identifier<'arena> {
     /// binding that carries `?` / a type annotation / decorators, construct
     /// directly with `extra: Some(arena.alloc(IdentifierParamExtra { … }))`.
     #[inline]
-    pub fn simple(name: IdentName, span: Span) -> Self {
+    pub fn simple(name: IdentName<'arena>, span: Span) -> Self {
         Self {
             escaped_name: name.escaped,
             name_len: name.raw_len,
@@ -344,14 +350,14 @@ impl<'arena> Identifier<'arena> {
 /// The name does NOT include the `#` prefix, while the span DOES include the
 /// `#` character — so the verbatim name is the span minus its leading byte.
 #[derive(Debug, Clone)]
-pub struct PrivateIdentifier {
+pub struct PrivateIdentifier<'arena> {
     /// The name channel (name excludes the `#`; `raw_len` covers the name
     /// bytes after the `#`).
-    pub name: IdentName,
+    pub name: IdentName<'arena>,
     pub span: Span,
 }
 
-impl PrivateIdentifier {
+impl<'arena> PrivateIdentifier<'arena> {
     /// The name's sub-span: the trailing `raw_len` bytes of the span (the name
     /// token ends the span; anchoring at the end stays correct even if the
     /// parser ever tolerated separation after the `#`).
@@ -360,12 +366,15 @@ impl PrivateIdentifier {
         Span::new(self.span.end - self.name.raw_len as u32, self.span.end)
     }
 
-    /// Resolve the name (without `#`): the raw source slice, or the interned
-    /// decoded form for escaped names.
+    /// Resolve the name (without `#`): the raw source slice, or the decoded
+    /// `&'arena str` for escaped names.
     #[inline]
-    pub fn name<'s>(&self, source: &'s str, interner: &'s Interner) -> &'s str {
+    pub fn name<'s>(&self, source: &'s str) -> &'s str
+    where
+        'arena: 's,
+    {
         self.name
-            .resolve(self.span.end - self.name.raw_len as u32, source, interner)
+            .resolve(self.span.end - self.name.raw_len as u32, source)
     }
 }
 

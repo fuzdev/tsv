@@ -61,12 +61,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let expr_content = &self.source[expr_start..expr_end];
 
         // Parse expression using TypeScript parser (with comments)
-        let (expression, comments) = tsv_ts::parse_expression_with_comments(
-            expr_content,
-            expr_start,
-            &mut self.interner,
-            self.arena,
-        )?;
+        let (expression, comments) =
+            tsv_ts::parse_expression_with_comments(expr_content, expr_start, self.arena)?;
 
         // Add expression comments to the parser's collection for later inclusion in Root.comments
         self.expression_comments.extend_from_slice(comments);

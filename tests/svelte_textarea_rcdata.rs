@@ -30,10 +30,8 @@ use serde_json::Value;
 /// ExpressionTag) and the close-tolerant element `end`.
 fn rcdata_skeleton(src: &str) -> String {
     let arena = bumpalo::Bump::new();
-    let mut interner = tsv_svelte::Interner::new();
-    let ast = tsv_svelte::parse(src, &arena, &mut interner)
-        .expect("parser should accept <textarea> RCDATA");
-    let json = tsv_svelte::convert_ast_json(&ast, src, &interner);
+    let ast = tsv_svelte::parse(src, &arena).expect("parser should accept <textarea> RCDATA");
+    let json = tsv_svelte::convert_ast_json(&ast, src);
     let nodes = json["fragment"]["nodes"]
         .as_array()
         .expect("Root.fragment.nodes array");
@@ -64,10 +62,8 @@ fn reduce(nodes: &[Value]) -> String {
 /// The `raw` / `data` of the first `<textarea>`'s first `Text` child.
 fn first_textarea_text(src: &str) -> (String, String) {
     let arena = bumpalo::Bump::new();
-    let mut interner = tsv_svelte::Interner::new();
-    let ast = tsv_svelte::parse(src, &arena, &mut interner)
-        .expect("parser should accept <textarea> RCDATA");
-    let json = tsv_svelte::convert_ast_json(&ast, src, &interner);
+    let ast = tsv_svelte::parse(src, &arena).expect("parser should accept <textarea> RCDATA");
+    let json = tsv_svelte::convert_ast_json(&ast, src);
     let text = &json["fragment"]["nodes"][0]["fragment"]["nodes"][0];
     (
         text["raw"].as_str().expect("Text.raw").to_owned(),
@@ -142,8 +138,7 @@ fn near_miss_close_stays_text() {
 #[test]
 fn unterminated_expression_rejected() {
     let arena = bumpalo::Bump::new();
-    let mut interner = tsv_svelte::Interner::new();
-    assert!(tsv_svelte::parse("<textarea>{foo</textarea>", &arena, &mut interner).is_err());
+    assert!(tsv_svelte::parse("<textarea>{foo</textarea>", &arena).is_err());
 }
 
 /// A close-less `<textarea>` (EOF before any `</textarea…>`) is rejected, matching
@@ -151,8 +146,7 @@ fn unterminated_expression_rejected() {
 #[test]
 fn unclosed_textarea_rejected() {
     let arena = bumpalo::Bump::new();
-    let mut interner = tsv_svelte::Interner::new();
-    assert!(tsv_svelte::parse("<textarea>abc</textarea", &arena, &mut interner).is_err());
+    assert!(tsv_svelte::parse("<textarea>abc</textarea", &arena).is_err());
 }
 
 /// RCDATA text decodes character references with attribute-value rules — Svelte's

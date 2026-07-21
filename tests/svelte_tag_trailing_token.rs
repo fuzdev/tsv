@@ -32,8 +32,7 @@
 /// `true` if tsv's Svelte parser accepts `src`.
 fn accepts(src: &str) -> bool {
     let arena = bumpalo::Bump::new();
-    let mut interner = tsv_svelte::Interner::new();
-    tsv_svelte::parse(src, &arena, &mut interner).is_ok()
+    tsv_svelte::parse(src, &arena).is_ok()
 }
 
 /// The expression exactly fills its slice (or is followed only by trivia) — accepted,

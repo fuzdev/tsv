@@ -29,7 +29,6 @@ json = ["dep:serde_json"]
 
 [dependencies]
 smallvec.workspace = true
-string-interner.workspace = true
 thiserror.workspace = true
 unicode-segmentation.workspace = true
 unicode-width.workspace = true

@@ -225,12 +225,9 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
         // materialization). The arena owns the internal AST and must outlive
         // `parsed` (caller-owns-`Bump`).
         let arena = bumpalo::Bump::new();
-        // The interner outlives `parsed` too (parse fills it, `input_ast_paths`'
-        // convert reads it), so it is caller-owned beside the arena.
-        let mut interner = tsv_lang::Interner::new();
-        match parse_input(&input, input_type, fixture.goal(), &arena, &mut interner) {
+        match parse_input(&input, input_type, fixture.goal(), &arena) {
             Ok(parsed) => {
-                match input_ast_paths(&parsed, &input, &interner) {
+                match input_ast_paths(&parsed, &input) {
                     Ok(paths) => {
                         // Phase 2: Our Parser validation - P2 (pure Rust)
                         validate_parser_ours(&mut result, fixture, &paths);

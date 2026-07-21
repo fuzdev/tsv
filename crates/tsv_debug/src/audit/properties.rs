@@ -43,15 +43,14 @@ use crate::render_normalize::{normalize_pair, structural_skeleton};
 /// this `Value`.
 pub(crate) fn tsv_parse_to_value(source: &str, parser: ParserType) -> Option<Value> {
     let arena = bumpalo::Bump::new();
-    let mut interner = tsv_lang::Interner::new();
     match parser {
         ParserType::TypeScript => {
-            let ast = tsv_ts::parse(source, &arena, &mut interner).ok()?;
-            Some(tsv_ts::convert_ast_json(&ast, source, &interner))
+            let ast = tsv_ts::parse(source, &arena).ok()?;
+            Some(tsv_ts::convert_ast_json(&ast, source))
         }
         ParserType::Svelte => {
-            let ast = tsv_svelte::parse(source, &arena, &mut interner).ok()?;
-            Some(tsv_svelte::convert_ast_json(&ast, source, &interner))
+            let ast = tsv_svelte::parse(source, &arena).ok()?;
+            Some(tsv_svelte::convert_ast_json(&ast, source))
         }
         ParserType::Css => {
             let ast = tsv_css::parse(source, &arena).ok()?;

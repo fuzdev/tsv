@@ -120,9 +120,6 @@ fn parse_to_json(
     // borrowed escapes this function. Pre-sized to the source to avoid the
     // bump's chunk-doubling tail on the parse.
     let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
-    // The one-shot parse owns its interner locally (parse fills it `&mut`,
-    // convert reads it `&`); CSS is interner-free, so its arm never touches it.
-    let mut interner = tsv_lang::Interner::new();
 
     // Shared tail: `--pretty` reparses the compact wire bytes (the sole emission
     // path) into a `Value` for tab-indented serialization; compact returns the
@@ -144,12 +141,11 @@ fn parse_to_json(
     // no goal.
     let bytes = match parser_type {
         ParserType::Svelte => {
-            let ast =
-                tsv_svelte::parse(source, &arena, &mut interner).map_err(|e| e.to_string())?;
+            let ast = tsv_svelte::parse(source, &arena).map_err(|e| e.to_string())?;
             if locations {
-                tsv_svelte::convert_ast_json_bytes(&ast, source, &interner)
+                tsv_svelte::convert_ast_json_bytes(&ast, source)
             } else {
-                tsv_svelte::convert_ast_json_bytes_no_locations(&ast, source, &interner)
+                tsv_svelte::convert_ast_json_bytes_no_locations(&ast, source)
             }
         }
         ParserType::Css => {
@@ -161,12 +157,11 @@ fn parse_to_json(
             }
         }
         ParserType::TypeScript => {
-            let ast = tsv_ts::parse_with_goal(source, goal, &arena, &mut interner)
-                .map_err(|e| e.to_string())?;
+            let ast = tsv_ts::parse_with_goal(source, goal, &arena).map_err(|e| e.to_string())?;
             if locations {
-                tsv_ts::convert_ast_json_bytes(&ast, source, &interner)
+                tsv_ts::convert_ast_json_bytes(&ast, source)
             } else {
-                tsv_ts::convert_ast_json_bytes_no_locations(&ast, source, &interner)
+                tsv_ts::convert_ast_json_bytes_no_locations(&ast, source)
             }
         }
     };

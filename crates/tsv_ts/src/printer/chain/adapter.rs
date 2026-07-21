@@ -14,12 +14,12 @@ use tsv_lang::{ClassifiedComments, Comment, Span};
 impl<'a> SymbolLookup for Printer<'a> {
     fn with_name<R>(
         &self,
-        name: internal::IdentName,
+        name: internal::IdentName<'_>,
         name_start: u32,
         f: impl FnOnce(&str) -> R,
     ) -> Option<R> {
         match name.escaped {
-            Some(sym) => Some(f(self.interner.resolve_infallible(sym))),
+            Some(s) => Some(f(s)),
             None => Some(f(
                 &self.source[name_start as usize..name_start as usize + name.raw_len as usize]
             )),
@@ -32,7 +32,7 @@ impl<'a> ChainPrinter for Printer<'a> {
         self.arena
     }
 
-    fn ident_doc(&self, name: internal::IdentName, name_start: u32) -> DocId {
+    fn ident_doc(&self, name: internal::IdentName<'_>, name_start: u32) -> DocId {
         self.ident_name_doc(name, name_start)
     }
 

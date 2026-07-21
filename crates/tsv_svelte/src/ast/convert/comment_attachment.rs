@@ -562,10 +562,9 @@ mod tests {
         let source = format!("<script lang=\"ts\">\n{body}\n</script>");
         // Test inputs are hardcoded valid sources; a parse failure should panic
         let arena = bumpalo::Bump::new();
-        let mut interner = tsv_lang::Interner::new();
         #[allow(clippy::expect_used)]
-        let root = crate::parse(&source, &arena, &mut interner).expect("parse");
-        crate::convert_ast_json(&root, &source, &interner)
+        let root = crate::parse(&source, &arena).expect("parse");
+        crate::convert_ast_json(&root, &source)
     }
 
     /// The first statement's expression in the instance `<script>`.

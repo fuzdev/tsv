@@ -68,8 +68,7 @@ use crate::PrinterInputs;
 use crate::ast::internal;
 use std::cell::Cell;
 use tsv_lang::{
-    EmbedContext, Interner, OutputBuffer, Span, SymbolResolver, SymbolToU32, TAB_WIDTH,
-    comments_to_emit_in_range,
+    EmbedContext, OutputBuffer, Span, TAB_WIDTH, comments_to_emit_in_range,
     doc::{
         self,
         arena::{DocArena, DocId},
@@ -113,9 +112,6 @@ pub struct Printer<'a> {
     pub(crate) embed: EmbedContext,
     /// Arena allocator for doc nodes (borrowed from caller or locally owned)
     pub(crate) arena: &'a DocArena,
-    /// Borrowed caller-owned interner for resolving symbols (read-only at
-    /// format time; the parse phase's `&mut` borrow has ended).
-    interner: &'a Interner,
     /// Original source code (for extracting raw values, preserving escape sequences, etc.)
     pub(crate) source: &'a str,
     /// Comments from the program (for printing leading/trailing comments)
@@ -262,7 +258,6 @@ impl<'a> Printer<'a> {
             indent_level: 0,
             embed,
             arena,
-            interner: inputs.interner,
             source: inputs.source,
             comments: inputs.comments,
             has_owned_comments: inputs.has_owned_comments,
@@ -362,7 +357,6 @@ impl<'a> Printer<'a> {
             // Source-aware resolver so `DocText::SourceSpan` nodes (verbatim
             // comment/literal slices) resolve without a `DocArena` lifetime.
             let resolver = doc::SourceTextResolver {
-                inner: self.interner,
                 source: self.source,
             };
             doc::arena_print_doc_with_indent_resolved_into(
@@ -382,7 +376,6 @@ impl<'a> Printer<'a> {
     /// Render an arena DocId to a flat string with effectively infinite width.
     pub(crate) fn render_arena_doc_flat(&self, d: DocId) -> String {
         let resolver = doc::SourceTextResolver {
-            inner: self.interner,
             source: self.source,
         };
         doc::arena_measure_doc_flat_resolved(self.arena, d, &self.embed, &resolver)
@@ -1171,17 +1164,16 @@ impl<'a> Printer<'a> {
     /// Emit an identifier-name doc node — the doc-side name-emission seam.
     /// Span-identity names render as verbatim source (`DocText::SourceSpan`
     /// with deferred width — identifier names are newline-free, and the lazy
-    /// measure matches `Symbol`'s zero build-time cost); escaped names defer
-    /// to the interner (`DocText::Symbol`), resolved at render exactly as
-    /// before.
+    /// measure matches the zero build-time cost); the rare escaped name copies
+    /// its decoded `&str` into the doc text pool (`DocText::Pooled`).
     pub(in crate::printer) fn ident_name_doc(
         &self,
-        name: internal::IdentName,
+        name: internal::IdentName<'_>,
         name_start: u32,
     ) -> DocId {
         let d = self.d();
         match name.escaped {
-            Some(sym) => d.symbol(sym.to_u32()),
+            Some(s) => d.text_pooled(s),
             None => d.source_span_ident(Span::new(name_start, name_start + name.raw_len as u32)),
         }
     }
@@ -1193,16 +1185,16 @@ impl<'a> Printer<'a> {
     }
 
     /// Run `f` over a name channel resolved at `name_start` — the compare/width
-    /// seam. Span-identity names borrow the source slice; escaped names resolve
-    /// the interned decoded form (so an escaped name still compares decoded).
+    /// seam. Span-identity names borrow the source slice; an escaped name compares its
+    /// arena string (so an escaped name still compares decoded).
     pub(in crate::printer) fn with_ident_name_at<R>(
         &self,
-        name: internal::IdentName,
+        name: internal::IdentName<'_>,
         name_start: u32,
         f: impl FnOnce(&str) -> R,
     ) -> R {
         match name.escaped {
-            Some(sym) => self.with_resolved_symbol(sym, f),
+            Some(s) => f(s),
             None => {
                 f(&self.source[name_start as usize..name_start as usize + name.raw_len as usize])
             }
@@ -1216,12 +1208,5 @@ impl<'a> Printer<'a> {
         f: impl FnOnce(&str) -> R,
     ) -> R {
         self.with_ident_name_at(id.ident_name(), id.span.start, f)
-    }
-}
-
-// Implement SymbolResolver trait for shared symbol resolution utilities
-impl<'a> SymbolResolver for Printer<'a> {
-    fn interner(&self) -> &Interner {
-        self.interner
     }
 }

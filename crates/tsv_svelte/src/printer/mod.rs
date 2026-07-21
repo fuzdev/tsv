@@ -32,8 +32,8 @@ use std::collections::HashSet;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::{
-    Comment, EmbedContext, INDENT, Interner, OutputBuffer, Span, SymbolResolver, TAB_WIDTH,
-    is_format_ignore_directive, is_format_ignore_range_end, is_format_ignore_range_start,
+    Comment, EmbedContext, INDENT, OutputBuffer, Span, TAB_WIDTH, is_format_ignore_directive,
+    is_format_ignore_range_end, is_format_ignore_range_start,
 };
 use tsv_ts::Expression;
 
@@ -61,9 +61,6 @@ pub(crate) struct Printer<'a> {
     pub(crate) arena: &'a DocArena,
     /// Source code (needed for preserving whitespace semantics)
     pub(crate) source: &'a str,
-    /// Borrowed caller-owned interner for resolving symbols (read-only at format
-    /// time; the parse phase's `&mut` borrow has ended).
-    interner: &'a Interner,
     /// Comments from scripts and template expressions
     comments: &'a [Comment],
     /// Whether any of `comments` is owned by a node (`owned_by_node`). Computed once
@@ -104,21 +101,15 @@ pub(crate) struct Printer<'a> {
 }
 
 impl<'a> Printer<'a> {
-    /// Create a new printer with the given source, interner, and comments (standalone layout).
-    pub(crate) fn new(
-        arena: &'a DocArena,
-        source: &'a str,
-        interner: &'a Interner,
-        comments: &'a [Comment],
-    ) -> Self {
-        Self::with_embed(arena, source, interner, comments, EmbedContext::default())
+    /// Create a new printer with the given source and comments (standalone layout).
+    pub(crate) fn new(arena: &'a DocArena, source: &'a str, comments: &'a [Comment]) -> Self {
+        Self::with_embed(arena, source, comments, EmbedContext::default())
     }
 
-    /// Create a new printer with the given source, interner, comments, and embed context.
+    /// Create a new printer with the given source, comments, and embed context.
     pub(crate) fn with_embed(
         arena: &'a DocArena,
         source: &'a str,
-        interner: &'a Interner,
         comments: &'a [Comment],
         embed: EmbedContext,
     ) -> Self {
@@ -135,7 +126,6 @@ impl<'a> Printer<'a> {
             embed,
             arena,
             source,
-            interner,
             comments,
             has_owned_comments: comments.iter().any(|c| c.owned_by_node),
             has_format_ignore: comments
@@ -211,13 +201,12 @@ impl<'a> Printer<'a> {
     }
 
     /// Standard [`tsv_ts::PrinterInputs`] for embedding TypeScript: this
-    /// document's source, interner, comments, and line breaks. Call sites
+    /// document's source, comments, and line breaks. Call sites
     /// needing empty comments override via
     /// `PrinterInputs { comments: &[], ..self.ts_inputs() }`.
     pub(crate) fn ts_inputs(&self) -> tsv_ts::PrinterInputs<'_> {
         tsv_ts::PrinterInputs {
             source: self.source,
-            interner: self.interner,
             comments: self.comments,
             line_breaks: &self.line_breaks,
             // The document-level owned-comment flag, computed once at construction
@@ -268,7 +257,6 @@ impl<'a> Printer<'a> {
             // printer's own markup text / comment slices plus any embedded
             // `tsv_ts` docs — are `DocText::SourceSpan` (host-absolute spans).
             let resolver = tsv_lang::doc::SourceTextResolver {
-                inner: self.interner,
                 source: self.source,
             };
             tsv_lang::doc::arena_print_doc_with_indent_resolved_preserve_whitespace_into(
@@ -325,13 +313,9 @@ impl<'a> Printer<'a> {
 }
 
 /// Format a Svelte AST back to source code
-pub(crate) fn format_svelte(
-    root: &internal::Root<'_>,
-    source: &str,
-    interner: &Interner,
-) -> String {
+pub(crate) fn format_svelte(root: &internal::Root<'_>, source: &str) -> String {
     let arena = DocArena::for_source(source);
-    format_svelte_in(root, source, &arena, interner)
+    format_svelte_in(root, source, &arena)
 }
 
 /// Format a Svelte AST into a caller-provided doc arena (the reuse path).
@@ -339,7 +323,6 @@ pub(crate) fn format_svelte_in(
     root: &internal::Root<'_>,
     source: &str,
     arena: &DocArena,
-    interner: &Interner,
 ) -> String {
     // The print-once comment ledger's expectation for this document (diagnostic; see
     // `tsv_lang::comment_ledger`). `Root.comments` is the `<script>` + template-expression
@@ -355,7 +338,7 @@ pub(crate) fn format_svelte_in(
         tsv_lang::comment_ledger::register_parsed_spans(source, html_comment_spans);
     }
 
-    let mut printer = Printer::new(arena, source, interner, &root.comments);
+    let mut printer = Printer::new(arena, source, &root.comments);
     printer.print_root(root);
     printer.into_string()
 }
@@ -931,12 +914,5 @@ impl<'a> Printer<'a> {
         self.write("<!--");
         self.write(comment.content(self.source));
         self.write("-->");
-    }
-}
-
-// Implement SymbolResolver trait for shared symbol resolution utilities
-impl<'a> SymbolResolver for Printer<'a> {
-    fn interner(&self) -> &Interner {
-        self.interner
     }
 }

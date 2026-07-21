@@ -449,7 +449,6 @@ impl<'a> Printer<'a> {
 
                 // Break-after-operator layout: group([left, " =", group(indent([line, right]))])
                 // Used for fluid RHS or simple RHS when LHS can break.
-                let interner = self.interner;
 
                 // Calls and imports with trailing comments expand internally and should not use fluid layout
                 let is_call_with_trailing_comments = if let Expression::CallExpression(call) = init
@@ -489,18 +488,12 @@ impl<'a> Printer<'a> {
                 // Matches Prettier's shouldBreakAfterOperator: poorly breakable chains,
                 // string literals, etc. These don't break well internally, so the
                 // assignment breaks at `=` with group(indent([line, rightDoc])).
-                let should_break_after_op_rhs =
-                    (is_module_path_fluid_call(init, self.source, interner)
-                        || is_pure_property_chain(init)
-                        || is_poorly_breakable_chain(
-                            init,
-                            self.source,
-                            PRINT_WIDTH,
-                            self.comments,
-                        )
-                        || is_string_literal(init)
-                        || matches!(init, Expression::RegexLiteral(_)))
-                        && is_layout_eligible;
+                let should_break_after_op_rhs = (is_module_path_fluid_call(init, self.source)
+                    || is_pure_property_chain(init)
+                    || is_poorly_breakable_chain(init, self.source, PRINT_WIDTH, self.comments)
+                    || is_string_literal(init)
+                    || matches!(init, Expression::RegexLiteral(_)))
+                    && is_layout_eligible;
 
                 // Decorated class expression → break after operator, each decorator
                 // on its own line (`const C =\n\t@dec\n\tclass {}`).

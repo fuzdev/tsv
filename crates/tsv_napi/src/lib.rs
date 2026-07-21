@@ -19,32 +19,21 @@
 use napi_derive::napi;
 // Per-thread reusable arenas live in the shared `tsv_arena` crate (used by both
 // native bindings — see its module docs for the reuse rationale + soundness).
+use tsv_arena::with_ast_arena;
 #[cfg(feature = "format")]
 use tsv_arena::with_doc_arena;
-use tsv_arena::{with_ast_arena, with_interner};
 
 /// Generate `parse_<lang>` / `parse_internal_<lang>` / `format_<lang>` N-API
 /// functions for one language module. The `js_name` literals keep the JS export
 /// names snake_case for parity with `tsv_wasm` (napi-rs would otherwise
 /// camelCase them).
-// Per-language compound-op helpers keyed on the interner `$flavor`
-// (`interned` for tsv_ts/tsv_svelte, `plain` for interner-free tsv_css) — the
-// interned arm threads a per-thread `Interner` (`with_interner`) through parse
-// (`&mut`) and convert/format (`&`); the plain arm uses CSS's interner-free
-// signatures. Localizes the CSS-vs-TS/Svelte arity asymmetry so `lang_bindings!`
-// stays uniform.
+// Per-language compound-op helpers: parse the source into a per-thread AST arena
+// and run the conversion/format/no-op over it. Every language crate is
+// interner-free (identifier and element/attribute names are span-identity), so
+// these are uniform across svelte/typescript/css — no per-language arity split.
 #[cfg(feature = "parse")]
 macro_rules! parse_convert {
-    (interned, $lang:ident, $conv:ident, $source:expr) => {
-        with_ast_arena(|arena| {
-            with_interner(|interner| {
-                let ast = $lang::parse($source, arena, interner)
-                    .map_err(|e| napi::Error::from_reason(e.to_string()))?;
-                Ok($lang::$conv(&ast, $source, interner))
-            })
-        })
-    };
-    (plain, $lang:ident, $conv:ident, $source:expr) => {
+    ($lang:ident, $conv:ident, $source:expr) => {
         with_ast_arena(|arena| {
             let ast = $lang::parse($source, arena)
                 .map_err(|e| napi::Error::from_reason(e.to_string()))?;
@@ -55,17 +44,7 @@ macro_rules! parse_convert {
 
 #[cfg(feature = "parse")]
 macro_rules! parse_internal {
-    (interned, $lang:ident, $source:expr) => {
-        with_ast_arena(|arena| {
-            with_interner(|interner| {
-                let ast = $lang::parse($source, arena, interner)
-                    .map_err(|e| napi::Error::from_reason(e.to_string()))?;
-                std::hint::black_box(&ast);
-                Ok(())
-            })
-        })
-    };
-    (plain, $lang:ident, $source:expr) => {
+    ($lang:ident, $source:expr) => {
         with_ast_arena(|arena| {
             let ast = $lang::parse($source, arena)
                 .map_err(|e| napi::Error::from_reason(e.to_string()))?;
@@ -77,18 +56,7 @@ macro_rules! parse_internal {
 
 #[cfg(feature = "format")]
 macro_rules! parse_format {
-    (interned, $lang:ident, $source:expr) => {
-        with_ast_arena(|arena| {
-            with_interner(|interner| {
-                let ast = $lang::parse($source, arena, interner)
-                    .map_err(|e| napi::Error::from_reason(e.to_string()))?;
-                Ok(with_doc_arena(|doc_arena| {
-                    $lang::format_in(&ast, $source, doc_arena, interner)
-                }))
-            })
-        })
-    };
-    (plain, $lang:ident, $source:expr) => {
+    ($lang:ident, $source:expr) => {
         with_ast_arena(|arena| {
             let ast = $lang::parse($source, arena)
                 .map_err(|e| napi::Error::from_reason(e.to_string()))?;
@@ -101,7 +69,6 @@ macro_rules! parse_format {
 
 macro_rules! lang_bindings {
     (
-        $flavor:ident,
         $lang:ident,
         $parse_fn:ident, $parse_js:literal,
         $parse_no_loc_fn:ident, $parse_no_loc_js:literal,
@@ -112,7 +79,7 @@ macro_rules! lang_bindings {
         #[cfg(feature = "parse")]
         #[napi(js_name = $parse_js)]
         pub fn $parse_fn(source: String) -> napi::Result<String> {
-            parse_convert!($flavor, $lang, convert_ast_json_string, &source)
+            parse_convert!($lang, convert_ast_json_string, &source)
         }
 
         /// Parse source and return its JSON AST string **without** per-node `loc`
@@ -120,12 +87,7 @@ macro_rules! lang_bindings {
         #[cfg(feature = "parse")]
         #[napi(js_name = $parse_no_loc_js)]
         pub fn $parse_no_loc_fn(source: String) -> napi::Result<String> {
-            parse_convert!(
-                $flavor,
-                $lang,
-                convert_ast_json_string_no_locations,
-                &source
-            )
+            parse_convert!($lang, convert_ast_json_string_no_locations, &source)
         }
 
         /// Parse source to the internal AST only (no conversion, no
@@ -134,20 +96,19 @@ macro_rules! lang_bindings {
         #[cfg(feature = "parse")]
         #[napi(js_name = $parse_internal_js)]
         pub fn $parse_internal_fn(source: String) -> napi::Result<()> {
-            parse_internal!($flavor, $lang, &source)
+            parse_internal!($lang, &source)
         }
 
         /// Format source code and return the formatted string.
         #[cfg(feature = "format")]
         #[napi(js_name = $format_js)]
         pub fn $format_fn(source: String) -> napi::Result<String> {
-            parse_format!($flavor, $lang, &source)
+            parse_format!($lang, &source)
         }
     };
 }
 
 lang_bindings!(
-    interned,
     tsv_svelte,
     parse_svelte,
     "parse_svelte",
@@ -159,7 +120,6 @@ lang_bindings!(
     "format_svelte"
 );
 lang_bindings!(
-    interned,
     tsv_ts,
     parse_typescript,
     "parse_typescript",
@@ -171,7 +131,6 @@ lang_bindings!(
     "format_typescript"
 );
 lang_bindings!(
-    plain,
     tsv_css,
     parse_css,
     "parse_css",
@@ -210,11 +169,9 @@ fn napi_goal(goal: &str) -> napi::Result<tsv_ts::Goal> {
 pub fn parse_typescript_with_goal(source: String, goal: String) -> napi::Result<String> {
     let goal = napi_goal(&goal)?;
     with_ast_arena(|arena| {
-        with_interner(|interner| {
-            let ast = tsv_ts::parse_with_goal(&source, goal, arena, interner)
-                .map_err(|e| napi::Error::from_reason(e.to_string()))?;
-            Ok(tsv_ts::convert_ast_json_string(&ast, &source, interner))
-        })
+        let ast = tsv_ts::parse_with_goal(&source, goal, arena)
+            .map_err(|e| napi::Error::from_reason(e.to_string()))?;
+        Ok(tsv_ts::convert_ast_json_string(&ast, &source))
     })
 }
 
@@ -227,13 +184,9 @@ pub fn parse_typescript_no_locations_with_goal(
 ) -> napi::Result<String> {
     let goal = napi_goal(&goal)?;
     with_ast_arena(|arena| {
-        with_interner(|interner| {
-            let ast = tsv_ts::parse_with_goal(&source, goal, arena, interner)
-                .map_err(|e| napi::Error::from_reason(e.to_string()))?;
-            Ok(tsv_ts::convert_ast_json_string_no_locations(
-                &ast, &source, interner,
-            ))
-        })
+        let ast = tsv_ts::parse_with_goal(&source, goal, arena)
+            .map_err(|e| napi::Error::from_reason(e.to_string()))?;
+        Ok(tsv_ts::convert_ast_json_string_no_locations(&ast, &source))
     })
 }
 
@@ -243,12 +196,10 @@ pub fn parse_typescript_no_locations_with_goal(
 pub fn parse_internal_typescript_with_goal(source: String, goal: String) -> napi::Result<()> {
     let goal = napi_goal(&goal)?;
     with_ast_arena(|arena| {
-        with_interner(|interner| {
-            let ast = tsv_ts::parse_with_goal(&source, goal, arena, interner)
-                .map_err(|e| napi::Error::from_reason(e.to_string()))?;
-            std::hint::black_box(&ast);
-            Ok(())
-        })
+        let ast = tsv_ts::parse_with_goal(&source, goal, arena)
+            .map_err(|e| napi::Error::from_reason(e.to_string()))?;
+        std::hint::black_box(&ast);
+        Ok(())
     })
 }
 

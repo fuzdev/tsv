@@ -2,7 +2,7 @@
 
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
-use tsv_lang::{Interner, ParseError, Span};
+use tsv_lang::{ParseError, Span};
 
 use super::find_raw_text_close;
 use super::parser_impl::SvelteParser;
@@ -45,11 +45,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Extract script content
         let content = &self.source[content_start..content_end];
 
-        // Parse content with TypeScript parser (shared interner + base offset);
-        // the embedded program shares this document's arena and the caller's
-        // one interner (borrowed `&mut` for this embedded parse).
-        let program =
-            tsv_ts::parse_with_interner(content, content_start, &mut self.interner, self.arena)?;
+        // Parse content with TypeScript parser (base offset); the embedded
+        // program shares this document's arena.
+        let program = tsv_ts::parse_embedded(content, content_start, self.arena)?;
 
         // Reposition the lexer to the closing `</script>` tag (resumes at `<`) and
         // consume it; `find_raw_text_close` already guaranteed it exists.
@@ -60,7 +58,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Module scripts can be specified as:
         //   - <script module> (boolean attribute)
         //   - <script context="module"> (string attribute)
-        let context = Self::detect_script_context(&attributes, self.source, &self.interner);
+        let context = Self::detect_script_context(&attributes, self.source);
 
         Ok(Script {
             content: program,
@@ -74,11 +72,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// Detect whether a script is a module script based on its attributes
-    fn detect_script_context(
-        attributes: &[AttributeNode<'_>],
-        source: &str,
-        interner: &Interner,
-    ) -> ScriptContext {
+    fn detect_script_context(attributes: &[AttributeNode<'_>], source: &str) -> ScriptContext {
         for attr_node in attributes {
             // Only process Attribute nodes (not AttachTag or directives)
             let attr = match attr_node {
@@ -95,8 +89,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 | AttributeNode::LetDirective(_) => continue,
             };
 
-            // Resolve attribute name (no owned copy)
-            let name = interner.resolve_infallible(attr.name);
+            // Span-identity attribute name (no owned copy)
+            let name = attr.name(source);
 
             // Check for boolean module attribute: <script module>
             if name == "module" && attr.value.is_none() {

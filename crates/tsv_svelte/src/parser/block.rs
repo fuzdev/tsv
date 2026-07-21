@@ -423,12 +423,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             if after_ident.starts_with(':') {
                 let ws_before_colon = trimmed.len() - end - after_ident.len();
                 let colon_offset = adjusted + end + ws_before_colon;
-                let (ta, type_end) = tsv_ts::parse_type_annotation_partial(
-                    after_ident,
-                    colon_offset,
-                    &mut self.interner,
-                    self.arena,
-                )?;
+                let (ta, type_end) =
+                    tsv_ts::parse_type_annotation_partial(after_ident, colon_offset, self.arena)?;
                 if let Expression::Identifier(id) = &mut expr {
                     // Re-bind the identifier's binding extra with the parsed type
                     // annotation, preserving any decorators already present.
@@ -1084,12 +1080,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // Snippet parameters preserve grouping parens (acorn's `preserveParens`,
             // without Svelte's `remove_parens`), so a default like `c = (2, 3)` keeps
             // its `ParenthesizedExpression` — matching Svelte's snippet-param AST.
-            match tsv_ts::parse_with_interner_preserve_parens(
-                &wrapper,
-                base,
-                &mut self.interner,
-                self.arena,
-            ) {
+            match tsv_ts::parse_embedded_preserve_parens(&wrapper, base, self.arena) {
                 Ok(program) => {
                     self.expression_comments.extend_from_slice(program.comments);
                     if let Some(tsv_ts::Statement::FunctionDeclaration(func)) = program.body.first()

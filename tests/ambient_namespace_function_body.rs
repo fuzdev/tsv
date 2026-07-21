@@ -21,16 +21,14 @@ use serde_json::Value;
 
 fn parse_json(source: &str) -> Value {
     let arena = bumpalo::Bump::new();
-    let mut interner = tsv_ts::Interner::new();
-    let program = tsv_ts::parse(source, &arena, &mut interner).expect("parse failed");
-    tsv_ts::convert_ast_json(&program, source, &interner)
+    let program = tsv_ts::parse(source, &arena).expect("parse failed");
+    tsv_ts::convert_ast_json(&program, source)
 }
 
 fn format(source: &str) -> String {
     let arena = bumpalo::Bump::new();
-    let mut interner = tsv_ts::Interner::new();
-    let program = tsv_ts::parse(source, &arena, &mut interner).expect("parse failed");
-    tsv_ts::format(&program, source, &interner)
+    let program = tsv_ts::parse(source, &arena).expect("parse failed");
+    tsv_ts::format(&program, source)
 }
 
 /// `declare namespace N { function f() {} }` parses, and the inner function is a
@@ -117,9 +115,8 @@ fn bodiless_namespace_signature_stays_tsdeclarefunction() {
 #[test]
 fn top_level_declare_function_body_still_rejected() {
     let arena = bumpalo::Bump::new();
-    let mut interner = tsv_ts::Interner::new();
     assert!(
-        tsv_ts::parse("declare function f() {}", &arena, &mut interner).is_err(),
+        tsv_ts::parse("declare function f() {}", &arena).is_err(),
         "top-level `declare function` with a body stays a parse error"
     );
 }

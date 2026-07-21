@@ -31,9 +31,8 @@ fn assert_name_decodes(
     expected_output: &str,
 ) {
     let arena = bumpalo::Bump::new();
-    let mut interner = tsv_ts::Interner::new();
-    let program = tsv_ts::parse(source, &arena, &mut interner).expect("parse failed");
-    let json = tsv_ts::convert_ast_json(&program, source, &interner);
+    let program = tsv_ts::parse(source, &arena).expect("parse failed");
+    let json = tsv_ts::convert_ast_json(&program, source);
 
     assert_eq!(
         json.pointer(name_pointer).and_then(Value::as_str),
@@ -41,7 +40,7 @@ fn assert_name_decodes(
         "wire name decodes (acorn IdentifierName StringValue): {json}"
     );
 
-    let output = tsv_ts::format(&program, source, &interner);
+    let output = tsv_ts::format(&program, source);
     assert_eq!(
         output, expected_output,
         "formatter decodes the escaped name"
@@ -49,14 +48,13 @@ fn assert_name_decodes(
 
     // The decoded output is tsv's fixed point and reparses to the same name.
     let arena_out = bumpalo::Bump::new();
-    let mut interner_out = tsv_ts::Interner::new();
-    let reparsed = tsv_ts::parse(&output, &arena_out, &mut interner_out).expect("reparse failed");
+    let reparsed = tsv_ts::parse(&output, &arena_out).expect("reparse failed");
     assert_eq!(
-        tsv_ts::format(&reparsed, &output, &interner_out),
+        tsv_ts::format(&reparsed, &output),
         output,
         "output should be stable"
     );
-    let json_out = tsv_ts::convert_ast_json(&reparsed, &output, &interner_out);
+    let json_out = tsv_ts::convert_ast_json(&reparsed, &output);
     assert_eq!(
         json_out.pointer(name_pointer).and_then(Value::as_str),
         Some(expected_name),
@@ -116,9 +114,8 @@ fn interface_member_key() {
 fn escaped_constructor_is_constructor() {
     let source = r"class C { \u0063onstructor() {} }";
     let arena = bumpalo::Bump::new();
-    let mut interner = tsv_ts::Interner::new();
-    let program = tsv_ts::parse(source, &arena, &mut interner).expect("parse failed");
-    let json = tsv_ts::convert_ast_json(&program, source, &interner);
+    let program = tsv_ts::parse(source, &arena).expect("parse failed");
+    let json = tsv_ts::convert_ast_json(&program, source);
     let member = json.pointer("/body/0/body/body/0").expect("class member");
     assert_eq!(
         member.pointer("/kind").and_then(Value::as_str),
@@ -131,7 +128,7 @@ fn escaped_constructor_is_constructor() {
         "constructor key name decodes: {member}"
     );
     assert_eq!(
-        tsv_ts::format(&program, source, &interner),
+        tsv_ts::format(&program, source),
         "class C {\n\tconstructor() {}\n}\n",
         "formatter decodes the escaped constructor"
     );

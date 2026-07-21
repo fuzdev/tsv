@@ -4,8 +4,7 @@ use crate::ast::internal::FragmentNode;
 use crate::lexer::{Lexer, Token, TokenKind};
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
-use string_interner::DefaultSymbol;
-use tsv_lang::{Comment, Interner, ParseError, Span};
+use tsv_lang::{Comment, ParseError, Span};
 use tsv_ts::Expression;
 
 /// Build an expression `Comment` from its already-shifted `span` / `content_span`.
@@ -49,11 +48,6 @@ pub(crate) struct SvelteParser<'a, 'arena> {
     /// **slice-relative** — `base_offset` is added when it's consumed, exactly
     /// as for a freshly lexed token); cleared whenever the lexer is re-seeked.
     pub(crate) peek: Option<Token>,
-    /// The one caller-owned interner shared with every embedded `<script>` /
-    /// `{expr}` (moved in for the parse, reclaimed by [`super::parse_svelte`]).
-    /// Its tenants are the template element/attribute names plus the rare
-    /// escaped TS identifier; the AST stores only `Copy` symbol IDs.
-    pub(crate) interner: Interner,
     pub(crate) base_offset: usize, // Offset of lexer's source in full source
     /// TS comments collected from template expressions (e.g., {@debug /* comment */ a})
     pub(crate) expression_comments: Vec<Comment>,
@@ -70,20 +64,13 @@ pub(crate) struct SvelteParser<'a, 'arena> {
 }
 
 impl<'a, 'arena> SvelteParser<'a, 'arena> {
-    pub(crate) fn new(
-        source: &'a str,
-        arena: &'arena Bump,
-        interner: Interner,
-    ) -> Result<Self, ParseError> {
+    pub(crate) fn new(source: &'a str, arena: &'arena Bump) -> Result<Self, ParseError> {
         let mut lexer = Lexer::new(source);
         // Extract token data immediately to avoid keeping token alive
         let (kind, start, end) = {
             let token = lexer.next_token()?;
             (token.kind, token.start as usize, token.end as usize)
         };
-        // The caller-owned interner (moved in) is shared with every embedded
-        // `<script>`/`{expr}`. Its tenants are element/attribute names plus the
-        // rare escaped TS identifier — tens of short strings.
         Ok(Self {
             arena,
             source,
@@ -92,7 +79,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             current_start: start,
             current_end: end,
             peek: None,
-            interner,
             base_offset: 0,
             expression_comments: Vec::new(),
             in_svelte_head: false,
@@ -140,10 +126,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         self.current_start = self.base_offset + token.start as usize;
         self.current_end = self.base_offset + token.end as usize;
         Ok(())
-    }
-
-    pub(crate) fn intern(&mut self, s: &str) -> DefaultSymbol {
-        self.interner.get_or_intern(s)
     }
 
     pub(crate) fn current_pos(&self) -> (usize, usize) {
@@ -407,12 +389,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
     ) -> Result<Expression<'arena>, ParseError> {
-        let (expr, comments) = tsv_ts::parse_expression_with_comments(
-            source,
-            base_offset,
-            &mut self.interner,
-            self.arena,
-        )?;
+        let (expr, comments) =
+            tsv_ts::parse_expression_with_comments(source, base_offset, self.arena)?;
         self.expression_comments.extend_from_slice(comments);
         Ok(expr)
     }
@@ -425,12 +403,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
     ) -> Result<(Expression<'arena>, usize), ParseError> {
-        let (expr, end_pos, comments) = tsv_ts::parse_expression_partial_with_comments(
-            source,
-            base_offset,
-            &mut self.interner,
-            self.arena,
-        )?;
+        let (expr, end_pos, comments) =
+            tsv_ts::parse_expression_partial_with_comments(source, base_offset, self.arena)?;
         self.expression_comments.extend_from_slice(comments);
         Ok((expr, end_pos))
     }
@@ -442,12 +416,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
     ) -> Result<Expression<'arena>, ParseError> {
-        let (pattern, comments) = tsv_ts::parse_pattern_with_comments(
-            source,
-            base_offset,
-            &mut self.interner,
-            self.arena,
-        )?;
+        let (pattern, comments) =
+            tsv_ts::parse_pattern_with_comments(source, base_offset, self.arena)?;
         // Canonical reads a destructure via a synthetic `(pattern = 1)` acorn
         // parse whose inserted `(` shifts the pattern's start line one column
         // right when that line is `> 1` — the same quirk the pattern nodes get
@@ -473,12 +443,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
     ) -> Result<tsv_ts::Statement<'arena>, ParseError> {
-        let (stmt, comments) = tsv_ts::parse_statement_with_comments(
-            source,
-            base_offset,
-            &mut self.interner,
-            self.arena,
-        )?;
+        let (stmt, comments) =
+            tsv_ts::parse_statement_with_comments(source, base_offset, self.arena)?;
         self.expression_comments.extend_from_slice(comments);
         Ok(stmt)
     }

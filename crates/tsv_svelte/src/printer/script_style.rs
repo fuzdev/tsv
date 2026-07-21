@@ -42,7 +42,6 @@ impl<'a> Printer<'a> {
             &script.content,
             self.source(),
             &self.line_breaks,
-            self.interner,
             embed,
         );
 
@@ -59,7 +58,6 @@ impl<'a> Printer<'a> {
             // Source-aware resolver: the embedded TS doc carries `DocText::SourceSpan`
             // leaves (comments etc.) whose spans are absolute into the host source.
             let resolver = doc::SourceTextResolver {
-                inner: self.interner,
                 source: self.source(),
             };
             doc::arena_print_doc_with_indent_resolved_into(
@@ -98,7 +96,7 @@ impl<'a> Printer<'a> {
     ) -> Option<&'a str> {
         for attr_node in attributes {
             if let internal::AttributeNode::Attribute(attr) = attr_node {
-                let name = self.interner.resolve_infallible(attr.name);
+                let name = attr.name(self.source);
                 if (name == "lang" || name == "type")
                     && let Some(value_parts) = attr.value
                 {
@@ -318,7 +316,6 @@ impl<'a> Printer<'a> {
         let mut output = self.arena.take_render_scratch();
         {
             let resolver = doc::SourceTextResolver {
-                inner: self.interner,
                 source: self.source(),
             };
             doc::arena_print_doc_with_indent_resolved_preserve_whitespace_into(

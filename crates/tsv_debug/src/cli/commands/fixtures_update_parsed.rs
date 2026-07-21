@@ -283,12 +283,11 @@ async fn generate_divergence_fixture(fixture: &fixtures::Fixture, source: &str) 
     let our_json = match fixture.input_type() {
         InputType::SvelteTs | InputType::TypeScript => {
             let arena = bumpalo::Bump::new();
-            let mut interner = tsv_lang::Interner::new();
-            let ast = match tsv_ts::parse_with_goal(source, fixture.goal(), &arena, &mut interner) {
+            let ast = match tsv_ts::parse_with_goal(source, fixture.goal(), &arena) {
                 Ok(ast) => ast,
                 Err(e) => return FixtureResult::Failed(format!("Our parser error: {e:?}")),
             };
-            let json_value = tsv_ts::convert_ast_json(&ast, source, &interner);
+            let json_value = tsv_ts::convert_ast_json(&ast, source);
             match to_json_with_tabs(&json_value) {
                 Ok(json) => format!("{json}\n"),
                 Err(e) => {
@@ -312,12 +311,11 @@ async fn generate_divergence_fixture(fixture: &fixtures::Fixture, source: &str) 
         }
         InputType::Svelte => {
             let arena = bumpalo::Bump::new();
-            let mut interner = tsv_lang::Interner::new();
-            let ast = match tsv_svelte::parse(source, &arena, &mut interner) {
+            let ast = match tsv_svelte::parse(source, &arena) {
                 Ok(ast) => ast,
                 Err(e) => return FixtureResult::Failed(format!("Our parser error: {e:?}")),
             };
-            let json_value = tsv_svelte::convert_ast_json(&ast, source, &interner);
+            let json_value = tsv_svelte::convert_ast_json(&ast, source);
             match to_json_with_tabs(&json_value) {
                 Ok(json) => format!("{json}\n"),
                 Err(e) => {

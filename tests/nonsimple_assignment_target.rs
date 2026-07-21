@@ -25,22 +25,19 @@ use serde_json::Value;
 
 fn parse_json(source: &str) -> Value {
     let arena = bumpalo::Bump::new();
-    let mut interner = tsv_ts::Interner::new();
-    let program = tsv_ts::parse(source, &arena, &mut interner).expect("parse failed");
-    tsv_ts::convert_ast_json(&program, source, &interner)
+    let program = tsv_ts::parse(source, &arena).expect("parse failed");
+    tsv_ts::convert_ast_json(&program, source)
 }
 
 fn format(source: &str) -> String {
     let arena = bumpalo::Bump::new();
-    let mut interner = tsv_ts::Interner::new();
-    let program = tsv_ts::parse(source, &arena, &mut interner).expect("parse failed");
-    tsv_ts::format(&program, source, &interner)
+    let program = tsv_ts::parse(source, &arena).expect("parse failed");
+    tsv_ts::format(&program, source)
 }
 
 fn rejects(source: &str) -> bool {
     let arena = bumpalo::Bump::new();
-    let mut interner = tsv_ts::Interner::new();
-    tsv_ts::parse(source, &arena, &mut interner).is_err()
+    tsv_ts::parse(source, &arena).is_err()
 }
 
 /// `foo() = bar;` parses as an `AssignmentExpression` whose left is the
@@ -245,9 +242,8 @@ fn cast_wrapping_destructure_target_parses_and_formats() {
 #[test]
 fn nested_parenthesized_cast_target_parses_and_formats() {
     let arena = bumpalo::Bump::new();
-    let mut interner = tsv_ts::Interner::new();
     assert!(
-        tsv_ts::parse("({ a: (b as T) } = obj);", &arena, &mut interner).is_ok(),
+        tsv_ts::parse("({ a: (b as T) } = obj);", &arena).is_ok(),
         "a nested parenthesized cast in a destructuring assignment parses",
     );
     let canonical = "({ a: b as T } = obj);\n";

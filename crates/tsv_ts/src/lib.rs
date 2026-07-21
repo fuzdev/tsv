@@ -29,23 +29,19 @@ use tsv_lang::EmbedContext;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::is_format_ignore_directive;
 use tsv_lang::printing::build_line_breaks_into;
-pub use tsv_lang::{Interner, ParseError, Result};
+pub use tsv_lang::{ParseError, Result};
 
 pub use goal::Goal;
 
 /// The per-document environment shared by every formatting entry point: the
-/// source the AST's spans index into, the shared interner, the comment buffer,
-/// and the precomputed line breaks. Bundling these keeps the printer
-/// constructor — and the `tsv_svelte` embedding call sites — from re-threading
-/// the same values. The [`EmbedContext`] and the expression/program being
-/// printed vary per call, so they stay separate args.
+/// source the AST's spans index into, the comment buffer, and the precomputed
+/// line breaks. Bundling these keeps the printer constructor — and the
+/// `tsv_svelte` embedding call sites — from re-threading the same values. The
+/// [`EmbedContext`] and the expression/program being printed vary per call, so
+/// they stay separate args.
 pub struct PrinterInputs<'a> {
     /// Full source the AST's spans index into.
     pub source: &'a str,
-    /// The caller-owned interner, borrowed for the format phase (the parse
-    /// phase's `&mut` borrow has ended; every printer built from these inputs
-    /// shares this one `&`).
-    pub interner: &'a Interner,
     /// Detached comment buffer for the document.
     pub comments: &'a [ast::Comment],
     /// Precomputed newline offsets for O(log n) line/column lookup.
@@ -118,12 +114,8 @@ fn make_doc_printer<'a>(
 /// let arena = bumpalo::Bump::new();
 /// let ast = tsv_ts::parse("const x = 42;", &arena)?;
 /// ```
-pub fn parse<'arena>(
-    source: &str,
-    arena: &'arena bumpalo::Bump,
-    interner: &mut Interner,
-) -> Result<Program<'arena>> {
-    parser::parse_typescript(source, arena, interner).map_err(|e| e.with_context(source))
+pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Program<'arena>> {
+    parser::parse_typescript(source, arena).map_err(|e| e.with_context(source))
 }
 
 /// Parse TypeScript source against an explicit [`Goal`] (`Script` vs `Module`).
@@ -137,26 +129,22 @@ pub fn parse_with_goal<'arena>(
     source: &str,
     goal: Goal,
     arena: &'arena bumpalo::Bump,
-    interner: &mut Interner,
 ) -> Result<Program<'arena>> {
-    parser::parse_typescript_with_goal(source, goal, arena, interner)
-        .map_err(|e| e.with_context(source))
+    parser::parse_typescript_with_goal(source, goal, arena).map_err(|e| e.with_context(source))
 }
 
 /// Parse standalone TypeScript with grouping parens preserved.
 ///
 /// Like [`parse`] but keeps `(expr)` as a `ParenthesizedExpression` node (acorn's
-/// `preserveParens: true`) against a fresh interner, so the paren structure is
+/// `preserveParens: true`), so the paren structure is
 /// present in the AST and its wire JSON. The binding audit uses this to reparse
 /// formatted output and see which parenthesized subtree a glued comment binds to
 /// — a re-binding is invisible in the paren-free public AST.
 pub fn parse_preserve_parens<'arena>(
     source: &str,
     arena: &'arena bumpalo::Bump,
-    interner: &mut Interner,
 ) -> Result<Program<'arena>> {
-    parser::parse_typescript_preserve_parens(source, arena, interner)
-        .map_err(|e| e.with_context(source))
+    parser::parse_typescript_preserve_parens(source, arena).map_err(|e| e.with_context(source))
 }
 
 /// Whether a block comment's content (delimiters excluded) is a JSDoc type cast —
@@ -189,24 +177,22 @@ pub fn is_jsdoc_type_cast_comment(content: &str) -> bool {
 /// let formatted = tsv_ts::format(&ast, source);
 /// assert_eq!(formatted, "const x = 42;\n");
 /// ```
-pub fn format(program: &Program<'_>, source: &str, interner: &Interner) -> String {
+pub fn format(program: &Program<'_>, source: &str) -> String {
     let arena = DocArena::for_source(source);
-    format_in(program, source, &arena, interner)
+    format_in(program, source, &arena)
 }
 
-/// Parse (`Goal::Module`) and format `source` in one call, owning the interner.
+/// Parse (`Goal::Module`) and format `source` in one call.
 ///
 /// The fully-fused one-shot convenience for callers that just want the
-/// formatted string and never touch the AST or the interner (the
-/// primitive/convenience split `format`/`format_in` already applies to the
-/// `DocArena`, extended here to the interner + parse). Batch drivers that reuse
-/// arenas across files thread the primitives ([`parse`] + [`format_in`]) with
-/// their own reusable [`Interner`] instead.
+/// formatted string and never touch the AST (the primitive/convenience split
+/// `format`/`format_in` already applies to the `DocArena`, extended here to the
+/// parse). Batch drivers that reuse arenas across files thread the primitives
+/// ([`parse`] + [`format_in`]) instead.
 pub fn format_str(source: &str) -> Result<String> {
     let arena = bumpalo::Bump::new();
-    let mut interner = Interner::new();
-    let program = parse(source, &arena, &mut interner)?;
-    Ok(format(&program, source, &interner))
+    let program = parse(source, &arena)?;
+    Ok(format(&program, source))
 }
 
 /// Format into a caller-provided doc arena.
@@ -216,12 +202,7 @@ pub fn format_str(source: &str) -> Result<String> {
 /// arena across them (`arena.reset()` between files retains the buffers). Nothing
 /// borrowed from `arena` escapes — the result is an owned `String` — so the
 /// caller may reset and reuse it the moment this returns.
-pub fn format_in(
-    program: &Program<'_>,
-    source: &str,
-    arena: &DocArena,
-    interner: &Interner,
-) -> String {
+pub fn format_in(program: &Program<'_>, source: &str, arena: &DocArena) -> String {
     // The print-once comment ledger's expectation for this document (diagnostic; see
     // `tsv_lang::comment_ledger`). A Svelte host registers its own `Root.comments`, so
     // an embedded `<script>` never reaches here.
@@ -234,7 +215,6 @@ pub fn format_in(
     build_line_breaks_into(source, &mut line_breaks);
     let inputs = PrinterInputs {
         source,
-        interner,
         comments: program.comments,
         line_breaks: &line_breaks,
         has_owned_comments: program.comments.iter().any(|c| c.owned_by_node),
@@ -259,28 +239,22 @@ pub fn format_in(
 /// `convert_ast_json_bytes` directly.
 #[cfg(feature = "convert")]
 #[allow(clippy::expect_used)]
-pub fn convert_ast_json(
-    program: &Program<'_>,
-    source: &str,
-    interner: &Interner,
-) -> serde_json::Value {
-    serde_json::from_slice(&convert_ast_json_bytes(program, source, interner))
+pub fn convert_ast_json(program: &Program<'_>, source: &str) -> serde_json::Value {
+    serde_json::from_slice(&convert_ast_json_bytes(program, source))
         .expect("writer emits valid JSON")
 }
 
-/// Parse (`Goal::Module`) and emit the compact wire-JSON string in one call,
-/// owning the interner.
+/// Parse (`Goal::Module`) and emit the compact wire-JSON string in one call.
 ///
 /// The parse analogue of [`format_str`] — the fully-fused one-shot convenience
-/// for callers that want the JSON string and never touch the AST or interner
-/// directly. Batch/byte-oriented consumers thread [`parse`] +
-/// [`convert_ast_json_bytes`] with their own reusable [`Interner`] instead.
+/// for callers that want the JSON string and never touch the AST directly.
+/// Batch/byte-oriented consumers thread [`parse`] + [`convert_ast_json_bytes`]
+/// instead.
 #[cfg(feature = "convert")]
 pub fn parse_to_json(source: &str) -> Result<String> {
     let arena = bumpalo::Bump::new();
-    let mut interner = Interner::new();
-    let program = parse(source, &arena, &mut interner)?;
-    Ok(convert_ast_json_string(&program, source, &interner))
+    let program = parse(source, &arena)?;
+    Ok(convert_ast_json_string(&program, source))
 }
 
 /// Convert internal AST to compact JSON wire bytes with character-based positions
@@ -297,8 +271,8 @@ pub fn parse_to_json(source: &str) -> Result<String> {
 /// UTF-8 validation `convert_ast_json_string` pays (the output is ~15× the
 /// source).
 #[cfg(feature = "convert")]
-pub fn convert_ast_json_bytes(program: &Program<'_>, source: &str, interner: &Interner) -> Vec<u8> {
-    convert_ast_json_bytes_variant(program, source, interner, true)
+pub fn convert_ast_json_bytes(program: &Program<'_>, source: &str) -> Vec<u8> {
+    convert_ast_json_bytes_variant(program, source, true)
 }
 
 /// Convert internal AST to compact JSON wire bytes **without** per-node `loc`.
@@ -314,21 +288,12 @@ pub fn convert_ast_json_bytes(program: &Program<'_>, source: &str, interner: &In
 /// second encoding of the acorn contract — mirroring acorn's own
 /// `locations: false`.
 #[cfg(feature = "convert")]
-pub fn convert_ast_json_bytes_no_locations(
-    program: &Program<'_>,
-    source: &str,
-    interner: &Interner,
-) -> Vec<u8> {
-    convert_ast_json_bytes_variant(program, source, interner, false)
+pub fn convert_ast_json_bytes_no_locations(program: &Program<'_>, source: &str) -> Vec<u8> {
+    convert_ast_json_bytes_variant(program, source, false)
 }
 
 #[cfg(feature = "convert")]
-fn convert_ast_json_bytes_variant(
-    program: &Program<'_>,
-    source: &str,
-    interner: &Interner,
-    locations: bool,
-) -> Vec<u8> {
+fn convert_ast_json_bytes_variant(program: &Program<'_>, source: &str, locations: bool) -> Vec<u8> {
     // One fused source scan builds both; ASCII sources take a byte-level line
     // scan and get the identity map. The `no-locations` path emits no line/column,
     // so it skips the line-start scan entirely (`new_map_only` builds just the
@@ -345,7 +310,6 @@ fn convert_ast_json_bytes_variant(
             tracker: &tracker,
             map: &map,
         },
-        interner,
         ast::convert::Schema::Acorn,
         locations,
     )
@@ -359,8 +323,8 @@ fn convert_ast_json_bytes_variant(
 /// bytes variant.
 #[cfg(feature = "convert")]
 #[allow(clippy::expect_used)]
-pub fn convert_ast_json_string(program: &Program<'_>, source: &str, interner: &Interner) -> String {
-    String::from_utf8(convert_ast_json_bytes(program, source, interner))
+pub fn convert_ast_json_string(program: &Program<'_>, source: &str) -> String {
+    String::from_utf8(convert_ast_json_bytes(program, source))
         .expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
 }
 
@@ -368,18 +332,12 @@ pub fn convert_ast_json_string(program: &Program<'_>, source: &str, interner: &I
 /// boundaries (the WASM binding's `JSON.parse`, N-API strings).
 #[cfg(feature = "convert")]
 #[allow(clippy::expect_used)]
-pub fn convert_ast_json_string_no_locations(
-    program: &Program<'_>,
-    source: &str,
-    interner: &Interner,
-) -> String {
-    String::from_utf8(convert_ast_json_bytes_no_locations(
-        program, source, interner,
-    ))
-    .expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
+pub fn convert_ast_json_string_no_locations(program: &Program<'_>, source: &str) -> String {
+    String::from_utf8(convert_ast_json_bytes_no_locations(program, source))
+        .expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
 }
 
-/// Parse TypeScript with a shared string interner and base offset
+/// Parse embedded TypeScript at a base offset into the full source
 ///
 /// This is used when parsing embedded TypeScript in Svelte files.
 ///
@@ -387,7 +345,6 @@ pub fn convert_ast_json_string_no_locations(
 ///
 /// * `source` - The TypeScript source code to parse
 /// * `base_offset` - Offset in the full source file
-/// * `interner` - Shared string interner
 ///
 /// # Returns
 ///
@@ -397,55 +354,42 @@ pub fn convert_ast_json_string_no_locations(
 // closure fails the higher-ranked lifetime check on `with_embedding_parser`'s `f`
 // bound (the closure lets the compiler infer it), so allow the closure here.
 #[allow(clippy::redundant_closure_for_method_calls)]
-pub fn parse_with_interner<'arena>(
+pub fn parse_embedded<'arena>(
     source: &str,
     base_offset: usize,
-    interner: &mut Interner,
     arena: &'arena bumpalo::Bump,
 ) -> Result<Program<'arena>> {
-    with_embedding_parser(source, base_offset, interner, arena, |parser| {
-        parser.parse()
-    })
+    with_embedding_parser(source, base_offset, arena, |parser| parser.parse())
 }
 
-/// Build an embedding [`parser::Parser`] sharing the caller's `interner` (moved
-/// in via `std::mem::take`), run `f` over it, and hand the interner back on
-/// **every** exit path — the reclaim dance every embedding parse entry point
-/// shares. What `f` returns borrows only `arena` (the AST holds `Copy` symbol
-/// IDs, never the interner), so nothing outlives the reclaim; `source` error
-/// context is applied once here, so `f`'s body stays context-free. A constructor
-/// failure leaves the caller's interner empty, which is harmless — a parse
-/// failure aborts the pipeline before any format/convert reads it.
+/// Build an embedding [`parser::Parser`] at `base_offset`, run `f` over it. What
+/// `f` returns borrows only `arena`; `source` error context is applied once
+/// here, so `f`'s body stays context-free.
 fn with_embedding_parser<'arena, T>(
     source: &str,
     base_offset: usize,
-    interner: &mut Interner,
     arena: &'arena bumpalo::Bump,
     f: impl FnOnce(&mut parser::Parser<'_, 'arena>) -> std::result::Result<T, ParseError>,
 ) -> Result<T> {
-    let mut parser =
-        parser::Parser::with_interner(source, base_offset, std::mem::take(interner), arena)?;
-    let result = f(&mut parser).map_err(|e| e.with_context(source));
-    *interner = std::mem::take(&mut parser.interner);
-    result
+    let mut parser = parser::Parser::with_base_offset(source, base_offset, arena)?;
+    f(&mut parser).map_err(|e| e.with_context(source))
 }
 
 /// Parse embedded TypeScript with grouping parens preserved.
 ///
-/// Like [`parse_with_interner`] but keeps `(expr)` as an internal
+/// Like [`parse_embedded`] but keeps `(expr)` as an internal
 /// `ParenthesizedExpression` node instead of discarding it. Used for the
 /// `{#snippet}`-parameter sub-parse (`function f(PARAMS) {}`), where Svelte
 /// parses with acorn's `preserveParens: true` and — unlike every other template
 /// expression — skips `remove_parens`, so its public AST keeps the parens. All
-/// other embedded parses ([`parse_with_interner`], expression/pattern parses)
+/// other embedded parses ([`parse_embedded`], expression/pattern parses)
 /// stay paren-free, matching acorn/Svelte.
-pub fn parse_with_interner_preserve_parens<'arena>(
+pub fn parse_embedded_preserve_parens<'arena>(
     source: &str,
     base_offset: usize,
-    interner: &mut Interner,
     arena: &'arena bumpalo::Bump,
 ) -> Result<Program<'arena>> {
-    with_embedding_parser(source, base_offset, interner, arena, |parser| {
+    with_embedding_parser(source, base_offset, arena, |parser| {
         parser.preserve_parens = true;
         parser.parse()
     })
@@ -458,10 +402,9 @@ pub fn parse_with_interner_preserve_parens<'arena>(
 pub fn parse_expression_with_comments<'arena>(
     source: &str,
     base_offset: usize,
-    interner: &mut Interner,
     arena: &'arena bumpalo::Bump,
 ) -> Result<(Expression<'arena>, &'arena [ast::Comment])> {
-    with_embedding_parser(source, base_offset, interner, arena, |parser| {
+    with_embedding_parser(source, base_offset, arena, |parser| {
         parser.parse_expression_with_comments()
     })
 }
@@ -500,7 +443,6 @@ pub fn format_expression(
 ///
 /// * `source` - The source code of the pattern
 /// * `base_offset` - Offset in the full source file
-/// * `interner` - Shared string interner
 ///
 /// # Returns
 ///
@@ -513,10 +455,9 @@ pub fn format_expression(
 pub fn parse_pattern_with_comments<'arena>(
     source: &str,
     base_offset: usize,
-    interner: &mut Interner,
     arena: &'arena bumpalo::Bump,
 ) -> Result<(Expression<'arena>, &'arena [ast::Comment])> {
-    with_embedding_parser(source, base_offset, interner, arena, |parser| {
+    with_embedding_parser(source, base_offset, arena, |parser| {
         let expr = parser.parse_expression_unbounded()?;
         let mut pattern = parser.expression_to_pattern(expr)?;
         // Check for type annotation (`: Type`) — used in Svelte block contexts
@@ -550,10 +491,9 @@ pub fn parse_pattern_with_comments<'arena>(
 pub fn parse_type_annotation_partial<'arena>(
     source: &str,
     base_offset: usize,
-    interner: &mut Interner,
     arena: &'arena bumpalo::Bump,
 ) -> Result<(TSTypeAnnotation<'arena>, usize)> {
-    with_embedding_parser(source, base_offset, interner, arena, |parser| {
+    with_embedding_parser(source, base_offset, arena, |parser| {
         let ta = parser.parse_type_annotation()?;
         Ok((ta, parser.current_absolute_position()))
     })
@@ -570,10 +510,9 @@ pub fn parse_type_annotation_partial<'arena>(
 pub fn parse_expression_partial_with_comments<'arena>(
     source: &str,
     base_offset: usize,
-    interner: &mut Interner,
     arena: &'arena bumpalo::Bump,
 ) -> Result<(Expression<'arena>, usize, &'arena [ast::Comment])> {
-    with_embedding_parser(source, base_offset, interner, arena, |parser| {
+    with_embedding_parser(source, base_offset, arena, |parser| {
         let (expr, end_pos) = parser.parse_assignment_expression_partial()?;
         Ok((expr, end_pos, parser.take_comments()))
     })
@@ -587,10 +526,9 @@ pub fn parse_expression_partial_with_comments<'arena>(
 pub fn parse_statement_with_comments<'arena>(
     source: &str,
     base_offset: usize,
-    interner: &mut Interner,
     arena: &'arena bumpalo::Bump,
 ) -> Result<(Statement<'arena>, &'arena [ast::Comment])> {
-    with_embedding_parser(source, base_offset, interner, arena, |parser| {
+    with_embedding_parser(source, base_offset, arena, |parser| {
         let stmt = parser.parse_statement()?;
         Ok((stmt, parser.take_comments()))
     })
@@ -691,19 +629,16 @@ pub fn build_type_parameters_doc_with_comments(
 ///
 /// `line_breaks` must be the host document's whole-source newline table
 /// (spans are absolute, so a table built from an island slice is wrong);
-/// `comments` stay island-local (taken from `program`), and `interner` is the
-/// host document's shared interner.
+/// `comments` stay island-local (taken from `program`).
 pub fn build_program_doc(
     arena: &DocArena,
     program: &Program<'_>,
     source: &str,
     line_breaks: &[u32],
-    interner: &Interner,
     embed: EmbedContext,
 ) -> DocId {
     let inputs = PrinterInputs {
         source,
-        interner,
         comments: program.comments,
         line_breaks,
         has_owned_comments: program.comments.iter().any(|c| c.owned_by_node),

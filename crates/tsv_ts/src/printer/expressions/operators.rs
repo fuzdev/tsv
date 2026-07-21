@@ -1491,13 +1491,11 @@ impl<'a> Printer<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tsv_lang::Interner;
 
     /// Run `should_group_binary_continuation` on a parsed binary expression.
     fn group(src: &str) -> bool {
         let arena = bumpalo::Bump::new();
-        let mut interner = Interner::new();
-        let expr = crate::parse_expression_with_comments(src, 0, &mut interner, &arena)
+        let expr = crate::parse_expression_with_comments(src, 0, &arena)
             .expect("expression should parse")
             .0;
         match expr {

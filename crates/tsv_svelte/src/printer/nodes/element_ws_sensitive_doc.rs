@@ -14,7 +14,6 @@ use super::helpers::each_expr_comment_end;
 use crate::ast::internal::{self, Fragment, FragmentNode};
 use crate::printer::Printer;
 use smallvec::smallvec;
-use tsv_lang::SymbolToU32;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 
 impl<'a> Printer<'a> {
@@ -45,7 +44,7 @@ impl<'a> Printer<'a> {
         attr_docs: DocBuf,
     ) -> DocId {
         let d = self.d();
-        let tag_sym = element.name.to_u32();
+        let name_doc = d.source_span_ident(element.name_span);
 
         // A void element has no closing tag — that is a fact about the TAG, not about the
         // surrounding layout, so whitespace-sensitivity has no say in it. Without this the
@@ -77,7 +76,7 @@ impl<'a> Printer<'a> {
             && attr_docs.is_empty()
             && self.span_was_self_closing(element.span)
         {
-            return d.concat(&[d.text("<"), d.symbol(tag_sym), d.text(" />")]);
+            return d.concat(&[d.text("<"), name_doc, d.text(" />")]);
         }
 
         // Deliberately NOT `ElementKind::is_inline` (and so not `classify_tag`): inside a
@@ -142,10 +141,10 @@ impl<'a> Printer<'a> {
             // When content doesn't end with \n, the closing </tag> has its `>` split
             // to a new line at the element level: `line2</span\n\t>`.
             let closing = if last_text_ends_with_newline {
-                self.end_tag(tag_sym)
+                self.end_tag(name_doc)
             } else {
                 // </tag\n> — closing > on its own line at the element's level
-                d.concat(&[d.text("</"), d.symbol(tag_sym), d.hardline(), d.text(">")])
+                d.concat(&[d.text("</"), name_doc, d.hardline(), d.text(">")])
             };
 
             // Opening `>` at element level + 1 (attr indent). Attrs (if any) go in a
@@ -160,7 +159,7 @@ impl<'a> Printer<'a> {
 
             return d.concat(&[
                 d.text("<"),
-                d.symbol(tag_sym),
+                name_doc,
                 d.indent(opening_inner),
                 content_doc,
                 closing,
@@ -194,17 +193,13 @@ impl<'a> Printer<'a> {
                 d.text(">"),
                 content_doc,
                 d.text("</"),
-                d.symbol(tag_sym),
+                name_doc,
             ]));
             // In flat mode: >content</tag (no closing > — it's outside the group)
-            let flat_doc = d.concat(&[d.text(">"), content_doc, d.text("</"), d.symbol(tag_sym)]);
+            let flat_doc = d.concat(&[d.text(">"), content_doc, d.text("</"), name_doc]);
             let if_break = d.if_break(break_doc, flat_doc);
-            let inner = d.group(d.concat(&[
-                d.text("<"),
-                d.symbol(tag_sym),
-                d.concat(&space_attrs),
-                if_break,
-            ]));
+            let inner =
+                d.group(d.concat(&[d.text("<"), name_doc, d.concat(&space_attrs), if_break]));
             // Outer group: closing `>` with softline breaks to new line at boundary.
             // Inner group stays flat when attrs+content fit, outer breaks only for the `>`.
             let sl = d.softline();
@@ -236,7 +231,7 @@ impl<'a> Printer<'a> {
                     d.text(">"),
                     content_doc,
                     d.text("</"),
-                    d.symbol(tag_sym),
+                    name_doc,
                     d.text(">"),
                 ]));
 
@@ -244,7 +239,7 @@ impl<'a> Printer<'a> {
                 let dedented = d.dedent(closing_and_content);
                 let attr_concat = d.concat(&attr_docs);
                 let indented = d.indent(d.concat(&[attr_concat, dedented]));
-                return d.group(d.concat(&[d.text("<"), d.symbol(tag_sym), indented]));
+                return d.group(d.concat(&[d.text("<"), name_doc, indented]));
             }
             // Fall through to normal handling for complex content
         }
@@ -272,7 +267,7 @@ impl<'a> Printer<'a> {
                 // group breaks. Mirrors build_void_element_doc.
                 return d.group(d.concat(&[
                     d.text("<"),
-                    d.symbol(tag_sym),
+                    name_doc,
                     attr_indent,
                     d.line(),
                     d.text("/>"),
@@ -280,26 +275,20 @@ impl<'a> Printer<'a> {
             }
             // group(['>', '</tag']): the final `>` is appended outside, so the softline's
             // fits() weighs `></tag>` and the trailing suffix together.
-            let close_seq = d.group(d.concat(&[d.text(">"), d.text("</"), d.symbol(tag_sym)]));
+            let close_seq = d.group(d.concat(&[d.text(">"), d.text("</"), name_doc]));
             let hugged = d.group(d.concat(&[d.softline(), close_seq]));
-            return d.group(d.concat(&[
-                d.text("<"),
-                d.symbol(tag_sym),
-                attr_indent,
-                hugged,
-                d.text(">"),
-            ]));
+            return d.group(d.concat(&[d.text("<"), name_doc, attr_indent, hugged, d.text(">")]));
         }
 
         // Build opening tag
         let opening_tag = if attr_docs.is_empty() {
-            self.start_tag(tag_sym)
+            self.start_tag(name_doc)
         } else {
             // Block whitespace-sensitive elements (pre): hug `>` with the last attr when
             // attrs wrap (prettier tolerates the overflow rather than breaking `>`).
             let attr_concat = d.concat(&attr_docs);
             let attr_indent = d.indent(attr_concat);
-            d.group(d.concat(&[d.text("<"), d.symbol(tag_sym), attr_indent, d.text(">")]))
+            d.group(d.concat(&[d.text("<"), name_doc, attr_indent, d.text(">")]))
         };
 
         // Build content preserving text whitespace but formatting expressions/blocks
@@ -309,7 +298,7 @@ impl<'a> Printer<'a> {
             opening_tag,
             content_doc,
             d.text("</"),
-            d.symbol(tag_sym),
+            name_doc,
             d.text(">"),
         ])
     }

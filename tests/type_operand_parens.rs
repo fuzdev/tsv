@@ -32,9 +32,8 @@ fn assert_operand_paren_arrow(source: &str, expected_output: &str) {
     );
 
     let arena = bumpalo::Bump::new();
-    let mut interner = tsv_ts::Interner::new();
-    let program = tsv_ts::parse(source, &arena, &mut interner).expect("parse failed");
-    let json = tsv_ts::convert_ast_json(&program, source, &interner);
+    let program = tsv_ts::parse(source, &arena).expect("parse failed");
+    let json = tsv_ts::convert_ast_json(&program, source);
 
     let init = json
         .pointer("/body/0/declarations/0/init")
@@ -60,19 +59,18 @@ fn assert_operand_paren_arrow(source: &str, expected_output: &str) {
         "the `(…)` operand is a parenthesized type, not function params: {return_type}"
     );
 
-    let output = tsv_ts::format(&program, source, &interner);
+    let output = tsv_ts::format(&program, source);
     assert_eq!(output, expected_output, "paren-strip output");
 
     // The stripped form is tsv's fixed point and keeps the same arrow shape.
     let arena_out = bumpalo::Bump::new();
-    let mut interner_out = tsv_ts::Interner::new();
-    let reparsed = tsv_ts::parse(&output, &arena_out, &mut interner_out).expect("reparse failed");
+    let reparsed = tsv_ts::parse(&output, &arena_out).expect("reparse failed");
     assert_eq!(
-        tsv_ts::format(&reparsed, &output, &interner_out),
+        tsv_ts::format(&reparsed, &output),
         output,
         "output should be stable"
     );
-    let json_out = tsv_ts::convert_ast_json(&reparsed, &output, &interner_out);
+    let json_out = tsv_ts::convert_ast_json(&reparsed, &output);
     assert_eq!(
         json_out
             .pointer("/body/0/declarations/0/init/body/name")

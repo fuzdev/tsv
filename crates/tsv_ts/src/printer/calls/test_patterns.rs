@@ -6,7 +6,6 @@
 use super::super::Printer;
 use crate::ast::internal::{self, IdentName};
 use smallvec::SmallVec;
-use tsv_lang::SymbolResolver;
 use tsv_lang::doc::arena::DocId;
 
 /// Test function patterns that Prettier keeps on a single line
@@ -44,7 +43,7 @@ pub(super) const TEST_CALL_PATTERNS: &[&str] = &[
 ];
 
 /// Get the name channel (+ span start) of an identifier if it's a simple identifier
-fn get_identifier_name(expr: &internal::Expression<'_>) -> Option<(IdentName, u32, u32)> {
+fn get_identifier_name<'a>(expr: &internal::Expression<'a>) -> Option<(IdentName<'a>, u32, u32)> {
     if let internal::Expression::Identifier(id) = expr {
         Some((id.ident_name(), id.span.start, id.span.end))
     } else {
@@ -53,13 +52,13 @@ fn get_identifier_name(expr: &internal::Expression<'_>) -> Option<(IdentName, u3
 }
 
 /// Build the flat, break-free callee doc (e.g. `test.describe.only`) for the
-/// test-call layout, straight from the interned member-chain parts of a simple
+/// test-call layout, straight from the span-identity member-chain parts of a simple
 /// identifier or non-computed, non-optional member chain — no intermediate
 /// `String`. Returns `None` for anything else (computed access, optional chains,
 /// or non-identifier callees), so the caller falls back to the general callee doc.
 ///
-/// Emitting `symbol` + `.` doc nodes is byte-identical to the old
-/// resolve-and-`join(".")` `String`: interned identifiers never contain `.`, and
+/// Emitting `source_span` name + `.` doc nodes is byte-identical to the old
+/// resolve-and-`join(".")` `String`: identifiers never contain `.`, and
 /// the concatenated text nodes carry no break point, so the flat callee still
 /// never breaks at `.skip` — at zero heap allocation. `is_test_call` matches the
 /// pattern list against the same chain parts directly (also no allocation) via
@@ -96,10 +95,10 @@ pub(super) fn build_test_callee_flat_doc(
 
 /// Get the member chain parts from an expression
 /// Returns parts reversed, e.g. `["skip", "test"]` for `test.skip`.
-fn get_member_chain_parts(
-    expr: &internal::Expression<'_>,
-) -> Option<SmallVec<[(IdentName, u32, u32); 8]>> {
-    let mut parts: SmallVec<[(IdentName, u32, u32); 8]> = SmallVec::new();
+fn get_member_chain_parts<'a>(
+    expr: &internal::Expression<'a>,
+) -> Option<SmallVec<[(IdentName<'a>, u32, u32); 8]>> {
+    let mut parts: SmallVec<[(IdentName<'a>, u32, u32); 8]> = SmallVec::new();
 
     match expr {
         internal::Expression::Identifier(id) => {
@@ -177,7 +176,7 @@ pub(super) fn is_test_call(call: &internal::CallExpression<'_>, printer: &Printe
     }
 
     // Check if the callee matches a known test pattern. Compare the resolved
-    // member-chain parts against the pattern list directly — one interner borrow,
+    // member-chain parts against the pattern list directly — span-identity slices,
     // a stack-only `SmallVec` — instead of building and immediately discarding a
     // dotted callee `String` on every test-shaped call (the hot waste this path
     // used to pay). `callee_chain_string` stays for the actual-test-call
@@ -185,14 +184,13 @@ pub(super) fn is_test_call(call: &internal::CallExpression<'_>, printer: &Printe
     let Some(parts) = get_member_chain_parts(call.callee) else {
         return false;
     };
-    let interner = printer.interner();
     // Parts come out leaf→root; reverse to root→leaf to match the dotted
     // patterns (`test.describe.only`). Identifiers never contain `.`, so a
     // per-segment compare against `pattern.split('.')` is exact.
     let names: SmallVec<[&str; 8]> = parts
         .iter()
         .rev()
-        .map(|&(name, name_start, _)| name.resolve(name_start, printer.source, interner))
+        .map(|&(name, name_start, _)| name.resolve(name_start, printer.source))
         .collect();
     TEST_CALL_PATTERNS
         .iter()

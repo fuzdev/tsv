@@ -23,7 +23,7 @@ use tsv_lang::estimated_ast_arena_capacity;
 ///   the render/`fits`/build loops linearly scan (so shrinking the dominant
 ///   variant's size is what would move cache density).
 /// - **DocText sub-histogram** — for `Text` nodes, the `Static` / `Pooled` /
-///   `SourceSpan` / `Symbol` split (which text representation to target).
+///   `SourceSpan` split (which text representation to target).
 ///
 /// Covers `.ts` / `.svelte.ts` / `.svelte` / `.css` (each formatted by its own
 /// printer into the shared doc arena). Pure Rust, no Deno.
@@ -69,7 +69,7 @@ const NODE_KINDS: &[&str] = &[
     "BreakParent",
     "Align",
 ];
-const TEXT_KINDS: &[&str] = &["Static", "Pooled", "SourceSpan", "Symbol"];
+const TEXT_KINDS: &[&str] = &["Static", "Pooled", "SourceSpan"];
 
 #[derive(Default)]
 struct Stats {
@@ -185,16 +185,15 @@ fn run_reuse(files: &[std::path::PathBuf]) -> Result<(), CliError> {
         // just avoids an `expect`/`unwrap` on the hot path).
         let Some(a) = arena.as_ref() else { continue };
         let bump = bumpalo::Bump::with_capacity(estimated_ast_arena_capacity(source.len()));
-        let mut interner = tsv_lang::Interner::new();
         let ok = match ParserType::from_extension(&path.to_string_lossy()) {
-            ParserType::TypeScript => tsv_ts::parse(&source, &bump, &mut interner)
+            ParserType::TypeScript => tsv_ts::parse(&source, &bump)
                 .map(|ast| {
-                    let _ = tsv_ts::format_in(&ast, &source, a, &interner);
+                    let _ = tsv_ts::format_in(&ast, &source, a);
                 })
                 .is_ok(),
-            ParserType::Svelte => tsv_svelte::parse(&source, &bump, &mut interner)
+            ParserType::Svelte => tsv_svelte::parse(&source, &bump)
                 .map(|ast| {
-                    let _ = tsv_svelte::format_in(&ast, &source, a, &interner);
+                    let _ = tsv_svelte::format_in(&ast, &source, a);
                 })
                 .is_ok(),
             ParserType::Css => tsv_css::parse(&source, &bump)
@@ -248,10 +247,9 @@ fn run_reuse(files: &[std::path::PathBuf]) -> Result<(), CliError> {
 /// the parse fails (the caller's first parse already succeeded, so it won't here).
 fn measure_bump_demand(source: &str, parser: ParserType) -> u64 {
     let bump = bumpalo::Bump::new();
-    let mut interner = tsv_lang::Interner::new();
     let ok = match parser {
-        ParserType::TypeScript => tsv_ts::parse(source, &bump, &mut interner).is_ok(),
-        ParserType::Svelte => tsv_svelte::parse(source, &bump, &mut interner).is_ok(),
+        ParserType::TypeScript => tsv_ts::parse(source, &bump).is_ok(),
+        ParserType::Svelte => tsv_svelte::parse(source, &bump).is_ok(),
         ParserType::Css => tsv_css::parse(source, &bump).is_ok(),
     };
     if ok { bump.allocated_bytes() as u64 } else { 0 }
@@ -264,17 +262,15 @@ fn collect_file(path: &Path, parser: ParserType, stats: &mut Stats) -> Result<()
     let source = std::fs::read_to_string(path).map_err(|e| format!("read: {e}"))?;
     let bump = bumpalo::Bump::with_capacity(estimated_ast_arena_capacity(source.len()));
     let arena = DocArena::for_source(&source);
-    let mut interner = tsv_lang::Interner::new();
 
     let output = match parser {
         ParserType::TypeScript => {
-            let ast = tsv_ts::parse(&source, &bump, &mut interner).map_err(|e| format!("{e}"))?;
-            tsv_ts::format_in(&ast, &source, &arena, &interner)
+            let ast = tsv_ts::parse(&source, &bump).map_err(|e| format!("{e}"))?;
+            tsv_ts::format_in(&ast, &source, &arena)
         }
         ParserType::Svelte => {
-            let ast =
-                tsv_svelte::parse(&source, &bump, &mut interner).map_err(|e| format!("{e}"))?;
-            tsv_svelte::format_in(&ast, &source, &arena, &interner)
+            let ast = tsv_svelte::parse(&source, &bump).map_err(|e| format!("{e}"))?;
+            tsv_svelte::format_in(&ast, &source, &arena)
         }
         ParserType::Css => {
             let ast = tsv_css::parse(&source, &bump).map_err(|e| format!("{e}"))?;
@@ -375,7 +371,6 @@ fn classify_text(t: &DocText) -> &'static str {
         DocText::Static(..) => "Static",
         DocText::Pooled(..) => "Pooled",
         DocText::SourceSpan(..) => "SourceSpan",
-        DocText::Symbol(..) => "Symbol",
     }
 }
 

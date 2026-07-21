@@ -54,8 +54,7 @@ async fn assert_prettier_errors_ours_stable(input: &str) {
     );
 
     let arena = bumpalo::Bump::new();
-    let mut interner = tsv_svelte::Interner::new();
-    let ast = tsv_svelte::parse(input, &arena, &mut interner).expect("parse failed");
-    let output = tsv_svelte::format(&ast, input, &interner);
+    let ast = tsv_svelte::parse(input, &arena).expect("parse failed");
+    let output = tsv_svelte::format(&ast, input);
     assert_eq!(output, input, "Our printer should keep the input stable");
 }

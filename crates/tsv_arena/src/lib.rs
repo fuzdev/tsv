@@ -13,13 +13,10 @@
 //! so its thread-local is effectively a module static; the reuse is sound there
 //! for the same reason (the per-file work is consumed before the next `reset()`).
 //!
-//! Three reusables, gated to match the bindings' `format` / `parse` split:
+//! Two reusables, gated to match the bindings' `format` / `parse` split:
 //!
 //! - [`with_ast_arena`] — the parse-time `bumpalo::Bump`. Always available;
 //!   parse and format both need it.
-//! - [`with_interner`] — the parse-time symbol table (`tsv_lang::Interner`).
-//!   Always available; parse fills it (`&mut`) and format/convert read it (`&`)
-//!   within one call.
 //! - [`with_doc_arena`] — the format-time doc IR arena (`DocArena`). Behind the
 //!   `format` feature.
 //!
@@ -55,30 +52,6 @@ pub fn with_ast_arena<R>(f: impl FnOnce(&bumpalo::Bump) -> R) -> R {
         let mut arena = cell.borrow_mut();
         arena.reset();
         f(&arena)
-    })
-}
-
-/// Run `f` with a per-thread reusable [`tsv_lang::Interner`] — the parse-time
-/// symbol table, the third caller-owned reusable beside [`with_ast_arena`] and
-/// [`with_doc_arena`].
-///
-/// `f` interns during parse (`&mut`) and resolves during format/convert (`&`)
-/// off the same borrow, all within the one call. The interner is `clear`ed at
-/// the *start* of each call (the arenas' `reset()` analogue). `string_interner`
-/// 0.20 exposes no capacity-retaining clear, so [`tsv_lang::Interner::clear`]
-/// replaces the backing with a fresh empty interner — alloc-free, since the
-/// common-path interner interns nothing. Per-thread, so a parallel `--jobs`
-/// worker gets its own. Like the arenas this is non-reentrant (a nested parse
-/// during formatting must use a *local* `Interner`, as the Svelte embedded
-/// re-parse paths do).
-pub fn with_interner<R>(f: impl FnOnce(&mut tsv_lang::Interner) -> R) -> R {
-    thread_local! {
-        static INTERNER: RefCell<tsv_lang::Interner> = RefCell::new(tsv_lang::Interner::new());
-    }
-    INTERNER.with(|cell| {
-        let mut interner = cell.borrow_mut();
-        interner.clear();
-        f(&mut interner)
     })
 }
 
@@ -119,23 +92,6 @@ mod tests {
             second, "second",
             "second call must see a clean, reset arena"
         );
-    }
-
-    #[test]
-    fn interner_is_reusable_and_cleared_across_calls() {
-        // Each call `clear`s the interner at entry, so symbol ids restart from
-        // the same base and a prior call's contents never leak.
-        let first = with_interner(|interner| {
-            let sym = interner.get_or_intern("first");
-            interner.resolve_infallible(sym).to_owned()
-        });
-        let second = with_interner(|interner| {
-            // The interner was cleared at entry, so this is the first symbol again.
-            let sym = interner.get_or_intern("second");
-            interner.resolve_infallible(sym).to_owned()
-        });
-        assert_eq!(first, "first");
-        assert_eq!(second, "second", "second call must see a cleared interner");
     }
 
     #[cfg(feature = "format")]
