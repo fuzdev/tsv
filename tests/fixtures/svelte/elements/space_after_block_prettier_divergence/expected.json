@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 304,
+	"end": 297,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,31 +10,31 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 265,
-				"data": " A block element followed by content text: tsv trims the boundary and puts the text on its\n     own line. Prettier strands a leading space when fed the same-line authoring (a non-idempotent\n     quirk) — see unformatted_ours_compact + prettier_intermediate. "
+				"end": 258,
+				"data": "\n\tA block element followed by content text: tsv trims the boundary and puts the text on its\n\town line. Prettier strands a leading space when fed the same-line authoring (a non-idempotent\n\tquirk) — see unformatted_ours_compact + prettier_intermediate.\n"
 			},
 			{
 				"type": "Text",
-				"start": 265,
-				"end": 266,
+				"start": 258,
+				"end": 259,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 266,
-				"end": 282,
+				"start": 259,
+				"end": 275,
 				"name": "div",
 				"name_loc": {
 					"start": {
-						"line": 4,
+						"line": 6,
 						"column": 1,
-						"character": 267
+						"character": 260
 					},
 					"end": {
-						"line": 4,
+						"line": 6,
 						"column": 4,
-						"character": 270
+						"character": 263
 					}
 				},
 				"attributes": [],
@@ -43,8 +43,8 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 271,
-							"end": 276,
+							"start": 264,
+							"end": 269,
 							"raw": "block",
 							"data": "block"
 						}
@@ -53,8 +53,8 @@
 			},
 			{
 				"type": "Text",
-				"start": 282,
-				"end": 303,
+				"start": 275,
+				"end": 296,
 				"raw": "\ntext after the block",
 				"data": "\ntext after the block"
 			}

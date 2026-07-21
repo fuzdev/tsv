@@ -1,0 +1,248 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1136,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 789,
+				"data": "\n\tA SHORT inline component (its own content fits) sandwiched in a wrapping fill of text and inline\n\tcomponents packs greedily and pairwise after the preceding word rather than being isolated onto\n\tits own line: <Comp>example.dev</Comp> stays on the <Comp>preferences</Comp> run line. The\n\tcomponent sibling of inline_short_content_fill_long (HTML <code>) — components route through a\n\tdifferent classification but the same after-element fold, so they pack identically. Prettier\n\tkeeps the run on one over-width line (the inline-content hug); tsv keeps printWidth a hard limit\n\tand wraps at a word boundary. The two blocks pin the 100/101 boundary: the run packs to exactly\n\t100 (`more` fits, `text` breaks), and one char more pushes `more` to 101 so it breaks instead.\n\tSee README.\n"
+			},
+			{
+				"type": "Text",
+				"start": 789,
+				"end": 790,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 790,
+				"end": 961,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 12,
+						"column": 1,
+						"character": 791
+					},
+					"end": {
+						"line": 12,
+						"column": 2,
+						"character": 792
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 793,
+							"end": 852,
+							"raw": "\n\talpha bravo charlie delta echo foxtrot golf hotel india\n\t",
+							"data": "\n\talpha bravo charlie delta echo foxtrot golf hotel india\n\t"
+						},
+						{
+							"type": "Component",
+							"start": 852,
+							"end": 876,
+							"name": "Comp",
+							"name_loc": {
+								"start": {
+									"line": 14,
+									"column": 2,
+									"character": 853
+								},
+								"end": {
+									"line": 14,
+									"column": 6,
+									"character": 857
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 858,
+										"end": 869,
+										"raw": "preferences",
+										"data": "preferences"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 876,
+							"end": 885,
+							"raw": " and set ",
+							"data": " and set "
+						},
+						{
+							"type": "Component",
+							"start": 885,
+							"end": 909,
+							"name": "Comp",
+							"name_loc": {
+								"start": {
+									"line": 14,
+									"column": 35,
+									"character": 886
+								},
+								"end": {
+									"line": 14,
+									"column": 39,
+									"character": 890
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 891,
+										"end": 902,
+										"raw": "example.dev",
+										"data": "example.dev"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 909,
+							"end": 957,
+							"raw": " as one exception here plus a little more\n\ttext\n",
+							"data": " as one exception here plus a little more\n\ttext\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 961,
+				"end": 963,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 963,
+				"end": 1135,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 18,
+						"column": 1,
+						"character": 964
+					},
+					"end": {
+						"line": 18,
+						"column": 2,
+						"character": 965
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 966,
+							"end": 1025,
+							"raw": "\n\talpha bravo charlie delta echo foxtrot golf hotel india\n\t",
+							"data": "\n\talpha bravo charlie delta echo foxtrot golf hotel india\n\t"
+						},
+						{
+							"type": "Component",
+							"start": 1025,
+							"end": 1049,
+							"name": "Comp",
+							"name_loc": {
+								"start": {
+									"line": 20,
+									"column": 2,
+									"character": 1026
+								},
+								"end": {
+									"line": 20,
+									"column": 6,
+									"character": 1030
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1031,
+										"end": 1042,
+										"raw": "preferences",
+										"data": "preferences"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1049,
+							"end": 1059,
+							"raw": " and sett ",
+							"data": " and sett "
+						},
+						{
+							"type": "Component",
+							"start": 1059,
+							"end": 1083,
+							"name": "Comp",
+							"name_loc": {
+								"start": {
+									"line": 20,
+									"column": 36,
+									"character": 1060
+								},
+								"end": {
+									"line": 20,
+									"column": 40,
+									"character": 1064
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1065,
+										"end": 1076,
+										"raw": "example.dev",
+										"data": "example.dev"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1083,
+							"end": 1131,
+							"raw": " as one exception here plus a little\n\tmore text\n",
+							"data": " as one exception here plus a little\n\tmore text\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
