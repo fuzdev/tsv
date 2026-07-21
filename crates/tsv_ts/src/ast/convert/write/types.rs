@@ -108,7 +108,7 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &internal::TSType<'_>, ctx
         internal::TSType::TypePredicate(p) => {
             node_header(w, "TSTypePredicate", p.span, ctx);
             w.raw(",\"parameterName\":");
-            if p.parameter_name.name(ctx.source, ctx.interner) == "this" {
+            if p.parameter_name.name(ctx.source) == "this" {
                 write_bare_node(w, "TSThisType", p.parameter_name.span, ctx);
             } else {
                 write_identifier_plain(w, &p.parameter_name, ctx);
@@ -389,7 +389,7 @@ fn write_type_element(w: &mut JsonWriter, elem: &internal::TSTypeElement<'_>, ct
             // acorn quirk: omits `computed` when the key is the `new` keyword
             // and the signature is neither computed nor readonly.
             let is_new_key = matches!(&p.key, internal::Expression::Identifier(id)
-                if id.name(ctx.source, ctx.interner) == "new");
+                if id.name(ctx.source) == "new");
             if !(!p.computed && !p.readonly && is_new_key) {
                 w.raw(",\"computed\":");
                 w.bool(p.computed);

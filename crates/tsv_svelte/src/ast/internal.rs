@@ -17,9 +17,8 @@
 
 use std::borrow::Cow;
 
-use string_interner::DefaultSymbol;
 use tsv_css::ast::internal::CssStyleSheet;
-pub use tsv_lang::{Comment, SharedInterner, Span};
+pub use tsv_lang::{Comment, Span};
 use tsv_ts::ast::internal::{Expression, Program, TSTypeParameterDeclaration, VariableDeclaration};
 
 /// Svelte Root - top-level AST node
@@ -38,7 +37,6 @@ pub struct Root<'arena> {
     /// Use `comments_to_emit_in_range(span)` to find comments for a specific node.
     pub comments: Vec<Comment>,
     pub span: Span,
-    pub interner: SharedInterner,
 }
 
 /// Svelte Fragment - container for template nodes
@@ -931,7 +929,6 @@ impl TagFacts {
 /// Elements have a name, attributes, and child nodes in a fragment.
 #[derive(Debug, Clone)]
 pub struct Element<'arena> {
-    pub name: DefaultSymbol,
     pub kind: ElementKind,
     /// Name-derived classification, computed once at parse (see [`TagFacts`]). Occupies padding
     /// beside `kind`, so it costs no extra size; the printer reads it instead of re-deriving.
@@ -946,11 +943,20 @@ pub struct Element<'arena> {
     pub open_tag_end: u32,
 }
 
+impl Element<'_> {
+    /// The tag name — span-identity, the verbatim `source[name_span]` slice
+    /// (tag names never carry surrounding whitespace).
+    #[inline]
+    pub fn name<'s>(&self, source: &'s str) -> &'s str {
+        &source[self.name_span.range()]
+    }
+}
+
 /// `facts` rides in the tail padding beside `kind`, so the parse-time classification costs no
 /// extra `Element` size. Guards that property against a future field reorder that would spill it.
 /// 64-bit only — the slice fields are half-width on wasm32, a different layout.
 #[cfg(target_pointer_width = "64")]
-const _: () = assert!(size_of::<Element<'static>>() == 64);
+const _: () = assert!(size_of::<Element<'static>>() == 56);
 
 /// Svelte Attribute - element attribute
 ///
@@ -962,10 +968,33 @@ const _: () = assert!(size_of::<Element<'static>>() == 64);
 /// Detection is implicit: check if name matches expression identifier.
 #[derive(Debug, Clone)]
 pub struct Attribute<'arena> {
-    pub name: DefaultSymbol,
     pub value: Option<&'arena [AttributeValue<'arena>]>,
     pub span: Span,
     pub name_span: Span,
+}
+
+impl Attribute<'_> {
+    /// The attribute name — span-identity, recovered from `source[name_span]`
+    /// with surrounding whitespace trimmed. Only a padded `{ shorthand }` has
+    /// any whitespace to trim (its `name_span` covers the untrimmed braces
+    /// interior, matching Svelte's `name_loc`); every other attribute name is a
+    /// verbatim source run, so `trim` is a no-op. Recovered directly from source.
+    #[inline]
+    pub fn name<'s>(&self, source: &'s str) -> &'s str {
+        source[self.name_span.range()].trim()
+    }
+
+    /// The sub-span of `name_span` covering the trimmed name — the doc-emission
+    /// seam (`DocText::SourceSpan`). Equal to `name_span` except for a padded
+    /// `{ shorthand }`.
+    #[inline]
+    pub fn name_render_span(&self, source: &str) -> Span {
+        let start = self.name_span.start as usize;
+        let raw = &source[start..self.name_span.end as usize];
+        let lead = raw.len() - raw.trim_start().len();
+        let len = raw.trim().len();
+        Span::new((start + lead) as u32, (start + lead + len) as u32)
+    }
 }
 
 /// Svelte SpreadAttribute - spread object as attributes

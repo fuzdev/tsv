@@ -56,6 +56,17 @@ pub fn format(root: &Root<'_>, source: &str) -> String {
     printer::format_svelte(root, source)
 }
 
+/// Parse and format `source` in one call.
+///
+/// The fully-fused one-shot convenience (the parse/format analogue of
+/// `tsv_ts::format_str`), for callers that just want the formatted string and
+/// never touch the AST. Batch drivers thread [`parse`] + [`format_in`] instead.
+pub fn format_str(source: &str) -> Result<String> {
+    let arena = bumpalo::Bump::new();
+    let root = parse(source, &arena)?;
+    Ok(format(&root, source))
+}
+
 /// Format into a caller-provided doc arena.
 ///
 /// Identical output to [`format`], but the doc IR is built into `arena` instead
@@ -90,6 +101,17 @@ pub fn format_in(root: &Root<'_>, source: &str, arena: &tsv_lang::doc::arena::Do
 #[allow(clippy::expect_used)]
 pub fn convert_ast_json(root: &Root<'_>, source: &str) -> serde_json::Value {
     serde_json::from_slice(&convert_ast_json_bytes(root, source)).expect("writer emits valid JSON")
+}
+
+/// Parse and emit the compact wire-JSON string in one call.
+///
+/// The parse analogue of [`format_str`] — the fully-fused one-shot convenience
+/// for callers that want the JSON string and never touch the AST.
+#[cfg(feature = "convert")]
+pub fn parse_to_json(source: &str) -> Result<String> {
+    let arena = bumpalo::Bump::new();
+    let root = parse(source, &arena)?;
+    Ok(convert_ast_json_string(&root, source))
 }
 
 /// Convert internal AST to compact JSON wire bytes with character-based positions

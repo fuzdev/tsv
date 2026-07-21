@@ -211,7 +211,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Returns `(expression, definite)` where `definite` is true if `!` was present.
     fn parse_simple_binding(
         &mut self,
-        name: IdentName,
+        name: IdentName<'arena>,
     ) -> Result<(Expression<'arena>, bool), ParseError> {
         let (start, end) = self.current_pos();
         self.advance()?;

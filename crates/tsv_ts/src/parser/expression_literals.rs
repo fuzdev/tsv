@@ -146,6 +146,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     )
                 }
                 TokenKind::Keyword(kw) => {
+                    // Copy the keyword out so the `&self.current` borrow ends before
+                    // `current_raw_ident_name` takes `&mut self` (it may intern).
+                    let kw = *kw;
                     let (key_start, key_end) = self.current_pos();
                     let name = self.current_raw_ident_name();
                     // A keyword is a valid bare shorthand only when it is a valid

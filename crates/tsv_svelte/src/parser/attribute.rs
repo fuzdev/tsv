@@ -257,7 +257,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         // Not a directive, parse as regular attribute
         Ok(AttributeNode::Attribute(self.parse_attribute_inner(
-            name_str,
             name_start,
             name_end,
             parse_expressions,
@@ -479,9 +478,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
     /// Name channel for a synthesized TS `Identifier` covering `span`:
     /// span-identity when the name is exactly the source slice (the common
-    /// case), else interned — e.g. a `{ name }` shorthand attribute whose
-    /// braces content was trimmed, so the span includes the padding.
-    fn synthesized_ident_name(&self, name: &str, span: Span) -> IdentName {
+    /// case), else the decoded name arena-copied as the `&'arena str` escape
+    /// hatch — e.g. a `{ name }` shorthand attribute whose braces content was
+    /// trimmed, so the span includes the padding.
+    fn synthesized_ident_name(&self, name: &str, span: Span) -> IdentName<'arena> {
         let slice = &self.source[span.start as usize..span.end as usize];
         if slice == name && u16::try_from(name.len()).is_ok() {
             IdentName {
@@ -490,7 +490,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             }
         } else {
             IdentName {
-                escaped: Some(self.interner.borrow_mut().get_or_intern(name)),
+                escaped: Some(self.alloc_str_in(name)),
                 raw_len: 0,
             }
         }
@@ -773,13 +773,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let mut value_vec = self.bvec();
         value_vec.push(AttributeValue::ExpressionTag(expression_tag));
 
-        // The Svelte-side attribute name stays interned (element/attr names are
-        // the interner's remaining tenants); only the TS identifier above is
-        // span-identity.
-        let name = self.intern(name_str);
-
+        // The attribute name is span-identity: `source[name_span].trim()`
+        // recovers it (the braces interior may carry padding, trimmed on read).
         Ok(Attribute {
-            name,
             value: Some(value_vec.into_bump_slice()),
             span: Span {
                 start: start as u32,
@@ -806,14 +802,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Svelte's `read_static_attribute` reads the raw run up to a token-ending char
         // (`regex_token_ending_character = /[\s=/>"']/`) as the attribute name.
         let end = self.attribute_name_end(start);
-        let name = self.intern(&self.source[start..end]);
         let span = Span {
             start: start as u32,
             end: end as u32,
         };
         self.advance_to_position(end)?;
         Ok(Attribute {
-            name,
             value: None,
             span,
             name_span: span,
@@ -822,16 +816,14 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
     fn parse_attribute_inner(
         &mut self,
-        name_str: &'a str,
         name_start: usize,
         name_end: usize,
         parse_expressions: bool,
     ) -> Result<Attribute<'arena>, ParseError> {
         // The name was already read as a Svelte `read_tag` run by the caller; it starts at
-        // an Identifier token but may extend past it over special chars (`a%b`). Intern the
-        // full name and resync the lexer past it.
+        // an Identifier token but may extend past it over special chars (`a%b`). The name is
+        // span-identity (`source[name_span]`); just resync the lexer past it.
         let start = name_start;
-        let name = self.intern(name_str);
         self.advance_past_name(name_end)?;
 
         // Check for = (attribute with value)
@@ -859,7 +851,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             };
 
             Ok(Attribute {
-                name,
                 value: Some(value.into_bump_slice()),
                 span: Span {
                     start: start as u32,
@@ -873,7 +864,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         } else {
             // Boolean attribute (no value) - ends where the name ends
             Ok(Attribute {
-                name,
                 value: None,
                 span: Span {
                     start: start as u32,

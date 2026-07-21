@@ -660,10 +660,10 @@ pub struct TSMappedType<'arena> {
 #[derive(Debug, Clone)]
 pub struct TSMappedTypeParameter<'arena> {
     /// The parameter name (just the string, not an `Identifier`) — span-identity
-    /// with the escaped-interned fallback, like every identifier name. `span`
+    /// with the arena-string escaped fallback, like every identifier name. `span`
     /// covers exactly the name token (`K`; the constraint is a sibling field),
     /// so the verbatim name is the leading `raw_len` bytes at `span.start`.
-    pub name: IdentName,
+    pub name: IdentName<'arena>,
     /// The constraint type (e.g., `keyof T`)
     pub constraint: &'arena TSType<'arena>,
     pub span: Span,

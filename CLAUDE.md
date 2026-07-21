@@ -509,7 +509,7 @@ tsv/
 - `printer/` - Code formatting (uses doc builder from tsv_lang)
 - `escapes/` - Language-specific escape handling (tsv_ts, tsv_css only; Svelte delegates to TS/CSS)
 
-`tsv_ts` and `tsv_css` also export embedding APIs for `tsv_svelte`: `parse_with_interner`, `parse_embedded`, expression formatting variants, `build_*_doc` functions.
+`tsv_ts` and `tsv_css` also export embedding APIs for `tsv_svelte`: `parse_embedded`, expression formatting variants, `build_*_doc` functions.
 
 ### Conformance
 
@@ -930,7 +930,6 @@ cases; prettier, oxfmt and biome all get the JSDoc-cast paren binding wrong — 
 
 - `serde_json` — wire-JSON emission: the writer's exact string-escape / `f64` formatting, and reparsing bytes to a `Value` (CLI `--pretty`, tests). The language crates no longer depend on `serde` directly (only transitively, without its `derive`); `serde`'s derive is dev-tooling only (`tsv_debug` / `tsv_cli`)
 - `smallvec` — Stack-allocated vectors
-- `string-interner` — String interning for the residual symbol tenants (Svelte element/attribute names, escaped identifiers); identifier names are span-identity (`IdentName`)
 - `thiserror` — Error type derivation
 - `phf` — Compile-time perfect hash maps (keywords, entities)
 - `unicode-ident` — Unicode XID_Start/XID_Continue for identifiers

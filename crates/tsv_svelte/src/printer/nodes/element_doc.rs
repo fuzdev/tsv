@@ -14,9 +14,9 @@
 use crate::ast::internal::{self, FragmentNode};
 use crate::printer::Printer;
 use smallvec::smallvec;
+use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::{DocBuf, arena::DocId};
-use tsv_lang::{Span, SymbolToU32};
 
 /// How content relates to an element boundary (opening or closing tag)
 ///
@@ -93,8 +93,8 @@ impl ElementKind {
 /// went multiline for block children, and the special path still dangled its delimiters
 /// where regular elements had moved to block-style.
 ///
-/// `name` is the tag-name doc, reused by both the opening and the closing tag (a symbol for
-/// a regular element, static text for a `svelte:*` one).
+/// `name` is the tag-name doc, reused by both the opening and the closing tag (a span-identity
+/// `source_span` slice for a regular element, static text for a `svelte:*` one).
 #[derive(Clone, Copy)]
 pub(super) struct ElementParts<'arena> {
     pub(super) name: DocId,
@@ -110,8 +110,8 @@ pub(super) struct ElementParts<'arena> {
 /// Everything the printer derives from an element's tag NAME.
 ///
 /// Unpacked from the parse-time `Element::facts` ([`TagFacts`](internal::TagFacts)) by
-/// `classify_tag`, so the printer re-derives nothing per element — one field read, no interner
-/// borrow, no per-element `String`. Emission uses the symbol, never the string.
+/// `classify_tag`, so the printer re-derives nothing per element — one field read, no
+/// per-element `String`. Emission is a span-identity `source_span` slice of the tag name.
 ///
 /// A named struct rather than a tuple: these are seven independent bools that would otherwise
 /// be positional and silently misorderable at the call site (the same reason
@@ -174,17 +174,18 @@ pub(super) struct ElementContext {
 
 impl<'a> Printer<'a> {
     /// `<name>` — a start tag with no attributes (HTML spec "start tag").
+    /// `name` is a pre-built name doc (span-identity `source_span`).
     #[inline]
-    pub(super) fn start_tag(&self, name: u32) -> DocId {
+    pub(super) fn start_tag(&self, name: DocId) -> DocId {
         let d = self.d();
-        d.concat(&[d.text("<"), d.symbol(name), d.text(">")])
+        d.concat(&[d.text("<"), name, d.text(">")])
     }
 
     /// `</name>` — an end tag (HTML spec "end tag").
     #[inline]
-    pub(super) fn end_tag(&self, name: u32) -> DocId {
+    pub(super) fn end_tag(&self, name: DocId) -> DocId {
         let d = self.d();
-        d.concat(&[d.text("</"), d.symbol(name), d.text(">")])
+        d.concat(&[d.text("</"), name, d.text(">")])
     }
 
     /// Unpack an element's parse-time name facts (`Element::facts`) into the printer's per-tag
@@ -220,7 +221,7 @@ impl<'a> Printer<'a> {
         class: TagClass,
     ) -> ElementParts<'e> {
         ElementParts {
-            name: self.d().symbol(element.name.to_u32()),
+            name: self.d().source_span_ident(element.name_span),
             kind: class.kind,
             is_void: class.is_void,
             // Components, foreign (SVG/MathML), and namespaced (`foo:bar`) elements may print
@@ -570,9 +571,9 @@ impl<'a> Printer<'a> {
         kind: ElementKind,
     ) -> DocId {
         let d = self.d();
-        let tag_sym = element.name.to_u32();
+        let name_doc = d.source_span_ident(element.name_span);
         let is_html = element.kind == internal::ElementKind::Html;
-        let closing = d.concat(&[d.text("></"), d.symbol(tag_sym), d.text(">")]);
+        let closing = d.concat(&[d.text("></"), name_doc, d.text(">")]);
 
         if has_attrs && (kind.is_inline() || kind.is_component()) {
             // State 1: All inline
@@ -588,7 +589,7 @@ impl<'a> Printer<'a> {
             );
             let hug_state = d.concat(&[
                 d.text("<"),
-                d.symbol(tag_sym),
+                name_doc,
                 d.concat(&hug_attrs),
                 d.hardline(),
                 closing,
@@ -606,7 +607,7 @@ impl<'a> Printer<'a> {
             let multiline_indent = d.indent(multiline_concat);
             let multiline_state = d.concat(&[
                 d.text("<"),
-                d.symbol(tag_sym),
+                name_doc,
                 multiline_indent,
                 d.hardline(),
                 closing,
@@ -623,7 +624,7 @@ impl<'a> Printer<'a> {
     /// Format: `<template lang="pug">\n{raw content}</template>`
     fn build_foreign_template_doc(&self, element: &internal::Element<'_>) -> DocId {
         let d = self.d();
-        let tag_sym = element.name.to_u32();
+        let name_doc = d.source_span_ident(element.name_span);
 
         // Opening tag: <template attrs> — use space-separated attrs (no wrapping)
         // Foreign template elements are always HTML, so is_html=true
@@ -634,7 +635,7 @@ impl<'a> Printer<'a> {
             element.open_tag_end,
             true,
         );
-        let mut parts: DocBuf = smallvec![d.text("<"), d.symbol(tag_sym)];
+        let mut parts: DocBuf = smallvec![d.text("<"), name_doc];
         parts.extend(space_attrs);
         parts.push(d.text(">"));
 
@@ -647,7 +648,7 @@ impl<'a> Printer<'a> {
 
         // Closing tag
         parts.push(d.text("</"));
-        parts.push(d.symbol(tag_sym));
+        parts.push(name_doc);
         parts.push(d.text(">"));
 
         d.concat(&parts)
@@ -664,17 +665,17 @@ impl<'a> Printer<'a> {
         attr_docs: DocBuf,
     ) -> DocId {
         let d = self.d();
-        let tag_sym = element.name.to_u32();
+        let name_doc = d.source_span_ident(element.name_span);
         // Build opening tag
         let opening_tag = if attr_docs.is_empty() {
-            self.start_tag(tag_sym)
+            self.start_tag(name_doc)
         } else {
             let sl = d.softline();
             let dedented = d.dedent(sl);
             let attr_concat = d.concat(&attr_docs);
             let inner = d.group(d.concat(&[attr_concat, dedented]));
             let indented = d.indent(inner);
-            d.group(d.concat(&[d.text("<"), d.symbol(tag_sym), indented, d.text(">")]))
+            d.group(d.concat(&[d.text("<"), name_doc, indented, d.text(">")]))
         };
 
         // Get raw content from the single Text child
@@ -685,7 +686,7 @@ impl<'a> Printer<'a> {
 
         // Empty element or whitespace-only content
         let Some(content) = content.filter(|c| !c.trim().is_empty()) else {
-            return d.concat(&[opening_tag, d.text("</"), d.symbol(tag_sym), d.text(">")]);
+            return d.concat(&[opening_tag, d.text("</"), name_doc, d.text(">")]);
         };
 
         // Parse and format content based on tag type
@@ -706,9 +707,8 @@ impl<'a> Printer<'a> {
                 .ok()
                 .map(|ast| tsv_css::format_in(&ast, &content, self.d()))
         } else {
-            tsv_ts::parse(&content, &arena)
-                .ok()
-                .map(|ast| tsv_ts::format_in(&ast, &content, self.d()))
+            let parsed = tsv_ts::parse(&content, &arena).ok();
+            parsed.map(|ast| tsv_ts::format_in(&ast, &content, self.d()))
         };
 
         match formatted {
@@ -731,7 +731,7 @@ impl<'a> Printer<'a> {
                     indented,
                     d.hardline(),
                     d.text("</"),
-                    d.symbol(tag_sym),
+                    name_doc,
                     d.text(">"),
                 ])
             }
@@ -741,7 +741,7 @@ impl<'a> Printer<'a> {
                     opening_tag,
                     d.text_pooled(&content),
                     d.text("</"),
-                    d.symbol(tag_sym),
+                    name_doc,
                     d.text(">"),
                 ])
             }

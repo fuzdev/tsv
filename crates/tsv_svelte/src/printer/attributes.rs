@@ -12,10 +12,10 @@
 use crate::ast::internal;
 use crate::printer::Printer;
 use smallvec::smallvec;
+use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::source_scan::find_char_skipping_comments;
-use tsv_lang::{Span, SymbolResolver, SymbolToU32};
 use tsv_ts::ast::internal::Expression;
 
 // Opening prefixes for brace-wrapped attribute expressions. `build_braced_expression_doc`
@@ -214,39 +214,39 @@ impl<'a> Printer<'a> {
         is_html: bool,
     ) -> DocId {
         let d = self.d();
-        let name_sym = attr.name.to_u32();
+        // Span-identity attribute name (`source[name_render_span]`, trimmed for a
+        // padded `{ shorthand }`), reused across the branches below.
+        let name_doc = d.source_span_ident(attr.name_render_span(self.source));
 
         if let Some(value_parts) = &attr.value {
             // Check for shorthand: {name}
-            if self.is_shorthand_attribute(attr.name, value_parts) {
-                let sym = d.symbol(name_sym);
-                return d.braces(sym);
+            if self.is_shorthand_attribute(attr, value_parts) {
+                return d.braces(name_doc);
             }
 
             // Normalize whitespace in class attributes on HTML elements
-            let normalize_class = is_html && self.with_resolved_symbol(attr.name, |s| s == "class");
+            let normalize_class = is_html && attr.name(self.source) == "class";
 
             // Fast path: a single value part (the common `name="x"` / `name={x}`).
             // Build with a stack array instead of the per-attribute `parts` buffer.
             if value_parts.len() == 1 {
-                let sym = d.symbol(name_sym);
                 let value_doc = if normalize_class {
                     self.build_class_attribute_value_doc(&value_parts[0], true)
                 } else {
                     self.build_attribute_value_doc(&value_parts[0])
                 };
                 return if matches!(value_parts[0], internal::AttributeValue::ExpressionTag(_)) {
-                    d.concat(&[sym, d.text("="), value_doc])
+                    d.concat(&[name_doc, d.text("="), value_doc])
                 } else {
                     let (open, close) = self.attribute_value_delims(value_parts);
-                    d.concat(&[sym, d.text(open), value_doc, d.text(close)])
+                    d.concat(&[name_doc, d.text(open), value_doc, d.text(close)])
                 };
             }
 
             // General path: a multi-part value is always a quoted string (a pure
             // `{expr}` value is single-part and handled by the fast path above).
             let (open, close) = self.attribute_value_delims(value_parts);
-            let mut parts: DocBuf = smallvec![d.symbol(name_sym), d.text(open)];
+            let mut parts: DocBuf = smallvec![name_doc, d.text(open)];
             let last_idx = value_parts.len().saturating_sub(1);
             for (i, part) in value_parts.iter().enumerate() {
                 if normalize_class {
@@ -260,7 +260,7 @@ impl<'a> Printer<'a> {
             d.concat(&parts)
         } else {
             // Boolean attribute
-            d.symbol(name_sym)
+            name_doc
         }
     }
 
@@ -935,7 +935,7 @@ impl<'a> Printer<'a> {
     /// Check if an attribute is a shorthand: {name} where value is ExpressionTag(Identifier(name))
     fn is_shorthand_attribute(
         &self,
-        attr_name: string_interner::DefaultSymbol,
+        attr: &internal::Attribute<'_>,
         value_parts: &[internal::AttributeValue<'_>],
     ) -> bool {
         // Must be exactly one value part
@@ -953,21 +953,15 @@ impl<'a> Printer<'a> {
             return false;
         };
 
-        // The identifier name must match the attribute name. TS identifiers are
-        // span-identity (no shared symbol space with the Svelte attribute-name
-        // interner), so compare the resolved names.
-        let interner = self.interner.borrow();
-        let Some(attr_str) = interner.resolve(attr_name) else {
-            return false;
-        };
-        ident.name(self.source, &interner) == attr_str
+        // The identifier name must match the attribute name. Both are
+        // span-identity source slices now.
+        ident.name(self.source) == attr.name(self.source)
     }
 
     /// Check if expression is an identifier with the given name
     fn is_identifier_with_name(&self, expr: &Expression<'_>, name: &str) -> bool {
         if let Expression::Identifier(id) = expr {
-            let interner = self.interner.borrow();
-            id.name(self.source, &interner) == name
+            id.name(self.source) == name
         } else {
             false
         }

@@ -1,7 +1,5 @@
 // Svelte parser - main entry point for parsing .svelte files
 
-use std::rc::Rc;
-
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use crate::parser::element::ParsedElement;
@@ -236,7 +234,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             options,
             comments,
             span: Span { start, end },
-            interner: Rc::clone(&self.interner),
         })
     }
 

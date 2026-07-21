@@ -120,35 +120,50 @@ fn parse_to_json(
     // borrowed escapes this function. Pre-sized to the source to avoid the
     // bump's chunk-doubling tail on the parse.
     let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
-    macro_rules! emit {
-        ($lang:ident, $parse:expr) => {{
-            let ast = $parse.map_err(|e| e.to_string())?;
-            let bytes = if locations {
-                $lang::convert_ast_json_bytes(&ast, source)
-            } else {
-                $lang::convert_ast_json_bytes_no_locations(&ast, source)
-            };
-            if pretty {
-                // Reparse the wire bytes for tab-indented serialization (the
-                // compact bytes are the sole emission path; `--pretty` is the
-                // cold `Value` consumer, so a no-locations pretty print rides the
-                // same bytes rather than a separate `Value` writer).
-                let value: serde_json::Value = serde_json::from_slice(&bytes)
-                    .map_err(|e| format!("JSON parse failed: {e}"))?;
-                to_json_with_tabs(&value)
-                    .map_err(|e| format!("JSON serialization failed: {e}"))?
-                    .into_bytes()
-            } else {
-                bytes
-            }
-        }};
-    }
+
+    // Shared tail: `--pretty` reparses the compact wire bytes (the sole emission
+    // path) into a `Value` for tab-indented serialization; compact returns the
+    // bytes verbatim. A no-locations pretty print rides the same bytes rather
+    // than a separate `Value` writer.
+    let finish = |bytes: Vec<u8>| -> Result<Vec<u8>, String> {
+        if pretty {
+            let value: serde_json::Value =
+                serde_json::from_slice(&bytes).map_err(|e| format!("JSON parse failed: {e}"))?;
+            Ok(to_json_with_tabs(&value)
+                .map_err(|e| format!("JSON serialization failed: {e}"))?
+                .into_bytes())
+        } else {
+            Ok(bytes)
+        }
+    };
 
     // The goal applies only to TypeScript; svelte is always a module and css has
     // no goal.
-    Ok(match parser_type {
-        ParserType::Svelte => emit!(tsv_svelte, tsv_svelte::parse(source, &arena)),
-        ParserType::Css => emit!(tsv_css, tsv_css::parse(source, &arena)),
-        ParserType::TypeScript => emit!(tsv_ts, tsv_ts::parse_with_goal(source, goal, &arena)),
-    })
+    let bytes = match parser_type {
+        ParserType::Svelte => {
+            let ast = tsv_svelte::parse(source, &arena).map_err(|e| e.to_string())?;
+            if locations {
+                tsv_svelte::convert_ast_json_bytes(&ast, source)
+            } else {
+                tsv_svelte::convert_ast_json_bytes_no_locations(&ast, source)
+            }
+        }
+        ParserType::Css => {
+            let ast = tsv_css::parse(source, &arena).map_err(|e| e.to_string())?;
+            if locations {
+                tsv_css::convert_ast_json_bytes(&ast, source)
+            } else {
+                tsv_css::convert_ast_json_bytes_no_locations(&ast, source)
+            }
+        }
+        ParserType::TypeScript => {
+            let ast = tsv_ts::parse_with_goal(source, goal, &arena).map_err(|e| e.to_string())?;
+            if locations {
+                tsv_ts::convert_ast_json_bytes(&ast, source)
+            } else {
+                tsv_ts::convert_ast_json_bytes_no_locations(&ast, source)
+            }
+        }
+    };
+    finish(bytes)
 }

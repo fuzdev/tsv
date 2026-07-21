@@ -55,11 +55,9 @@ impl<'a> Printer<'a> {
         // Render into the arena-parked scratch (one warm buffer, no per-block alloc).
         let mut output = self.d().take_render_scratch();
         {
-            let interner = script.content.interner.borrow();
             // Source-aware resolver: the embedded TS doc carries `DocText::SourceSpan`
             // leaves (comments etc.) whose spans are absolute into the host source.
             let resolver = doc::SourceTextResolver {
-                inner: &*interner,
                 source: self.source(),
             };
             doc::arena_print_doc_with_indent_resolved_into(
@@ -96,10 +94,9 @@ impl<'a> Printer<'a> {
         &self,
         attributes: &[internal::AttributeNode<'_>],
     ) -> Option<&'a str> {
-        let interner = self.interner.borrow();
         for attr_node in attributes {
             if let internal::AttributeNode::Attribute(attr) = attr_node {
-                let name = interner.resolve(attr.name).unwrap_or("");
+                let name = attr.name(self.source);
                 if (name == "lang" || name == "type")
                     && let Some(value_parts) = attr.value
                 {
@@ -318,9 +315,7 @@ impl<'a> Printer<'a> {
         // Render into the arena-parked scratch (one warm buffer, no per-tag alloc).
         let mut output = self.arena.take_render_scratch();
         {
-            let interner = self.interner.borrow();
             let resolver = doc::SourceTextResolver {
-                inner: &*interner,
                 source: self.source(),
             };
             doc::arena_print_doc_with_indent_resolved_preserve_whitespace_into(

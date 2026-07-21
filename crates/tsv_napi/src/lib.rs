@@ -27,6 +27,46 @@ use tsv_arena::with_doc_arena;
 /// functions for one language module. The `js_name` literals keep the JS export
 /// names snake_case for parity with `tsv_wasm` (napi-rs would otherwise
 /// camelCase them).
+// Per-language compound-op helpers: parse the source into a per-thread AST arena
+// and run the conversion/format/no-op over it. Every language crate is
+// interner-free (identifier and element/attribute names are span-identity), so
+// these are uniform across svelte/typescript/css — no per-language arity split.
+#[cfg(feature = "parse")]
+macro_rules! parse_convert {
+    ($lang:ident, $conv:ident, $source:expr) => {
+        with_ast_arena(|arena| {
+            let ast = $lang::parse($source, arena)
+                .map_err(|e| napi::Error::from_reason(e.to_string()))?;
+            Ok($lang::$conv(&ast, $source))
+        })
+    };
+}
+
+#[cfg(feature = "parse")]
+macro_rules! parse_internal {
+    ($lang:ident, $source:expr) => {
+        with_ast_arena(|arena| {
+            let ast = $lang::parse($source, arena)
+                .map_err(|e| napi::Error::from_reason(e.to_string()))?;
+            std::hint::black_box(&ast);
+            Ok(())
+        })
+    };
+}
+
+#[cfg(feature = "format")]
+macro_rules! parse_format {
+    ($lang:ident, $source:expr) => {
+        with_ast_arena(|arena| {
+            let ast = $lang::parse($source, arena)
+                .map_err(|e| napi::Error::from_reason(e.to_string()))?;
+            Ok(with_doc_arena(|doc_arena| {
+                $lang::format_in(&ast, $source, doc_arena)
+            }))
+        })
+    };
+}
+
 macro_rules! lang_bindings {
     (
         $lang:ident,
@@ -39,11 +79,7 @@ macro_rules! lang_bindings {
         #[cfg(feature = "parse")]
         #[napi(js_name = $parse_js)]
         pub fn $parse_fn(source: String) -> napi::Result<String> {
-            with_ast_arena(|arena| {
-                let ast = $lang::parse(&source, arena)
-                    .map_err(|e| napi::Error::from_reason(e.to_string()))?;
-                Ok($lang::convert_ast_json_string(&ast, &source))
-            })
+            parse_convert!($lang, convert_ast_json_string, &source)
         }
 
         /// Parse source and return its JSON AST string **without** per-node `loc`
@@ -51,11 +87,7 @@ macro_rules! lang_bindings {
         #[cfg(feature = "parse")]
         #[napi(js_name = $parse_no_loc_js)]
         pub fn $parse_no_loc_fn(source: String) -> napi::Result<String> {
-            with_ast_arena(|arena| {
-                let ast = $lang::parse(&source, arena)
-                    .map_err(|e| napi::Error::from_reason(e.to_string()))?;
-                Ok($lang::convert_ast_json_string_no_locations(&ast, &source))
-            })
+            parse_convert!($lang, convert_ast_json_string_no_locations, &source)
         }
 
         /// Parse source to the internal AST only (no conversion, no
@@ -64,25 +96,14 @@ macro_rules! lang_bindings {
         #[cfg(feature = "parse")]
         #[napi(js_name = $parse_internal_js)]
         pub fn $parse_internal_fn(source: String) -> napi::Result<()> {
-            with_ast_arena(|arena| {
-                let ast = $lang::parse(&source, arena)
-                    .map_err(|e| napi::Error::from_reason(e.to_string()))?;
-                std::hint::black_box(&ast);
-                Ok(())
-            })
+            parse_internal!($lang, &source)
         }
 
         /// Format source code and return the formatted string.
         #[cfg(feature = "format")]
         #[napi(js_name = $format_js)]
         pub fn $format_fn(source: String) -> napi::Result<String> {
-            with_ast_arena(|arena| {
-                let ast = $lang::parse(&source, arena)
-                    .map_err(|e| napi::Error::from_reason(e.to_string()))?;
-                Ok(with_doc_arena(|doc_arena| {
-                    $lang::format_in(&ast, &source, doc_arena)
-                }))
-            })
+            parse_format!($lang, &source)
         }
     };
 }

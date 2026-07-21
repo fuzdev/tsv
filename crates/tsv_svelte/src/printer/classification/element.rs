@@ -56,9 +56,7 @@ fn has_raw_content(element: &internal::Element<'_>) -> bool {
 mod tests {
     use super::*;
     use crate::ast::internal::FragmentNode;
-    use std::rc::Rc;
     use tsv_html as html;
-    use tsv_lang::SymbolResolver;
 
     /// Find the first child element of `parent` whose resolved tag name is `tag`.
     fn child<'p, 'arena>(
@@ -71,11 +69,7 @@ mod tests {
             .nodes
             .iter()
             .find_map(|n| match n {
-                FragmentNode::Element(el)
-                    if printer.with_resolved_symbol(el.name, |n| n == tag) =>
-                {
-                    Some(el)
-                }
+                FragmentNode::Element(el) if el.name(printer.source) == tag => Some(el),
                 _ => None,
             })
             .unwrap_or_else(|| panic!("no <{tag}> child"))
@@ -86,9 +80,8 @@ mod tests {
         let src = "<div><span>i</span><Comp>c</Comp></div>";
         let arena = bumpalo::Bump::new();
         let root = crate::parse(src, &arena).expect("template should parse");
-        // Reuse the parse's interner so the tag-name symbols resolve.
         let doc_arena = tsv_lang::doc::arena::DocArena::for_source(src);
-        let printer = Printer::new(&doc_arena, src, Rc::clone(&root.interner), &[]);
+        let printer = Printer::new(&doc_arena, src, &[]);
         let div = match &root.fragment.nodes[0] {
             FragmentNode::Element(el) => el,
             other => panic!("expected a <div>, got: {other:?}"),
@@ -113,7 +106,7 @@ mod tests {
         let arena = bumpalo::Bump::new();
         let root = crate::parse(src, &arena).expect("template should parse");
         let doc_arena = tsv_lang::doc::arena::DocArena::for_source(src);
-        let printer = Printer::new(&doc_arena, src, Rc::clone(&root.interner), &[]);
+        let printer = Printer::new(&doc_arena, src, &[]);
         let div = match &root.fragment.nodes[0] {
             FragmentNode::Element(el) => el,
             other => panic!("expected a <div>, got: {other:?}"),
@@ -133,7 +126,7 @@ mod tests {
         let arena = bumpalo::Bump::new();
         let root = crate::parse(src, &arena).expect("template should parse");
         let doc_arena = tsv_lang::doc::arena::DocArena::for_source(src);
-        let printer = Printer::new(&doc_arena, src, Rc::clone(&root.interner), &[]);
+        let printer = Printer::new(&doc_arena, src, &[]);
         let div = match &root.fragment.nodes[0] {
             FragmentNode::Element(el) => el,
             other => panic!("expected a <div>, got: {other:?}"),

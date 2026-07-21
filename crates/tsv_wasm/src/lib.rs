@@ -243,6 +243,44 @@ extern "C" {
 /// (so the parse-only build drops the printers at link time). `$parse_ret`
 /// is the extern type from the block above whose `typescript_type` attribute
 /// names the matching interface in `tsv_ast.d.ts`.
+// Per-language compound-op helpers: parse the source into a per-thread AST arena
+// and run the conversion/format/no-op over it. Every language crate is
+// interner-free (identifier and element/attribute names are span-identity), so
+// these are uniform across svelte/typescript/css — no per-language arity split.
+// WASM is single-threaded, so the arena thread-local is a module static.
+#[cfg(feature = "parse")]
+macro_rules! parse_convert {
+    ($lang:ident, $conv:ident, $source:expr) => {
+        with_ast_arena(|arena| {
+            let ast = $lang::parse($source, arena).map_err(err)?;
+            Ok($lang::$conv(&ast, $source))
+        })
+    };
+}
+
+#[cfg(feature = "parse")]
+macro_rules! parse_internal {
+    ($lang:ident, $source:expr) => {
+        with_ast_arena(|arena| {
+            let ast = $lang::parse($source, arena).map_err(err)?;
+            std::hint::black_box(&ast);
+            Ok(())
+        })
+    };
+}
+
+#[cfg(feature = "format")]
+macro_rules! parse_format {
+    ($lang:ident, $source:expr) => {
+        with_ast_arena(|arena| {
+            let ast = $lang::parse($source, arena).map_err(err)?;
+            Ok(with_doc_arena(|doc_arena| {
+                $lang::format_in(&ast, $source, doc_arena)
+            }))
+        })
+    };
+}
+
 macro_rules! lang_bindings {
     (
         $parse_fn:ident,
@@ -267,31 +305,19 @@ macro_rules! lang_bindings {
         #[cfg(feature = "parse")]
         #[wasm_bindgen]
         pub fn $parse_json_fn(source: &str) -> Result<String, JsError> {
-            with_ast_arena(|arena| {
-                let ast = $lang::parse(source, arena).map_err(err)?;
-                Ok($lang::convert_ast_json_string(&ast, source))
-            })
+            parse_convert!($lang, convert_ast_json_string, source)
         }
 
         #[cfg(feature = "parse")]
         #[wasm_bindgen]
         pub fn $parse_internal_fn(source: &str) -> Result<(), JsError> {
-            with_ast_arena(|arena| {
-                let ast = $lang::parse(source, arena).map_err(err)?;
-                std::hint::black_box(ast);
-                Ok(())
-            })
+            parse_internal!($lang, source)
         }
 
         #[cfg(feature = "format")]
         #[wasm_bindgen]
         pub fn $format_fn(source: &str) -> Result<String, JsError> {
-            with_ast_arena(|arena| {
-                let ast = $lang::parse(source, arena).map_err(err)?;
-                Ok(with_doc_arena(|doc_arena| {
-                    $lang::format_in(&ast, source, doc_arena)
-                }))
-            })
+            parse_format!($lang, source)
         }
     };
 }
@@ -418,7 +444,7 @@ pub fn parse_internal_typescript_with_goal(source: &str, goal: &str) -> Result<(
     let goal = goal_from_str(goal)?;
     with_ast_arena(|arena| {
         let ast = tsv_ts::parse_with_goal(source, goal, arena).map_err(err)?;
-        std::hint::black_box(ast);
+        std::hint::black_box(&ast);
         Ok(())
     })
 }

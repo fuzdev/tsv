@@ -6,7 +6,6 @@
 
 use crate::ast::internal;
 use crate::printer::Printer;
-use string_interner::DefaultStringInterner;
 use tsv_lang::Span;
 use tsv_lang::doc::arena::DocId;
 
@@ -67,11 +66,7 @@ pub(crate) fn next_printed_stmt_start(
 /// Patterns:
 /// - `require.resolve(stringLiteral)`
 /// - `await import(stringLiteral)`
-pub(crate) fn is_module_path_fluid_call(
-    expr: &internal::Expression<'_>,
-    source: &str,
-    interner: &DefaultStringInterner,
-) -> bool {
+pub(crate) fn is_module_path_fluid_call(expr: &internal::Expression<'_>, source: &str) -> bool {
     // Check for `await import(string)` — single-arg only (no options)
     if let internal::Expression::AwaitExpression(await_expr) = expr
         && let internal::Expression::ImportExpression(import_expr) = await_expr.argument
@@ -94,9 +89,9 @@ pub(crate) fn is_module_path_fluid_call(
         && !member.computed
         && !member.optional
         && let internal::Expression::Identifier(resolve_id) = member.property
-        && resolve_id.name(source, interner) == "resolve"
+        && resolve_id.name(source) == "resolve"
         && let internal::Expression::Identifier(require_id) = member.object
-        && require_id.name(source, interner) == "require"
+        && require_id.name(source) == "require"
     {
         return true;
     }
@@ -530,7 +525,7 @@ pub(crate) fn container_may_have_multiline_content(span: Span, source: &str) -> 
 /// Build doc for TSEntityName (qualified names like `A.B.C`)
 ///
 /// Needs the printer for the name-emission seam (span-identity source slices,
-/// interner-deferred escaped names).
+/// arena-string escaped names).
 pub(crate) fn build_entity_name_doc(
     printer: &Printer<'_>,
     name: &internal::TSEntityName<'_>,

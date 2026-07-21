@@ -158,6 +158,43 @@ fn error_result(message: &str, out_len: *mut usize) -> *mut u8 {
 /// - `source_ptr` must point to valid UTF-8 data of `source_len` bytes
 /// - `out_len` must point to a valid `usize` for writing output length
 /// - Caller must free returned pointer via `tsv_free(ptr, *out_len)`
+// Per-language compound-op helpers: parse the source into a per-thread AST arena
+// and run the conversion/format/no-op over it. Every language crate is
+// interner-free (identifier and element/attribute names are span-identity), so
+// these are uniform across svelte/typescript/css — no per-language arity split.
+#[cfg(feature = "parse")]
+macro_rules! parse_convert {
+    ($lang:ident, $conv:ident, $source:expr) => {
+        with_ast_arena(|arena| {
+            let ast = $lang::parse($source, arena).map_err(|e| e.to_string())?;
+            Ok($lang::$conv(&ast, $source))
+        })
+    };
+}
+
+#[cfg(feature = "parse")]
+macro_rules! parse_internal {
+    ($lang:ident, $source:expr) => {
+        with_ast_arena(|arena| {
+            let ast = $lang::parse($source, arena).map_err(|e| e.to_string())?;
+            std::hint::black_box(&ast);
+            Ok(())
+        })
+    };
+}
+
+#[cfg(feature = "format")]
+macro_rules! parse_format {
+    ($lang:ident, $source:expr) => {
+        with_ast_arena(|arena| {
+            let ast = $lang::parse($source, arena).map_err(|e| e.to_string())?;
+            Ok(with_doc_arena(|doc_arena| {
+                $lang::format_in(&ast, $source, doc_arena)
+            }))
+        })
+    };
+}
+
 macro_rules! lang_bindings {
     ($parse_fn:ident, $parse_no_loc_fn:ident, $parse_internal_fn:ident, $format_fn:ident, $lang:ident) => {
         /// Parse source code and return JSON AST.
@@ -173,10 +210,7 @@ macro_rules! lang_bindings {
         ) -> *mut u8 {
             unsafe {
                 with_source_string(source_ptr, source_len, out_len, |source| {
-                    with_ast_arena(|arena| {
-                        let ast = $lang::parse(source, arena).map_err(|e| e.to_string())?;
-                        Ok($lang::convert_ast_json_bytes(&ast, source))
-                    })
+                    parse_convert!($lang, convert_ast_json_bytes, source)
                 })
             }
         }
@@ -197,10 +231,7 @@ macro_rules! lang_bindings {
         ) -> *mut u8 {
             unsafe {
                 with_source_string(source_ptr, source_len, out_len, |source| {
-                    with_ast_arena(|arena| {
-                        let ast = $lang::parse(source, arena).map_err(|e| e.to_string())?;
-                        Ok($lang::convert_ast_json_bytes_no_locations(&ast, source))
-                    })
+                    parse_convert!($lang, convert_ast_json_bytes_no_locations, source)
                 })
             }
         }
@@ -219,13 +250,7 @@ macro_rules! lang_bindings {
         ) -> *mut u8 {
             unsafe {
                 with_source_parse_internal(source_ptr, source_len, out_len, |source| {
-                    with_ast_arena(|arena| {
-                        let ast = $lang::parse(source, arena).map_err(|e| e.to_string())?;
-                        // Consume the borrowed AST before `with_ast_arena` resets
-                        // it on the next call (the AST borrows from `arena`).
-                        std::hint::black_box(&ast);
-                        Ok(())
-                    })
+                    parse_internal!($lang, source)
                 })
             }
         }
@@ -243,12 +268,7 @@ macro_rules! lang_bindings {
         ) -> *mut u8 {
             unsafe {
                 with_source_string(source_ptr, source_len, out_len, |source| {
-                    with_ast_arena(|arena| {
-                        let ast = $lang::parse(source, arena).map_err(|e| e.to_string())?;
-                        Ok(with_doc_arena(|doc_arena| {
-                            $lang::format_in(&ast, source, doc_arena)
-                        }))
-                    })
+                    parse_format!($lang, source)
                 })
             }
         }

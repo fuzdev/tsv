@@ -26,8 +26,8 @@ pub trait ChainPrinter: SymbolLookup {
     fn arena(&self) -> &DocArena;
 
     /// Emit an identifier-name doc node (span-identity source slice, or the
-    /// interner-deferred escaped form)
-    fn ident_doc(&self, name: internal::IdentName, name_start: u32) -> DocId;
+    /// escaped name's arena string)
+    fn ident_doc(&self, name: internal::IdentName<'_>, name_start: u32) -> DocId;
 
     /// Print an expression as a DocId
     fn print_expression(&self, expr: &Expression<'_>) -> DocId;
@@ -608,7 +608,7 @@ fn computed_lookup_doc<P: ChainPrinter>(
 #[allow(clippy::too_many_arguments)]
 fn print_member_access<P: ChainPrinter>(
     printer: &P,
-    property: internal::IdentName,
+    property: internal::IdentName<'_>,
     name_start: u32,
     optional: bool,
     object_end: u32,
@@ -617,8 +617,8 @@ fn print_member_access<P: ChainPrinter>(
     skip_comments: bool,
 ) -> DocId {
     let d = printer.arena();
-    // Build member doc without format! allocation — span-identity (or deferred
-    // interner resolution for escaped names)
+    // Build member doc without format! allocation — span-identity source slice
+    // (or the escaped name's arena string)
     let prop_doc = printer.ident_doc(property, name_start);
     let member_doc = match (optional, is_private) {
         (false, false) => d.concat(&[d.text("."), prop_doc]),
