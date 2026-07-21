@@ -66,14 +66,16 @@ impl<'a> Printer<'a> {
 
         // Check if any property value has multiline content (e.g., line continuation strings)
         // Prettier expands objects containing multiline strings (recursively)
-        let has_multiline = obj.properties.iter().any(|prop| match prop {
-            internal::ObjectProperty::Property(p) => {
-                crate::printer::has_multiline_content(&p.value, self.source)
-            }
-            internal::ObjectProperty::SpreadElement(s) => {
-                crate::printer::has_multiline_content(s.argument, self.source)
-            }
-        });
+        let has_multiline =
+            crate::printer::container_may_have_multiline_content(obj.span, self.source)
+                && obj.properties.iter().any(|prop| match prop {
+                    internal::ObjectProperty::Property(p) => {
+                        crate::printer::has_multiline_content(&p.value, self.source)
+                    }
+                    internal::ObjectProperty::SpreadElement(s) => {
+                        crate::printer::has_multiline_content(s.argument, self.source)
+                    }
+                });
 
         // Decide the formatting strategy
         // must_break: conditions that require hardlines (comments, multiline content)
