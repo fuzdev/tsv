@@ -291,6 +291,7 @@ mod tests {
         "TypeScript syntax without lang=\"ts\" (the oracle parse-errors)",
         "abstract class property (the oracle emits invalid JS)",
         "accessor class field (the oracle rejects it)",
+        "arguments referenced outside a function (the oracle rejects it)",
         "assignment to a constant (a const declarator or import local — the oracle's constant_assignment)",
         "assignment to an {#each} item (the oracle's each_item_invalid_assignment)",
         "assignment to a {#snippet} parameter (the oracle's snippet_parameter_assignment)",

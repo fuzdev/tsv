@@ -329,7 +329,20 @@ project-wide conventions.
   everywhere — script, template, snippet bodies, dropped handlers, dropped
   `{:catch}`. Placed at the top of the `MemberExpression` arm, first-wins. A member/call rooted at a prop/import that is *also* bound
   in a nested scope is ambiguous for this name-based port and refuses, as does one
-  rooted at an escaped identifier (classification not ported). Descends
+  rooted at an escaped identifier (classification not ported). The same walk also
+  hosts the oracle's `invalid_arguments_usage` **reference-site** rule
+  (`Identifier.js:27-32`): a reference to `arguments` with no
+  `FunctionDeclaration`/`FunctionExpression` ancestor refuses
+  (`Refusal::InvalidArgumentsUsage`) — an **arrow**, a `{#snippet}` body, a class
+  field initializer, and a static block do NOT count as such an ancestor. It keys on
+  a `nonarrow_fn_depth` field **distinct from `fn_depth`** (which ALSO counts arrows,
+  static blocks, and snippet bodies): the depth is bumped only at the three non-arrow
+  function sites (`walk_function_expression`, the `Statement::FunctionDeclaration` and
+  `ExportDefaultValue::FunctionDeclaration` arms), BEFORE the params walk (so a
+  function parameter default is inside the function while an arrow's is not), and the
+  reference test is `nonarrow_fn_depth == 0`. `is_reference` semantics are free from
+  the walk (a member property / object key is visited only when `computed`, excluding
+  `foo.arguments` / `{ arguments: 1 }`). Descends
   into `{#snippet}` bodies (a function-like subtree — a `new`/prop-rooted access
   there still fires the flag) and `{@render}` arguments. Also computes
   `uses_stores` in the same whole-component walk — the oracle's analysis-driven

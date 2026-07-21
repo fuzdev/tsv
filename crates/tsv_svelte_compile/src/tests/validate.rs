@@ -449,3 +449,82 @@ fn compile_keeps_the_direct_child_named_slot_a_fence_not_a_placement_refusal() {
         other => panic!("expected the named-slot fence, got {other:?}"),
     }
 }
+
+#[test]
+fn compile_arguments_outside_a_function_refuses() {
+    // The oracle's `invalid_arguments_usage` (`Identifier.js:27-32`): a REFERENCE
+    // to `arguments` with no FunctionDeclaration/FunctionExpression ancestor. An
+    // arrow, a `{#snippet}` body, a class field initializer, and a static block do
+    // NOT count as such an ancestor. Rides the whole-component `needs_context` walk,
+    // so it reaches the instance/module scripts and the template alike. The reason
+    // substring is derived from the refusal the shape actually produces.
+    const R: &str = "arguments referenced outside a function";
+    // Top-level script reference.
+    assert_unsupported("<script>const x = arguments;</script>", R);
+    // A module script — walked by the same analysis.
+    assert_unsupported("<script module>const x = arguments;</script>", R);
+    // An arrow body does NOT suppress it (an arrow is not a function ancestor).
+    assert_unsupported("<script>const f = () => arguments;</script>", R);
+    // Nested arrows only — still no function ancestor.
+    assert_unsupported("<script>const f = () => () => arguments;</script>", R);
+    // An arrow BLOCK body.
+    assert_unsupported(
+        "<script>const f = () => { const y = arguments; };</script>",
+        R,
+    );
+    // An arrow parameter default is NOT inside a function (the arrow doesn't count).
+    assert_unsupported("<script>const f = (g = arguments) => g; f();</script>", R);
+    // A template expression at the top level of the component.
+    assert_unsupported("{arguments}", R);
+    // A shorthand object value IS a reference (unlike a plain key).
+    assert_unsupported("<script>const o = { arguments };</script>", R);
+    // A computed object key IS a reference.
+    assert_unsupported("<script>const o = { [arguments]: 1 };</script>", R);
+    // A member ROOT is a reference (unlike a non-computed member property).
+    assert_unsupported("<script>const x = arguments[0];</script>", R);
+    assert_unsupported("<script>const x = arguments.length;</script>", R);
+    // A call CALLEE is a reference.
+    assert_unsupported("<script>const x = arguments();</script>", R);
+    // A `{#snippet}` body does NOT suppress it (a snippet is not a function).
+    assert_unsupported("<script></script>{#snippet s()}{arguments}{/snippet}", R);
+    // Benign reason divergence (test optional per the slice): a class field
+    // initializer and a static block also reference `arguments` with no function
+    // ancestor. The oracle rejects these at PARSE as `js_parse_error` (acorn early
+    // errors — "Cannot use 'arguments' in class field initializer" / "Cannot use
+    // arguments in class static initialization block"; there are no Svelte rule
+    // codes by those names), while tsv's permissive parser DEFERS those early
+    // errors and the compiler refuses them here as `InvalidArgumentsUsage`. Both
+    // reject, so no MISMATCH — only the mechanism/reason differs.
+    assert_unsupported("<script>class C { x = arguments; }</script>", R);
+    assert_unsupported("<script>class C { static { arguments; } }</script>", R);
+    // ⚠️ An ESCAPED `arguments` (decoding to the same name) falls through
+    // `plain_name` — which returns `None` for an escaped identifier — so the rule,
+    // like every name-keyed rule in this walk, skips it and the shape OVER-ACCEPTS.
+    // The crate's standing escaped-identifier residual (corpus-absent), the same
+    // class as `collect_rest_prop_names` / `MemberCallEscapedRoot`.
+}
+
+#[test]
+fn compile_arguments_inside_a_function_compiles() {
+    // The must-NOT-over-refuse half. `arguments` inside a NON-arrow function is
+    // legal, and a missed function-entry site would over-refuse real code (where
+    // `arguments` is used legitimately inside functions) and DROP corpus parity.
+    // A FunctionDeclaration.
+    let _ = compile_js("<script>function f() { return arguments; }</script>");
+    // A FunctionExpression.
+    let _ = compile_js("<script>const g = function() { return arguments; };</script>");
+    // A class method (routed through `walk_function_expression`).
+    let _ = compile_js("<script>class C { m() { return arguments; } }</script>");
+    // An object method.
+    let _ = compile_js("<script>const o = { m() { return arguments; } };</script>");
+    // An object getter.
+    let _ = compile_js("<script>const o = { get x() { return arguments; } };</script>");
+    // An arrow INSIDE a function — the function ancestor suppresses the rule.
+    let _ = compile_js("<script>function f() { const g = () => arguments; return g; }</script>");
+    // A function parameter default is inside the function (unlike an arrow's).
+    let _ = compile_js("<script>function f(g = arguments) { return g; } f();</script>");
+    // A non-computed object key is NOT a reference.
+    let _ = compile_js("<script>const o = { arguments: 1 };</script>");
+    // A non-computed member property is NOT a reference.
+    let _ = compile_js("<script>const x = foo.arguments; x;</script>");
+}

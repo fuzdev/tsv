@@ -674,6 +674,23 @@ pub enum Refusal {
         target: &'static str,
     },
 
+    /// A reference to `arguments` with no `FunctionDeclaration` /
+    /// `FunctionExpression` ancestor — the oracle's `invalid_arguments_usage`
+    /// (`phases/2-analyze/visitors/Identifier.js:27-32`). `arguments` is legal
+    /// only inside a **non-arrow** function: an **arrow** does not count as such
+    /// an ancestor, and neither does a `{#snippet}` body, a class field
+    /// initializer, or a static block, so a reference in any of those (or at the
+    /// top level of a script or the template) refuses.
+    ///
+    /// Fires only in a **reference** position (the oracle's `is_reference`
+    /// guard): a non-computed member property (`foo.arguments`) and a
+    /// non-computed object key (`{ arguments: 1 }`) are excluded, which the
+    /// `needs_context` walk gives for free (it gates the property/key walk on
+    /// `computed`). A shorthand value (`{ arguments }`), a computed key, a member
+    /// root (`arguments[0]`), and a call callee (`arguments()`) ARE references.
+    #[error("arguments referenced outside a function (the oracle rejects it)")]
+    InvalidArgumentsUsage,
+
     // ── Template expressions ───────────────────────────────────────────────
     /// `{@html}` with a statically-known value (the oracle folds it).
     #[error("{{@html}} with a statically-known value")]

@@ -52,7 +52,10 @@ impl Refusal {
             Self::TemplateNode { .. }
             | Self::BindingPatternShape { .. }
             | Self::RunesOnlyFence { .. }
-            | Self::InvalidAssignmentTarget { .. } => Cow::Owned(self.to_string()),
+            | Self::InvalidAssignmentTarget { .. }
+            // A unit variant with no user-chosen identifier to collapse — the
+            // full message is the bucket.
+            | Self::InvalidArgumentsUsage => Cow::Owned(self.to_string()),
             // Parameterized reasons — the user-chosen value collapses away.
             Self::LangInstanceScript { .. } => Cow::Borrowed("lang=\"{lang}\" script"),
             Self::GeneratedNameCollision { .. } => {
@@ -565,6 +568,7 @@ impl Refusal {
             Self::InvalidAssignmentTarget {
                 target: INVALID_ASSIGNMENT_SNIPPET_PARAMETER,
             },
+            Self::InvalidArgumentsUsage,
             Self::SpreadOnSelect,
             Self::SpreadOnLoadErrorElement,
             Self::BindDirective {

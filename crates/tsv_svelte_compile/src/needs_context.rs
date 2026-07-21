@@ -153,6 +153,19 @@ struct Nc<'a> {
     /// Current function-like nesting depth (arrows, function expressions and
     /// declarations, class methods, static blocks).
     fn_depth: u32,
+    /// Current **non-arrow** function nesting depth — the oracle's
+    /// `invalid_arguments_usage` ancestor test (`Identifier.js:29`): the count of
+    /// `FunctionDeclaration`/`FunctionExpression` ancestors around the walk.
+    /// ⚠️ DISTINCT from [`Nc::fn_depth`], which ALSO counts arrows, static blocks,
+    /// and `{#snippet}` bodies — none of which suppress the `arguments` rule. A
+    /// reference to `arguments` refuses exactly when this is 0 (see
+    /// [`Refusal::InvalidArgumentsUsage`]). Incremented at the three non-arrow
+    /// function sites only — `walk_function_expression`, the
+    /// `Statement::FunctionDeclaration` arm, and the
+    /// `ExportDefaultValue::FunctionDeclaration` arm — BEFORE the params walk, so a
+    /// function parameter default (`function f(g = arguments)`) counts as inside
+    /// the function while an arrow's (`(g = arguments) =>`) does not.
+    nonarrow_fn_depth: u32,
     /// Set by any `$$slots` reference (the oracle's `uses_slots`): the component
     /// gains `const $$slots = $.sanitize_slots($$props)` and the `$$props` param.
     uses_slots: bool,
@@ -250,6 +263,7 @@ pub(crate) fn analyze_component(
         reassigned: NameSet::default(),
         fn_declared: NameSet::default(),
         fn_depth: 0,
+        nonarrow_fn_depth: 0,
         uses_slots: false,
         uses_stores: false,
         in_dropped_catch: false,
@@ -953,6 +967,21 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
         // otherwise a leaf.
         Expression::Identifier(id) => {
             if let Some(name) = plain_name(id, nc.source) {
+                // The oracle's `invalid_arguments_usage` (`Identifier.js:27-32`):
+                // a REFERENCE to `arguments` with no
+                // `FunctionDeclaration`/`FunctionExpression` ancestor. This arm is
+                // reached only for reference-position identifiers (the
+                // member-property / object-key walks are `computed`-gated), so the
+                // `is_reference` guard is satisfied by construction; the ancestor
+                // test is `nonarrow_fn_depth == 0` (arrows / snippet bodies / class
+                // field inits / static blocks do NOT suppress it). Resolved late
+                // like every other refusal, first-wins. An ESCAPED `arguments`
+                // returns `None` from `plain_name` and so never reaches this block —
+                // an over-acceptance, the crate's standing escaped-identifier
+                // residual (same class as `MemberCallEscapedRoot`).
+                if name == "arguments" && nc.nonarrow_fn_depth == 0 && nc.refuse.is_none() {
+                    nc.refuse = Some(Refusal::InvalidArgumentsUsage);
+                }
                 if name == "$$slots" {
                     nc.uses_slots = true;
                 } else if crate::analyze::store_read_base(name)
@@ -1058,6 +1087,9 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
 
 fn walk_function_expression(f: &FunctionExpression<'_>, nc: &mut Nc<'_>) {
     nc.fn_depth += 1;
+    // A `FunctionExpression` suppresses `invalid_arguments_usage` — before the
+    // params, so a parameter default (`function(g = arguments)`) counts as inside.
+    nc.nonarrow_fn_depth += 1;
     let mark = js_scope_mark(nc);
     // A function EXPRESSION's own name binds inside its own scope only.
     if let Some(id) = &f.id {
@@ -1069,6 +1101,7 @@ fn walk_function_expression(f: &FunctionExpression<'_>, nc: &mut Nc<'_>) {
     }
     walk_block(f.body.body, nc);
     js_scope_restore(nc, mark);
+    nc.nonarrow_fn_depth -= 1;
     nc.fn_depth -= 1;
 }
 
@@ -1130,6 +1163,9 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
                 declare_js_ident(id, nc);
             }
             nc.fn_depth += 1;
+            // A `FunctionDeclaration` suppresses `invalid_arguments_usage` — before
+            // the params, so a parameter default counts as inside the function.
+            nc.nonarrow_fn_depth += 1;
             let mark = js_scope_mark(nc);
             for param in f.params {
                 declare_js_pattern(param, nc, false);
@@ -1137,6 +1173,7 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
             }
             walk_block(f.body.body, nc);
             js_scope_restore(nc, mark);
+            nc.nonarrow_fn_depth -= 1;
             nc.fn_depth -= 1;
         }
         Statement::ClassDeclaration(c) => {
@@ -1239,6 +1276,8 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
             ExportDefaultValue::Expression(e) => walk_expr(e, nc),
             ExportDefaultValue::FunctionDeclaration(f) => {
                 nc.fn_depth += 1;
+                // Suppresses `invalid_arguments_usage` — before the params.
+                nc.nonarrow_fn_depth += 1;
                 let mark = js_scope_mark(nc);
                 for param in f.params {
                     declare_js_pattern(param, nc, false);
@@ -1246,6 +1285,7 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
                 }
                 walk_block(f.body.body, nc);
                 js_scope_restore(nc, mark);
+                nc.nonarrow_fn_depth -= 1;
                 nc.fn_depth -= 1;
             }
             ExportDefaultValue::ClassDeclaration(c) => walk_class_body(&c.body, nc),
@@ -1442,13 +1482,18 @@ fn walk_element(element: &Element<'_>, nc: &mut Nc<'_>) {
     }
     // The shared traversal (`attr_refs`) defines which attribute expressions are
     // reference-bearing on the emitted path: plain attribute values on any element,
-    // component `{...spread}` expressions (emitted as `$.spread_props` elements),
-    // and the no-op drop family (`use:`/`transition:`/`animate:`/`{@attach}`) on a
-    // regular element — dropped from the tag but still walked, so a prop-rooted
-    // access inside a `use:` argument still fires the wrapper. Element spreads and
-    // the refused legacy directives are not visited (their emission refusal fires).
-    // A bare directive *name* never triggers `needs_context`, so the name walk is
-    // the snippet analysis's alone. Inside a dropped `{:catch}` the emitter never
+    // a `{...spread}` expression on EITHER element kind (`each_attribute_expression`
+    // visits it unconditionally — a component's `$.spread_props` element and a
+    // regular element's fused `$.attributes({…})` object element both emit it, so
+    // `<div {...arguments}>` is walked and refuses), a `class:`/`style:`/`bind:`
+    // expression on a regular element (emitted as `$.attr_class`/`$.attr_style`/an
+    // inline `$.attr`), and the no-op drop family
+    // (`use:`/`transition:`/`animate:`/`{@attach}`) on a regular element — dropped
+    // from the tag but still walked, so a prop-rooted access inside a `use:`
+    // argument still fires the wrapper. Only the refused legacy `on:`/`let:`
+    // directives are skipped (their emission refusal fires). A bare directive *name*
+    // never triggers `needs_context`, so the name walk is the snippet analysis's
+    // alone. Inside a dropped `{:catch}` the emitter never
     // walks the fragment, so those emission refusals never fire — there a
     // `new`/prop-rooted access in any skipped position must still trigger the
     // wrapper, so every attribute reference is walked.
