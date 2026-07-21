@@ -14,6 +14,7 @@
 //! - Bulk deallocation
 
 use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 
 use smallvec::SmallVec;
 
@@ -612,12 +613,27 @@ pub struct DocArena {
     /// A builder assembling a variable-length parts list `acquire`s a cleared
     /// buffer (with retained heap capacity from a prior spill) and `release`s it
     /// on scope exit via the [`PooledDocBuf`] guard. A recursion-safe
-    /// pop-or-new / clear-and-push-on-release pool self-sizes to the max
-    /// concurrent-live buffers (~30 for real code), turning the per-spill
-    /// `SmallVec` malloc/free churn into a handful of long-lived reused
-    /// allocations. Retained across `reset()` (reused across files), like the
-    /// other scratches; only ever affects allocation, never output.
+    /// pop-or-new pool, holding **only spilled buffers** — a release drops a
+    /// never-spilled buffer instead of pooling it (nothing to retain, free to
+    /// re-construct), so every pooled entry carries real heap capacity and the
+    /// LIFO can't hand a virgin buffer to a big-need builder while a spilled
+    /// one sits deeper. Self-sizes to the max concurrent-live spilled buffers,
+    /// turning the per-spill `SmallVec` malloc/free churn into a handful of
+    /// long-lived reused allocations. Retained across `reset()` (reused across
+    /// files), like the other scratches; only ever affects allocation, never
+    /// output.
     docbuf_pool: RefCell<Vec<DocBuf>>,
+    /// Parked node-keyed doc-share map: an AST-node pointer (`usize`) → the
+    /// `DocId` already built for it. Storage for the TS printer's member-chain
+    /// argument sharing, parked here — on the reused per-thread arena — so the
+    /// table's capacity warms once instead of a fresh `HashMap` resize chain
+    /// per printer/file. The consumer owns the protocol: it clears the map at
+    /// every share-scope entry AND exit, so between scopes it is logically
+    /// empty (stale `DocId`s from a prior document are unreachable — cleared
+    /// before any read) and only capacity persists across `reset()`. Only ever
+    /// affects allocation, never output (a hit is byte-identical to a rebuild
+    /// by the consumer's eligibility rules).
+    share_map_scratch: RefCell<HashMap<usize, DocId>>,
     /// Memoized `will_break(id)` results, indexed by `DocId`. Lazily extended to
     /// match `nodes`; sound because nodes are append-only and the arena is
     /// per-format, so a node's `will_break` value never changes once it exists.
@@ -774,6 +790,7 @@ impl DocArena {
             line_spans_scratch: RefCell::new(Vec::new()),
             line_breaks_scratch: Cell::new(Vec::new()),
             docbuf_pool: RefCell::new(Vec::new()),
+            share_map_scratch: RefCell::new(HashMap::new()),
             will_break_cache: RefCell::new(Vec::new()),
             flat_width_cache: RefCell::new(Vec::new()),
             static_cache: [const { Cell::new(StaticSlot::EMPTY) }; STATIC_CACHE_SLOTS],
@@ -825,6 +842,7 @@ impl DocArena {
             line_spans_scratch: RefCell::new(Vec::new()),
             line_breaks_scratch: Cell::new(Vec::new()),
             docbuf_pool: RefCell::new(Vec::new()),
+            share_map_scratch: RefCell::new(HashMap::new()),
             // The fitting memos top out at `nodes.len()` (~= `estimated_nodes`),
             // growing from 0 via repeated `resize(nodes.len(), …)`; pre-reserve
             // to absorb those reallocs. Only capacity changes — never values.
@@ -2148,10 +2166,20 @@ impl DocArena {
 
     /// Return a [`DocBuf`] to the free-list, cleared (capacity retained), for a
     /// later builder to reuse. Only affects allocation, never output.
+    ///
+    /// Only *spilled* buffers are worth keeping: a never-spilled `DocBuf` has no
+    /// heap capacity to retain and costs nothing to construct fresh
+    /// (`acquire_docbuf`'s `unwrap_or_default`), so pooling it would only bury
+    /// the capacity-bearing buffers deeper in the LIFO — a big-need builder
+    /// popping a virgin buffer while a spilled one sits below it re-pays the
+    /// spill malloc. Dropping virgins keeps every pooled entry capacity-bearing,
+    /// so the pop always hands back real capacity when any is free.
     #[inline]
     pub fn release_docbuf(&self, mut buf: DocBuf) {
-        buf.clear();
-        self.docbuf_pool.borrow_mut().push(buf);
+        if buf.spilled() {
+            buf.clear();
+            self.docbuf_pool.borrow_mut().push(buf);
+        }
     }
 
     /// RAII form of [`Self::acquire_docbuf`]: a [`PooledDocBuf`] that derefs to
@@ -2163,6 +2191,16 @@ impl DocArena {
             buf: self.acquire_docbuf(),
             arena: self,
         }
+    }
+
+    /// The parked node-keyed doc-share map (see the field doc). Returned as the
+    /// `RefCell` itself — the consumer's share scope spans many interleaved
+    /// arena calls, so it borrows point-wise per lookup/insert/clear rather
+    /// than holding a `RefMut` open. The consumer owns the clear-at-scope-
+    /// entry/exit protocol; this accessor deliberately does NOT clear.
+    #[inline]
+    pub fn share_map_scratch(&self) -> &RefCell<HashMap<usize, DocId>> {
+        &self.share_map_scratch
     }
 
     /// Borrow the pooled line-offset scratch (cleared here) — a multi-line

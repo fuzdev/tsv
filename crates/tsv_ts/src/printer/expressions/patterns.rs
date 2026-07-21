@@ -610,7 +610,7 @@ impl<'a> Printer<'a> {
                 CommentVec::new()
             };
 
-            prop_parts.extend(self.build_leading_comments_before(&leading_comments, prop_start));
+            self.push_leading_comments_before(&mut prop_parts, &leading_comments, prop_start);
 
             // A preceding format-ignore directive keeps the property's source verbatim
             // (trailing comment/comma handled normally)

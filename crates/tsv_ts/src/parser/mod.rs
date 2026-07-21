@@ -105,8 +105,12 @@ pub struct Parser<'a, 'arena> {
     peek: Option<Token>,
     peek_decoded: Option<String>,
     interner: SharedInterner,
-    base_offset: usize,     // Offset in full source (for embedded expressions)
-    comments: Vec<Comment>, // Collected comments during parsing
+    base_offset: usize, // Offset in full source (for embedded expressions)
+    /// Comments collected during parsing, gathered directly in the AST arena
+    /// (`Comment` is a `Copy` POD, so bumpalo's no-`Drop` rule holds). Handed to
+    /// consumers as an `&'arena [Comment]` slice via `take_comments`, so the
+    /// warm binding loops (`reset()`-reused arenas) never malloc for comments.
+    comments: BumpVec<'arena, Comment>,
     /// True if a line terminator occurred between the previous token and current token.
     /// Used for ASI (Automatic Semicolon Insertion).
     had_line_terminator: bool,
@@ -299,7 +303,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let mut decoded = lexer.take_decoded().map(|b| *b);
 
         // Collect leading comment tokens
-        let mut comments = Vec::new();
+        let mut comments = BumpVec::new_in(arena);
         while let TokenKind::Comment {
             is_block,
             content_start,
@@ -1609,7 +1613,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         Ok(Program {
             body: body.into_bump_slice(),
-            comments: std::mem::take(&mut self.comments),
+            comments: self.take_comments(),
             span: Span::new(start as u32, end as u32),
             interner: Rc::clone(&self.interner),
             goal: self.goal,
@@ -1647,17 +1651,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// The expression must fill the whole slice (see `expect_end_of_input`).
     pub fn parse_expression_with_comments(
         &mut self,
-    ) -> Result<(Expression<'arena>, Vec<Comment>), ParseError> {
+    ) -> Result<(Expression<'arena>, &'arena [Comment]), ParseError> {
         let expr = self.parse_expression()?;
         self.expect_end_of_input()?;
         let comments = self.take_comments();
         Ok((expr, comments))
     }
 
-    /// Take ownership of collected comments.
+    /// Hand the collected comments to the caller as an arena slice.
     /// Used when parsing expressions that need to return comments to the caller.
-    pub fn take_comments(&mut self) -> Vec<Comment> {
-        std::mem::take(&mut self.comments)
+    pub fn take_comments(&mut self) -> &'arena [Comment] {
+        std::mem::replace(&mut self.comments, BumpVec::new_in(self.arena)).into_bump_slice()
     }
 
     /// Parse a single assignment expression and return position where parsing stopped.
