@@ -464,6 +464,23 @@ impl<'arena> Builder<'arena> {
         })
     }
 
+    /// `[<elements>]` — an array literal. The `[`/`]` are minted for span bounds;
+    /// the elements (already built, their text elsewhere in the appendix) print
+    /// structurally with the printer's own commas. Used for
+    /// `$.exclude_from_object(o, ['a', 'b'])`.
+    pub fn array_of(
+        &mut self,
+        elements: &'arena [Option<Expression<'arena>>],
+    ) -> Expression<'arena> {
+        let start = self.mint("[").start;
+        let end = self.mint("]").end;
+        Expression::ArrayExpression(tsv_ts::ast::internal::ArrayExpression {
+            elements,
+            spread_trailing_comma: false,
+            span: Span::new(start, end),
+        })
+    }
+
     /// A numeric literal expression (`0`).
     pub fn number(&mut self, value: f64) -> Expression<'arena> {
         let span = self.mint(&format!("{value}"));

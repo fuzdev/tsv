@@ -251,3 +251,171 @@ fn compile_derived_read_state_stays_bare() {
         out.js
     );
 }
+
+// ── Destructured `$derived` / `$derived.by` (the 1→N lowering) ──────────────
+
+#[test]
+fn compile_destructured_derived_object_joins_and_reads_call() {
+    // `{a, b} = $derived(o)` → ONE joined declaration, one `$.derived(() => o.KEY)`
+    // per leaf; template AND script reads become calls (`a()`).
+    let out = compile_checked(
+        "<script>\n\tlet o = $props();\n\tlet { a, b } = $derived(o);\n\tconst s = a + b;\n</script>\n{a}{b}",
+    );
+    assert!(
+        out.js
+            .contains("let a = $.derived(() => o.a),\n\t\tb = $.derived(() => o.b);"),
+        "destructured derived must be one joined declaration: {}",
+        out.js
+    );
+    assert!(
+        out.js.contains("const s = a() + b();"),
+        "script-position leaf reads must become calls: {}",
+        out.js
+    );
+    assert!(
+        out.js.contains("$.escape(a())") && out.js.contains("$.escape(b())"),
+        "template leaf reads must become calls: {}",
+        out.js
+    );
+}
+
+#[test]
+fn compile_destructured_derived_renamed_and_nested_keys() {
+    // A renamed key binds the VALUE (`x`) projecting the KEY (`o.a`); a nested
+    // pattern chains the member (`o.a.c`).
+    let renamed = compile_js(
+        "<script>\n\tlet o = $props();\n\tlet { a: x, b } = $derived(o);\n</script>\n{x}{b}",
+    );
+    assert!(
+        renamed.contains("let x = $.derived(() => o.a),"),
+        "renamed key must bind the value projecting the key: {renamed}"
+    );
+    let nested = compile_js(
+        "<script>\n\tlet o = $props();\n\tlet { a: { c } } = $derived(o);\n</script>\n{c}",
+    );
+    assert!(
+        nested.contains("let c = $.derived(() => o.a.c);"),
+        "nested pattern must chain the projection: {nested}"
+    );
+}
+
+#[test]
+fn compile_destructured_derived_object_rest_and_default() {
+    // A rest projects `$.exclude_from_object(o, [<sibling keys>])`; a simple default
+    // wraps `$.fallback`; a non-simple default thunks + collapses (`f()` → `f`).
+    let rest = compile_js(
+        "<script>\n\tlet o = $props();\n\tlet { a, ...r } = $derived(o);\n</script>\n{a}{r}",
+    );
+    assert!(
+        rest.contains("r = $.derived(() => $.exclude_from_object(o, ['a']));"),
+        "rest must exclude the sibling keys: {rest}"
+    );
+    let simple =
+        compile_js("<script>\n\tlet o = $props();\n\tlet { a = 9 } = $derived(o);\n</script>\n{a}");
+    assert!(
+        simple.contains("let a = $.derived(() => $.fallback(o.a, 9));"),
+        "a simple default is a 2-arg fallback: {simple}"
+    );
+    let complex = compile_js(
+        "<script>\n\tlet o = $props();\n\tfunction f() {\n\t\treturn 1;\n\t}\n\tlet { a = f() } = $derived(o);\n</script>\n{a}",
+    );
+    assert!(
+        complex.contains("$.fallback(o.a, f, true)"),
+        "a non-simple default thunks + unthunk-collapses: {complex}"
+    );
+}
+
+#[test]
+fn compile_destructured_derived_array_and_collision() {
+    // An array mints a `$$derived_array` derived intermediate (read as a call),
+    // projecting `()[i]`; a second array collides to `$$derived_array_1`.
+    let out = compile_js(
+        "<script>\n\tlet o = $props();\n\tlet [a, b] = $derived(o);\n\tlet [c, d] = $derived(o);\n</script>\n{a}{b}{c}{d}",
+    );
+    assert!(
+        out.contains("let $$derived_array = $.derived(() => $.to_array(o, 2)),")
+            && out.contains("a = $.derived(() => $$derived_array()[0]),"),
+        "array must project through a $$derived_array intermediate: {out}"
+    );
+    assert!(
+        out.contains("let $$derived_array_1 = $.derived(() => $.to_array(o, 2)),"),
+        "a second array must collide to $$derived_array_1: {out}"
+    );
+}
+
+#[test]
+fn compile_destructured_derived_array_rest_omits_length() {
+    // A trailing rest omits the `$.to_array` length and slices from the index.
+    let out = compile_js(
+        "<script>\n\tlet o = $props();\n\tlet [a, ...rest] = $derived(o);\n</script>\n{a}{rest}",
+    );
+    assert!(
+        out.contains("$.to_array(o)")
+            && out.contains("rest = $.derived(() => $$derived_array().slice(1));"),
+        "array rest must omit length and slice: {out}"
+    );
+}
+
+#[test]
+fn compile_destructured_derived_by_and_non_identifier_arg_mint_intermediate() {
+    // `$derived.by` (and any non-identifier `$derived` arg) mints `$$d`, projecting
+    // from `$$d()`; the `.by` compute fn rides `$.derived(() => …)`.
+    let by = compile_js(
+        "<script>\n\tlet o = $props();\n\tlet { a } = $derived.by(() => o);\n</script>\n{a}",
+    );
+    assert!(
+        by.contains("let $$d = $.derived(() => o),\n\t\ta = $.derived(() => $$d().a);"),
+        "$derived.by destructure must mint $$d: {by}"
+    );
+    // A member argument mints `$$d` and forces the needs_context wrapper.
+    let member =
+        compile_js("<script>\n\tlet o = $props();\n\tlet { a } = $derived(o.x);\n</script>\n{a}");
+    assert!(
+        member.contains("let $$d = $.derived(() => o.x),")
+            && member.contains("$$renderer.component("),
+        "a member arg mints $$d and wraps: {member}"
+    );
+    // A call argument unthunk-collapses the intermediate init (`$.derived(getObj)`).
+    let call = compile_js(
+        "<script>\n\tlet getObj = $props();\n\tlet { a } = $derived(getObj());\n</script>\n{a}",
+    );
+    assert!(
+        call.contains("let $$d = $.derived(getObj),"),
+        "a call arg collapses the $$d init via unthunk: {call}"
+    );
+}
+
+#[test]
+fn compile_destructured_derived_from_derived_base_calls_it() {
+    // `{x} = $derived(base)` where `base` is itself a derived: no `$$d` (bare
+    // identifier), and the store rewrite lowers the projected `base` read to
+    // `base()` — `$.derived(() => base().x)`.
+    let out = compile_js(
+        "<script>\n\tlet n = $props();\n\tlet obj = $derived({ m: 1 });\n\tlet { m } = $derived(obj);\n</script>\n{m}",
+    );
+    assert!(
+        out.contains("let m = $.derived(() => obj().m);"),
+        "a derived base must be read as a call inside the projection: {out}"
+    );
+}
+
+#[test]
+fn compile_destructured_derived_refuses_comments() {
+    // A carried script comment alongside a destructured derived refuses (the 1→N
+    // split is not comment-safe) — a safe over-refusal.
+    assert_unsupported(
+        "<script>\n\t// note\n\tlet o = { a: 1, b: 2 };\n\tlet { a, b } = $derived(o);\n</script>\n{a}{b}",
+        "comments in a script with a destructured $derived declarator",
+    );
+}
+
+#[test]
+fn compile_destructured_derived_refuses_in_multi_declarator() {
+    // A destructured derived alongside another declarator in one `let` needs
+    // per-source-declarator grouping tsv doesn't reproduce — refuse (the oracle
+    // compiles it; a safe over-refusal).
+    assert_unsupported(
+        "<script>\n\tlet o = $props();\n\tlet x = 1,\n\t\t{ a, b } = $derived(o);\n</script>\n{x}{a}{b}",
+        "destructuring a $derived declarator",
+    );
+}

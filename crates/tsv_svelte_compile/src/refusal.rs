@@ -487,6 +487,17 @@ pub enum Refusal {
     /// Comments in a script with an argument-less `$state()`.
     #[error("comments in a script with an argument-less $state()")]
     CommentsWithArglessState,
+    /// Comments in a script with a destructured `$derived`/`$derived.by`
+    /// declarator. Unlike an identifier target (which span-steals the replaced
+    /// call so authored gaps survive), the destructure lowers ONE source
+    /// declarator into N synthetic `$.derived(() => …)` declarators — scattering
+    /// the pattern leaves and minting `$$d`/`$$derived_array` intermediates whose
+    /// leading-comment windows would sweep a carried script comment. A safe
+    /// over-refusal (absent from the gating Svelte corpus but reachable in
+    /// ecosystem code), like [`Self::CommentsWithArglessState`] /
+    /// [`Self::CommentsWithBindable`].
+    #[error("comments in a script with a destructured $derived declarator")]
+    CommentsWithDestructuredDerived,
     /// Comments in a script with a rest-element `$props()`.
     #[error("comments in a script with a rest-element $props() (injected $$slots/$$events)")]
     CommentsWithRestProps,

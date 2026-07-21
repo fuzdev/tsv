@@ -709,6 +709,13 @@ pub(crate) fn compile_server<'arena>(
     // $props.id()`). The declarator is skipped in the loop and hoisted to the top
     // of the component body below. At most one (`props_duplicate`).
     let mut props_id: Option<String> = None;
+    // The component-wide allocator for the derived-destructure intermediates
+    // (`$$d` / `$$derived_array`), mirroring the oracle's `scope.generate`
+    // counter — persistent across declarators so a second array destructure gets
+    // `$$derived_array_1`. Its collision floor is the full top-level binding-name
+    // set: `store_names` is `bindings.names()` (every binding a candidate store
+    // base), so it doubles as the `scope.generate` dedup set here.
+    let mut generated_names = crate::derived_destructure::GeneratedNames::new(&store_names);
     // `component` is the whole-component analysis, computed up front by `analyze`
     // (the script rewrite needs its `uses_slots`) but left UNRESOLVED: its error
     // must NOT win over the script-loop refusals below, so it is `?`-unwrapped
@@ -751,6 +758,7 @@ pub(crate) fn compile_server<'arena>(
             &mut dropped_regions,
             &mut bindable,
             &mut props_id,
+            &mut generated_names,
         )?;
         let Some(rewritten) = rewritten else {
             continue;
@@ -764,8 +772,18 @@ pub(crate) fn compile_server<'arena>(
         // already matches that. Comments refuse: the oracle re-anchors a
         // comment *inside* the split (`let // c` then the declarator on the
         // next line), a placement this transform can't reproduce.
+        //
+        // The split keys on the SOURCE declarator count, not the output's: a
+        // single source declarator that expanded 1→N (a DESTRUCTURED `$derived`
+        // — `derived_destructure`) is emitted as ONE joined declaration
+        // (`let a = …, b = …;`), exactly the oracle's shape, so it must NOT be
+        // split. A multi-declarator source carrying such an expansion would need
+        // per-source-declarator grouping the flat accumulator has lost, so it
+        // refuses upstream (in `rewrite_script_statement`).
+        let source_multi =
+            matches!(stmt, Statement::VariableDeclaration(src) if src.declarations.len() > 1);
         match rewritten {
-            Statement::VariableDeclaration(decl) if decl.declarations.len() > 1 => {
+            Statement::VariableDeclaration(decl) if source_multi && decl.declarations.len() > 1 => {
                 if has_comments {
                     return Err(unsupported(Refusal::CommentsAlongsideMultiDeclarator));
                 }

@@ -420,6 +420,7 @@ fn collect<'arena>(
     let mut dropped_regions = Vec::new();
     let mut bindable = Vec::new();
     let mut props_id = None;
+    let mut generated_names = crate::derived_destructure::GeneratedNames::new(&store_names);
     for stmt in erased_body {
         if matches!(
             stmt,
@@ -453,6 +454,7 @@ fn collect<'arena>(
             &mut dropped_regions,
             &mut bindable,
             &mut props_id,
+            &mut generated_names,
         ) {
             push_unsupported(found, err);
         }

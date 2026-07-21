@@ -215,6 +215,9 @@ impl Refusal {
             Self::CommentsWithArglessState => {
                 Cow::Borrowed("comments in a script with an argument-less $state()")
             }
+            Self::CommentsWithDestructuredDerived => {
+                Cow::Borrowed("comments in a script with a destructured $derived declarator")
+            }
             Self::CommentsWithRestProps => Cow::Borrowed(
                 "comments in a script with a rest-element $props() (injected $$slots/$$events)",
             ),
@@ -508,6 +511,7 @@ impl Refusal {
             Self::LeadingCommentGluedToScript,
             Self::CommentsWithTemplateBeforeScript,
             Self::CommentsWithArglessState,
+            Self::CommentsWithDestructuredDerived,
             Self::CommentsWithRestProps,
             Self::CommentsWithNonDestructuredProps,
             Self::CommentsWithPropsId,

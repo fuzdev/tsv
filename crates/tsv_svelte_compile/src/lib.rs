@@ -64,6 +64,7 @@ mod body_builder;
 mod build;
 mod component;
 mod css_scope;
+mod derived_destructure;
 mod dropped;
 mod element;
 mod element_census;

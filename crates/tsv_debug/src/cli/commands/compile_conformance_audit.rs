@@ -318,6 +318,7 @@ mod tests {
         "comments in a script with a $$slots reference (injected sanitize_slots)",
         "comments in a script with a $bindable() prop default",
         "comments in a script with a $props.id() declarator",
+        "comments in a script with a destructured $derived declarator",
         "comments in a script with a non-destructured $props() (injected $$slots/$$events)",
         "comments in a script with a rest-element $props() (injected $$slots/$$events)",
         "comments in a script with an argument-less $state()",

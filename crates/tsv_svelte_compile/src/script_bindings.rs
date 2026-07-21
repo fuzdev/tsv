@@ -199,6 +199,42 @@ fn analyze_script_in<'arena>(
     })
 }
 
+/// Register every leaf of a destructured `$derived`/`$derived.by` pattern as a
+/// `Derived` binding with no foldable initial, and add each to `derived_names`
+/// so a `{name}` read lowers to `name()` (template value walk / store rewrite).
+///
+/// The transform (`derived_destructure`) reconstructs the same leaf set from the
+/// pattern nodes, so the two stay in step. An ESCAPED binding leaf can't be named
+/// from its source span ([`pattern_binding_names`] skips it), so a pattern binding
+/// one refuses (`unnameable`): registering the leaf is what makes its read a call,
+/// and a missed leaf would emit a bare `name` where the oracle emits `name()` — a
+/// MISMATCH. A safe over-refusal on a shape absent from the gating Svelte corpus.
+fn register_destructured_derived<'arena>(
+    id: &Expression<'arena>,
+    source: &str,
+    bindings: &mut Bindings<'arena>,
+    derived_names: &mut NameSet,
+    unnameable: Refusal,
+) -> Result<(), CompileError> {
+    if crate::analyze::pattern_binds_unnameable_identifier(id) {
+        return Err(unsupported(unnameable));
+    }
+    let mut names = Vec::new();
+    pattern_binding_names(id, source, &mut names)?;
+    for name in names {
+        derived_names.insert(name.clone());
+        bindings.insert(
+            name,
+            Binding {
+                kind: BindingKind::Derived,
+                initial: Initial::None,
+                updated: false,
+            },
+        );
+    }
+    Ok(())
+}
+
 /// Classify one top-level declarator into the binding table.
 fn analyze_declarator<'arena>(
     declarator: &'arena VariableDeclarator<'arena>,
@@ -300,41 +336,63 @@ fn analyze_declarator<'arena>(
             Ok(())
         }
         Some(RuneInit::Derived(expr)) => {
-            let name = identifier_binding_name(&declarator.id, source)
-                .ok_or_else(|| unsupported(Refusal::DestructuringDerived))?;
-            derived_names.insert(name.clone());
-            bindings.insert(
-                name,
-                Binding {
-                    kind: BindingKind::Derived,
-                    initial: Initial::Expr(expr),
-                    updated: false,
-                },
-            );
-            Ok(())
+            if let Some(name) = identifier_binding_name(&declarator.id, source) {
+                derived_names.insert(name.clone());
+                bindings.insert(
+                    name,
+                    Binding {
+                        kind: BindingKind::Derived,
+                        initial: Initial::Expr(expr),
+                        updated: false,
+                    },
+                );
+                Ok(())
+            } else {
+                // A destructured `$derived` — the transform (`derived_destructure`)
+                // lowers it to one `$.derived(() => path)` per leaf, so every leaf
+                // binding is itself a derived read (`{name}` → `name()`). None of
+                // them has a foldable initial (the pattern projects from an UNKNOWN
+                // root), so each is `Initial::None` — probe-confirmed the oracle
+                // never folds a destructured-derived read.
+                register_destructured_derived(
+                    &declarator.id,
+                    source,
+                    bindings,
+                    derived_names,
+                    Refusal::DestructuringDerived,
+                )
+            }
         }
         Some(RuneInit::DerivedBy(f)) => {
-            let name = identifier_binding_name(&declarator.id, source)
-                .ok_or_else(|| unsupported(Refusal::DestructuringDerivedBy))?;
-            derived_names.insert(name.clone());
-            // The oracle evaluates through an expression-bodied arrow.
-            use tsv_ts::ast::internal::ArrowFunctionBody;
-            let initial = match f {
-                Expression::ArrowFunctionExpression(arrow) => match &arrow.body {
-                    ArrowFunctionBody::Expression(body) => Initial::Expr(body),
-                    ArrowFunctionBody::BlockStatement(_) => Initial::None,
-                },
-                _ => Initial::None,
-            };
-            bindings.insert(
-                name,
-                Binding {
-                    kind: BindingKind::Derived,
-                    initial,
-                    updated: false,
-                },
-            );
-            Ok(())
+            if let Some(name) = identifier_binding_name(&declarator.id, source) {
+                derived_names.insert(name.clone());
+                // The oracle evaluates through an expression-bodied arrow.
+                use tsv_ts::ast::internal::ArrowFunctionBody;
+                let initial = match f {
+                    Expression::ArrowFunctionExpression(arrow) => match &arrow.body {
+                        ArrowFunctionBody::Expression(body) => Initial::Expr(body),
+                        ArrowFunctionBody::BlockStatement(_) => Initial::None,
+                    },
+                    _ => Initial::None,
+                };
+                bindings.insert(
+                    name,
+                    Binding {
+                        kind: BindingKind::Derived,
+                        initial,
+                        updated: false,
+                    },
+                );
+                Ok(())
+            } else {
+                register_destructured_derived(
+                    &declarator.id,
+                    source,
+                    bindings,
+                    derived_names,
+                    Refusal::DestructuringDerivedBy,
+                )
+            }
         }
         None => {
             // Plain declarator: an Identifier id gets its init as the

@@ -25,6 +25,7 @@ use tsv_ts::ast::internal::{
 
 use crate::analyze::{NameSet, RuneInit, classify_rune_init, is_effect_call, is_inspect_call};
 use crate::build::Builder;
+use crate::derived_destructure::{GeneratedNames, expand_destructured_derived};
 use crate::rune_guard::{
     WalkCtx, refuse_dollar_binding_name, refuse_dollar_binding_pattern, walk_class_member_guarded,
     walk_expression_guarded, walk_statement_guarded,
@@ -71,7 +72,9 @@ fn script_walk_ctx<'a>(
 ///
 /// An optional call (`f?.()`) is a `ChainExpression` in the oracle's AST, never a
 /// bare `CallExpression`, so it never collapses either.
-fn unthunk_callee<'arena>(expr: &Expression<'arena>) -> Option<&'arena Expression<'arena>> {
+pub(crate) fn unthunk_callee<'arena>(
+    expr: &Expression<'arena>,
+) -> Option<&'arena Expression<'arena>> {
     let Expression::CallExpression(call) = expr else {
         return None;
     };
@@ -140,6 +143,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
     dropped_regions: &mut Vec<Span>,
     bindable: &mut Vec<BindableEntry>,
     props_id: &mut Option<String>,
+    names: &mut GeneratedNames<'_>,
 ) -> Result<Option<Statement<'arena>>, CompileError> {
     // A top-level `$:` label is a legacy reactive statement — invalid in
     // runes mode (the oracle rejects it with legacy_reactive_statement_invalid),
@@ -295,6 +299,50 @@ pub(crate) fn rewrite_script_statement<'arena>(
                 .ok_or_else(|| unsupported(Refusal::PropsIdBindingPattern))?;
             *props_id = Some(name);
             dropped_regions.push(declarator.span);
+            continue;
+        }
+
+        // A DESTRUCTURED `$derived` / `$derived.by` — the 1→N lowering
+        // (`derived_destructure`), unlike an identifier target's single rewrite.
+        if matches!(rune, Some(RuneInit::Derived(_) | RuneInit::DerivedBy(_)))
+            && identifier_binding_name(&declarator.id, source).is_none()
+        {
+            // A destructured `$derived` in a MULTI-declarator source (`let x = 1,
+            // {a, b} = $derived(o)`) expands 1→N, but the oracle keeps only THAT
+            // declarator's leaves joined while splitting the siblings off — a
+            // per-source-declarator grouping the flat accumulator + downstream
+            // split has lost. Refuse rather than over-split (a safe over-refusal
+            // on a shape absent from the gating Svelte corpus; the oracle
+            // compiles it).
+            if decl.declarations.len() > 1 {
+                return Err(unsupported(match rune {
+                    Some(RuneInit::DerivedBy(_)) => Refusal::DestructuringDerivedBy,
+                    _ => Refusal::DestructuringDerived,
+                }));
+            }
+            // The split scatters the pattern leaves and mints `$$d`/
+            // `$$derived_array` intermediates whose leading-comment windows would
+            // sweep a carried script comment. Refuse rather than reproduce the
+            // oracle's emergent placement — a safe over-refusal, like the argless
+            // `$state` / `$bindable` cases.
+            if has_comments {
+                return Err(unsupported(Refusal::CommentsWithDestructuredDerived));
+            }
+            // `rune` is `Some(Derived | DerivedBy)` by the `matches!` guard above;
+            // extract it to move into the expander.
+            #[allow(clippy::unreachable)] // the guard above proved the variant
+            let Some(rune) = rune else {
+                unreachable!("guarded to a derived rune above")
+            };
+            expand_destructured_derived(
+                b,
+                &mut ctx,
+                &mut declarations,
+                declarator,
+                rune,
+                source,
+                names,
+            )?;
             continue;
         }
 
