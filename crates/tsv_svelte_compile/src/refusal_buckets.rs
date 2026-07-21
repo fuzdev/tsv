@@ -388,7 +388,7 @@ impl Refusal {
             Self::SpecialElementIllegalAttribute { .. } => {
                 Cow::Borrowed("invalid attribute on <{name}> (the oracle rejects it)")
             }
-            Self::CssAtRule => Cow::Borrowed("css at-rule in <style>"),
+            Self::CssKeyframes => Cow::Borrowed("css @keyframes in <style>"),
             Self::CssNestedRule => Cow::Borrowed("nested css rule in <style>"),
             Self::CssEmptyRule => {
                 Cow::Borrowed("empty css rule in <style> (the oracle comment-wraps it)")
@@ -677,7 +677,7 @@ impl Refusal {
             Self::SpecialElementIllegalAttribute {
                 name: "{name}".to_string(),
             },
-            Self::CssAtRule,
+            Self::CssKeyframes,
             Self::CssNestedRule,
             Self::CssEmptyRule,
             Self::CssCombinatorSelector,
@@ -864,6 +864,6 @@ mod tests {
             }
             .is_deliberate_fence()
         );
-        assert!(!Refusal::CssAtRule.is_deliberate_fence());
+        assert!(!Refusal::CssKeyframes.is_deliberate_fence());
     }
 }

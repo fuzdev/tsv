@@ -169,7 +169,7 @@ pub fn refusal_census_buckets() -> Vec<Cow<'static, str>> {
         Refusal::TsExportAssignment,
         Refusal::TsNamespaceExport,
         // CSS scoping.
-        Refusal::CssAtRule,
+        Refusal::CssKeyframes,
         Refusal::CssNestedRule,
         Refusal::CssEmptyRule,
         Refusal::CssCombinatorSelector,
@@ -626,6 +626,36 @@ mod tests {
         assert!(
             keys.iter().any(|k| k.contains("unsupported css selector")),
             "unsupported selector not detected: {keys:?}"
+        );
+    }
+
+    #[test]
+    fn collect_mode_refuses_inside_at_rule_without_bailing() {
+        // `analyze_style`'s collect seam recurses into at-rule blocks
+        // (`analyze_atrule`). In collect mode a refusal INSIDE the block must
+        // push-and-continue, not whole-walk-bail: BOTH refusals inside the `@media`
+        // block (an unsupported `:has(.a)` selector, then an empty `.q {}` rule) AND
+        // the `||` combinator rule AFTER the at-rule must all surface. (The collect
+        // seam builds no census, so only PARSE-TIME refusals appear here — never
+        // `CssSelectorNoMatch`, which is a match-time verdict.)
+        let source = "<style>@media screen { :has(.a) { color: red } .q {} } \
+                      a || b { color: red }</style>\n";
+        let keys = bucket_set(source);
+        // First refusal inside the at-rule.
+        assert!(
+            keys.iter().any(|k| k.contains("unsupported css selector")),
+            "inner unsupported selector not detected: {keys:?}"
+        );
+        // Second refusal inside the SAME at-rule — proves the inner loop continues.
+        assert!(
+            keys.iter().any(|k| k.contains("empty css rule")),
+            "second inner refusal not detected (at-rule descent bailed?): {keys:?}"
+        );
+        // Refusal after the at-rule — proves the descent returned control so the
+        // outer walk still reaches the `||` combinator rule.
+        assert!(
+            keys.iter().any(|k| k.contains("combinator")),
+            "post-at-rule refusal not detected (walk bailed?): {keys:?}"
         );
     }
 

@@ -1311,9 +1311,20 @@ bump resets per comma. A scoped element with no `class` markup synthesizes
     `:global(<compound>)` (dropped from matching by `truncate`, wrapper still
     stripped), a fully-global `:global(<compound>)` (never pruned, scopes nothing),
     and a bare `:global` combinator (`div :global.x` → `div.x`, the preceding
-    whitespace eaten).
+    whitespace eaten);
+  - **group at-rules** — a non-`@keyframes` at-rule
+    (`@media`/`@supports`/`@container`/`@layer`/`@scope`/…) recurses into its block
+    and scopes the inner rules the ordinary way (the oracle's generic `next()`
+    recursion), arbitrarily deep for nested at-rules; the at-rule PRELUDE is never
+    scoped (`@scope (.a) to (.b)` scopes only its inner `.a`). A statement at-rule
+    (`@import`/`@charset`, no block) and a descriptor block (`@font-face`/`@page`,
+    declarations only) scope nothing and pass through verbatim.
 - **Refused**:
-  - `css at-rule in <style>` — every at-rule, including `@keyframes` and `@media`;
+  - `css @keyframes in <style>` — DEFERRED: the oracle name-prefixes keyframes
+    (`@keyframes spin` → `@keyframes svelte-<hash>-spin`) plus rewrites `animation`
+    values, which this slice does not port. Name-discriminated case-sensitively (the
+    oracle's `is_keyframes_node`), so `@KEYFRAMES` is a group at-rule whose `from`/`to`
+    refuse via `css selector {selector} matches no element` instead;
   - `nested css rule in <style>` — including a `:global { … }` global block, which is
     a nested rule;
   - `empty css rule in <style> (the oracle comment-wraps it)`;
@@ -1330,8 +1341,8 @@ bump resets per comma. A scoped element with no `class` markup synthesizes
   - `css case-insensitive match with a non-ASCII operand (Unicode case-fold not ported)`;
   - `css selector {selector} matches no element (pruning not implemented)`.
 - **Planned** (each its own follow-up sub-slice): `:global { … }` global blocks (a
-  nested-rule / comma-list surface) and `@keyframes` name scoping (needs general
-  at-rule handling first).
+  nested-rule / comma-list surface) and `@keyframes` name scoping (the name-prefix +
+  `animation`-value rewrite the general at-rule descent now leaves deferred).
 
 ---
 

@@ -1370,13 +1370,21 @@ classes, this one enumerates scoping candidates.
   `.svelte-tsvhash`, each later one a zero-specificity `:where(.svelte-tsvhash)`,
   reset per comma `ComplexSelector`). **Supported**: the four combinators
   (descendant / child / `+` / `~`, including block-descent and the `{#each}`
-  wrap-around) and basic `:global` (leading `:global(<compound>) .y`, trailing
+  wrap-around); basic `:global` (leading `:global(<compound>) .y`, trailing
   `:global(<compound>)`, a fully-global `:global(<compound>)`, and the bare
-  `:global` combinator `div :global.x` → `div.x`). **Refused**: `:global{}` global
+  `:global` combinator `div :global.x` → `div.x`); and a non-`@keyframes` **group
+  at-rule** (`@media`/`@supports`/`@container`/`@layer`/`@scope`/…), which
+  `analyze_atrule` recurses into and scopes the inner rules the ordinary way (the
+  oracle's generic `next()` recursion, arbitrarily deep — the prelude is never
+  scoped; a statement / descriptor-only at-rule scopes nothing and the splicer
+  copies it through verbatim). **Refused**: `:global{}` global
   blocks (nested rules), `:is`/`:where`/`:has`/`:not`, `:root`/`:host`, nesting, the
   `||` column combinator, a snippet/render-crossing combinator path (`CssCombinatorSelector`
-  — the site-resolution product isn't built, a safe over-refusal), at-rules /
-  `@keyframes` (`CssAtRule`), empty rules (`CssEmptyRule`), an enumerable dynamic
+  — the site-resolution product isn't built, a safe over-refusal), `@keyframes`
+  (`CssKeyframes` — DEFERRED: the oracle's name-prefix + `animation`-value rewrite is
+  a separate slice; discriminated case-sensitively, so `@KEYFRAMES` recurses as a
+  group at-rule and its `from`/`to` refuse via `CssSelectorNoMatch`), empty rules
+  (`CssEmptyRule`), an enumerable dynamic
   attribute value (`CssDynamicAttributeMatch`), a non-ASCII case-insensitive operand
   (`CssCaseInsensitiveNonAscii`), and a chain matching no element
   (`CssSelectorNoMatch`).

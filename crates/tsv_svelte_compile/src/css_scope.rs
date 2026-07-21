@@ -14,16 +14,21 @@
 //! subsequent-sibling `~`) over type / id / class / attribute / universal compounds
 //! (plus trailing pseudo); basic `:global` — leading `:global(<compound>)`, trailing
 //! `:global(<compound>)` (dropped by truncate), and a bare `:global` combinator
-//! (`div :global.x` → `div.x`). Everything else refuses: the `||` column combinator,
-//! `:global{}` blocks, `:is`/`:where`/`:has`/`:not`, `:root`/`:host`, nesting,
-//! at-rules, namespaced/escaped names, a snippet/render-crossing combinator path, and
-//! a compound matching no element (`CssSelectorNoMatch`; the oracle comment-wraps).
+//! (`div :global.x` → `div.x`); and a non-`@keyframes` **group at-rule**
+//! (`@media`/`@supports`/`@container`/`@layer`/`@scope`/…), which recurses into its
+//! block and scopes the inner rules the ordinary way (the oracle's generic `next()`
+//! recursion — `phases/3-transform/css/index.js:82-99`; the at-rule prelude is never
+//! scoped). Everything else refuses: the `||` column combinator, `:global{}` blocks,
+//! `:is`/`:where`/`:has`/`:not`, `:root`/`:host`, nesting, `@keyframes` (deferred —
+//! its name-prefix + animation-value rewrite is a separate slice), namespaced/escaped
+//! names, a snippet/render-crossing combinator path, and a compound matching no
+//! element (`CssSelectorNoMatch`; the oracle comment-wraps).
 
 use std::collections::HashSet;
 
 use tsv_css::ast::internal::{
-    AttributeMatcher, Combinator, ComplexSelector, CssBlockChild, CssNode, PseudoClassArgs,
-    RelativeSelector, SimpleSelector,
+    AttributeMatcher, Combinator, ComplexSelector, CssAtrule, CssBlockChild, CssNode, CssRule,
+    PseudoClassArgs, RelativeSelector, SimpleSelector,
 };
 use tsv_lang::Span;
 use tsv_svelte::ast::internal::{AttributeNode, AttributeValue, Element, SpecialElement, Style};
@@ -237,34 +242,112 @@ pub(crate) fn analyze_style(
         selectors: Vec::new(),
     };
     for node in style.css_stylesheet.nodes {
-        let CssNode::Rule(rule) = node else {
-            refuse(&mut sink, Refusal::CssAtRule)?;
-            continue;
-        };
-        for child in rule.declarations {
-            if matches!(child, CssBlockChild::Rule(_) | CssBlockChild::Atrule(_)) {
-                refuse(&mut sink, Refusal::CssNestedRule)?;
-                break;
-            }
-        }
-        // An empty rule (no declarations) is comment-wrapped `/* (empty) … */` by the
-        // oracle in non-dev mode; tsv declines to reproduce the wrap and refuses.
-        if !rule
-            .declarations
-            .iter()
-            .any(|child| matches!(child, CssBlockChild::Declaration(_)))
-        {
-            refuse(&mut sink, Refusal::CssEmptyRule)?;
-            continue;
-        }
-        for complex in rule.selector.selectors {
-            match build_selector(complex, source) {
-                Ok(selector) => info.selectors.push(selector),
-                Err(reason) => refuse(&mut sink, reason)?,
-            }
+        match node {
+            CssNode::Rule(rule) => analyze_rule(rule, source, &mut sink, &mut info)?,
+            CssNode::Atrule(atrule) => analyze_atrule(atrule, source, &mut sink, &mut info)?,
         }
     }
     Ok(info)
+}
+
+/// Analyze one top-level-or-nested CSS rule: refuse a nested rule / an empty rule,
+/// else build a [`ScopedSelector`] per `ComplexSelector` into `info`. Shared by the
+/// top-level walk and the at-rule descent, so a rule inside `@media` scopes exactly
+/// like a top-level one. Preserves the sink's collect-vs-bail semantics via
+/// [`refuse`] (`None` bails at the first refusal; `Some` pushes and continues).
+fn analyze_rule(
+    rule: &CssRule<'_>,
+    source: &str,
+    sink: &mut Option<&mut Vec<Refusal>>,
+    info: &mut ScopeInfo,
+) -> Result<(), CompileError> {
+    for child in rule.declarations {
+        if matches!(child, CssBlockChild::Rule(_) | CssBlockChild::Atrule(_)) {
+            refuse(sink, Refusal::CssNestedRule)?;
+            break;
+        }
+    }
+    // An empty rule (no declarations) is comment-wrapped `/* (empty) … */` by the
+    // oracle in non-dev mode; tsv declines to reproduce the wrap and refuses.
+    if !rule
+        .declarations
+        .iter()
+        .any(|child| matches!(child, CssBlockChild::Declaration(_)))
+    {
+        refuse(sink, Refusal::CssEmptyRule)?;
+        return Ok(());
+    }
+    for complex in rule.selector.selectors {
+        match build_selector(complex, source) {
+            Ok(selector) => info.selectors.push(selector),
+            Err(reason) => refuse(sink, reason)?,
+        }
+    }
+    Ok(())
+}
+
+/// Analyze one at-rule (the oracle's `Atrule` visitor,
+/// `phases/3-transform/css/index.js:82-99`). `@keyframes` (name-discriminated — the
+/// ONLY at-rule family whose inner "rules" are keyframe stops rather than element
+/// selectors) is DEFERRED: the oracle special-cases it (a name-prefix rewrite plus
+/// an animation-value rewrite that this slice does not port), so tsv refuses. Every
+/// other at-rule recurses generically into its block — inner rules scope like
+/// top-level ones, nested at-rules recurse further, and a descriptor block
+/// (`@font-face`/`@page`, whose children are descriptors — and, for `@page`, margin
+/// at-rules like `@top-center` — never element-selector rules, so a margin at-rule
+/// recurses harmlessly) or a statement at-rule (`@import`/`@charset`/`@layer a,b;`,
+/// `block: None`) yields no scoping (the splicer copies its source through verbatim,
+/// since it applies edits only from `info.selectors`). The at-rule PRELUDE is never
+/// touched — `@scope (.a) to (.b) { .a {} }` scopes only the inner `.a`.
+fn analyze_atrule(
+    atrule: &CssAtrule<'_>,
+    source: &str,
+    sink: &mut Option<&mut Vec<Refusal>>,
+    info: &mut ScopeInfo,
+) -> Result<(), CompileError> {
+    // TODO: @keyframes name-prefix + animation-value scoping is a follow-up slice
+    // (../svelte/packages/svelte/src/compiler/phases/3-transform/css/index.js:83-92,
+    // the `is_keyframes_node` branch).
+    if is_keyframes_atrule(atrule.name) {
+        refuse(sink, Refusal::CssKeyframes)?;
+        return Ok(());
+    }
+    // A statement at-rule (`block: None`) scopes nothing.
+    let Some(block) = &atrule.block else {
+        return Ok(());
+    };
+    for child in block.children {
+        match child {
+            CssBlockChild::Rule(rule) => analyze_rule(rule, source, sink, info)?,
+            CssBlockChild::Atrule(nested) => analyze_atrule(nested, source, sink, info)?,
+            // A descriptor declaration (`@font-face`/`@page`) or a comment scopes
+            // nothing — emitted verbatim by the splicer.
+            CssBlockChild::Declaration(_) | CssBlockChild::Comment(_) => {}
+        }
+    }
+    Ok(())
+}
+
+/// Whether an at-rule name is `@keyframes` — the oracle's `is_keyframes_node`
+/// (`remove_css_prefix(node.name) === 'keyframes'`, `phases/css.js:14`).
+/// **Case-sensitive** on purpose: `@KEYFRAMES` is NOT keyframes to the oracle, so it
+/// recurses as a group at-rule and its `from`/`to` are treated as element selectors
+/// (which match nothing → `CssSelectorNoMatch`). `atrule.name` is escape-decoded by
+/// tsv_css, matching the oracle's decoded `node.name`.
+fn is_keyframes_atrule(name: &str) -> bool {
+    remove_css_prefix(name) == "keyframes"
+}
+
+/// Strip a leading vendor prefix (`-webkit-`/`-moz-`/`-o-`/`-ms-`) — the oracle's
+/// `remove_css_prefix` (`/^-((webkit)|(moz)|(o)|(ms))-/`, `phases/css.js:2-9`).
+/// Case-sensitive, like the regex (no `i` flag).
+fn remove_css_prefix(name: &str) -> &str {
+    for prefix in ["-webkit-", "-moz-", "-o-", "-ms-"] {
+        if let Some(rest) = name.strip_prefix(prefix) {
+            return rest;
+        }
+    }
+    name
 }
 
 /// Match every selector chain against the census, producing the [`CssScoping`]

@@ -580,7 +580,7 @@ mod tests {
                     "../svelte/packages/svelte/tests/validator/samples/b/input.svelte",
                     Bucket::OracleRejected {
                         code: "constant_assignment".to_string(),
-                        tsv_refusal: Some("css at-rule in <style>".to_string()),
+                        tsv_refusal: Some("css @keyframes in <style>".to_string()),
                     },
                 ),
                 outcome(
@@ -592,7 +592,7 @@ mod tests {
                     0,
                     "../svelte/packages/svelte/tests/compiler-errors/samples/d/input.svelte",
                     Bucket::Refused {
-                        reason: "css at-rule in <style>".to_string(),
+                        reason: "css @keyframes in <style>".to_string(),
                         fenced: false,
                         fence_contained: false,
                     },

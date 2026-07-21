@@ -1658,7 +1658,7 @@ mod tests {
             &groups,
             &[
                 refused("a.svelte", "legacy on: directive (runes-only fence)", true),
-                refused("b.svelte", "css at-rule in <style>", false),
+                refused("b.svelte", "css @keyframes in <style>", false),
             ],
         );
         assert!(exit_verdict(&refusals).is_ok());
@@ -1698,7 +1698,7 @@ mod tests {
                     bucket: Bucket::Parity { tolerated: true },
                 },
                 refused("f.svelte", "template node special element <slot>", true),
-                refused("r1.svelte", "css at-rule in <style>", false),
+                refused("r1.svelte", "css @keyframes in <style>", false),
                 refused(
                     "r2.svelte",
                     "template node special element <svelte:boundary>",
@@ -1775,9 +1775,9 @@ mod tests {
                     bucket: Bucket::Parity { tolerated: false },
                 },
                 refused("f.svelte", "template node special element <slot>", true),
-                refused_containing_fence("c1.svelte", "css at-rule in <style>"),
+                refused_containing_fence("c1.svelte", "css @keyframes in <style>"),
                 refused_containing_fence("c2.svelte", "instance-script export"),
-                refused("r.svelte", "css at-rule in <style>", false),
+                refused("r.svelte", "css @keyframes in <style>", false),
             ],
         );
 
@@ -1835,7 +1835,7 @@ mod tests {
                     path: PathBuf::from("p.svelte"),
                     bucket: Bucket::Parity { tolerated: false },
                 },
-                refused("r.svelte", "css at-rule in <style>", false),
+                refused("r.svelte", "css @keyframes in <style>", false),
                 FileOutcome {
                     group: 0,
                     path: PathBuf::from("e.svelte"),
@@ -1883,7 +1883,7 @@ mod tests {
                     path: PathBuf::from("tolerated.svelte"),
                     bucket: Bucket::Parity { tolerated: true },
                 },
-                refused("r.svelte", "css at-rule in <style>", false),
+                refused("r.svelte", "css @keyframes in <style>", false),
             ],
         );
 

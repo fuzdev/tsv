@@ -298,6 +298,102 @@ fn compile_css_spread_element_scoped_by_type() {
 }
 
 #[test]
+fn compile_css_group_at_rule_scopes_inner_rules() {
+    // A non-keyframes group at-rule recurses into its block and scopes the inner
+    // rules exactly like top-level ones (the oracle's generic `next()` recursion);
+    // the at-rule prelude is untouched. @media with a class inner + a type inner.
+    assert_eq!(
+        compile_css(
+            "<div class=\"a\">x</div>\n<style>@media (min-width: 500px) { .a { color: red } div { color: blue } }</style>"
+        ),
+        "@media (min-width: 500px) { .a.svelte-tsvhash { color: red } div.svelte-tsvhash { color: blue } }"
+    );
+    // A combinator inside an at-rule bumps specificity per ComplexSelector just like
+    // at top level (`.svelte-tsvhash` then `:where(...)`).
+    assert_eq!(
+        compile_css("<div><p>x</p></div>\n<style>@media screen { div p { color: red } }</style>"),
+        "@media screen { div.svelte-tsvhash p:where(.svelte-tsvhash) { color: red } }"
+    );
+    // Nested at-rules recurse arbitrarily deep.
+    assert_eq!(
+        compile_css(
+            "<div class=\"a\">x</div>\n<style>@media screen { @supports (display: grid) { .a { color: red } } }</style>"
+        ),
+        "@media screen { @supports (display: grid) { .a.svelte-tsvhash { color: red } } }"
+    );
+}
+
+#[test]
+fn compile_css_statement_and_descriptor_at_rules_pass_through_verbatim() {
+    // A statement at-rule (`@import`, `block: None`) and a descriptor block
+    // (`@font-face`, declarations only) scope nothing and are copied through
+    // verbatim by the splicer (it applies edits only from matched inner rules); a
+    // sibling `div` rule still scopes.
+    assert_eq!(
+        compile_css("<div>x</div>\n<style>@import 'x.css'; div { color: red }</style>"),
+        "@import 'x.css'; div.svelte-tsvhash { color: red }"
+    );
+    assert_eq!(
+        compile_css(
+            "<div>x</div>\n<style>@font-face { font-family: Foo } div { color: red }</style>"
+        ),
+        "@font-face { font-family: Foo } div.svelte-tsvhash { color: red }"
+    );
+}
+
+#[test]
+fn compile_css_at_rule_prelude_is_never_scoped() {
+    // `@scope (.a) to (.b)` — the prelude selectors are a raw string the oracle
+    // never scopes; only the inner `.a` rule gains the hash.
+    assert_eq!(
+        compile_css(
+            "<div class=\"a\">x</div>\n<style>@scope (.a) to (.b) { .a { color: red } }</style>"
+        ),
+        "@scope (.a) to (.b) { .a.svelte-tsvhash { color: red } }"
+    );
+}
+
+#[test]
+fn compile_css_at_rule_unused_inner_selector_refuses() {
+    // An inner selector matching no element is the oracle's comment-wrap (unused);
+    // tsv's existing posture — refuse `CssSelectorNoMatch` — carries through the
+    // at-rule descent unchanged (a safe over-refusal).
+    assert_unsupported(
+        "<div>x</div>\n<style>@media screen { .z { color: red } }</style>",
+        "matches no element",
+    );
+}
+
+#[test]
+fn compile_css_keyframes_is_deferred() {
+    // `@keyframes` is DEFERRED — the oracle name-prefixes it (a separate slice), so
+    // tsv refuses `CssKeyframes` rather than emit an unscoped name. A vendor prefix
+    // is stripped (case-sensitively) before the keyframes test, so
+    // `@-webkit-keyframes` refuses the same way.
+    assert_unsupported(
+        "<div>x</div>\n<style>@keyframes spin { from { opacity: 0 } to { opacity: 1 } }</style>",
+        "css @keyframes in <style>",
+    );
+    assert_unsupported(
+        "<div>x</div>\n<style>@-webkit-keyframes spin { from { opacity: 0 } to { opacity: 1 } }</style>",
+        "css @keyframes in <style>",
+    );
+}
+
+#[test]
+fn compile_css_uppercase_keyframes_is_a_group_at_rule() {
+    // The keyframes discriminator is case-SENSITIVE (the oracle's `is_keyframes_node`
+    // tests `=== 'keyframes'`), so `@KEYFRAMES` is NOT keyframes: it recurses as a
+    // group at-rule and its `from`/`to` are element selectors matching no element →
+    // `CssSelectorNoMatch` (the oracle likewise comment-wraps them as unused). Either
+    // verdict is safe; this pins the one tsv reaches.
+    assert_unsupported(
+        "<div>x</div>\n<style>@KEYFRAMES spin { from { opacity: 0 } to { opacity: 1 } }</style>",
+        "matches no element",
+    );
+}
+
+#[test]
 fn compile_refuses_global_pseudo_class_with_a_non_ascii_ident_char() {
     // A CSS name must NOT be trimmed with a Unicode-whitespace notion: every code
     // point at or above U+0080 is a CSS *ident* code point, so `:global\u{a0}` is
