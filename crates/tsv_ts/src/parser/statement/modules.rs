@@ -1212,12 +1212,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn attribute_key_string(&self, key: &ImportAttributeKey<'_>) -> String {
         match key {
             ImportAttributeKey::Identifier(id) => match id.escaped_name {
-                Some(sym) => self
-                    .interner
-                    .borrow()
-                    .resolve(sym)
-                    .unwrap_or("")
-                    .to_string(),
+                Some(sym) => self.interner.resolve_infallible(sym).to_string(),
                 None => {
                     let start = id.span.start as usize - self.base_offset;
                     self.source[start..start + id.name_len as usize].to_string()

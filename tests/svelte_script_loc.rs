@@ -22,8 +22,10 @@ use serde_json::Value;
 /// `"instance"` or `"module"`).
 fn content_loc(src: &str, field: &str) -> Value {
     let arena = bumpalo::Bump::new();
-    let ast = tsv_svelte::parse(src, &arena).expect("parser should accept the script");
-    let json = tsv_svelte::convert_ast_json(&ast, src);
+    let mut interner = tsv_svelte::Interner::new();
+    let ast =
+        tsv_svelte::parse(src, &arena, &mut interner).expect("parser should accept the script");
+    let json = tsv_svelte::convert_ast_json(&ast, src, &interner);
     json[field]["content"]["loc"].clone()
 }
 

@@ -215,15 +215,27 @@ comments:audit` drives it over `tests/fixtures` and is gated in `deno task check
 
 `is_format_ignore_directive()` / `is_format_ignore_range_start()` / `is_format_ignore_range_end()` are the single source of truth for the format-suppression directive set — the tsv-native `format-ignore` family plus prettier's `prettier-ignore` family (drop-in compat). Each operates on trimmed comment text and is called by all three language printers (`tsv_ts`, `tsv_css`, `tsv_svelte`), since the comment types differ across crates. See [docs/directives.md](../../docs/directives.md) and [docs/conformance_prettier.md §Format-ignore directive](../../docs/conformance_prettier.md#format-ignore-directive).
 
-## Interner Traits
+## Interner
 
-The interner is per-document, shared across all languages in a file — its tenants are Svelte element/attribute names and escaped identifiers (identifier names are span-identity; see the Pattern below). Symbols flow from parser through doc builder to renderer:
+`Interner` is a newtype over the upstream `string_interner::DefaultStringInterner`
+(kept out of every public signature). It is **caller-owned** — the third
+per-document reusable beside the parse-time `bumpalo::Bump` and the format-time
+`DocArena` — threaded `&mut` through parse (interning) and `&` through
+format/convert (resolve); interning is **not** interior-mutable (no `RefCell`), so
+the borrow checker enforces the write-phase-then-read-phase ordering. `new()`
+allocates nothing (the common-path document interns zero strings — identifier names
+are span-identity; see the Pattern below); its tenants are Svelte element/attribute
+names and escaped identifiers. Reuse across files clears via `Interner::clear` /
+`tsv_arena::with_interner` (`string_interner` 0.20 has no capacity-retaining clear,
+so this replaces the empty backing with a fresh `new()` — alloc-free). Inherent
+methods: `get_or_intern` (`&mut`) and `resolve_infallible` (`&`, panics on a symbol
+this interner didn't create — an invariant, not a recoverable condition).
 
-- `TextResolver` — `resolve(id: u32) -> &str` — resolve symbol during rendering. Also `resolve_source_span(span) -> &str` (defaulted to panic) for `DocText::SourceSpan` nodes; the default-impl interner carries no source, so a printer emitting `SourceSpan` wraps its interner in `doc::SourceTextResolver { inner, source }` and passes that to the resolved render entry points (this is how `source` reaches render without a `DocArena` lifetime). A printer with **no interner** — the CSS printer, which emits source slices directly and never `DocText::Symbol` — instead supplies a bare source-only `TextResolver` (its `resolve` is unreachable, only `resolve_source_span` does work), the same source-awareness without a symbol table.
-- `SymbolResolver` — `resolve_symbol()`, `with_resolved_symbol()` — zero-allocation hot path
-- `InfallibleResolve` — `resolve_infallible()` — panic-free resolution
-- `SymbolToU32` — Convert `DefaultSymbol` to `u32` for doc builder `Symbol` variant
-- `SharedInterner` — Type alias `Rc<RefCell<DefaultStringInterner>>` — shared interner handle
+Symbols flow from parser through doc builder to renderer via these traits:
+
+- `TextResolver` — `resolve(id: u32) -> &str` (impl'd by `Interner`) — resolve symbol during rendering. Also `resolve_source_span(span) -> &str` (defaulted to panic) for `DocText::SourceSpan` nodes; a printer emitting `SourceSpan` wraps its `&Interner` in `doc::SourceTextResolver { inner, source }` and passes that to the resolved render entry points (this is how `source` reaches render without a `DocArena` lifetime). A printer with **no interner** — the CSS printer, which emits source slices directly and never `DocText::Symbol` — instead supplies a bare source-only `TextResolver` (its `resolve` is unreachable, only `resolve_source_span` does work), the same source-awareness without a symbol table.
+- `SymbolResolver` — `interner() -> &Interner` + `resolve_symbol()` / `with_resolved_symbol()` — the zero-allocation hot path for the doc-based printers.
+- `SymbolToU32` — Convert `DefaultSymbol` to `u32` for doc builder `Symbol` variant.
 
 **Pattern**: identifier names are span-identity — the AST stores a name channel (tsv_ts's `IdentName`: raw token length + an `Option<DefaultSymbol>` escape hatch) and printers emit `DocText::SourceSpan` name slices, so the common path never interns. The interner's remaining tenants are tsv_svelte's element/attribute names (parser interns → AST stores `DefaultSymbol` → printer calls `arena.symbol(sym.to_u32())`, interned per document so repeated ids share one node → renderer resolves via `TextResolver` at print time) and the rare unicode-escaped identifier, whose decoded name rides the same deferred-`Symbol` path.
 

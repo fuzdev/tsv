@@ -8,19 +8,19 @@ repository.workspace = true
 
 [dependencies]
 bumpalo.workspace = true
-# Only `with_doc_arena` needs the `DocArena` type; gated to `format` so a
-# parse-only binding (which sets default-features = false and enables neither
-# default features nor `format`) doesn't pull tsv_lang for it.
-tsv_lang = { workspace = true, optional = true }
+# `with_interner` (parse + format) needs the `Interner` type, and `with_doc_arena`
+# (format) the `DocArena` type — both from tsv_lang, which every binding already
+# links via the language crates, so this pulls no crate the graph lacked.
+tsv_lang.workspace = true
 
 [features]
-# `format` adds the reusable doc arena (`with_doc_arena`); `with_ast_arena` is
-# always available (parse and format both use it). Default-on so a standalone
-# `cargo test -p tsv_arena` exercises both helpers; the binding crates set
-# `default-features = false` and re-enable `format` from their own `format`
-# feature, so their parse-only build stays lean.
+# `format` adds the reusable doc arena (`with_doc_arena`); `with_ast_arena` and
+# `with_interner` are always available (parse and format both use them). Default-on
+# so a standalone `cargo test -p tsv_arena` exercises every helper; the binding
+# crates set `default-features = false` and re-enable `format` from their own
+# `format` feature.
 default = ["format"]
-format = ["dep:tsv_lang"]
+format = []
 
 [lints]
 workspace = true

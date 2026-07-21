@@ -293,12 +293,13 @@ pub(in crate::fixtures::validation) fn validate_tsv_rejects(
     }
 
     let arena = bumpalo::Bump::new();
+    let mut interner = tsv_lang::Interner::new();
     let parse_result: Result<(), String> = match input_type {
-        InputType::Svelte => tsv_svelte::parse(input, &arena)
+        InputType::Svelte => tsv_svelte::parse(input, &arena, &mut interner)
             .map(|_| ())
             .map_err(|e| e.to_string()),
         InputType::SvelteTs | InputType::TypeScript => {
-            tsv_ts::parse_with_goal(input, fixture.goal(), &arena)
+            tsv_ts::parse_with_goal(input, fixture.goal(), &arena, &mut interner)
                 .map(|_| ())
                 .map_err(|e| e.to_string())
         }
@@ -419,10 +420,14 @@ pub(in crate::fixtures::validation) async fn validate_invalid_syntax(
 
         // Check our parser
         let arena = bumpalo::Bump::new();
+        let mut interner = tsv_lang::Interner::new();
         let ours_failed = match input_type {
-            InputType::Svelte => tsv_svelte::parse(&variant_content, &arena).is_err(),
+            InputType::Svelte => {
+                tsv_svelte::parse(&variant_content, &arena, &mut interner).is_err()
+            }
             InputType::SvelteTs | InputType::TypeScript => {
-                tsv_ts::parse_with_goal(&variant_content, fixture.goal(), &arena).is_err()
+                tsv_ts::parse_with_goal(&variant_content, fixture.goal(), &arena, &mut interner)
+                    .is_err()
             }
             InputType::Css => tsv_css::parse(&variant_content, &arena).is_err(),
         };

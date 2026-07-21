@@ -24,13 +24,14 @@ pub(super) fn parse_input<'arena>(
     input_type: InputType,
     goal: tsv_ts::Goal,
     arena: &'arena bumpalo::Bump,
+    interner: &mut tsv_lang::Interner,
 ) -> Result<ParsedInput<'arena>, String> {
     match input_type {
-        InputType::Svelte => tsv_svelte::parse(content, arena)
+        InputType::Svelte => tsv_svelte::parse(content, arena, interner)
             .map(ParsedInput::Svelte)
             .map_err(|e| format!("Parse error: {e:?}")),
         InputType::SvelteTs | InputType::TypeScript => {
-            tsv_ts::parse_with_goal(content, goal, arena)
+            tsv_ts::parse_with_goal(content, goal, arena, interner)
                 .map(ParsedInput::Ts)
                 .map_err(|e| format!("Parse error: {e:?}"))
         }
@@ -59,10 +60,11 @@ pub(super) struct InputAstPaths {
 pub(super) fn input_ast_paths(
     parsed: &ParsedInput<'_>,
     content: &str,
+    interner: &tsv_lang::Interner,
 ) -> Result<InputAstPaths, String> {
     let ast_json = match parsed {
-        ParsedInput::Svelte(ast) => tsv_svelte::convert_ast_json(ast, content),
-        ParsedInput::Ts(ast) => tsv_ts::convert_ast_json(ast, content),
+        ParsedInput::Svelte(ast) => tsv_svelte::convert_ast_json(ast, content, interner),
+        ParsedInput::Ts(ast) => tsv_ts::convert_ast_json(ast, content, interner),
         ParsedInput::Css(ast) => tsv_css::convert_ast_json(ast, content),
     };
     let tabs = to_json_with_tabs(&ast_json)

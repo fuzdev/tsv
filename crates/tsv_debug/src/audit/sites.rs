@@ -230,10 +230,11 @@ fn svelte_only_regions(source: &str) -> Vec<(usize, usize)> {
     }
 
     let arena = bumpalo::Bump::new();
+    let mut interner = tsv_lang::Interner::new();
     // A parse failure is not this function's business to report: the caller already skipped
     // any seed file tsv rejects, and an injected source that stops parsing is a `Rejected`
     // the inject loop drops on the floor.
-    let Ok(root) = tsv_svelte::parse(source, &arena) else {
+    let Ok(root) = tsv_svelte::parse(source, &arena, &mut interner) else {
         return Vec::new();
     };
     let mut out = Vec::new();

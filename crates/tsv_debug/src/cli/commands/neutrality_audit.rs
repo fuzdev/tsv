@@ -209,7 +209,8 @@ struct Site {
 /// annotation (≥6 bytes), keyed by its content byte-range.
 fn glued_block_sites(source: &str) -> Vec<Site> {
     let arena = bumpalo::Bump::new();
-    let Ok(program) = tsv_ts::parse(source, &arena) else {
+    let mut interner = tsv_lang::Interner::new();
+    let Ok(program) = tsv_ts::parse(source, &arena, &mut interner) else {
         return Vec::new();
     };
     let bytes = source.as_bytes();
@@ -339,7 +340,8 @@ mod tests {
         let sites = glued_block_sites(src);
         assert_eq!(sites.len(), 1);
         let arena = bumpalo::Bump::new();
-        let _ = tsv_ts::parse(src, &arena); // sanity: parses
+        let mut interner = tsv_lang::Interner::new();
+        let _ = tsv_ts::parse(src, &arena, &mut interner); // sanity: parses
         assert!(
             probe_site(Path::new("t.ts"), src, &sites[0]).is_none(),
             "a plain leading-comment position must be layout-neutral"

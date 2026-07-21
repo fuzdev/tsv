@@ -14,9 +14,11 @@
 //! freed wholesale when the `Bump` drops, with no per-node `Drop`. Leaf nodes
 //! that hold only `Span`/`IdentName`/primitives (`PrivateIdentifier`,
 //! `RegexLiteral`, `ThisExpression`, `Super`, the operator enums) carry no
-//! lifetime. The interner stays `Rc<RefCell<…>>` (shared across the embedding
-//! boundary, mutated during parse) — orthogonal to `'arena`; its tenants are
-//! the Svelte host's element/attribute names and escaped identifiers.
+//! lifetime. The AST stores only `Copy` symbol IDs ([`DefaultSymbol`]) for the
+//! rare escaped name — never a borrow into the interner — so `Program` holds no
+//! interner and carries no interner lifetime; the caller owns a [`Interner`]
+//! threaded through parse (`&mut`) and format/convert (`&`), orthogonal to
+//! `'arena`.
 
 mod classes;
 mod declarations;
@@ -26,8 +28,8 @@ mod patterns;
 mod statements;
 mod types;
 
-use string_interner::{DefaultStringInterner, DefaultSymbol};
-use tsv_lang::InfallibleResolve;
+use string_interner::DefaultSymbol;
+use tsv_lang::Interner;
 pub use tsv_lang::{Comment, Span};
 
 //
@@ -112,7 +114,6 @@ pub struct Program<'arena> {
     pub body: &'arena [Statement<'arena>],
     pub comments: &'arena [Comment],
     pub span: Span,
-    pub interner: std::rc::Rc<std::cell::RefCell<DefaultStringInterner>>,
     /// The goal symbol this program was parsed against. Drives the public AST's
     /// `sourceType` and (eventually) the goal-specific grammar gates.
     pub goal: crate::Goal,
@@ -239,12 +240,7 @@ impl IdentName {
     /// interned decoded form. `source` must be the host document the spans
     /// were recorded against.
     #[inline]
-    pub fn resolve<'s>(
-        &self,
-        span_start: u32,
-        source: &'s str,
-        interner: &'s DefaultStringInterner,
-    ) -> &'s str {
+    pub fn resolve<'s>(&self, span_start: u32, source: &'s str, interner: &'s Interner) -> &'s str {
         match self.escaped {
             Some(sym) => interner.resolve_infallible(sym),
             None => &source[span_start as usize..span_start as usize + self.raw_len as usize],
@@ -321,7 +317,7 @@ impl<'arena> Identifier<'arena> {
     /// the interned decoded form for escaped names. `source` must be the host
     /// document the spans were recorded against.
     #[inline]
-    pub fn name<'s>(&self, source: &'s str, interner: &'s DefaultStringInterner) -> &'s str {
+    pub fn name<'s>(&self, source: &'s str, interner: &'s Interner) -> &'s str {
         self.ident_name().resolve(self.span.start, source, interner)
     }
 
@@ -367,7 +363,7 @@ impl PrivateIdentifier {
     /// Resolve the name (without `#`): the raw source slice, or the interned
     /// decoded form for escaped names.
     #[inline]
-    pub fn name<'s>(&self, source: &'s str, interner: &'s DefaultStringInterner) -> &'s str {
+    pub fn name<'s>(&self, source: &'s str, interner: &'s Interner) -> &'s str {
         self.name
             .resolve(self.span.end - self.name.raw_len as u32, source, interner)
     }

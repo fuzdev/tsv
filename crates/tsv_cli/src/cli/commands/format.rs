@@ -258,6 +258,7 @@ fn format_file(
     check: bool,
     arena: &bumpalo::Bump,
     doc_arena: &tsv_lang::doc::arena::DocArena,
+    interner: &mut tsv_lang::Interner,
 ) -> FileOutcome {
     let source = match fs::read_to_string(path) {
         Ok(source) => source,
@@ -267,7 +268,7 @@ fn format_file(
     // catch_unwind isolates formatter bugs to the file; release builds use
     // panic=abort so this only pays off in dev/corpus profiles
     let result = panic::catch_unwind(AssertUnwindSafe(|| {
-        format_source_in(&source, parser_type, arena, doc_arena)
+        format_source_in(&source, parser_type, arena, doc_arena, interner)
     }));
     let formatted = match result {
         Ok(Ok(formatted)) => formatted,
@@ -308,14 +309,21 @@ fn format_files(files: &[PathBuf], check: bool, jobs: usize) -> Vec<FileOutcome>
                     // (which returns an owned outcome), so the `&mut` resets are sound.
                     let mut arena = bumpalo::Bump::new();
                     let mut doc_arena = tsv_lang::doc::arena::DocArena::new();
+                    // The third per-worker reusable beside the two arenas — cleared
+                    // per file so a worker's symbol table stays bounded.
+                    let mut interner = tsv_lang::Interner::new();
                     loop {
                         let i = next.fetch_add(1, Ordering::Relaxed);
                         if i >= files.len() {
                             break;
                         }
-                        outcomes.push((i, format_file(&files[i], check, &arena, &doc_arena)));
+                        outcomes.push((
+                            i,
+                            format_file(&files[i], check, &arena, &doc_arena, &mut interner),
+                        ));
                         arena.reset();
                         doc_arena.reset();
+                        interner.clear();
                     }
                     outcomes
                 })

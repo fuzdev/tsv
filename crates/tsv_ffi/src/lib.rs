@@ -26,9 +26,9 @@ use std::slice;
 // native bindings — see its module docs for the reuse rationale + soundness;
 // the FFI path additionally relies on `reset()` recovering cleanly after a
 // `catch_unwind`-caught panic).
-use tsv_arena::with_ast_arena;
 #[cfg(feature = "format")]
 use tsv_arena::with_doc_arena;
+use tsv_arena::{with_ast_arena, with_interner};
 
 /// Extract a &str from source pointer, or return an error result.
 ///
@@ -158,8 +158,75 @@ fn error_result(message: &str, out_len: *mut usize) -> *mut u8 {
 /// - `source_ptr` must point to valid UTF-8 data of `source_len` bytes
 /// - `out_len` must point to a valid `usize` for writing output length
 /// - Caller must free returned pointer via `tsv_free(ptr, *out_len)`
+// Per-language compound-op helpers, keyed on the interner `$flavor`
+// (`interned` for tsv_ts/tsv_svelte, `plain` for the interner-free tsv_css).
+// The interned arm threads a per-thread `Interner` (`with_interner`) through
+// parse (`&mut`) and convert/format (`&`); the plain arm calls CSS's
+// interner-free signatures. This localizes the CSS-vs-TS/Svelte arity asymmetry
+// to these three macros so `lang_bindings!` below stays uniform.
+#[cfg(feature = "parse")]
+macro_rules! parse_convert {
+    (interned, $lang:ident, $conv:ident, $source:expr) => {
+        with_ast_arena(|arena| {
+            with_interner(|interner| {
+                let ast = $lang::parse($source, arena, interner).map_err(|e| e.to_string())?;
+                Ok($lang::$conv(&ast, $source, interner))
+            })
+        })
+    };
+    (plain, $lang:ident, $conv:ident, $source:expr) => {
+        with_ast_arena(|arena| {
+            let ast = $lang::parse($source, arena).map_err(|e| e.to_string())?;
+            Ok($lang::$conv(&ast, $source))
+        })
+    };
+}
+
+#[cfg(feature = "parse")]
+macro_rules! parse_internal {
+    (interned, $lang:ident, $source:expr) => {
+        with_ast_arena(|arena| {
+            with_interner(|interner| {
+                let ast = $lang::parse($source, arena, interner).map_err(|e| e.to_string())?;
+                // Consume the borrowed AST before the next call's `reset()`.
+                std::hint::black_box(&ast);
+                Ok(())
+            })
+        })
+    };
+    (plain, $lang:ident, $source:expr) => {
+        with_ast_arena(|arena| {
+            let ast = $lang::parse($source, arena).map_err(|e| e.to_string())?;
+            std::hint::black_box(&ast);
+            Ok(())
+        })
+    };
+}
+
+#[cfg(feature = "format")]
+macro_rules! parse_format {
+    (interned, $lang:ident, $source:expr) => {
+        with_ast_arena(|arena| {
+            with_interner(|interner| {
+                let ast = $lang::parse($source, arena, interner).map_err(|e| e.to_string())?;
+                Ok(with_doc_arena(|doc_arena| {
+                    $lang::format_in(&ast, $source, doc_arena, interner)
+                }))
+            })
+        })
+    };
+    (plain, $lang:ident, $source:expr) => {
+        with_ast_arena(|arena| {
+            let ast = $lang::parse($source, arena).map_err(|e| e.to_string())?;
+            Ok(with_doc_arena(|doc_arena| {
+                $lang::format_in(&ast, $source, doc_arena)
+            }))
+        })
+    };
+}
+
 macro_rules! lang_bindings {
-    ($parse_fn:ident, $parse_no_loc_fn:ident, $parse_internal_fn:ident, $format_fn:ident, $lang:ident) => {
+    ($flavor:ident, $parse_fn:ident, $parse_no_loc_fn:ident, $parse_internal_fn:ident, $format_fn:ident, $lang:ident) => {
         /// Parse source code and return JSON AST.
         ///
         /// # Safety
@@ -173,10 +240,7 @@ macro_rules! lang_bindings {
         ) -> *mut u8 {
             unsafe {
                 with_source_string(source_ptr, source_len, out_len, |source| {
-                    with_ast_arena(|arena| {
-                        let ast = $lang::parse(source, arena).map_err(|e| e.to_string())?;
-                        Ok($lang::convert_ast_json_bytes(&ast, source))
-                    })
+                    parse_convert!($flavor, $lang, convert_ast_json_bytes, source)
                 })
             }
         }
@@ -197,10 +261,7 @@ macro_rules! lang_bindings {
         ) -> *mut u8 {
             unsafe {
                 with_source_string(source_ptr, source_len, out_len, |source| {
-                    with_ast_arena(|arena| {
-                        let ast = $lang::parse(source, arena).map_err(|e| e.to_string())?;
-                        Ok($lang::convert_ast_json_bytes_no_locations(&ast, source))
-                    })
+                    parse_convert!($flavor, $lang, convert_ast_json_bytes_no_locations, source)
                 })
             }
         }
@@ -219,13 +280,7 @@ macro_rules! lang_bindings {
         ) -> *mut u8 {
             unsafe {
                 with_source_parse_internal(source_ptr, source_len, out_len, |source| {
-                    with_ast_arena(|arena| {
-                        let ast = $lang::parse(source, arena).map_err(|e| e.to_string())?;
-                        // Consume the borrowed AST before `with_ast_arena` resets
-                        // it on the next call (the AST borrows from `arena`).
-                        std::hint::black_box(&ast);
-                        Ok(())
-                    })
+                    parse_internal!($flavor, $lang, source)
                 })
             }
         }
@@ -243,12 +298,7 @@ macro_rules! lang_bindings {
         ) -> *mut u8 {
             unsafe {
                 with_source_string(source_ptr, source_len, out_len, |source| {
-                    with_ast_arena(|arena| {
-                        let ast = $lang::parse(source, arena).map_err(|e| e.to_string())?;
-                        Ok(with_doc_arena(|doc_arena| {
-                            $lang::format_in(&ast, source, doc_arena)
-                        }))
-                    })
+                    parse_format!($flavor, $lang, source)
                 })
             }
         }
@@ -256,6 +306,7 @@ macro_rules! lang_bindings {
 }
 
 lang_bindings!(
+    interned,
     tsv_parse_svelte,
     tsv_parse_svelte_no_locations,
     tsv_parse_internal_svelte,
@@ -263,6 +314,7 @@ lang_bindings!(
     tsv_svelte
 );
 lang_bindings!(
+    interned,
     tsv_parse_typescript,
     tsv_parse_typescript_no_locations,
     tsv_parse_internal_typescript,
@@ -270,6 +322,7 @@ lang_bindings!(
     tsv_ts
 );
 lang_bindings!(
+    plain,
     tsv_parse_css,
     tsv_parse_css_no_locations,
     tsv_parse_internal_css,
@@ -313,9 +366,11 @@ pub unsafe extern "C" fn tsv_parse_typescript_with_goal(
     unsafe {
         with_source_string(source_ptr, source_len, out_len, |source| {
             with_ast_arena(|arena| {
-                let ast = tsv_ts::parse_with_goal(source, ffi_goal(goal), arena)
-                    .map_err(|e| e.to_string())?;
-                Ok(tsv_ts::convert_ast_json_bytes(&ast, source))
+                with_interner(|interner| {
+                    let ast = tsv_ts::parse_with_goal(source, ffi_goal(goal), arena, interner)
+                        .map_err(|e| e.to_string())?;
+                    Ok(tsv_ts::convert_ast_json_bytes(&ast, source, interner))
+                })
             })
         })
     }
@@ -336,9 +391,13 @@ pub unsafe extern "C" fn tsv_parse_typescript_no_locations_with_goal(
     unsafe {
         with_source_string(source_ptr, source_len, out_len, |source| {
             with_ast_arena(|arena| {
-                let ast = tsv_ts::parse_with_goal(source, ffi_goal(goal), arena)
-                    .map_err(|e| e.to_string())?;
-                Ok(tsv_ts::convert_ast_json_bytes_no_locations(&ast, source))
+                with_interner(|interner| {
+                    let ast = tsv_ts::parse_with_goal(source, ffi_goal(goal), arena, interner)
+                        .map_err(|e| e.to_string())?;
+                    Ok(tsv_ts::convert_ast_json_bytes_no_locations(
+                        &ast, source, interner,
+                    ))
+                })
             })
         })
     }
@@ -360,10 +419,12 @@ pub unsafe extern "C" fn tsv_parse_internal_typescript_with_goal(
     unsafe {
         with_source_parse_internal(source_ptr, source_len, out_len, |source| {
             with_ast_arena(|arena| {
-                let ast = tsv_ts::parse_with_goal(source, ffi_goal(goal), arena)
-                    .map_err(|e| e.to_string())?;
-                std::hint::black_box(&ast);
-                Ok(())
+                with_interner(|interner| {
+                    let ast = tsv_ts::parse_with_goal(source, ffi_goal(goal), arena, interner)
+                        .map_err(|e| e.to_string())?;
+                    std::hint::black_box(&ast);
+                    Ok(())
+                })
             })
         })
     }

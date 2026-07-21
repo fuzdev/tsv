@@ -109,9 +109,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// ordinary elements rather than `SlotElement`s — mirrors Svelte's
     /// `parent_is_shadowroot_template` (`1-parse/state/element.js`).
     fn attrs_have_shadowrootmode(&self, attributes: &[AttributeNode<'arena>]) -> bool {
-        let interner = self.interner.borrow();
         attributes.iter().any(|attr| {
-            matches!(attr, AttributeNode::Attribute(a) if interner.resolve(a.name) == Some("shadowrootmode"))
+            matches!(attr, AttributeNode::Attribute(a) if self.interner.resolve_infallible(a.name) == "shadowrootmode")
         })
     }
 
@@ -391,8 +390,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             match &attr {
                 AttributeNode::Attribute(a) => {
                     // Check for `this` attribute on svelte:element and svelte:component.
-                    // Compare the resolved name by borrow — no per-attribute `String`.
-                    if self.interner.borrow().resolve(a.name) == Some("this") {
+                    // Compare the resolved name directly — no per-attribute `String`.
+                    if self.interner.resolve_infallible(a.name) == "this" {
                         if tag == SpecialElementTag::SvelteElement {
                             // Extract expression from the attribute value
                             if let Some(values) = a.value {

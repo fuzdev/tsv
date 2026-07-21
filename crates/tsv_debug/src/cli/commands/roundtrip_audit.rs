@@ -532,9 +532,10 @@ fn tsv_self_roundtrip(path: &Path, render: bool, verbose: bool, reparse_only: bo
 /// convert). The gate fast path's reparseability test.
 fn tsv_reparses(source: &str, parser: ParserType) -> bool {
     let arena = bumpalo::Bump::new();
+    let mut interner = tsv_lang::Interner::new();
     match parser {
-        ParserType::TypeScript => tsv_ts::parse(source, &arena).is_ok(),
-        ParserType::Svelte => tsv_svelte::parse(source, &arena).is_ok(),
+        ParserType::TypeScript => tsv_ts::parse(source, &arena, &mut interner).is_ok(),
+        ParserType::Svelte => tsv_svelte::parse(source, &arena, &mut interner).is_ok(),
         ParserType::Css => tsv_css::parse(source, &arena).is_ok(),
     }
 }

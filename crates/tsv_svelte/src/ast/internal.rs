@@ -19,7 +19,7 @@ use std::borrow::Cow;
 
 use string_interner::DefaultSymbol;
 use tsv_css::ast::internal::CssStyleSheet;
-pub use tsv_lang::{Comment, SharedInterner, Span};
+pub use tsv_lang::{Comment, Span};
 use tsv_ts::ast::internal::{Expression, Program, TSTypeParameterDeclaration, VariableDeclaration};
 
 /// Svelte Root - top-level AST node
@@ -38,7 +38,6 @@ pub struct Root<'arena> {
     /// Use `comments_to_emit_in_range(span)` to find comments for a specific node.
     pub comments: Vec<Comment>,
     pub span: Span,
-    pub interner: SharedInterner,
 }
 
 /// Svelte Fragment - container for template nodes

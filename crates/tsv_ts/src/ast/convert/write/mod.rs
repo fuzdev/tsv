@@ -26,8 +26,7 @@
 
 use super::super::internal;
 use super::{Schema, bigint_to_decimal};
-use string_interner::DefaultStringInterner;
-use tsv_lang::{LocationMapper, Position, Span};
+use tsv_lang::{Interner, LocationMapper, Position, Span};
 // The JSON-scalar substrate is shared across the three language writers (so the
 // Svelte writer can compose embedded TS/CSS emission into one buffer). Only the
 // TS-specific node emitters (`node_header`, field helpers, `Ctx`) live here.
@@ -66,11 +65,11 @@ pub fn write_program_json(
     program: &internal::Program<'_>,
     source: &str,
     loc: LocationMapper<'_>,
+    interner: &Interner,
     schema: Schema,
     locations: bool,
 ) -> Vec<u8> {
-    let interner = program.interner.borrow();
-    let mut ctx = Ctx::new(source, loc, &interner);
+    let mut ctx = Ctx::new(source, loc, interner);
     ctx.vanilla_acorn = schema.is_svelte_script();
     ctx.emit_loc = locations;
     let mut w = JsonWriter::with_capacity(tsv_lang::estimated_json_capacity(source.len()));
@@ -93,7 +92,7 @@ pub fn write_expression_embedded(
     expr: &internal::Expression<'_>,
     source: &str,
     loc: LocationMapper<'_>,
-    interner: &DefaultStringInterner,
+    interner: &Interner,
     comments: CommentMode<'_>,
     emit_loc: bool,
 ) {
@@ -113,7 +112,7 @@ pub fn write_variable_declaration_embedded(
     var_decl: &internal::VariableDeclaration<'_>,
     source: &str,
     loc: LocationMapper<'_>,
-    interner: &DefaultStringInterner,
+    interner: &Interner,
     comments: CommentMode<'_>,
     emit_loc: bool,
 ) {
@@ -136,7 +135,7 @@ pub fn write_identifier_expression_with_character(
     expr: &internal::Expression<'_>,
     source: &str,
     loc: LocationMapper<'_>,
-    interner: &DefaultStringInterner,
+    interner: &Interner,
     comments: CommentMode<'_>,
     emit_loc: bool,
 ) {
@@ -193,7 +192,7 @@ pub fn write_pattern_embedded(
     expr: &internal::Expression<'_>,
     source: &str,
     loc: LocationMapper<'_>,
-    interner: &DefaultStringInterner,
+    interner: &Interner,
     comments: CommentMode<'_>,
     emit_loc: bool,
 ) {
@@ -281,7 +280,7 @@ pub fn write_program_embedded(
     program: &internal::Program<'_>,
     source: &str,
     loc: LocationMapper<'_>,
-    interner: &DefaultStringInterner,
+    interner: &Interner,
     schema: Schema,
     loc_override: (Position, Position),
     comments: CommentMode<'_>,
@@ -342,7 +341,7 @@ pub enum CommentMode<'a> {
 pub(super) struct Ctx<'a> {
     pub(super) source: &'a str,
     pub(super) loc: LocationMapper<'a>,
-    pub(super) interner: &'a DefaultStringInterner,
+    pub(super) interner: &'a Interner,
     /// Block-pattern `read_pattern` `+1`-column quirk: the (1-based) line on
     /// which the pattern starts, or `0` when inactive. A node's `loc` column is
     /// bumped `+1` on this line only, reproducing `adjust_read_pattern_columns`.
@@ -376,7 +375,7 @@ pub(super) struct Ctx<'a> {
 impl<'a> Ctx<'a> {
     /// The base per-document context (no pattern quirks active).
     #[inline]
-    fn new(source: &'a str, loc: LocationMapper<'a>, interner: &'a DefaultStringInterner) -> Self {
+    fn new(source: &'a str, loc: LocationMapper<'a>, interner: &'a Interner) -> Self {
         Ctx {
             source,
             loc,
@@ -600,7 +599,6 @@ pub(super) fn write_name(
     name_start: u32,
     ctx: &Ctx<'_>,
 ) {
-    use tsv_lang::InfallibleResolve;
     match name.escaped {
         Some(sym) => w.string(ctx.interner.resolve_infallible(sym)),
         None => {

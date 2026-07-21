@@ -1,12 +1,10 @@
 // Svelte parser - main entry point for parsing .svelte files
 
-use std::rc::Rc;
-
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use crate::parser::element::ParsedElement;
 use tsv_lang::source_scan::{TriviaProfile, skip_template_literal, skip_trivia};
-use tsv_lang::{ParseError, Span};
+use tsv_lang::{Interner, ParseError, Span};
 
 // Module declarations
 mod attribute;
@@ -30,9 +28,14 @@ use parser_impl::SvelteParser;
 pub fn parse_svelte<'arena>(
     source: &str,
     arena: &'arena bumpalo::Bump,
+    interner: &mut Interner,
 ) -> Result<Root<'arena>, ParseError> {
-    let mut parser = SvelteParser::new(source, arena)?;
-    parser.parse_root()
+    let mut parser = SvelteParser::new(source, arena, std::mem::take(interner))?;
+    let result = parser.parse_root();
+    // Reclaim the interner for the format/convert phases (the AST stores only
+    // `Copy` symbol IDs, so nothing returned borrows it).
+    *interner = std::mem::take(&mut parser.interner);
+    result
 }
 
 impl<'a, 'arena> SvelteParser<'a, 'arena> {
@@ -236,7 +239,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             options,
             comments,
             span: Span { start, end },
-            interner: Rc::clone(&self.interner),
         })
     }
 

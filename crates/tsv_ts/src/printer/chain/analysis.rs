@@ -21,8 +21,9 @@ pub trait SymbolLookup {
     /// Resolve the name channel (span-identity slice at `name_start`, or the
     /// interned escaped form) and apply `f` without materializing a `String`.
     ///
-    /// Callback style keeps the interner borrow inside the call, so implementations
-    /// backed by `Rc<RefCell<…>>` don't need an owned copy to outlive the borrow.
+    /// Callback style keeps the resolved slice borrowed inside the call (a
+    /// span-identity name borrows `source`, an escaped name the interner), so no
+    /// implementation materializes an owned copy to outlive the borrow.
     /// Returns `None` when an escaped symbol is unknown to the interner.
     fn with_name<R>(
         &self,
@@ -580,16 +581,13 @@ mod tests {
     use super::*;
     use crate::ast::internal::{CallExpression, Identifier, MemberExpression};
     use bumpalo::Bump;
-    use string_interner::DefaultStringInterner;
+    use tsv_lang::Interner;
     use tsv_lang::Span;
 
     /// Helper to create an identifier expression. Tests fabricate spans with no
     /// backing source, so the name rides the escaped/interned channel (resolved
     /// through the interner regardless of span).
-    fn make_identifier<'arena>(
-        interner: &mut DefaultStringInterner,
-        name: &str,
-    ) -> Expression<'arena> {
+    fn make_identifier<'arena>(interner: &mut Interner, name: &str) -> Expression<'arena> {
         let len = name.len() as u32;
         let name = IdentName {
             escaped: Some(interner.get_or_intern(name)),
@@ -601,7 +599,7 @@ mod tests {
     /// Helper to create a member expression: object.property
     fn make_member<'arena>(
         arena: &'arena Bump,
-        interner: &mut DefaultStringInterner,
+        interner: &mut Interner,
         object: Expression<'arena>,
         property_name: &str,
         object_end: u32,
@@ -641,7 +639,7 @@ mod tests {
 
     #[test]
     fn test_linearize_simple_identifier() {
-        let mut interner = DefaultStringInterner::new();
+        let mut interner = Interner::new();
         let expr = make_identifier(&mut interner, "foo");
 
         let nodes = linearize_chain(&expr);
@@ -659,7 +657,7 @@ mod tests {
     #[test]
     fn test_linearize_member_chain() {
         let arena = Bump::new();
-        let mut interner = DefaultStringInterner::new();
+        let mut interner = Interner::new();
         // Build: a.b.c
         let a = make_identifier(&mut interner, "a");
         let ab = make_member(&arena, &mut interner, a, "b", 1);
@@ -677,7 +675,7 @@ mod tests {
     #[test]
     fn test_linearize_call_chain() {
         let arena = Bump::new();
-        let mut interner = DefaultStringInterner::new();
+        let mut interner = Interner::new();
         // Build: a().b()
         let a = make_identifier(&mut interner, "a");
         let a_call = make_call(&arena, a, 1);
@@ -697,7 +695,7 @@ mod tests {
     #[test]
     fn test_group_member_only_chain() {
         let arena = Bump::new();
-        let mut interner = DefaultStringInterner::new();
+        let mut interner = Interner::new();
         // Build: a.b.c.d
         let a = make_identifier(&mut interner, "a");
         let ab = make_member(&arena, &mut interner, a, "b", 1);
@@ -723,7 +721,7 @@ mod tests {
     #[test]
     fn test_group_call_chain_breaks_after_call() {
         let arena = Bump::new();
-        let mut interner = DefaultStringInterner::new();
+        let mut interner = Interner::new();
         // Build: a().b().c
         let a = make_identifier(&mut interner, "a");
         let a_call = make_call(&arena, a, 1);

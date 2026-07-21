@@ -185,14 +185,14 @@ pub(super) fn is_test_call(call: &internal::CallExpression<'_>, printer: &Printe
     let Some(parts) = get_member_chain_parts(call.callee) else {
         return false;
     };
-    let interner = printer.interner().borrow();
+    let interner = printer.interner();
     // Parts come out leaf→root; reverse to root→leaf to match the dotted
     // patterns (`test.describe.only`). Identifiers never contain `.`, so a
     // per-segment compare against `pattern.split('.')` is exact.
     let names: SmallVec<[&str; 8]> = parts
         .iter()
         .rev()
-        .map(|&(name, name_start, _)| name.resolve(name_start, printer.source, &interner))
+        .map(|&(name, name_start, _)| name.resolve(name_start, printer.source, interner))
         .collect();
     TEST_CALL_PATTERNS
         .iter()

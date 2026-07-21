@@ -1,7 +1,5 @@
 // Expression tag parsing
 
-use std::rc::Rc;
-
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
@@ -66,7 +64,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let (expression, comments) = tsv_ts::parse_expression_with_comments(
             expr_content,
             expr_start,
-            Rc::clone(&self.interner),
+            &mut self.interner,
             self.arena,
         )?;
 

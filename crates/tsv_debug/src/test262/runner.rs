@@ -322,7 +322,8 @@ pub fn grade_for_manifest(test: &TestFile) -> Option<ManifestEntry> {
         Verdict::Accept
     };
     let arena = bumpalo::Bump::new();
-    let tsv = match tsv_ts::parse_with_goal(&content, goal_for(module), &arena) {
+    let mut interner = tsv_lang::Interner::new();
+    let tsv = match tsv_ts::parse_with_goal(&content, goal_for(module), &arena, &mut interner) {
         Ok(_) => Verdict::Accept,
         Err(_) => Verdict::Reject,
     };
@@ -342,7 +343,8 @@ fn run_parse_test(content: &str, is_negative_parse: bool, goal: tsv_ts::Goal) ->
     // Note: test262 tests are pure ECMAScript, so we parse as TypeScript
     // (which is a superset of JS)
     let arena = bumpalo::Bump::new();
-    let parse_result = tsv_ts::parse_with_goal(content, goal, &arena);
+    let mut interner = tsv_lang::Interner::new();
+    let parse_result = tsv_ts::parse_with_goal(content, goal, &arena, &mut interner);
 
     match (parse_result, is_negative_parse) {
         // Positive test passed: parsed successfully as expected

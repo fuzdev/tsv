@@ -56,7 +56,6 @@ fn has_raw_content(element: &internal::Element<'_>) -> bool {
 mod tests {
     use super::*;
     use crate::ast::internal::FragmentNode;
-    use std::rc::Rc;
     use tsv_html as html;
     use tsv_lang::SymbolResolver;
 
@@ -85,10 +84,11 @@ mod tests {
     fn block_adapter_delegates_and_treats_components_as_inline() {
         let src = "<div><span>i</span><Comp>c</Comp></div>";
         let arena = bumpalo::Bump::new();
-        let root = crate::parse(src, &arena).expect("template should parse");
+        let mut interner = tsv_lang::Interner::new();
+        let root = crate::parse(src, &arena, &mut interner).expect("template should parse");
         // Reuse the parse's interner so the tag-name symbols resolve.
         let doc_arena = tsv_lang::doc::arena::DocArena::for_source(src);
-        let printer = Printer::new(&doc_arena, src, Rc::clone(&root.interner), &[]);
+        let printer = Printer::new(&doc_arena, src, &interner, &[]);
         let div = match &root.fragment.nodes[0] {
             FragmentNode::Element(el) => el,
             other => panic!("expected a <div>, got: {other:?}"),
@@ -111,9 +111,10 @@ mod tests {
 
         let src = "<div><script>let x = 1;</script><style>a { color: red }</style></div>";
         let arena = bumpalo::Bump::new();
-        let root = crate::parse(src, &arena).expect("template should parse");
+        let mut interner = tsv_lang::Interner::new();
+        let root = crate::parse(src, &arena, &mut interner).expect("template should parse");
         let doc_arena = tsv_lang::doc::arena::DocArena::for_source(src);
-        let printer = Printer::new(&doc_arena, src, Rc::clone(&root.interner), &[]);
+        let printer = Printer::new(&doc_arena, src, &interner, &[]);
         let div = match &root.fragment.nodes[0] {
             FragmentNode::Element(el) => el,
             other => panic!("expected a <div>, got: {other:?}"),
@@ -131,9 +132,10 @@ mod tests {
         // `has_raw_content` — not node-presence — is what makes this inline.
         let src = "<div><script></script><style></style></div>";
         let arena = bumpalo::Bump::new();
-        let root = crate::parse(src, &arena).expect("template should parse");
+        let mut interner = tsv_lang::Interner::new();
+        let root = crate::parse(src, &arena, &mut interner).expect("template should parse");
         let doc_arena = tsv_lang::doc::arena::DocArena::for_source(src);
-        let printer = Printer::new(&doc_arena, src, Rc::clone(&root.interner), &[]);
+        let printer = Printer::new(&doc_arena, src, &interner, &[]);
         let div = match &root.fragment.nodes[0] {
             FragmentNode::Element(el) => el,
             other => panic!("expected a <div>, got: {other:?}"),

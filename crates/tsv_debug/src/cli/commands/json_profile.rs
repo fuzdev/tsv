@@ -141,22 +141,25 @@ fn profile_once(
     // Arena allocated outside the timed region so its setup isn't counted.
     let arena = bumpalo::Bump::with_capacity(estimated_ast_arena_capacity(source.len()));
 
+    let mut interner = tsv_lang::Interner::new();
     let wire = match parser_type {
         ParserType::TypeScript => {
             let t = Instant::now();
-            let ast = tsv_ts::parse(source, &arena).map_err(|e| format!("parse error: {e}"))?;
+            let ast = tsv_ts::parse(source, &arena, &mut interner)
+                .map_err(|e| format!("parse error: {e}"))?;
             steps.parse.push(t.elapsed());
             let t = Instant::now();
-            let wire = tsv_ts::convert_ast_json_bytes(&ast, source);
+            let wire = tsv_ts::convert_ast_json_bytes(&ast, source, &interner);
             steps.write.push(t.elapsed());
             wire
         }
         ParserType::Svelte => {
             let t = Instant::now();
-            let ast = tsv_svelte::parse(source, &arena).map_err(|e| format!("parse error: {e}"))?;
+            let ast = tsv_svelte::parse(source, &arena, &mut interner)
+                .map_err(|e| format!("parse error: {e}"))?;
             steps.parse.push(t.elapsed());
             let t = Instant::now();
-            let wire = tsv_svelte::convert_ast_json_bytes(&ast, source);
+            let wire = tsv_svelte::convert_ast_json_bytes(&ast, source, &interner);
             steps.write.push(t.elapsed());
             wire
         }

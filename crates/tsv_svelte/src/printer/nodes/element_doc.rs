@@ -706,9 +706,11 @@ impl<'a> Printer<'a> {
                 .ok()
                 .map(|ast| tsv_css::format_in(&ast, &content, self.d()))
         } else {
-            tsv_ts::parse(&content, &arena)
-                .ok()
-                .map(|ast| tsv_ts::format_in(&ast, &content, self.d()))
+            // A fresh local interner for this independent re-parse of `content`
+            // (its symbols never mix with the host document's).
+            let mut interner = tsv_lang::Interner::new();
+            let parsed = tsv_ts::parse(&content, &arena, &mut interner).ok();
+            parsed.map(|ast| tsv_ts::format_in(&ast, &content, self.d(), &interner))
         };
 
         match formatted {

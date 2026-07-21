@@ -28,7 +28,8 @@
 /// `true` if tsv's Svelte parser accepts `src`.
 fn accepts(src: &str) -> bool {
     let arena = bumpalo::Bump::new();
-    tsv_svelte::parse(src, &arena).is_ok()
+    let mut interner = tsv_svelte::Interner::new();
+    tsv_svelte::parse(src, &arena, &mut interner).is_ok()
 }
 
 /// A call expression (or an optional chain ending in one) — accepted, matching

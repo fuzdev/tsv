@@ -19,7 +19,7 @@ impl<'a> SymbolLookup for Printer<'a> {
         f: impl FnOnce(&str) -> R,
     ) -> Option<R> {
         match name.escaped {
-            Some(sym) => self.interner.borrow().resolve(sym).map(f),
+            Some(sym) => Some(f(self.interner.resolve_infallible(sym))),
             None => Some(f(
                 &self.source[name_start as usize..name_start as usize + name.raw_len as usize]
             )),

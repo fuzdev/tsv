@@ -386,8 +386,9 @@ fn audit_file(path: &Path) -> FileOutcome {
 /// `preserve_parens`), in source order. `None` if the source doesn't parse.
 fn extract_bindings(source: &str) -> Option<Vec<CommentBinding>> {
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse_preserve_parens(source, &arena).ok()?;
-    let wire = tsv_ts::convert_ast_json(&program, source);
+    let mut interner = tsv_lang::Interner::new();
+    let program = tsv_ts::parse_preserve_parens(source, &arena, &mut interner).ok()?;
+    let wire = tsv_ts::convert_ast_json(&program, source, &interner);
     let map = Utf16ToByte::new(source);
     let bytes = source.as_bytes();
 

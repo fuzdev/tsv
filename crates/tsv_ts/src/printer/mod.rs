@@ -67,9 +67,8 @@ pub(crate) use types::unwrap_parenthesized;
 use crate::PrinterInputs;
 use crate::ast::internal;
 use std::cell::Cell;
-use std::rc::Rc;
 use tsv_lang::{
-    EmbedContext, OutputBuffer, SharedInterner, Span, SymbolResolver, SymbolToU32, TAB_WIDTH,
+    EmbedContext, Interner, OutputBuffer, Span, SymbolResolver, SymbolToU32, TAB_WIDTH,
     comments_to_emit_in_range,
     doc::{
         self,
@@ -114,8 +113,9 @@ pub struct Printer<'a> {
     pub(crate) embed: EmbedContext,
     /// Arena allocator for doc nodes (borrowed from caller or locally owned)
     pub(crate) arena: &'a DocArena,
-    /// Shared string interner for resolving symbols
-    interner: SharedInterner,
+    /// Borrowed caller-owned interner for resolving symbols (read-only at
+    /// format time; the parse phase's `&mut` borrow has ended).
+    interner: &'a Interner,
     /// Original source code (for extracting raw values, preserving escape sequences, etc.)
     pub(crate) source: &'a str,
     /// Comments from the program (for printing leading/trailing comments)
@@ -262,7 +262,7 @@ impl<'a> Printer<'a> {
             indent_level: 0,
             embed,
             arena,
-            interner: Rc::clone(&inputs.interner),
+            interner: inputs.interner,
             source: inputs.source,
             comments: inputs.comments,
             has_owned_comments: inputs.has_owned_comments,
@@ -359,11 +359,10 @@ impl<'a> Printer<'a> {
         // expression when Svelte-embedded) instead of an alloc/free per call.
         let mut output = self.arena.take_render_scratch();
         {
-            let interner = self.interner.borrow();
             // Source-aware resolver so `DocText::SourceSpan` nodes (verbatim
             // comment/literal slices) resolve without a `DocArena` lifetime.
             let resolver = doc::SourceTextResolver {
-                inner: &*interner,
+                inner: self.interner,
                 source: self.source,
             };
             doc::arena_print_doc_with_indent_resolved_into(
@@ -382,9 +381,8 @@ impl<'a> Printer<'a> {
 
     /// Render an arena DocId to a flat string with effectively infinite width.
     pub(crate) fn render_arena_doc_flat(&self, d: DocId) -> String {
-        let interner = self.interner.borrow();
         let resolver = doc::SourceTextResolver {
-            inner: &*interner,
+            inner: self.interner,
             source: self.source,
         };
         doc::arena_measure_doc_flat_resolved(self.arena, d, &self.embed, &resolver)
@@ -1223,7 +1221,7 @@ impl<'a> Printer<'a> {
 
 // Implement SymbolResolver trait for shared symbol resolution utilities
 impl<'a> SymbolResolver for Printer<'a> {
-    fn interner(&self) -> &SharedInterner {
-        &self.interner
+    fn interner(&self) -> &Interner {
+        self.interner
     }
 }

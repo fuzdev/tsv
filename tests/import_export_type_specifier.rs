@@ -17,8 +17,9 @@ use serde_json::Value;
 
 fn parse_json(source: &str) -> Value {
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("parse failed");
-    tsv_ts::convert_ast_json(&program, source)
+    let mut interner = tsv_ts::Interner::new();
+    let program = tsv_ts::parse(source, &arena, &mut interner).expect("parse failed");
+    tsv_ts::convert_ast_json(&program, source, &interner)
 }
 
 /// Assert the first import specifier's `imported`/`local` names and `importKind`.

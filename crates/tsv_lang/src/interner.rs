@@ -1,59 +1,89 @@
-// String interner utilities shared across language printers
+// String interner utilities shared across language parsers and printers
 
 use crate::doc::TextResolver;
-use std::cell::RefCell;
-use std::rc::Rc;
 use string_interner::{DefaultStringInterner, DefaultSymbol, Symbol};
 
-/// Shared, mutable interner reference threaded through parsers and printers.
+/// A caller-owned string interner — the third per-document reusable threaded
+/// alongside the parse-time `bumpalo::Bump` and the format-time `DocArena`.
 ///
-/// Used for the embedded TS-in-Svelte path so the same string identity is
-/// reused across crates. This alias hides the upstream
-/// `string_interner::DefaultStringInterner` type from consumer signatures.
-pub type SharedInterner = Rc<RefCell<DefaultStringInterner>>;
+/// A newtype over the upstream `string_interner::DefaultStringInterner` that
+/// keeps that type out of every public signature (as the retired
+/// `Rc<RefCell<…>>` `SharedInterner` alias did) while exposing only the three
+/// operations the pipeline needs: `get_or_intern` (`&mut`, at parse), and
+/// `resolve_infallible` / the [`TextResolver`] impl (`&`, at format and
+/// convert). Interning is **not** interior-mutable — parse takes `&mut Interner`
+/// and format/convert take `&Interner`, and the borrow checker enforces that
+/// the write phase ends before the read phase (which it always does: tsv is a
+/// batch parse-then-format, never an incremental compiler).
+///
+/// Its tenants are tsv_svelte's element/attribute names and the rare
+/// unicode-escaped / oversized identifier — tens of short strings per document,
+/// nothing on the common path (identifier names are span-identity). `new()`
+/// therefore allocates nothing.
+#[derive(Debug, Default)]
+pub struct Interner(DefaultStringInterner);
 
-/// Extension trait for infallible symbol resolution.
-///
-/// Symbols in tsv are always resolved by the same interner that created them.
-/// This is an invariant of the system - if violated, it's a bug in our code.
-/// This trait provides `resolve_infallible()` which panics with a clear message
-/// rather than returning `Option`.
-///
-/// # Example
-///
-/// ```rust,ignore
-/// use tsv_lang::InfallibleResolve;
-///
-/// let interner = program.interner.borrow();
-/// let name = interner.resolve_infallible(symbol).to_string();
-/// ```
-pub trait InfallibleResolve {
-    /// Resolve a symbol to its string, panicking if not found.
+impl Interner {
+    /// A fresh, empty interner. Allocates nothing — the common-path document
+    /// interns no strings at all.
+    #[inline]
+    #[must_use]
+    pub fn new() -> Self {
+        Self(DefaultStringInterner::new())
+    }
+
+    /// A fresh interner pre-sized for `capacity` distinct strings. Used by the
+    /// Svelte parser, whose element/attribute names are a small fixed
+    /// population covered by one up-front allocation.
+    #[inline]
+    #[must_use]
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self(DefaultStringInterner::with_capacity(capacity))
+    }
+
+    /// Intern `string`, returning its stable symbol (parse-time; needs `&mut`).
+    #[inline]
+    pub fn get_or_intern(&mut self, string: &str) -> DefaultSymbol {
+        self.0.get_or_intern(string)
+    }
+
+    /// Resolve a symbol to its string, panicking if it was not interned here.
+    ///
+    /// Symbols in tsv are always resolved by the same interner that created
+    /// them — an invariant of the system, so a miss is a bug in our code, not a
+    /// recoverable condition.
     ///
     /// # Panics
     ///
     /// Panics if the symbol was not interned by this interner.
-    /// This indicates a bug - symbols should only be resolved by the
-    /// interner that created them.
-    fn resolve_infallible(&self, symbol: DefaultSymbol) -> &str;
-}
-
-impl InfallibleResolve for DefaultStringInterner {
+    #[inline]
     #[allow(clippy::expect_used)]
-    fn resolve_infallible(&self, symbol: DefaultSymbol) -> &str {
-        self.resolve(symbol)
+    pub fn resolve_infallible(&self, symbol: DefaultSymbol) -> &str {
+        self.0
+            .resolve(symbol)
             .expect("Symbol not found in interner - this is a bug")
+    }
+
+    /// Reset for reuse across files (the [`crate::doc::arena::DocArena::reset`]
+    /// analogue for a per-thread reusable interner).
+    ///
+    /// `string_interner` 0.20 exposes no capacity-retaining `clear`, so this
+    /// replaces the backing with a fresh empty interner. That allocates nothing
+    /// — the common-path interner is already empty — so there is no retained
+    /// capacity to lose, and reuse is sound (each file's symbols are fully
+    /// consumed by its format/convert before the next `clear`).
+    #[inline]
+    pub fn clear(&mut self) {
+        self.0 = DefaultStringInterner::new();
     }
 }
 
-/// Implement TextResolver for DefaultStringInterner to enable deferred symbol resolution in docs
+/// Deferred symbol resolution during doc rendering.
 ///
-/// This allows printers to borrow the interner and pass it to print_doc_resolved:
-/// ```ignore
-/// let interner = self.interner.borrow();
-/// let output = doc::print_doc_resolved(&doc, &config, &*interner);
-/// ```
-impl TextResolver for DefaultStringInterner {
+/// `DocText::Symbol` nodes carry a raw `u32` id (a [`DefaultSymbol`] flattened
+/// via [`SymbolToU32`]); the renderer resolves them through this impl.
+impl TextResolver for Interner {
+    #[inline]
     #[allow(clippy::expect_used)]
     fn resolve(&self, id: u32) -> &str {
         let symbol = DefaultSymbol::try_from_usize(id as usize)
@@ -62,110 +92,46 @@ impl TextResolver for DefaultStringInterner {
     }
 }
 
-/// Trait for printers that use string interning
+/// Trait for printers that use string interning.
 ///
-/// This trait provides common symbol resolution methods for printers that use
-/// a shared string interner. By implementing this trait, printers automatically
-/// gain access to efficient symbol resolution utilities.
+/// Provides common symbol-resolution helpers on top of a single required
+/// `interner()` accessor. A printer holds a borrowed [`Interner`] and gains:
 ///
-/// # String Interning
-///
-/// String interning is a memory optimization technique where identical strings
-/// are stored only once. Instead of duplicating strings, we store each unique
-/// string once and reference it via a lightweight `Symbol` (essentially an integer).
-///
-/// # Methods
-///
-/// - `resolve_symbol()`: Allocates a String for the symbol (use when ownership needed)
-/// - `with_resolved_symbol()`: Zero-allocation callback approach (preferred for hot paths)
-///
-/// # Example
-///
-/// ```rust,ignore
-/// use tsv_lang::{SharedInterner, SymbolResolver};
-///
-/// struct MyPrinter<'a> {
-///     interner: SharedInterner,
-///     // ... other fields
-/// }
-///
-/// impl<'a> SymbolResolver for MyPrinter<'a> {
-///     fn interner(&self) -> &SharedInterner {
-///         &self.interner
-///     }
-/// }
-///
-/// // Now you can use:
-/// let name = printer.resolve_symbol(symbol);  // Allocates
-/// printer.with_resolved_symbol(symbol, |s| {  // Zero-allocation
-///     println!("Name: {}", s);
-/// });
-/// ```
+/// - `resolve_symbol()`: allocates a `String` for the symbol (use when
+///   ownership is needed)
+/// - `with_resolved_symbol()`: zero-allocation callback (preferred for hot
+///   paths)
 pub trait SymbolResolver {
-    /// Get reference to the string interner
+    /// Get a reference to the string interner.
     ///
-    /// This is the only required method. All other methods have default
-    /// implementations that use this interner reference.
-    fn interner(&self) -> &SharedInterner;
+    /// The only required method; every other method defaults off it.
+    fn interner(&self) -> &Interner;
 
-    /// Resolve a symbol to a String (allocates)
+    /// Resolve a symbol to a `String` (allocates).
     ///
-    /// This method allocates a new String on every call. For hot paths where
-    /// you need to perform multiple operations on the same symbol, prefer
-    /// `with_resolved_symbol()` instead for zero-allocation access.
+    /// For hot paths that operate on the resolved string without needing
+    /// ownership, prefer `with_resolved_symbol()`.
     ///
     /// # Panics
     ///
     /// Panics if the symbol is not found in the interner (should never happen
     /// in correctly functioning code).
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// let identifier = printer.resolve_symbol(symbol);
-    /// println!("Identifier: {}", identifier);
-    /// ```
     fn resolve_symbol(&self, symbol: DefaultSymbol) -> String {
-        self.interner()
-            .borrow()
-            .resolve_infallible(symbol)
-            .to_string()
+        self.interner().resolve_infallible(symbol).to_string()
     }
 
-    /// Execute a callback with a borrowed string for a symbol (zero-allocation)
-    ///
-    /// This method is more efficient than `resolve_symbol()` when you need to
-    /// perform operations on the resolved string without needing ownership.
-    /// The string is borrowed from the interner and passed to your callback,
-    /// avoiding any allocation.
+    /// Execute a callback with a borrowed string for a symbol (zero-allocation).
     ///
     /// # Panics
     ///
     /// Panics if the symbol is not found in the interner (should never happen
     /// in correctly functioning code).
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// // Zero-allocation string comparison
-    /// printer.with_resolved_symbol(symbol, |s| {
-    ///     if s == "const" {
-    ///         // Handle const keyword
-    ///     }
-    /// });
-    ///
-    /// // Zero-allocation string writing
-    /// printer.with_resolved_symbol(symbol, |s| {
-    ///     printer.buffer.push_str(s);
-    /// });
-    /// ```
     #[inline]
     fn with_resolved_symbol<F, R>(&self, symbol: DefaultSymbol, f: F) -> R
     where
         F: FnOnce(&str) -> R,
     {
-        let interner = self.interner().borrow();
-        f(interner.resolve_infallible(symbol))
+        f(self.interner().resolve_infallible(symbol))
     }
 }
 

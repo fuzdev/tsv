@@ -430,10 +430,8 @@ impl<'a> Printer<'a> {
 mod tests {
     use super::*;
     use crate::PrinterInputs;
-    use std::cell::RefCell;
-    use std::rc::Rc;
-    use string_interner::DefaultStringInterner;
     use tsv_lang::EmbedContext;
+    use tsv_lang::Interner;
     use tsv_lang::doc::arena::DocArena;
 
     /// A synthetic if/else region (as `tsv_svelte_compile` mints) can bracket arbitrary
@@ -447,10 +445,10 @@ mod tests {
         // end for an `e` at index 0) falls inside the em-dash.
         let source = "ex—";
         let arena = DocArena::new();
-        let interner = Rc::new(RefCell::new(DefaultStringInterner::new()));
+        let interner = Interner::new();
         let inputs = PrinterInputs {
             source,
-            interner,
+            interner: &interner,
             comments: &[],
             line_breaks: &[],
             has_owned_comments: false,

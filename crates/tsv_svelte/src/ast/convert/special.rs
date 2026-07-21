@@ -11,9 +11,8 @@
 use crate::ast::internal;
 use std::borrow::Cow;
 use std::collections::VecDeque;
-use string_interner::DefaultStringInterner;
 use tsv_lang::{
-    Comment, InfallibleResolve, JsonWriter, LocationMapper, LocationTracker, Position, Span,
+    Comment, Interner, JsonWriter, LocationMapper, LocationTracker, Position, Span,
     estimated_json_capacity,
 };
 use tsv_ts::ast::convert::{
@@ -47,7 +46,7 @@ fn expression_skeleton(
     expr: &tsv_ts::ast::internal::Expression<'_>,
     source: &str,
     tracker: &LocationTracker,
-    interner: &DefaultStringInterner,
+    interner: &Interner,
 ) -> SkeletonTree {
     let recorder = SkeletonRecorder::new();
     let mut w = skeleton_writer(expr.span());
@@ -77,7 +76,7 @@ pub(super) fn build_expression_writer_comments(
     template_comments: &[&Comment],
     source: &str,
     tracker: &LocationTracker,
-    interner: &DefaultStringInterner,
+    interner: &Interner,
     container_start: u32,
     range_end: u32,
 ) -> WriterComments {
@@ -111,7 +110,7 @@ pub(super) fn build_const_tag_writer_comments(
     template_comments: &[&Comment],
     source: &str,
     tracker: &LocationTracker,
-    interner: &DefaultStringInterner,
+    interner: &Interner,
 ) -> WriterComments {
     let id_span = tag.id.span();
     let mut out = WriterComments::default();
@@ -148,7 +147,7 @@ pub(super) fn build_declaration_tag_writer_comments(
     template_comments: &[&Comment],
     source: &str,
     tracker: &LocationTracker,
-    interner: &DefaultStringInterner,
+    interner: &Interner,
     tag_start: u32,
     tag_end: u32,
 ) -> WriterComments {
@@ -192,7 +191,7 @@ pub(super) fn build_expression_list_writer_comments(
     template_comments: &[&Comment],
     source: &str,
     tracker: &LocationTracker,
-    interner: &DefaultStringInterner,
+    interner: &Interner,
     container_start: u32,
     range_end: u32,
     wrapper_end: Option<u32>,
@@ -239,7 +238,7 @@ pub(super) fn build_script_writer_comments(
     script: &internal::Script<'_>,
     source: &str,
     tracker: &LocationTracker,
-    interner: &DefaultStringInterner,
+    interner: &Interner,
     html_leading_comment: Option<&internal::HtmlComment>,
     schema: Schema,
 ) -> WriterComments {
@@ -286,7 +285,7 @@ pub(super) fn build_script_writer_comments(
 fn script_lang<'s>(
     script: &internal::Script<'_>,
     source: &'s str,
-    interner: &'s DefaultStringInterner,
+    interner: &'s Interner,
 ) -> Option<&'s str> {
     for attr_node in script.attributes {
         let internal::AttributeNode::Attribute(attr) = attr_node else {
@@ -317,7 +316,7 @@ fn script_lang<'s>(
 pub(super) fn component_is_typescript(
     root: &internal::Root<'_>,
     source: &str,
-    interner: &DefaultStringInterner,
+    interner: &Interner,
 ) -> bool {
     // The two top-level scripts in source order — the first one carrying a `lang` decides.
     let mut scripts = [root.module, root.instance];
@@ -336,7 +335,7 @@ pub(super) fn component_is_typescript(
 pub(super) fn find_option_values<'arena>(
     attrs: &[internal::AttributeNode<'arena>],
     name: &str,
-    interner: &DefaultStringInterner,
+    interner: &Interner,
 ) -> Option<&'arena [internal::AttributeValue<'arena>]> {
     attrs.iter().find_map(|attr| {
         if let internal::AttributeNode::Attribute(attr) = attr
@@ -371,7 +370,7 @@ pub(super) fn text_value<'src>(
 pub(super) fn bool_option(
     attrs: &[internal::AttributeNode<'_>],
     name: &str,
-    interner: &DefaultStringInterner,
+    interner: &Interner,
 ) -> Option<bool> {
     attrs.iter().find_map(|attr| {
         if let internal::AttributeNode::Attribute(attr) = attr

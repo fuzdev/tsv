@@ -2,8 +2,6 @@
 //
 // Handles: {#if}, {#each}, {#await}, {#key} blocks
 
-use std::rc::Rc;
-
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use crate::parser::element::ParsedElement;
@@ -428,7 +426,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 let (ta, type_end) = tsv_ts::parse_type_annotation_partial(
                     after_ident,
                     colon_offset,
-                    Rc::clone(&self.interner),
+                    &mut self.interner,
                     self.arena,
                 )?;
                 if let Expression::Identifier(id) = &mut expr {
@@ -1089,7 +1087,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             match tsv_ts::parse_with_interner_preserve_parens(
                 &wrapper,
                 base,
-                Rc::clone(&self.interner),
+                &mut self.interner,
                 self.arena,
             ) {
                 Ok(program) => {

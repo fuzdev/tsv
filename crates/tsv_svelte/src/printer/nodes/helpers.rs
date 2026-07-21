@@ -692,7 +692,11 @@ mod tests {
         arena: &'arena bumpalo::Bump,
         src: &str,
     ) -> &'arena [FragmentNode<'arena>] {
-        crate::parse(src, arena)
+        // The nodes borrow only the arena (symbol IDs are `Copy`), so a local
+        // interner that dies with the returned slice is sound — these tests
+        // inspect node structure, not resolved names.
+        let mut interner = tsv_lang::Interner::new();
+        crate::parse(src, arena, &mut interner)
             .expect("template should parse")
             .fragment
             .nodes

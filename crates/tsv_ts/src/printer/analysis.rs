@@ -6,7 +6,7 @@
 
 use crate::ast::internal;
 use crate::printer::Printer;
-use string_interner::DefaultStringInterner;
+use tsv_lang::Interner;
 use tsv_lang::Span;
 use tsv_lang::doc::arena::DocId;
 
@@ -70,7 +70,7 @@ pub(crate) fn next_printed_stmt_start(
 pub(crate) fn is_module_path_fluid_call(
     expr: &internal::Expression<'_>,
     source: &str,
-    interner: &DefaultStringInterner,
+    interner: &Interner,
 ) -> bool {
     // Check for `await import(string)` — single-arg only (no options)
     if let internal::Expression::AwaitExpression(await_expr) = expr

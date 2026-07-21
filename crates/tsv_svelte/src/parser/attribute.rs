@@ -462,7 +462,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
     /// Create an identifier expression for shorthand directives (bind:value, class:class1)
     fn make_shorthand_identifier(
-        &self,
+        &mut self,
         name: &str,
         start: usize,
         end: usize,
@@ -481,7 +481,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// span-identity when the name is exactly the source slice (the common
     /// case), else interned — e.g. a `{ name }` shorthand attribute whose
     /// braces content was trimmed, so the span includes the padding.
-    fn synthesized_ident_name(&self, name: &str, span: Span) -> IdentName {
+    fn synthesized_ident_name(&mut self, name: &str, span: Span) -> IdentName {
         let slice = &self.source[span.start as usize..span.end as usize];
         if slice == name && u16::try_from(name.len()).is_ok() {
             IdentName {
@@ -490,7 +490,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             }
         } else {
             IdentName {
-                escaped: Some(self.interner.borrow_mut().get_or_intern(name)),
+                escaped: Some(self.intern(name)),
                 raw_len: 0,
             }
         }

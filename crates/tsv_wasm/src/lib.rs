@@ -23,9 +23,9 @@ use wasm_bindgen::prelude::*;
 // documented WASM-format allocation-count lever). Soundness matches the native
 // bindings — the AST/doc are fully consumed into an owned return value before the
 // next call's `reset()`.
-use tsv_arena::with_ast_arena;
 #[cfg(feature = "format")]
 use tsv_arena::with_doc_arena;
+use tsv_arena::{with_ast_arena, with_interner};
 
 // WASM global allocator: talc replaces std's default dlmalloc on wasm32. The
 // format path is allocation-heavy (doc IR, output string, memo vecs) and
@@ -243,8 +243,75 @@ extern "C" {
 /// (so the parse-only build drops the printers at link time). `$parse_ret`
 /// is the extern type from the block above whose `typescript_type` attribute
 /// names the matching interface in `tsv_ast.d.ts`.
+// Per-language compound-op helpers keyed on the interner `$flavor`
+// (`interned` for tsv_ts/tsv_svelte, `plain` for interner-free tsv_css) — the
+// interned arm threads a per-thread `Interner` (`with_interner`) through parse
+// (`&mut`) and convert/format (`&`); the plain arm uses CSS's interner-free
+// signatures. Localizes the CSS-vs-TS/Svelte arity asymmetry so `lang_bindings!`
+// stays uniform. WASM is single-threaded, so the thread-local is a module static.
+#[cfg(feature = "parse")]
+macro_rules! parse_convert {
+    (interned, $lang:ident, $conv:ident, $source:expr) => {
+        with_ast_arena(|arena| {
+            with_interner(|interner| {
+                let ast = $lang::parse($source, arena, interner).map_err(err)?;
+                Ok($lang::$conv(&ast, $source, interner))
+            })
+        })
+    };
+    (plain, $lang:ident, $conv:ident, $source:expr) => {
+        with_ast_arena(|arena| {
+            let ast = $lang::parse($source, arena).map_err(err)?;
+            Ok($lang::$conv(&ast, $source))
+        })
+    };
+}
+
+#[cfg(feature = "parse")]
+macro_rules! parse_internal {
+    (interned, $lang:ident, $source:expr) => {
+        with_ast_arena(|arena| {
+            with_interner(|interner| {
+                let ast = $lang::parse($source, arena, interner).map_err(err)?;
+                std::hint::black_box(&ast);
+                Ok(())
+            })
+        })
+    };
+    (plain, $lang:ident, $source:expr) => {
+        with_ast_arena(|arena| {
+            let ast = $lang::parse($source, arena).map_err(err)?;
+            std::hint::black_box(&ast);
+            Ok(())
+        })
+    };
+}
+
+#[cfg(feature = "format")]
+macro_rules! parse_format {
+    (interned, $lang:ident, $source:expr) => {
+        with_ast_arena(|arena| {
+            with_interner(|interner| {
+                let ast = $lang::parse($source, arena, interner).map_err(err)?;
+                Ok(with_doc_arena(|doc_arena| {
+                    $lang::format_in(&ast, $source, doc_arena, interner)
+                }))
+            })
+        })
+    };
+    (plain, $lang:ident, $source:expr) => {
+        with_ast_arena(|arena| {
+            let ast = $lang::parse($source, arena).map_err(err)?;
+            Ok(with_doc_arena(|doc_arena| {
+                $lang::format_in(&ast, $source, doc_arena)
+            }))
+        })
+    };
+}
+
 macro_rules! lang_bindings {
     (
+        $flavor:ident,
         $parse_fn:ident,
         $parse_json_fn:ident,
         $parse_internal_fn:ident,
@@ -267,36 +334,25 @@ macro_rules! lang_bindings {
         #[cfg(feature = "parse")]
         #[wasm_bindgen]
         pub fn $parse_json_fn(source: &str) -> Result<String, JsError> {
-            with_ast_arena(|arena| {
-                let ast = $lang::parse(source, arena).map_err(err)?;
-                Ok($lang::convert_ast_json_string(&ast, source))
-            })
+            parse_convert!($flavor, $lang, convert_ast_json_string, source)
         }
 
         #[cfg(feature = "parse")]
         #[wasm_bindgen]
         pub fn $parse_internal_fn(source: &str) -> Result<(), JsError> {
-            with_ast_arena(|arena| {
-                let ast = $lang::parse(source, arena).map_err(err)?;
-                std::hint::black_box(ast);
-                Ok(())
-            })
+            parse_internal!($flavor, $lang, source)
         }
 
         #[cfg(feature = "format")]
         #[wasm_bindgen]
         pub fn $format_fn(source: &str) -> Result<String, JsError> {
-            with_ast_arena(|arena| {
-                let ast = $lang::parse(source, arena).map_err(err)?;
-                Ok(with_doc_arena(|doc_arena| {
-                    $lang::format_in(&ast, source, doc_arena)
-                }))
-            })
+            parse_format!($flavor, $lang, source)
         }
     };
 }
 
 lang_bindings!(
+    interned,
     parse_svelte,
     parse_svelte_json,
     parse_internal_svelte,
@@ -305,6 +361,7 @@ lang_bindings!(
     SvelteRoot,
 );
 lang_bindings!(
+    interned,
     parse_typescript,
     parse_typescript_json,
     parse_internal_typescript,
@@ -313,6 +370,7 @@ lang_bindings!(
     TsProgram,
 );
 lang_bindings!(
+    plain,
     parse_css,
     parse_css_json,
     parse_internal_css,
@@ -349,8 +407,10 @@ fn goal_from_str(goal: &str) -> Result<tsv_ts::Goal, JsError> {
 pub fn parse_typescript_json_with_goal(source: &str, goal: &str) -> Result<String, JsError> {
     let goal = goal_from_str(goal)?;
     with_ast_arena(|arena| {
-        let ast = tsv_ts::parse_with_goal(source, goal, arena).map_err(err)?;
-        Ok(tsv_ts::convert_ast_json_string(&ast, source))
+        with_interner(|interner| {
+            let ast = tsv_ts::parse_with_goal(source, goal, arena, interner).map_err(err)?;
+            Ok(tsv_ts::convert_ast_json_string(&ast, source, interner))
+        })
     })
 }
 
@@ -360,10 +420,12 @@ pub fn parse_typescript_json_with_goal(source: &str, goal: &str) -> Result<Strin
 pub fn format_typescript_with_goal(source: &str, goal: &str) -> Result<String, JsError> {
     let goal = goal_from_str(goal)?;
     with_ast_arena(|arena| {
-        let ast = tsv_ts::parse_with_goal(source, goal, arena).map_err(err)?;
-        Ok(with_doc_arena(|doc_arena| {
-            tsv_ts::format_in(&ast, source, doc_arena)
-        }))
+        with_interner(|interner| {
+            let ast = tsv_ts::parse_with_goal(source, goal, arena, interner).map_err(err)?;
+            Ok(with_doc_arena(|doc_arena| {
+                tsv_ts::format_in(&ast, source, doc_arena, interner)
+            }))
+        })
     })
 }
 
@@ -388,8 +450,12 @@ pub fn format_typescript_with_goal(source: &str, goal: &str) -> Result<String, J
 #[wasm_bindgen]
 pub fn parse_typescript_json_no_locations(source: &str) -> Result<String, JsError> {
     with_ast_arena(|arena| {
-        let ast = tsv_ts::parse(source, arena).map_err(err)?;
-        Ok(tsv_ts::convert_ast_json_string_no_locations(&ast, source))
+        with_interner(|interner| {
+            let ast = tsv_ts::parse(source, arena, interner).map_err(err)?;
+            Ok(tsv_ts::convert_ast_json_string_no_locations(
+                &ast, source, interner,
+            ))
+        })
     })
 }
 
@@ -404,8 +470,12 @@ pub fn parse_typescript_json_with_goal_no_locations(
 ) -> Result<String, JsError> {
     let goal = goal_from_str(goal)?;
     with_ast_arena(|arena| {
-        let ast = tsv_ts::parse_with_goal(source, goal, arena).map_err(err)?;
-        Ok(tsv_ts::convert_ast_json_string_no_locations(&ast, source))
+        with_interner(|interner| {
+            let ast = tsv_ts::parse_with_goal(source, goal, arena, interner).map_err(err)?;
+            Ok(tsv_ts::convert_ast_json_string_no_locations(
+                &ast, source, interner,
+            ))
+        })
     })
 }
 
@@ -417,9 +487,11 @@ pub fn parse_typescript_json_with_goal_no_locations(
 pub fn parse_internal_typescript_with_goal(source: &str, goal: &str) -> Result<(), JsError> {
     let goal = goal_from_str(goal)?;
     with_ast_arena(|arena| {
-        let ast = tsv_ts::parse_with_goal(source, goal, arena).map_err(err)?;
-        std::hint::black_box(ast);
-        Ok(())
+        with_interner(|interner| {
+            let ast = tsv_ts::parse_with_goal(source, goal, arena, interner).map_err(err)?;
+            std::hint::black_box(&ast);
+            Ok(())
+        })
     })
 }
 
@@ -437,10 +509,12 @@ pub fn parse_typescript_no_locations(source: &str) -> Result<JsValue, JsError> {
 #[wasm_bindgen]
 pub fn parse_svelte_json_no_locations(source: &str) -> Result<String, JsError> {
     with_ast_arena(|arena| {
-        let ast = tsv_svelte::parse(source, arena).map_err(err)?;
-        Ok(tsv_svelte::convert_ast_json_string_no_locations(
-            &ast, source,
-        ))
+        with_interner(|interner| {
+            let ast = tsv_svelte::parse(source, arena, interner).map_err(err)?;
+            Ok(tsv_svelte::convert_ast_json_string_no_locations(
+                &ast, source, interner,
+            ))
+        })
     })
 }
 

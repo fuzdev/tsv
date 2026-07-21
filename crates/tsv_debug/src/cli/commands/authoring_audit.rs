@@ -190,7 +190,8 @@ fn flip_run(run: &str) -> Option<(bool, &'static str)> {
 // idempotency invariant predicts those embedded triggers are each self-stable.
 fn svelte_sites(f: &str) -> Option<Vec<Site>> {
     let arena = bumpalo::Bump::new();
-    let root = tsv_svelte::parse(f, &arena).ok()?;
+    let mut interner = tsv_lang::Interner::new();
+    let root = tsv_svelte::parse(f, &arena, &mut interner).ok()?;
     let mut sites = Vec::new();
     collect_sites(root.fragment.nodes, f, false, &mut sites);
     Some(sites)

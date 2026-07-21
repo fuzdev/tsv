@@ -21,19 +21,22 @@ use serde_json::Value;
 
 fn parse_json(source: &str) -> Value {
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("parse failed");
-    tsv_ts::convert_ast_json(&program, source)
+    let mut interner = tsv_ts::Interner::new();
+    let program = tsv_ts::parse(source, &arena, &mut interner).expect("parse failed");
+    tsv_ts::convert_ast_json(&program, source, &interner)
 }
 
 fn format(source: &str) -> String {
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("parse failed");
-    tsv_ts::format(&program, source)
+    let mut interner = tsv_ts::Interner::new();
+    let program = tsv_ts::parse(source, &arena, &mut interner).expect("parse failed");
+    tsv_ts::format(&program, source, &interner)
 }
 
 fn rejects(source: &str) -> bool {
     let arena = bumpalo::Bump::new();
-    tsv_ts::parse(source, &arena).is_err()
+    let mut interner = tsv_ts::Interner::new();
+    tsv_ts::parse(source, &arena, &mut interner).is_err()
 }
 
 /// Reserved keywords prettier accepts as a bare type-reference name (each verified

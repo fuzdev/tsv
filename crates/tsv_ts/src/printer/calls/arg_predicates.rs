@@ -543,15 +543,13 @@ pub(in crate::printer) fn is_function_composition_args(arguments: &[Expression<'
 mod tests {
     use super::*;
     use bumpalo::Bump;
-    use std::cell::RefCell;
-    use std::rc::Rc;
-    use string_interner::DefaultStringInterner;
+    use tsv_lang::Interner;
 
     /// Parse a bare expression to its internal AST node (spans index into `src`),
     /// allocated in the caller-supplied `arena`.
     fn parse_expr<'a>(arena: &'a Bump, src: &str) -> Expression<'a> {
-        let interner = Rc::new(RefCell::new(DefaultStringInterner::new()));
-        crate::parse_expression_with_comments(src, 0, interner, arena)
+        let mut interner = Interner::new();
+        crate::parse_expression_with_comments(src, 0, &mut interner, arena)
             .expect("expression should parse")
             .0
     }

@@ -59,10 +59,9 @@
 //! the shape the canonical Svelte parser's `expected.json` records.
 
 use crate::ast::internal;
-use string_interner::DefaultStringInterner;
 use tsv_css::ast::convert::write_css_node;
 use tsv_lang::{
-    Comment, InfallibleResolve, JsonWriter, LocationMapper, LocationTracker, Position, Span,
+    Comment, Interner, JsonWriter, LocationMapper, LocationTracker, Position, Span,
     estimated_json_capacity, write_array, write_or_null,
 };
 use tsv_ts::ast::convert::{
@@ -82,8 +81,12 @@ use super::special::{
 ///
 /// One AST walk, no intermediate `serde_json::Value` for the spine — the fused
 /// char-space wire the FFI/CLI/WASM parse bindings ship.
-pub(crate) fn write_root_bytes(root: &internal::Root<'_>, source: &str) -> Vec<u8> {
-    write_root_bytes_variant(root, source, true)
+pub(crate) fn write_root_bytes(
+    root: &internal::Root<'_>,
+    source: &str,
+    interner: &Interner,
+) -> Vec<u8> {
+    write_root_bytes_variant(root, source, interner, true)
 }
 
 /// The `no-locations` variant of `write_root_bytes`: drops every line/column
@@ -91,11 +94,20 @@ pub(crate) fn write_root_bytes(root: &internal::Root<'_>, source: &str) -> Vec<u
 /// the `name_loc` on elements/attributes/directives, and the root-comment
 /// `loc`. Only `start`/`end` offsets remain; nothing else changes. Because that
 /// removes *all* line/column emission, the LF line table is never queried.
-pub(crate) fn write_root_bytes_no_locations(root: &internal::Root<'_>, source: &str) -> Vec<u8> {
-    write_root_bytes_variant(root, source, false)
+pub(crate) fn write_root_bytes_no_locations(
+    root: &internal::Root<'_>,
+    source: &str,
+    interner: &Interner,
+) -> Vec<u8> {
+    write_root_bytes_variant(root, source, interner, false)
 }
 
-fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: bool) -> Vec<u8> {
+fn write_root_bytes_variant(
+    root: &internal::Root<'_>,
+    source: &str,
+    interner: &Interner,
+    emit_loc: bool,
+) -> Vec<u8> {
     // LF-only tracker (Svelte's `locate-character` convention) + byte→UTF-16 map
     // in one source scan; the identity map short-circuits on ASCII. The
     // `no-locations` path emits no line/column at all (loc, name_loc, and
@@ -106,7 +118,6 @@ fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: b
     } else {
         LocationTracker::new_map_only(source)
     };
-    let interner = root.interner.borrow();
 
     // Template comments (outside `<script>` content spans) are the only comments
     // the template attach passes move; everything else stays where it is.
@@ -123,11 +134,11 @@ fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: b
             tracker: &tracker,
             map: &map,
         },
-        interner: &interner,
+        interner,
         comments: &template_comments,
         // Component-global: `lang="ts"` on any script makes *every* script emit the
         // acorn-typescript wire shape (Svelte's single `this.ts` flag).
-        component_is_ts: component_is_typescript(root, source, &interner),
+        component_is_ts: component_is_typescript(root, source, interner),
         emit_loc,
     };
 
@@ -146,7 +157,7 @@ struct Ctx<'a> {
     /// and the `<script>` tag-line lookups); its `map`, the `<style>` CSS
     /// children.
     loc: LocationMapper<'a>,
-    interner: &'a DefaultStringInterner,
+    interner: &'a Interner,
     /// Template comments, sorted by position (empty on the common no-comment
     /// template — the whole spine then fuses).
     comments: &'a [&'a Comment],
@@ -1861,9 +1872,10 @@ mod tests {
     fn convert_svelte(source: &str) -> Value {
         let arena = bumpalo::Bump::new();
         // Test inputs are hardcoded valid sources; a parse failure should panic
+        let mut interner = tsv_lang::Interner::new();
         #[allow(clippy::expect_used)]
-        let root = crate::parse(source, &arena).expect("parse");
-        crate::convert_ast_json(&root, source)
+        let root = crate::parse(source, &arena, &mut interner).expect("parse");
+        crate::convert_ast_json(&root, source, &interner)
     }
 
     // Svelte hard-codes a `{@const}` declaration's `end` to `parser.index - 1`

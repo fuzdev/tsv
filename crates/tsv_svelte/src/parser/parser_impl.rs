@@ -4,10 +4,8 @@ use crate::ast::internal::FragmentNode;
 use crate::lexer::{Lexer, Token, TokenKind};
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
-use std::cell::RefCell;
-use std::rc::Rc;
-use string_interner::{DefaultStringInterner, DefaultSymbol};
-use tsv_lang::{Comment, ParseError, SharedInterner, Span};
+use string_interner::DefaultSymbol;
+use tsv_lang::{Comment, Interner, ParseError, Span};
 use tsv_ts::Expression;
 
 /// Build an expression `Comment` from its already-shifted `span` / `content_span`.
@@ -51,7 +49,11 @@ pub(crate) struct SvelteParser<'a, 'arena> {
     /// **slice-relative** — `base_offset` is added when it's consumed, exactly
     /// as for a freshly lexed token); cleared whenever the lexer is re-seeked.
     pub(crate) peek: Option<Token>,
-    pub(crate) interner: SharedInterner,
+    /// The one caller-owned interner shared with every embedded `<script>` /
+    /// `{expr}` (moved in for the parse, reclaimed by [`super::parse_svelte`]).
+    /// Its tenants are the template element/attribute names plus the rare
+    /// escaped TS identifier; the AST stores only `Copy` symbol IDs.
+    pub(crate) interner: Interner,
     pub(crate) base_offset: usize, // Offset of lexer's source in full source
     /// TS comments collected from template expressions (e.g., {@debug /* comment */ a})
     pub(crate) expression_comments: Vec<Comment>,
@@ -68,20 +70,20 @@ pub(crate) struct SvelteParser<'a, 'arena> {
 }
 
 impl<'a, 'arena> SvelteParser<'a, 'arena> {
-    pub(crate) fn new(source: &'a str, arena: &'arena Bump) -> Result<Self, ParseError> {
+    pub(crate) fn new(
+        source: &'a str,
+        arena: &'arena Bump,
+        interner: Interner,
+    ) -> Result<Self, ParseError> {
         let mut lexer = Lexer::new(source);
         // Extract token data immediately to avoid keeping token alive
         let (kind, start, end) = {
             let token = lexer.next_token()?;
             (token.kind, token.start as usize, token.end as usize)
         };
-        // The Svelte parser owns the single interner shared with every embedded
+        // The caller-owned interner (moved in) is shared with every embedded
         // `<script>`/`{expr}`. Its tenants are element/attribute names plus the
-        // rare escaped TS identifier — tens of short strings, not the
-        // per-identifier population the retired source-proportional pre-size was
-        // tuned for. A small fixed capacity covers a typical component's distinct
-        // names in one up-front allocation instead of ~9 from-empty growth steps.
-        let interner = Rc::new(RefCell::new(DefaultStringInterner::with_capacity(32)));
+        // rare escaped TS identifier — tens of short strings.
         Ok(Self {
             arena,
             source,
@@ -140,8 +142,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         Ok(())
     }
 
-    pub(crate) fn intern(&self, s: &str) -> DefaultSymbol {
-        self.interner.borrow_mut().get_or_intern(s)
+    pub(crate) fn intern(&mut self, s: &str) -> DefaultSymbol {
+        self.interner.get_or_intern(s)
     }
 
     pub(crate) fn current_pos(&self) -> (usize, usize) {
@@ -408,7 +410,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let (expr, comments) = tsv_ts::parse_expression_with_comments(
             source,
             base_offset,
-            Rc::clone(&self.interner),
+            &mut self.interner,
             self.arena,
         )?;
         self.expression_comments.extend_from_slice(comments);
@@ -426,7 +428,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let (expr, end_pos, comments) = tsv_ts::parse_expression_partial_with_comments(
             source,
             base_offset,
-            Rc::clone(&self.interner),
+            &mut self.interner,
             self.arena,
         )?;
         self.expression_comments.extend_from_slice(comments);
@@ -443,7 +445,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let (pattern, comments) = tsv_ts::parse_pattern_with_comments(
             source,
             base_offset,
-            Rc::clone(&self.interner),
+            &mut self.interner,
             self.arena,
         )?;
         // Canonical reads a destructure via a synthetic `(pattern = 1)` acorn
@@ -474,7 +476,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let (stmt, comments) = tsv_ts::parse_statement_with_comments(
             source,
             base_offset,
-            Rc::clone(&self.interner),
+            &mut self.interner,
             self.arena,
         )?;
         self.expression_comments.extend_from_slice(comments);

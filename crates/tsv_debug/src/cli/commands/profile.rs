@@ -217,25 +217,28 @@ fn profile_once(
     arena: &bumpalo::Bump,
     doc_arena: &tsv_lang::doc::arena::DocArena,
 ) -> Result<(Duration, Duration), String> {
+    let mut interner = tsv_lang::Interner::new();
     match parser_type {
         ParserType::TypeScript => {
             let t0 = Instant::now();
-            let ast = tsv_ts::parse(source, arena).map_err(|e| format!("parse error: {e}"))?;
+            let ast = tsv_ts::parse(source, arena, &mut interner)
+                .map_err(|e| format!("parse error: {e}"))?;
             let parse_dur = t0.elapsed();
 
             let t1 = Instant::now();
-            let _ = tsv_ts::format_in(&ast, source, doc_arena);
+            let _ = tsv_ts::format_in(&ast, source, doc_arena, &interner);
             let format_dur = t1.elapsed();
 
             Ok((parse_dur, format_dur))
         }
         ParserType::Svelte => {
             let t0 = Instant::now();
-            let ast = tsv_svelte::parse(source, arena).map_err(|e| format!("parse error: {e}"))?;
+            let ast = tsv_svelte::parse(source, arena, &mut interner)
+                .map_err(|e| format!("parse error: {e}"))?;
             let parse_dur = t0.elapsed();
 
             let t1 = Instant::now();
-            let _ = tsv_svelte::format_in(&ast, source, doc_arena);
+            let _ = tsv_svelte::format_in(&ast, source, doc_arena, &interner);
             let format_dur = t1.elapsed();
 
             Ok((parse_dur, format_dur))

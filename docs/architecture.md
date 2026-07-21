@@ -465,7 +465,7 @@ Script/style tag content is extracted by **raw byte scanning** for closing delim
 
 ### Multi-Language Embedding
 
-The Svelte parser shares a single `Rc<RefCell<StringInterner>>` with tsv_ts, so identifiers are deduplicated across template expressions and script blocks. Each embedded region gets a fresh parser instance — reusing one would require `reset()` (bug-prone, error-unsafe) to save only a small fixed allocation per region.
+The Svelte parser threads a single caller-owned `tsv_lang::Interner` through tsv_ts, so identifiers are deduplicated across template expressions and script blocks. The Svelte parser owns the one interner for the parse and reborrows `&mut` into each embedded `<script>`/`{expr}` parse; each embedded region gets a fresh parser instance.
 
 Embedded parsers track `base_offset` so spans are absolute positions in the root source, not relative to tag content. Standalone parsing passes `base_offset = 0`.
 
@@ -772,9 +772,10 @@ wholesale when the arena drops, with no per-node `Drop`:
 ```rust
 pub struct Program<'arena> {
     pub body: &'arena [Statement<'arena>],
-    pub comments: Vec<Comment>, // root-owned; not the per-node target
+    pub comments: &'arena [Comment], // arena-gathered; not the per-node target
     pub span: Span,
-    // …interner (Rc<RefCell<…>>, shared across embedded languages)
+    // no interner field — the AST holds only Copy symbol IDs; the caller owns
+    // the `tsv_lang::Interner`, threaded &mut through parse, & through format/convert
 }
 
 pub enum Statement<'arena> {
@@ -784,12 +785,15 @@ pub enum Statement<'arena> {
 }
 ```
 
-The caller owns the arena (`parse(source, &arena)`); the returned AST borrows it,
-and `format`/`convert` consume it into an owned `String`/JSON, so the arena never
-escapes the call (no self-referential ownership — `unsafe_code = "forbid"`, safe
-bumpalo API only). The interner stays `Rc<RefCell<…>>` (created before the arena,
-mutated during parse, shared across the Svelte→TS embedding boundary) — orthogonal
-to `'arena`.
+The caller owns the arena (`parse(source, &arena, &mut interner)`); the returned
+AST borrows it, and `format`/`convert` consume it into an owned `String`/JSON, so
+the arena never escapes the call (no self-referential ownership — `unsafe_code =
+"forbid"`, safe bumpalo API only). The interner is the **third caller-owned
+reusable** beside the arena: a `tsv_lang::Interner` threaded `&mut` through parse
+(interning) and `&` through format/convert (resolve), never held by the AST (which
+stores only `Copy` symbol IDs) — orthogonal to `'arena`. The parser owns it for the
+parse's duration (moved in via `std::mem::take`, handed back after) so no third
+lifetime lands on the parser struct.
 
 **Inline-by-value layout, deliberately not size-minimized.** A node holds its
 children inline by value where they were owned inline before; only genuinely

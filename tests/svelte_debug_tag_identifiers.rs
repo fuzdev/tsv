@@ -36,14 +36,16 @@
 /// `true` if tsv's Svelte parser accepts `src`.
 fn accepts(src: &str) -> bool {
     let arena = bumpalo::Bump::new();
-    tsv_svelte::parse(src, &arena).is_ok()
+    let mut interner = tsv_svelte::Interner::new();
+    tsv_svelte::parse(src, &arena, &mut interner).is_ok()
 }
 
 /// Parse and format `src` (panics if `src` does not parse).
 fn format(src: &str) -> String {
     let arena = bumpalo::Bump::new();
-    let root = tsv_svelte::parse(src, &arena).expect("src should parse");
-    tsv_svelte::format(&root, src)
+    let mut interner = tsv_svelte::Interner::new();
+    let root = tsv_svelte::parse(src, &arena, &mut interner).expect("src should parse");
+    tsv_svelte::format(&root, src, &interner)
 }
 
 /// Every argument is a plain identifier — accepted (matching Svelte). Includes

@@ -29,8 +29,9 @@ fn assert_paren_this(source: &str, pointer: &str, expected_output: &str) {
     );
 
     let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("parse failed");
-    let json = tsv_ts::convert_ast_json(&program, source);
+    let mut interner = tsv_ts::Interner::new();
+    let program = tsv_ts::parse(source, &arena, &mut interner).expect("parse failed");
+    let json = tsv_ts::convert_ast_json(&program, source, &interner);
 
     let paren = json.pointer(pointer).expect("parenthesized type");
     assert_eq!(
@@ -46,14 +47,15 @@ fn assert_paren_this(source: &str, pointer: &str, expected_output: &str) {
         "inner is the this-type, not a type reference named `this`: {paren}"
     );
 
-    let output = tsv_ts::format(&program, source);
+    let output = tsv_ts::format(&program, source, &interner);
     assert_eq!(output, expected_output, "paren-strip output");
 
     // The stripped form is tsv's fixed point.
     let arena_out = bumpalo::Bump::new();
-    let reparsed = tsv_ts::parse(&output, &arena_out).expect("reparse failed");
+    let mut interner_out = tsv_ts::Interner::new();
+    let reparsed = tsv_ts::parse(&output, &arena_out, &mut interner_out).expect("reparse failed");
     assert_eq!(
-        tsv_ts::format(&reparsed, &output),
+        tsv_ts::format(&reparsed, &output, &interner_out),
         output,
         "output should be stable"
     );

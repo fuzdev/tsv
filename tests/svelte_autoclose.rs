@@ -36,8 +36,10 @@ use serde_json::Value;
 /// `end` at the byte offset of the tag that triggered the implicit close.
 fn autoclose_skeleton(src: &str) -> String {
     let arena = bumpalo::Bump::new();
-    let ast = tsv_svelte::parse(src, &arena).expect("parser should accept implicit-close markup");
-    let json = tsv_svelte::convert_ast_json(&ast, src);
+    let mut interner = tsv_svelte::Interner::new();
+    let ast = tsv_svelte::parse(src, &arena, &mut interner)
+        .expect("parser should accept implicit-close markup");
+    let json = tsv_svelte::convert_ast_json(&ast, src, &interner);
     let nodes = json["fragment"]["nodes"]
         .as_array()
         .expect("Root.fragment.nodes array");

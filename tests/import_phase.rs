@@ -30,16 +30,19 @@
 /// tsv parses + formats `input` to itself, then re-formats stably (idempotent).
 fn assert_ours_stable(input: &str) {
     let arena = bumpalo::Bump::new();
-    let ast = tsv_svelte::parse(input, &arena).expect("parse failed");
-    let output = tsv_svelte::format(&ast, input);
+    let mut interner = tsv_svelte::Interner::new();
+    let ast = tsv_svelte::parse(input, &arena, &mut interner).expect("parse failed");
+    let output = tsv_svelte::format(&ast, input, &interner);
     assert_eq!(
         output, input,
         "printer should keep import-phase syntax stable"
     );
 
     let arena_twice = bumpalo::Bump::new();
-    let ast_twice = tsv_svelte::parse(&output, &arena_twice).expect("reparse failed");
-    let output_twice = tsv_svelte::format(&ast_twice, &output);
+    let mut interner_twice = tsv_svelte::Interner::new();
+    let ast_twice =
+        tsv_svelte::parse(&output, &arena_twice, &mut interner_twice).expect("reparse failed");
+    let output_twice = tsv_svelte::format(&ast_twice, &output, &interner_twice);
     assert_eq!(output, output_twice, "printer should be idempotent");
 }
 
@@ -89,8 +92,9 @@ fn static_import_source_binding_stable() {
 /// it. See `docs/conformance_svelte.md` §Import-phase proposals.
 fn assert_ours_rejects(input: &str) {
     let arena = bumpalo::Bump::new();
+    let mut interner = tsv_svelte::Interner::new();
     assert!(
-        tsv_svelte::parse(input, &arena).is_err(),
+        tsv_svelte::parse(input, &arena, &mut interner).is_err(),
         "expected parse rejection (pinned divergence)"
     );
 }

@@ -300,14 +300,16 @@ struct ConstructResult {
 fn doc_node_count(source: &str, parser: ParserType) -> Result<usize, String> {
     let bump = bumpalo::Bump::with_capacity(estimated_ast_arena_capacity(source.len()));
     let doc_arena = DocArena::for_source(source);
+    let mut interner = tsv_lang::Interner::new();
     match parser {
         ParserType::Svelte => {
-            let ast = tsv_svelte::parse(source, &bump).map_err(|e| format!("{e}"))?;
-            let _ = tsv_svelte::format_in(&ast, source, &doc_arena);
+            let ast =
+                tsv_svelte::parse(source, &bump, &mut interner).map_err(|e| format!("{e}"))?;
+            let _ = tsv_svelte::format_in(&ast, source, &doc_arena, &interner);
         }
         ParserType::TypeScript => {
-            let ast = tsv_ts::parse(source, &bump).map_err(|e| format!("{e}"))?;
-            let _ = tsv_ts::format_in(&ast, source, &doc_arena);
+            let ast = tsv_ts::parse(source, &bump, &mut interner).map_err(|e| format!("{e}"))?;
+            let _ = tsv_ts::format_in(&ast, source, &doc_arena, &interner);
         }
         ParserType::Css => {
             let ast = tsv_css::parse(source, &bump).map_err(|e| format!("{e}"))?;

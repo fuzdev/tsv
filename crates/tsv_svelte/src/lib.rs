@@ -7,7 +7,7 @@ mod lexer;
 mod parser;
 mod printer;
 
-pub use tsv_lang::{ParseError, Result};
+pub use tsv_lang::{Interner, ParseError, Result};
 
 /// Parse Svelte source code into an internal AST
 ///
@@ -29,8 +29,12 @@ pub use tsv_lang::{ParseError, Result};
 /// let arena = bumpalo::Bump::new();
 /// let ast = tsv_svelte::parse("<div>Hello</div>", &arena)?;
 /// ```
-pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Root<'arena>> {
-    parser::parse_svelte(source, arena).map_err(|e| e.with_context(source))
+pub fn parse<'arena>(
+    source: &str,
+    arena: &'arena bumpalo::Bump,
+    interner: &mut Interner,
+) -> Result<Root<'arena>> {
+    parser::parse_svelte(source, arena, interner).map_err(|e| e.with_context(source))
 }
 
 /// Format a Svelte AST back to source code
@@ -52,8 +56,21 @@ pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Root<
 /// let ast = tsv_svelte::parse(source, &arena)?;
 /// let formatted = tsv_svelte::format(&ast, source);
 /// ```
-pub fn format(root: &Root<'_>, source: &str) -> String {
-    printer::format_svelte(root, source)
+pub fn format(root: &Root<'_>, source: &str, interner: &Interner) -> String {
+    printer::format_svelte(root, source, interner)
+}
+
+/// Parse and format `source` in one call, owning the interner.
+///
+/// The fully-fused one-shot convenience (the parse/format/interner analogue of
+/// `tsv_ts::format_str`), for callers that just want the formatted string and
+/// never touch the AST or interner. Batch drivers thread [`parse`] +
+/// [`format_in`] with their own reusable [`Interner`] instead.
+pub fn format_str(source: &str) -> Result<String> {
+    let arena = bumpalo::Bump::new();
+    let mut interner = Interner::new();
+    let root = parse(source, &arena, &mut interner)?;
+    Ok(format(&root, source, &interner))
 }
 
 /// Format into a caller-provided doc arena.
@@ -64,8 +81,13 @@ pub fn format(root: &Root<'_>, source: &str) -> String {
 /// borrowed from `arena` escapes — the result is an owned `String`. Embedded
 /// `<style>` blocks share this same arena (the CSS renders to its own string but
 /// builds its doc nodes into the host arena, not a second per-block one).
-pub fn format_in(root: &Root<'_>, source: &str, arena: &tsv_lang::doc::arena::DocArena) -> String {
-    printer::format_svelte_in(root, source, arena)
+pub fn format_in(
+    root: &Root<'_>,
+    source: &str,
+    arena: &tsv_lang::doc::arena::DocArena,
+    interner: &Interner,
+) -> String {
+    printer::format_svelte_in(root, source, arena, interner)
 }
 
 /// Convert internal AST to JSON with character-based positions
@@ -88,8 +110,21 @@ pub fn format_in(root: &Root<'_>, source: &str, arena: &tsv_lang::doc::arena::Do
 /// ```
 #[cfg(feature = "convert")]
 #[allow(clippy::expect_used)]
-pub fn convert_ast_json(root: &Root<'_>, source: &str) -> serde_json::Value {
-    serde_json::from_slice(&convert_ast_json_bytes(root, source)).expect("writer emits valid JSON")
+pub fn convert_ast_json(root: &Root<'_>, source: &str, interner: &Interner) -> serde_json::Value {
+    serde_json::from_slice(&convert_ast_json_bytes(root, source, interner))
+        .expect("writer emits valid JSON")
+}
+
+/// Parse and emit the compact wire-JSON string in one call, owning the interner.
+///
+/// The parse analogue of [`format_str`] — the fully-fused one-shot convenience
+/// for callers that want the JSON string and never touch the AST or interner.
+#[cfg(feature = "convert")]
+pub fn parse_to_json(source: &str) -> Result<String> {
+    let arena = bumpalo::Bump::new();
+    let mut interner = Interner::new();
+    let root = parse(source, &arena, &mut interner)?;
+    Ok(convert_ast_json_string(&root, source, &interner))
 }
 
 /// Convert internal AST to compact JSON wire bytes with character-based positions
@@ -113,8 +148,8 @@ pub fn convert_ast_json(root: &Root<'_>, source: &str) -> serde_json::Value {
 /// The output is the Svelte parser's JSON shape; `convert_ast_json` parses these
 /// bytes back into a `Value`.
 #[cfg(feature = "convert")]
-pub fn convert_ast_json_bytes(root: &Root<'_>, source: &str) -> Vec<u8> {
-    ast::convert::write_root_bytes(root, source)
+pub fn convert_ast_json_bytes(root: &Root<'_>, source: &str, interner: &Interner) -> Vec<u8> {
+    ast::convert::write_root_bytes(root, source, interner)
 }
 
 /// Convert internal AST to compact JSON wire bytes **without** line/column data.
@@ -129,8 +164,12 @@ pub fn convert_ast_json_bytes(root: &Root<'_>, source: &str) -> Vec<u8> {
 /// nothing queries the line table. Mirrors acorn's `locations: false`; a
 /// distinct, narrower product from the default drop-in wire.
 #[cfg(feature = "convert")]
-pub fn convert_ast_json_bytes_no_locations(root: &Root<'_>, source: &str) -> Vec<u8> {
-    ast::convert::write_root_bytes_no_locations(root, source)
+pub fn convert_ast_json_bytes_no_locations(
+    root: &Root<'_>,
+    source: &str,
+    interner: &Interner,
+) -> Vec<u8> {
+    ast::convert::write_root_bytes_no_locations(root, source, interner)
 }
 
 /// Convert internal AST to a compact JSON string with character-based positions
@@ -141,16 +180,21 @@ pub fn convert_ast_json_bytes_no_locations(root: &Root<'_>, source: &str) -> Vec
 /// bytes variant.
 #[cfg(feature = "convert")]
 #[allow(clippy::expect_used)]
-pub fn convert_ast_json_string(root: &Root<'_>, source: &str) -> String {
-    String::from_utf8(convert_ast_json_bytes(root, source)).expect("serde_json emits valid UTF-8")
+pub fn convert_ast_json_string(root: &Root<'_>, source: &str, interner: &Interner) -> String {
+    String::from_utf8(convert_ast_json_bytes(root, source, interner))
+        .expect("serde_json emits valid UTF-8")
 }
 
 /// The `String` form of `convert_ast_json_bytes_no_locations` for `&str`
 /// boundaries (the WASM binding's `JSON.parse`, N-API strings).
 #[cfg(feature = "convert")]
 #[allow(clippy::expect_used)]
-pub fn convert_ast_json_string_no_locations(root: &Root<'_>, source: &str) -> String {
-    String::from_utf8(convert_ast_json_bytes_no_locations(root, source))
+pub fn convert_ast_json_string_no_locations(
+    root: &Root<'_>,
+    source: &str,
+    interner: &Interner,
+) -> String {
+    String::from_utf8(convert_ast_json_bytes_no_locations(root, source, interner))
         .expect("serde_json emits valid UTF-8")
 }
 

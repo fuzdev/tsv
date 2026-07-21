@@ -5,10 +5,8 @@ use crate::ast::internal::*;
 use crate::lexer::{KeywordKind, Lexer, Token, TokenKind};
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
-use std::cell::RefCell;
-use std::rc::Rc;
-use string_interner::{DefaultStringInterner, DefaultSymbol};
-use tsv_lang::{ParseError, SharedInterner, Span};
+use string_interner::DefaultSymbol;
+use tsv_lang::{Interner, ParseError, Span};
 
 // Import parsing implementations
 mod expression;
@@ -107,7 +105,13 @@ pub struct Parser<'a, 'arena> {
     /// into `current` with no intermediate lookahead struct to reassemble.
     peek: Option<Token>,
     peek_decoded: Option<&'arena str>,
-    interner: SharedInterner,
+    /// The caller-owned interner, moved in for the duration of this parse. Its
+    /// tenants are the rare escaped/oversized identifier names (span-identity
+    /// otherwise). The public `parse` entry points move the caller's `Interner`
+    /// in via `std::mem::take` and reclaim it (`take(&mut parser.interner)`) once
+    /// parsing returns, so the symbols outlive the parser for the format/convert
+    /// phases; the AST stores only `Copy` symbol IDs, never a borrow into it.
+    pub(crate) interner: Interner,
     base_offset: usize, // Offset in full source (for embedded expressions)
     /// Comments collected during parsing, gathered directly in the AST arena
     /// (`Comment` is a `Copy` POD, so bumpalo's no-`Drop` rule holds). Handed to
@@ -222,17 +226,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Create a parser with a fresh interner against an explicit goal symbol.
     /// The standalone `parse`/`parse_with_goal` paths use this; embedders go
     /// through [`Parser::with_interner`] (always `Module`).
-    fn new_with_goal(source: &'a str, goal: Goal, arena: &'arena Bump) -> Result<Self, ParseError> {
+    fn new_with_goal(
+        source: &'a str,
+        goal: Goal,
+        arena: &'arena Bump,
+        interner: Interner,
+    ) -> Result<Self, ParseError> {
         // Span-identity identifiers intern nothing on the common path — the
-        // interner holds only the rare escaped/oversized names, so it starts
-        // empty (`new()` allocates nothing) instead of pre-sized.
-        Self::with_interner_and_goal(
-            source,
-            0,
-            Rc::new(RefCell::new(DefaultStringInterner::new())),
-            goal,
-            arena,
-        )
+        // interner holds only the rare escaped/oversized names. The caller owns
+        // it (moved in here, reclaimed by the public entry point after parse).
+        Self::with_interner_and_goal(source, 0, interner, goal, arena)
     }
 
     /// Allocate a single AST node in the arena, returning a shared `&'arena`
@@ -290,7 +293,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub fn with_interner(
         source: &'a str,
         base_offset: usize,
-        interner: SharedInterner,
+        interner: Interner,
         arena: &'arena Bump,
     ) -> Result<Self, ParseError> {
         Self::with_interner_and_goal(source, base_offset, interner, Goal::Module, arena)
@@ -301,7 +304,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn with_interner_and_goal(
         source: &'a str,
         base_offset: usize,
-        interner: SharedInterner,
+        interner: Interner,
         goal: Goal,
         arena: &'arena Bump,
     ) -> Result<Self, ParseError> {
@@ -466,8 +469,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
-    pub(super) fn intern(&self, s: &str) -> DefaultSymbol {
-        self.interner.borrow_mut().get_or_intern(s)
+    pub(super) fn intern(&mut self, s: &str) -> DefaultSymbol {
+        self.interner.get_or_intern(s)
     }
 
     // Helper methods for extract-then-advance pattern
@@ -575,7 +578,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// bytes) unless the token carries a decoded unicode escape
     /// (`\u0066oo` → `foo`) or is too long for `raw_len` — only those rare
     /// cases intern.
-    pub(super) fn current_ident_name(&self) -> IdentName {
+    pub(super) fn current_ident_name(&mut self) -> IdentName {
         if let Some(decoded) = self.current_decoded {
             IdentName {
                 escaped: Some(self.intern(decoded)),
@@ -591,11 +594,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// lexer re-classifies an escaped keyword as an `Identifier`, so its decoded
     /// value flows through `current_ident_name` instead (property/member and
     /// class/interface/type-member keys decode via that path — acorn parity).
-    pub(super) fn current_raw_ident_name(&self) -> IdentName {
+    pub(super) fn current_raw_ident_name(&mut self) -> IdentName {
         let len = self.current.end - self.current.start;
         if len > u16::MAX as u32 {
+            let value = self.current_value();
             IdentName {
-                escaped: Some(self.intern(self.current_value())),
+                escaped: Some(self.intern(value)),
                 raw_len: 0,
             }
         } else {
@@ -611,7 +615,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// (`at_await_identifier` — e.g. a class name, single-param arrow param, or
     /// `break`/`continue` label at Script `[~Await]`). A plain identifier decodes
     /// unicode escapes; `await` is a keyword token, verbatim by construction.
-    pub(super) fn current_ident_name_or_await(&self) -> IdentName {
+    pub(super) fn current_ident_name_or_await(&mut self) -> IdentName {
         if matches!(self.current_kind(), TokenKind::Identifier) {
             self.current_ident_name()
         } else {
@@ -632,7 +636,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         expected: &str,
     ) -> bool {
         match escaped {
-            Some(sym) => self.interner.borrow().resolve(sym) == Some(expected),
+            Some(sym) => self.interner.resolve_infallible(sym) == expected,
             None => {
                 let start = name_start - self.base_offset;
                 self.source.as_bytes().get(start..start + name_len) == Some(expected.as_bytes())
@@ -668,7 +672,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Handles `TokenKind::Identifier` (with unicode escape decoding) and
     /// contextual keywords like `from`, `as`, `satisfies`. Returns `None`
     /// if the current token is not identifier-like.
-    pub(super) fn try_ident_or_keyword_name(&self) -> Option<IdentName> {
+    pub(super) fn try_ident_or_keyword_name(&mut self) -> Option<IdentName> {
         match self.current_kind() {
             TokenKind::Identifier => Some(self.current_ident_name()),
             TokenKind::Keyword(kw) if kw.can_be_identifier() => Some(self.current_raw_ident_name()),
@@ -683,7 +687,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// errors), so `function await(){}` / `export function await(){}` reject there,
     /// matching acorn-as-module and the function-expression name path. Other
     /// contextual keywords (`async`, `from`, type keywords) stay valid names.
-    pub(super) fn try_function_name(&self) -> Option<IdentName> {
+    pub(super) fn try_function_name(&mut self) -> Option<IdentName> {
         if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Await))
             && !self.await_is_identifier()
         {
@@ -697,7 +701,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// Like `try_ident_or_keyword_name` but uses `can_be_binding_name()`,
     /// which excludes `await`, `yield`, and `let` (not valid as parameter/variable names).
-    pub(super) fn try_binding_name(&self) -> Option<IdentName> {
+    /// Whether the current token is binding-name-eligible — the non-interning
+    /// classification behind `try_binding_name().is_some()`. Pure `&self` (no
+    /// interning), so it is safe inside a `debug_assert!` (the name-building
+    /// path `try_binding_name` takes may intern).
+    pub(super) fn at_binding_name(&self) -> bool {
+        match self.current_kind() {
+            TokenKind::Identifier => true,
+            TokenKind::Keyword(kw) if kw.can_be_binding_name() => true,
+            TokenKind::Keyword(KeywordKind::Await) => self.await_is_identifier(),
+            _ => false,
+        }
+    }
+
+    pub(super) fn try_binding_name(&mut self) -> Option<IdentName> {
         match self.current_kind() {
             TokenKind::Identifier => Some(self.current_ident_name()),
             TokenKind::Keyword(kw) if kw.can_be_binding_name() => {
@@ -832,15 +849,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Like `try_binding_name`, but also accepts the `this` keyword as the
     /// TypeScript `this` parameter (`function f(this: T)`, `(this: T) => U`).
-    pub(super) fn try_param_name(&self) -> Option<IdentName> {
-        self.try_binding_name().or_else(|| self.this_as_name())
+    pub(super) fn try_param_name(&mut self) -> Option<IdentName> {
+        match self.try_binding_name() {
+            Some(name) => Some(name),
+            None => self.this_as_name(),
+        }
     }
 
     /// The `this` keyword used as a name channel — the TypeScript `this`
     /// parameter (`function f(this: T)`) and the subject of a `this` type
     /// predicate (`this is T`, `asserts this`). `None` when the current token is
     /// not `this`; its raw text is verbatim (`this` is never escaped).
-    pub(super) fn this_as_name(&self) -> Option<IdentName> {
+    pub(super) fn this_as_name(&mut self) -> Option<IdentName> {
         if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::This)) {
             Some(self.current_raw_ident_name())
         } else {
@@ -854,7 +874,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// ES spec: `ModuleExportName : IdentifierName | StringLiteral`. This handles
     /// only the `IdentifierName` arm; callers test for `TokenKind::String` first
     /// and build a `ModuleExportName::Literal` for the `StringLiteral` arm.
-    pub(super) fn try_identifier_name(&self) -> Option<IdentName> {
+    pub(super) fn try_identifier_name(&mut self) -> Option<IdentName> {
         match self.current_kind() {
             TokenKind::Identifier => Some(self.current_ident_name()),
             TokenKind::Keyword(_) => Some(self.current_raw_ident_name()),
@@ -1626,7 +1646,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             body: body.into_bump_slice(),
             comments: self.take_comments(),
             span: Span::new(start as u32, end as u32),
-            interner: Rc::clone(&self.interner),
             goal: self.goal,
         })
     }
@@ -1760,22 +1779,51 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 }
 
 /// Parse TypeScript source code into an AST allocated in `arena`.
+///
+/// `interner` is the caller-owned reusable interner (the third reusable beside
+/// `arena` and the format-time `DocArena`); its symbols are populated during
+/// parse and consulted by the later format/convert phases, so the same
+/// `&mut Interner` must be borrowed `&` there. It is moved in for the parse and
+/// restored on return.
 pub fn parse_typescript<'arena>(
     source: &str,
     arena: &'arena Bump,
+    interner: &mut Interner,
 ) -> Result<Program<'arena>, ParseError> {
-    parse_typescript_with_goal(source, Goal::Module, arena)
+    parse_typescript_with_goal(source, Goal::Module, arena, interner)
+}
+
+/// Build a standalone [`Parser`] against `goal` sharing the caller's `interner`
+/// (moved in via `std::mem::take`), run `f`, and hand the interner back on
+/// **every** exit path — the reclaim dance the standalone `parse_typescript*`
+/// entry points share. What `f` returns borrows only `arena` (never the
+/// interner). Error context (`with_context`) is applied by the public
+/// `crate::parse*` wrappers, not here.
+fn parse_reclaiming<'arena, T>(
+    source: &str,
+    goal: Goal,
+    arena: &'arena Bump,
+    interner: &mut Interner,
+    f: impl FnOnce(&mut Parser<'_, 'arena>) -> Result<T, ParseError>,
+) -> Result<T, ParseError> {
+    let mut parser = Parser::new_with_goal(source, goal, arena, std::mem::take(interner))?;
+    let result = f(&mut parser);
+    *interner = std::mem::take(&mut parser.interner);
+    result
 }
 
 /// [`parse_typescript`] against an explicit goal symbol. `parse_typescript` is
 /// the `Goal::Module` form.
+// `Parser::parse` (clippy's method-path suggestion) fails the higher-ranked
+// lifetime check on `parse_reclaiming`'s `f` bound; the closure infers it.
+#[allow(clippy::redundant_closure_for_method_calls)]
 pub fn parse_typescript_with_goal<'arena>(
     source: &str,
     goal: Goal,
     arena: &'arena Bump,
+    interner: &mut Interner,
 ) -> Result<Program<'arena>, ParseError> {
-    let mut parser = Parser::new_with_goal(source, goal, arena)?;
-    parser.parse()
+    parse_reclaiming(source, goal, arena, interner, |parser| parser.parse())
 }
 
 /// [`parse_typescript`] with grouping parens preserved as `ParenthesizedExpression`
@@ -1786,8 +1834,10 @@ pub fn parse_typescript_with_goal<'arena>(
 pub fn parse_typescript_preserve_parens<'arena>(
     source: &str,
     arena: &'arena Bump,
+    interner: &mut Interner,
 ) -> Result<Program<'arena>, ParseError> {
-    let mut parser = Parser::new_with_goal(source, Goal::Module, arena)?;
-    parser.preserve_parens = true;
-    parser.parse()
+    parse_reclaiming(source, Goal::Module, arena, interner, |parser| {
+        parser.preserve_parens = true;
+        parser.parse()
+    })
 }

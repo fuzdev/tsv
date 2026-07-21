@@ -956,18 +956,14 @@ impl<'a> Printer<'a> {
         // The identifier name must match the attribute name. TS identifiers are
         // span-identity (no shared symbol space with the Svelte attribute-name
         // interner), so compare the resolved names.
-        let interner = self.interner.borrow();
-        let Some(attr_str) = interner.resolve(attr_name) else {
-            return false;
-        };
-        ident.name(self.source, &interner) == attr_str
+        let attr_str = self.interner.resolve_infallible(attr_name);
+        ident.name(self.source, self.interner) == attr_str
     }
 
     /// Check if expression is an identifier with the given name
     fn is_identifier_with_name(&self, expr: &Expression<'_>, name: &str) -> bool {
         if let Expression::Identifier(id) = expr {
-            let interner = self.interner.borrow();
-            id.name(self.source, &interner) == name
+            id.name(self.source, self.interner) == name
         } else {
             false
         }

@@ -2,8 +2,7 @@
 
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
-use std::rc::Rc;
-use tsv_lang::{InfallibleResolve, ParseError, SharedInterner, Span};
+use tsv_lang::{Interner, ParseError, Span};
 
 use super::find_raw_text_close;
 use super::parser_impl::SvelteParser;
@@ -47,13 +46,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let content = &self.source[content_start..content_end];
 
         // Parse content with TypeScript parser (shared interner + base offset);
-        // the embedded program shares this document's arena.
-        let program = tsv_ts::parse_with_interner(
-            content,
-            content_start,
-            Rc::clone(&self.interner),
-            self.arena,
-        )?;
+        // the embedded program shares this document's arena and the caller's
+        // one interner (borrowed `&mut` for this embedded parse).
+        let program =
+            tsv_ts::parse_with_interner(content, content_start, &mut self.interner, self.arena)?;
 
         // Reposition the lexer to the closing `</script>` tag (resumes at `<`) and
         // consume it; `find_raw_text_close` already guaranteed it exists.
@@ -81,7 +77,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     fn detect_script_context(
         attributes: &[AttributeNode<'_>],
         source: &str,
-        interner: &SharedInterner,
+        interner: &Interner,
     ) -> ScriptContext {
         for attr_node in attributes {
             // Only process Attribute nodes (not AttachTag or directives)
@@ -99,9 +95,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 | AttributeNode::LetDirective(_) => continue,
             };
 
-            // Resolve attribute name (borrow scoped to this iteration — no owned copy)
-            let interner_ref = interner.borrow();
-            let name = interner_ref.resolve_infallible(attr.name);
+            // Resolve attribute name (no owned copy)
+            let name = interner.resolve_infallible(attr.name);
 
             // Check for boolean module attribute: <script module>
             if name == "module" && attr.value.is_none() {

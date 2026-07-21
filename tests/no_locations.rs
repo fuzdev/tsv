@@ -39,12 +39,14 @@ fn strip_locations(v: &mut Value) {
 
 fn assert_ts(src: &str) {
     let arena = bumpalo::Bump::new();
-    let ast = tsv_ts::parse(src, &arena).expect("TS source should parse");
-    let mut full = tsv_ts::convert_ast_json(&ast, src);
+    let mut interner = tsv_ts::Interner::new();
+    let ast = tsv_ts::parse(src, &arena, &mut interner).expect("TS source should parse");
+    let mut full = tsv_ts::convert_ast_json(&ast, src, &interner);
     strip_locations(&mut full);
-    let no_loc: Value =
-        serde_json::from_slice(&tsv_ts::convert_ast_json_bytes_no_locations(&ast, src))
-            .expect("no-locations output is valid JSON");
+    let no_loc: Value = serde_json::from_slice(&tsv_ts::convert_ast_json_bytes_no_locations(
+        &ast, src, &interner,
+    ))
+    .expect("no-locations output is valid JSON");
     assert_eq!(
         full, no_loc,
         "TS no-locations != strip_loc(full) for: {src:?}"
@@ -53,12 +55,14 @@ fn assert_ts(src: &str) {
 
 fn assert_svelte(src: &str) {
     let arena = bumpalo::Bump::new();
-    let ast = tsv_svelte::parse(src, &arena).expect("Svelte source should parse");
-    let mut full = tsv_svelte::convert_ast_json(&ast, src);
+    let mut interner = tsv_svelte::Interner::new();
+    let ast = tsv_svelte::parse(src, &arena, &mut interner).expect("Svelte source should parse");
+    let mut full = tsv_svelte::convert_ast_json(&ast, src, &interner);
     strip_locations(&mut full);
-    let no_loc: Value =
-        serde_json::from_slice(&tsv_svelte::convert_ast_json_bytes_no_locations(&ast, src))
-            .expect("no-locations output is valid JSON");
+    let no_loc: Value = serde_json::from_slice(&tsv_svelte::convert_ast_json_bytes_no_locations(
+        &ast, src, &interner,
+    ))
+    .expect("no-locations output is valid JSON");
     assert_eq!(
         full, no_loc,
         "Svelte no-locations != strip_loc(full) for: {src:?}"

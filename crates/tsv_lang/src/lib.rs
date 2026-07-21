@@ -12,7 +12,7 @@
 //! - `doc` - document builder primitives for prettier-compatible formatting
 //! - `escapes` - escape sequence utilities for printers
 //! - `printing` - shared printing utilities for printers
-//! - `interner` - string interner utilities for printers
+//! - `interner` - the caller-owned `Interner` newtype + resolver traits
 //! - `sizing` - sizing heuristics for public-AST JSON / arena buffers
 //! - `json_writer` - shared wire-JSON emission substrate (`json` feature)
 
@@ -43,7 +43,7 @@ pub use comment::{
 };
 pub use config::{EmbedContext, INDENT, LayoutMode, PRINT_WIDTH, TAB_WIDTH};
 pub use error::{ErrorContext, ParseError, Result, lex_err};
-pub use interner::{InfallibleResolve, SharedInterner, SymbolResolver, SymbolToU32};
+pub use interner::{Interner, SymbolResolver, SymbolToU32};
 #[cfg(feature = "json")]
 pub use json_writer::{JsonWriter, write_array, write_or_null};
 pub use location::{ByteToCharMap, LocationMapper, LocationTracker, Position};
