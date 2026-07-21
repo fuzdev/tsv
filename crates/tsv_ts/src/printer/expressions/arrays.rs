@@ -7,7 +7,9 @@
 // - Comment preservation
 
 use crate::ast::internal::{self, Expression, LiteralValue};
-use crate::printer::{CommentVec, Printer, has_multiline_content};
+use crate::printer::{
+    CommentVec, Printer, container_may_have_multiline_content, has_multiline_content,
+};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -305,11 +307,12 @@ impl<'a> Printer<'a> {
 
         // Check if any element has multiline content (e.g., line continuation strings)
         // Prettier expands arrays containing multiline strings (recursively)
-        let has_multiline = arr
-            .elements
-            .iter()
-            .flatten()
-            .any(|elem| has_multiline_content(elem, self.source));
+        let has_multiline = container_may_have_multiline_content(arr.span, self.source)
+            && arr
+                .elements
+                .iter()
+                .flatten()
+                .any(|elem| has_multiline_content(elem, self.source));
 
         // Check if this is a "numbers-only" array (use fill) vs other (one-per-line)
         let is_numbers_only = self.is_numbers_only_array(arr);
