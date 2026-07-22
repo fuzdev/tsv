@@ -53,26 +53,6 @@ pub use arena_render::{
 // Arena fits
 pub use arena_fits::arena_fits;
 
-use crate::{PRINT_WIDTH, TAB_WIDTH};
-
-/// Calculate available width for fitting check
-///
-/// This centralizes the width calculation logic used across TypeScript, CSS, and Svelte
-/// formatters. It accounts for indentation and any trailing characters that will follow
-/// the content being checked.
-///
-/// Uses the hardcoded [`PRINT_WIDTH`] and [`TAB_WIDTH`].
-///
-/// # Arguments
-/// * `indent_level` - Current indentation level
-/// * `current_column` - Position on current line (0 if start of line)
-/// * `trailing_chars` - Space to reserve for trailing punctuation (e.g., 1 for ";")
-pub fn available_width(indent_level: usize, current_column: usize, trailing_chars: usize) -> usize {
-    let indent_width = indent_level * TAB_WIDTH;
-    let used = indent_width.max(current_column) + trailing_chars;
-    PRINT_WIDTH.saturating_sub(used)
-}
-
 #[cfg(test)]
 mod arena_tests {
     use super::arena::{DocArena, DocId};
@@ -130,18 +110,6 @@ mod arena_tests {
             ..RenderConfig::default()
         };
         render_test(arena, doc, &render, 0)
-    }
-
-    #[test]
-    fn test_available_width() {
-        // PRINT_WIDTH = 100, TAB_WIDTH = 2.
-        assert_eq!(available_width(0, 0, 0), 100);
-        // indent 2 levels (2*2=4) + 1 trailing char reserved.
-        assert_eq!(available_width(2, 0, 1), 100 - 4 - 1);
-        // current_column (50) dominates the indent width (1*2=2).
-        assert_eq!(available_width(1, 50, 0), 50);
-        // saturating floor: never underflows below 0.
-        assert_eq!(available_width(0, 200, 0), 0);
     }
 
     #[test]

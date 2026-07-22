@@ -51,6 +51,6 @@ pub(in crate::printer) fn fluid_after_operator(
     d.concat(&[
         d.group_with_id(d.indent(d.line()), group_id),
         d.line_suffix_boundary(),
-        d.indent_if_break(value, group_id, false),
+        d.indent_if_break(value, group_id),
     ])
 }

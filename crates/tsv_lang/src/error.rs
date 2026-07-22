@@ -104,6 +104,10 @@ pub enum ParseError {
         position: usize,
         context: Option<ErrorContext>,
     },
+    // TODO: never constructed yet — no parse entry point enforces the 4 GB source cap,
+    // so a >4 GB source silently overflows the `u32` span offsets instead of erroring
+    // here. `Token`/`Span` assume the cap holds (see `tsv_ts/src/lexer/token.rs`); wire
+    // this check into each crate's `parse` before that assumption can be violated.
     #[error("File too large: {size} bytes (maximum: {max} bytes / 4GB)")]
     FileTooLarge { size: usize, max: usize },
 }

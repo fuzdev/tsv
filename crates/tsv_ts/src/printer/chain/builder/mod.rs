@@ -29,11 +29,12 @@ use member_only::{
 
 use super::analysis::should_merge_first_groups;
 use super::printing::{
-    ChainPrinter, has_inside_bracket_comments, print_group, print_group_expanded,
-    print_group_standard_expanded, print_node,
+    has_inside_bracket_comments, print_group, print_group_expanded, print_group_standard_expanded,
+    print_node,
 };
 use super::types::{ChainGroup, ChainNode, ChainNodeRefVec};
 use crate::ast::internal::Expression;
+use crate::printer::Printer;
 use crate::printer::calls::arg_predicates::contains_call_expression;
 use smallvec::smallvec;
 use tsv_lang::Span;
@@ -49,10 +50,7 @@ const SHORT_CHAIN_CUTOFF_MERGED: usize = 3;
 //
 
 /// Build expanded docs for rest groups (each call uses hardlines)
-fn build_rest_expanded_docs<'a, P: ChainPrinter>(
-    rest_groups: &[ChainGroup<'a>],
-    printer: &P,
-) -> DocBuf {
+fn build_rest_expanded_docs<'a>(rest_groups: &[ChainGroup<'a>], printer: &Printer<'_>) -> DocBuf {
     rest_groups
         .iter()
         .map(|g| print_group_expanded(g, printer))
@@ -60,14 +58,14 @@ fn build_rest_expanded_docs<'a, P: ChainPrinter>(
 }
 
 /// Build flat docs for groups
-fn build_groups_flat_docs<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: &P) -> DocBuf {
+fn build_groups_flat_docs<'a>(groups: &[ChainGroup<'a>], printer: &Printer<'_>) -> DocBuf {
     groups.iter().map(|g| print_group(g, printer)).collect()
 }
 
 /// Check if a single-arg call has an object/array that will break
-fn call_has_breaking_single_arg<P: ChainPrinter>(
+fn call_has_breaking_single_arg(
     call: &crate::ast::internal::CallExpression<'_>,
-    printer: &P,
+    printer: &Printer<'_>,
 ) -> bool {
     if call.arguments.len() != 1 {
         return false;
@@ -75,7 +73,7 @@ fn call_has_breaking_single_arg<P: ChainPrinter>(
     let d = printer.arena();
     match &call.arguments[0] {
         Expression::ObjectExpression(_) | Expression::ArrayExpression(_) => {
-            let arg_doc = printer.print_expression(&call.arguments[0]);
+            let arg_doc = printer.build_expression_doc(&call.arguments[0]);
             d.will_break(arg_doc)
         }
         // Object/array-body arrows (typed or not) are expandable per prettier's
@@ -93,10 +91,10 @@ fn call_has_breaking_single_arg<P: ChainPrinter>(
 /// - Short chains (≤cutoff groups): simple group with softlines
 /// - Longer chains: conditionalGroup([oneLine, expanded])
 /// - 3+ calls with complex args: force expanded (no width-based decision)
-pub fn build_chain_doc<'a, P: ChainPrinter>(
+pub fn build_chain_doc<'a>(
     groups: &[ChainGroup<'a>],
     chain_span: Span,
-    printer: &P,
+    printer: &Printer<'_>,
 ) -> DocId {
     // Activate arg-doc sharing for the outermost chain only (nested chains observe it
     // already active and reuse the map), so the flat and expanded group builds across
@@ -116,7 +114,7 @@ pub fn build_chain_doc<'a, P: ChainPrinter>(
     result
 }
 
-fn build_chain_doc_impl<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: &P) -> DocId {
+fn build_chain_doc_impl<'a>(groups: &[ChainGroup<'a>], printer: &Printer<'_>) -> DocId {
     let d = printer.arena();
     if groups.is_empty() {
         return d.empty();
@@ -242,10 +240,10 @@ fn build_chain_doc_impl<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer:
 }
 
 /// Check if chain expansion should be forced
-fn should_force_chain_expand<'a, P: ChainPrinter>(
+fn should_force_chain_expand<'a>(
     groups: &[ChainGroup<'a>],
     chain_has_comments: bool,
-    printer: &P,
+    printer: &Printer<'_>,
 ) -> bool {
     // Iterate call nodes in place — no materialized Vec
     let call_nodes = || {
@@ -287,13 +285,13 @@ fn should_force_chain_expand<'a, P: ChainPrinter>(
 }
 
 /// Build doc for short chains (groups.len() <= cutoff)
-fn build_short_chain_doc<'a, P: ChainPrinter>(
+fn build_short_chain_doc<'a>(
     first_groups: &[ChainGroup<'a>],
     rest_groups: &[ChainGroup<'a>],
     first_doc: DocId,
     first_has_parens: bool,
     has_calls: bool,
-    printer: &P,
+    printer: &Printer<'_>,
 ) -> DocId {
     let d = printer.arena();
     if rest_groups.is_empty() {
@@ -432,10 +430,10 @@ fn build_short_chain_doc<'a, P: ChainPrinter>(
 /// nodes, no inter-element comments). This is prettier's `printMemberExpression`
 /// (member.js) territory, not the member chain; other shapes fall back to the chain
 /// conditionalGroup.
-fn is_base_call_then_only_members<'a, P: ChainPrinter>(
+fn is_base_call_then_only_members<'a>(
     first_groups: &[ChainGroup<'a>],
     rest_groups: &[ChainGroup<'a>],
-    printer: &P,
+    printer: &Printer<'_>,
 ) -> bool {
     // Runs on every short chain with rest groups — kept off the heap via the
     // stack-friendly `ChainNodeRefVec` (the common short chain stays inline).
@@ -482,10 +480,10 @@ fn is_base_call_then_only_members<'a, P: ChainPrinter>(
 /// prints inline (its args group breaks only if the call itself overflows) and each
 /// trailing member is `group(indent([softline, .prop]))`, so the overflowing member
 /// drops to its own indented line while earlier members hug the call's `)`.
-fn build_base_call_then_members_doc<'a, P: ChainPrinter>(
+fn build_base_call_then_members_doc<'a>(
     first_groups: &[ChainGroup<'a>],
     rest_groups: &[ChainGroup<'a>],
-    printer: &P,
+    printer: &Printer<'_>,
 ) -> DocId {
     let d = printer.arena();
     let all_nodes: ChainNodeRefVec<'_, 'a> = first_groups
@@ -508,13 +506,13 @@ fn build_base_call_then_members_doc<'a, P: ChainPrinter>(
 }
 
 /// Build doc for short chains with multi-arg calls in first groups
-fn build_multiarg_short_chain_doc<'a, P: ChainPrinter>(
+fn build_multiarg_short_chain_doc<'a>(
     first_groups: &[ChainGroup<'a>],
     rest_groups: &[ChainGroup<'a>],
     first_doc: DocId,
     on_line: DocId,
     rest_docs: &[DocId],
-    printer: &P,
+    printer: &Printer<'_>,
 ) -> DocId {
     let d = printer.arena();
     // State: First args inline, rest groups with arrow-hugging expanded call args
@@ -552,7 +550,7 @@ fn build_multiarg_short_chain_doc<'a, P: ChainPrinter>(
 
     // State: Everything expanded (first args broken, chain broken)
     let mut rest_parts_hard = d.pooled_docbuf();
-    build_rest_parts_with_comments(&mut rest_parts_hard, rest_groups, printer, true, true);
+    build_rest_parts_with_comments(&mut rest_parts_hard, rest_groups, printer, true);
     let state_all_expanded = d.concat(&[first_expanded_doc, d.indent(d.concat(&rest_parts_hard))]);
 
     d.conditional_group(&[
@@ -565,13 +563,13 @@ fn build_multiarg_short_chain_doc<'a, P: ChainPrinter>(
 }
 
 /// Build doc for long chains (groups.len() > cutoff)
-fn build_long_chain_doc<'a, P: ChainPrinter>(
+fn build_long_chain_doc<'a>(
     groups: &[ChainGroup<'a>],
     first_groups: &[ChainGroup<'a>],
     rest_groups: &[ChainGroup<'a>],
     should_merge: bool,
     force_expand: bool,
-    printer: &P,
+    printer: &Printer<'_>,
 ) -> DocId {
     let d = printer.arena();
     // Print every group's flat doc once. Both the "any non-last group breaks" scan
@@ -635,12 +633,12 @@ fn build_long_chain_doc<'a, P: ChainPrinter>(
 }
 
 /// Build doc for chains ending with member access (e.g., `.length`)
-fn build_member_ending_chain_doc<'a, P: ChainPrinter>(
+fn build_member_ending_chain_doc<'a>(
     first_groups: &[ChainGroup<'a>],
     rest_groups: &[ChainGroup<'a>],
     on_line_doc: DocId,
     expanded: DocId,
-    printer: &P,
+    printer: &Printer<'_>,
 ) -> DocId {
     let d = printer.arena();
     // Check if the call's single arg needs expansion
@@ -675,10 +673,10 @@ fn build_member_ending_chain_doc<'a, P: ChainPrinter>(
 
 /// Build doc for chains where the last call has a single breaking argument that
 /// prettier keeps flat-chained (oneLine) rather than expanding the chain.
-fn build_breaking_object_chain_doc<'a, P: ChainPrinter>(
+fn build_breaking_object_chain_doc<'a>(
     first_groups: &[ChainGroup<'a>],
     rest_groups: &[ChainGroup<'a>],
-    printer: &P,
+    printer: &Printer<'_>,
 ) -> Option<DocId> {
     let d = printer.arena();
     // The last call's single argument breaks and is one prettier keeps on the flat
@@ -701,7 +699,7 @@ fn build_breaking_object_chain_doc<'a, P: ChainPrinter>(
                             | Expression::CallExpression(_)
                     )
                     && {
-                        let arg_doc = printer.print_expression(&call.arguments[0]);
+                        let arg_doc = printer.build_expression_doc(&call.arguments[0]);
                         d.will_break(arg_doc)
                     }
             })

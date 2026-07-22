@@ -260,7 +260,6 @@ fn flush_line_suffix(
 fn process_indent_if_break(
     contents: DocId,
     group_id: GroupId,
-    negate: bool,
     group_mode_map: Option<&GroupModeMap>,
     cmd: &ArenaCommand,
 ) -> ArenaCommand {
@@ -268,13 +267,7 @@ fn process_indent_if_break(
         .and_then(|map| map.get(group_id))
         .unwrap_or(Mode::Flat);
 
-    let should_indent = if negate {
-        group_mode == Mode::Flat
-    } else {
-        group_mode == Mode::Break
-    };
-
-    if should_indent {
+    if group_mode == Mode::Break {
         cmd.indented(contents)
     } else {
         cmd.with_doc(contents)
@@ -949,21 +942,10 @@ fn render_doc_core<P: RenderPolicy>(
                 continue;
             }
 
-            DocNode::IndentIfBreak {
-                contents,
-                group_id,
-                negate,
-            } => {
+            DocNode::IndentIfBreak { contents, group_id } => {
                 let contents = *contents;
                 let group_id = *group_id;
-                let negate = *negate;
-                cmd = process_indent_if_break(
-                    contents,
-                    group_id,
-                    negate,
-                    policy.group_mode_map(),
-                    &cmd,
-                );
+                cmd = process_indent_if_break(contents, group_id, policy.group_mode_map(), &cmd);
                 continue;
             }
 

@@ -129,7 +129,7 @@ impl<'a> Printer<'a> {
                 d.text(" ="),
                 d.group_with_id(d.indent(d.line()), GroupId::Assignment),
                 d.line_suffix_boundary(),
-                d.indent_if_break(init_doc, GroupId::Assignment, false),
+                d.indent_if_break(init_doc, GroupId::Assignment),
                 d.text("}"),
             ])
         }

@@ -349,7 +349,7 @@ pub enum DocNode {
     Align { n, contents },                      // Sub-tab align(n): literal spaces under useTabs
     Group { contents, expanded_states, id, should_break },  // All-or-nothing breaking
     IfBreak { break_doc, flat_doc },            // Conditional on parent
-    IndentIfBreak { contents, group_id, negate },  // Conditional indent
+    IndentIfBreak { contents, group_id },  // Conditional indent
     Concat(ChildRange),                         // Sequence
     Fill(ChildRange),                           // Greedy line packing
     WithContext { doc, context },                // Rendering hints

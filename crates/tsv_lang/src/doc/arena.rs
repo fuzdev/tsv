@@ -168,11 +168,7 @@ pub enum DocNode {
     },
 
     /// Conditionally indent based on whether a specific group broke
-    IndentIfBreak {
-        contents: DocId,
-        group_id: GroupId,
-        negate: bool,
-    },
+    IndentIfBreak { contents: DocId, group_id: GroupId },
 
     /// Sequence of docs - rendered one after another
     Concat(ChildRange),
@@ -1458,11 +1454,10 @@ impl DocArena {
     }
 
     /// Conditionally indent based on whether a specific group broke.
-    pub fn indent_if_break(&self, doc: DocId, group_id: GroupId, negate: bool) -> DocId {
+    pub fn indent_if_break(&self, doc: DocId, group_id: GroupId) -> DocId {
         self.alloc(DocNode::IndentIfBreak {
             contents: doc,
             group_id,
-            negate,
         })
     }
 

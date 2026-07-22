@@ -14,7 +14,6 @@ use tsv_lang::{ParseError, Span};
 /// in both modes (a spec-mandated `<url-token>` normalization).
 pub(super) fn parse_raw_prelude_content<'arena>(
     parser: &mut CssParser<'_, 'arena>,
-    is_selector_list_prelude: bool,
     normalize_whitespace: bool,
     // `@namespace` normalizes string / `url()` quotes to prettier's single-quote form
     // (`"x"` → `'x'`, `url("x")` → `url('x')`, per the `singleQuote` option — the same
@@ -37,7 +36,6 @@ pub(super) fn parse_raw_prelude_content<'arena>(
     let mut trailing_spaces: usize = 0;
     let mut prev_token_kind: Option<TokenKind> = None;
     let mut last_non_whitespace_kind: Option<TokenKind> = None;
-    let mut paren_depth: u32 = 0; // Track parenthesis nesting for selector detection
 
     // Categorize at-rule by prelude type based on CSS specs:
     // - Selector list preludes (@scope): Format like CSS selectors (.widget:hover)
@@ -57,35 +55,14 @@ pub(super) fn parse_raw_prelude_content<'arena>(
                 prev_token_kind = Some(TokenKind::Whitespace);
                 continue;
             }
-            // Skip whitespace in selector list preludes (inside parentheses for @scope):
-            // - After '(' or before ')'
-            // - After ':' (pseudo-classes like :hover) - only for selector list preludes
-            // - Before ',' (selector lists) - only for selector list preludes
-            // - After '[' or before ']' (attribute selectors) - only for selector list preludes
-            // - Before/after '=' (attribute selectors) - only for selector list preludes
-            // A whitespace run right after a value colon (`(min-width: )`, empty value)
-            // is the prettier-mandated single space after `:` — keep it before `)`
-            // rather than dropping it, or `(a: )` would collapse to `(a:)` while `(a:)`
-            // gains the space (the colon-space rule below), an F1 oscillation. Gated on
-            // the same query-colon regime that adds the space (`!is_selector_list_prelude
-            // || paren_depth == 0`), so a selector-list pseudo-class `:` is unaffected.
-            let after_value_colon = matches!(prev_token_kind, Some(TokenKind::Colon))
-                && (!is_selector_list_prelude || paren_depth == 0);
+            // Skip a whitespace run right after `(` or right before `)`. A run right after a
+            // value colon (`(min-width: )`, empty value) is the prettier-mandated single space
+            // after `:` — keep it before `)` rather than dropping it, or `(a: )` would collapse
+            // to `(a:)` while `(a:)` gains the space (the colon-space rule below), an F1
+            // oscillation.
+            let after_value_colon = matches!(prev_token_kind, Some(TokenKind::Colon));
             let skip_whitespace = matches!(prev_token_kind, Some(TokenKind::LeftParen))
-                || (matches!(parser.peek_kind(), Ok(TokenKind::RightParen)) && !after_value_colon)
-                || (is_selector_list_prelude
-                    && paren_depth > 0
-                    && matches!(prev_token_kind, Some(TokenKind::Colon)))
-                || (is_selector_list_prelude
-                    && paren_depth > 0
-                    && matches!(parser.peek_kind(), Ok(TokenKind::Comma)))
-                || (is_selector_list_prelude
-                    && matches!(prev_token_kind, Some(TokenKind::LeftBracket)))
-                || (is_selector_list_prelude
-                    && matches!(parser.peek_kind(), Ok(TokenKind::RightBracket)))
-                || (is_selector_list_prelude && matches!(prev_token_kind, Some(TokenKind::Equals)))
-                || (is_selector_list_prelude
-                    && matches!(parser.peek_kind(), Ok(TokenKind::Equals)));
+                || (matches!(parser.peek_kind(), Ok(TokenKind::RightParen)) && !after_value_colon);
 
             parser.advance()?;
 
@@ -226,13 +203,6 @@ pub(super) fn parse_raw_prelude_content<'arena>(
 
         let current_kind = parser.current_kind;
 
-        // Track parenthesis depth for selector detection
-        if matches!(current_kind, TokenKind::LeftParen) {
-            paren_depth += 1;
-        } else if matches!(current_kind, TokenKind::RightParen) {
-            paren_depth = paren_depth.saturating_sub(1);
-        }
-
         parser.advance()?;
 
         // Add space after boolean operators, comments, commas, or ':' if not followed by whitespace
@@ -255,18 +225,16 @@ pub(super) fn parse_raw_prelude_content<'arena>(
                 prelude.push(' ');
                 trailing_spaces += 1;
             } else if matches!(current_kind, TokenKind::Colon) {
-                // Add space after ':' for property:value pairs (preceded by identifier/number/dimension)
-                // For selector list preludes (@scope): Don't add space inside parentheses (pseudo-classes like :hover)
-                // For query preludes (@media, @supports, @container): Always add space (property:value in queries)
-                // Use last_non_whitespace_kind to check (handles case where whitespace was removed before colon)
-                let should_add_space = (!is_selector_list_prelude || paren_depth == 0)
-                    && matches!(
-                        last_non_whitespace_kind,
-                        Some(TokenKind::Identifier)
-                            | Some(TokenKind::Number)
-                            | Some(TokenKind::Dimension { .. })
-                            | Some(TokenKind::Percentage)
-                    );
+                // Add space after ':' for property:value pairs in query preludes (@media,
+                // @supports, @container) — preceded by identifier/number/dimension. Uses
+                // last_non_whitespace_kind (handles whitespace removed before the colon).
+                let should_add_space = matches!(
+                    last_non_whitespace_kind,
+                    Some(TokenKind::Identifier)
+                        | Some(TokenKind::Number)
+                        | Some(TokenKind::Dimension { .. })
+                        | Some(TokenKind::Percentage)
+                );
 
                 if should_add_space {
                     prelude.push(' ');

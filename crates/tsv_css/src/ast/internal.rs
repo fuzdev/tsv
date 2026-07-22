@@ -733,21 +733,6 @@ impl PreludeValue<'_> {
             PreludeValue::Media { span, .. } => *span,
         }
     }
-
-    pub fn is_empty(&self) -> bool {
-        match self {
-            PreludeValue::Values { values, .. } => values.is_empty(),
-            PreludeValue::Raw { content, .. } => content.is_empty(),
-            PreludeValue::Selectors { root, limit, .. } => {
-                root.as_ref().is_none_or(|r| r.list.selectors.is_empty()) && limit.is_none()
-            }
-            PreludeValue::Supports { condition, .. } => condition.parts.is_empty(),
-            PreludeValue::Container {
-                name, condition, ..
-            } => name.is_none() && condition.parts.is_empty(),
-            PreludeValue::Media { content, .. } => content.is_empty(),
-        }
-    }
 }
 
 /// At-rule (@media, @keyframes, @supports, @import, @layer, @font-face, etc.)

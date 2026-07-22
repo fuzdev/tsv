@@ -4,34 +4,11 @@
 // - Linearization: Flatten nested AST into a flat list of ChainNodes
 // - Grouping: Group nodes by natural break points
 // - Merge decisions: Determine if first groups should be merged
-// - SymbolLookup trait for identifier resolution
 
-use super::printing::ChainPrinter;
 use super::types::{ChainGroup, ChainGroupVec, ChainNode, ChainNodeVec};
 use crate::ast::internal::{self, Expression, IdentName};
-use crate::printer::{ParenContext, needs_parens};
+use crate::printer::{ParenContext, Printer, needs_parens};
 use tsv_lang::TAB_WIDTH;
-
-//
-// Symbol Lookup Trait
-//
-
-/// Trait for looking up identifier names (abstraction over the source slice).
-pub trait SymbolLookup {
-    /// Resolve the name channel (span-identity slice at `name_start`, or the
-    /// escaped name's arena string) and apply `f` without materializing a `String`.
-    ///
-    /// Callback style keeps the resolved slice borrowed inside the call (a
-    /// span-identity name borrows `source`, an escaped name borrows its arena
-    /// string), so no implementation materializes an owned copy to outlive the
-    /// borrow.
-    fn with_name<R>(
-        &self,
-        name: IdentName<'_>,
-        name_start: u32,
-        f: impl FnOnce(&str) -> R,
-    ) -> Option<R>;
-}
 
 //
 // Linearization
@@ -487,10 +464,7 @@ pub fn group_chain_nodes<'a>(nodes: &[ChainNode<'a>]) -> ChainGroupVec<'a> {
 /// Corresponds to prettier's `shouldMerge` logic:
 /// - `Object.keys(items).filter()` → merge "Object" + ".keys()" on first line
 /// - `_.values(obj).map()` → merge "_" + ".values()" on first line
-pub fn should_merge_first_groups<'a, P: ChainPrinter>(
-    groups: &[ChainGroup<'a>],
-    printer: &P,
-) -> bool {
+pub fn should_merge_first_groups<'a>(groups: &[ChainGroup<'a>], printer: &Printer<'_>) -> bool {
     if groups.len() < 2 {
         return false;
     }
@@ -506,7 +480,7 @@ pub fn should_merge_first_groups<'a, P: ChainPrinter>(
 /// Corresponds to prettier's `shouldNotWrap` logic:
 /// - Single base that's `this`, factory identifier, or short name (in expression statement)
 /// - Multiple nodes where last is member with factory property
-pub fn should_not_wrap<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: &P) -> bool {
+pub fn should_not_wrap<'a>(groups: &[ChainGroup<'a>], printer: &Printer<'_>) -> bool {
     if groups.len() < 2 {
         return false;
     }
@@ -554,10 +528,8 @@ pub fn should_not_wrap<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
 ///
 /// Prettier ref: `isShort` in print/member-chain.js:284
 /// Uses `name.length <= options.tabWidth` (JS .length, ASCII-only in practice)
-fn is_short_name(name: IdentName<'_>, name_start: u32, lookup: &impl SymbolLookup) -> bool {
-    lookup
-        .with_name(name, name_start, |name| name.len() <= TAB_WIDTH)
-        .unwrap_or(false)
+fn is_short_name(name: IdentName<'_>, name_start: u32, printer: &Printer<'_>) -> bool {
+    printer.with_ident_name_at(name, name_start, |name| name.len() <= TAB_WIDTH)
 }
 
 /// Check if an identifier name is a factory pattern.
@@ -566,14 +538,12 @@ fn is_short_name(name: IdentName<'_>, name_start: u32, lookup: &impl SymbolLooku
 /// Matches Prettier's `isFactory`: `/^[A-Z]|^[$_]+$/u` (member-chain.js:273)
 /// - Starts with uppercase: `Object`, `React`, `Observable`
 /// - Pure `$`/`_` identifiers: `$`, `_`, `$_`, `$__` (lodash-style)
-fn is_factory_name(name: IdentName<'_>, name_start: u32, lookup: &impl SymbolLookup) -> bool {
-    lookup
-        .with_name(
-            name,
-            name_start,
-            crate::printer::expressions::literals::is_factory_identifier_name,
-        )
-        .unwrap_or(false)
+fn is_factory_name(name: IdentName<'_>, name_start: u32, printer: &Printer<'_>) -> bool {
+    printer.with_ident_name_at(
+        name,
+        name_start,
+        crate::printer::expressions::literals::is_factory_identifier_name,
+    )
 }
 
 #[cfg(test)]

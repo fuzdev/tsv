@@ -61,7 +61,7 @@ impl<'a> Printer<'a> {
             self.push_pre_name_comments_doc(&mut parts, cursor, bound);
         }
         let (key_doc, key_region_end) =
-            self.build_type_member_key_doc(prop.span.start, &prop.key, prop.computed, true);
+            self.build_type_member_key_doc(prop.span.start, &prop.key, prop.computed);
         parts.push(key_doc);
 
         // Push the optional `?` marker (comments around it stay after `?`; prettier
@@ -167,7 +167,7 @@ impl<'a> Printer<'a> {
             _ => {}
         }
         let (key_doc, key_region_end) =
-            self.build_type_member_key_doc(method.span.start, &method.key, method.computed, true);
+            self.build_type_member_key_doc(method.span.start, &method.key, method.computed);
         parts.push(key_doc);
 
         // Find `(` in source (skip comments so a `(` inside one isn't matched).

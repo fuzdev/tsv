@@ -64,12 +64,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.advance()?;
 
         // Check for generator: function*
-        let is_generator = if matches!(self.current_kind(), TokenKind::Star) {
-            self.advance()?;
-            true
-        } else {
-            false
-        };
+        let is_generator = self.eat(TokenKind::Star);
 
         // Parse function name (required for declarations)
         // Keywords like `object` and `async` can be function names; `await` is a
@@ -165,7 +160,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Used by export default and export named to handle both regular and ambient contexts
     pub(super) fn parse_function_declaration_or_declare(
         &mut self,
-        name_required: bool,
         is_async: bool,
     ) -> Result<ExportFunctionDeclaration<'arena>, ParseError> {
         let (start, _) = self.current_pos();
@@ -178,12 +172,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.advance()?;
 
         // Check for generator: function*
-        let is_generator = if matches!(self.current_kind(), TokenKind::Star) {
-            self.advance()?;
-            true
-        } else {
-            false
-        };
+        let is_generator = self.eat(TokenKind::Star);
 
         // Parse function name (required for declarations, optional for export default)
         // Keywords like `object` and `async` can be function names; `await` is a
@@ -196,8 +185,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 name,
                 Span::new(id_start as u32, id_end as u32),
             ))
-        } else if name_required {
-            return Err(self.error_expected_after("function name", "function"));
         } else {
             None
         };
@@ -295,12 +282,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.advance()?;
 
         // Check for generator: function*
-        let is_generator = if matches!(self.current_kind(), TokenKind::Star) {
-            self.advance()?;
-            true
-        } else {
-            false
-        };
+        let is_generator = self.eat(TokenKind::Star);
 
         // Parse the optional name in the function expression's own `[Await]`
         // context: a `FunctionExpression` name is `[~Await]` (non-async) /
