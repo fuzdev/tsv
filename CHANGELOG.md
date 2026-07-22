@@ -9,7 +9,9 @@ non-empty and carry a `<!-- bump: patch|minor|major -->` marker; `deno task publ
 `## Unreleased` (reset to `bump: patch`) for the next cycle.
 
 ## Unreleased
-<!-- bump: minor -->
+<!-- bump: patch -->
+
+## 0.2.0
 
 Formatting is now non-configurable by design -
 tsv has no config that changes its formatting style behavior, and none will be added.
