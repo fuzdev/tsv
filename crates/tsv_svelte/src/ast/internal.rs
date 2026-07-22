@@ -37,7 +37,6 @@ pub struct Root<'arena> {
     /// All comments from scripts and template expressions.
     /// Use `comments_to_emit_in_range(span)` to find comments for a specific node.
     pub comments: Vec<Comment>,
-    pub span: Span,
 }
 
 /// Svelte Fragment - container for template nodes

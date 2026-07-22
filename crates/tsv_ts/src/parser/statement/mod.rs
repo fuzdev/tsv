@@ -55,7 +55,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 KeywordKind::Const => {
                     // Check for `const enum` declaration
                     if self.peek_kind() == TokenKind::Keyword(KeywordKind::Enum) {
-                        self.parse_enum_declaration(true, false)
+                        self.parse_enum_declaration(true)
                     } else {
                         self.parse_variable_declaration()
                     }
@@ -74,7 +74,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     self.parse_function_declaration()
                 }
                 KeywordKind::Class => self.parse_class_declaration(),
-                KeywordKind::Enum => self.parse_enum_declaration(false, false),
+                KeywordKind::Enum => self.parse_enum_declaration(false),
                 // `import`/`export` declarations are `ModuleItem`s — reachable only via
                 // `parse_module_item` (the module top level and TS namespace/module
                 // bodies). Reached here they are nested in a block, function body, or
@@ -230,7 +230,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         && self.peek_kind() == TokenKind::String
                         && !self.peek_preceded_by_line_terminator())
                 {
-                    return self.parse_module_declaration(false, false);
+                    return self.parse_module_declaration();
                 }
                 // Bare global augmentation: `global { … }` (no `declare`), at the
                 // top level or nested in a `declare module`. Unlike namespace/module,

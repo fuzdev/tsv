@@ -499,10 +499,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_enum_declaration(
         &mut self,
         is_const: bool,
-        is_declare: bool,
     ) -> Result<Statement<'arena>, ParseError> {
         let start = self.current_pos().0;
-        self.parse_enum_declaration_with_start(is_const, is_declare, start)
+        self.parse_enum_declaration_with_start(is_const, false, start)
     }
 
     fn parse_enum_declaration_with_start(
@@ -619,13 +618,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - `declare module 'name' { statements }` (ambient module augmentation)
     /// - `declare module 'name';` (shorthand ambient module)
     /// - `module Name { statements }` (old syntax)
-    pub(super) fn parse_module_declaration(
-        &mut self,
-        declare: bool,
-        global: bool,
-    ) -> Result<Statement<'arena>, ParseError> {
+    pub(super) fn parse_module_declaration(&mut self) -> Result<Statement<'arena>, ParseError> {
         let start = self.current_pos().0;
-        self.parse_module_declaration_with_start(declare, global, start)
+        self.parse_module_declaration_with_start(false, false, start)
     }
 
     fn parse_module_declaration_with_start(

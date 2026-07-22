@@ -67,20 +67,7 @@ pub(crate) fn parse_attribute_selector<'arena>(
                 // Parse value (identifier or string)
                 let value = parse_attribute_value(parser)?;
 
-                // Parse attribute flags (i/I=case-insensitive, s/S=case-sensitive) - optional
-                let flags = if parser.check(TokenKind::Identifier) {
-                    let flag = parser.alloc_str_in(parser.current_value());
-                    let flag_lower = flag.to_lowercase();
-                    if flag_lower == "i" || flag_lower == "s" {
-                        parser.advance()?;
-                        parser.skip_whitespace()?;
-                        Some(flag) // Preserve original case
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                };
+                let flags = parse_attribute_flags(parser)?;
 
                 // Expect ] and capture its end position
                 let end = parser.expect_and_capture(TokenKind::RightBracket)?;
@@ -104,34 +91,8 @@ pub(crate) fn parse_attribute_selector<'arena>(
             // It's the attribute name (no namespace) — use its captured span; the decoded
             // `maybe_namespace` is unused here (the name is recovered from source).
 
-            // Check for matcher and value: =, ~=, |=, ^=, $=, *=
-            let (matcher, value) = if parser.check(TokenKind::RightBracket) {
-                (None, None) // Just [attr]
-            } else {
-                let matcher = parse_attribute_matcher(parser)?;
-                parser.skip_whitespace()?;
-
-                // Parse value (identifier or string)
-                let value = parse_attribute_value(parser)?;
-
-                (Some(matcher), value)
-            };
-
-            // Parse attribute flags (i/I=case-insensitive, s/S=case-sensitive) - optional
-            let flags = if parser.check(TokenKind::Identifier) {
-                let flag = parser.alloc_str_in(parser.current_value());
-                let flag_lower = flag.to_lowercase();
-                // Accept both lowercase and uppercase flag letters
-                if flag_lower == "i" || flag_lower == "s" {
-                    parser.advance()?;
-                    parser.skip_whitespace()?;
-                    Some(flag) // Preserve original case
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
+            let (matcher, value) = parse_attribute_matcher_and_value(parser)?;
+            let flags = parse_attribute_flags(parser)?;
 
             // Expect ] and capture its end position
             let end = parser.expect_and_capture(TokenKind::RightBracket)?;
@@ -167,34 +128,8 @@ pub(crate) fn parse_attribute_selector<'arena>(
     parser.advance()?;
     parser.skip_whitespace()?;
 
-    // Check for matcher and value: =, ~=, |=, ^=, $=, *=
-    let (matcher, value) = if parser.check(TokenKind::RightBracket) {
-        (None, None) // Just [attr]
-    } else {
-        let matcher = parse_attribute_matcher(parser)?;
-        parser.skip_whitespace()?;
-
-        // Parse value (identifier or string)
-        let value = parse_attribute_value(parser)?;
-
-        (Some(matcher), value)
-    };
-
-    // Parse attribute flags (i/I=case-insensitive, s/S=case-sensitive) - optional
-    let flags = if parser.check(TokenKind::Identifier) {
-        let flag = parser.alloc_str_in(parser.current_value());
-        let flag_lower = flag.to_lowercase();
-        // Accept both lowercase and uppercase flag letters
-        if flag_lower == "i" || flag_lower == "s" {
-            parser.advance()?;
-            parser.skip_whitespace()?;
-            Some(flag) // Preserve original case
-        } else {
-            None
-        }
-    } else {
-        None
-    };
+    let (matcher, value) = parse_attribute_matcher_and_value(parser)?;
+    let flags = parse_attribute_flags(parser)?;
 
     // Expect ] and capture its end position
     let end = parser.expect_and_capture(TokenKind::RightBracket)?;
@@ -210,6 +145,44 @@ pub(crate) fn parse_attribute_selector<'arena>(
             end,
         },
     })
+}
+
+/// Parse the optional matcher + value that may follow an attribute name: a
+/// closing `]` immediately yields `(None, None)` (bare `[attr]`); otherwise a
+/// matcher (`=`, `~=`, `|=`, `^=`, `$=`, `*=`) and its value.
+fn parse_attribute_matcher_and_value<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+) -> Result<(Option<AttributeMatcher>, Option<&'arena str>), ParseError> {
+    if parser.check(TokenKind::RightBracket) {
+        Ok((None, None)) // Just [attr]
+    } else {
+        let matcher = parse_attribute_matcher(parser)?;
+        parser.skip_whitespace()?;
+        let value = parse_attribute_value(parser)?;
+        Ok((Some(matcher), value))
+    }
+}
+
+/// Parse an optional attribute case flag (`i`/`I` = case-insensitive, `s`/`S` =
+/// case-sensitive), preserving the original case. A trailing identifier that
+/// isn't a flag is left unconsumed. Advances past the flag + trailing
+/// whitespace when present.
+fn parse_attribute_flags<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+) -> Result<Option<&'arena str>, ParseError> {
+    if parser.check(TokenKind::Identifier) {
+        let flag = parser.alloc_str_in(parser.current_value());
+        let flag_lower = flag.to_lowercase();
+        if flag_lower == "i" || flag_lower == "s" {
+            parser.advance()?;
+            parser.skip_whitespace()?;
+            Ok(Some(flag)) // Preserve original case
+        } else {
+            Ok(None)
+        }
+    } else {
+        Ok(None)
+    }
 }
 
 /// Parse an attribute selector's value (identifier or string), copying the
