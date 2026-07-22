@@ -706,7 +706,8 @@ pub(super) fn write_name(
 /// `null` (JSON has no Infinity/NaN — an overflow literal like `1e999`),
 /// integral doubles below `1e21` as their expanded shortest-round-trip integer
 /// digits and integral doubles at/above `1e21` in exponential form (JS
-/// `Number::toString` / `JSON.stringify` semantics), everything else as ryu.
+/// `Number::toString` / `JSON.stringify` semantics), everything else as ryu —
+/// which matches JS except the one non-integral decade handled below.
 pub(super) fn write_number_value(w: &mut JsonWriter, n: f64) {
     if !n.is_finite() {
         // ±Inf → null, matching JSON.stringify (a parsed literal is never NaN).
@@ -740,6 +741,28 @@ pub(super) fn write_number_value(w: &mut JsonWriter, n: f64) {
         // wrongly keep expanding, so that range falls through to ryu (`w.f64`).
         if n.abs() < 1e21 {
             w.raw(&shortest);
+            return;
+        }
+    } else {
+        // Non-integral. JS `Number::toString` uses fixed notation down to the
+        // spec's `n = -5` (|x| in [1e-6, 1e-5)), whereas ryu switches to
+        // scientific one decade earlier — the sole non-integral divergence.
+        // In that single decade the point sits at position -5, so the fixed
+        // form is `0.` + five zeros + the shortest significant digits.
+        let a = n.abs();
+        if (1e-6..1e-5).contains(&a) {
+            // `{a:e}` is the shortest round-trip scientific form (`d[.ddd]e-6`);
+            // its mantissa digits are exactly `s` in the spec, so the fixed form
+            // is `0.` + five zeros + those digits.
+            let sci = format!("{a:e}");
+            let mantissa = sci.split('e').next().unwrap_or(&sci);
+            let mut out = String::with_capacity(8 + mantissa.len());
+            if n.is_sign_negative() {
+                out.push('-');
+            }
+            out.push_str("0.00000");
+            out.extend(mantissa.chars().filter(|&c| c != '.'));
+            w.raw(&out);
             return;
         }
     }
