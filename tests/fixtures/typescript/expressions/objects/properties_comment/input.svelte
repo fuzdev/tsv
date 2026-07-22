@@ -40,9 +40,6 @@
 	// Spread with comments
 	const j = { ...a /* after spread */, b: 2 };
 
-	// Empty object with comment
-	const k = {/* inside empty */};
-
 	// Comment before closing brace
 	const l = { x: 1, y: 2 /* before close */ };
 

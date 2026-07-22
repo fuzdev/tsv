@@ -667,28 +667,17 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for an empty `{}` body whose only content is a dangling
-    /// comment, keeping a fitting block comment inline (`{/* c */}`).
+    /// comment, keeping a fitting block comment inline with bracket spacing
+    /// (`{ /* c */ }`).
     ///
-    /// No bracket spacing — used by object literals/patterns and enum bodies,
-    /// which prettier prints as `{/* c */}` (no surrounding spaces). See
+    /// tsv applies bracket spacing uniformly: object literals, destructuring
+    /// patterns, enum bodies, and type literals all print a comment-only empty
+    /// body as `{ /* c */ }`. Prettier tightens every one of these to
+    /// `{/* c */}`, so this is a divergence — see conformance_prettier.md
+    /// §Empty-object comment bracket spacing. A truly empty `{}` (no comment)
+    /// has no content to space and stays tight in both. See
     /// [`Self::build_empty_inline_with_comments_doc`].
     pub(crate) fn build_empty_braces_inline_with_comments_doc(&self, body_span: Span) -> DocId {
-        let d = self.d();
-        let sep = d.softline();
-        self.build_empty_inline_with_comments_doc(body_span.start, body_span.end, "{}", sep)
-    }
-
-    /// Build a Doc for an empty type-literal `{}` body whose only content is a
-    /// dangling comment, keeping a fitting block comment inline with bracket
-    /// spacing (`{ /* c */ }`).
-    ///
-    /// Type literals carry bracket spacing even in the empty-dangling case
-    /// (prettier prints `type B = { /* c */ }` with surrounding spaces),
-    /// unlike object literals. See [`Self::build_empty_inline_with_comments_doc`].
-    pub(crate) fn build_empty_type_literal_inline_with_comments_doc(
-        &self,
-        body_span: Span,
-    ) -> DocId {
         let d = self.d();
         let sep = d.line();
         self.build_empty_inline_with_comments_doc(body_span.start, body_span.end, "{}", sep)
