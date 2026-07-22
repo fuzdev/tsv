@@ -1,25 +1,26 @@
 # property_modifier_comment_prettier_divergence
 
-A class property with a **no-annotation** `?`/`!` modifier and an initializer.
-The `!` form (`b! = 1`) is a TypeScript early error — a definite-assignment
-assertion with neither a type annotation (TS1264) nor without an initializer
-(TS1263) — while the `?` form (`a? = 1`) is valid. tsv is a deliberately
-permissive parser: it defers these static-semantic early errors to a future
-diagnostics layer (tsc is the correctness oracle, not the formatter), so it
-parses and formats both properties, preserving the author's comment position:
+Prettier relocates a comment between a property name and its `?` modifier
+(no type annotation) to before the modifier:
 
-- Input: `a? /* c1 */ = 1;` / `b! /* c2 */ = 1;`
-- Ours: unchanged (idempotent — `a? /* c1 */`, `b! /* c2 */` kept where authored)
-- Prettier: **rejects** the whole input on the `b!` property (see
-  `prettier_rejects.txt`), so there is no prettier oracle for this construct.
+- Input: `a? /* c1 */ = 1;`
+- Prettier: `a /* c1 */? = 1;`
+- Ours: `a? /* c1 */ = 1;` (preserves the user's position)
 
-Prettier ≤3.9.5 accepted the input and relocated each comment before its
-modifier (`a /* c1 */? = 1;` / `b /* c2 */! = 1;`); Prettier 3.9.6 tightened its
-TypeScript parser to reject the definite-assignment-without-annotation form
-outright, matching tsc, and since both properties share one file it throws on
-the whole thing. The former `output_prettier` / `variant_before_modifier` forms
-are no longer expressible and have been removed; `unformatted_ours_compact`
-still pins tsv's own normalization to the input.
+Per comment placement policy, we preserve the user's original comment position.
+The before-modifier form is dual-stable in both formatters
+(`variant_before_modifier`, identical to prettier's relocation target); only the
+after-modifier form (input) diverges — prettier moves it, tsv keeps it.
+
+An **optional** (`?`) property with an initializer and no type annotation
+(`a? = 1`) is valid TypeScript, so this divergence stays live. The parallel
+**definite** (`!`) property (`b! = 1`) is *not* valid — a definite-assignment
+assertion with no type annotation is a TypeScript early error (TS1264), which
+Prettier 3.9.6 rejects at parse time — so that case is the `prettier_rejects`
+fixture [property_definite_comment](../property_definite_comment_prettier_divergence/)
+rather than a relocation divergence here. (Prettier ≤3.9.5 accepted `b!` and
+relocated its comment too; this fixture covered both modifiers until 3.9.6
+tightened the parser.)
 
 When a type annotation is present (e.g. `a /* c */?: number;` or
 `c! /* c */: number;`) both formatters agree and preserve the comment — that
