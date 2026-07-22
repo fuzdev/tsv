@@ -44,6 +44,5 @@
 	// Without type annotation (implicit any)
 	class I {
 		a?;
-		b!;
 	}
 </script>
