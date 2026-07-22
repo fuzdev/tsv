@@ -1,0 +1,1102 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 669,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A line comment inside the iterable array keeps the for-of head inline",
+			"start": 10,
+			"end": 82,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " (`for (const item of [`); only the array breaks.",
+			"start": 84,
+			"end": 135,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 52
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing",
+			"start": 171,
+			"end": 182,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 6
+				},
+				"end": {
+					"line": 6,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A leading line comment inside the array behaves the same.",
+			"start": 206,
+			"end": 266,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " leading",
+			"start": 291,
+			"end": 301,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 2
+				},
+				"end": {
+					"line": 13,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A line comment inside a destructuring binding stays with the pattern:",
+			"start": 338,
+			"end": 410,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the head stays inline and only the pattern breaks.",
+			"start": 412,
+			"end": 465,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 54
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " leading",
+			"start": 482,
+			"end": 492,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 2
+				},
+				"end": {
+					"line": 23,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " for-in over an object iterable — same rule, shared code path.",
+			"start": 534,
+			"end": 598,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 1
+				},
+				"end": {
+					"line": 30,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing",
+			"start": 627,
+			"end": 638,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 7
+				},
+				"end": {
+					"line": 32,
+					"column": 18
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 668,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 659,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 36,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ForOfStatement",
+					"start": 137,
+					"end": 203,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 2
+						}
+					},
+					"await": false,
+					"left": {
+						"type": "VariableDeclaration",
+						"start": 142,
+						"end": 152,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 6
+							},
+							"end": {
+								"line": 4,
+								"column": 16
+							}
+						},
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 148,
+								"end": 152,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 12
+									},
+									"end": {
+										"line": 4,
+										"column": 16
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 148,
+									"end": 152,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 12
+										},
+										"end": {
+											"line": 4,
+											"column": 16
+										}
+									},
+									"name": "item"
+								},
+								"init": null
+							}
+						],
+						"kind": "const"
+					},
+					"right": {
+						"type": "ArrayExpression",
+						"start": 156,
+						"end": 185,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 20
+							},
+							"end": {
+								"line": 7,
+								"column": 2
+							}
+						},
+						"elements": [
+							{
+								"type": "Literal",
+								"start": 160,
+								"end": 163,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 5
+									}
+								},
+								"value": "a",
+								"raw": "'a'"
+							},
+							{
+								"type": "Literal",
+								"start": 167,
+								"end": 170,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 5
+									}
+								},
+								"value": "b",
+								"raw": "'b'",
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " trailing",
+										"start": 171,
+										"end": 182
+									}
+								]
+							}
+						]
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 187,
+						"end": 203,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 4
+							},
+							"end": {
+								"line": 9,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 191,
+								"end": 200,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 11
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 191,
+									"end": 199,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 2
+										},
+										"end": {
+											"line": 8,
+											"column": 10
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 191,
+										"end": 193,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 2
+											},
+											"end": {
+												"line": 8,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 194,
+											"end": 198,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 5
+												},
+												"end": {
+													"line": 8,
+													"column": 9
+												}
+											},
+											"name": "item"
+										}
+									],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A line comment inside the iterable array keeps the for-of head inline",
+							"start": 10,
+							"end": 82
+						},
+						{
+							"type": "Line",
+							"value": " (`for (const item of [`); only the array breaks.",
+							"start": 84,
+							"end": 135
+						}
+					]
+				},
+				{
+					"type": "ForOfStatement",
+					"start": 268,
+					"end": 335,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 2
+						}
+					},
+					"await": false,
+					"left": {
+						"type": "VariableDeclaration",
+						"start": 273,
+						"end": 283,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 6
+							},
+							"end": {
+								"line": 12,
+								"column": 16
+							}
+						},
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 279,
+								"end": 283,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 12
+									},
+									"end": {
+										"line": 12,
+										"column": 16
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 279,
+									"end": 283,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 12
+										},
+										"end": {
+											"line": 12,
+											"column": 16
+										}
+									},
+									"name": "item"
+								},
+								"init": null
+							}
+						],
+						"kind": "const"
+					},
+					"right": {
+						"type": "ArrayExpression",
+						"start": 287,
+						"end": 317,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 20
+							},
+							"end": {
+								"line": 16,
+								"column": 2
+							}
+						},
+						"elements": [
+							{
+								"type": "Literal",
+								"start": 304,
+								"end": 307,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 5
+									}
+								},
+								"value": "a",
+								"raw": "'a'",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " leading",
+										"start": 291,
+										"end": 301
+									}
+								]
+							},
+							{
+								"type": "Literal",
+								"start": 311,
+								"end": 314,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 2
+									},
+									"end": {
+										"line": 15,
+										"column": 5
+									}
+								},
+								"value": "b",
+								"raw": "'b'"
+							}
+						]
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 319,
+						"end": 335,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 4
+							},
+							"end": {
+								"line": 18,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 323,
+								"end": 332,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 11
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 323,
+									"end": 331,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 2
+										},
+										"end": {
+											"line": 17,
+											"column": 10
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 323,
+										"end": 325,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 2
+											},
+											"end": {
+												"line": 17,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 326,
+											"end": 330,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 5
+												},
+												"end": {
+													"line": 17,
+													"column": 9
+												}
+											},
+											"name": "item"
+										}
+									],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A leading line comment inside the array behaves the same.",
+							"start": 206,
+							"end": 266
+						}
+					]
+				},
+				{
+					"type": "ForOfStatement",
+					"start": 467,
+					"end": 531,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 28,
+							"column": 2
+						}
+					},
+					"await": false,
+					"left": {
+						"type": "VariableDeclaration",
+						"start": 472,
+						"end": 504,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 6
+							},
+							"end": {
+								"line": 26,
+								"column": 2
+							}
+						},
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 478,
+								"end": 504,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 12
+									},
+									"end": {
+										"line": 26,
+										"column": 2
+									}
+								},
+								"id": {
+									"type": "ArrayPattern",
+									"start": 478,
+									"end": 504,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 12
+										},
+										"end": {
+											"line": 26,
+											"column": 2
+										}
+									},
+									"elements": [
+										{
+											"type": "Identifier",
+											"start": 495,
+											"end": 496,
+											"loc": {
+												"start": {
+													"line": 24,
+													"column": 2
+												},
+												"end": {
+													"line": 24,
+													"column": 3
+												}
+											},
+											"name": "a",
+											"leadingComments": [
+												{
+													"type": "Line",
+													"value": " leading",
+													"start": 482,
+													"end": 492
+												}
+											]
+										},
+										{
+											"type": "Identifier",
+											"start": 500,
+											"end": 501,
+											"loc": {
+												"start": {
+													"line": 25,
+													"column": 2
+												},
+												"end": {
+													"line": 25,
+													"column": 3
+												}
+											},
+											"name": "b"
+										}
+									]
+								},
+								"init": null
+							}
+						],
+						"kind": "const"
+					},
+					"right": {
+						"type": "Identifier",
+						"start": 508,
+						"end": 513,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 6
+							},
+							"end": {
+								"line": 26,
+								"column": 11
+							}
+						},
+						"name": "pairs"
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 515,
+						"end": 531,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 13
+							},
+							"end": {
+								"line": 28,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 519,
+								"end": 528,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 2
+									},
+									"end": {
+										"line": 27,
+										"column": 11
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 519,
+									"end": 527,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 2
+										},
+										"end": {
+											"line": 27,
+											"column": 10
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 519,
+										"end": 521,
+										"loc": {
+											"start": {
+												"line": 27,
+												"column": 2
+											},
+											"end": {
+												"line": 27,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 522,
+											"end": 523,
+											"loc": {
+												"start": {
+													"line": 27,
+													"column": 5
+												},
+												"end": {
+													"line": 27,
+													"column": 6
+												}
+											},
+											"name": "a"
+										},
+										{
+											"type": "Identifier",
+											"start": 525,
+											"end": 526,
+											"loc": {
+												"start": {
+													"line": 27,
+													"column": 8
+												},
+												"end": {
+													"line": 27,
+													"column": 9
+												}
+											},
+											"name": "b"
+										}
+									],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A line comment inside a destructuring binding stays with the pattern:",
+							"start": 338,
+							"end": 410
+						},
+						{
+							"type": "Line",
+							"value": " the head stays inline and only the pattern breaks.",
+							"start": 412,
+							"end": 465
+						}
+					]
+				},
+				{
+					"type": "ForInStatement",
+					"start": 600,
+					"end": 658,
+					"loc": {
+						"start": {
+							"line": 31,
+							"column": 1
+						},
+						"end": {
+							"line": 35,
+							"column": 2
+						}
+					},
+					"left": {
+						"type": "VariableDeclaration",
+						"start": 605,
+						"end": 614,
+						"loc": {
+							"start": {
+								"line": 31,
+								"column": 6
+							},
+							"end": {
+								"line": 31,
+								"column": 15
+							}
+						},
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 611,
+								"end": 614,
+								"loc": {
+									"start": {
+										"line": 31,
+										"column": 12
+									},
+									"end": {
+										"line": 31,
+										"column": 15
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 611,
+									"end": 614,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 12
+										},
+										"end": {
+											"line": 31,
+											"column": 15
+										}
+									},
+									"name": "key"
+								},
+								"init": null
+							}
+						],
+						"kind": "const"
+					},
+					"right": {
+						"type": "ObjectExpression",
+						"start": 618,
+						"end": 641,
+						"loc": {
+							"start": {
+								"line": 31,
+								"column": 19
+							},
+							"end": {
+								"line": 33,
+								"column": 2
+							}
+						},
+						"properties": [
+							{
+								"type": "Property",
+								"start": 622,
+								"end": 626,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 2
+									},
+									"end": {
+										"line": 32,
+										"column": 6
+									}
+								},
+								"method": false,
+								"shorthand": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 622,
+									"end": 623,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 2
+										},
+										"end": {
+											"line": 32,
+											"column": 3
+										}
+									},
+									"name": "a"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 625,
+									"end": 626,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 5
+										},
+										"end": {
+											"line": 32,
+											"column": 6
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								},
+								"kind": "init",
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " trailing",
+										"start": 627,
+										"end": 638
+									}
+								]
+							}
+						]
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 643,
+						"end": 658,
+						"loc": {
+							"start": {
+								"line": 33,
+								"column": 4
+							},
+							"end": {
+								"line": 35,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 647,
+								"end": 655,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 2
+									},
+									"end": {
+										"line": 34,
+										"column": 10
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 647,
+									"end": 654,
+									"loc": {
+										"start": {
+											"line": 34,
+											"column": 2
+										},
+										"end": {
+											"line": 34,
+											"column": 9
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 647,
+										"end": 649,
+										"loc": {
+											"start": {
+												"line": 34,
+												"column": 2
+											},
+											"end": {
+												"line": 34,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 650,
+											"end": 653,
+											"loc": {
+												"start": {
+													"line": 34,
+													"column": 5
+												},
+												"end": {
+													"line": 34,
+													"column": 8
+												}
+											},
+											"name": "key"
+										}
+									],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " for-in over an object iterable — same rule, shared code path.",
+							"start": 534,
+							"end": 598
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
