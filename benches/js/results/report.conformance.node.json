@@ -2,8 +2,8 @@
 	"version": 7,
 	"runtime": "node",
 	"corpus_kind": "conformance",
-	"timestamp": "2026-07-16T11:52:16.141Z",
-	"git_commit": "135b7b93",
+	"timestamp": "2026-07-22T09:27:46.776Z",
+	"git_commit": "d063479a",
 	"machine": {
 		"cpu_model": "AMD Ryzen 5 PRO 7530U with Radeon Graphics",
 		"os": "linux",
@@ -142,60 +142,67 @@
 		"svelte": "5.56.4",
 		"acorn": "8.16.0",
 		"acorn_ts": "1.0.11",
-		"prettier": "3.9.0",
+		"prettier": "3.9.5",
 		"prettier_svelte": "4.1.1",
 		"oxc_parser": "0.140.0",
-		"oxfmt": "0.59.0",
-		"biome": "2.5.4"
+		"oxfmt": "0.60.0",
+		"biome": "2.5.4",
+		"dprint": "0.96.1"
 	},
 	"binary_sizes": [
 		{
 			"label": "tsv (ffi)",
-			"bytes": 3407520,
+			"bytes": 3346544,
 			"kind": "native",
-			"gzip_bytes": 1473224
+			"gzip_bytes": 1442507
 		},
 		{
 			"label": "tsv format (ffi)",
-			"bytes": 3143024,
+			"bytes": 3095968,
 			"kind": "native",
-			"gzip_bytes": 1366105
+			"gzip_bytes": 1339168
 		},
 		{
 			"label": "tsv parse (ffi)",
-			"bytes": 1602672,
+			"bytes": 1606912,
 			"kind": "native",
-			"gzip_bytes": 704951
+			"gzip_bytes": 703248
 		},
 		{
 			"label": "tsv (napi)",
-			"bytes": 3540848,
+			"bytes": 3479392,
 			"kind": "native",
-			"gzip_bytes": 1517414
+			"gzip_bytes": 1486322
 		},
 		{
 			"label": "tsv_format_wasm",
-			"bytes": 2261397,
+			"bytes": 2216330,
 			"kind": "wasm",
-			"gzip_bytes": 794650
+			"gzip_bytes": 787915
 		},
 		{
 			"label": "tsv_parse_wasm",
-			"bytes": 1057603,
+			"bytes": 1052601,
 			"kind": "wasm",
-			"gzip_bytes": 389582
+			"gzip_bytes": 388661
 		},
 		{
 			"label": "tsv_wasm",
-			"bytes": 2491464,
+			"bytes": 2444292,
 			"kind": "wasm",
-			"gzip_bytes": 875399
+			"gzip_bytes": 867803
 		},
 		{
 			"label": "biome (wasm)",
 			"bytes": 38584187,
 			"kind": "wasm",
 			"gzip_bytes": 9281487
+		},
+		{
+			"label": "dprint (wasm)",
+			"bytes": 4174185,
+			"kind": "wasm",
+			"gzip_bytes": 1155127
 		},
 		{
 			"label": "oxc-parser (napi)",
@@ -205,9 +212,9 @@
 		},
 		{
 			"label": "oxfmt (napi)",
-			"bytes": 8917776,
+			"bytes": 8844056,
 			"kind": "native",
-			"gzip_bytes": 3586269
+			"gzip_bytes": 3575335
 		},
 		{
 			"label": "oxc-parser (wasm)",
