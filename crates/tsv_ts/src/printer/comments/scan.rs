@@ -114,6 +114,15 @@ impl<'a> Printer<'a> {
     /// exactly one, then look for a second before any non-whitespace. Bounded by `upper` (the
     /// next element's start), so it never reads past its own gap.
     pub(crate) fn is_next_line_empty(&self, from: u32, upper: u32) -> bool {
+        // A direct `self.source` newline scan, so it must be gated on the canonical
+        // flag (see the `Printer::canonical` doc): the canonical reprint empties the
+        // layout line-break table so table-based blank reads collapse to "no blank",
+        // but a raw source scan would still see the authored blank on pass 1 and force
+        // expansion — breaking authoring-independence (`f(a,\n\nb)` must canonicalize
+        // to `f(a, b)`) and, across passes, idempotence.
+        if self.canonical {
+            return false;
+        }
         let bytes = self.source.as_bytes();
         let end = (upper as usize).min(bytes.len());
         // `skipInlineComment` / `skipTrailingComment`: a comment on the element's own line is

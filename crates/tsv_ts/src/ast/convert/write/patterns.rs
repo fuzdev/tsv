@@ -4,8 +4,32 @@ use super::super::super::internal;
 use super::declarations::write_decorators_field;
 use super::expressions::{write_expression, write_expressions};
 use super::functions::write_function_expression;
-use super::{Ctx, JsonWriter, close_node, node_header, write_array, write_type_annotation_field};
+use super::{
+    Ctx, JsonWriter, close_node, node_header, node_header_wide_end, write_array,
+    write_type_annotation_field,
+};
 use tsv_lang::Span;
+
+/// The header of a destructuring pattern (`ObjectPattern` / `ArrayPattern`).
+///
+/// An annotation widens the wire `end` but **not** the `loc`
+/// ([`node_header_wide_end`]): a signature parameter's span already covers its
+/// annotation, so the widening is a no-op there, but a Svelte **block** binding
+/// pattern's span stops at the bare pattern — and the oracle's own `end` and `loc`
+/// disagree for exactly that reason (`read_pattern` patches `end` and leaves `loc`).
+/// Shared so the two pattern writers can't drift.
+pub(super) fn pattern_header(
+    w: &mut JsonWriter,
+    node_type: &'static str,
+    span: Span,
+    type_annotation: Option<&internal::TSTypeAnnotation<'_>>,
+    ctx: &Ctx<'_>,
+) {
+    match type_annotation {
+        Some(ta) => node_header_wide_end(w, node_type, span, ta.span.end, ctx),
+        None => node_header(w, node_type, span, ctx),
+    }
+}
 
 /// Emits a `TemplateLiteral` node. Field order: `expressions`, `quasis`.
 pub(super) fn write_template_literal(
@@ -57,7 +81,13 @@ pub(super) fn write_object_pattern(
     obj: &internal::ObjectPattern<'_>,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "ObjectPattern", obj.span, ctx);
+    pattern_header(
+        w,
+        "ObjectPattern",
+        obj.span,
+        obj.type_annotation.as_ref(),
+        ctx,
+    );
     w.raw(",\"properties\":");
     write_array(w, obj.properties, |w, p| match p {
         internal::ObjectPatternProperty::Property(p) => write_property(w, p, ctx),

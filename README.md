@@ -66,12 +66,12 @@ Future features (unknown order):
   but the lift to support it is small)
 - JS parsing diagnostics (test262 negative cases)
 - CSS error recovery (recover past invalid CSS per the spec)
+- Svelte compiler (partially implemented, not ready for usage)
 - later:
   - TypeScript 7 integration (the Go impl), unlocking:
     - svelte-check replacement
     - LSP
     - linter - type aware, initially focused on serializable data-only plugins for extensibility
-  - Svelte compiler (exact mirror, maybe out of scope, see [rsvelte](https://github.com/baseballyama/rsvelte))
   - bundling is probably out of scope 
   - [discussion](https://github.com/fuzdev/tsv/discussions) welcome
 

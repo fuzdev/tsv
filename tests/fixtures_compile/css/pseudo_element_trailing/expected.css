@@ -1,0 +1,4 @@
+
+	.c.svelte-tsvhash::before {
+		content: 'x';
+	}

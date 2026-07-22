@@ -479,6 +479,28 @@ impl<'a> Printer<'a> {
     /// `search_end` do: every caller bounds the search at the token before the
     /// continuation, and no operator can occur in that gap. A caller that widens those
     /// bounds must re-check that itself.
+    /// The keyword's words joined by one space, with its end *measured* rather than
+    /// located — the shape used where the words cannot be located: the source does not
+    /// hold them, or there is no window of source to hold them in.
+    ///
+    /// It assumes exactly one space per interior gap, so it scans no gap and can emit
+    /// no interior comment. Every caller must therefore have established that there is
+    /// none to emit — which an empty window proves, and which the located path below
+    /// makes unnecessary.
+    fn measured_keyword_doc(&self, words: &[&'static str], start: u32) -> (DocId, u32) {
+        let d = self.d();
+        let mut parts: DocBuf = DocBuf::new();
+        for (i, w) in words.iter().enumerate() {
+            if i > 0 {
+                parts.push(d.text(" "));
+            }
+            parts.push(d.text(w));
+        }
+        let width: u32 = words.iter().map(|w| w.len() as u32).sum();
+        let measured = start + width + words.len() as u32 - 1;
+        (d.concat(&parts), measured)
+    }
+
     pub(crate) fn build_keyword_words_doc(
         &self,
         words: &[&'static str],
@@ -487,6 +509,21 @@ impl<'a> Printer<'a> {
     ) -> (DocId, u32) {
         let d = self.d();
         debug_assert!(!words.is_empty(), "a keyword has at least one word");
+
+        // Does any source lie between `start` and what follows the keyword? A real
+        // parsed node always says yes — the keyword's own bytes are inside the window,
+        // so it cannot be empty. An empty one therefore means the span is not source-
+        // backed at all, which is `tsv_svelte_compile`'s generated AST: its synthetic
+        // nodes carry spans whose only job is steering these very windows, placed to
+        // come out empty/inverted precisely so a minted node claims no comment out of
+        // the host document (see that crate's `build.rs`).
+        //
+        // That is the condition under which everything below is *meaningful*, not a
+        // special case for one caller. An empty window holds no comment, so the drop
+        // this function exists to prevent is impossible in it; the words cannot be
+        // located because there is no source to find them in; and both answers below
+        // reduce to the same measured text either way.
+        let has_window = search_end > start;
 
         // A one-word keyword has no interior gap, so there is nothing to locate: it
         // begins at `start` and its end is arithmetic. This is the hot path — the
@@ -500,15 +537,22 @@ impl<'a> Printer<'a> {
             // scan to prove what every caller already knows, so assert it in debug
             // instead — a caller passing a wider span (one that leads with `export `,
             // say) would otherwise silently mis-place `keyword_end` and drop the gap's
-            // comment, which is the very bug this function exists to prevent.
+            // comment, which is the very bug this function exists to prevent. With no
+            // window there is no such comment, and no source to read the word from.
             debug_assert!(
-                self.source
-                    .as_bytes()
-                    .get(start as usize..)
-                    .is_some_and(|rest| rest.starts_with(word.as_bytes())),
+                !has_window
+                    || self
+                        .source
+                        .as_bytes()
+                        .get(start as usize..)
+                        .is_some_and(|rest| rest.starts_with(word.as_bytes())),
                 "single-word keyword `{word}` must begin at `start` ({start})"
             );
             return (d.text(word), start + word.len() as u32);
+        }
+
+        if !has_window {
+            return self.measured_keyword_doc(words, start);
         }
 
         // Left-to-right and FLAT: every gap emits its comments where the author wrote
@@ -527,8 +571,8 @@ impl<'a> Printer<'a> {
         let mut in_gap = false;
         for word in words {
             let Some(pos) = self.find_keyword_in_range(cursor, search_end, word) else {
-                // The source doesn't hold the shape the caller named — only reachable
-                // through a synthetic span or a `search_end` that precedes the words.
+                // A non-empty window that does not hold the shape the caller named:
+                // a `search_end` past the words, or a span that isn't the keyword's.
                 // Assert it in debug: this arm's measured end is the very arithmetic
                 // this function exists to replace (it assumes one space per gap), so a
                 // caller that lands here silently drops the comment it came for. Prod
@@ -537,19 +581,9 @@ impl<'a> Printer<'a> {
                 debug_assert!(
                     false,
                     "keyword word `{word}` not found in source[{cursor}..{search_end}] \
-                     — caller passed a synthetic span or a bad search_end"
+                     — caller passed a bad search_end"
                 );
-                let mut parts: DocBuf = DocBuf::new();
-                let mut measured = start;
-                for (i, w) in words.iter().enumerate() {
-                    if i > 0 {
-                        parts.push(d.text(" "));
-                        measured += 1;
-                    }
-                    parts.push(d.text(w));
-                    measured += w.len() as u32;
-                }
-                return (d.concat(&parts), measured);
+                return self.measured_keyword_doc(words, start);
             };
             // The first word is emitted by the caller below, outside the indent — it
             // leads the header, so no gap precedes it.

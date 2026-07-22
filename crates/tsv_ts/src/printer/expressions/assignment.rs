@@ -417,6 +417,12 @@ fn unwrap_expression<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
 /// newline in the span, so a newline is a sound stand-in for the printed doc's
 /// `willBreak` (and keeps the `is_poorly_breakable_chain` debug_assert sound: a
 /// force-breaking mapped type-arg is never classified poorly-breakable).
+///
+/// The mapped-type source-newline read below is one half of a pair with
+/// `build_mapped_type_doc` (printer/types/composite.rs), which reads the same source
+/// newline to decide the force-break. Both are deliberately left un-erased by the
+/// canonical reprint (`crate::format_canonical`) — gating either one alone, or both,
+/// is unsound. See `build_mapped_type_doc` for the full reasoning before touching this.
 fn is_call_with_complex_type_arguments(call: &internal::CallExpression<'_>, source: &str) -> bool {
     use internal::TSType;
     let Some(type_args) = &call.type_arguments else {

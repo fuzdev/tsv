@@ -1,0 +1,4 @@
+
+	a.svelte-tsvhash + b:where(.svelte-tsvhash) {
+		color: red;
+	}

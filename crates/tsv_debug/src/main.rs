@@ -1,5 +1,6 @@
 mod audit;
 mod cli;
+mod compile_fixtures;
 mod deno;
 mod diff;
 mod error;

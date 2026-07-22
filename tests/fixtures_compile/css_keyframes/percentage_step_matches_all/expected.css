@@ -1,0 +1,12 @@
+
+	.a.svelte-tsvhash {
+		animation: svelte-tsvhash-k 1s;
+	}
+	@keyframes svelte-tsvhash-k {
+		0% {
+			opacity: 0;
+		}
+		100% {
+			opacity: 1;
+		}
+	}

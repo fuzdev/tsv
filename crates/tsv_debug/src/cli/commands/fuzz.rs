@@ -153,12 +153,16 @@ pub struct FuzzCommand {
 }
 
 /// A dep-free SplitMix64 PRNG — deterministic, tiny, no external crate.
-struct Rng {
+///
+/// `pub(crate)` because `compile_fuzz` seeds its mutants from the same generator:
+/// two independent "the" SplitMix64s would be a silent drift hazard, and the
+/// corpus-add-stability property below is stated once here for both fuzzers.
+pub(crate) struct Rng {
     state: u64,
 }
 
 impl Rng {
-    fn new(seed: u64) -> Self {
+    pub(crate) fn new(seed: u64) -> Self {
         Self { state: seed }
     }
 
@@ -171,7 +175,7 @@ impl Rng {
     }
 
     /// A value in `[0, n)`; 0 when `n == 0`.
-    fn below(&mut self, n: usize) -> usize {
+    pub(crate) fn below(&mut self, n: usize) -> usize {
         if n == 0 {
             0
         } else {
@@ -187,7 +191,7 @@ impl Rng {
 /// Per-file stream seed: FNV-1a over the path bytes XOR the master seed,
 /// finalized through one SplitMix64 step. Keying each file's mutant stream by
 /// its own path is what makes the gate corpus-add-stable (see the module doc).
-fn stream_seed(master: u64, path: &str) -> u64 {
+pub(crate) fn stream_seed(master: u64, path: &str) -> u64 {
     let mut h: u64 = 0xcbf2_9ce4_8422_2325; // FNV-1a offset basis
     for &b in path.as_bytes() {
         h = (h ^ u64::from(b)).wrapping_mul(0x0000_0100_0000_01B3); // FNV-1a prime

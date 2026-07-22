@@ -59,7 +59,7 @@ impl FixturesAuditCommand {
 
         // Audit fixtures in parallel on the bulk sidecar pool. Order doesn't
         // matter — results are collected and printed afterward.
-        let mut tasks = super::spawn_fixture_stream(
+        let mut tasks = super::spawn_work_stream(
             fixture_list,
             super::ResultOrder::Completion,
             |fixture| async move { audit_fixture(&fixture).await },

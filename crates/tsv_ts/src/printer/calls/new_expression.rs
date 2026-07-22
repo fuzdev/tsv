@@ -457,7 +457,7 @@ impl<'a> Printer<'a> {
 
                     let pc = PartitionedComments::new(
                         self.comments,
-                        self.line_breaks,
+                        self.comment_line_breaks,
                         arg_end,
                         paren_close,
                     );
@@ -518,7 +518,7 @@ impl<'a> Printer<'a> {
 
             let pc = PartitionedComments::new(
                 self.comments,
-                self.line_breaks,
+                self.comment_line_breaks,
                 effective_arg_end,
                 new_expr.span.end,
             );
@@ -740,7 +740,7 @@ impl<'a> Printer<'a> {
             let first_arg_start = new_expr.arguments[0].span().start;
             let gap_pc = PartitionedComments::new(
                 self.comments,
-                self.line_breaks,
+                self.comment_line_breaks,
                 paren_open,
                 first_arg_start,
             );

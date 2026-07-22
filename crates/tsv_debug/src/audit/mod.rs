@@ -26,6 +26,11 @@
 // verify layer is internally feature-gated.)
 pub(crate) mod properties;
 
+// The ratchet is NOT gated: `compile_corpus_compare --ratchet` (the validation-suite
+// gate) drives no comment ledger, so it must exist in a default build. It is pure
+// generic snapshot plumbing with no ledger dependency of its own.
+pub(crate) mod ratchet;
+
 // The injection machinery is only reachable through `gap_audit` / `blank_audit`,
 // both themselves behind the `comment_check` feature (they arm
 // `tsv_lang::comment_ledger`), so gate these too — otherwise they read as dead
@@ -34,8 +39,6 @@ pub(crate) mod properties;
 pub(crate) mod node_edge;
 #[cfg(feature = "comment_check")]
 pub(crate) mod parallel;
-#[cfg(feature = "comment_check")]
-pub(crate) mod ratchet;
 #[cfg(feature = "comment_check")]
 pub(crate) mod report;
 #[cfg(feature = "comment_check")]

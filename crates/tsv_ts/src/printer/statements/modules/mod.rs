@@ -861,7 +861,7 @@ impl<'a> Printer<'a> {
         // The literal plus whatever trails it inside the parens.
         let close = PartitionedComments::new(
             self.comments,
-            self.line_breaks,
+            self.comment_line_breaks,
             ext_ref.expression.span.end,
             close_paren,
         );

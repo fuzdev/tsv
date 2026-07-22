@@ -647,7 +647,28 @@ impl<'a> Printer<'a> {
     /// - Source multi-line: `{\n\t[K in keyof T]: T[K];\n}` (always)
     pub(super) fn build_mapped_type_doc(&self, m: &TSMappedType<'_>) -> DocId {
         let d = self.d();
-        // Check if source was multi-line (preserve author's formatting choice)
+        // Check if source was multi-line (preserve author's formatting choice).
+        //
+        // Intentionally NOT gated by `self.canonical` — and NOT merely "unimplemented".
+        // This read is one half of a pair: `is_call_with_complex_type_arguments`
+        // (printer/expressions/assignment.rs) approximates prettier's `willBreak` on a
+        // mapped type-arg with the same source-newline test. The two must agree, or the
+        // assignment's poorly-breakable classification is wrong.
+        //
+        // Gating BOTH on `canonical` looks like the obvious full-erasure fix. It is
+        // unsound: canonical mode preserves comments, and a line comment inside the
+        // mapped type still forces a break — so the doc force-breaks while a
+        // canonical-gated newline test reports "doesn't break", the assignment is
+        // misclassified poorly-breakable, and `is_poorly_breakable_chain`'s debug_assert
+        // fires. The root cause is that canonical mode CHANGES what force-breaks
+        // (authored newlines stop forcing; comments still do), which invalidates the
+        // "source newline <=> willBreak" approximation both reads rest on. Erasing this
+        // properly needs a canonical-aware willBreak approximation (forcing-comment-in-span
+        // instead of newline-in-span), not a flag.
+        //
+        // So mapped-type multi-line-ness is a deliberate un-erased residual of the
+        // canonicalizer; `format_canonical`'s docs record it as a contract hole.
+        // Unreachable for the current consumer (compiled JS carries no TS types).
         let source_is_multiline = super::super::is_brace_block_multiline(self.source, m.span);
 
         // Find the start of the mapping content (after `{`)

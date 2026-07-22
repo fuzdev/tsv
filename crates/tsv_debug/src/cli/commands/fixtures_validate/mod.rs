@@ -43,7 +43,7 @@ impl FixturesValidateCommand {
         // phases never print directly and concurrent fixtures can't interleave
         // output (each fixture's diffs stay contiguous).
         let prettier_only = self.prettier_only;
-        let mut results = super::spawn_fixture_stream(
+        let mut results = super::spawn_work_stream(
             fixture_list,
             super::ResultOrder::Completion,
             move |fixture| async move { validation::validate_fixture(&fixture, prettier_only).await },

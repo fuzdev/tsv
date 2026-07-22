@@ -1,0 +1,11 @@
+
+	@media (min-width: 100px) {
+		@keyframes svelte-tsvhash-m {
+			from {
+				opacity: 0;
+			}
+		}
+	}
+	.a.svelte-tsvhash {
+		animation: svelte-tsvhash-m 1s;
+	}

@@ -1,0 +1,4 @@
+
+	.x.svelte-tsvhash ~ .foo:where(.svelte-tsvhash) {
+		color: green;
+	}

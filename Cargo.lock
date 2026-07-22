@@ -630,6 +630,7 @@ dependencies = [
  "tsv_debug",
  "tsv_lang",
  "tsv_svelte",
+ "tsv_svelte_compile",
  "tsv_ts",
 ]
 
@@ -685,6 +686,7 @@ dependencies = [
  "tsv_html",
  "tsv_lang",
  "tsv_svelte",
+ "tsv_svelte_compile",
  "tsv_ts",
 ]
 
@@ -754,6 +756,20 @@ dependencies = [
  "tsv_html",
  "tsv_lang",
  "tsv_ts",
+]
+
+[[package]]
+name = "tsv_svelte_compile"
+version = "0.1.0"
+dependencies = [
+ "bumpalo",
+ "thiserror",
+ "tsv_css",
+ "tsv_html",
+ "tsv_lang",
+ "tsv_svelte",
+ "tsv_ts",
+ "unicode-ident",
 ]
 
 [[package]]

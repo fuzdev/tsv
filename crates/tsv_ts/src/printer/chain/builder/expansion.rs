@@ -26,7 +26,7 @@ pub(super) fn has_blank_lines_between_methods<'a>(
     groups: &[ChainGroup<'a>],
     printer: &Printer<'_>,
 ) -> bool {
-    let line_breaks = printer.get_line_breaks();
+    let line_breaks = printer.get_layout_line_breaks();
     // Skip groups[0] (base) and groups[1] (first method) - only check groups[2+]
     groups.iter().skip(2).any(|group| {
         group

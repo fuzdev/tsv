@@ -274,9 +274,12 @@ impl<'a> Printer<'a> {
         // `is_block` test keeps this honest without leaning on the callers' gate:
         // only a *line* comment can trail the comma, since a block there would be
         // the caller's block-only path.
-        let trails_comma = comments
-            .get(first_line_idx)
-            .is_some_and(|c| !c.is_block && !self.has_newline_between(comma_pos, c.span.start));
+        //
+        // Comment-adjacency read (real even in canonical mode): an own-line line
+        // comment must drop below the comma, not merge into the `line_suffix` run.
+        let trails_comma = comments.get(first_line_idx).is_some_and(|c| {
+            !c.is_block && !self.comment_has_newline_between(comma_pos, c.span.start)
+        });
         let run_start = if trails_comma {
             parts.push(self.build_trailing_comment_doc(comments[first_line_idx]));
             first_line_idx + 1

@@ -1,4 +1,5 @@
 // Public modules for use by tests
+pub mod compile_fixtures;
 pub mod deno;
 pub mod diff;
 pub mod error;

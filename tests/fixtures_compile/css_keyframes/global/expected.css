@@ -1,0 +1,12 @@
+
+	@keyframes spin {
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
+	}
+	.a.svelte-tsvhash {
+		animation: spin 1s;
+	}

@@ -41,10 +41,10 @@ async fn run(list_only: bool, filters: &[String]) -> Result<(), CliError> {
 
     let matched_count = fixture_list.len();
 
-    // Fixture order (`ResultOrder::Fixture`) so progress lines print deterministically.
-    let mut results = super::spawn_fixture_stream(
+    // Input order (`ResultOrder::Input`) so progress lines print deterministically.
+    let mut results = super::spawn_work_stream(
         fixture_list,
-        super::ResultOrder::Fixture,
+        super::ResultOrder::Input,
         |fixture| async move {
             let result = generate_expected_fixture(&fixture).await;
             (fixture, result)

@@ -284,7 +284,20 @@ fn run_link_audit(
         // Clone the parsed links so we can borrow the cache mutably while resolving.
         let links = match cache.get(source) {
             Some(doc) => doc.links.clone(),
-            None => continue,
+            // A README that vanished between the walk and here is a race we ignore,
+            // but an enumerated doc that can't be read is a mis-wired audit, not a
+            // clean run — report it rather than silently checking nothing.
+            None => {
+                if docs.iter().any(|d| d == source) {
+                    dead.push(DeadLink {
+                        source: source.display().to_string(),
+                        line: 0,
+                        target: String::new(),
+                        reason: "link-checked doc could not be read".to_string(),
+                    });
+                }
+                continue;
+            }
         };
         checked += links.len();
         for link in links {
