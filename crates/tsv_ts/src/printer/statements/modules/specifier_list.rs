@@ -12,6 +12,15 @@ use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{Span, comments_to_emit_in_range};
 
+/// The keyword-header end and outer bound that bracket a braced specifier list —
+/// the window in which `push_braced_specifier_list` locates the `{ … }`.
+pub(super) struct SpecifierListSpans {
+    /// End of the keyword header, where the forward `{` search starts.
+    pub(super) kw_end: u32,
+    /// Upper bound for the closing-`}` search (source-literal start or decl end).
+    pub(super) bound: u32,
+}
+
 impl<'a> Printer<'a> {
     /// Check if an import declaration has empty named braces `{}` in source.
     /// This distinguishes `import {} from 'x'` from `import 'x'`.
@@ -186,15 +195,11 @@ impl<'a> Printer<'a> {
     /// `{` directly follows the header — always so for exports, and for imports only
     /// without a preceding default/namespace binding (whose own→`{` comments are
     /// handled separately, so capturing here would double-emit them).
-    // Two closures (span + per-item doc) plus positional context — inherent to a
-    // generic list builder; sibling `build_braced_hardline_comma_list` is at 7.
-    #[allow(clippy::too_many_arguments)]
     pub(super) fn push_braced_specifier_list<T>(
         &self,
         parts: &mut DocBuf,
         specifiers: &[T],
-        kw_end: u32,
-        bound: u32,
+        spans: SpecifierListSpans,
         capture_keyword_comment: bool,
         get_span: impl Fn(&T) -> Span,
         build_item: impl Fn(&T) -> DocId,
@@ -206,11 +211,11 @@ impl<'a> Printer<'a> {
         // Forward search from the header skips a `{` inside comments.
         let first_start = get_span(&specifiers[0]).start;
         let brace_start = self
-            .find_char_outside_comments(kw_end, first_start, b'{')
+            .find_char_outside_comments(spans.kw_end, first_start, b'{')
             .unwrap_or(0);
 
         let last_spec_end = specifiers.last().map_or(0, |s| get_span(s).end);
-        let brace_close = self.close_brace_offset(last_spec_end, bound);
+        let brace_close = self.close_brace_offset(last_spec_end, spans.bound);
 
         // Expanding comments (line comments, or own-line single-line block
         // comments) force the multiline path. One zero-comment window check over
@@ -255,7 +260,7 @@ impl<'a> Printer<'a> {
         // space comes from the caller's `import `/`export `/`type ` token. Captured
         // only when the `{` directly follows the header (see `capture_keyword_comment`).
         if capture_keyword_comment {
-            parts.push(self.gap_comment_continuation_tail(kw_end, brace_start, braces_doc));
+            parts.push(self.gap_comment_continuation_tail(spans.kw_end, brace_start, braces_doc));
         } else {
             parts.push(braces_doc);
         }

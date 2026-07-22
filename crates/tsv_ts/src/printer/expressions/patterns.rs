@@ -7,6 +7,7 @@
 // - Assignment expressions: `a = b` with width-based wrapping and chain detection
 // - Rest elements: `...rest`
 
+use super::assignment::RhsCommentInfo;
 use crate::ast::internal::{self, ArrowFunctionBody, Expression, ObjectPatternProperty};
 use crate::printer::{
     CommentVec, ParenContext, PatternContext, Printer, object_pattern_should_expand,
@@ -168,9 +169,11 @@ impl<'a> Printer<'a> {
                     assign.operator.as_str_with_leading_space(),
                     assign.right,
                     false,
-                    rhs_comments,
-                    rhs_has_line_comment,
-                    Some(assign.span.end),
+                    RhsCommentInfo {
+                        comments: rhs_comments,
+                        has_line_comment: rhs_has_line_comment,
+                        boundary: Some(assign.span.end),
+                    },
                 );
             }
         }
@@ -186,9 +189,11 @@ impl<'a> Printer<'a> {
                 assign.operator.as_str_with_leading_space(),
                 assign.right,
                 false,
-                rhs_comments,
-                rhs_has_line_comment,
-                Some(assign.span.end),
+                RhsCommentInfo {
+                    comments: rhs_comments,
+                    has_line_comment: rhs_has_line_comment,
+                    boundary: Some(assign.span.end),
+                },
             );
         }
 
