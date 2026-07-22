@@ -780,6 +780,27 @@ pub struct CssAtrule<'arena> {
     pub span: Span,
 }
 
+impl CssAtrule<'_> {
+    /// The at-rule's **public-AST prelude** — the exact string Svelte's parser exposes as
+    /// `node.prelude` (its `read_value(...).trim()`, block comments elided). Routes through
+    /// the wire-JSON prelude reconstruction ([`convert_prelude_to_string`]), the single
+    /// fixture-gated definition of that shape, so a consumer that must agree with the
+    /// oracle's `node.prelude` byte-for-byte — the Svelte compiler's `@keyframes` name
+    /// collection and its `-global-` prefix test — reads the identical bytes rather than the
+    /// printer-facing [`PreludeValue::Raw`] `content`, which is CSS-whitespace-trimmed and
+    /// comment-preserving and so diverges on a prelude carrying a comment or JS-only
+    /// whitespace (`@keyframes spin /* c */`, a trailing vertical tab / NBSP).
+    ///
+    /// A pure visibility bridge over the writer's own reconstruction — no parse, printer, or
+    /// wire behavior of its own.
+    ///
+    /// [`convert_prelude_to_string`]: crate::ast::convert::convert_prelude_to_string
+    #[cfg(feature = "convert")]
+    pub fn public_prelude<'src>(&self, source: &'src str) -> std::borrow::Cow<'src, str> {
+        crate::ast::convert::convert_prelude_to_string(&self.prelude, source)
+    }
+}
+
 /// At-rule block - can contain rules, declarations, or nested at-rules
 #[derive(Debug, Clone)]
 pub struct CssAtruleBlock<'arena> {

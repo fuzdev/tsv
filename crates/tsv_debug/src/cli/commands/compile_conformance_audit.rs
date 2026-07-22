@@ -325,7 +325,6 @@ mod tests {
         "comments in a script with an argument-less $state()",
         "comments with template markup before the script (window ordering)",
         "conflicting transition directives (an element may have at most one intro and one outro — the oracle rejects it)",
-        "css @keyframes in <style>",
         "css attribute selector against a dynamic attribute value (static-eval not ported)",
         "css case-insensitive match with a non-ASCII operand (Unicode case-fold not ported)",
         "css combinator selector in <style>",

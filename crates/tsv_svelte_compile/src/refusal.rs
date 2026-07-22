@@ -1198,18 +1198,6 @@ pub enum Refusal {
         name: String,
     },
     // ── CSS scoping ────────────────────────────────────────────────────────
-    /// A `@keyframes` at-rule in `<style>` (including a vendor-prefixed
-    /// `@-webkit-keyframes`, …). DEFERRED: the oracle special-cases keyframes —
-    /// a name-prefix rewrite (`@keyframes spin` → `@keyframes svelte-<hash>-spin`)
-    /// plus an animation-value rewrite — which this slice does not port, so tsv
-    /// refuses rather than emit an unscoped name. Every OTHER at-rule
-    /// (`@media`/`@supports`/`@container`/`@layer`/`@scope`/…) now recurses and
-    /// scopes its inner rules the ordinary way (`css_scope::analyze_atrule`). The
-    /// keyframes discriminator is the oracle's case-SENSITIVE `is_keyframes_node`,
-    /// so `@KEYFRAMES` is a group at-rule whose `from`/`to` refuse via
-    /// [`Self::CssSelectorNoMatch`] instead.
-    #[error("css @keyframes in <style>")]
-    CssKeyframes,
     /// A nested rule in `<style>`.
     #[error("nested css rule in <style>")]
     CssNestedRule,

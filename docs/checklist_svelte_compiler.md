@@ -1319,12 +1319,29 @@ bump resets per comma. A scoped element with no `class` markup synthesizes
     scoped (`@scope (.a) to (.b)` scopes only its inner `.a`). A statement at-rule
     (`@import`/`@charset`, no block) and a descriptor block (`@font-face`/`@page`,
     declarations only) scope nothing and pass through verbatim.
+  - **`@keyframes` name scoping** — the oracle's `is_keyframes_node` handling: a
+    collection pre-pass gathers every keyframes prelude not starting with `-global-`
+    (at any depth, descending even into keyframes blocks), then the at-rule is
+    name-prefixed (`@keyframes spin` → `@keyframes svelte-<hash>-spin`, or a `-global-`
+    prefix is REMOVED and the name left un-scoped) WITHOUT descending — its inner step
+    rules are never scoped and its declarations never rewritten — and every
+    `animation` / `animation-name` value token matching a collected name gains the same
+    `svelte-<hash>-` prefix (across both properties, comma lists, and vendor-prefixed
+    property/at-rule forms). Name-discriminated case-sensitively (`@KEYFRAMES` is a
+    group at-rule, below); the raw byte edits reproduce the oracle's own glued-garbage
+    (a TAB after the name) and empty-prelude behavior. **Step matching**: the transform
+    never descends, but the oracle's separate phase-2 PRUNE walk does — it matches each
+    step rule's selectors against every element the ordinary backward way, and a matched
+    element gains the hash class. Built through the same selector machinery, with a
+    `Percentage` / `Nth` simple selector SKIPPED per-simple within its compound
+    (`css-prune.js:509`): a percentage-only compound (`0%`/`50%`/`100%`) then matches
+    EVERY element (scoping the whole component, `-global-` / `@media`-nested included),
+    while `0%.c` narrows to `class="c"` and a `from` / `to` / `div` / `.c` step scopes
+    only matching elements. Step selectors feed ONLY the scoped-element set — never
+    spliced, never pruned for no match (a no-match step neither scopes nor refuses), and
+    an empty step (`from {}`) never hits the empty-rule refusal. A build failure on a
+    step, or a nested rule/at-rule inside one, refuses (safe over-refusal, corpus-absent).
 - **Refused**:
-  - `css @keyframes in <style>` — DEFERRED: the oracle name-prefixes keyframes
-    (`@keyframes spin` → `@keyframes svelte-<hash>-spin`) plus rewrites `animation`
-    values, which this slice does not port. Name-discriminated case-sensitively (the
-    oracle's `is_keyframes_node`), so `@KEYFRAMES` is a group at-rule whose `from`/`to`
-    refuse via `css selector {selector} matches no element` instead;
   - `nested css rule in <style>` — including a `:global { … }` global block, which is
     a nested rule;
   - `empty css rule in <style> (the oracle comment-wraps it)`;
@@ -1341,8 +1358,7 @@ bump resets per comma. A scoped element with no `class` markup synthesizes
   - `css case-insensitive match with a non-ASCII operand (Unicode case-fold not ported)`;
   - `css selector {selector} matches no element (pruning not implemented)`.
 - **Planned** (each its own follow-up sub-slice): `:global { … }` global blocks (a
-  nested-rule / comma-list surface) and `@keyframes` name scoping (the name-prefix +
-  `animation`-value rewrite the general at-rule descent now leaves deferred).
+  nested-rule / comma-list surface).
 
 ---
 

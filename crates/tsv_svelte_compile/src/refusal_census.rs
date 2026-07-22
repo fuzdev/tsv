@@ -169,7 +169,6 @@ pub fn refusal_census_buckets() -> Vec<Cow<'static, str>> {
         Refusal::TsExportAssignment,
         Refusal::TsNamespaceExport,
         // CSS scoping.
-        Refusal::CssKeyframes,
         Refusal::CssNestedRule,
         Refusal::CssEmptyRule,
         Refusal::CssCombinatorSelector,

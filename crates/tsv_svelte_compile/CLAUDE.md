@@ -1372,20 +1372,48 @@ classes, this one enumerates scoping candidates.
   (descendant / child / `+` / `~`, including block-descent and the `{#each}`
   wrap-around); basic `:global` (leading `:global(<compound>) .y`, trailing
   `:global(<compound>)`, a fully-global `:global(<compound>)`, and the bare
-  `:global` combinator `div :global.x` → `div.x`); and a non-`@keyframes` **group
+  `:global` combinator `div :global.x` → `div.x`); a non-`@keyframes` **group
   at-rule** (`@media`/`@supports`/`@container`/`@layer`/`@scope`/…), which
   `analyze_atrule` recurses into and scopes the inner rules the ordinary way (the
   oracle's generic `next()` recursion, arbitrarily deep — the prelude is never
   scoped; a statement / descriptor-only at-rule scopes nothing and the splicer
-  copies it through verbatim). **Refused**: `:global{}` global
-  blocks (nested rules), `:is`/`:where`/`:has`/`:not`, `:root`/`:host`, nesting, the
-  `||` column combinator, a snippet/render-crossing combinator path (`CssCombinatorSelector`
-  — the site-resolution product isn't built, a safe over-refusal), `@keyframes`
-  (`CssKeyframes` — DEFERRED: the oracle's name-prefix + `animation`-value rewrite is
-  a separate slice; discriminated case-sensitively, so `@KEYFRAMES` recurses as a
-  group at-rule and its `from`/`to` refuse via `CssSelectorNoMatch`), empty rules
-  (`CssEmptyRule`), an enumerable dynamic
-  attribute value (`CssDynamicAttributeMatch`), a non-ASCII case-insensitive operand
+  copies it through verbatim); and **`@keyframes`** — the oracle's
+  `is_keyframes_node` handling (`css-analyze.js:52-63` / `css/index.js:82-124`): a
+  separate collection pre-pass gathers every keyframes prelude not starting with
+  `-global-` (at any nesting depth, descending even into keyframes blocks), then
+  `analyze_atrule` name-prefixes the at-rule (`@keyframes foo` → `@keyframes
+  svelte-tsvhash-foo`, or REMOVES a `-global-` prefix) WITHOUT descending (its inner
+  step rules are never scoped, its declarations never rewritten, nothing inside
+  refuses), and every `animation` / `animation-name` declaration value token matching a
+  collected name gains the same `svelte-tsvhash-` prefix (`scan_animation_declaration`,
+  a raw-property compare + boundary-scan mirroring the oracle byte-for-byte, including
+  the glued-garbage and empty-prelude edges). These ride the same `Edit` stream as the
+  selector splices, merged before the sort (`ScopeInfo::keyframes_edits`; the regions
+  are disjoint). The transform never descends, but the oracle's separate phase-2 PRUNE
+  walk (`css-prune.js`) does: it matches each step rule's selectors against every element
+  the ordinary backward way, and a matched element gains the hash. `analyze_keyframes_steps`
+  collects those step selectors into a SEPARATE list (`ScopeInfo::step_selectors`) — built
+  through the SAME `build_selector` machinery as ordinary rules with `keyframe_step = true`,
+  which skips a `Percentage`/`Nth` simple selector within its compound
+  (`css-prune.js:509`), so a percentage-only compound has an empty predicate list and
+  matches ANY element (the fallthrough — `0%`/`50%`/`100%` scope the whole component)
+  while `0%.c` narrows PER-SIMPLE to `class="c"` and a `from` step is the type selector
+  `from` (scoping a `<from>` element). `match_scope` matches them into `scoped_elements`
+  ONLY — steps are never spliced (kept out of `ScopeInfo::selectors`, so they contribute
+  no `global_strip` removal / specificity bump / `unused_selectors` entry — their source
+  stays verbatim), never pruned for no match (no `CssSelectorNoMatch`), and an empty step
+  (`from {}`) never hits the empty-rule refusal. A build failure on a step, or a nested
+  rule/at-rule inside a step (or an at-rule directly in the keyframes block), refuses
+  (`CssNestedRule` / the shape's own reason — safe over-refusals, corpus-absent). Step
+  matching runs for a `-global-` keyframes and one `@media`-nested too (the prune walk is
+  name-blind). Keyframes is discriminated case-SENSITIVELY, so `@KEYFRAMES` recurses as a
+  group at-rule and its `from`/`to` refuse via `CssSelectorNoMatch`.
+  **Refused**: `:global{}`
+  global blocks (nested rules), `:is`/`:where`/`:has`/`:not`, `:root`/`:host`, nesting,
+  the `||` column combinator, a snippet/render-crossing combinator path
+  (`CssCombinatorSelector` — the site-resolution product isn't built, a safe
+  over-refusal), empty rules (`CssEmptyRule`), an enumerable dynamic attribute value
+  (`CssDynamicAttributeMatch`), a non-ASCII case-insensitive operand
   (`CssCaseInsensitiveNonAscii`), and a chain matching no element
   (`CssSelectorNoMatch`).
 

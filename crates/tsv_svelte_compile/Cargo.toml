@@ -9,7 +9,9 @@ tsv_lang.workspace = true
 tsv_html.workspace = true
 tsv_ts.workspace = true
 tsv_svelte.workspace = true
-tsv_css.workspace = true
+# `convert` (off in the workspace default) exposes `CssAtrule::public_prelude`, the
+# wire-parity `@keyframes` prelude string the scoping pass must match the oracle on.
+tsv_css = { workspace = true, features = ["convert"] }
 bumpalo.workspace = true
 thiserror.workspace = true
 # ECMAScript IdentifierPart classification for the rune/store collision walk's

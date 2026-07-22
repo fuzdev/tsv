@@ -14,21 +14,33 @@
 //! subsequent-sibling `~`) over type / id / class / attribute / universal compounds
 //! (plus trailing pseudo); basic `:global` — leading `:global(<compound>)`, trailing
 //! `:global(<compound>)` (dropped by truncate), and a bare `:global` combinator
-//! (`div :global.x` → `div.x`); and a non-`@keyframes` **group at-rule**
+//! (`div :global.x` → `div.x`); a non-`@keyframes` **group at-rule**
 //! (`@media`/`@supports`/`@container`/`@layer`/`@scope`/…), which recurses into its
 //! block and scopes the inner rules the ordinary way (the oracle's generic `next()`
 //! recursion — `phases/3-transform/css/index.js:82-99`; the at-rule prelude is never
-//! scoped). Everything else refuses: the `||` column combinator, `:global{}` blocks,
-//! `:is`/`:where`/`:has`/`:not`, `:root`/`:host`, nesting, `@keyframes` (deferred —
-//! its name-prefix + animation-value rewrite is a separate slice), namespaced/escaped
-//! names, a snippet/render-crossing combinator path, and a compound matching no
-//! element (`CssSelectorNoMatch`; the oracle comment-wraps).
+//! scoped); and **`@keyframes`** — name-prefixed (`@keyframes foo` → `@keyframes
+//! svelte-tsvhash-foo`, a `-global-` prefix stripped and un-scoped instead) with every
+//! `animation` / `animation-name` value referencing a collected name rewritten to the
+//! prefixed spelling (the oracle's `is_keyframes_node` collect + `Atrule`/`Declaration`
+//! transform, `css-analyze.js:52-63` / `css/index.js:82-124`). The transform never
+//! descends into a keyframes block, but the oracle's phase-2 PRUNE walk does: it matches
+//! each step rule's selectors against every element the ordinary backward way, so a step
+//! selector can scope elements (a `from` step matches `<from>`, `.c` matches
+//! `class="c"`). A `Percentage` / `Nth` simple selector is skipped within its compound
+//! (`css-prune.js:509`), so a percentage-only compound matches ANY element (the
+//! fallthrough) while `0%.c` still narrows to `class="c"`. Step matching feeds ONLY the
+//! scoped-element set — step selectors are never spliced, pruned, or refused for no
+//! match. Everything else refuses:
+//! the `||` column combinator, `:global{}` blocks, `:is`/`:where`/`:has`/`:not`,
+//! `:root`/`:host`, nesting, namespaced/escaped names, a snippet/render-crossing
+//! combinator path, and a compound matching no element (`CssSelectorNoMatch`; the
+//! oracle comment-wraps).
 
 use std::collections::HashSet;
 
 use tsv_css::ast::internal::{
-    AttributeMatcher, Combinator, ComplexSelector, CssAtrule, CssBlockChild, CssNode, CssRule,
-    PseudoClassArgs, RelativeSelector, SimpleSelector,
+    AttributeMatcher, Combinator, ComplexSelector, CssAtrule, CssBlockChild, CssDeclaration,
+    CssNode, CssRule, PseudoClassArgs, RelativeSelector, SimpleSelector,
 };
 use tsv_lang::Span;
 use tsv_svelte::ast::internal::{AttributeNode, AttributeValue, Element, SpecialElement, Style};
@@ -45,6 +57,11 @@ use crate::{CompileError, Refusal};
 /// The deterministic scoping class — the fixed `cssHash` the oracle sidecar
 /// compiles with, so outputs are byte-comparable across runs.
 pub(crate) const SCOPE_HASH_CLASS: &str = "svelte-tsvhash";
+
+/// The `@keyframes` name-prefix (`<hash>-`) — the oracle's `${state.hash}-`, inserted
+/// before a keyframes name and before each `animation`-value token that references a
+/// collected name (`css/index.js:92`/`:111`). NOT a class (no leading `.`).
+const SCOPE_HASH_PREFIX: &str = "svelte-tsvhash-";
 
 /// HTML attributes whose enumerated values are case-insensitive per the HTML
 /// spec (the oracle's `case_insensitive_attributes`, `css-prune.js:30-67`).
@@ -169,9 +186,27 @@ struct ScopedSelector {
     display: String,
 }
 
-/// The scoping analysis product: the parsed selector chains, in source order.
+/// The scoping analysis product: the parsed selector chains, in source order, plus
+/// the `@keyframes` source edits.
 pub(crate) struct ScopeInfo {
     selectors: Vec<ScopedSelector>,
+    /// The `@keyframes` name-prefix / `-global-` strip / `animation`-value inserts,
+    /// computed during analysis (the oracle's keyframes transform). Merged into
+    /// [`splice_scoped_css`]'s edit vec before its sort — they touch source regions
+    /// disjoint from the selector splices (keyframes names, `-global-` prefixes, and
+    /// `animation`/`animation-name` value tokens, never a selector anchor).
+    keyframes_edits: Vec<Edit>,
+    /// The `@keyframes` STEP selectors (`0%`, `from`, `.c`, …), kept **separate** from
+    /// [`selectors`](Self::selectors). The oracle's phase-2 prune walk descends into
+    /// keyframes blocks and matches each step rule's selectors against every element the
+    /// ordinary backward way; the transform never descends, so step matching affects ONLY
+    /// the scoped-element set. Kept out of [`selectors`](Self::selectors) so they
+    /// contribute NOTHING to `used` / `unused_selectors` (steps are never pruned),
+    /// `relative_scoped` (never specificity-bumped), or the edit stream ([`splice_scoped_css`]
+    /// pushes `global_strip` removals unconditionally from `selectors` — a step's source
+    /// must stay verbatim, since the transform doesn't descend). [`match_scope`] matches
+    /// each against the census, accumulating into `scoped_elements` only.
+    step_selectors: Vec<ScopedSelector>,
 }
 
 /// The matching product — read at emission (`element_scope`), at the post-emission
@@ -240,14 +275,100 @@ pub(crate) fn analyze_style(
 ) -> Result<ScopeInfo, CompileError> {
     let mut info = ScopeInfo {
         selectors: Vec::new(),
+        keyframes_edits: Vec::new(),
+        step_selectors: Vec::new(),
     };
+    // Collection is a separate pre-pass: an `animation`/`animation-name` value can
+    // reference a keyframes name declared LATER in source (the oracle collects every
+    // keyframes prelude in phase 2 before the phase-3 value rewrite). The walk descends
+    // everywhere — including into a keyframes block, where a nested keyframes still
+    // collects (`css-analyze.js` calls `context.next()` unconditionally).
+    let keyframes = collect_keyframes(style.css_stylesheet.nodes, source);
+    let content_end = style.content_span.end;
     for node in style.css_stylesheet.nodes {
         match node {
-            CssNode::Rule(rule) => analyze_rule(rule, source, &mut sink, &mut info)?,
-            CssNode::Atrule(atrule) => analyze_atrule(atrule, source, &mut sink, &mut info)?,
+            CssNode::Rule(rule) => {
+                analyze_rule(rule, source, &keyframes, content_end, &mut sink, &mut info)?;
+            }
+            CssNode::Atrule(atrule) => {
+                analyze_atrule(
+                    atrule,
+                    source,
+                    &keyframes,
+                    content_end,
+                    &mut sink,
+                    &mut info,
+                )?;
+            }
         }
     }
     Ok(info)
+}
+
+// ── @keyframes collection + transform (the oracle's is_keyframes_node handling) ─
+
+/// Collect every `@keyframes` prelude the oracle's phase-2 analysis pushes into
+/// `state.keyframes` (`css-analyze.js:52-63`): the trimmed prelude of every keyframes
+/// at-rule at any nesting depth whose prelude does not start with `-global-`. The walk
+/// descends into every at-rule block (including a keyframes block, so a nested keyframes
+/// collects too), mirroring the analysis walk's unconditional `context.next()`.
+/// Duplicates are harmless — the value rewrite is a membership test.
+///
+/// The name string is the oracle's `node.prelude` exactly, via
+/// [`CssAtrule::public_prelude`] — the wire-parity form (block comments elided, JS-whitespace
+/// trim), NOT the printer-facing `Raw::content` (comment-preserving, CSS-whitespace trim).
+/// The two diverge whenever the prelude carries a comment or JS-only whitespace, and the
+/// membership compare here is against a raw-source `animation` value token, so a wrong name
+/// silently fails to rewrite the reference while the at-rule name still gets prefixed —
+/// renamed keyframes, un-renamed reference.
+///
+/// ⚠️ The oracle also gates the push on `!is_in_global_block(context.path)`
+/// (`css-analyze.js:52`), a conjunct tsv drops here (matching [`keyframes_name_edit`]). It
+/// is safe: the only shape it excludes is a keyframes inside a `:global { … }` block, which
+/// sits inside a rule — and a rule containing a nested at-rule refuses [`Refusal::CssNestedRule`]
+/// in [`analyze_rule`] before any name edit is emitted, so a name collected here is discarded
+/// on that over-refusal and never reaches output.
+fn collect_keyframes(nodes: &[CssNode<'_>], source: &str) -> Vec<String> {
+    let mut names = Vec::new();
+    for node in nodes {
+        match node {
+            CssNode::Rule(rule) => {
+                collect_keyframes_children(rule.declarations, source, &mut names);
+            }
+            CssNode::Atrule(atrule) => collect_keyframes_atrule(atrule, source, &mut names),
+        }
+    }
+    names
+}
+
+fn collect_keyframes_children(
+    children: &[CssBlockChild<'_>],
+    source: &str,
+    names: &mut Vec<String>,
+) {
+    for child in children {
+        match child {
+            CssBlockChild::Rule(rule) => {
+                collect_keyframes_children(rule.declarations, source, names);
+            }
+            CssBlockChild::Atrule(atrule) => collect_keyframes_atrule(atrule, source, names),
+            CssBlockChild::Declaration(_) | CssBlockChild::Comment(_) => {}
+        }
+    }
+}
+
+fn collect_keyframes_atrule(atrule: &CssAtrule<'_>, source: &str, names: &mut Vec<String>) {
+    if is_keyframes_atrule(atrule.name) {
+        let prelude = atrule.public_prelude(source);
+        if !prelude.starts_with("-global-") {
+            names.push(prelude.into_owned());
+        }
+    }
+    if let Some(block) = &atrule.block {
+        // Descend regardless — the analysis walk enters even a keyframes block, so a nested
+        // keyframes collects (it is never PREFIXED, since the transform returns early).
+        collect_keyframes_children(block.children, source, names);
+    }
 }
 
 /// Analyze one top-level-or-nested CSS rule: refuse a nested rule / an empty rule,
@@ -258,6 +379,8 @@ pub(crate) fn analyze_style(
 fn analyze_rule(
     rule: &CssRule<'_>,
     source: &str,
+    keyframes: &[String],
+    content_end: u32,
     sink: &mut Option<&mut Vec<Refusal>>,
     info: &mut ScopeInfo,
 ) -> Result<(), CompileError> {
@@ -277,8 +400,22 @@ fn analyze_rule(
         refuse(sink, Refusal::CssEmptyRule)?;
         return Ok(());
     }
+    // The oracle's `Declaration` visitor runs on every declaration the transform reaches
+    // (`css/index.js:100`) — including inside a plain rule — rewriting `animation` /
+    // `animation-name` values that reference a collected keyframes name.
+    for child in rule.declarations {
+        if let CssBlockChild::Declaration(decl) = child {
+            scan_animation_declaration(
+                decl,
+                source,
+                keyframes,
+                content_end,
+                &mut info.keyframes_edits,
+            );
+        }
+    }
     for complex in rule.selector.selectors {
-        match build_selector(complex, source) {
+        match build_selector(complex, source, false) {
             Ok(selector) => info.selectors.push(selector),
             Err(reason) => refuse(sink, reason)?,
         }
@@ -289,27 +426,41 @@ fn analyze_rule(
 /// Analyze one at-rule (the oracle's `Atrule` visitor,
 /// `phases/3-transform/css/index.js:82-99`). `@keyframes` (name-discriminated — the
 /// ONLY at-rule family whose inner "rules" are keyframe stops rather than element
-/// selectors) is DEFERRED: the oracle special-cases it (a name-prefix rewrite plus
-/// an animation-value rewrite that this slice does not port), so tsv refuses. Every
-/// other at-rule recurses generically into its block — inner rules scope like
-/// top-level ones, nested at-rules recurse further, and a descriptor block
-/// (`@font-face`/`@page`, whose children are descriptors — and, for `@page`, margin
-/// at-rules like `@top-center` — never element-selector rules, so a margin at-rule
-/// recurses harmlessly) or a statement at-rule (`@import`/`@charset`/`@layer a,b;`,
-/// `block: None`) yields no scoping (the splicer copies its source through verbatim,
-/// since it applies edits only from `info.selectors`). The at-rule PRELUDE is never
-/// touched — `@scope (.a) to (.b) { .a {} }` scopes only the inner `.a`.
+/// selectors) is name-prefixed and its block is LEFT UNTRANSFORMED: the oracle emits the
+/// name edit (`@keyframes foo` → `@keyframes svelte-tsvhash-foo`, or strips a `-global-`
+/// prefix) and `return`s WITHOUT descending, so its inner step rules are never scoped
+/// (spliced), its declarations never rewritten, and nothing inside it fails to compile
+/// for an empty rule or a no-match selector. But the oracle's separate phase-2 PRUNE walk
+/// DOES descend into the block and match each step rule's selectors against every element
+/// — so [`analyze_keyframes_steps`] collects those step selectors (they scope elements
+/// without ever touching the CSS output). Every other at-rule
+/// recurses generically into its block — inner rules scope like top-level ones, nested
+/// at-rules recurse further, and a descriptor block (`@font-face`/`@page`, whose
+/// children are descriptors — and, for `@page`, margin at-rules like `@top-center` —
+/// never element-selector rules, so a margin at-rule recurses harmlessly) or a
+/// statement at-rule (`@import`/`@charset`/`@layer a,b;`, `block: None`) scopes nothing.
+/// A descriptor declaration is still `animation`-scanned (the oracle's `Declaration`
+/// visitor reaches `@font-face`, and `@media`-nested declarations at any depth). The
+/// at-rule PRELUDE is never touched — `@scope (.a) to (.b) { .a {} }` scopes only the
+/// inner `.a`.
 fn analyze_atrule(
     atrule: &CssAtrule<'_>,
     source: &str,
+    keyframes: &[String],
+    content_end: u32,
     sink: &mut Option<&mut Vec<Refusal>>,
     info: &mut ScopeInfo,
 ) -> Result<(), CompileError> {
-    // TODO: @keyframes name-prefix + animation-value scoping is a follow-up slice
-    // (../svelte/packages/svelte/src/compiler/phases/3-transform/css/index.js:83-92,
-    // the `is_keyframes_node` branch).
+    // `@keyframes` (name-discriminated case-sensitively): emit the name edit and RETURN —
+    // the TRANSFORM does not descend into the block (no scoping splice, no declaration
+    // rewrite), mirroring the oracle's `return; // don't transform anything within`. The
+    // name-prefix path runs regardless of block presence (`@keyframes foo;`, `block: None`).
+    // The oracle's separate PRUNE walk still descends the block: collect its step selectors
+    // (they scope elements without ever splicing the block).
     if is_keyframes_atrule(atrule.name) {
-        refuse(sink, Refusal::CssKeyframes)?;
+        info.keyframes_edits
+            .push(keyframes_name_edit(atrule, source));
+        analyze_keyframes_steps(atrule, source, sink, info)?;
         return Ok(());
     }
     // A statement at-rule (`block: None`) scopes nothing.
@@ -318,14 +469,181 @@ fn analyze_atrule(
     };
     for child in block.children {
         match child {
-            CssBlockChild::Rule(rule) => analyze_rule(rule, source, sink, info)?,
-            CssBlockChild::Atrule(nested) => analyze_atrule(nested, source, sink, info)?,
-            // A descriptor declaration (`@font-face`/`@page`) or a comment scopes
-            // nothing — emitted verbatim by the splicer.
+            CssBlockChild::Rule(rule) => {
+                analyze_rule(rule, source, keyframes, content_end, sink, info)?;
+            }
+            CssBlockChild::Atrule(nested) => {
+                analyze_atrule(nested, source, keyframes, content_end, sink, info)?;
+            }
+            // A descriptor declaration (`@font-face`/`@page`) scopes no selector but is
+            // still `animation`-scanned; a comment scopes nothing (emitted verbatim).
+            CssBlockChild::Declaration(decl) => {
+                scan_animation_declaration(
+                    decl,
+                    source,
+                    keyframes,
+                    content_end,
+                    &mut info.keyframes_edits,
+                );
+            }
+            CssBlockChild::Comment(_) => {}
+        }
+    }
+    Ok(())
+}
+
+/// Collect a `@keyframes` block's direct step rules into [`ScopeInfo::step_selectors`].
+/// The oracle's phase-2 prune walk (`css-prune.js`) descends into every keyframes block
+/// — for a `-global-` keyframes, one nested in `@media`, at any depth — and matches each
+/// step rule's selectors against every element with the ordinary backward matcher; a
+/// matched element gains the hash class. The transform never descends, so a step is never
+/// spliced, never pruned as unused (no `CssSelectorNoMatch`), and an empty step (`from {}`)
+/// never hits the empty-rule refusal.
+///
+/// Each step's prelude `ComplexSelector`s are built through the SAME
+/// [`build_selector`] machinery as ordinary rules, with `keyframe_step = true` so a
+/// `Percentage`/`Nth` simple selector is skipped within its compound
+/// (`css-prune.js:509`): `0%` becomes an empty predicate list that matches any element,
+/// `0%.c` narrows to `class="c"`. A build failure on a step (an unsupported pseudo, …)
+/// refuses via the sink (safe over-refusal, corpus-absent). A nested rule/at-rule inside
+/// a step, or an at-rule directly inside the keyframes block, refuses
+/// [`Refusal::CssNestedRule`] (safe over-refusal — the oracle's step preludes are simple
+/// compounds). Declaration/comment children of the block or of a step are ignored.
+fn analyze_keyframes_steps(
+    atrule: &CssAtrule<'_>,
+    source: &str,
+    sink: &mut Option<&mut Vec<Refusal>>,
+    info: &mut ScopeInfo,
+) -> Result<(), CompileError> {
+    let Some(block) = &atrule.block else {
+        return Ok(());
+    };
+    for child in block.children {
+        match child {
+            CssBlockChild::Rule(step) => {
+                // A nested rule/at-rule INSIDE a step rule refuses (corpus-absent).
+                for grandchild in step.declarations {
+                    if matches!(
+                        grandchild,
+                        CssBlockChild::Rule(_) | CssBlockChild::Atrule(_)
+                    ) {
+                        refuse(sink, Refusal::CssNestedRule)?;
+                        break;
+                    }
+                }
+                for complex in step.selector.selectors {
+                    match build_selector(complex, source, true) {
+                        Ok(selector) => info.step_selectors.push(selector),
+                        Err(reason) => refuse(sink, reason)?,
+                    }
+                }
+            }
+            // An at-rule directly inside a keyframes block refuses (corpus-absent).
+            CssBlockChild::Atrule(_) => refuse(sink, Refusal::CssNestedRule)?,
             CssBlockChild::Declaration(_) | CssBlockChild::Comment(_) => {}
         }
     }
     Ok(())
+}
+
+/// The `@keyframes` name edit (`css/index.js:82-93`): the insert point is
+/// `atrule.start + 1 + decoded_name.len()` (the `@` plus the decoded at-keyword — ASCII
+/// by the keyframes discriminator, so byte length == the oracle's `node.name.length`),
+/// advanced over LITERAL SPACE bytes only (not tabs/newlines). A `-global-` prelude
+/// REMOVES the 8-byte prefix there; otherwise `svelte-tsvhash-` is INSERTED. The
+/// `-global-` test reads [`CssAtrule::public_prelude`] — the oracle's `node.prelude`
+/// byte-for-byte (comment-elided, JS-whitespace-trimmed), so a prelude whose `-global-`
+/// hides behind a comment (`@keyframes /* c */-global-foo`) still takes the strip branch,
+/// as the oracle does.
+///
+/// ⚠️ The oracle gates the INSERT branch on `!is_in_global_block(path)`
+/// (`css/index.js:83`), a conjunct tsv drops (matching [`collect_keyframes_atrule`]). The
+/// `-global-` STRIP branch runs unconditionally on both sides, so only the insert is
+/// affected — and the sole shape it changes is a keyframes inside a `:global { … }` block,
+/// which tsv never reaches: the enclosing rule holds a nested at-rule and refuses
+/// [`Refusal::CssNestedRule`] in [`analyze_rule`] before this edit is emitted (a safe
+/// over-refusal masking the dropped conjunct; the oracle instead compiles it un-prefixed).
+fn keyframes_name_edit(atrule: &CssAtrule<'_>, source: &str) -> Edit {
+    let mut start = atrule.span.start + 1 + atrule.name.len() as u32;
+    let bytes = source.as_bytes();
+    while (start as usize) < bytes.len() && bytes[start as usize] == b' ' {
+        start += 1;
+    }
+    if atrule.public_prelude(source).starts_with("-global-") {
+        Edit {
+            at: start,
+            remove_to: start + 8,
+            insert: "",
+        }
+    } else {
+        Edit {
+            at: start,
+            remove_to: start,
+            insert: SCOPE_HASH_PREFIX,
+        }
+    }
+}
+
+/// Rewrite an `animation` / `animation-name` declaration's value tokens that reference a
+/// collected keyframes name (the oracle's `Declaration` visitor, `css/index.js:100-124`).
+/// The property compare uses the RAW property source text (so an escaped `\61nimation`
+/// spelling never matches, as the oracle's raw compare doesn't), ASCII-lowercased then
+/// vendor-prefix-stripped. ASCII-lowercase is provably equivalent to JS `.toLowerCase()`
+/// here: the only non-ASCII→ASCII single-char lower map is U+212A→`k`, and neither target
+/// string contains `k`; `İ` lowers to two code units and can never equal them.
+fn scan_animation_declaration(
+    decl: &CssDeclaration<'_>,
+    source: &str,
+    keyframes: &[String],
+    content_end: u32,
+    edits: &mut Vec<Edit>,
+) {
+    if keyframes.is_empty() {
+        return;
+    }
+    // Raw property = source from the declaration start (the property identifier start,
+    // like the oracle's `node.start`) up to the first JS `\s` — mirroring Svelte's
+    // `read_until(/[\s:]/)`, since the slice already ends at the colon.
+    let prop_slice = &source[decl.span.start as usize..decl.colon_offset as usize];
+    let raw_property = match prop_slice.find(is_js_whitespace) {
+        Some(i) => &prop_slice[..i],
+        None => prop_slice,
+    };
+    let lowered = raw_property.to_ascii_lowercase();
+    let stripped = remove_css_prefix(&lowered);
+    if stripped != "animation" && stripped != "animation-name" {
+        return;
+    }
+    // Scan forward from `decl.start + raw_property.len() + 1` (the `+1` is the `:`).
+    let index_start = decl.span.start as usize + raw_property.len() + 1;
+    let end = (content_end as usize).min(source.len());
+    if index_start >= end {
+        return;
+    }
+    // A name token is the run of chars between boundaries (JS `\s` or `,` `;` `}` — the
+    // oracle's `regex_css_name_boundary`). At each boundary the accumulated token — the
+    // EMPTY token included, so a collected `''` matches at every boundary — is inserted
+    // before if it is a collected keyframes name. `token_start` tracks the token's start
+    // byte (never index-minus-length arithmetic), matching the oracle's `index -
+    // name.length`. The scan stops at a `;`/`}` boundary.
+    let mut token_start = index_start;
+    for (rel, ch) in source[index_start..end].char_indices() {
+        let index = index_start + rel;
+        if is_js_whitespace(ch) || ch == ',' || ch == ';' || ch == '}' {
+            let token = &source[token_start..index];
+            if keyframes.iter().any(|name| name == token) {
+                edits.push(Edit {
+                    at: token_start as u32,
+                    remove_to: token_start as u32,
+                    insert: SCOPE_HASH_PREFIX,
+                });
+            }
+            if ch == ';' || ch == '}' {
+                break;
+            }
+            token_start = index + ch.len_utf8();
+        }
+    }
 }
 
 /// Whether an at-rule name is `@keyframes` — the oracle's `is_keyframes_node`
@@ -387,6 +705,34 @@ pub(crate) fn match_scope(
         relative_scoped.push(rel_scoped);
     }
 
+    // `@keyframes` step selectors: the oracle's prune walk descends into keyframes blocks
+    // and matches each step compound against every element. This only expands the
+    // scoped-element set — steps are never spliced (the transform doesn't descend), never
+    // marked `used`/`relative_scoped`, so they run through a THROWAWAY `rel_scoped` buffer
+    // and touch only `scoped_elements`. A percentage-only compound has an empty predicate
+    // list and matches every element (the fallthrough); a no-match step scopes nothing and
+    // never refuses. A dynamic-attribute / non-ASCII case-fold / snippet-crossing step
+    // refuses via `apply_selector` (safe over-refusal, corpus-absent).
+    for selector in &info.step_selectors {
+        if selector.fully_global {
+            continue;
+        }
+        let mut scratch = vec![false; selector.relatives.len()];
+        for census_element in &census.elements {
+            apply_selector(
+                selector,
+                census_element.node,
+                &census_element.path,
+                0,
+                selector.match_len,
+                census,
+                source,
+                &mut scoped_elements,
+                &mut scratch,
+            )?;
+        }
+    }
+
     Ok(CssScoping {
         info,
         scoped_elements,
@@ -398,8 +744,14 @@ pub(crate) fn match_scope(
 // ── Selector chain parsing ────────────────────────────────────────────────────
 
 /// Build one `ComplexSelector` into the chain model, or the [`Refusal`] its shape
-/// maps to.
-fn build_selector(complex: &ComplexSelector<'_>, source: &str) -> Result<ScopedSelector, Refusal> {
+/// maps to. `keyframe_step` marks a `@keyframes` step selector: a `Percentage`/`Nth`
+/// simple selector is then skipped within its compound (the oracle's `css-prune.js:509`
+/// `continue`). Ordinary selectors pass `false`, so a top-level `50% {}` keeps refusing.
+fn build_selector(
+    complex: &ComplexSelector<'_>,
+    source: &str,
+    keyframe_step: bool,
+) -> Result<ScopedSelector, Refusal> {
     if complex.children.is_empty() {
         return Err(Refusal::CssUnsupportedSelector);
     }
@@ -410,7 +762,7 @@ fn build_selector(complex: &ComplexSelector<'_>, source: &str) -> Result<ScopedS
 
     let mut relatives = Vec::with_capacity(complex.children.len());
     for relative in complex.children {
-        relatives.push(classify_relative(relative, source)?);
+        relatives.push(classify_relative(relative, source, keyframe_step)?);
     }
 
     // `truncate` (css-prune.js:209-232): drop trailing global relatives from the
@@ -430,10 +782,13 @@ fn build_selector(complex: &ComplexSelector<'_>, source: &str) -> Result<ScopedS
 }
 
 /// Classify one compound: `:global(...)` (pure), bare `:global` (possibly glued),
-/// or a plain compound. Refuses unsupported combinators/`:global` shapes.
+/// or a plain compound. Refuses unsupported combinators/`:global` shapes. `keyframe_step`
+/// is threaded to [`parse_plain_compound`] (skip `Percentage`/`Nth` within a keyframes
+/// step compound).
 fn classify_relative(
     relative: &RelativeSelector<'_>,
     source: &str,
+    keyframe_step: bool,
 ) -> Result<ScopedRelative, Refusal> {
     let combinator = relative.combinator;
     if combinator == Some(Combinator::Column) {
@@ -453,7 +808,7 @@ fn classify_relative(
         } = &simples[0]
         && pseudo_name(span.extract(source)) == "global"
     {
-        let inner = parse_global_args(args, source)?;
+        let inner = parse_global_args(args, source, keyframe_step)?;
         return Ok(ScopedRelative {
             kind: RelKind::PureGlobal,
             predicates: inner,
@@ -491,7 +846,7 @@ fn classify_relative(
         return Err(Refusal::CssUnsupportedSelector);
     }
 
-    let (predicates, anchor) = parse_plain_compound(simples, source)?;
+    let (predicates, anchor) = parse_plain_compound(simples, source, keyframe_step)?;
     Ok(ScopedRelative {
         kind: RelKind::Normal,
         predicates,
@@ -504,14 +859,22 @@ fn classify_relative(
 
 /// Parse a plain compound into its predicate list and hash-splice anchor. Refuses
 /// combinators (via the caller), the refused pseudos, namespaced/escaped/nesting/nth
-/// selectors, and a bare pseudo-only compound (no anchor).
+/// selectors, and a bare pseudo-only compound (no anchor). `keyframe_step` skips a
+/// `Percentage`/`Nth` simple selector (the oracle's `css-prune.js:509` `continue`): the
+/// skipped selector contributes no predicate, so a compound of only these has an empty
+/// predicate list and matches ANY element (the oracle's fallthrough `return true`).
 fn parse_plain_compound(
     simples: &[SimpleSelector<'_>],
     source: &str,
+    keyframe_step: bool,
 ) -> Result<(Vec<Predicate>, Splice), Refusal> {
     let mut predicates = Vec::new();
     for simple in simples {
         match simple {
+            // Skipped within a keyframes step compound (the oracle's `continue`). Gated on
+            // `keyframe_step` — a top-level `50% {}` falls through to the `_` arm and keeps
+            // refusing `CssUnsupportedSelector` (safe over-refusal, byte-unchanged).
+            SimpleSelector::Percentage { .. } | SimpleSelector::Nth { .. } if keyframe_step => {}
             SimpleSelector::Universal {
                 namespace: None, ..
             } => predicates.push(Predicate::Universal),
@@ -589,7 +952,13 @@ fn parse_plain_compound(
 
 /// Parse a `:global(<args>)`'s inner compound: exactly one complex selector, one
 /// relative selector (no combinator), a plain compound. Yields its leaf predicates.
-fn parse_global_args(args: &PseudoClassArgs<'_>, source: &str) -> Result<Vec<Predicate>, Refusal> {
+/// `keyframe_step` is threaded to [`parse_plain_compound`] for consistency (a `:global`
+/// inside a keyframes step is corpus-absent, but the machinery stays one mechanism).
+fn parse_global_args(
+    args: &PseudoClassArgs<'_>,
+    source: &str,
+    keyframe_step: bool,
+) -> Result<Vec<Predicate>, Refusal> {
     let PseudoClassArgs::SelectorList { selectors, .. } = args else {
         return Err(Refusal::CssUnsupportedSelector);
     };
@@ -604,7 +973,7 @@ fn parse_global_args(args: &PseudoClassArgs<'_>, source: &str) -> Result<Vec<Pre
     }
     // Reuse the plain-compound parser; the inner anchor is unused (the whole
     // `:global(...)` is stripped, not hash-spliced).
-    let (predicates, _anchor) = parse_plain_compound(relative.selectors, source)?;
+    let (predicates, _anchor) = parse_plain_compound(relative.selectors, source, keyframe_step)?;
     Ok(predicates)
 }
 
@@ -1089,6 +1458,7 @@ fn test_attribute_cs(operator: Option<AttributeMatcher>, expected: &str, value: 
 
 /// One source edit applied to the `<style>` content: drop `[at, remove_to)`, insert
 /// `insert`.
+#[derive(Clone, Copy)]
 struct Edit {
     at: u32,
     remove_to: u32,
@@ -1129,6 +1499,10 @@ pub(crate) fn splice_scoped_css(style: &Style<'_>, source: &str, scope: &CssScop
             }
         }
     }
+
+    // The `@keyframes` name / `-global-` / `animation`-value edits touch source regions
+    // disjoint from every selector splice, so they merge into one sorted edit stream.
+    edits.extend_from_slice(&scope.info.keyframes_edits);
 
     let content_start = style.content_span.start;
     let content = style.content_span.extract(source);

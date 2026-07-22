@@ -364,19 +364,217 @@ fn compile_css_at_rule_unused_inner_selector_refuses() {
     );
 }
 
+// ── @keyframes scoping (the oracle's is_keyframes_node name-prefix + animation-value
+// rewrite; every expected string below is the live oracle's CSS, canonical_compile) ──
+
 #[test]
-fn compile_css_keyframes_is_deferred() {
-    // `@keyframes` is DEFERRED — the oracle name-prefixes it (a separate slice), so
-    // tsv refuses `CssKeyframes` rather than emit an unscoped name. A vendor prefix
-    // is stripped (case-sensitively) before the keyframes test, so
-    // `@-webkit-keyframes` refuses the same way.
-    assert_unsupported(
-        "<div>x</div>\n<style>@keyframes spin { from { opacity: 0 } to { opacity: 1 } }</style>",
-        "css @keyframes in <style>",
+fn compile_css_keyframes_basic_name_prefix_and_animation_ref() {
+    // The keyframes NAME is prefixed and every `animation` value token referencing a
+    // collected name is rewritten to the prefixed spelling (probe 1).
+    assert_eq!(
+        compile_css(
+            "<div class=\"a\">x</div><style>@keyframes foo { from { opacity: 0 } to { opacity: 1 } } .a { animation: foo 1s }</style>"
+        ),
+        "@keyframes svelte-tsvhash-foo { from { opacity: 0 } to { opacity: 1 } } .a.svelte-tsvhash { animation: svelte-tsvhash-foo 1s }"
     );
-    assert_unsupported(
-        "<div>x</div>\n<style>@-webkit-keyframes spin { from { opacity: 0 } to { opacity: 1 } }</style>",
-        "css @keyframes in <style>",
+}
+
+#[test]
+fn compile_css_keyframes_global_prefix_is_stripped_and_uncollected() {
+    // A `-global-` prelude STRIPS the 8-byte prefix (leaving the bare name, un-scoped)
+    // and is NOT collected — so `animation: foo` is left alone (probe 2).
+    assert_eq!(
+        compile_css(
+            "<div class=\"a\">x</div><style>@keyframes -global-foo { from { opacity: 0 } to { opacity: 1 } } .a { animation: foo 1s }</style>"
+        ),
+        "@keyframes foo { from { opacity: 0 } to { opacity: 1 } } .a.svelte-tsvhash { animation: foo 1s }"
+    );
+}
+
+#[test]
+fn compile_css_keyframes_vendor_at_rule_collects() {
+    // A vendor-prefixed keyframes at-rule (`@-webkit-keyframes`) DOES collect; the name
+    // start is `@` + decoded name (`-webkit-keyframes`, 17 bytes) + 1 (probe 3).
+    assert_eq!(
+        compile_css(
+            "<div class=\"a\">x</div><style>@-webkit-keyframes spin { from { opacity: 0 } to { opacity: 1 } } .a { animation: spin 1s }</style>"
+        ),
+        "@-webkit-keyframes svelte-tsvhash-spin { from { opacity: 0 } to { opacity: 1 } } .a.svelte-tsvhash { animation: svelte-tsvhash-spin 1s }"
+    );
+}
+
+#[test]
+fn compile_css_keyframes_multi_name_list_in_both_declarations() {
+    // Two names, rewritten in BOTH an `animation` list (commas + other tokens) and an
+    // `animation-name` list (probe 4).
+    assert_eq!(
+        compile_css(
+            "<div class=\"x\">x</div><style>@keyframes a { from { opacity: 0 } } @keyframes b { from { opacity: 0 } } .x { animation: a 1s ease, b 2s; animation-name: a, b }</style>"
+        ),
+        "@keyframes svelte-tsvhash-a { from { opacity: 0 } } @keyframes svelte-tsvhash-b { from { opacity: 0 } } .x.svelte-tsvhash { animation: svelte-tsvhash-a 1s ease, svelte-tsvhash-b 2s; animation-name: svelte-tsvhash-a, svelte-tsvhash-b }"
+    );
+}
+
+#[test]
+fn compile_css_keyframes_unused_is_kept_and_prefixed() {
+    // Keyframes are never pruned — an unreferenced keyframes is still kept and prefixed
+    // (probe 5).
+    assert_eq!(
+        compile_css(
+            "<div class=\"a\">x</div><style>@keyframes unused { from { opacity: 0 } to { opacity: 1 } } .a { color: red }</style>"
+        ),
+        "@keyframes svelte-tsvhash-unused { from { opacity: 0 } to { opacity: 1 } } .a.svelte-tsvhash { color: red }"
+    );
+}
+
+#[test]
+fn compile_css_keyframes_inside_media_collects_and_prefixes() {
+    // Keyframes nested in `@media` are prefixed and collected — the `@media` descent
+    // reaches them (probe 6).
+    assert_eq!(
+        compile_css(
+            "<div class=\"a\">x</div><style>@media (min-width: 100px) { @keyframes m { from { opacity: 0 } to { opacity: 1 } } } .a { animation: m 1s }</style>"
+        ),
+        "@media (min-width: 100px) { @keyframes svelte-tsvhash-m { from { opacity: 0 } to { opacity: 1 } } } .a.svelte-tsvhash { animation: svelte-tsvhash-m 1s }"
+    );
+}
+
+#[test]
+fn compile_css_keyframes_declarations_inside_block_are_untouched() {
+    // The transform returns without descending into a keyframes block, so an
+    // `animation-name` INSIDE it stays verbatim (probe 7).
+    assert_eq!(
+        compile_css(
+            "<div class=\"a\">x</div><style>@keyframes foo { from { animation-name: foo; opacity: 0 } } .a { animation: foo 1s }</style>"
+        ),
+        "@keyframes svelte-tsvhash-foo { from { animation-name: foo; opacity: 0 } } .a.svelte-tsvhash { animation: svelte-tsvhash-foo 1s }"
+    );
+}
+
+#[test]
+fn compile_css_keyframes_property_compare_lowercases_but_source_preserved() {
+    // The property compare lowercases (`ANIMATION`), but the source property text is
+    // preserved — only the value is rewritten (probe 8).
+    assert_eq!(
+        compile_css(
+            "<div class=\"a\">x</div><style>@keyframes foo { from { opacity: 0 } } .a { ANIMATION: foo 1s }</style>"
+        ),
+        "@keyframes svelte-tsvhash-foo { from { opacity: 0 } } .a.svelte-tsvhash { ANIMATION: svelte-tsvhash-foo 1s }"
+    );
+}
+
+#[test]
+fn compile_css_keyframes_tab_after_name_glues_the_insert() {
+    // Only LITERAL SPACE bytes are skipped after the name, so a TAB leaves the insert
+    // glued right after `@keyframes` — GLUED garbage the oracle also emits. The prelude
+    // is still trimmed (`foo` collects, `animation: foo` rewrites) (probe 10).
+    assert_eq!(
+        compile_css(
+            "<div class=\"a\">x</div><style>@keyframes\tfoo { from { opacity: 0 } } .a { animation: foo 1s }</style>"
+        ),
+        "@keyframessvelte-tsvhash-\tfoo { from { opacity: 0 } } .a.svelte-tsvhash { animation: svelte-tsvhash-foo 1s }"
+    );
+}
+
+#[test]
+fn compile_css_keyframes_empty_prelude_collects_the_empty_string() {
+    // An EMPTY prelude collects the empty string: the name insert lands on `{` after the
+    // space-skip (probe 13), and the collected `''` matches at every boundary whose
+    // accumulated token is empty — here the first boundary after `:` and the final `}`
+    // (probe 18). One test pins both.
+    assert_eq!(
+        compile_css("<div class=\"a\">x</div><style>@keyframes { from { opacity: 0 } }</style>"),
+        "@keyframes svelte-tsvhash-{ from { opacity: 0 } }"
+    );
+    assert_eq!(
+        compile_css(
+            "<div class=\"a\">x</div><style>@keyframes { from { opacity: 0 } } .a { animation: x 1s }</style>"
+        ),
+        "@keyframes svelte-tsvhash-{ from { opacity: 0 } } .a.svelte-tsvhash { animation:svelte-tsvhash- x 1s svelte-tsvhash-}"
+    );
+}
+
+#[test]
+fn compile_css_keyframes_quoted_name_not_rewritten() {
+    // Quotes are part of the accumulated token, so `"foo"` never equals the collected
+    // `foo` — not rewritten (probe 14).
+    assert_eq!(
+        compile_css(
+            "<div class=\"a\">x</div><style>@keyframes foo { from { opacity: 0 } } .a { animation-name: \"foo\" }</style>"
+        ),
+        "@keyframes svelte-tsvhash-foo { from { opacity: 0 } } .a.svelte-tsvhash { animation-name: \"foo\" }"
+    );
+}
+
+#[test]
+fn compile_css_keyframes_declaration_scan_reaches_font_face_descriptor() {
+    // The `Declaration` visitor reaches a descriptor block (`@font-face`), so an
+    // `animation-name` there is rewritten (probe 15).
+    assert_eq!(
+        compile_css(
+            "<div class=\"a\">x</div><style>@keyframes foo { from { opacity: 0 } } @font-face { font-family: x; animation-name: foo }</style>"
+        ),
+        "@keyframes svelte-tsvhash-foo { from { opacity: 0 } } @font-face { font-family: x; animation-name: svelte-tsvhash-foo }"
+    );
+}
+
+#[test]
+fn compile_css_keyframes_reference_before_declaration_is_a_full_prepass() {
+    // Collection is a full pre-pass, so an `animation` referencing a keyframes declared
+    // LATER in source still rewrites (probe 16).
+    assert_eq!(
+        compile_css(
+            "<div class=\"a\">x</div><style>.a { animation: late 1s } @keyframes late { from { opacity: 0 } }</style>"
+        ),
+        ".a.svelte-tsvhash { animation: svelte-tsvhash-late 1s } @keyframes svelte-tsvhash-late { from { opacity: 0 } }"
+    );
+}
+
+#[test]
+fn compile_css_keyframes_no_space_after_colon() {
+    // No space between `:` and the name — the token scan still finds it (probe 17).
+    assert_eq!(
+        compile_css(
+            "<div class=\"a\">x</div><style>@keyframes foo { from { opacity: 0 } } .a { animation:foo 1s }</style>"
+        ),
+        "@keyframes svelte-tsvhash-foo { from { opacity: 0 } } .a.svelte-tsvhash { animation:svelte-tsvhash-foo 1s }"
+    );
+}
+
+#[test]
+fn compile_css_keyframes_two_word_prelude_collects_the_whole_string() {
+    // A two-word prelude collects `'foo bar'` (the whole trimmed prelude), so
+    // `animation: foo` does NOT match — but the name TOKEN is still prefixed (probe 19).
+    assert_eq!(
+        compile_css(
+            "<div class=\"a\">x</div><style>@keyframes foo bar { from { opacity: 0 } } .a { animation: foo 1s }</style>"
+        ),
+        "@keyframes svelte-tsvhash-foo bar { from { opacity: 0 } } .a.svelte-tsvhash { animation: foo 1s }"
+    );
+}
+
+#[test]
+fn compile_css_keyframes_only_animation_and_animation_name_rewrite() {
+    // `animation-duration` is neither `animation` nor `animation-name`, so its value is
+    // left alone (probe 26).
+    assert_eq!(
+        compile_css(
+            "<div class=\"a\">x</div><style>@keyframes foo { from { opacity: 0 } } .a { animation-duration: foo }</style>"
+        ),
+        "@keyframes svelte-tsvhash-foo { from { opacity: 0 } } .a.svelte-tsvhash { animation-duration: foo }"
+    );
+}
+
+#[test]
+fn compile_css_keyframes_vendor_prefixed_property_rewrites() {
+    // A vendor-prefixed PROPERTY (`-webkit-animation`) is stripped before the compare,
+    // so its value rewrites (probe 11); the name-start arithmetic uses the raw property
+    // length (17) so the scan begins at the right byte.
+    assert_eq!(
+        compile_css(
+            "<div class=\"a\">x</div><style>@keyframes foo { from { opacity: 0 } } .a { -webkit-animation: foo 1s }</style>"
+        ),
+        "@keyframes svelte-tsvhash-foo { from { opacity: 0 } } .a.svelte-tsvhash { -webkit-animation: svelte-tsvhash-foo 1s }"
     );
 }
 
@@ -393,6 +591,100 @@ fn compile_css_uppercase_keyframes_is_a_group_at_rule() {
     );
 }
 
+// ── @keyframes prelude = the oracle's `node.prelude` (comment-elided, JS-whitespace trim),
+// via `CssAtrule::public_prelude` — NOT the printer-facing `Raw::content` (comment-preserving,
+// CSS-whitespace trim). When the two diverge, the wrong name silently fails to rewrite the
+// `animation` reference while the at-rule name still gets prefixed (renamed keyframes,
+// un-renamed reference). Every expected string below is the live oracle's CSS
+// (canonical_compile on the exact single-line input). ──
+
+#[test]
+fn compile_css_keyframes_prelude_comment_is_elided_for_collection() {
+    // Natural real-world CSS: a comment after the name. The oracle's `read_value` elides the
+    // comment for `node.prelude` (→ `spin`), so `animation: spin` IS rewritten; the comment
+    // survives verbatim in the emitted at-rule (only the name is spliced). `Raw::content`
+    // preserved the comment (`spin /* clockwise */`), so the token compare missed `spin`.
+    assert_eq!(
+        compile_css(
+            "<div class=\"spinner\">x</div><style>@keyframes spin /* clockwise */ { from { opacity: 0 } to { opacity: 1 } } .spinner { animation: spin 1s linear infinite }</style>"
+        ),
+        "@keyframes svelte-tsvhash-spin /* clockwise */ { from { opacity: 0 } to { opacity: 1 } } .spinner.svelte-tsvhash { animation: svelte-tsvhash-spin 1s linear infinite }"
+    );
+}
+
+#[test]
+fn compile_css_keyframes_prelude_vertical_tab_is_trimmed_for_collection() {
+    // A vertical tab (U+000B) after the name: JS whitespace (`read_value().trim()` → `foo`)
+    // but NOT CSS whitespace, so `Raw::content` kept it (`foo\u{000b}`) and the token compare
+    // missed `foo`. The VT survives verbatim after the spliced name.
+    assert_eq!(
+        compile_css(
+            "<div class=\"a\">x</div><style>@keyframes foo\u{000b} { from { opacity: 0 } } .a { animation: foo 1s }</style>"
+        ),
+        "@keyframes svelte-tsvhash-foo\u{000b} { from { opacity: 0 } } .a.svelte-tsvhash { animation: svelte-tsvhash-foo 1s }"
+    );
+}
+
+#[test]
+fn compile_css_keyframes_prelude_nbsp_is_trimmed_for_collection() {
+    // A no-break space (U+00A0) after the name: JS whitespace (trimmed → `foo`) but a CSS
+    // *ident* code point, so `Raw::content` kept it and the token compare missed `foo`.
+    assert_eq!(
+        compile_css(
+            "<div class=\"a\">x</div><style>@keyframes foo\u{a0} { from { opacity: 0 } } .a { animation: foo 1s }</style>"
+        ),
+        "@keyframes svelte-tsvhash-foo\u{a0} { from { opacity: 0 } } .a.svelte-tsvhash { animation: svelte-tsvhash-foo 1s }"
+    );
+}
+
+#[test]
+fn compile_css_keyframes_prelude_glued_comment_is_elided_for_collection() {
+    // A comment glued to the name (`foo/* c */`): the oracle elides it (→ `foo`), the token
+    // compare hits, and `animation: foo` is rewritten; the glued comment survives verbatim.
+    assert_eq!(
+        compile_css(
+            "<div class=\"a\">x</div><style>@keyframes foo/* c */ { from { opacity: 0 } } .a { animation: foo 1s }</style>"
+        ),
+        "@keyframes svelte-tsvhash-foo/* c */ { from { opacity: 0 } } .a.svelte-tsvhash { animation: svelte-tsvhash-foo 1s }"
+    );
+}
+
+#[test]
+fn compile_css_keyframes_animation_in_style_attribute_is_never_rewritten() {
+    // The control: `animation` in a `style=` ATTRIBUTE value is never scanned (only `<style>`
+    // declarations are), so it stays `foo` even though the `<style>` keyframes is prefixed.
+    // Pins that the collection fix did not widen the rewrite into attribute values.
+    let out = compile_checked(
+        "<div class=\"a\" style=\"animation: foo 1s\">x</div><style>@keyframes foo { from { opacity: 0 } } .a { color: red }</style>",
+    );
+    assert!(
+        out.js.contains("style=\"animation: foo 1s\""),
+        "style-attribute animation must stay un-prefixed:\n{}",
+        out.js
+    );
+    assert_eq!(
+        out.css.as_deref(),
+        Some(
+            "@keyframes svelte-tsvhash-foo { from { opacity: 0 } } .a.svelte-tsvhash { color: red }"
+        )
+    );
+}
+
+#[test]
+fn compile_css_keyframes_global_hidden_behind_a_comment_still_strips() {
+    // `-global-` hides behind a leading comment (`@keyframes /* c */-global-foo`). The oracle
+    // elides the comment (`node.prelude` → `-global-foo`), so BOTH the collection exclusion
+    // and the STRIP branch fire: the name edit removes 8 bytes at the space-skipped start
+    // (`/* c */-`, comment + dash), leaving `global-foo`, and `animation: foo` is left alone.
+    // `Raw::content` (`/* c */-global-foo`) missed the `-global-`, so tsv wrongly prefixed.
+    assert_eq!(
+        compile_css(
+            "<div class=\"a\">x</div><style>@keyframes /* c */-global-foo { from { opacity: 0 } } .a { animation: foo 1s }</style>"
+        ),
+        "@keyframes global-foo { from { opacity: 0 } } .a.svelte-tsvhash { animation: foo 1s }"
+    );
+}
+
 #[test]
 fn compile_refuses_global_pseudo_class_with_a_non_ascii_ident_char() {
     // A CSS name must NOT be trimmed with a Unicode-whitespace notion: every code
@@ -404,5 +696,208 @@ fn compile_refuses_global_pseudo_class_with_a_non_ascii_ident_char() {
     assert_unsupported(
         "<div class=\"x\">a</div>\n<style>\n\tdiv :global\u{a0}.x { color: red }\n</style>",
         "matches no element",
+    );
+}
+
+// ── @keyframes STEP matching (the oracle's prune walk descends into keyframes blocks and
+// matches each step rule's selectors against every element — the transform never descends,
+// so a step scopes elements without ever splicing the block). Every expected string below
+// is the live oracle's output (canonical_compile). ──
+
+#[test]
+fn compile_css_keyframes_percentage_step_matches_every_element() {
+    // s1: a percentage-only step compound (`0%`/`100%`) has an empty predicate list after the
+    // per-simple Percentage skip, so it matches EVERY element (the oracle's fallthrough) —
+    // both `<h2>` and `<p>` gain the hash though no selector targets them. The step block is
+    // never spliced (only the name is prefixed).
+    let out = compile_checked(
+        "<h2>x</h2><p>y</p><style>@keyframes k { 0% { opacity: 0 } 100% { opacity: 1 } }</style>",
+    );
+    assert!(
+        out.js
+            .contains(r#"<h2 class="svelte-tsvhash">x</h2><p class="svelte-tsvhash">y</p>"#),
+        "{}",
+        out.js
+    );
+    assert_eq!(
+        out.css.as_deref(),
+        Some("@keyframes svelte-tsvhash-k { 0% { opacity: 0 } 100% { opacity: 1 } }")
+    );
+}
+
+#[test]
+fn compile_css_keyframes_from_to_steps_scope_only_named_elements() {
+    // s2: `from`/`to` are TYPE selectors (they match elements NAMED `from`/`to`), so with a
+    // plain `<h2>` present nothing scopes.
+    let out = compile_checked(
+        "<h2>x</h2><style>@keyframes k { from { opacity: 0 } to { opacity: 1 } }</style>",
+    );
+    assert!(out.js.contains("<h2>x</h2>"), "{}", out.js);
+    assert!(!out.js.contains("svelte-tsvhash\">x"), "{}", out.js);
+    assert_eq!(
+        out.css.as_deref(),
+        Some("@keyframes svelte-tsvhash-k { from { opacity: 0 } to { opacity: 1 } }")
+    );
+}
+
+#[test]
+fn compile_css_keyframes_global_percentage_step_still_matches_every_element() {
+    // s3: step matching runs for a `-global-` keyframes too (the prune walk is name-blind) —
+    // the `0%` step scopes `<h2>`. The NAME edit strips `-global-` (leaving the bare,
+    // un-prefixed `k`), independent of step matching.
+    let out =
+        compile_checked("<h2>x</h2><style>@keyframes -global-k { 0% { opacity: 0 } }</style>");
+    assert!(
+        out.js.contains(r#"<h2 class="svelte-tsvhash">x</h2>"#),
+        "{}",
+        out.js
+    );
+    assert_eq!(
+        out.css.as_deref(),
+        Some("@keyframes k { 0% { opacity: 0 } }")
+    );
+}
+
+#[test]
+fn compile_css_keyframes_media_nested_percentage_step_matches_every_element() {
+    // s4: an `@media`-nested keyframes is reached by the group-at-rule descent; its `0%` step
+    // scopes `<h2>` and the name is prefixed inside the `@media`.
+    let out = compile_checked(
+        "<h2>x</h2><style>@media (min-width: 10px) { @keyframes k { 0% { opacity: 0 } } }</style>",
+    );
+    assert!(
+        out.js.contains(r#"<h2 class="svelte-tsvhash">x</h2>"#),
+        "{}",
+        out.js
+    );
+    assert_eq!(
+        out.css.as_deref(),
+        Some("@media (min-width: 10px) { @keyframes svelte-tsvhash-k { 0% { opacity: 0 } } }")
+    );
+}
+
+#[test]
+fn compile_css_keyframes_from_step_scopes_a_from_element() {
+    // s5: a `from` step is the TYPE selector `from`, so it scopes a `<from>` element — the
+    // step selector matches by tag name, exactly like a top-level type selector.
+    let out = compile_checked("<from>x</from><style>@keyframes k { from { opacity: 0 } }</style>");
+    assert!(
+        out.js.contains(r#"<from class="svelte-tsvhash">x</from>"#),
+        "{}",
+        out.js
+    );
+    assert_eq!(
+        out.css.as_deref(),
+        Some("@keyframes svelte-tsvhash-k { from { opacity: 0 } }")
+    );
+}
+
+#[test]
+fn compile_css_keyframes_comma_step_scopes_matching_element_only() {
+    // t2: `from, to` is two step ComplexSelectors — `<to>` matches `to`, `<h2>` matches
+    // neither, so only `<to>` scopes.
+    let out = compile_checked(
+        "<to>x</to><h2>y</h2><style>@keyframes k { from, to { opacity: 0 } }</style>",
+    );
+    assert!(
+        out.js
+            .contains(r#"<to class="svelte-tsvhash">x</to><h2>y</h2>"#),
+        "{}",
+        out.js
+    );
+    assert_eq!(
+        out.css.as_deref(),
+        Some("@keyframes svelte-tsvhash-k { from, to { opacity: 0 } }")
+    );
+}
+
+#[test]
+fn compile_css_keyframes_type_step_scopes_matching_element_only() {
+    // t3: a `div` type step scopes `<div>` and leaves `<p>` bare.
+    let out =
+        compile_checked("<div>x</div><p>y</p><style>@keyframes k { div { opacity: 0 } }</style>");
+    assert!(
+        out.js
+            .contains(r#"<div class="svelte-tsvhash">x</div><p>y</p>"#),
+        "{}",
+        out.js
+    );
+    assert_eq!(
+        out.css.as_deref(),
+        Some("@keyframes svelte-tsvhash-k { div { opacity: 0 } }")
+    );
+}
+
+#[test]
+fn compile_css_keyframes_class_step_scopes_matching_element_only() {
+    // t4: a `.c` class step scopes the `class="c"` div (appending the hash) and leaves `<p>`
+    // bare.
+    let out = compile_checked(
+        "<div class=\"c\">x</div><p>y</p><style>@keyframes k { .c { opacity: 0 } }</style>",
+    );
+    assert!(
+        out.js
+            .contains(r#"<div class="c svelte-tsvhash">x</div><p>y</p>"#),
+        "{}",
+        out.js
+    );
+    assert_eq!(
+        out.css.as_deref(),
+        Some("@keyframes svelte-tsvhash-k { .c { opacity: 0 } }")
+    );
+}
+
+#[test]
+fn compile_css_keyframes_percentage_class_compound_narrows_per_simple() {
+    // t5: `0%.c` — the Percentage is skipped PER-SIMPLE within the compound, but the `.c`
+    // predicate remains, so it matches ONLY `class="c"` (the div), NOT `<p>`. This proves the
+    // skip is per-simple, not a blanket "contains a percentage ⇒ scope everything".
+    let out = compile_checked(
+        "<div class=\"c\">x</div><p>y</p><style>@keyframes k { 0%.c { opacity: 0 } }</style>",
+    );
+    assert!(
+        out.js
+            .contains(r#"<div class="c svelte-tsvhash">x</div><p>y</p>"#),
+        "{}",
+        out.js
+    );
+    assert_eq!(
+        out.css.as_deref(),
+        Some("@keyframes svelte-tsvhash-k { 0%.c { opacity: 0 } }")
+    );
+}
+
+#[test]
+fn compile_css_keyframes_empty_step_scopes_and_keeps_block_verbatim() {
+    // t6: an EMPTY step (`from {}`) does NOT hit the empty-rule refusal (steps are never
+    // refused for emptiness) — it still scopes `<from>`, and the CSS keeps `from {}` verbatim
+    // (no empty-rule comment-wrap, the transform never descends).
+    let out = compile_checked("<from>x</from><style>@keyframes k { from {} }</style>");
+    assert!(
+        out.js.contains(r#"<from class="svelte-tsvhash">x</from>"#),
+        "{}",
+        out.js
+    );
+    assert_eq!(
+        out.css.as_deref(),
+        Some("@keyframes svelte-tsvhash-k { from {} }")
+    );
+}
+
+#[test]
+fn compile_css_keyframes_no_match_step_neither_scopes_nor_refuses() {
+    // t7: a `from` step with only an `<h2>` present matches nothing — it NEITHER scopes
+    // anything NOR refuses `CssSelectorNoMatch` (steps are never pruned). The component
+    // compiles and the keyframes name is still prefixed.
+    let out = compile_checked("<h2>x</h2><style>@keyframes k { from { opacity: 0 } }</style>");
+    assert!(out.js.contains("<h2>x</h2>"), "{}", out.js);
+    assert!(
+        !out.js.contains("svelte-tsvhash"),
+        "nothing scoped: {}",
+        out.js
+    );
+    assert_eq!(
+        out.css.as_deref(),
+        Some("@keyframes svelte-tsvhash-k { from { opacity: 0 } }")
     );
 }
