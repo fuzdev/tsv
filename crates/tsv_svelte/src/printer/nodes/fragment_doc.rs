@@ -624,12 +624,8 @@ impl<'a> Printer<'a> {
                     if is_last {
                         // Last child: fold the element and the trailing words into ONE fill so a
                         // wide element wraps its own content within printWidth and the words pack
-                        // after it. `sandwiched` = there is content before the element (it can be
-                        // pushed onto its own line by a preceding break); when it actually drops,
-                        // the trailing text wraps to its own line rather than hugging the dropped
-                        // element's `>` — see `build_after_element_fold`.
-                        let sandwiched = !child_docs.is_empty();
-                        child_docs.push(self.build_after_element_fold(last_doc, raw, sandwiched));
+                        // after it — see `build_after_element_fold`.
+                        child_docs.push(self.build_after_element_fold(last_doc, raw));
                         return;
                     }
                     // Non-last (text between two inline elements): keep the group-wrapped boundary.
@@ -739,6 +735,20 @@ impl<'a> Printer<'a> {
                     fill_doc,
                     tsv_lang::doc::DocContext {
                         break_before_wide_flow: true,
+                        ..Default::default()
+                    },
+                )
+            } else if next_is_tag && !has_trailing_ws {
+                // The text's last word is welded to a following tag with no whitespace
+                // (`… tsv is ~{ratio}`). prettier keeps the tag outside the fill, so the fill never
+                // breaks before that word and the tag rides past printWidth after it. Measure the
+                // last word alone so tsv matches — otherwise the glued tag folds into the word's fit
+                // check and strands it on its own line. (`has_trailing_ws` false ⇒ `trailing_line`
+                // false, so this never coincides with the branch above.)
+                d.with_context(
+                    fill_doc,
+                    tsv_lang::doc::DocContext {
+                        trailing_glued_tag: true,
                         ..Default::default()
                     },
                 )
@@ -1125,14 +1135,12 @@ impl<'a> Printer<'a> {
     /// non-convergent, pinned by
     /// [`inline_wide_content_text_sibling_long`](../../../../../tests/fixtures/svelte/elements/inline_wide_content_text_sibling_long_prettier_divergence/).
     ///
-    /// `sandwiched` (the element has a preceding sibling, so a preceding break can push it onto its
-    /// own line) sets [`DocContext::break_after_dropped_first`]: when the element actually drops to
-    /// its own line (renders at line start) the trailing text wraps to the next line instead of
-    /// hugging the dropped element's `>` — a wide inline child owns its line, regardless of whether
-    /// the drop came from the element's own content wrapping or from the preceding text being too
-    /// long. A first-child element (`!sandwiched`) can't drop via a preceding sibling, so the
-    /// trailing text packs after it normally.
-    fn build_after_element_fold(&self, prev: DocId, raw: &str, sandwiched: bool) -> DocId {
+    /// A **short** element (its content fits flat) packs like every other fill word: when it drops
+    /// to its own line — whether pushed there by the preceding text or dropped mid-fill — the
+    /// trailing text flows greedily after it rather than being isolated (matching prettier's
+    /// pairwise fill; a preceding sibling doesn't change that). A **wide** element that wraps still
+    /// dangles its `>` and the terminal tail hugs it (`hug_terminal_after_break`).
+    fn build_after_element_fold(&self, prev: DocId, raw: &str) -> DocId {
         let d = self.d();
         let mut parts = d.pooled_docbuf();
         parts.push(prev);
@@ -1142,14 +1150,11 @@ impl<'a> Printer<'a> {
         // `hug_wide_first` is always set: the fold's first item is the inline element, and when it
         // sits mid-line right after a parent element's `>` and is too wide for its own line, it must
         // hug-and-break-internally rather than drop (which would strand a spurious `>⏎<child` break —
-        // the nested-`<span>` non-idempotency). `break_after_dropped_first` couples the *trailing*
-        // text to the drop, and only applies when the element is sandwiched (a preceding sibling can
-        // push it onto its own line); the two flags address opposite ends of the fold.
+        // the nested-`<span>` non-idempotency).
         d.with_context(
             fill,
             tsv_lang::doc::DocContext {
                 hug_wide_first: true,
-                break_after_dropped_first: sandwiched,
                 // The fold only ever runs for terminal trailing text, which hugs the dangled `>`
                 // (respecting the author's space boundary).
                 hug_terminal_after_break: true,

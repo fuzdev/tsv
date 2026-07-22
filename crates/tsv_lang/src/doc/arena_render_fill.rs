@@ -47,12 +47,21 @@ pub(super) fn render_fill_iterative(
             remaining
         };
 
-        let content_fits = if is_final_segment && !rest_commands.is_empty() {
+        // A text-run fill glued to a following tag (`… ~{ratio}`) measures its last word ALONE:
+        // prettier keeps the tag outside the fill, so the fill never breaks before the word it is
+        // glued to (the word stays put, the tag rides past printWidth after it). Suppress the
+        // last-item look-ahead so the glued tag doesn't fold into the word's fit check.
+        let lookahead_rest: &[ArenaCommand] = if context.trailing_glued_tag && is_final_segment {
+            &[]
+        } else {
+            rest_commands
+        };
+        let content_fits = if is_final_segment && !lookahead_rest.is_empty() {
             arena_fits_with_lookahead(
                 arena,
                 content,
                 Mode::Flat,
-                rest_commands,
+                lookahead_rest,
                 remaining as isize,
                 embed,
                 source,
@@ -86,13 +95,17 @@ pub(super) fn render_fill_iterative(
         // `rest_commands` measurement already asks the right question.
         let content_fits = if offset + 1 < parts.len() && arena.is_collapsible_line(content) {
             let mut with_sep: SmallVec<[ArenaCommand; 8]> =
-                SmallVec::from_slice(if is_final_segment { rest_commands } else { &[] });
+                SmallVec::from_slice(if is_final_segment {
+                    lookahead_rest
+                } else {
+                    &[]
+                });
             with_sep.push(ArenaCommand {
                 indent,
                 mode: Mode::Flat,
                 doc: parts[offset + 1],
             });
-            let budget = if is_final_segment && !rest_commands.is_empty() {
+            let budget = if is_final_segment && !lookahead_rest.is_empty() {
                 remaining
             } else {
                 available
@@ -110,55 +123,13 @@ pub(super) fn render_fill_iterative(
             content_fits
         };
 
-        // Dropped-first boundary (Svelte after-element fold of a sandwiched inline child): if the
-        // first fill item rendered at the start of its line, it was pushed there by a preceding
-        // break — it dropped to its own line — so break the separator after it and let the rest of
-        // the fill pack from there. A wide inline child that drops owns its line; trailing text
-        // wraps to the next line rather than hugging the child's `>`. Scoped by the context flag so
-        // greedy fills (text word-wrap, CSS value lists) are unaffected.
-        //
-        // Exception: a block-style element (its own content doesn't fit flat, so it wraps intact
-        // and dangles its `>` low) with *terminal* trailing text is the `hug_terminal_after_break`
-        // shape — the tail should hug the dangled `>` when it fits there, exactly as the first-child
-        // case (`inline_wide_content_trailing_long`) does; a preceding sibling doesn't change that,
-        // since nothing follows the tail (the hug stays convergent). Skip the unconditional break
-        // here and let Case 3's at-line-start arm run its `hug_terminal_after_break` decision, which
-        // hugs only when the tail actually fits and breaks otherwise. The plain dropped-whole case
-        // (`content_fits`) is unaffected and still owns its line.
-        if offset == 0
-            && context.break_after_dropped_first
-            && offset + 1 < parts.len()
-            && (content_fits || !context.hug_terminal_after_break)
-        {
-            let line_start_pos = line_start_column(indent, render, embed);
-            if *pos == line_start_pos {
-                let content_mode = if content_fits {
-                    Mode::Flat
-                } else {
-                    Mode::Break
-                };
-                render_single_doc(
-                    ctx,
-                    content,
-                    output,
-                    pos,
-                    indent,
-                    content_mode,
-                    should_remeasure,
-                );
-                render_single_doc(
-                    ctx,
-                    parts[offset + 1],
-                    output,
-                    pos,
-                    indent,
-                    Mode::Break,
-                    should_remeasure,
-                );
-                offset += 2;
-                continue;
-            }
-        }
+        // A short inline element (its own content fits flat) that dropped to its own line — whether
+        // pushed there by a preceding break (already at line start) or dropped mid-fill below — no
+        // longer isolates its trailing text: it packs like every other fill word so the run flows
+        // after it (conformance_prettier.md §Svelte: Inline content block-style, "a text run flows as
+        // one fill"). The at-line-start case falls through to Case 3's `both_fit` flow; the mid-fill
+        // case flows via the `hug_terminal_after_break`-gated arm in Case 3. A *wide* element that
+        // wraps still hugs the dangled `>` (`hug_terminal_after_break`) / owns its line.
 
         // Case 1: Last item
         if offset + 1 >= parts.len() {
@@ -469,13 +440,21 @@ pub(super) fn render_fill_iterative(
                         Mode::Flat,
                         should_remeasure,
                     );
+                    // The Svelte after-element fold's lead element dropped to its own line from
+                    // mid-fill (a preceding word pushed it). It fits intact here, so let the trailing
+                    // text flow greedily after it — the short inline element packs like any other fill
+                    // word (conformance_prettier.md §Svelte: Inline content block-style, "a text run
+                    // flows as one fill"), and the same-line-authored drop converges with the
+                    // newline-authored one instead of one flowing and the other isolating (an F1
+                    // break).
+                    let sep_mode = hug_terminal_sep_mode(ctx, context, next_content, *pos);
                     render_single_doc(
                         ctx,
                         separator,
                         output,
                         pos,
                         indent,
-                        Mode::Break,
+                        sep_mode,
                         should_remeasure,
                     );
                 } else {
@@ -513,26 +492,11 @@ pub(super) fn render_fill_iterative(
                     Mode::Break,
                     should_remeasure,
                 );
-                // Exception (Svelte after-element fold, terminal trailing text): choose the
-                // separator by the *actual resulting column* after the wrapped element. If the next
-                // item fits after the dangled `>` (separator rendered flat = one space), hug it
-                // there — respecting the author's space boundary — instead of forcing its own line.
+                // Exception (Svelte after-element fold, terminal trailing text): hug the dangled `>`
+                // when the tail fits there, else own line — see `hug_terminal_sep_mode`.
                 // `next_content` (= `parts[offset + 2]`) is in bounds here: this is the at-line-start
                 // arm of Case 3, which Case 2 (`offset + 2 >= parts.len()`) has already excluded.
-                let sep_mode = if context.hug_terminal_after_break
-                    && arena_fits_with_lookahead(
-                        arena,
-                        next_content,
-                        Mode::Flat,
-                        &[],
-                        render.print_width.saturating_sub(*pos + 1) as isize,
-                        embed,
-                        source,
-                    ) {
-                    Mode::Flat
-                } else {
-                    Mode::Break
-                };
+                let sep_mode = hug_terminal_sep_mode(ctx, context, next_content, *pos);
                 render_single_doc(
                     ctx,
                     separator,
@@ -546,5 +510,36 @@ pub(super) fn render_fill_iterative(
         }
 
         offset += 2;
+    }
+}
+
+/// Terminal-tail separator mode for the Svelte after-element fold, shared by Case 3's two drop
+/// arms (the mid-fill drop and the at-line-start wrapped drop). After the fold's lead element has
+/// rendered on its own line, the trailing text hugs the dangled `>` — separator rendered Flat, the
+/// one space it stands for — when the next item actually fits at the resulting column (`+ 1` for
+/// that space), and takes its own line (Break) otherwise. Gated on the fold via
+/// [`DocContext::hug_terminal_after_break`]; every non-fold fill keeps the isolating Break, where a
+/// wrapped item never lets the next hug its last line.
+#[inline]
+fn hug_terminal_sep_mode(
+    ctx: &RenderCtx<'_>,
+    context: &DocContext,
+    next_content: DocId,
+    pos: usize,
+) -> Mode {
+    if context.hug_terminal_after_break
+        && arena_fits_with_lookahead(
+            ctx.arena,
+            next_content,
+            Mode::Flat,
+            &[],
+            ctx.render.print_width.saturating_sub(pos + 1) as isize,
+            ctx.embed,
+            ctx.source,
+        )
+    {
+        Mode::Flat
+    } else {
+        Mode::Break
     }
 }
