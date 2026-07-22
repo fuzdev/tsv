@@ -65,16 +65,17 @@ use tsv_lang::{
     write_array, write_or_null,
 };
 use tsv_ts::ast::convert::{
-    CommentMode, Schema, translate_column, write_expression_embedded,
+    CommentMode, EmbedWriter, ProgramLoc, Schema, translate_column, write_expression_embedded,
     write_identifier_expression_with_character, write_pattern_embedded, write_program_embedded,
     write_variable_declaration_embedded,
 };
 
 use super::comment_attachment::{get_comment_value, is_template_comment};
 use super::special::{
-    bool_option, build_const_tag_writer_comments, build_declaration_tag_writer_comments,
-    build_expression_list_writer_comments, build_expression_writer_comments,
-    build_script_writer_comments, component_is_typescript, find_option_values, text_value,
+    AttachInputs, bool_option, build_const_tag_writer_comments,
+    build_declaration_tag_writer_comments, build_expression_list_writer_comments,
+    build_expression_writer_comments, build_script_writer_comments, component_is_typescript,
+    find_option_values, text_value,
 };
 
 /// Convert an internal Svelte `Root` straight to its compact wire-JSON bytes.
@@ -163,6 +164,30 @@ impl<'a> Ctx<'a> {
     #[inline]
     fn pos(&self, byte: u32) -> u32 {
         self.loc.pos(byte)
+    }
+
+    /// The shared inputs for an embedded `tsv_ts` writer — this document's
+    /// `source` / `loc` / `emit_loc` paired with the per-call comment `mode`.
+    #[inline]
+    fn embed(&self, mode: CommentMode<'a>) -> EmbedWriter<'a> {
+        EmbedWriter {
+            source: self.source,
+            loc: self.loc,
+            comments: mode,
+            emit_loc: self.emit_loc,
+        }
+    }
+
+    /// The shared inputs for a template comment-attach builder
+    /// (`build_*_writer_comments`) — this document's template comments, source,
+    /// and byte-offset tracker.
+    #[inline]
+    fn attach(&self) -> AttachInputs<'a> {
+        AttachInputs {
+            template_comments: self.comments,
+            source: self.source,
+            tracker: self.loc.tracker,
+        }
     }
 
     /// A copy of this context with no template comments — for subtrees the
@@ -357,25 +382,11 @@ fn write_generic_island(
     ctx: &Ctx<'_>,
 ) {
     if ctx.any_comment_in(container_start, range_end) {
-        let wc = build_expression_writer_comments(
-            expr,
-            ctx.comments,
-            ctx.source,
-            ctx.loc.tracker,
-            container_start,
-            range_end,
-        );
-        write_expression_embedded(
-            w,
-            expr,
-            ctx.source,
-            ctx.loc,
-            CommentMode::Emit(&wc),
-            ctx.emit_loc,
-        );
+        let wc = build_expression_writer_comments(expr, ctx.attach(), container_start, range_end);
+        write_expression_embedded(w, expr, ctx.embed(CommentMode::Emit(&wc)));
         wc.debug_assert_consumed();
     } else {
-        write_expression_embedded(w, expr, ctx.source, ctx.loc, CommentMode::Off, ctx.emit_loc);
+        write_expression_embedded(w, expr, ctx.embed(CommentMode::Off));
     }
 }
 
@@ -531,14 +542,7 @@ fn write_shorthand_expression_tag(
     w.raw(",\"end\":");
     w.u32(ctx.pos(tag.span.end));
     w.raw(",\"expression\":");
-    write_identifier_expression_with_character(
-        w,
-        &tag.expression,
-        ctx.source,
-        ctx.loc,
-        CommentMode::Off,
-        ctx.emit_loc,
-    );
+    write_identifier_expression_with_character(w, &tag.expression, ctx.embed(CommentMode::Off));
     w.raw("}");
 }
 
@@ -756,32 +760,11 @@ fn write_snippet_name(
         // The injected `character` lives in the identifier's `loc` and doesn't
         // affect the attach walk (span/type keyed), so the skeleton builds
         // without it and the fused emit adds it.
-        let wc = build_expression_writer_comments(
-            expr,
-            ctx.comments,
-            ctx.source,
-            ctx.loc.tracker,
-            container_start,
-            range_end,
-        );
-        write_identifier_expression_with_character(
-            w,
-            expr,
-            ctx.source,
-            ctx.loc,
-            CommentMode::Emit(&wc),
-            ctx.emit_loc,
-        );
+        let wc = build_expression_writer_comments(expr, ctx.attach(), container_start, range_end);
+        write_identifier_expression_with_character(w, expr, ctx.embed(CommentMode::Emit(&wc)));
         wc.debug_assert_consumed();
     } else {
-        write_identifier_expression_with_character(
-            w,
-            expr,
-            ctx.source,
-            ctx.loc,
-            CommentMode::Off,
-            ctx.emit_loc,
-        );
+        write_identifier_expression_with_character(w, expr, ctx.embed(CommentMode::Off));
     }
 }
 
@@ -801,27 +784,18 @@ fn write_snippet_parameters(
     if !parameters.is_empty() && ctx.any_comment_in(container_start, range_end) {
         let wc = build_expression_list_writer_comments(
             parameters,
-            ctx.comments,
-            ctx.source,
-            ctx.loc.tracker,
+            ctx.attach(),
             container_start,
             range_end,
             None,
         );
         write_array(w, parameters, |w, p| {
-            write_expression_embedded(
-                w,
-                p,
-                ctx.source,
-                ctx.loc,
-                CommentMode::Emit(&wc),
-                ctx.emit_loc,
-            );
+            write_expression_embedded(w, p, ctx.embed(CommentMode::Emit(&wc)));
         });
         wc.debug_assert_consumed();
     } else {
         write_array(w, parameters, |w, p| {
-            write_expression_embedded(w, p, ctx.source, ctx.loc, CommentMode::Off, ctx.emit_loc);
+            write_expression_embedded(w, p, ctx.embed(CommentMode::Off));
         });
     }
 }
@@ -868,22 +842,13 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'
     if tag.identifiers.len() > 1 && ctx.any_comment_in(tag.span.start, tag.span.end) {
         let wc = build_expression_list_writer_comments(
             tag.identifiers,
-            ctx.comments,
-            ctx.source,
-            ctx.loc.tracker,
+            ctx.attach(),
             tag.span.start,
             tag.span.end,
             tag.identifiers.last().map(|id| id.span().end),
         );
         write_array(w, tag.identifiers, |w, id| {
-            write_expression_embedded(
-                w,
-                id,
-                ctx.source,
-                ctx.loc,
-                CommentMode::Emit(&wc),
-                ctx.emit_loc,
-            );
+            write_expression_embedded(w, id, ctx.embed(CommentMode::Emit(&wc)));
         });
         wc.debug_assert_consumed();
     } else {
@@ -923,7 +888,7 @@ fn write_const_tag(w: &mut JsonWriter, tag: &internal::ConstTag<'_>, ctx: &Ctx<'
     } else {
         // The document has template comments: precompute the init-subtree
         // attach map (comments attach to the init only).
-        let wc = build_const_tag_writer_comments(tag, ctx.comments, ctx.source, ctx.loc.tracker);
+        let wc = build_const_tag_writer_comments(tag, ctx.attach());
         write_const_declaration(
             w,
             tag,
@@ -995,9 +960,9 @@ fn write_const_declaration(
     w.raw(
         "{\"type\":\"VariableDeclaration\",\"kind\":\"const\",\"declarations\":[{\"type\":\"VariableDeclarator\",\"id\":",
     );
-    write_pattern_embedded(w, &tag.id, ctx.source, ctx.loc, mode, ctx.emit_loc);
+    write_pattern_embedded(w, &tag.id, ctx.embed(mode));
     w.raw(",\"init\":");
-    write_expression_embedded(w, &tag.init, ctx.source, ctx.loc, mode, ctx.emit_loc);
+    write_expression_embedded(w, &tag.init, ctx.embed(mode));
     w.raw(",\"start\":");
     w.u32(ctx.pos(tag.id.span().start));
     w.raw(",\"end\":");
@@ -1026,31 +991,15 @@ fn write_declaration_tag(w: &mut JsonWriter, tag: &internal::DeclarationTag<'_>,
     // Scoped comment pre-check (see `write_const_tag`): no comment inside this
     // tag's span means the attach map is empty, so fuse directly.
     if !ctx.any_comment_in(tag.span.start, tag.span.end) {
-        write_variable_declaration_embedded(
-            w,
-            &tag.declaration,
-            ctx.source,
-            ctx.loc,
-            CommentMode::Off,
-            ctx.emit_loc,
-        );
+        write_variable_declaration_embedded(w, &tag.declaration, ctx.embed(CommentMode::Off));
     } else {
         let wc = build_declaration_tag_writer_comments(
             &tag.declaration,
-            ctx.comments,
-            ctx.source,
-            ctx.loc.tracker,
+            ctx.attach(),
             tag.span.start,
             tag.span.end,
         );
-        write_variable_declaration_embedded(
-            w,
-            &tag.declaration,
-            ctx.source,
-            ctx.loc,
-            CommentMode::Emit(&wc),
-            ctx.emit_loc,
-        );
+        write_variable_declaration_embedded(w, &tag.declaration, ctx.embed(CommentMode::Emit(&wc)));
         wc.debug_assert_consumed();
     }
     w.raw("}");
@@ -1496,17 +1445,16 @@ fn write_script_program_fused(
             ) as usize,
         }
     };
-    // The override is only consumed when `loc` is emitted; on the no-locations
-    // path it's discarded, so skip the two `get_line_column` line-table lookups
-    // (which would only hit the stub `[0]` table anyway — see `new_map_only`).
-    let loc_override = if ctx.emit_loc {
-        (
+    // The override is only consumed when `loc` is emitted; `ProgramLoc::Omit` is
+    // the no-locations path, which skips the two `get_line_column` line-table
+    // lookups (which would only hit the stub `[0]` table anyway — see `new_map_only`).
+    let program_loc = if ctx.emit_loc {
+        ProgramLoc::Emit(
             position_at(script.span.start, program.span.start),
             position_at(script.span.end, program.span.end),
         )
     } else {
-        let dummy = Position { line: 1, column: 0 };
-        (dummy, dummy)
+        ProgramLoc::Omit
     };
     write_program_embedded(
         w,
@@ -1514,9 +1462,8 @@ fn write_script_program_fused(
         ctx.source,
         ctx.loc,
         schema,
-        loc_override,
+        program_loc,
         comments,
-        ctx.emit_loc,
     );
 }
 
@@ -1699,14 +1646,7 @@ fn write_custom_element_field(
                 Some(shadow_expr @ Expression::ObjectExpression(_)) => {
                     json_comma(w, &mut first);
                     w.raw("\"shadow\":");
-                    write_expression_embedded(
-                        w,
-                        shadow_expr,
-                        ctx.source,
-                        ctx.loc,
-                        CommentMode::Off,
-                        ctx.emit_loc,
-                    );
+                    write_expression_embedded(w, shadow_expr, ctx.embed(CommentMode::Off));
                 }
                 _ => {}
             }
@@ -1714,14 +1654,7 @@ fn write_custom_element_field(
             if let Some(extend_expr) = extend {
                 json_comma(w, &mut first);
                 w.raw("\"extend\":");
-                write_expression_embedded(
-                    w,
-                    extend_expr,
-                    ctx.source,
-                    ctx.loc,
-                    CommentMode::Off,
-                    ctx.emit_loc,
-                );
+                write_expression_embedded(w, extend_expr, ctx.embed(CommentMode::Off));
             }
             w.raw("}");
             return;
@@ -1772,7 +1705,7 @@ fn write_pattern_island(
     expr: &tsv_ts::ast::internal::Expression<'_>,
     ctx: &Ctx<'_>,
 ) {
-    write_pattern_embedded(w, expr, ctx.source, ctx.loc, CommentMode::Off, ctx.emit_loc);
+    write_pattern_embedded(w, expr, ctx.embed(CommentMode::Off));
 }
 
 /// A fragment or `null` (the `AwaitBlock` branch fields and `IfBlock`'s

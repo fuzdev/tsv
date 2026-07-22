@@ -36,9 +36,10 @@ impl Schema {
 mod write;
 
 pub use write::{
-    AttachedComment, CommentMode, SkeletonRecorder, SkeletonTree, WriterComments,
-    write_expression_embedded, write_identifier_expression_with_character, write_pattern_embedded,
-    write_program_embedded, write_program_json, write_variable_declaration_embedded,
+    AttachedComment, CommentMode, EmbedWriter, ProgramLoc, SkeletonRecorder, SkeletonTree,
+    WriterComments, write_expression_embedded, write_identifier_expression_with_character,
+    write_pattern_embedded, write_program_embedded, write_program_json,
+    write_variable_declaration_embedded,
 };
 
 /// Translate a column from byte-based to char-based, preserving any prior adjustment (e.g., +1)

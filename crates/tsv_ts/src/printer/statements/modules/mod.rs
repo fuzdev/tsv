@@ -12,6 +12,7 @@
 mod header_comments;
 mod import_attributes;
 mod specifier_list;
+use specifier_list::SpecifierListSpans;
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`
 pub(super) use super::{Printer, build_entity_name_doc};
@@ -242,8 +243,7 @@ impl<'a> Printer<'a> {
                 close_brace_end = self.push_braced_specifier_list(
                     &mut parts,
                     decl.specifiers,
-                    kw_end,
-                    bound,
+                    SpecifierListSpans { kw_end, bound },
                     true,
                     |s| s.span,
                     |s| self.build_export_specifier_doc(s, is_type_export),
@@ -687,8 +687,10 @@ impl<'a> Printer<'a> {
                 from_content_end = Some(self.push_braced_specifier_list(
                     &mut parts,
                     &named_specs,
-                    kw_end,
-                    decl.source.span.start,
+                    SpecifierListSpans {
+                        kw_end,
+                        bound: decl.source.span.start,
+                    },
                     capture_keyword_comment,
                     |s| s.span,
                     |s| self.build_import_specifier_doc(s, is_type_import),
