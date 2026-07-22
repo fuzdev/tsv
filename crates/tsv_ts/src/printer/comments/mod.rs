@@ -46,11 +46,14 @@ use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::{Comment, comments_to_emit_in_range};
 
-/// Small stack-allocated vector of comment references. Inline capacity 4 keeps
-/// the common comment gaps off the heap: 0–2 comments are the bulk, and a short
-/// stacked `//` block (3–4 lines, common in documented code) still fits inline.
-/// A larger run spills to a single heap alloc — exactly what a `Vec` would do.
-pub(crate) type CommentVec<'a> = SmallVec<[&'a Comment; 4]>;
+/// Small stack-allocated vector of comment references. Inline capacity 8 keeps
+/// the common comment gaps off the heap: 0–2 comments are the bulk, and a
+/// stacked `//` block (3–8 lines, common in documented code) still fits inline;
+/// comment-dense corpora put the p99 statement-gap run at 7 (`cargo run -p
+/// tsv_debug --features buffer_stats buffer_sizes` — the histogram source for
+/// this `N`). A larger run spills to a single heap alloc — exactly what a
+/// `Vec` would do.
+pub(crate) type CommentVec<'a> = SmallVec<[&'a Comment; 8]>;
 
 /// Spacing style for comments in doc building
 #[derive(Debug, Clone, Copy)]
@@ -796,10 +799,10 @@ impl<'a> Printer<'a> {
     /// (tuples, type params/args, function-type params, the union's first member, the
     /// bracket-break shell, the broken `<T>` cast), the array literal / array pattern
     /// element runs, the body/member runs via
-    /// [`build_leading_comments_before`](Self::build_leading_comments_before) (class,
+    /// [`push_leading_comments_before`](Self::push_leading_comments_before) (class,
     /// interface and enum members, statement lists, type literals, expanded object
     /// patterns), and — for all but its last comment —
-    /// [`build_orphaned_comment_run`](Self::build_orphaned_comment_run).
+    /// [`push_orphaned_comment_run`](Self::push_orphaned_comment_run).
     ///
     /// Three loops still emit a leading run themselves, because their surrounding
     /// separator policy genuinely differs — the import/export specifier list, the

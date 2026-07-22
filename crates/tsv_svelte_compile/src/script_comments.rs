@@ -153,7 +153,7 @@ pub(crate) fn collect_script_comments(
         if text.contains("prettier-ignore") || text.contains("format-ignore") {
             return Err(unsupported(Refusal::FormatIgnoreComment));
         }
-        let mut comment = comment.clone();
+        let mut comment = *comment;
         // Release a JSDoc cast's comment back to the positional machinery. `tsv_ts`
         // binds it to its `JsdocCast` node (`Comment::owned_by_node`) so a synthesized
         // paren can't land between the comment and the `(` it glues to — the owning
@@ -282,7 +282,7 @@ pub(crate) fn collect_module_script_comments(
         if text.contains("prettier-ignore") || text.contains("format-ignore") {
             return Err(unsupported(Refusal::FormatIgnoreComment));
         }
-        let mut comment = comment.clone();
+        let mut comment = *comment;
         // Release JSDoc-cast ownership so the positional machinery prints it — its
         // owning `JsdocCast` node is erased in the emitted program (see the same
         // step in `collect_script_comments`).

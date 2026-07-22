@@ -105,8 +105,8 @@ pub fn compare_canonical(ours: &str, oracle: &str) -> Parity {
     // The CODE must be identical: reprint both with comments cleared and byte-compare.
     // A comment-forced line break vanishes with its comment, so two same-code programs
     // reprint identically here regardless of where their comments sat.
-    ours_program.comments.clear();
-    oracle_program.comments.clear();
+    ours_program.comments = &[];
+    oracle_program.comments = &[];
     let ours_code = tsv_ts::format_canonical(&ours_program, ours);
     let oracle_code = tsv_ts::format_canonical(&oracle_program, oracle);
     if ours_code == oracle_code {

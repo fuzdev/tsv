@@ -163,7 +163,7 @@ through `dollar_identifier_name` → `identifier_name`, which returns `None` whe
 `escaped_name` is set, so tsv **compiles** it while the oracle emits the same
 ungrammatical `class $.store_get(…) {}` (probe-verified). That is not one of the six
 escaped binding over-acceptances the escaped-identifier residual covered (now closed —
-those six decode via the interner and refuse); here the oracle *accepts* a
+those six decode via `Identifier::name` and refuse); here the oracle *accepts* a
 class-expression id, so slipping past the refusal is parity on the rule — it lands on
 this oracle defect instead. Refusing the unescaped spelling is a
 deliberate over-refusal — the oracle compiles these, so refusing costs achievable parity — but the

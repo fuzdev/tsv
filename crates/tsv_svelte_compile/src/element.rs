@@ -22,7 +22,7 @@
 use std::collections::HashMap;
 
 use bumpalo::collections::Vec as BumpVec;
-use tsv_lang::{InfallibleResolve, Span};
+use tsv_lang::Span;
 use tsv_svelte::ast::internal::{
     Attribute, AttributeNode, ClassDirective, Element, ElementKind, FragmentNode, SpecialElement,
     SpecialThis, StyleDirective,
@@ -113,10 +113,7 @@ fn attribute_is_style(env: &EmitEnv<'_, '_>, attr: &Attribute<'_>) -> bool {
 /// Case-insensitive attribute-name test (the oracle lowercases attribute names on
 /// non-foreign elements).
 fn attribute_name_eq(env: &EmitEnv<'_, '_>, attr: &Attribute<'_>, name: &str) -> bool {
-    let interner = env.b.interner.borrow();
-    interner
-        .resolve_infallible(attr.name)
-        .eq_ignore_ascii_case(name)
+    attr.name(env.source).eq_ignore_ascii_case(name)
 }
 
 /// The two element kinds that share the attribute-emission machinery: a regular
@@ -194,12 +191,7 @@ pub(crate) fn emit_element<'arena>(
     parent_ctx: &FragmentCtx<'_>,
     is_standalone: bool,
 ) -> Result<(), CompileError> {
-    let name = env
-        .b
-        .interner
-        .borrow()
-        .resolve_infallible(element.name)
-        .to_string();
+    let name = element.name(env.source).to_string();
     // A component (`<Foo>`, `<Foo.Bar>`) compiles to a call
     // (`Foo($$renderer, {…props})`), not static markup — route it to the
     // component emitter. Exhaustive over `ElementKind` so a new kind can't
@@ -483,8 +475,7 @@ fn is_custom_element_node(env: &EmitEnv<'_, '_>, element: &Element<'_>, name: &s
             let AttributeNode::Attribute(attr) = attr_node else {
                 return false;
             };
-            let interner = env.b.interner.borrow();
-            interner.resolve_infallible(attr.name) == "is"
+            attr.name(env.source) == "is"
         })
 }
 

@@ -721,6 +721,8 @@ mod tests {
         arena: &'arena bumpalo::Bump,
         src: &str,
     ) -> &'arena [FragmentNode<'arena>] {
+        // The nodes borrow only the arena, so the returned slice is self-contained —
+        // these tests inspect node structure, not name text.
         crate::parse(src, arena)
             .expect("template should parse")
             .fragment

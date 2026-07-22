@@ -81,7 +81,7 @@ impl<'a> Printer<'a> {
             docs.push(d.literalline());
         }
         docs.push(d.hardline());
-        docs.extend(self.build_leading_comments_before(&leading_comments, member_start));
+        self.push_leading_comments_before(&mut docs, &leading_comments, member_start);
         docs
     }
 
@@ -677,7 +677,7 @@ impl<'a> Printer<'a> {
         // preserve any interior comment. The members-only alignment path returns an
         // empty doc for zero members, so the `d.line()` boundary below would render
         // as a spurious space and the comment would be dropped — mirror the plain
-        // type-literal empty path (`build_empty_type_literal_inline_with_comments_doc`),
+        // type-literal empty path (`build_empty_braces_inline_with_comments_doc`),
         // threading this path's (possibly prefixed) `opening`/`closing`.
         if obj.members.is_empty() {
             return self.build_empty_bracketed_with_comments_doc(
@@ -765,7 +765,7 @@ impl<'a> Printer<'a> {
             // Empty type literal - handle comments inside. The helper already
             // returns a self-managing group (a fitting block comment stays
             // inline as `{ /* c */ }`), so it's correct in both modes.
-            return self.build_empty_type_literal_inline_with_comments_doc(t.span);
+            return self.build_empty_braces_inline_with_comments_doc(t.span);
         }
 
         let mut parts: DocBuf = smallvec![d.text("{")];

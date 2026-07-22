@@ -232,14 +232,8 @@ pub(crate) fn guard_dropped<'arena>(
     // so no rewrite is needed, and the `var $$store_subs` injection is already
     // decided by `needs_context`. A shadowed base still refuses here (the oracle's
     // `store_invalid_scoped_subscription`), so we pass the full shadow set.
-    let mut ctx = WalkCtx::new(
-        env.source,
-        &mut updated,
-        &mut nested,
-        &no_derived,
-        std::rc::Rc::clone(&env.b.interner),
-    )
-    .allow_store_reads(&env.store_names, Some(&env.store_shadowed));
+    let mut ctx = WalkCtx::new(env.source, &mut updated, &mut nested, &no_derived)
+        .allow_store_reads(&env.store_names, Some(&env.store_shadowed));
     walk_expression_guarded(expr, &mut ctx)
 }
 
@@ -267,13 +261,7 @@ pub(crate) fn guard_pattern<'arena>(
 ) -> Result<(), CompileError> {
     let mut updated = NameSet::default();
     let mut nested = NameSet::default();
-    let mut ctx = WalkCtx::new(
-        env.source,
-        &mut updated,
-        &mut nested,
-        &env.derived_names,
-        std::rc::Rc::clone(&env.b.interner),
-    );
+    let mut ctx = WalkCtx::new(env.source, &mut updated, &mut nested, &env.derived_names);
     walk_expression_guarded(pattern, &mut ctx)
 }
 

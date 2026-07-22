@@ -13,6 +13,9 @@ convert = ["dep:serde_json", "tsv_lang/json"]
 # Debug-only: exposes `debug_token_stream` for the differential lexer harness
 # (`tsv_debug lex_diff`). Off in production builds.
 debug_lex = []
+# Debug-only: printer buffer-population sampling for `tsv_debug buffer_sizes`
+# (chain/comment SmallVec length histograms). Off in production builds.
+buffer_stats = []
 # Opt-in print-once comment ledger (`tsv_lang::comment_ledger`): `format_in` registers
 # the program's comments, `build_comment_doc` records each emit, and the format-ignore
 # verbatim seam records its range. Off in production builds.
@@ -23,7 +26,6 @@ tsv_lang.workspace = true
 bumpalo.workspace = true
 serde_json = { workspace = true, optional = true }
 smallvec.workspace = true
-string-interner.workspace = true
 unicode-ident.workspace = true
 
 [lints]

@@ -466,7 +466,7 @@ fn analyze<'arena>(
     // oracle, not as the rune — refuse before the binding table (which would
     // classify it as the rune) is built. `instance.scope.get` chains to the module
     // scope, so both bodies are searched. See `refuse_rune_store_collision`.
-    refuse_rune_store_collision(instance_body, module_body, source, &root.interner)?;
+    refuse_rune_store_collision(instance_body, module_body, source)?;
 
     // Script analysis pass: the top-level binding table (evaluator input) and
     // the derived-name set (read rewriting / refusal). The instance script fills
@@ -573,7 +573,7 @@ fn analyze<'arena>(
     // `export { … }` specifiers (`2-analyze/index.js:823-836`). It reads the
     // hoist decision (a hoistable snippet's binding lands in module scope), so it
     // runs after `analyze_snippets`.
-    crate::validate::validate_module_exports(module_body, source, &snippets, &root.interner)?;
+    crate::validate::validate_module_exports(module_body, source, &snippets)?;
 
     // Every top-level binding name — instance AND module — is a candidate store
     // base: a `$name` reference is a store auto-subscription iff `name` is a
@@ -685,7 +685,7 @@ pub(crate) fn compile_server<'arena>(
     // 1. `import * as $ from 'svelte/internal/server';` — the first appendix
     // lexeme. `analyze` mints nothing, so this heads the appendix exactly as it
     // did before the setup block was factored out.
-    let mut b = Builder::new(arena, source, std::rc::Rc::clone(&root.interner));
+    let mut b = Builder::new(arena, source);
     let import = b.import_namespace("$", "svelte/internal/server");
 
     // 4. Script rewrite pass: rune rewrites, guard walks, mutation/shadow
@@ -739,7 +739,7 @@ pub(crate) fn compile_server<'arena>(
             return Err(unsupported(Refusal::InstanceScriptExport));
         }
         if let Statement::ImportDeclaration(import) = stmt {
-            refuse_runes_invalid_import(import, source, &root.interner)?;
+            refuse_runes_invalid_import(import, source)?;
             user_imports.push(stmt.clone());
             continue;
         }
@@ -1178,9 +1178,8 @@ pub(crate) fn compile_server<'arena>(
     );
     let import_program = tsv_ts::ast::internal::Program {
         body: import_body,
-        comments: Vec::new(),
+        comments: &[],
         span: Span::new(0, env.b.buffer.len() as u32),
-        interner: std::rc::Rc::clone(&root.interner),
         goal: tsv_ts::Goal::Module,
     };
 
@@ -1194,9 +1193,8 @@ pub(crate) fn compile_server<'arena>(
         }
         tsv_ts::ast::internal::Program {
             body: hoisted_body.into_bump_slice(),
-            comments: Vec::new(),
+            comments: &[],
             span: Span::new(0, env.b.buffer.len() as u32),
-            interner: std::rc::Rc::clone(&root.interner),
             goal: tsv_ts::Goal::Module,
         }
     });
@@ -1228,9 +1226,8 @@ pub(crate) fn compile_server<'arena>(
                 module_body,
                 &module_comments,
             )?,
-            comments: module_comments,
+            comments: arena.alloc_slice_copy(&module_comments),
             span: Span::new(0, env.b.buffer.len() as u32),
-            interner: std::rc::Rc::clone(&root.interner),
             goal: tsv_ts::Goal::Module,
         })
     };
@@ -1239,9 +1236,8 @@ pub(crate) fn compile_server<'arena>(
     export_body.push(Statement::ExportDefaultDeclaration(export));
     let export_program = tsv_ts::ast::internal::Program {
         body: export_body.into_bump_slice(),
-        comments: script_comments,
+        comments: arena.alloc_slice_copy(&script_comments),
         span: Span::new(0, env.b.buffer.len() as u32),
-        interner: std::rc::Rc::clone(&root.interner),
         goal: tsv_ts::Goal::Module,
     };
 

@@ -19,7 +19,7 @@
 use std::collections::HashMap;
 
 use bumpalo::collections::Vec as BumpVec;
-use tsv_lang::{InfallibleResolve, Span};
+use tsv_lang::Span;
 use tsv_svelte::ast::internal::{
     Attribute, AttributeNode, AttributeValue, Element, ElementKind, Fragment, FragmentNode,
     SpecialElement, SpecialElementKind,
@@ -84,10 +84,7 @@ pub(crate) fn component_is_standalone_eligible(
     if element.kind != ElementKind::Component {
         return false;
     }
-    let name = {
-        let interner = env.b.interner.borrow();
-        interner.resolve_infallible(element.name).to_string()
-    };
+    let name = element.name(env.source).to_string();
     if component_dynamic(env, &name) {
         return false;
     }
@@ -95,8 +92,7 @@ pub(crate) fn component_is_standalone_eligible(
         let AttributeNode::Attribute(attr) = attr_node else {
             return false;
         };
-        let interner = env.b.interner.borrow();
-        interner.resolve_infallible(attr.name).starts_with("--")
+        attr.name(env.source).starts_with("--")
     })
 }
 
@@ -236,8 +232,7 @@ fn special_element_slot_attribute(env: &EmitEnv<'_, '_>, se: &SpecialElement<'_>
         let AttributeNode::Attribute(attr) = attr_node else {
             return false;
         };
-        let interner = env.b.interner.borrow();
-        interner.resolve_infallible(attr.name) == "slot"
+        attr.name(env.source) == "slot"
     })
 }
 
@@ -248,8 +243,7 @@ fn component_has_named_attribute(env: &EmitEnv<'_, '_>, element: &Element<'_>, n
         let AttributeNode::Attribute(attr) = attr_node else {
             return false;
         };
-        let interner = env.b.interner.borrow();
-        interner.resolve_infallible(attr.name) == name
+        attr.name(env.source) == name
     })
 }
 
@@ -353,10 +347,7 @@ fn build_component_props<'arena>(
     for attr_node in element.attributes {
         match attr_node {
             AttributeNode::Attribute(attr) => {
-                let attr_name = {
-                    let interner = env.b.interner.borrow();
-                    interner.resolve_infallible(attr.name).to_string()
-                };
+                let attr_name = attr.name(env.source).to_string();
                 // A `--custom-property` attribute takes the oracle's `$.css_props`
                 // path — a later slice.
                 if attr_name.starts_with("--") {
@@ -581,10 +572,7 @@ fn build_component_property<'arena>(
     env: &mut EmitEnv<'arena, '_>,
     attr: &'arena Attribute<'arena>,
 ) -> Result<Property<'arena>, CompileError> {
-    let name = {
-        let interner = env.b.interner.borrow();
-        interner.resolve_infallible(attr.name).to_string()
-    };
+    let name = attr.name(env.source).to_string();
     let key_is_ident = is_js_identifier(&name);
     let key = if key_is_ident {
         Expression::Identifier(env.b.ident(&name))

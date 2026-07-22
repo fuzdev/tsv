@@ -265,7 +265,7 @@ fn collect<'arena>(
         && module.content.body.iter().any(|stmt| match stmt {
             Statement::ExportDefaultDeclaration(_) => true,
             Statement::ExportNamedDeclaration(export) => {
-                crate::validate::export_named_has_default_specifier(export, source, &root.interner)
+                crate::validate::export_named_has_default_specifier(export, source)
             }
             _ => false,
         })
@@ -411,7 +411,7 @@ fn collect<'arena>(
     // Instance-script phase: exports, invalid imports, and the per-statement rune
     // rewrite/guard (reused verbatim), collected across statements. A scratch
     // builder absorbs the rewrite's appendix minting; its output is discarded.
-    let mut b = Builder::new(arena, source, std::rc::Rc::clone(&root.interner));
+    let mut b = Builder::new(arena, source);
     let mut updated = NameSet::default();
     let mut nested_declared = NameSet::default();
     let mut uses_props = false;
@@ -433,7 +433,7 @@ fn collect<'arena>(
             continue;
         }
         if let Statement::ImportDeclaration(import) = stmt {
-            if let Err(err) = refuse_runes_invalid_import(import, source, &root.interner) {
+            if let Err(err) = refuse_runes_invalid_import(import, source) {
                 push_unsupported(found, err);
             }
             continue;

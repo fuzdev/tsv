@@ -35,7 +35,6 @@
 //! `FragmentNode` variant fails compilation here instead of silently slipping
 //! past the analysis.
 
-use tsv_lang::SharedInterner;
 use tsv_svelte::ast::internal::{
     AttributeNode, AwaitBlock, ConstTag, EachBlock, Element, Fragment, FragmentNode, HtmlTag,
     IfBlock, KeyBlock, RenderTag, Root, SnippetBlock, SpecialElement, SpecialElementKind,
@@ -60,10 +59,6 @@ use crate::{CompileError, Refusal};
 #[allow(clippy::struct_excessive_bools)] // independent monotonic accumulator flags, not a state machine
 struct Nc<'a> {
     source: &'a str,
-    /// The parse's interner — to decode an escaped identifier's name where an
-    /// oracle rule reads the DECODED `node.name`: the `invalid_arguments_usage`
-    /// reference and the `props_illegal_name` reference-site property.
-    interner: &'a SharedInterner,
     /// Prop + import names — the roots whose member/call access is unsafe.
     context_roots: &'a NameSet,
     /// The instance script's `$props()` **rest_prop** binding names — the roots
@@ -254,9 +249,6 @@ pub(crate) fn analyze_component(
 
     let mut nc = Nc {
         source,
-        // `root` is already a parameter, so the interner is available without a new
-        // `analyze_component` argument.
-        interner: &root.interner,
         context_roots: &context_roots,
         rest_prop_names: &rest_prop_names,
         store_names,
@@ -936,7 +928,7 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
             // Literal, not an Identifier, so the `Expression::Identifier(prop)`
             // arm fails — matching the oracle, which also compiles it.
             //
-            // The property NAME is DECODED via the interner (`Identifier::name`),
+            // The property NAME is DECODED via `Identifier::name`,
             // so an escaped `$$` property (`rest.$$foo` written `$$foo`)
             // refuses too — the oracle reads the DECODED `node.name`. The object
             // ROOT stays span-identity (`plain_name`): `rest_prop_names` is a
@@ -947,9 +939,7 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
                 && let Some(obj_name) = plain_name(obj, nc.source)
                 && nc.rest_prop_names.contains(obj_name)
                 && let Expression::Identifier(prop) = member.property
-                && prop
-                    .name(nc.source, &nc.interner.borrow())
-                    .starts_with("$$")
+                && prop.name(nc.source).starts_with("$$")
             {
                 nc.refuse = Some(Refusal::PropsIllegalName);
             }
@@ -990,13 +980,11 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
             // object-key walks are `computed`-gated), so the `is_reference` guard is
             // satisfied by construction; the ancestor test is `nonarrow_fn_depth ==
             // 0` (arrows / snippet bodies / class field inits / static blocks do NOT
-            // suppress it). The name is DECODED via the interner, so an escaped
-            // `arguments` reference outside a non-arrow function refuses too —
-            // the oracle reads the DECODED `node.name`. Resolved late, first-wins;
-            // the cheap gates short-circuit before the interner borrow.
-            if nc.nonarrow_fn_depth == 0
-                && nc.refuse.is_none()
-                && id.name(nc.source, &nc.interner.borrow()) == "arguments"
+            // suppress it). The name is DECODED via `Identifier::name`, so an
+            // escaped `arguments` reference outside a non-arrow function refuses
+            // too — the oracle reads the DECODED `node.name`. Resolved late,
+            // first-wins; the cheap gates short-circuit before the decode.
+            if nc.nonarrow_fn_depth == 0 && nc.refuse.is_none() && id.name(nc.source) == "arguments"
             {
                 nc.refuse = Some(Refusal::InvalidArgumentsUsage);
             }
@@ -1004,13 +992,12 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
             // key on the DECODED identifier name — the oracle reads `node.name`,
             // so an escaped `$$slots` or a `$name` store reference counts exactly
             // as its plain spelling. The plain fast path stays a span slice; only
-            // an escaped identifier borrows the interner to decode (the `.to_string`
-            // releases the borrow before the flag write).
+            // an escaped identifier reads its decoded `&'arena str`.
             let decoded;
             let name = if let Some(name) = plain_name(id, nc.source) {
                 name
             } else {
-                decoded = id.name(nc.source, &nc.interner.borrow()).to_string();
+                decoded = id.name(nc.source).to_string();
                 &decoded
             };
             if name == "$$slots" {

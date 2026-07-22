@@ -316,7 +316,10 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a private identifier
-    pub(super) fn build_private_identifier_doc(&self, pid: &internal::PrivateIdentifier) -> DocId {
+    pub(super) fn build_private_identifier_doc(
+        &self,
+        pid: &internal::PrivateIdentifier<'_>,
+    ) -> DocId {
         let d = self.d();
         d.concat(&[
             d.text("#"),

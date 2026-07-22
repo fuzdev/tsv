@@ -26,6 +26,8 @@
 // 3. **Modularity**: Each module has single responsibility for future maintainability
 
 mod analysis;
+#[cfg(feature = "buffer_stats")]
+pub mod buffer_stats;
 mod calls;
 mod chain;
 mod class_common;
@@ -64,12 +66,9 @@ pub(crate) use types::unwrap_parenthesized;
 
 use crate::PrinterInputs;
 use crate::ast::internal;
-use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
-use std::rc::Rc;
+use std::cell::Cell;
 use tsv_lang::{
-    EmbedContext, OutputBuffer, SharedInterner, Span, SymbolResolver, SymbolToU32, TAB_WIDTH,
-    comments_to_emit_in_range,
+    EmbedContext, OutputBuffer, Span, TAB_WIDTH, comments_to_emit_in_range,
     doc::{
         self,
         arena::{DocArena, DocId},
@@ -113,8 +112,6 @@ pub struct Printer<'a> {
     pub(crate) embed: EmbedContext,
     /// Arena allocator for doc nodes (borrowed from caller or locally owned)
     pub(crate) arena: &'a DocArena,
-    /// Shared string interner for resolving symbols
-    interner: SharedInterner,
     /// Original source code (for extracting raw values, preserving escape sequences, etc.)
     pub(crate) source: &'a str,
     /// Comments from the program (for printing leading/trailing comments)
@@ -231,23 +228,27 @@ pub struct Printer<'a> {
     /// `needs_parens` check (assignment RHS, ternary branches/test).
     /// Uses Cell for interior mutability so doc builders (&self) can set this.
     pub(crate) in_for_init: Cell<bool>,
-    /// Scoped argument-doc share map for member-chain building: an argument
-    /// expression's pointer → its already-built [`Self::build_arg_expression_doc`]
-    /// `DocId`. A member chain renders the same group **flat** (`print_group`) and
-    /// **expanded** (`print_group_expanded`) across `conditional_group` candidates;
-    /// without sharing, the recursive arg build runs once per candidate and a nested
-    /// chain in a call arg compounds to O(4^depth) — the member-chain rebuild blowup.
-    /// The flat and expanded builds differ in
-    /// Printer state **only** via `skip_arrow_chain` / `expand_last_arg_flat_params`
-    /// (the sole `.set` sites in `calls/chain_args.rs`); every other flag is
-    /// statement-constant during a chain or set identically by the shared AST
-    /// traversal, so a given node is reached under identical state in both candidates.
-    /// Hence the cache is consulted only when [`Self::chain_arg_share_eligible`]
-    /// (active + both of those flags clear), making a hit byte-identical to a rebuild.
-    /// Active only between `enter_chain_arg_share`/`exit_chain_arg_share` (the outermost
-    /// `build_chain_doc`); keyed by node pointer (stable — the AST arena is immutable
-    /// during formatting).
-    pub(crate) chain_arg_share: RefCell<HashMap<usize, DocId>>,
+    /// Whether the scoped argument-doc share map for member-chain building is
+    /// active: an argument expression's pointer → its already-built
+    /// [`Self::build_arg_expression_doc`] `DocId`. A member chain renders the same
+    /// group **flat** (`print_group`) and **expanded** (`print_group_expanded`)
+    /// across `conditional_group` candidates; without sharing, the recursive arg
+    /// build runs once per candidate and a nested chain in a call arg compounds to
+    /// O(4^depth) — the member-chain rebuild blowup. The flat and expanded builds
+    /// differ in Printer state **only** via `skip_arrow_chain` /
+    /// `expand_last_arg_flat_params` (the sole `.set` sites in
+    /// `calls/chain_args.rs`); every other flag is statement-constant during a
+    /// chain or set identically by the shared AST traversal, so a given node is
+    /// reached under identical state in both candidates. Hence the cache is
+    /// consulted only when [`Self::chain_arg_share_eligible`] (active + both of
+    /// those flags clear), making a hit byte-identical to a rebuild. Active only
+    /// between `enter_chain_arg_share`/`exit_chain_arg_share` (the outermost
+    /// `build_chain_doc`); keyed by node pointer (stable — the AST arena is
+    /// immutable during formatting). The map's *storage* is the doc arena's
+    /// parked [`DocArena::share_map_scratch`] (cleared at both enter and exit, so
+    /// between chains — and across printers sharing one arena — it is logically
+    /// empty and only its table capacity persists, killing the per-printer
+    /// `HashMap` resize chain).
     pub(crate) chain_arg_share_active: Cell<bool>,
     /// Expand-last-arg body reuse: `(body-expr span start, pre-built body DocId)`.
     /// The call/new expand-last paths build an arrow's call body **once** up front
@@ -266,7 +267,7 @@ pub struct Printer<'a> {
     /// Whether the member chain currently being built has any comment anywhere in its
     /// span. Set once per `build_chain_doc` (save/restore, so a nested chain in a call
     /// arg / base restores the parent's value on exit — re-entrancy-safe like
-    /// [`Self::chain_arg_share`]). The chain print path reads it to skip per-member
+    /// [`Self::chain_arg_share_active`]). The chain print path reads it to skip per-member
     /// comment classification when the whole chain is comment-free (the common case).
     /// Safe by construction: the flag only *enables* a skip whose soundness is
     /// span-containment (a member's comment gap ⊆ the chain span), so a stale value can
@@ -293,7 +294,6 @@ impl<'a> Printer<'a> {
             indent_level: 0,
             embed,
             arena,
-            interner: Rc::clone(&inputs.interner),
             source: inputs.source,
             comments: inputs.comments,
             has_owned_comments: inputs.has_owned_comments,
@@ -314,7 +314,6 @@ impl<'a> Printer<'a> {
             expr_stmt_paren_target: Cell::new(None),
             arrow_chain_context: Cell::new(ArrowChainContext::None),
             in_for_init: Cell::new(false),
-            chain_arg_share: RefCell::new(HashMap::new()),
             chain_arg_share_active: Cell::new(false),
             arrow_body_inject: Cell::new(None),
             chain_has_comments: Cell::new(true),
@@ -395,36 +394,24 @@ impl<'a> Printer<'a> {
         // file's renders (the whole program standalone; one per template
         // expression when Svelte-embedded) instead of an alloc/free per call.
         let mut output = self.arena.take_render_scratch();
-        {
-            let interner = self.interner.borrow();
-            // Source-aware resolver so `DocText::SourceSpan` nodes (verbatim
-            // comment/literal slices) resolve without a `DocArena` lifetime.
-            let resolver = doc::SourceTextResolver {
-                inner: &*interner,
-                source: self.source,
-            };
-            doc::arena_print_doc_with_indent_resolved_into(
-                self.arena,
-                d,
-                &self.embed,
-                current_col,
-                self.indent_level,
-                &resolver,
-                &mut output,
-            );
-        }
+        // Pass the document source so `DocText::SourceSpan` nodes (verbatim
+        // comment/literal slices) resolve at render without a `DocArena` lifetime.
+        doc::arena_print_doc_with_indent_resolved_into(
+            self.arena,
+            d,
+            &self.embed,
+            current_col,
+            self.indent_level,
+            self.source,
+            &mut output,
+        );
         self.write(&output);
         self.arena.park_render_scratch(output);
     }
 
     /// Render an arena DocId to a flat string with effectively infinite width.
     pub(crate) fn render_arena_doc_flat(&self, d: DocId) -> String {
-        let interner = self.interner.borrow();
-        let resolver = doc::SourceTextResolver {
-            inner: &*interner,
-            source: self.source,
-        };
-        doc::arena_measure_doc_flat_resolved(self.arena, d, &self.embed, &resolver)
+        doc::arena_measure_doc_flat_resolved(self.arena, d, &self.embed, self.source)
     }
 
     /// Get the formatted output
@@ -547,10 +534,10 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Whether `build_arg_expression_doc` may share its result via `chain_arg_share`.
+    /// Whether `build_arg_expression_doc` may share its result via the chain-arg share map.
     /// True only while a member chain is building (`chain_arg_share_active`) AND the two
     /// flags that make the flat vs expanded chain-group builds diverge are clear — see
-    /// the `chain_arg_share` field doc. When either is set we're building an arrow arg in
+    /// the `chain_arg_share_active` field doc. When either is set we're building an arrow arg in
     /// the expand-last / curried path, which the expanded candidate builds under different
     /// state, so it must not share.
     pub(crate) fn chain_arg_share_eligible(&self) -> bool {
@@ -559,24 +546,24 @@ impl<'a> Printer<'a> {
             && !self.expand_last_arg_flat_params.get()
     }
 
-    /// Activate `chain_arg_share` for the outermost `build_chain_doc` only. Returns the
+    /// Activate the chain-arg share map for the outermost `build_chain_doc` only. Returns the
     /// prior active state; nested chains observe `true` and become no-ops (the map
     /// persists across the whole top-level chain so every nesting level shares).
     pub(crate) fn enter_chain_arg_share(&self) -> bool {
         let was_active = self.chain_arg_share_active.get();
         if !was_active {
             self.chain_arg_share_active.set(true);
-            self.chain_arg_share.borrow_mut().clear();
+            self.arena.share_map_scratch().borrow_mut().clear();
         }
         was_active
     }
 
-    /// Deactivate + clear `chain_arg_share` when leaving the outermost `build_chain_doc`
+    /// Deactivate + clear the chain-arg share map when leaving the outermost `build_chain_doc`
     /// (`was_active` false). Nested exits are no-ops.
     pub(crate) fn exit_chain_arg_share(&self, was_active: bool) {
         if !was_active {
             self.chain_arg_share_active.set(false);
-            self.chain_arg_share.borrow_mut().clear();
+            self.arena.share_map_scratch().borrow_mut().clear();
         }
     }
 
@@ -1263,17 +1250,16 @@ impl<'a> Printer<'a> {
     /// Emit an identifier-name doc node — the doc-side name-emission seam.
     /// Span-identity names render as verbatim source (`DocText::SourceSpan`
     /// with deferred width — identifier names are newline-free, and the lazy
-    /// measure matches `Symbol`'s zero build-time cost); escaped names defer
-    /// to the interner (`DocText::Symbol`), resolved at render exactly as
-    /// before.
+    /// measure matches the zero build-time cost); the rare escaped name copies
+    /// its decoded `&str` into the doc text pool (`DocText::Pooled`).
     pub(in crate::printer) fn ident_name_doc(
         &self,
-        name: internal::IdentName,
+        name: internal::IdentName<'_>,
         name_start: u32,
     ) -> DocId {
         let d = self.d();
         match name.escaped {
-            Some(sym) => d.symbol(sym.to_u32()),
+            Some(s) => d.text_pooled(s),
             None => d.source_span_ident(Span::new(name_start, name_start + name.raw_len as u32)),
         }
     }
@@ -1285,16 +1271,16 @@ impl<'a> Printer<'a> {
     }
 
     /// Run `f` over a name channel resolved at `name_start` — the compare/width
-    /// seam. Span-identity names borrow the source slice; escaped names resolve
-    /// the interned decoded form (so an escaped name still compares decoded).
+    /// seam. Span-identity names borrow the source slice; an escaped name compares its
+    /// arena string (so an escaped name still compares decoded).
     pub(in crate::printer) fn with_ident_name_at<R>(
         &self,
-        name: internal::IdentName,
+        name: internal::IdentName<'_>,
         name_start: u32,
         f: impl FnOnce(&str) -> R,
     ) -> R {
         match name.escaped {
-            Some(sym) => self.with_resolved_symbol(sym, f),
+            Some(s) => f(s),
             None => {
                 f(&self.source[name_start as usize..name_start as usize + name.raw_len as usize])
             }
@@ -1308,12 +1294,5 @@ impl<'a> Printer<'a> {
         f: impl FnOnce(&str) -> R,
     ) -> R {
         self.with_ident_name_at(id.ident_name(), id.span.start, f)
-    }
-}
-
-// Implement SymbolResolver trait for shared symbol resolution utilities
-impl<'a> SymbolResolver for Printer<'a> {
-    fn interner(&self) -> &SharedInterner {
-        &self.interner
     }
 }

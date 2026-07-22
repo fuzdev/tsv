@@ -813,9 +813,9 @@ fn to_int32(n: f64) -> i32 {
 /// properties, defaults, rests, nested patterns).
 ///
 /// ⚠️ **Escaped binding identifiers are SKIPPED** — `const { a: \u0073tate } = x`
-/// binds `state`, but the name lives in the interner, not in the source slice,
-/// and this walk has no interner. A caller that must not MISS a binding pairs
-/// this with [`pattern_binds_unnameable_identifier`].
+/// binds `state`, but the name lives in the `escaped_name` channel, not in the
+/// source slice, and this walk reads only the raw slice. A caller that must not
+/// MISS a binding pairs this with [`pattern_binds_unnameable_identifier`].
 pub(crate) fn pattern_binding_names(
     pattern: &Expression<'_>,
     source: &str,

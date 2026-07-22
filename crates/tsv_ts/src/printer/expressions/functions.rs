@@ -756,7 +756,7 @@ impl<'a> Printer<'a> {
         d.group(d.concat(&[
             heads,
             d.text(" =>"),
-            d.indent_if_break(body_part, GroupId::ArrowChain, false),
+            d.indent_if_break(body_part, GroupId::ArrowChain),
         ]))
     }
 

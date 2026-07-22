@@ -203,16 +203,12 @@ impl<'a> Printer<'a> {
     /// # Arguments
     /// * `start` - Start position (e.g., end of previous chain element)
     /// * `end` - End position (e.g., start of next chain element)
-    /// * `same_line` - If true, returns comments on same line as start; if false, returns comments on their own lines
-    pub(crate) fn filter_block_comments(
-        &self,
-        start: u32,
-        end: u32,
-        same_line: bool,
-    ) -> CommentVec<'_> {
+    ///
+    /// Returns the block comments on the same source line as `start`.
+    pub(crate) fn filter_block_comments(&self, start: u32, end: u32) -> CommentVec<'_> {
         comments_to_emit_in_range(self.comments, start, end)
             .filter(|c| c.is_block)
-            .filter(|c| same_line == self.is_same_line(start, c.span.start))
+            .filter(|c| self.is_same_line(start, c.span.start))
             .collect()
     }
 
@@ -329,21 +325,22 @@ impl<'a> Printer<'a> {
     ///
     /// Used by: class body members, interface/enum members, block statement bodies,
     /// type literals, expanded object patterns. The orphaned-comment sibling is
-    /// [`Self::build_orphaned_comment_run`].
-    pub(crate) fn build_leading_comments_before(
+    /// [`Self::push_orphaned_comment_run`]. Pushes into the caller's buffer
+    /// (usually pooled) rather than returning a fresh `DocBuf` — a long run
+    /// would spill the intermediate on every call just to be `extend`ed away.
+    pub(crate) fn push_leading_comments_before(
         &self,
+        parts: &mut DocBuf,
         comments: &[&internal::Comment],
         target_start: u32,
-    ) -> DocBuf {
-        let mut parts = DocBuf::new();
+    ) {
         self.push_leading_comment_run(
-            &mut parts,
+            parts,
             comments.iter().copied(),
             target_start,
             LeadingGlue::Adjacent,
             self.d().empty(),
         );
-        parts
     }
 
     /// Build the run for comments **orphaned by a dropped statement** — a bare `;`
@@ -360,19 +357,19 @@ impl<'a> Printer<'a> {
     /// leading run — so it routes through the shared emitter unchanged, and only the
     /// last comment is special-cased here.
     ///
-    /// A sibling of [`Self::build_leading_comments_before`] rather than a flag on it:
+    /// A sibling of [`Self::push_leading_comments_before`] rather than a flag on it:
     /// what differs is not a separator policy but whether the run has a target at all.
-    pub(crate) fn build_orphaned_comment_run(
+    pub(crate) fn push_orphaned_comment_run(
         &self,
+        parts: &mut DocBuf,
         comments: &[&internal::Comment],
         gap_end: u32,
-    ) -> DocBuf {
-        let mut parts = DocBuf::new();
+    ) {
         let Some((last, leading)) = comments.split_last() else {
-            return parts;
+            return;
         };
         self.push_leading_comment_run(
-            &mut parts,
+            parts,
             leading.iter().copied(),
             last.span.start,
             LeadingGlue::Adjacent,
@@ -382,7 +379,6 @@ impl<'a> Printer<'a> {
         if self.has_blank_line_between(last.span.end, gap_end) {
             parts.push(self.d().literalline());
         }
-        parts
     }
 
     /// Build docs for trailing comments at the end of a body (before closing `}`).
@@ -671,28 +667,17 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for an empty `{}` body whose only content is a dangling
-    /// comment, keeping a fitting block comment inline (`{/* c */}`).
+    /// comment, keeping a fitting block comment inline with bracket spacing
+    /// (`{ /* c */ }`).
     ///
-    /// No bracket spacing — used by object literals/patterns and enum bodies,
-    /// which prettier prints as `{/* c */}` (no surrounding spaces). See
+    /// tsv applies bracket spacing uniformly: object literals, destructuring
+    /// patterns, enum bodies, and type literals all print a comment-only empty
+    /// body as `{ /* c */ }`. Prettier tightens every one of these to
+    /// `{/* c */}`, so this is a divergence — see conformance_prettier.md
+    /// §Empty-object comment bracket spacing. A truly empty `{}` (no comment)
+    /// has no content to space and stays tight in both. See
     /// [`Self::build_empty_inline_with_comments_doc`].
     pub(crate) fn build_empty_braces_inline_with_comments_doc(&self, body_span: Span) -> DocId {
-        let d = self.d();
-        let sep = d.softline();
-        self.build_empty_inline_with_comments_doc(body_span.start, body_span.end, "{}", sep)
-    }
-
-    /// Build a Doc for an empty type-literal `{}` body whose only content is a
-    /// dangling comment, keeping a fitting block comment inline with bracket
-    /// spacing (`{ /* c */ }`).
-    ///
-    /// Type literals carry bracket spacing even in the empty-dangling case
-    /// (prettier prints `type B = { /* c */ }` with surrounding spaces),
-    /// unlike object literals. See [`Self::build_empty_inline_with_comments_doc`].
-    pub(crate) fn build_empty_type_literal_inline_with_comments_doc(
-        &self,
-        body_span: Span,
-    ) -> DocId {
         let d = self.d();
         let sep = d.line();
         self.build_empty_inline_with_comments_doc(body_span.start, body_span.end, "{}", sep)

@@ -20,7 +20,6 @@
 //! See [`crate::transform_server`] for the orchestration.
 
 use bumpalo::collections::Vec as BumpVec;
-use tsv_lang::InfallibleResolve;
 use tsv_svelte::ast::internal::{Attribute, AttributeNode, AttributeValue, BindDirective, Element};
 use tsv_ts::ast::internal::{BinaryOperator, Expression, Property};
 
@@ -105,10 +104,7 @@ fn classify_input_type(env: &EmitEnv<'_, '_>, element: &Element<'_>) -> InputTyp
         let AttributeNode::Attribute(attr) = attr_node else {
             continue;
         };
-        let is_type = {
-            let interner = env.b.interner.borrow();
-            interner.resolve_infallible(attr.name) == "type"
-        };
+        let is_type = attr.name(env.source) == "type";
         if !is_type {
             continue;
         }
@@ -321,8 +317,7 @@ fn find_value_attribute<'arena>(
         let AttributeNode::Attribute(attr) = attr_node else {
             return None;
         };
-        let interner = env.b.interner.borrow();
-        (interner.resolve_infallible(attr.name) == "value").then_some(attr)
+        (attr.name(env.source) == "value").then_some(attr)
     })
 }
 

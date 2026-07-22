@@ -10,15 +10,15 @@ use super::arena_fits::{arena_fits_multi, arena_fits_with_lookahead};
 use super::arena_render::{
     RenderCtx, line_start_column, render_single_doc, trim_trailing_whitespace, write_indentation,
 };
-use super::types::{DocContext, Mode, TextResolver};
+use super::types::{DocContext, Mode};
 
 /// Render a fill doc using greedy line packing (iterative version).
 // Remaining args are the MUTABLE render state (`output`/`pos`/`should_remeasure`, plus the
 // work buffers). Deliberately not bundled: a struct would take their address and sink them out
 // of registers in the hot loop — see `RenderCtx`, which carries only the shared context.
 #[allow(clippy::too_many_arguments)]
-pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
-    ctx: &RenderCtx<'_, R>,
+pub(super) fn render_fill_iterative(
+    ctx: &RenderCtx<'_>,
     parts: &[DocId],
     output: &mut String,
     pos: &mut usize,
@@ -31,7 +31,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
         arena,
         render,
         embed,
-        resolver,
+        source,
     } = ctx;
     let mut offset = 0;
 
@@ -55,7 +55,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                 rest_commands,
                 remaining as isize,
                 embed,
-                resolver,
+                source,
             )
         } else {
             arena_fits_with_lookahead(
@@ -65,7 +65,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                 &[],
                 available as isize,
                 embed,
-                resolver,
+                source,
             )
         };
 
@@ -104,7 +104,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                 &with_sep,
                 budget as isize,
                 embed,
-                resolver,
+                source,
             )
         } else {
             content_fits
@@ -302,7 +302,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                     &rest_with_sep,
                     remaining as isize,
                     embed,
-                    resolver,
+                    source,
                 )
             } else {
                 content_fits
@@ -328,7 +328,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
             available,
             Mode::Flat,
             embed,
-            resolver,
+            source,
         );
 
         if both_fit {
@@ -382,7 +382,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                     &[],
                     remaining_at_start as isize,
                     embed,
-                    resolver,
+                    source,
                 );
 
                 if context.hug_wide_first && !content_fits_at_start {
@@ -527,7 +527,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                         &[],
                         render.print_width.saturating_sub(*pos + 1) as isize,
                         embed,
-                        resolver,
+                        source,
                     ) {
                     Mode::Flat
                 } else {

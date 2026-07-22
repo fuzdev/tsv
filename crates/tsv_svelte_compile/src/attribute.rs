@@ -20,7 +20,6 @@
 //! [`crate::attribute_bind`] for the `bind:` half.
 
 use bumpalo::collections::Vec as BumpVec;
-use tsv_lang::InfallibleResolve;
 use tsv_svelte::ast::internal::{Attribute, AttributeValue};
 use tsv_ts::ast::internal::{Expression, LiteralValue, Property};
 
@@ -118,12 +117,7 @@ pub(crate) fn emit_attribute<'arena>(
     // (those keys are lowercase by definition), while `emit_name` is what actually
     // reaches the output — case-preserved on an svg/mathml element (`viewBox`,
     // `preserveAspectRatio`, …).
-    let raw_name = env
-        .b
-        .interner
-        .borrow()
-        .resolve_infallible(attr.name)
-        .to_string();
+    let raw_name = attr.name(env.source).to_string();
     let name = raw_name.to_ascii_lowercase();
     let emit_name: &str = if element_is_foreign(element_name, namespace) {
         &raw_name
@@ -564,12 +558,7 @@ pub(crate) fn build_spread_object_property<'arena>(
     element_name: &str,
     inherited: Namespace,
 ) -> Result<Option<Property<'arena>>, CompileError> {
-    let raw_name = env
-        .b
-        .interner
-        .borrow()
-        .resolve_infallible(attr.name)
-        .to_string();
+    let raw_name = attr.name(env.source).to_string();
     // `defaultValue`/`defaultChecked` are properties, not attributes — the oracle
     // omits them from the object (case-sensitive raw-name test).
     if raw_name == "defaultValue" || raw_name == "defaultChecked" {

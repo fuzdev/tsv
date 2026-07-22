@@ -105,7 +105,7 @@ fn compile_refuses_escaped_reserved_bindings() {
     // identifier decodes to a reserved name the oracle rejects (it reads the
     // DECODED `node.name`), but the name-extraction helpers were span-identity and
     // bailed on `escaped_name`, so every guarded position over-accepted. Each rule
-    // now decodes via the interner (`Identifier::name`), matching the oracle.
+    // now decodes via `Identifier::name`, matching the oracle.
     //
     // `dollar_prefix_invalid` across all six binding positions — `$` = `$`.
     for (source, name) in [

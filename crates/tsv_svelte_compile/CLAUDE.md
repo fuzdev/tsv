@@ -6,7 +6,7 @@
 
 Depends on:
 
-- [`tsv_lang`](../tsv_lang/CLAUDE.md) — `ParseError`, `Span`, the shared interner
+- [`tsv_lang`](../tsv_lang/CLAUDE.md) — `ParseError`, `Span`, `Comment`
 - `tsv_svelte` — component parsing (`parse`) and the internal Svelte AST the transform walks
 - `tsv_ts` — the internal TS AST the generator constructs, plus `parse_with_goal` and the canonical reprint (`format_canonical`)
 - `tsv_css` — the parsed stylesheet the scoping analysis reads
@@ -256,8 +256,8 @@ project-wide conventions.
   the print buffer is the host `.svelte` source plus an appendix of minted
   lexemes. Borrowed user subtrees keep their real host spans; minted
   literal/template-quasi text lives in the appendix at the spans the nodes
-  claim; synthetic identifiers ride the interned-name channel
-  (`IdentName { escaped: Some(symbol), raw_len: 0 }`, source-free — `ident_at`
+  claim; synthetic identifiers ride the `IdentName` escape-hatch channel
+  (`IdentName { escaped: Some(arena.alloc_str(name)), raw_len: 0 }`, source-free — `ident_at`
   places one at a caller-chosen span, either fictional-low so header comment
   windows stay empty, or *stolen* from the node it replaces so authored gaps
   survive). Codegen owns zero precedence knowledge — the printer's

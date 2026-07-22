@@ -15,7 +15,6 @@
 //! where `inherited` is html). A `<svelte:element>`'s xmlns/ancestor namespace
 //! resolution is likewise approximated (its runtime tag is unknown).
 
-use tsv_lang::InfallibleResolve;
 use tsv_svelte::ast::internal::{
     AwaitBlock, Element, ElementKind, FragmentNode, IfBlock, SpecialElementKind,
 };
@@ -96,8 +95,7 @@ pub(crate) fn element_is_mathml(name: &str) -> bool {
 /// `(is_svg, is_mathml)` for a regular element in a fragment whose inherited
 /// namespace is `inherited` (the ancestor signal for the `<a>`/`<title>` rule).
 fn element_flags(env: &EmitEnv<'_, '_>, el: &Element<'_>, inherited: Namespace) -> (bool, bool) {
-    let interner = env.b.interner.borrow();
-    let name = interner.resolve_infallible(el.name);
+    let name = el.name(env.source);
     (element_is_svg(name, inherited), element_is_mathml(name))
 }
 

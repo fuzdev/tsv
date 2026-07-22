@@ -13,12 +13,16 @@ use smallvec::SmallVec;
 pub type ChainNodeVec<'a> = SmallVec<[ChainNode<'a>; 8]>;
 
 /// Stack-friendly buffer for the grouped chain — `group_chain_nodes` builds this
-/// once per chain. `ChainGroup` is ~112 bytes (it embeds an inline `ChainNodeVec`),
+/// once per chain. `ChainGroup` is ~112 bytes (it embeds an inline `ChainGroupNodesVec`),
 /// so the inline capacity stays small at `4`: most chains are 1–2 groups, but a
 /// 3–4-group chain (`a.b().c()` and friends) is common in real code — a two-call
 /// chain is already 3 groups — so `4` keeps the common shapes on the stack while
 /// the genuinely long chains, which break anyway, spill to the heap.
 pub type ChainGroupVec<'a> = SmallVec<[ChainGroup<'a>; 4]>;
+
+/// Stack-friendly buffer for one group's own nodes (the [`ChainGroup::nodes`]
+/// field) — groups are measured-short, so up to `4` entries stay inline.
+pub type ChainGroupNodesVec<'a> = SmallVec<[ChainNode<'a>; 4]>;
 
 /// Stack-friendly buffer of chain-node references — for the member-only and
 /// base-call flatten passes that collect `&ChainNode` before printing. `8` covers
@@ -54,7 +58,7 @@ pub enum ChainNode<'a> {
     /// `property_start` is where the property identifier starts (for comment
     /// detection; also the name's span start for span-identity resolution)
     Member {
-        property: IdentName,
+        property: IdentName<'a>,
         optional: bool,
         object_end: u32,
         property_start: u32,
@@ -63,7 +67,7 @@ pub enum ChainNode<'a> {
     /// `property_start` is the `#` (comment detection); `name_start` is the
     /// name token after it (span-identity resolution).
     PrivateMember {
-        property: IdentName,
+        property: IdentName<'a>,
         optional: bool,
         object_end: u32,
         property_start: u32,
@@ -136,7 +140,7 @@ impl<'a> ChainNode<'a> {
 
     /// Create a new member node
     pub fn member(
-        property: IdentName,
+        property: IdentName<'a>,
         optional: bool,
         object_end: u32,
         property_start: u32,
@@ -151,7 +155,7 @@ impl<'a> ChainNode<'a> {
 
     /// Create a new private member node: .#prop
     pub fn private_member(
-        property: IdentName,
+        property: IdentName<'a>,
         optional: bool,
         object_end: u32,
         property_start: u32,
@@ -236,7 +240,7 @@ impl<'a> ChainNode<'a> {
     }
 
     /// Get the property name channel (+ its span start) for Member nodes
-    pub const fn property(&self) -> Option<(IdentName, u32)> {
+    pub const fn property(&self) -> Option<(IdentName<'a>, u32)> {
         match self {
             Self::Member {
                 property,
@@ -259,11 +263,11 @@ impl<'a> ChainNode<'a> {
 
 /// A group of chain nodes that stay on the same line
 ///
-/// Groups are measured-short, so the nodes buffer holds up to 4 entries inline
-/// without heap allocation.
+/// Groups are measured-short, so the nodes buffer keeps the common shapes
+/// inline (see [`ChainGroupNodesVec`]).
 #[derive(Debug, Clone)]
 pub struct ChainGroup<'a> {
-    pub nodes: SmallVec<[ChainNode<'a>; 4]>,
+    pub nodes: ChainGroupNodesVec<'a>,
 }
 
 impl<'a> ChainGroup<'a> {

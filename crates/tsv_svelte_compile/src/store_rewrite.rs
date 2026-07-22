@@ -183,15 +183,14 @@ impl<'arena> StoreRewriter<'_, 'arena> {
     /// `bare_store_read`.
     ///
     /// The name is DECODED: a plain identifier is its span slice (the fast path —
-    /// the interner is never touched), while a unicode-escaped `$`-identifier
-    /// (`$count` written `$count`) resolves through the interner, so it is read
+    /// no arena string touched), while a unicode-escaped `$`-identifier
+    /// (`$count` written `$count`) reads its decoded `&'arena str`, so it is read
     /// as the store the oracle sees (the oracle decodes `node.name`).
     fn store_base(&self, id: &Identifier<'_>) -> Option<String> {
         if id.escaped_name.is_some() {
             // An escaped `$`-identifier decodes to a store name the oracle treats
-            // exactly as its plain spelling — resolve it via the interner.
-            let borrow = self.b.interner.borrow();
-            let name = id.name(self.source, &borrow);
+            // exactly as its plain spelling.
+            let name = id.name(self.source);
             let base = store_read_base(name)?;
             return self.store_names.contains(base).then(|| base.to_string());
         }

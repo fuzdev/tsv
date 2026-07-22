@@ -11,7 +11,6 @@
 //! exhaustive statement enumeration — so a new AST variant fails compilation
 //! rather than silently escaping the table.
 
-use tsv_lang::SharedInterner;
 use tsv_ts::ast::internal::{
     Expression, ImportDeclaration, ImportSpecifier, LiteralValue, ModuleExportName, Statement,
     VariableDeclarator,
@@ -85,15 +84,9 @@ pub(crate) fn analyze_module_script<'arena>(
             return Err(unsupported(Refusal::ModuleDefaultExport));
         }
         if let Statement::ImportDeclaration(import) = stmt {
-            refuse_runes_invalid_import(import, source, &root.interner)?;
+            refuse_runes_invalid_import(import, source)?;
         }
-        let mut ctx = WalkCtx::new(
-            source,
-            &mut updated,
-            &mut nested,
-            &derived,
-            std::rc::Rc::clone(&root.interner),
-        );
+        let mut ctx = WalkCtx::new(source, &mut updated, &mut nested, &derived);
         walk_statement_guarded(stmt, &mut ctx, 0)?;
     }
     Ok((body, regions))
@@ -101,8 +94,8 @@ pub(crate) fn analyze_module_script<'arena>(
 
 /// Mirror the oracle's runes-mode import rules (its analyze-phase
 /// `ImportDeclaration` visitor): a `$`-prefixed import LOCAL is refused via
-/// [`refuse_dollar_import_locals`], which DECODES an escaped local through the
-/// `interner` (so `import { $x } from …` written escaped refuses like plain `$x`),
+/// [`refuse_dollar_import_locals`], which DECODES an escaped local via
+/// `Identifier::name` (so `import { $x } from …` written escaped refuses like plain `$x`),
 /// any `svelte/internal*` source is forbidden (private runtime code), and
 /// `beforeUpdate`/`afterUpdate` cannot be imported from `svelte`. A string-literal
 /// imported name is skipped exactly as the oracle skips it (its check matches
@@ -112,13 +105,12 @@ pub(crate) fn analyze_module_script<'arena>(
 pub(crate) fn refuse_runes_invalid_import(
     import: &ImportDeclaration<'_>,
     source: &str,
-    interner: &SharedInterner,
 ) -> Result<(), CompileError> {
     // Checked here rather than in the guard walk because the transform hoists
     // imports out of the statement stream before `walk_statement` runs. The rule
     // — including the type-only-import caveat — lives at
     // `refuse_dollar_import_locals`.
-    refuse_dollar_import_locals(import.specifiers, source, interner)?;
+    refuse_dollar_import_locals(import.specifiers, source)?;
     let LiteralValue::String(cooked) = &import.source.value else {
         return Ok(());
     };

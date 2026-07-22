@@ -217,7 +217,7 @@ fn compile_refuses_static_block_separated_by_zwnbsp() {
 #[test]
 fn compile_refuses_rune_name_bound_by_escaped_identifier() {
     // An ESCAPED binding identifier binds the decoded name. `plain_identifier_name`
-    // reports `None` for one, so the walk resolves through the interner instead —
+    // reports `None` for one, so the walk decodes via `Identifier::name` instead —
     // the reference here is plain, so refusing the escaped *reference* elsewhere
     // does not cover this. Oracle (verified): `$.store_get(…, '$state', state)(1)`.
     assert_unsupported(

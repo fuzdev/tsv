@@ -12,7 +12,6 @@
 //! Both over-refuse on purpose; the direction matters, because a missed binding
 //! is a MISMATCH while an extra refusal is merely a gap.
 
-use tsv_lang::SharedInterner;
 use tsv_ts::ast::internal::{LiteralValue, Statement};
 
 use crate::analyze::{
@@ -132,7 +131,6 @@ pub(crate) fn refuse_rune_store_collision<'arena>(
     instance_body: &'arena [Statement<'arena>],
     module_body: &'arena [Statement<'arena>],
     source: &str,
-    interner: &SharedInterner,
 ) -> Result<(), CompileError> {
     let static_block = script_contains_static_block(instance_body, source)
         || script_contains_static_block(module_body, source);
@@ -149,8 +147,8 @@ pub(crate) fn refuse_rune_store_collision<'arena>(
         }
         // `instance.scope.get(stem)`: the instance scope's own declarations, then
         // its parent's — the module scope.
-        let Some(init) = stem_declaration(instance_body, stem, source, interner)
-            .or_else(|| stem_declaration(module_body, stem, source, interner))
+        let Some(init) = stem_declaration(instance_body, stem, source)
+            .or_else(|| stem_declaration(module_body, stem, source))
         else {
             continue;
         };
@@ -250,7 +248,6 @@ fn stem_declaration<'arena>(
     stmts: &'arena [Statement<'arena>],
     stem: &str,
     source: &str,
-    interner: &SharedInterner,
 ) -> Option<StemInit> {
     let mut found = None;
     let walk = each_script_declaration::<()>(stmts, VarScope::WithHoistedVars, &mut |decl| {
@@ -286,12 +283,12 @@ fn stem_declaration<'arena>(
                 });
             }
             ScriptDeclaration::Function(id) | ScriptDeclaration::Class(id) => {
-                if identifier_name(id, source, interner) == stem {
+                if identifier_name(id, source) == stem {
                     found = Some(StemInit::Plain);
                 }
             }
             ScriptDeclaration::Import { local, declaration } => {
-                if identifier_name(local, source, interner) == stem {
+                if identifier_name(local, source) == stem {
                     let from_store = matches!(
                         &declaration.source.value,
                         LiteralValue::String(s) if s.resolve(declaration.source.span, source) == "svelte/store"
@@ -316,12 +313,8 @@ fn stem_declaration<'arena>(
 /// Unlike [`crate::script_decls::plain_identifier_name`] this never returns
 /// `None`: a binding whose name this check cannot read is a binding it would
 /// MISS, and a missed binding is an under-refusal.
-fn identifier_name(
-    id: &tsv_ts::ast::internal::Identifier<'_>,
-    source: &str,
-    interner: &SharedInterner,
-) -> String {
-    id.name(source, &interner.borrow()).to_string()
+fn identifier_name(id: &tsv_ts::ast::internal::Identifier<'_>, source: &str) -> String {
+    id.name(source).to_string()
 }
 
 /// Whether `name` (a `$`-prefixed rune keyword) occurs in `source` as a whole

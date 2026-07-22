@@ -7,7 +7,7 @@
 //! See [`crate::transform_server`] for the orchestration that calls these in
 //! sequence, and [`crate::erase`] for the erasure these gate.
 
-use tsv_lang::{InfallibleResolve, Span};
+use tsv_lang::Span;
 use tsv_svelte::ast::internal::{AttributeNode, AttributeValue, Root};
 use tsv_ts::ast::internal::Statement;
 
@@ -75,10 +75,7 @@ pub(crate) fn document_ts_flag(root: &Root<'_>, source: &str) -> Result<bool, Co
             let AttributeNode::Attribute(attr) = attr_node else {
                 continue;
             };
-            let name = {
-                let interner = script.content.interner.borrow();
-                interner.resolve_infallible(attr.name).to_string()
-            };
+            let name = attr.name(source).to_string();
             match name.as_str() {
                 "lang" => {
                     // Only the first lang-bearing script decides; a later `lang`
@@ -169,10 +166,7 @@ pub(crate) fn refuse_invalid_script_attributes(
             let AttributeNode::Attribute(attr) = attr_node else {
                 continue;
             };
-            let name = {
-                let interner = script.content.interner.borrow();
-                interner.resolve_infallible(attr.name).to_string()
-            };
+            let name = attr.name(source).to_string();
             match name.as_str() {
                 // The oracle's FIRST check, fired before module/context and
                 // regardless of the attribute's value.

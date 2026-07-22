@@ -129,20 +129,21 @@ pub struct Lexer<'a> {
     /// the current token. Used for Automatic Semicolon Insertion (ASI).
     /// Reset at start of skip_whitespace(), set when line terminators are found.
     had_line_terminator: bool,
-    /// Out-of-band decoded value for the token just produced — `Some` only on the
+    /// Out-of-band decoded value for the token just produced — populated only on the
     /// rare escape path (strings/templates with escapes, escaped identifiers). Kept
-    /// off `Token` so the hot per-token value stays a 16-byte POD. Cleared at the top
-    /// of every token-producing entry point (`next_token`,
-    /// `continue_template_from_brace`, `read_regex_literal`) so it reflects only the
-    /// current token; the parser drains it with `take_decoded()` after each lex.
+    /// off `Token` so the hot per-token value stays a 16-byte POD.
     ///
-    /// `Box<String>` (8-byte thin pointer), not a bare `String` (24 bytes): this field
-    /// is cleared and `take`-n on *every* token, so its width is per-token memory
-    /// traffic on the hot pump — keeping it pointer-sized is what makes moving `decoded`
-    /// off `Token` a net win rather than a wash. The box only allocates on the rare
-    /// escape path.
-    #[allow(clippy::box_collection)]
-    decoded: Option<Box<String>>,
+    /// The decoded bytes live in `decode_scratch`, a buffer parked on the lexer and
+    /// **reused across the file** (cleared per escape, capacity retained), so no
+    /// per-literal `String` allocates — the escaped-string decode churn a fresh
+    /// `String` (plus its `Box`) produced per token is gone. `has_decoded` is the
+    /// presence flag `decoded_str` reads; it is cleared at the top of
+    /// every token-producing entry point (`next_token`, `continue_template_from_brace`,
+    /// `read_regex_literal`) so it reflects only the current token, and set by the
+    /// escape paths. The scratch is never read while `has_decoded` is false, so its
+    /// stale contents are inert.
+    decode_scratch: String,
+    has_decoded: bool,
 }
 
 /// Returns true if `c` is an ECMAScript **WhiteSpace** code point (ES spec
@@ -188,7 +189,8 @@ impl<'a> Lexer<'a> {
             position,
             template_depth: 0,
             had_line_terminator: false,
-            decoded: None,
+            decode_scratch: String::new(),
+            has_decoded: false,
         }
     }
 
@@ -219,15 +221,18 @@ impl<'a> Lexer<'a> {
         matches!(self.cur_char(), Some('\u{2028}' | '\u{2029}'))
     }
 
-    /// Take the decoded value produced for the most recently lexed token (escape
-    /// paths only); `None` for the common escape-free token. The parser calls this
-    /// right after each lex to populate its `current_decoded` slot.
-    // `Box<String>` mirrors the `decoded` field: pointer-sized so the per-token
-    // `take` stays cheap (see the field doc); the box is rare-path-only.
-    #[allow(clippy::box_collection)]
+    /// The decoded value produced for the most recently lexed token (escape paths
+    /// only); `None` for the common escape-free token. Borrows the parked
+    /// `decode_scratch` — valid until the next token is lexed (which may overwrite
+    /// it), so the parser copies it into its AST arena immediately after each lex
+    /// (`Parser::decoded_to_arena`) rather than holding the borrow.
     #[inline]
-    pub fn take_decoded(&mut self) -> Option<Box<String>> {
-        self.decoded.take()
+    pub fn decoded_str(&self) -> Option<&str> {
+        if self.has_decoded {
+            Some(&self.decode_scratch)
+        } else {
+            None
+        }
     }
 
     /// Returns true if a line terminator was encountered while skipping to the current token.
@@ -395,7 +400,16 @@ impl<'a> Lexer<'a> {
             TokenKind::Identifier
         };
 
-        self.decoded = decoded.map(Box::new);
+        // Escaped identifiers are near-zero in real code; funnel the rare local
+        // buffer into the parked scratch so `decoded_str` reads it uniformly.
+        match decoded {
+            Some(s) => {
+                self.decode_scratch.clear();
+                self.decode_scratch.push_str(&s);
+                self.has_decoded = true;
+            }
+            None => self.has_decoded = false,
+        }
         *dst = Token {
             kind,
             start: start as u32,
@@ -632,7 +646,7 @@ impl<'a> Lexer<'a> {
 
     /// Scan a single- or double-quoted string literal (cursor on the opening
     /// `quote` byte), writing the `String` token into `*dst` and the decoded value
-    /// out-of-band via `self.decoded` only when it contains escapes. Mirrors the
+    /// out-of-band via the parked `decode_scratch` only when it contains escapes. Mirrors the
     /// `_into` write-through of the other large scanners.
     ///
     /// The inner run skips everything that is neither the close quote nor a
@@ -668,15 +682,14 @@ impl<'a> Lexer<'a> {
 
                 let content = &self.source[content_start..content_end];
 
-                // Decode escape sequences if present
-                let decoded = if has_escapes {
-                    Some(escapes::decode_string_escapes(content).map_err(Box::new)?)
-                } else {
-                    // No escapes - use content as-is
-                    None
-                };
-
-                self.decoded = decoded.map(Box::new);
+                // Decode escape sequences into the parked scratch (no per-literal
+                // String/Box allocation); `has_decoded` was cleared at entry and is
+                // set only when this token actually carries escapes.
+                if has_escapes {
+                    escapes::decode_string_escapes_into(content, &mut self.decode_scratch)
+                        .map_err(Box::new)?;
+                    self.has_decoded = true;
+                }
                 *dst = Token {
                     kind: TokenKind::String,
                     start: start as u32,
@@ -755,9 +768,9 @@ impl<'a> Lexer<'a> {
     /// [`Lexer::next_token`] is the thin by-value wrapper kept for the
     /// peek/seek/bootstrap callers.
     pub fn next_token_into(&mut self, dst: &mut Token) -> Result<(), Box<ParseError>> {
-        // Clear any decoded value left from the previous token so `take_decoded`
+        // Clear the decoded-value flag from the previous token so `decoded_str`
         // reflects only the token produced by this call (set by the escape paths below).
-        self.decoded = None;
+        self.has_decoded = false;
         self.skip_whitespace();
 
         let start = self.position;
@@ -1135,23 +1148,6 @@ impl<'a> Lexer<'a> {
         Ok(tok)
     }
 
-    /// Decode a template segment's escape sequences for the token's cooked value.
-    ///
-    /// Unlike a string literal, an **invalid** escape is not a lex error here: per
-    /// the ES2018 template-literals revision it is allowed in a *tagged* template
-    /// (cooked `null`) and is a syntax error only in an untagged template / template
-    /// type. The lexer can't know which (the tag precedes the backtick), so it
-    /// defers: `.ok()` yields `None` on a bad escape, exactly like a no-escape
-    /// segment, and the parser (`template_cooked`) distinguishes the two by the
-    /// presence of a backslash and decides based on tagged-ness.
-    fn decode_template_segment(content: &str, has_escapes: bool) -> Option<String> {
-        if has_escapes {
-            escapes::decode_string_escapes(content).ok()
-        } else {
-            None
-        }
-    }
-
     /// Scan one template segment body over raw bytes, starting at `content_start`
     /// (just past the opening `` ` `` or `}`). Returns `(content_end, stop,
     /// has_escapes)`: `content_end` is the segment's content boundary and `stop`
@@ -1163,8 +1159,8 @@ impl<'a> Lexer<'a> {
     /// search the compiler auto-vectorizes. Byte-at-a-time is sound: all three are
     /// ASCII (`< 0x80`) and so never appear as a UTF-8 continuation byte. A `\`
     /// skips itself plus the next full char (a multibyte escaped char resumes the
-    /// scan on a char boundary); the escape is validated later in
-    /// `decode_template_segment`. Depth tracking (`${` push) stays with the caller.
+    /// scan on a char boundary); the escape is validated later when the segment is
+    /// decoded (`decode_string_escapes_into`). Depth tracking (`${` push) stays with the caller.
     fn scan_template_body(&mut self, content_start: usize) -> (usize, TemplateStop, bool) {
         let bytes = self.bytes;
         let len = bytes.len();
@@ -1241,7 +1237,14 @@ impl<'a> Lexer<'a> {
         };
 
         let content = &self.source[content_start..content_end];
-        self.decoded = Self::decode_template_segment(content, has_escapes).map(Box::new);
+        // Decode into the parked scratch. A bad escape (deferred for tagged
+        // templates) leaves `has_decoded` false — same as a no-escape segment; the
+        // parser distinguishes them by the presence of a backslash in `content`.
+        if has_escapes
+            && escapes::decode_string_escapes_into(content, &mut self.decode_scratch).is_ok()
+        {
+            self.has_decoded = true;
+        }
 
         *dst = Token {
             kind,
@@ -1269,8 +1272,8 @@ impl<'a> Lexer<'a> {
         slash_start: usize,
     ) -> Result<(Token, usize), Box<ParseError>> {
         // A regex token never carries a decoded value; clear any left from the
-        // previous token so the parser's `take_decoded()` after this lex sees `None`.
-        self.decoded = None;
+        // previous token so the parser's `decoded_str()` after this lex sees `None`.
+        self.has_decoded = false;
         // Sync to just after the opening /
         self.set_position(slash_start + 1);
 
@@ -1402,8 +1405,8 @@ impl<'a> Lexer<'a> {
         brace_end: usize,
     ) -> Result<Token, Box<ParseError>> {
         // Standalone token-producing entry point — clear the out-of-band decoded slot
-        // so `take_decoded()` reflects only the segment produced here (set below on escapes).
-        self.decoded = None;
+        // so `decoded_str()` reflects only the segment produced here (set below on escapes).
+        self.has_decoded = false;
         if self.template_depth == 0 {
             return Err(lex_err(
                 "continue_template called outside template context",
@@ -1432,7 +1435,14 @@ impl<'a> Lexer<'a> {
         };
 
         let content = &self.source[content_start..content_end];
-        self.decoded = Self::decode_template_segment(content, has_escapes).map(Box::new);
+        // Decode into the parked scratch. A bad escape (deferred for tagged
+        // templates) leaves `has_decoded` false — same as a no-escape segment; the
+        // parser distinguishes them by the presence of a backslash in `content`.
+        if has_escapes
+            && escapes::decode_string_escapes_into(content, &mut self.decode_scratch).is_ok()
+        {
+            self.has_decoded = true;
+        }
 
         Ok(Token {
             kind,

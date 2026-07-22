@@ -1,7 +1,5 @@
 // Svelte parser - main entry point for parsing .svelte files
 
-use std::rc::Rc;
-
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use crate::parser::element::ParsedElement;
@@ -48,7 +46,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let mut fragment_nodes = self.bvec();
         // Start gap tracking at lexer's initial position (accounts for BOM skip)
         let mut last_end = self.initial_position();
-        let mut root_start = None;
 
         // Parse the entire file linearly
         while !self.check(TokenKind::Eof) {
@@ -166,63 +163,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             nodes: fragment_nodes.into_bump_slice(),
         };
 
-        // Root span calculation: Skip leading/trailing whitespace-only text nodes
-        //
-        // Whitespace-only text at root level is formatting (blank lines, indentation), not content.
-        // root.span semantically covers meaningful content; full fidelity is in fragment.nodes.
-        // This matches Svelte's parser exactly and aligns with JS AST conventions.
-
-        // root.start: First fragment node (whitespace-only text → skip, content/element/comment → include)
-        if let Some(first_node) = fragment.nodes.first() {
-            root_start = Some(match first_node {
-                FragmentNode::Text(text) if text.data(self.source).trim().is_empty() => {
-                    // Whitespace-only: skip it (start after the whitespace)
-                    text.span.end_usize()
-                }
-                // Any node with content: include it
-                _ => first_node.span().start_usize(),
-            });
-        }
-
-        // root.end: Last fragment node (whitespace-only text → exclude, content/element/comment → include)
-        let end = if let Some(last_node) = fragment.nodes.last() {
-            match last_node {
-                FragmentNode::Text(text) if text.data(self.source).trim().is_empty() => {
-                    // Whitespace-only: exclude it (end before the whitespace)
-                    text.span.start
-                }
-                // Any node with content: include it
-                _ => last_node.span().end,
-            }
-        } else {
-            // No fragment nodes - use max of all top-level items
-            let mut max_end = 0;
-            if let Some(script) = &instance {
-                max_end = max_end.max(script.span.end);
-            }
-            if let Some(script) = &module {
-                max_end = max_end.max(script.span.end);
-            }
-            if let Some(style) = &css {
-                max_end = max_end.max(style.span.end);
-            }
-            max_end
-        };
-
-        // Use calculated root_start (from first fragment node), or 0 if no fragments
-        let start = root_start.unwrap_or(0) as u32;
-
         // Collect all comments from scripts and template expressions
         let mut comments = Vec::new();
         if let Some(script) = instance {
-            for ts_comment in &script.content.comments {
-                comments.push(ts_comment.clone());
-            }
+            comments.extend_from_slice(script.content.comments);
         }
         if let Some(script) = module {
-            for ts_comment in &script.content.comments {
-                comments.push(ts_comment.clone());
-            }
+            comments.extend_from_slice(script.content.comments);
         }
         // Add expression comments collected during template parsing
         // Currently extracted from: {@debug} tags (intentional divergence from prettier)
@@ -239,8 +186,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             css,
             options,
             comments,
-            span: Span { start, end },
-            interner: Rc::clone(&self.interner),
         })
     }
 

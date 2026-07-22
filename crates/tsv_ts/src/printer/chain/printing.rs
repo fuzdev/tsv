@@ -3,187 +3,12 @@
 // This module handles rendering chain nodes and groups to Docs:
 // - print_node: Basic node printing (with optional expansion flag)
 // - print_group: Group printing (with optional expansion and comment skipping)
-// - ChainPrinter trait: Interface for the printer
 
-use super::analysis::SymbolLookup;
 use super::types::{ChainGroup, ChainNode, is_numeric_index};
 use crate::ast::internal::{self, Expression};
-use crate::printer::{ParenContext, needs_parens};
-use tsv_lang::doc::{
-    DocBuf,
-    arena::{DocArena, DocId},
-};
+use crate::printer::{ParenContext, Printer, needs_parens};
+use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::printing::has_blank_line_between_strict;
-use tsv_lang::{ClassifiedComments, Comment, Span};
-
-//
-// Trait Definition
-//
-
-/// Trait for printing chain elements (abstraction over Printer)
-pub trait ChainPrinter: SymbolLookup {
-    /// Get a reference to the doc arena
-    fn arena(&self) -> &DocArena;
-
-    /// Emit an identifier-name doc node (span-identity source slice, or the
-    /// interner-deferred escaped form)
-    fn ident_doc(&self, name: internal::IdentName, name_start: u32) -> DocId;
-
-    /// Print an expression as a DocId
-    fn print_expression(&self, expr: &Expression<'_>) -> DocId;
-
-    /// Whether we're building a `for` header init clause — an `in` binary in a
-    /// computed member index (`for (x = arr[(a in b)]; …)`) needs parens there.
-    fn in_for_init(&self) -> bool;
-
-    /// Build inner doc for logical binary in parenthesized chain base
-    fn build_parenthesized_base_inner_logical(
-        &self,
-        binary: &internal::BinaryExpression<'_>,
-    ) -> DocId;
-
-    /// Build inner doc for arithmetic binary in parenthesized chain base
-    fn build_parenthesized_base_inner_binary(
-        &self,
-        binary: &internal::BinaryExpression<'_>,
-    ) -> DocId;
-
-    /// Print call arguments: () or (arg1, arg2)
-    fn print_call_args(&self, call: &internal::CallExpression<'_>, optional: bool) -> DocId;
-
-    /// Print call arguments with forced expansion (hardlines)
-    /// Used for the "args broken, chain inline" state in conditionalGroup
-    fn print_call_args_expanded(
-        &self,
-        call: &internal::CallExpression<'_>,
-        optional: bool,
-    ) -> DocId;
-
-    /// Print call arguments with standard forced expansion (hardlines, no arrow hugging)
-    /// Always uses `(\n  args,\n)`, never `(sig =>\n  body,\n)`
-    fn print_call_args_standard_expanded(
-        &self,
-        call: &internal::CallExpression<'_>,
-        optional: bool,
-    ) -> DocId;
-
-    /// Build a doc for block comments between two positions.
-    ///
-    /// When `same_line_only` is true, only includes comments on the same line as `start`.
-    /// When false, includes all block comments in range.
-    /// Note: Only block comments are included (line comments are filtered out).
-    fn build_block_comments_doc(
-        &self,
-        start: u32,
-        end: u32,
-        spacing: crate::printer::CommentSpacing,
-        same_line_only: bool,
-    ) -> DocId;
-
-    /// Build the break-path doc for a computed member's `[…]` when it carries a
-    /// **line** comment inside the brackets — before the index (`arr[// c⏎i]`) or
-    /// after it, before `]` (`arr[i // c⏎]`). Returns `None` when there is no such
-    /// line comment, so the caller falls through to the existing block-only
-    /// inline/group behavior.
-    ///
-    /// A line comment inside `arr[…]` is otherwise dropped (the block-only paths
-    /// skip it) — content loss. This breaks the bracket so each comment and the
-    /// index take their own line, preserving the comment in place (`open` is `[`
-    /// or `?.[`). Prettier relocates the comment before the whole expression
-    /// instead — a deliberate divergence (conformance_prettier.md §Comment relocation).
-    fn build_computed_member_line_comment_bracket(
-        &self,
-        open: &'static str,
-        inside_start: u32,
-        prop_start: u32,
-        prop_end: u32,
-        bracket_end: u32,
-        inner: DocId,
-    ) -> Option<DocId>;
-
-    /// Get the span for a given expression
-    fn get_property_span(&self, expr: &Expression<'_>) -> Span;
-
-    /// Check if the chain is the direct child of an ExpressionStatement
-    ///
-    /// Used to determine if short identifier names should be merged with their
-    /// first call (e.g., `a.fn().b()` → merge `a` with `.fn()` only in statements).
-    fn is_expression_statement(&self) -> bool;
-
-    /// Reset `is_expression_statement` to false.
-    ///
-    /// Called after `should_merge` captures the flag, so that sub-expressions
-    /// (call arguments, etc.) don't inherit the expression statement context.
-    /// Prettier checks `path.parent.type === "ExpressionStatement"` per-chain,
-    /// so only the outermost chain should see `true`.
-    fn clear_expression_statement(&self);
-
-    /// Activate the chain arg-doc share for the outermost chain build; returns the prior
-    /// active state to restore via [`Self::exit_chain_arg_share`]. See the `Printer`
-    /// `chain_arg_share` field doc.
-    fn enter_chain_arg_share(&self) -> bool;
-
-    /// Restore the chain arg-doc share state captured by [`Self::enter_chain_arg_share`].
-    fn exit_chain_arg_share(&self, was_active: bool);
-
-    /// Get the precomputed *layout* line-breaks table for O(log n) line boundary
-    /// lookups (blank lines between chain methods, callback multi-line-ness).
-    ///
-    /// Empty under the canonical reprint, which erases those reads. Not for comment
-    /// classification — see the `layout_line_breaks` field on `Printer`.
-    fn get_layout_line_breaks(&self) -> &[u32];
-
-    /// Check if there are any comments between two positions
-    fn has_comments_to_emit_between(&self, start: u32, end: u32) -> bool;
-
-    /// As `has_comments_to_emit_between`, but counts comments a node owns and prints itself.
-    /// The chain-level flag is a *structural* gate (it selects the doc shape, not who
-    /// emits), so an owned-comment-only chain must still take the commented path.
-    fn has_comments_on_page_between(&self, start: u32, end: u32) -> bool;
-
-    /// Whether the chain currently being built contains any comment anywhere in its
-    /// span. Set once per chain (save/restore) at [`build_chain_doc`] and read by the
-    /// print path to skip per-member comment classification on comment-free chains.
-    fn chain_has_comments(&self) -> bool;
-
-    /// Set the chain-comment flag, returning the prior value to restore. Called at the
-    /// top of each `build_chain_doc`; nested chains (call args / base) save/restore so
-    /// the flag always reflects the innermost chain being built.
-    fn set_chain_has_comments(&self, has_comments: bool) -> bool;
-
-    /// Restore the chain-comment flag to the parent chain's value on leaving a
-    /// `build_chain_doc`.
-    fn restore_chain_has_comments(&self, prev: bool);
-
-    /// Classify all comments in a range by position and type in a single pass.
-    ///
-    /// Returns comments organized into 4 buckets (trailing_block, trailing_line,
-    /// leading_block, leading_line) using a single binary search instead of 4
-    /// separate filter calls.
-    fn classify_comments(&self, start: u32, end: u32) -> ClassifiedComments<'_>;
-
-    /// Build doc for trailing block comments from a pre-classified slice.
-    /// Emits space before each comment: `method() /* c */`
-    fn build_trailing_block_doc(&self, comments: &[&Comment]) -> DocId;
-
-    /// Build doc for trailing line comments from a pre-classified slice.
-    /// Uses line_suffix to keep comments with preceding element.
-    fn build_trailing_line_doc(&self, comments: &[&Comment]) -> DocId;
-
-    /// Build doc for a pre-classified slice of leading comments, each on its
-    /// own line (hardline after each).
-    fn build_leading_comments_doc(&self, comments: &[&Comment]) -> DocId;
-
-    /// Build line_suffix docs for line comments WITHOUT a trailing boundary.
-    ///
-    /// Used for inline chain formatting where we want comments to defer to end
-    /// of line without being flushed immediately. Unlike `build_trailing_line_doc`,
-    /// this doesn't add a `line_suffix_boundary()` at the end.
-    fn build_line_comments_no_boundary(&self, comments: &[&Comment]) -> DocId;
-
-    /// Get the source code string
-    fn get_source(&self) -> &str;
-}
 
 //
 // Node Printing
@@ -197,9 +22,9 @@ pub trait ChainPrinter: SymbolLookup {
 /// - `expanded`: If true, use forced call expansion (hardlines)
 /// - `skip_comments`: If true, skip comments for member nodes (used when comments
 ///   are handled separately by add_comments_and_break)
-pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
+pub(crate) fn print_node_inner<'a>(
     node: &ChainNode<'a>,
-    printer: &P,
+    printer: &Printer<'_>,
     expanded: bool,
     skip_comments: bool,
 ) -> DocId {
@@ -211,7 +36,7 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
             paren_comment_end,
         } => {
             if *needs_parens {
-                let inner = printer.print_expression(expr);
+                let inner = printer.build_expression_doc(expr);
                 // Match Prettier: inner group handles indent-on-break,
                 // bare parens outside so chain conditionalGroup drives breaking
                 let inner_group = match expr {
@@ -263,9 +88,9 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
                         // the comment inside — the same shape as a unary line-comment
                         // operand (`!(\n\tx + y // c\n)`).
                         let leading_block =
-                            printer.build_leading_comments_doc(&classified.leading_block);
+                            printer.build_chain_leading_comments_doc(&classified.leading_block);
                         let leading_line =
-                            printer.build_leading_comments_doc(&classified.leading_line);
+                            printer.build_chain_leading_comments_doc(&classified.leading_line);
                         let trailing_block =
                             printer.build_trailing_block_doc(&classified.trailing_block);
                         let trailing_line =
@@ -285,7 +110,7 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
                         ]);
                     }
                     if printer.has_comments_to_emit_between(start, end) {
-                        let trailing = printer.build_block_comments_doc(
+                        let trailing = printer.build_chain_block_comments_doc(
                             start,
                             end,
                             crate::printer::CommentSpacing::Leading,
@@ -296,7 +121,7 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
                 }
                 d.parens(inner_group)
             } else {
-                printer.print_expression(expr)
+                printer.build_expression_doc(expr)
             }
         }
 
@@ -354,7 +179,7 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
             // …)`) — the brackets make the bare `in` reachable here, unlike a chain
             // base/callee whose parens are structurally mandatory. A sequence
             // self-parenthesizes via `build_sequence_doc`.
-            let raw_inner = printer.print_expression(expr);
+            let raw_inner = printer.build_expression_doc(expr);
             let inner = if needs_parens(
                 expr,
                 ParenContext::ComputedPropertyKey,
@@ -407,13 +232,13 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
                 // No same-line filter because when the input is already broken across
                 // lines, the comment may be on a different line from the bracket opening
                 // (e.g., `?.[` on one line, `/** @type {string} */ d` on the next).
-                let leading_comments_doc = printer.build_block_comments_doc(
+                let leading_comments_doc = printer.build_chain_block_comments_doc(
                     inside_start,
                     prop_span.start,
                     crate::printer::CommentSpacing::Trailing,
                     false,
                 );
-                let trailing_comments_doc = printer.build_block_comments_doc(
+                let trailing_comments_doc = printer.build_chain_block_comments_doc(
                     prop_span.end,
                     *bracket_end,
                     crate::printer::CommentSpacing::Leading,
@@ -463,19 +288,13 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
             // consecutive ones onto one line where the first `//` swallows the rest.
             if !pre_bracket.trailing_line.is_empty() || !pre_bracket.leading_line.is_empty() {
                 let mut parts = DocBuf::new();
-                push_gap_comments_and_break(
-                    &mut parts,
-                    printer,
-                    *object_end,
-                    bracket_open_pos,
-                    true,
-                );
+                push_gap_comments_and_break(&mut parts, printer, *object_end, bracket_open_pos);
                 parts.push(bracket_doc);
                 return d.concat(&parts);
             }
 
             // Block comments before the bracket (e.g., `a /* c */[0]`) stay inline.
-            let pre_bracket_block_doc = printer.build_block_comments_doc(
+            let pre_bracket_block_doc = printer.build_chain_block_comments_doc(
                 *object_end,
                 bracket_open_pos,
                 crate::printer::CommentSpacing::Leading,
@@ -490,7 +309,7 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
 }
 
 /// Print a single chain node (normal mode)
-pub(crate) fn print_node<'a, P: ChainPrinter>(node: &ChainNode<'a>, printer: &P) -> DocId {
+pub(crate) fn print_node<'a>(node: &ChainNode<'a>, printer: &Printer<'_>) -> DocId {
     print_node_inner(node, printer, false, false)
 }
 
@@ -499,15 +318,12 @@ pub(crate) fn print_node<'a, P: ChainPrinter>(node: &ChainNode<'a>, printer: &P)
 //
 
 /// Print a single chain group
-pub(crate) fn print_group<'a, P: ChainPrinter>(group: &ChainGroup<'a>, printer: &P) -> DocId {
+pub(crate) fn print_group<'a>(group: &ChainGroup<'a>, printer: &Printer<'_>) -> DocId {
     print_group_inner(group, printer, false, false)
 }
 
 /// Print a chain group with forced call expansion
-pub(crate) fn print_group_expanded<'a, P: ChainPrinter>(
-    group: &ChainGroup<'a>,
-    printer: &P,
-) -> DocId {
+pub(crate) fn print_group_expanded<'a>(group: &ChainGroup<'a>, printer: &Printer<'_>) -> DocId {
     print_group_inner(group, printer, true, false)
 }
 
@@ -516,9 +332,9 @@ pub(crate) fn print_group_expanded<'a, P: ChainPrinter>(
 /// Like `print_group_expanded`, but uses `(\n  args,\n)` instead of `(sig =>\n  body,\n)`
 /// for single-arg arrows with breakable bodies. Used in short chain states where the
 /// chain doesn't break between groups.
-pub(crate) fn print_group_standard_expanded<'a, P: ChainPrinter>(
+pub(crate) fn print_group_standard_expanded<'a>(
     group: &ChainGroup<'a>,
-    printer: &P,
+    printer: &Printer<'_>,
 ) -> DocId {
     let d = printer.arena();
     let docs: DocBuf = group
@@ -538,25 +354,25 @@ pub(crate) fn print_group_standard_expanded<'a, P: ChainPrinter>(
 ///
 /// Used by ChainPartsBuilder in expanded path where `add_comments_and_break`
 /// already handles comments for the first member (emitting before the line break).
-pub(crate) fn print_group_skip_first_comments<'a, P: ChainPrinter>(
+pub(crate) fn print_group_skip_first_comments<'a>(
     group: &ChainGroup<'a>,
-    printer: &P,
+    printer: &Printer<'_>,
 ) -> DocId {
     print_group_inner(group, printer, false, true)
 }
 
 /// Print a chain group with forced call expansion, skipping block comments for the first member
-pub(crate) fn print_group_expanded_skip_first_comments<'a, P: ChainPrinter>(
+pub(crate) fn print_group_expanded_skip_first_comments<'a>(
     group: &ChainGroup<'a>,
-    printer: &P,
+    printer: &Printer<'_>,
 ) -> DocId {
     print_group_inner(group, printer, true, true)
 }
 
 /// Internal implementation for printing a chain group
-fn print_group_inner<'a, P: ChainPrinter>(
+fn print_group_inner<'a>(
     group: &ChainGroup<'a>,
-    printer: &P,
+    printer: &Printer<'_>,
     expanded: bool,
     skip_first_comments: bool,
 ) -> DocId {
@@ -587,8 +403,8 @@ fn print_group_inner<'a, P: ChainPrinter>(
 /// `starts_segment` in the member-only builder. A non-breakable lookup (`breakable ==
 /// false`, the numeric-index carve-out) has no break point at all, and so overflows the
 /// print width rather than splitting.
-fn computed_lookup_doc<P: ChainPrinter>(
-    printer: &P,
+fn computed_lookup_doc(
+    printer: &Printer<'_>,
     open: &'static str,
     index: DocId,
     breakable: bool,
@@ -610,9 +426,9 @@ fn computed_lookup_doc<P: ChainPrinter>(
 /// The `skip_comments` flag is used by the expanded path where `add_comments_and_break`
 /// already handles comments for the first member of rest groups.
 #[allow(clippy::too_many_arguments)]
-fn print_member_access<P: ChainPrinter>(
-    printer: &P,
-    property: internal::IdentName,
+fn print_member_access(
+    printer: &Printer<'_>,
+    property: internal::IdentName<'_>,
     name_start: u32,
     optional: bool,
     object_end: u32,
@@ -621,8 +437,8 @@ fn print_member_access<P: ChainPrinter>(
     skip_comments: bool,
 ) -> DocId {
     let d = printer.arena();
-    // Build member doc without format! allocation — span-identity (or deferred
-    // interner resolution for escaped names)
+    // Build member doc without format! allocation — span-identity source slice
+    // (or the escaped name's arena string)
     let prop_doc = printer.ident_doc(property, name_start);
     let member_doc = match (optional, is_private) {
         (false, false) => d.concat(&[d.text("."), prop_doc]),
@@ -675,10 +491,7 @@ fn print_member_access<P: ChainPrinter>(
 /// Used by the chain builder to route chains with inside-bracket comments
 /// through the conditional_group path (instead of fill), so the bracket
 /// content can break internally.
-pub(crate) fn has_inside_bracket_comments<'a, P: ChainPrinter>(
-    node: &ChainNode<'a>,
-    printer: &P,
-) -> bool {
+pub(crate) fn has_inside_bracket_comments<'a>(node: &ChainNode<'a>, printer: &Printer<'_>) -> bool {
     if let ChainNode::ComputedMember {
         expr,
         optional,
@@ -700,7 +513,7 @@ pub(crate) fn has_inside_bracket_comments<'a, P: ChainPrinter>(
 /// skipping over comments to avoid matching `[` inside comments.
 ///
 /// For `?.[`, returns the position of `?` (the start of the optional chain syntax).
-fn find_bracket_position<P: ChainPrinter>(printer: &P, start: u32, end: u32) -> u32 {
+fn find_bracket_position(printer: &Printer<'_>, start: u32, end: u32) -> u32 {
     let source = printer.get_source();
     let bytes = source.as_bytes();
     let start_pos = start as usize;
@@ -748,24 +561,18 @@ fn find_bracket_position<P: ChainPrinter>(printer: &P, start: u32, end: u32) -> 
 // "same-line trails, later-line breaks, never merge" rule lives in one place. Only the
 // emission differs per shape — dot (here) / operator / comma — which is intentional
 // (this dot path also owns blank-line preservation around the leading run).
-pub(crate) fn push_gap_comments_and_break<P: ChainPrinter>(
+pub(crate) fn push_gap_comments_and_break(
     parts: &mut DocBuf,
-    printer: &P,
+    printer: &Printer<'_>,
     object_end: u32,
     property_start: u32,
-    use_hardline: bool,
 ) {
     // Chain-level zero-comment gate: a comment-free chain span has no comment in this
     // gap (gap ⊆ span), so the only non-empty part below is the line break — the
     // classification and its four empty comment pushes collapse to nothing. Emit just
     // the break. Byte-identical (empty comment slots render to nothing).
     if !printer.chain_has_comments() {
-        parts.push(build_chain_line_break(
-            printer,
-            object_end,
-            property_start,
-            use_hardline,
-        ));
+        parts.push(build_chain_line_break(printer, object_end, property_start));
         return;
     }
 
@@ -777,12 +584,7 @@ pub(crate) fn push_gap_comments_and_break<P: ChainPrinter>(
     // Trailing line comments (same line as previous element), via line_suffix
     parts.push(printer.build_trailing_line_doc(&classified.trailing_line));
     // Line break with blank line preservation
-    parts.push(build_chain_line_break(
-        printer,
-        object_end,
-        property_start,
-        use_hardline,
-    ));
+    parts.push(build_chain_line_break(printer, object_end, property_start));
 
     // When comments exist, build_chain_line_break skips blank line detection.
     // Check for blank lines before the first comment and after the last comment.
@@ -790,7 +592,7 @@ pub(crate) fn push_gap_comments_and_break<P: ChainPrinter>(
         !classified.leading_block.is_empty() || !classified.leading_line.is_empty();
 
     // Blank line before first leading comment
-    if use_hardline && has_leading_comments {
+    if has_leading_comments {
         let first_start = classified
             .leading_block
             .first()
@@ -806,12 +608,12 @@ pub(crate) fn push_gap_comments_and_break<P: ChainPrinter>(
     }
 
     // Leading block comments (on their own line)
-    parts.push(printer.build_leading_comments_doc(&classified.leading_block));
+    parts.push(printer.build_chain_leading_comments_doc(&classified.leading_block));
     // Leading line comments (on their own line)
-    parts.push(printer.build_leading_comments_doc(&classified.leading_line));
+    parts.push(printer.build_chain_leading_comments_doc(&classified.leading_line));
 
     // Blank line after last leading comment (before property)
-    if use_hardline && has_leading_comments {
+    if has_leading_comments {
         let last_end = classified
             .leading_line
             .last()
@@ -834,10 +636,7 @@ pub(crate) fn push_gap_comments_and_break<P: ChainPrinter>(
 /// boundary-less `line_suffix` copy would flush at the end of the line, merging consecutive
 /// comments into one). The `[` scan is skipped on a comment-free chain, where every gap
 /// query is empty regardless of the bound.
-pub(crate) fn node_comment_gap<P: ChainPrinter>(
-    node: &ChainNode<'_>,
-    printer: &P,
-) -> Option<(u32, u32)> {
+pub(crate) fn node_comment_gap(node: &ChainNode<'_>, printer: &Printer<'_>) -> Option<(u32, u32)> {
     let (object_end, property_start) = node.comment_range()?;
     if matches!(node, ChainNode::ComputedMember { .. }) && printer.chain_has_comments() {
         let bracket_open = find_bracket_position(printer, object_end, property_start);
@@ -847,29 +646,24 @@ pub(crate) fn node_comment_gap<P: ChainPrinter>(
 }
 
 /// The chain-level comment gap before a group's first node — see [`node_comment_gap`].
-pub(crate) fn group_comment_gap<P: ChainPrinter>(
+pub(crate) fn group_comment_gap(
     group: &ChainGroup<'_>,
-    printer: &P,
+    printer: &Printer<'_>,
 ) -> Option<(u32, u32)> {
     node_comment_gap(group.nodes.first()?, printer)
 }
 
-/// Build a line break doc with optional blank line preservation
+/// Build a line break doc with blank line preservation
 ///
 /// Returns:
-/// - `softline` when `use_hardline` is false
 /// - `hardline` when no blank line in source
 /// - `literalline + hardline` when blank line should be preserved
-pub(crate) fn build_chain_line_break<P: ChainPrinter>(
-    printer: &P,
+pub(crate) fn build_chain_line_break(
+    printer: &Printer<'_>,
     object_end: u32,
     property_start: u32,
-    use_hardline: bool,
 ) -> DocId {
     let d = printer.arena();
-    if !use_hardline {
-        return d.softline();
-    }
 
     // Check for blank line preservation (only when no comments - comments handle their own spacing)
     // When there are comments between obj and property, the 2+ newlines (one before comment,

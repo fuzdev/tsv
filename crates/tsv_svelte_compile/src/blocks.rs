@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 
 use bumpalo::collections::Vec as BumpVec;
-use tsv_lang::{InfallibleResolve, Span};
+use tsv_lang::Span;
 use tsv_svelte::ast::internal::{
     AttributeNode, AttributeValue, AwaitBlock, ConstTag, EachBlock, Element, Fragment,
     FragmentNode, IfBlock, KeyBlock, SnippetBlock, SpecialElement,
@@ -400,10 +400,7 @@ fn guard_boundary_attributes<'arena>(
             // A spread or any directive — `svelte_boundary_invalid_attribute`.
             return Err(unsupported(Refusal::BoundaryInvalidAttribute));
         };
-        let name = {
-            let interner = env.b.interner.borrow();
-            interner.resolve_infallible(attr.name).to_string()
-        };
+        let name = attr.name(env.source).to_string();
         let Some(valid) = BOUNDARY_VALID_ATTRIBUTES
             .into_iter()
             .find(|candidate| *candidate == name)

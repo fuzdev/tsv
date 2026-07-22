@@ -9,8 +9,9 @@
 use crate::ast::internal::{ArrowFunctionBody, Expression};
 use crate::printer::calls::arg_predicates::is_simple_call_argument;
 
-use super::super::printing::{ChainPrinter, node_comment_gap};
+use super::super::printing::node_comment_gap;
 use super::super::types::{ChainGroup, ChainNode};
+use crate::printer::Printer;
 use tsv_lang::printing::{self, has_blank_line_between_fast};
 
 /// Check if there are blank lines BETWEEN methods (not just before the first method)
@@ -21,9 +22,9 @@ use tsv_lang::printing::{self, has_blank_line_between_fast};
 ///
 /// Returns true only if there are blank lines after the first method (groups index >= 2),
 /// which is when we should force the expanded layout.
-pub(super) fn has_blank_lines_between_methods<'a, P: ChainPrinter>(
+pub(super) fn has_blank_lines_between_methods<'a>(
     groups: &[ChainGroup<'a>],
-    printer: &P,
+    printer: &Printer<'_>,
 ) -> bool {
     let line_breaks = printer.get_layout_line_breaks();
     // Skip groups[0] (base) and groups[1] (first method) - only check groups[2+]
@@ -43,9 +44,9 @@ pub(super) fn has_blank_lines_between_methods<'a, P: ChainPrinter>(
 /// in the chain). Those comments are handled inline via line_suffix in print_node.
 ///
 /// Returns true if comments exist that should force expansion.
-pub(super) fn has_comments_forcing_expansion<'a, P: ChainPrinter>(
+pub(super) fn has_comments_forcing_expansion<'a>(
     groups: &[ChainGroup<'a>],
-    printer: &P,
+    printer: &Printer<'_>,
 ) -> bool {
     for (group_idx, group) in groups.iter().enumerate() {
         let is_last_group = group_idx == groups.len() - 1;
@@ -79,10 +80,7 @@ pub(super) fn has_comments_forcing_expansion<'a, P: ChainPrinter>(
 /// comment — the one gap a chain builder never owns, since a computed member with a
 /// numeric-literal index is glued into the preceding call's group instead of starting
 /// one. `print_node_inner` emits a forced break for it, so the chain must expand.
-fn computed_pre_bracket_line_comment<'a, P: ChainPrinter>(
-    node: &ChainNode<'a>,
-    printer: &P,
-) -> bool {
+fn computed_pre_bracket_line_comment<'a>(node: &ChainNode<'a>, printer: &Printer<'_>) -> bool {
     if !matches!(node, ChainNode::ComputedMember { .. }) {
         return false;
     }

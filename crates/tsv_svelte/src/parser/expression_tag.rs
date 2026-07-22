@@ -1,7 +1,5 @@
 // Expression tag parsing
 
-use std::rc::Rc;
-
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
@@ -63,15 +61,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let expr_content = &self.source[expr_start..expr_end];
 
         // Parse expression using TypeScript parser (with comments)
-        let (expression, comments) = tsv_ts::parse_expression_with_comments(
-            expr_content,
-            expr_start,
-            Rc::clone(&self.interner),
-            self.arena,
-        )?;
+        let (expression, comments) =
+            tsv_ts::parse_expression_with_comments(expr_content, expr_start, self.arena)?;
 
         // Add expression comments to the parser's collection for later inclusion in Root.comments
-        self.expression_comments.extend(comments);
+        self.expression_comments.extend_from_slice(comments);
 
         // The span end is right after the closing brace
         let end = expr_end + 1;

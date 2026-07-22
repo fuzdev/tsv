@@ -529,7 +529,7 @@ tsv/
 - `printer/` - Code formatting (uses doc builder from tsv_lang)
 - `escapes/` - Language-specific escape handling (tsv_ts, tsv_css only; Svelte delegates to TS/CSS)
 
-`tsv_ts` and `tsv_css` also export embedding APIs for `tsv_svelte`: `parse_with_interner`, `parse_embedded`, expression formatting variants, `build_*_doc` functions.
+`tsv_ts` and `tsv_css` also export embedding APIs for `tsv_svelte`: `parse_embedded`, expression formatting variants, `build_*_doc` functions.
 
 ### Conformance
 
@@ -865,7 +865,7 @@ See ./docs/conformance_test262.md (command interface; §Differential for the tsv
 ```bash
 cargo run -p tsv_debug profile ~/dev/zzz/src/lib                    # parse vs format phase timing (--iterations, --json)
 cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib  # FFI parse path: parse vs the wire-JSON write (§2)
-cargo run -p tsv_debug buffer_sizes ~/dev/zzz/src ~/dev/gro/src     # printer SmallVec/MultilineText sizing histograms (§8)
+cargo run -p tsv_debug buffer_sizes ~/dev/zzz/src ~/dev/gro/src     # printer SmallVec sizing histograms (§8)
 cargo run -p tsv_debug arena_stats ~/dev/zzz/src/lib                # DocArena node-population + memory audit (§7; --reuse, --list-errors)
 cargo run --release -p tsv_debug -- compile_profile tests/fixtures_compile  # Svelte compile against the format wall (§9)
 ```
@@ -971,7 +971,7 @@ Worked example + full design: ./docs/architecture.md §Two-AST Design.
 ### Position Types: u32 vs usize
 
 - **Span**: `u32` for start/end (8 bytes total, 50% memory savings vs usize)
-- **`Token`**: `u32` for start/end — `Token` is a 16-byte `Copy`-free POD (`{kind, start: u32, end: u32}`) returned from `next_token` in registers; the decoded value (escapes only) lives out-of-band on the lexer (`Lexer::take_decoded`). A `const _: () = assert!(size_of::<Token>() == 16)` guards the size. See [docs/performance.md] and the lexer's byte cursor (`bytes: &[u8]` + `position: usize`).
+- **`Token`**: `u32` for start/end — `Token` is a 16-byte `Copy`-free POD (`{kind, start: u32, end: u32}`) returned from `next_token` in registers; the decoded value (escapes only) lives out-of-band on the lexer (a reused `Lexer::decode_scratch` buffer, borrowed via `decoded_str`). A `const _: () = assert!(size_of::<Token>() == 16)` guards the size. See [docs/performance.md] and the lexer's byte cursor (`bytes: &[u8]` + `position: usize`).
 - **Lexer/Parser positions**: `usize` (natural for `source[pos]` indexing); the lexer dispatches on raw bytes (`cur_byte`) and decodes a `char` only at non-ASCII branches.
 - **Conversions**: At boundaries only - `as u32` when creating Spans / `Token` fields, `as usize` when extracting
 - **Helpers**: Use `span.extract(source)` or `span.range()` instead of manual casts
@@ -1045,7 +1045,6 @@ cases; prettier, oxfmt and biome all get the JSDoc-cast paren binding wrong — 
 
 - `serde_json` — wire-JSON emission: the writer's exact string-escape / `f64` formatting, and reparsing bytes to a `Value` (CLI `--pretty`, tests). The language crates no longer depend on `serde` directly (only transitively, without its `derive`); `serde`'s derive is dev-tooling only (`tsv_debug` / `tsv_cli`)
 - `smallvec` — Stack-allocated vectors
-- `string-interner` — String interning for the residual symbol tenants (Svelte element/attribute names, escaped identifiers); identifier names are span-identity (`IdentName`)
 - `thiserror` — Error type derivation
 - `phf` — Compile-time perfect hash maps (keywords, entities)
 - `unicode-ident` — Unicode XID_Start/XID_Continue for identifiers

@@ -11,10 +11,11 @@
 //! - **Minted literals / template quasis** get spans pointing into the
 //!   appendix, which contains their exact text (appended monotonically, so
 //!   every span is in-bounds and on char boundaries).
-//! - **Synthetic identifiers** ride the interned-name channel
-//!   (`IdentName { escaped: Some(symbol), raw_len: 0 }`) — resolved through the
-//!   shared interner, source-free. Their spans are still backed by minted text
-//!   for debuggability (the appendix reads as the generated skeleton).
+//! - **Synthetic identifiers** ride the `IdentName` escape-hatch channel
+//!   (`IdentName { escaped: Some(arena.alloc_str(name)), raw_len: 0 }`) — the
+//!   name is an arena-allocated `&'arena str`, source-free. Their spans are still
+//!   backed by minted text for debuggability (the appendix reads as the
+//!   generated skeleton).
 //! - Keywords/punctuation are printer statics and need no buffer text; the
 //!   skeleton around them is minted anyway so node spans cover plausible text.
 //!
@@ -40,7 +41,7 @@
 //! shared across the parsed AST and the synthetic program.
 
 use bumpalo::Bump;
-use tsv_lang::{SharedInterner, Span};
+use tsv_lang::Span;
 use tsv_ts::ast::internal::{
     ArrowFunctionBody, ArrowFunctionExpression, AssignmentExpression, AssignmentOperator,
     BinaryExpression, BinaryOperator, BlockStatement, CallExpression, Expression,
@@ -52,26 +53,21 @@ use tsv_ts::ast::internal::{
     VariableDeclarator,
 };
 
-/// The appendix-buffer bookkeeping plus interner access — everything node
-/// constructors need. Owns the growing buffer; the arena and interner are
-/// shared with the parsed host AST so borrowed subtrees and synthetic nodes
-/// coexist in one graph.
+/// The appendix-buffer bookkeeping plus arena access — everything node
+/// constructors need. Owns the growing buffer; the arena is shared with the
+/// parsed host AST so borrowed subtrees and synthetic nodes coexist in one graph.
 pub(crate) struct Builder<'arena> {
     pub arena: &'arena Bump,
     /// Host source + appendix of minted lexemes. Passed to `format_canonical`
     /// as the source every span in the synthetic program indexes into.
     pub buffer: String,
-    /// The parse's interner — synthetic identifier names are interned here so
-    /// the printer's symbol resolver (built from `Program.interner`) finds them.
-    pub interner: SharedInterner,
 }
 
 impl<'arena> Builder<'arena> {
-    pub fn new(arena: &'arena Bump, host_source: &str, interner: SharedInterner) -> Self {
+    pub fn new(arena: &'arena Bump, host_source: &str) -> Self {
         Self {
             arena,
             buffer: host_source.to_string(),
-            interner,
         }
     }
 
@@ -82,12 +78,12 @@ impl<'arena> Builder<'arena> {
         Span::new(start, self.buffer.len() as u32)
     }
 
-    /// A synthetic identifier: interned name (source-free resolution) with its
-    /// text minted into the appendix so the span is backed.
+    /// A synthetic identifier: arena-allocated name (source-free resolution) with
+    /// its text minted into the appendix so the span is backed.
     pub fn ident(&mut self, name: &str) -> Identifier<'arena> {
         let span = self.mint(name);
         let ident_name = IdentName {
-            escaped: Some(self.interner.borrow_mut().get_or_intern(name)),
+            escaped: Some(self.arena.alloc_str(name)),
             raw_len: 0,
         };
         Identifier::simple(ident_name, span)
@@ -100,21 +96,21 @@ impl<'arena> Builder<'arena> {
     }
 
     /// A synthetic identifier at a caller-chosen span (no minting). The
-    /// interned-name channel never extracts the span, so the span's only job is
-    /// steering the printer's comment windows — a *fictional* low span keeps a
-    /// synthetic header node's windows empty/inverted, and a *stolen* host span
+    /// arena-allocated name channel never extracts the span, so the span's only
+    /// job is steering the printer's comment windows — a *fictional* low span keeps
+    /// a synthetic header node's windows empty/inverted, and a *stolen* host span
     /// (the node it replaces, e.g. `$$props` over the original `$props()` call)
     /// keeps the surrounding gaps exactly the authored ones.
     pub fn ident_at(&self, name: &str, span: Span) -> Identifier<'arena> {
         let ident_name = IdentName {
-            escaped: Some(self.interner.borrow_mut().get_or_intern(name)),
+            escaped: Some(self.arena.alloc_str(name)),
             raw_len: 0,
         };
         Identifier::simple(ident_name, span)
     }
 
     /// [`Self::ident_at`] as an arena-allocated expression (no minting — the
-    /// interned-name channel supplies the text, so the span steers comment
+    /// arena-allocated name channel supplies the text, so the span steers comment
     /// windows only).
     pub fn ident_expr_at(&self, name: &str, span: Span) -> &'arena Expression<'arena> {
         self.arena

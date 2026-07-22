@@ -159,8 +159,8 @@ fn compile_module_refuses_export_as_default() {
         "default export in <script module>",
     );
     // An ESCAPED identifier alias that decodes to `default` — the oracle compares
-    // the DECODED `.name`, so it rejects this too. `Identifier::name` decodes via
-    // the interner, so tsv catches it (a plain-source-slice read would miss it).
+    // the DECODED `.name`, so it rejects this too. `Identifier::name` reads the
+    // decoded `escaped_name`, so tsv catches it (a plain-source-slice read would miss it).
     assert_unsupported(
         "<script module>\n\tlet answer = 42;\n\texport { answer as \\u0064efault };\n</script>\n<p>hi</p>",
         "default export in <script module>",

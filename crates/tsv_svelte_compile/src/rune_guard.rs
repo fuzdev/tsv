@@ -36,7 +36,6 @@
 
 use std::collections::HashSet;
 
-use tsv_lang::{InfallibleResolve, SharedInterner};
 use tsv_ts::ast::internal::{
     ArrowFunctionBody, ClassBody, ClassMember, ExportDefaultValue, Expression, ForInOfLeft,
     ForInit, FunctionExpression, ImportSpecifier, ObjectPatternProperty, ObjectProperty, Statement,
@@ -47,7 +46,7 @@ use crate::script_decls::plain_identifier_str;
 use crate::{CompileError, Refusal};
 
 /// The walk's shared state: the source names resolve against, the collection
-/// sinks, the refusal set, and the interner (to decode an escaped identifier).
+/// sinks, and the refusal set.
 pub(crate) struct WalkCtx<'a> {
     pub source: &'a str,
     /// Assignment/update target root names (fed back as `updated` bindings).
@@ -56,9 +55,6 @@ pub(crate) struct WalkCtx<'a> {
     pub nested_declared: &'a mut HashSet<String>,
     /// Derived binding names — reading one anywhere in walked code refuses.
     pub derived_names: &'a HashSet<String>,
-    /// The parse's interner — to decode an escaped identifier's name (an owned
-    /// `Rc<RefCell<…>>` clone, a cheap refcount bump, avoids a new lifetime).
-    pub interner: SharedInterner,
     /// Top-level component binding names, for recognizing a `$name` store
     /// auto-subscription. `Some` **exempts** a valid store read from the
     /// `$`-prefixed-identifier refusal (it is rewritten elsewhere — the script
@@ -92,14 +88,12 @@ impl<'a> WalkCtx<'a> {
         updated: &'a mut HashSet<String>,
         nested_declared: &'a mut HashSet<String>,
         derived_names: &'a HashSet<String>,
-        interner: SharedInterner,
     ) -> Self {
         Self {
             source,
             updated,
             nested_declared,
             derived_names,
-            interner,
             store_names: None,
             store_shadowed: None,
             allow_derived_reads: false,
@@ -433,8 +427,8 @@ fn collect_nested_declared(pattern: &Expression<'_>, ctx: &mut WalkCtx<'_>) {
 /// stated at that call site.
 ///
 /// Scope: **both** plain and escaped binding names. An escaped leaf
-/// (`let $x = 1` binds `$x`, its decoded name in the interner) is decoded via
-/// [`collect_decoded_binding_names`], so the six guarded positions — a declarator
+/// (`let $x = 1` binds `$x`, its decoded name in the `escaped_name` channel) is
+/// decoded via [`collect_decoded_binding_names`], so the six guarded positions — a declarator
 /// leaf, a function-declaration id, a class-declaration id, a function-expression
 /// id, an import specifier's local, and a catch-clause parameter — refuse the
 /// escaped spelling exactly as the oracle does (it validates the DECODED
@@ -446,7 +440,6 @@ fn collect_nested_declared(pattern: &Expression<'_>, ctx: &mut WalkCtx<'_>) {
 pub(crate) fn refuse_dollar_binding_pattern(
     pattern: &Expression<'_>,
     source: &str,
-    interner: &SharedInterner,
 ) -> Result<(), CompileError> {
     // One walk: `collect_decoded_binding_names` both enforces the shape gate
     // (erroring on a pattern the binding table can't enumerate, exactly as
@@ -454,7 +447,7 @@ pub(crate) fn refuse_dollar_binding_pattern(
     // decoding an escaped leaf `pattern_binding_names` would skip. The `$`-prefix
     // test then reads those decoded names.
     let mut names = Vec::new();
-    collect_decoded_binding_names(pattern, source, interner, &mut names)?;
+    collect_decoded_binding_names(pattern, source, &mut names)?;
     for name in names {
         if name.starts_with('$') {
             return Err(CompileError::Unsupported(Refusal::DollarPrefixedBinding {
@@ -466,11 +459,11 @@ pub(crate) fn refuse_dollar_binding_pattern(
 }
 
 /// Collect every binding-leaf name a declarator-id / catch-param pattern declares,
-/// DECODING escaped identifiers via the interner, and refuse a shape the binding
+/// DECODING escaped identifiers via `Identifier::name`, and refuse a shape the binding
 /// table can't enumerate. The decode-aware companion to
-/// [`crate::analyze::pattern_binding_names`], which is interner-free and therefore
+/// [`crate::analyze::pattern_binding_names`], which reads the raw source slice and therefore
 /// SKIPS an escaped leaf (`let $x = 1` binds `$x`, whose name lives in the
-/// interner, not the source slice); it carries the SAME shape gate (erroring with
+/// `escaped_name` channel, not the source slice); it carries the SAME shape gate (erroring with
 /// `BindingPatternShape` on an unrecognized shape) so its sole caller needs only
 /// this one walk. Kept in lockstep with that walk's pattern shapes — Identifier,
 /// ObjectPattern/ObjectExpression property-values + rest, ArrayPattern elements +
@@ -478,21 +471,20 @@ pub(crate) fn refuse_dollar_binding_pattern(
 fn collect_decoded_binding_names(
     pattern: &Expression<'_>,
     source: &str,
-    interner: &SharedInterner,
     out: &mut Vec<String>,
 ) -> Result<(), CompileError> {
     match pattern {
         Expression::Identifier(id) => {
-            out.push(id.name(source, &interner.borrow()).to_string());
+            out.push(id.name(source).to_string());
         }
         Expression::ObjectPattern(obj) => {
             for prop in obj.properties {
                 match prop {
                     ObjectPatternProperty::Property(p) => {
-                        collect_decoded_binding_names(&p.value, source, interner, out)?;
+                        collect_decoded_binding_names(&p.value, source, out)?;
                     }
                     ObjectPatternProperty::RestElement(rest) => {
-                        collect_decoded_binding_names(rest.argument, source, interner, out)?;
+                        collect_decoded_binding_names(rest.argument, source, out)?;
                     }
                 }
             }
@@ -501,24 +493,24 @@ fn collect_decoded_binding_names(
             for prop in obj.properties {
                 match prop {
                     ObjectProperty::Property(p) => {
-                        collect_decoded_binding_names(&p.value, source, interner, out)?;
+                        collect_decoded_binding_names(&p.value, source, out)?;
                     }
                     ObjectProperty::SpreadElement(s) => {
-                        collect_decoded_binding_names(s.argument, source, interner, out)?;
+                        collect_decoded_binding_names(s.argument, source, out)?;
                     }
                 }
             }
         }
         Expression::ArrayPattern(arr) => {
             for element in arr.elements.iter().flatten() {
-                collect_decoded_binding_names(element, source, interner, out)?;
+                collect_decoded_binding_names(element, source, out)?;
             }
         }
         Expression::AssignmentPattern(assign) => {
-            collect_decoded_binding_names(assign.left, source, interner, out)?;
+            collect_decoded_binding_names(assign.left, source, out)?;
         }
         Expression::RestElement(rest) => {
-            collect_decoded_binding_names(rest.argument, source, interner, out)?;
+            collect_decoded_binding_names(rest.argument, source, out)?;
         }
         other => {
             return Err(CompileError::Unsupported(Refusal::BindingPatternShape {
@@ -541,14 +533,11 @@ fn collect_decoded_binding_names(
 pub(crate) fn refuse_dollar_binding_name(
     id: &tsv_ts::ast::internal::Identifier<'_>,
     source: &str,
-    interner: &SharedInterner,
 ) -> Result<(), CompileError> {
-    // Decode via the interner (`Identifier::name`) — the raw slice for a plain id,
-    // the interned decoded form for an escaped one — so an escaped `$f` refuses
-    // exactly as the oracle rejects the decoded `$f`. The `Ref` is held across the
-    // `starts_with` + `to_string` so the borrowed `&str` outlives both.
-    let borrow = interner.borrow();
-    let name = id.name(source, &borrow);
+    // Decode via `Identifier::name` — the raw slice for a plain id, the decoded
+    // `&'arena str` for an escaped one — so an escaped `$f` refuses exactly as the
+    // oracle rejects the decoded `$f`.
+    let name = id.name(source);
     if name.starts_with('$') {
         return Err(CompileError::Unsupported(Refusal::DollarPrefixedBinding {
             name: name.to_string(),
@@ -583,7 +572,6 @@ pub(crate) fn refuse_dollar_binding_name(
 pub(crate) fn refuse_dollar_import_locals(
     specifiers: &[ImportSpecifier<'_>],
     source: &str,
-    interner: &SharedInterner,
 ) -> Result<(), CompileError> {
     for specifier in specifiers {
         let local = match specifier {
@@ -591,7 +579,7 @@ pub(crate) fn refuse_dollar_import_locals(
             ImportSpecifier::Named(n) => &n.local,
             ImportSpecifier::Namespace(n) => &n.local,
         };
-        refuse_dollar_binding_name(local, source, interner)?;
+        refuse_dollar_binding_name(local, source)?;
     }
     Ok(())
 }
@@ -628,7 +616,7 @@ fn walk_statement(
         Statement::BlockStatement(s) => walk_statements(s.body, ctx, depth + 1),
         Statement::FunctionDeclaration(s) => {
             if let Some(id) = &s.id {
-                refuse_dollar_binding_name(id, ctx.source, &ctx.interner)?;
+                refuse_dollar_binding_name(id, ctx.source)?;
             }
             if (depth > 0 || ctx.fn_depth > 0)
                 && let Some(id) = &s.id
@@ -643,12 +631,10 @@ fn walk_statement(
         }
         // Nothing else here is walkable — the source is a literal and the
         // imported name is a name-only position.
-        Statement::ImportDeclaration(s) => {
-            refuse_dollar_import_locals(s.specifiers, ctx.source, &ctx.interner)
-        }
+        Statement::ImportDeclaration(s) => refuse_dollar_import_locals(s.specifiers, ctx.source),
         Statement::ClassDeclaration(s) => {
             if let Some(id) = &s.id {
-                refuse_dollar_binding_name(id, ctx.source, &ctx.interner)?;
+                refuse_dollar_binding_name(id, ctx.source)?;
             }
             walk_class_body(&s.body, ctx)
         }
@@ -660,7 +646,7 @@ fn walk_statement(
             ExportDefaultValue::Expression(e) => walk_expression(e, ctx),
             ExportDefaultValue::FunctionDeclaration(f) => {
                 if let Some(id) = &f.id {
-                    refuse_dollar_binding_name(id, ctx.source, &ctx.interner)?;
+                    refuse_dollar_binding_name(id, ctx.source)?;
                 }
                 enter_function(f.params, ctx)?;
                 let result = walk_statements(f.body.body, ctx, depth + 1);
@@ -669,7 +655,7 @@ fn walk_statement(
             }
             ExportDefaultValue::ClassDeclaration(c) => {
                 if let Some(id) = &c.id {
-                    refuse_dollar_binding_name(id, ctx.source, &ctx.interner)?;
+                    refuse_dollar_binding_name(id, ctx.source)?;
                 }
                 walk_class_body(&c.body, ctx)
             }
@@ -735,7 +721,7 @@ fn walk_statement(
                     // A catch parameter IS a binding (`declaration_kind: 'let'`
                     // in a porous scope), so the `$$slots` reference carve-out
                     // must not reach it.
-                    refuse_dollar_binding_pattern(param, ctx.source, &ctx.interner)?;
+                    refuse_dollar_binding_pattern(param, ctx.source)?;
                     walk_expression(param, ctx)?;
                 }
                 walk_statements(handler.body.body, ctx, depth + 1)?;
@@ -779,7 +765,7 @@ fn walk_variable_declaration(
         if depth > 0 || ctx.fn_depth > 0 {
             collect_nested_declared(&declarator.id, ctx);
         }
-        refuse_dollar_binding_pattern(&declarator.id, ctx.source, &ctx.interner)?;
+        refuse_dollar_binding_pattern(&declarator.id, ctx.source)?;
         walk_expression(&declarator.id, ctx)?;
         walk_opt(declarator.init.as_ref(), ctx)?;
     }
@@ -830,7 +816,7 @@ fn walk_function_expression(
     ctx: &mut WalkCtx<'_>,
 ) -> Result<(), CompileError> {
     if let Some(id) = &f.id {
-        refuse_dollar_binding_name(id, ctx.source, &ctx.interner)?;
+        refuse_dollar_binding_name(id, ctx.source)?;
         if let Some(name) = identifier_name(id, ctx.source) {
             ctx.nested_declared.insert(name.to_string());
         }
@@ -942,7 +928,7 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
                 // a new site that walks a binding pattern through
                 // `walk_expression_guarded` inherits the exemption and must
                 // refuse first if the oracle rejects that position. Both upstream
-                // refusals now DECODE via the interner
+                // refusals now DECODE via `Identifier::name`
                 // (`refuse_dollar_binding_pattern` / `refuse_dollar_binding_name`),
                 // so an ESCAPED `$` leaf (`let $x = 1`) refuses upstream exactly
                 // as the plain spelling does — the class-EXPRESSION id being the
@@ -983,14 +969,12 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
             // value-walk can't rewrite an escaped read (classification not ported,
             // like needs_context/snippet), so refuse rather than emit a bare `d` —
             // a MISMATCH. A plain escaped local (not a derived name) stays legal.
-            if let Some(sym) = id.escaped_name {
-                let interner = ctx.interner.borrow();
-                let name = interner.resolve_infallible(sym);
-                if ctx.derived_names.contains(name) {
-                    return Err(CompileError::Unsupported(Refusal::DerivedBindingRead {
-                        name: name.to_string(),
-                    }));
-                }
+            if let Some(name) = id.escaped_name
+                && ctx.derived_names.contains(name)
+            {
+                return Err(CompileError::Unsupported(Refusal::DerivedBindingRead {
+                    name: name.to_string(),
+                }));
             }
             Ok(())
         }
@@ -1070,7 +1054,7 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
         // the ESCAPED spelling (`class $Foo {}`) is DELIBERATELY left
         // compiling — it lands on the oracle's own mis-compile rather than a tsv
         // over-refusal, and is not one of the escaped over-acceptances the
-        // interner decode closes. See `docs/conformance_svelte_compiler.md`.
+        // `Identifier::name` decode closes. See `docs/conformance_svelte_compiler.md`.
         Expression::ClassExpression(c) => {
             if let Some(id) = &c.id
                 && let Some(name) = dollar_identifier_name(id, ctx.source)

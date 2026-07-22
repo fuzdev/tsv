@@ -2,8 +2,6 @@
 //
 // Handles: {#if}, {#each}, {#await}, {#key} blocks
 
-use std::rc::Rc;
-
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use crate::parser::element::ParsedElement;
@@ -438,12 +436,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         }
         let ws_before_colon = trimmed.len() - end - after_pattern.len();
         let colon_offset = adjusted + end + ws_before_colon;
-        let (ta, type_end) = tsv_ts::parse_type_annotation_partial(
-            after_pattern,
-            colon_offset,
-            Rc::clone(&self.interner),
-            self.arena,
-        )?;
+        let (ta, type_end) =
+            tsv_ts::parse_type_annotation_partial(after_pattern, colon_offset, self.arena)?;
         tsv_ts::attach_pattern_type_annotation(&mut expr, ta, self.arena)?;
         Ok((expr, type_end))
     }
@@ -1087,14 +1081,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // Snippet parameters preserve grouping parens (acorn's `preserveParens`,
             // without Svelte's `remove_parens`), so a default like `c = (2, 3)` keeps
             // its `ParenthesizedExpression` — matching Svelte's snippet-param AST.
-            match tsv_ts::parse_with_interner_preserve_parens(
-                &wrapper,
-                base,
-                Rc::clone(&self.interner),
-                self.arena,
-            ) {
-                Ok(mut program) => {
-                    self.expression_comments.append(&mut program.comments);
+            match tsv_ts::parse_embedded_preserve_parens(&wrapper, base, self.arena) {
+                Ok(program) => {
+                    self.expression_comments.extend_from_slice(program.comments);
                     if let Some(tsv_ts::Statement::FunctionDeclaration(func)) = program.body.first()
                     {
                         type_parameters.clone_from(&func.type_parameters);

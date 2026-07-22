@@ -17,7 +17,7 @@
 //! sequence.
 
 use bumpalo::collections::Vec as BumpVec;
-use tsv_lang::{SharedInterner, Span};
+use tsv_lang::Span;
 use tsv_ts::ast::internal::{
     ClassBody, ClassDeclaration, ClassMember, Expression, PropertyDefinition, Statement,
     VariableDeclaration, VariableDeclarator,
@@ -50,9 +50,8 @@ fn script_walk_ctx<'a>(
     nested_declared: &'a mut NameSet,
     derived_names: &'a NameSet,
     store_names: &'a NameSet,
-    interner: SharedInterner,
 ) -> WalkCtx<'a> {
-    WalkCtx::new(source, updated, nested_declared, derived_names, interner)
+    WalkCtx::new(source, updated, nested_declared, derived_names)
         .allow_store_reads(store_names, None)
         .allow_derived_reads()
 }
@@ -170,14 +169,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
     {
         *has_effects = true;
         dropped_regions.push(stmt.span());
-        let mut ctx = script_walk_ctx(
-            source,
-            updated,
-            nested_declared,
-            derived_names,
-            store_names,
-            std::rc::Rc::clone(&b.interner),
-        );
+        let mut ctx = script_walk_ctx(source, updated, nested_declared, derived_names, store_names);
         walk_expression_guarded(callback, &mut ctx)?;
         return Ok(None);
     }
@@ -194,14 +186,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
         && let Some(guarded) = is_inspect_call(&expr_stmt.expression, source)
     {
         dropped_regions.push(stmt.span());
-        let mut ctx = script_walk_ctx(
-            source,
-            updated,
-            nested_declared,
-            derived_names,
-            store_names,
-            std::rc::Rc::clone(&b.interner),
-        );
+        let mut ctx = script_walk_ctx(source, updated, nested_declared, derived_names, store_names);
         for expr in guarded {
             walk_expression_guarded(expr, &mut ctx)?;
         }
@@ -229,14 +214,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
     }
 
     let Statement::VariableDeclaration(decl) = stmt else {
-        let mut ctx = script_walk_ctx(
-            source,
-            updated,
-            nested_declared,
-            derived_names,
-            store_names,
-            std::rc::Rc::clone(&b.interner),
-        );
+        let mut ctx = script_walk_ctx(source, updated, nested_declared, derived_names, store_names);
         walk_statement_guarded(stmt, &mut ctx, 0)?;
         return Ok(Some(stmt.clone()));
     };
@@ -247,28 +225,14 @@ pub(crate) fn rewrite_script_statement<'arena>(
             .is_some_and(|i| classify_rune_init(i, source).is_some())
     });
     if !has_rune_init {
-        let mut ctx = script_walk_ctx(
-            source,
-            updated,
-            nested_declared,
-            derived_names,
-            store_names,
-            std::rc::Rc::clone(&b.interner),
-        );
+        let mut ctx = script_walk_ctx(source, updated, nested_declared, derived_names, store_names);
         walk_statement_guarded(stmt, &mut ctx, 0)?;
         return Ok(Some(stmt.clone()));
     }
 
     let mut declarations: BumpVec<'arena, VariableDeclarator<'arena>> = BumpVec::new_in(b.arena);
     for declarator in decl.declarations {
-        let mut ctx = script_walk_ctx(
-            source,
-            updated,
-            nested_declared,
-            derived_names,
-            store_names,
-            std::rc::Rc::clone(&b.interner),
-        );
+        let mut ctx = script_walk_ctx(source, updated, nested_declared, derived_names, store_names);
         // The `$`-prefixed BINDING rule, at the one point every declarator on
         // this path passes — before the rune dispatch below, mirroring the
         // oracle's own `VariableDeclarator` visitor, which runs
@@ -279,7 +243,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
         // not walked at all, and the two that are walked go through
         // `walk_expression_guarded`, which sees a pattern as an expression and
         // takes the store-read exemption this `WalkCtx` enables.
-        refuse_dollar_binding_pattern(&declarator.id, source, &b.interner)?;
+        refuse_dollar_binding_pattern(&declarator.id, source)?;
         let rune = declarator
             .init
             .as_ref()
@@ -600,18 +564,11 @@ fn rewrite_class_state_fields<'arena>(
     // This path intercepts the statement before the guard walk's
     // `ClassDeclaration` arm, so it owns the class id's binding check.
     if let Some(id) = &class.id {
-        refuse_dollar_binding_name(id, source, &b.interner)?;
+        refuse_dollar_binding_name(id, source)?;
     }
     // Same exemptions as the surrounding script guard: a `$name` store read / a
     // `$derived` read inside a method body is rewritten later, not refused here.
-    let mut ctx = script_walk_ctx(
-        source,
-        updated,
-        nested_declared,
-        derived_names,
-        store_names,
-        std::rc::Rc::clone(&b.interner),
-    );
+    let mut ctx = script_walk_ctx(source, updated, nested_declared, derived_names, store_names);
 
     let members = class.body.body;
     let mut out: Option<BumpVec<'arena, ClassMember<'arena>>> = None;
@@ -641,13 +598,7 @@ fn rewrite_class_state_fields<'arena>(
                     // argument to `$.store_get(…)` / `d()` — a MISMATCH. A compound
                     // (`$state($count + 1)`) or a plain-variable argument is fine —
                     // the inner read there IS rewritten at parity.
-                    if is_lone_reactive_binding(
-                        arg,
-                        source,
-                        &b.interner,
-                        derived_names,
-                        store_names,
-                    ) {
+                    if is_lone_reactive_binding(arg, source, derived_names, store_names) {
                         return Err(unsupported(Refusal::ClassFieldStateReactiveArg));
                     }
                     walk_expression_guarded(arg, &mut ctx)?;
@@ -724,7 +675,6 @@ fn rewrite_class_state_fields<'arena>(
 fn is_lone_reactive_binding(
     arg: &Expression<'_>,
     source: &str,
-    interner: &SharedInterner,
     derived_names: &NameSet,
     store_names: &NameSet,
 ) -> bool {
@@ -734,8 +684,7 @@ fn is_lone_reactive_binding(
     if id.escaped_name.is_some() {
         // Escaped: the store rewrite decodes it, the derived rewrite does not — so
         // decode and test the STORE branch alone.
-        let borrow = interner.borrow();
-        let name = id.name(source, &borrow);
+        let name = id.name(source);
         return crate::analyze::store_read_base(name)
             .is_some_and(|base| store_names.contains(base));
     }
