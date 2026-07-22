@@ -68,9 +68,16 @@ tokio = { version = "1" }
 futures-util = "0.3"
 phf = { version = "0.14", features = ["macros"] }
 serde = { version = "1", features = ["derive"] }
-# float_roundtrip: exact f64 parsing so big literal values (e.g. integral
-# doubles beyond u64) survive the expected.json round-trip byte-faithfully
-serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
+# preserve_order: keep object key order (wire field-order conformance).
+# float_roundtrip: exact shortest f64 parsing.
+# arbitrary_precision: `serde_json::Value` stores number tokens verbatim
+# instead of collapsing them to f64, so the fixture pipeline (expected.json
+# generation + validation, both of which round-trip through `Value` via
+# `to_json_with_tabs`) compares the writer's exact number bytes against acorn's
+# — a literal like `1e20`/`0.000001` no longer gets reformatted through ryu on
+# both sides, which had masked `Number::toString` divergences. The production
+# wire writer (`JsonWriter`) never touches `Value`, so its output is unchanged.
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip", "arbitrary_precision"] }
 smallvec = "1.15.2"
 thiserror = "2"
 unicode-ident = "1.0"
