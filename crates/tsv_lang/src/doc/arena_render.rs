@@ -1170,6 +1170,8 @@ mod column_arithmetic_tests {
     //! flagged each arm below as an unasserted survivor; corruption-verify any
     //! change here by breaking the arm and watching exactly one assertion fail.
     use super::RenderConfig;
+    #[cfg(feature = "comment_check")]
+    use super::RenderPurpose;
     use super::{
         RenderIndent, effective_suffix_width, indent_str_width, indent_width, line_start_column,
         update_pos_for_text,
@@ -1261,7 +1263,8 @@ mod column_arithmetic_tests {
         RenderConfig {
             print_width: 100,
             indent,
-            ..RenderConfig::default()
+            #[cfg(feature = "comment_check")]
+            purpose: RenderPurpose::Output,
         }
     }
 

@@ -58,6 +58,8 @@ mod arena_tests {
     use super::arena::{DocArena, DocId};
     use super::arena_render::arena_print_doc_with_indent_and_render;
     use super::render_config::RenderConfig;
+    #[cfg(feature = "comment_check")]
+    use super::render_config::RenderPurpose;
     use super::*;
     use crate::EmbedContext;
 
@@ -97,7 +99,8 @@ mod arena_tests {
         let render = RenderConfig {
             print_width,
             indent: "  ",
-            ..RenderConfig::default()
+            #[cfg(feature = "comment_check")]
+            purpose: RenderPurpose::Output,
         };
         render_test(arena, doc, &render, 0)
     }
@@ -107,7 +110,8 @@ mod arena_tests {
         let render = RenderConfig {
             print_width,
             indent: "\t",
-            ..RenderConfig::default()
+            #[cfg(feature = "comment_check")]
+            purpose: RenderPurpose::Output,
         };
         render_test(arena, doc, &render, 0)
     }
@@ -648,7 +652,8 @@ mod arena_tests {
         let render = RenderConfig {
             print_width: 12,
             indent: "\t",
-            ..RenderConfig::default()
+            #[cfg(feature = "comment_check")]
+            purpose: RenderPurpose::Output,
         };
         assert_eq!(
             render_test(&a, doc, &render, 0),
@@ -782,7 +787,8 @@ mod arena_tests {
         let render = RenderConfig {
             print_width: 100,
             indent: "\t",
-            ..RenderConfig::default()
+            #[cfg(feature = "comment_check")]
+            purpose: RenderPurpose::Output,
         };
         let embed = EmbedContext {
             base_indent_offset: 1,
