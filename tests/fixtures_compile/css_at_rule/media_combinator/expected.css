@@ -1,0 +1,6 @@
+
+	@media screen {
+		div.svelte-tsvhash p:where(.svelte-tsvhash) {
+			color: red;
+		}
+	}

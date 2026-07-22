@@ -136,8 +136,8 @@ impl<'a> Printer<'a> {
         self.is_expression_statement.set(false);
     }
 
-    pub(crate) fn get_line_breaks(&self) -> &[u32] {
-        self.line_breaks
+    pub(crate) fn get_layout_line_breaks(&self) -> &[u32] {
+        self.layout_line_breaks
     }
 
     pub(crate) fn chain_has_comments(&self) -> bool {
@@ -155,7 +155,7 @@ impl<'a> Printer<'a> {
     }
 
     pub(crate) fn classify_comments(&self, start: u32, end: u32) -> ClassifiedComments<'_> {
-        ClassifiedComments::from_range(self.comments, start, end, self.line_breaks)
+        ClassifiedComments::from_range(self.comments, start, end, self.comment_line_breaks)
     }
 
     pub(crate) fn build_trailing_block_doc(&self, comments: &[&Comment]) -> DocId {

@@ -42,11 +42,11 @@ async fn run(filters: &[String]) -> Result<(), CliError> {
 
     let matched_count = fixture_list.len();
 
-    // Fixture order (`ResultOrder::Fixture`) so progress lines print deterministically;
+    // Input order (`ResultOrder::Input`) so progress lines print deterministically;
     // tasks never print — all output happens here in the driver, per fixture.
-    let mut results = super::spawn_fixture_stream(
+    let mut results = super::spawn_work_stream(
         fixture_list,
-        super::ResultOrder::Fixture,
+        super::ResultOrder::Input,
         |fixture| async move {
             let outcome = process_fixture(&fixture).await;
             (fixture, outcome)

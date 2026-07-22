@@ -230,6 +230,69 @@ pub fn format_in(program: &Program<'_>, source: &str, arena: &DocArena) -> Strin
     output
 }
 
+/// Format a program with newline-derived authoring intent **erased** — the
+/// intent-erased *canonical* reprint.
+///
+/// [`format`] deliberately preserves authoring intent: an object literal, import
+/// list, or call whose source carried a newline after the opening delimiter stays
+/// expanded even when it would fit inline, and blank lines between statements are
+/// kept. `format_canonical` turns all of that off — constructs collapse when they
+/// fit the print width and break only by width, and blank lines are dropped — so
+/// two programs that differ only in incidental whitespace reprint to the same
+/// string. Comments are preserved (never dropped or merged); only their placement
+/// is normalized deterministically (an own-line comment may become a trailing
+/// comment of the preceding node). The output is idempotent:
+/// `format_canonical(parse(format_canonical(x)))` reproduces its input.
+///
+/// # Residual: mapped-type multi-line-ness is NOT erased
+///
+/// One newline-derived read survives canonicalization: a `TSMappedType` whose
+/// source span carries a newline still force-breaks, so `Fn<{\n[K in keyof T]: T[K]\n}>`
+/// and its inline authoring do **not** reach the same canonical string. This is
+/// deliberate and load-bearing — see `printer::types::composite::build_mapped_type_doc`
+/// for why erasing it is unsound rather than merely unimplemented. The output stays
+/// idempotent (a force-broken mapped type reprints force-broken); it is only the
+/// *authoring-independence* property that has this one hole.
+///
+/// The residual is unreachable for the current consumer (compiled JS carries no
+/// TypeScript types, so a mapped type cannot appear in it). A caller that
+/// canonicalizes hand-written TS must account for it.
+///
+/// This is a cold path used by tooling that needs a canonical form for comparison
+/// (e.g. diffing two compilers' output); the [`format`] path is untouched and
+/// byte-identical.
+pub fn format_canonical(program: &Program<'_>, source: &str) -> String {
+    let arena = DocArena::for_source(source);
+    format_canonical_in(program, source, &arena)
+}
+
+/// [`format_canonical`] into a caller-provided doc arena (see [`format_in`] for
+/// the arena-reuse contract).
+pub fn format_canonical_in(program: &Program<'_>, source: &str, arena: &DocArena) -> String {
+    // Build with the real line-break table (comment classification needs it), then
+    // switch the printer into canonical mode — which empties the *layout* table so
+    // blank-line / expansion reads collapse, while comment classification keeps the
+    // real table (`set_canonical`).
+    let mut line_breaks = arena.take_line_breaks_scratch();
+    build_line_breaks_into(source, &mut line_breaks);
+    let inputs = PrinterInputs {
+        source,
+        comments: program.comments,
+        line_breaks: &line_breaks,
+        has_owned_comments: program.comments.iter().any(|c| c.owned_by_node),
+        has_format_ignore: program
+            .comments
+            .iter()
+            .any(|c| is_format_ignore_directive(c.content(source))),
+    };
+    let mut printer = make_printer(arena, &inputs, EmbedContext::default());
+    printer.set_canonical();
+    printer.print_program(program);
+    let output = printer.into_string();
+    arena.park_line_breaks_scratch(line_breaks);
+    output
+}
+
 /// Convert internal AST to JSON with character-based positions
 ///
 /// Returns a `serde_json::Value` parsed from the wire bytes
@@ -464,15 +527,7 @@ pub fn parse_pattern_with_comments<'arena>(
         // like `{:then num: number}` and `{:catch error: Error}`
         if parser.at_colon() {
             let ta = parser.parse_type_annotation()?;
-            if let Expression::Identifier(id) = &mut pattern {
-                // Re-bind the identifier's binding extra with the parsed type
-                // annotation (preserving any decorators already present).
-                let decorators = id.decorators();
-                id.extra = Some(arena.alloc(ast::internal::IdentifierParamExtra {
-                    type_annotation: Some(ta),
-                    decorators,
-                }));
-            }
+            attach_pattern_type_annotation(&mut pattern, ta, arena)?;
         }
         // The pattern (plus any type annotation) must fill the whole slice — the Svelte
         // callers (`{@const id = …}`, `{:then pattern}`, `{:catch pattern}`) hand us a slice
@@ -481,6 +536,65 @@ pub fn parse_pattern_with_comments<'arena>(
         parser.expect_end_of_input()?;
         Ok((pattern, parser.take_comments()))
     })
+}
+
+/// Attach a `: T` annotation to a **Svelte block-position** binding pattern
+/// (`{#each xs as p: T}`, `{:then p: T}`, `{:catch p: T}`, `{@const p: T = v}`).
+///
+/// **The span stays on the bare pattern** — for every kind. That is the canonical
+/// parser's shape, and it is not the same as a *signature* parameter's:
+///
+/// | | `{ a }: T` as a Svelte block binding | `{ a }: T` as a function parameter |
+/// |---|---|---|
+/// | wire `start`/`end` | over the annotation | over the annotation |
+/// | wire `loc` | **bare pattern only** | over the annotation |
+///
+/// Svelte's `read_pattern` (`1-parse/read/context.js`) parses the bare pattern
+/// with acorn, then patches `expression.end = typeAnnotation.end` — and never
+/// touches `expression.loc`. acorn, parsing a real signature, extends both. So a
+/// block pattern's byte range and its line/column range genuinely disagree, and
+/// the internal span cannot encode both.
+///
+/// The span therefore records the **bare** pattern (which `loc` is derived from)
+/// and the wire writer widens `end` to `type_annotation.end` — a `max`, so a
+/// signature parameter, whose span already covers its annotation, is unaffected.
+/// The same convention already holds for an `Identifier`, whose span stays on the
+/// bare name with the annotation hanging off as a sibling.
+///
+/// A kind with no place to put the annotation must never silently swallow it: a
+/// dropped node is an **invisible** node — it vanishes from the wire AST, prints
+/// nowhere (real content loss on a format round-trip), and is unreachable to every
+/// consumer that reasons about TypeScript by walking the tree. So the fallback
+/// **errors** rather than dropping.
+pub fn attach_pattern_type_annotation<'arena>(
+    pattern: &mut Expression<'arena>,
+    ta: TSTypeAnnotation<'arena>,
+    arena: &'arena bumpalo::Bump,
+) -> Result<()> {
+    match pattern {
+        Expression::Identifier(id) => {
+            // Re-bind the identifier's binding extra with the parsed type
+            // annotation (preserving any decorators already present).
+            let decorators = id.decorators();
+            id.extra = Some(arena.alloc(ast::internal::IdentifierParamExtra {
+                type_annotation: Some(ta),
+                decorators,
+            }));
+        }
+        Expression::ObjectPattern(pattern) => pattern.type_annotation = Some(ta),
+        Expression::ArrayPattern(pattern) => pattern.type_annotation = Some(ta),
+        // The Svelte block grammar admits an identifier or a destructuring
+        // pattern, so nothing else is reachable — and no other `Expression`
+        // variant has an annotation slot to hold it. Reject rather than drop.
+        other => {
+            return Err(tsv_lang::lex_err(
+                "type annotation is not valid on this binding pattern",
+                other.span().start as usize,
+            )
+            .into());
+        }
+    }
+    Ok(())
 }
 
 /// Parse a type annotation (`: Type`) and return it with the position where parsing stopped.
@@ -620,6 +734,25 @@ pub fn build_type_parameters_doc_with_comments(
 ) -> DocId {
     let printer = make_doc_printer(arena, inputs, *embed);
     printer.build_type_parameter_declaration_doc_wrapping(type_parameters)
+}
+
+/// Build a DocId for a type annotation (`: T`) with comments, in the caller's arena.
+///
+/// Routes the annotation through the same comment-aware printer a real declaration
+/// uses, so a comment between the `:` and the type keeps its place. Used by
+/// `tsv_svelte` for a **destructuring** block binding pattern
+/// (`{#each xs as { a }: T}`, `{:then { a }: T}`), whose braces the Svelte printer
+/// builds itself (its own comment-preserving path) and which therefore has to
+/// append the annotation tail explicitly — an identifier binding gets it for free
+/// from the TypeScript pattern printer.
+pub fn build_type_annotation_doc_with_comments(
+    arena: &DocArena,
+    annotation: &TSTypeAnnotation<'_>,
+    inputs: &PrinterInputs<'_>,
+    embed: &EmbedContext,
+) -> DocId {
+    let printer = make_doc_printer(arena, inputs, *embed);
+    printer.build_type_annotation_doc_public(annotation)
 }
 
 /// Build a DocId for a TypeScript program in the caller's arena.

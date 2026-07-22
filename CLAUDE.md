@@ -8,8 +8,16 @@ High-performance Rust parser as a drop-in replacement for Svelte's modern parser
 
 ## Committing
 
-`git add` and `git commit` are denied by `.claude/settings.local.json` in
-this repo — make the edits and stop, the user commits.
+**Branch exception (`svelte-compiler` branch / the `~/dev/tsv-svelte-compiler`
+worktree only — remove this block before merging to main):** agent commits
+ARE permitted here. Commit at sensible stopping points with short 1-liner
+messages (`fix:` / `feat:` / `docs:` / `test:` / `refactor:` / `chore:`
+prefixes; no body, no trailers, no `Co-Authored-By`). Merging to main,
+version bumps, and publishing remain user-owned.
+
+On main and every other branch: `git add` and `git commit` are denied by
+`.claude/settings.local.json` in this repo — make the edits and stop, the
+user commits.
 
 **Do not edit `CHANGELOG.md`.** Like release version bumps, the changelog is
 the user's responsibility — agents make the source/doc/fixture edits and leave
@@ -179,6 +187,14 @@ deno task fixtures:update:formatted  # regenerate output_prettier.svelte only
 deno task fixtures:audit             # audit _prettier_divergence fixtures (diagnostic; --all for every fixture)
 deno task fixtures:ts-audit          # which input.ts fixtures genuinely need .ts vs could be .svelte (alias of `ts_fixture_audit`)
 deno task conformance:audit          # doc/fixture integrity: divergences cataloged + every docs/*.md + README link resolves + divergence READMEs back-link their sanctioning doc + no stray READMEs (gated in `deno task check`; ./docs/audits.md)
+deno task conformance:audit:compiler # compile-fixture divergence integrity + checklist ↔ `Refusal` drift (gated in `deno task check`; ./docs/audits.md)
+deno task canonicalize:audit         # canonicalize_js idempotence + output validity + comment preservation over tests/fixtures + tests/fixtures_compile (gated in `deno task check`; ./docs/audits.md)
+deno task compile:fixtures:init      # create/reinit a compile fixture (oracle-compiles + canonicalizes; tests/fixtures_compile)
+deno task compile:fixtures:validate  # validate compile fixtures: oracle freshness + expected idempotence + ours parity (all gating; the sidecar-free slice also gates in cargo test)
+deno task compile:corpus:compare     # compile-parity wide net over real repos + the Svelte suites (sidecar-dependent, on demand; ./docs/compile_tooling.md)
+deno task compile:validation         # validation-suite RATCHET over Svelte's own compiler-errors + validator suites (sidecar-dependent, on demand; ./docs/compile_validation_ratchet.md)
+deno task compile:validation:update  # regenerate that snapshot after fixing a finding (or newly refusing a shape); refuses a narrowed run, and never pins a MISMATCH
+deno task compile:fuzz               # differential compile fuzzer over feature cross-products — a discovery tool with an open work list, currently RED by design (sidecar-dependent, on demand; ./docs/compile_tooling.md)
 deno task pins:audit                 # canonical-oracle version sync (gated in `deno task check`): (1) pin agreement — sidecar.ts VERSIONS + npm: imports, benches/js/package.json, actor.rs acorn import-map must be identical; (2) checkout alignment — a PRESENT ../svelte or ../acorn-typescript checkout must match its pin (absent → skipped, so clean machines pass)
 deno task scan:audit                 # no new raw find/rfind/match_indices substring scans over source (gated in `deno task check`; ./docs/audits.md)
 deno task fanout:audit               # no super-linear doc-node fanout — the per-layout-candidate rebuild blowup (gated in `deno task check`; ./docs/audits.md)
@@ -412,6 +428,8 @@ cargo run --release -p tsv_debug -- profile file.ts --iterations 20  # more iter
 # Also: --json (machine-readable)
 
 cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib   # parse vs wire-JSON write timing
+
+cargo run --release -p tsv_debug -- compile_profile tests/fixtures_compile  # Svelte compile vs the format wall
 ```
 
 For function-level hotspots, use `perf` with the `profiling` cargo profile:
@@ -489,6 +507,7 @@ tsv/
 │   ├── tsv_ts/      # TypeScript: parse(), format(), convert_ast_json_bytes()
 │   ├── tsv_css/     # CSS: parse(), format(), convert_ast_json_bytes()
 │   ├── tsv_svelte/  # Svelte: parse(), format(), convert_ast_json_bytes()
+│   ├── tsv_svelte_compile/ # Svelte→JS compiler (Svelte's compile() oracle) + JS canonicalizer (intent-erased reprint); consumed by tsv_debug — no shipped artifact links it
 │   ├── tsv_cli/     # Production CLI (binary: tsv) - pure Rust
 │   ├── tsv_debug/   # Dev utilities (binary: tsv_debug) - uses Deno
 │   ├── tsv_ffi/     # C FFI bindings (Deno's native path)
@@ -496,7 +515,8 @@ tsv/
 │   └── tsv_napi/    # N-API bindings (Node/Bun native path; measurement-only for the Node bench, publish is a fast-follow after 0.2)
 ├── scripts/         # Publish orchestrator, npm package patcher, Node artifact + N-API addon tests, AST type drift check
 ├── tests/           # Integration tests (parser, formatter, CLI)
-│   └── fixtures/    # Test fixtures organized by language/feature
+│   ├── fixtures/    # Test fixtures organized by language/feature
+│   └── fixtures_compile/ # Compiler fixtures (input.svelte + canonicalized oracle expected_server.js + expected.css) — a separate tree so parser/formatter fixture counts stay unperturbed
 └── docs/            # Documentation (fixtures, cli, architecture, etc.)
 ```
 
@@ -548,6 +568,7 @@ when trailing is lossless and the position carries no signal — otherwise add a
 
 - ./docs/conformance_prettier.md - Where we differ from Prettier (and why)
 - ./docs/conformance_svelte.md - Where we differ from Svelte (and why)
+- ./docs/conformance_svelte_compiler.md - Where we differ from Svelte's compiler (expected to stay empty — a safety valve, not a budget)
 
 ## Fixtures
 
@@ -677,6 +698,81 @@ cargo run -p tsv_debug ast_diff --render input.svelte               # render-awa
 # canonical_parse - parse using external parsers (Svelte, acorn+typescript, or our CSS)
 cargo run -p tsv_debug canonical_parse file.svelte
 
+# canonical_compile - compile Svelte with the canonical compiler (runes-only, deterministic oracle)
+cargo run -p tsv_debug canonical_compile file.svelte                      # normalized server JS to stdout
+cargo run -p tsv_debug canonical_compile file.svelte --target client --css  # client JS + delimited CSS
+cargo run -p tsv_debug canonical_compile file.svelte --json              # { js, css, warnings } as JSON
+# Fixed cssHash ('svelte-tsvhash') + constant filename make output byte-identical across runs.
+# Also: --target server|client (default server), --dev, --content <str>, --stdin. Compile errors exit non-zero.
+
+# compile_compare - diff tsv's Svelte compile against the canonical compiler, comparing
+# the CANONICALIZED JS of both sides (intent-erased reprint via tsv_svelte_compile::canonicalize_js).
+# The parity bar tolerates a comment-POSITION difference (compare_canonical: same code + same comment
+# sequence, no bundler annotation — tsv's comment placement vs the oracle's esrap), so a remaining diff
+# is a real code difference, not incidental whitespace. Self-checks canonicalizer idempotence on the
+# oracle side. Exit codes: 0 parity (byte-exact OR comment-position-tolerated), 1 real diff, 2 error
+# (including a component shape tsv's compiler doesn't cover yet — that prints the oracle canonical form
+# as the target). --json emits { target, parity, comment_position_tolerated, ours_status, hunks }.
+cargo run -p tsv_debug compile_compare file.svelte                       # human diff / oracle canonical form
+cargo run -p tsv_debug compile_compare --content '<h1>hi</h1>' --json    # machine-readable report
+# Also: --target server|client (default server), --content <str>, --stdin. The ad-hoc one-file view;
+# durable expectations live in the compile fixtures (tests/fixtures_compile, below).
+
+# compile_fixture_init - create or reinitialize a compile fixture (tests/fixtures_compile/<feature>/<case>/):
+# prettier-formats the runes component, compiles it with the deterministic oracle (server, non-dev),
+# writes input.svelte + expected_server.js (the CANONICALIZED oracle JS) + expected.css (raw oracle
+# CSS, styled components only). Expected files are ALWAYS oracle-generated, never hand-written.
+cargo run -p tsv_debug compile_fixture_init tests/fixtures_compile/feature/case --content '<p>text</p>'
+echo '<p>text</p>' | cargo run -p tsv_debug compile_fixture_init tests/fixtures_compile/feature/case --stdin
+cargo run -p tsv_debug compile_fixture_init tests/fixtures_compile/feature/case  # regenerate from existing input
+# Also: --force (overwrite existing input).
+
+# compile_fixtures_validate - validate compile fixtures. Per fixture, all gating: (a) oracle
+# freshness — canonicalize(oracle(input)) must equal the committed expected_server.js byte-exact (+ css
+# match); (b) ours — tsv_svelte_compile::compile must succeed and its canonicalized JS must be PARITY
+# with expected_server.js (byte-exact or comment-position-tolerated, compare_canonical) + CSS match;
+# (c) the committed expected_server.js must be a canonicalize fixed point.
+# The pure-Rust slice of the contract (input parses, expected idempotent, OURS-VS-EXPECTED parity —
+# compile() needs no Deno) also runs sidecar-free in
+# `cargo test --workspace --test compile_fixtures_tests`, the offline parity gate.
+cargo run -p tsv_debug compile_fixtures_validate [pattern...]
+# Also: --list, --json.
+
+# compile_corpus_compare - the compile-parity wide net: compile every .svelte under the given
+# roots with the canonical compiler AND tsv and compare the canonical reprints, bucketing per file
+# (parity / refused / fenced / oracle-rejected / MISMATCH / error). A MISMATCH or an
+# OVER-ACCEPTANCE (the oracle rejected it, tsv compiled it) is a refusal-contract bug and gates.
+# Exit codes: 0 clean, 1 FAILURE, 2 harness error. Sidecar-dependent, so NOT in `deno task check`.
+cargo run -p tsv_debug compile_corpus_compare <paths...>
+# Also: --list, --json. Full detail: ./docs/compile_tooling.md
+
+# compile_corpus_compare --ratchet - the VALIDATION-SUITE GATE: the same pipeline over Svelte's
+# own compiler-errors + validator suites (~2/3 deliberately INVALID), graded against the committed
+# path-keyed known-bug snapshot `compile_validation_known.txt`. An over-acceptance is the ratcheted
+# debt; a MISMATCH and an unpinnable HARNESS-ERROR fail unconditionally. ⚠️ Always a SEPARATE
+# invocation from the ordinary corpus run — never extra roots on it.
+cargo run -p tsv_debug compile_corpus_compare --ratchet            # the gate
+cargo run -p tsv_debug compile_corpus_compare --ratchet --update   # re-pin
+# Full reference: ./docs/compile_validation_ratchet.md
+
+# compile_fuzz - the DIFFERENTIAL compile fuzzer: generate feature CROSS-PRODUCTS from the compile
+# fixtures (eleven AST/feature-level operators) and grade each mutant against the oracle — the
+# adversarial leg the real-component corpus can't be, since it exercises every feature while
+# missing nearly every feature PAIR. ⚠️ CURRENTLY RED BY DESIGN: a discovery tool with an open work
+# list, not a regression gate. Deterministic per --seed, independent of --jobs.
+cargo run --profile corpus -p tsv_debug compile_fuzz                 # tests/fixtures_compile
+cargo run --profile corpus -p tsv_debug compile_fuzz --iterations 20000 --dump-dir /tmp/cf
+# Also: --seed, --max-mutations N, --limit N, --jobs N, --max-findings N, --list, --json. Build with
+# `--profile corpus` so a panic in tsv's compile is caught and REPORTED rather than killing the run.
+# Findings cataloged in ./docs/checklist_svelte_compiler.md; full detail: ./docs/compile_tooling.md
+
+# erase_comment_census - size the type-eraser's comment-refusal haircut over a corpus (pure Rust,
+# no Deno): per lang="ts" component, count the comments intersecting an erased span's refusal
+# window. The rate is a LOWER BOUND (the census measures the forward half of a bidirectional
+# window). Full detail: ./docs/compile_tooling.md
+cargo run --release -p tsv_debug -- erase_comment_census ../fuz_ui ../zzz
+# Also: --verbose (per exposed file), --json.
+
 # format_prettier - format using prettier (shows line widths by default; --no-line-widths to hide)
 cargo run -p tsv_debug format_prettier file.svelte
 
@@ -727,6 +823,23 @@ cargo run -p tsv_debug ts_fixture_audit [pattern...]
 # non-zero on any finding. Gated in `deno task check`. Full detail: ./docs/audits.md
 cargo run -p tsv_debug conformance_audit
 # Also: --json (machine-readable: {orphans, dead_links, missing_backlinks, stray_readmes})
+
+# compile_conformance_audit - the compiler analog of conformance_audit, deliberately minimal: a
+# _compiled_divergence compile fixture must be cataloged in docs/conformance_svelte_compiler.md and
+# back-link it (the catalog is expected to stay EMPTY — a tripwire, not a standing gate), plus the
+# check that DOES hold today: checklist ↔ `Refusal` drift (a bucket key
+# docs/checklist_svelte_compiler.md quotes that the catalog can't produce GATES; the reverse is
+# report-only). Pure Rust (no Deno); exits non-zero on any finding. Gated in `deno task check`.
+cargo run -p tsv_debug compile_conformance_audit
+# Also: --json. Full detail: ./docs/audits.md
+
+# canonicalize_audit - canonicalize_js (the compile-parity reprint) at corpus scale: run the
+# canonicalizer twice per TS/JS file and bucket — input-rejected (informational), NON-IDEMPOTENT,
+# CORRUPT-OUTPUT, COMMENT-LOSS (the last three all failures). Pure Rust (no Deno); exits 1 on any
+# failure. Gated in `deno task check` over tests/fixtures + tests/fixtures_compile.
+cargo run -p tsv_debug canonicalize_audit tests/fixtures tests/fixtures_compile  # the check-gate scope
+cargo run -p tsv_debug canonicalize_audit ~/dev/zzz/src ~/dev/gro/src            # real-corpus sweep
+# Also: --json. Full detail: ./docs/audits.md
 ```
 
 > **Troubleshooting:** See ./docs/fixture_overview.md#quick-decision-tree
@@ -754,6 +867,7 @@ cargo run -p tsv_debug profile ~/dev/zzz/src/lib                    # parse vs f
 cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib  # FFI parse path: parse vs the wire-JSON write (§2)
 cargo run -p tsv_debug buffer_sizes ~/dev/zzz/src ~/dev/gro/src     # printer SmallVec sizing histograms (§8)
 cargo run -p tsv_debug arena_stats ~/dev/zzz/src/lib                # DocArena node-population + memory audit (§7; --reuse, --list-errors)
+cargo run --release -p tsv_debug -- compile_profile tests/fixtures_compile  # Svelte compile against the format wall (§9)
 ```
 
 **Codebase Metrics Commands:**
@@ -769,7 +883,8 @@ deno task metrics                          # shorthand
 the print-once comment ledger, gap/blank injection, build-fanout, raw-find scan,
 authoring-independence, format→reparse round-trip, comment↔token binding,
 render-equivalence, layout-neutrality, the seeded mutational fuzzer, the F1 idempotency
-sweep, the `audit:corpus` bundle, and the `lex_diff` differential lexer harness. Each is
+sweep, the `audit:corpus` bundle, the `lex_diff` differential lexer harness, and the two
+compiler audits (compile-fixture divergence integrity, the canonicalizer). Each is
 cataloged in ./docs/audits.md — what it proves, what it is blind to, flags, and where it
 gates; the `deno task` entry points are indexed in [Fixtures](#fixtures-rust--deno-based).
 Read the relevant section there before running or modifying an audit.
@@ -979,6 +1094,8 @@ formatting behavior. Key files: `src/language-js/print/assignment.js` (assignmen
 - ./docs/cli.md - CLI architecture and command patterns
 - ./docs/audits.md - the standing audit gates: what each proves, blind spots, flags, gating
 - ./docs/comments.md - the detached comment model: ownership, the three axes, hazards, emitters
+- ./docs/compile_tooling.md - the sidecar-dependent compiler harnesses: corpus compare, compile fuzz, erase census
+- ./docs/compile_validation_ratchet.md - the validation-suite ratchet: snapshot, kinds, verdict, triage
 - ./docs/performance.md - profiling methodology, tooling, and results tracking
 - ./docs/workflow_corpus.md - corpus-driven formatting conformance workflow
 - ./docs/workflow_test262.md - test262 conformance workflow
@@ -990,6 +1107,7 @@ formatting behavior. Key files: `src/language-js/print/assignment.js` (assignmen
 
 - ./docs/checklist_css.md
 - ./docs/checklist_svelte.md
+- ./docs/checklist_svelte_compiler.md
 - ./docs/checklist_typescript.md
 
 ## Bash Tool Notes

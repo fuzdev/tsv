@@ -1,0 +1,17 @@
+
+	@keyframes svelte-tsvhash-a {
+		from {
+			opacity: 0;
+		}
+	}
+	@keyframes svelte-tsvhash-b {
+		from {
+			opacity: 0;
+		}
+	}
+	.x.svelte-tsvhash {
+		animation:
+			svelte-tsvhash-a 1s ease,
+			svelte-tsvhash-b 2s;
+		animation-name: svelte-tsvhash-a, svelte-tsvhash-b;
+	}

@@ -1,0 +1,21 @@
+
+	@keyframes svelte-tsvhash-why {
+		0% {
+			color: red;
+		}
+		100% {
+			color: blue;
+		}
+	}
+	@-webkit-keyframes svelte-tsvhash-why {
+		0% {
+			color: red;
+		}
+		100% {
+			color: blue;
+		}
+	}
+	.animated.svelte-tsvhash {
+		-webkit-animation: svelte-tsvhash-why 2s;
+		animation: svelte-tsvhash-why 2s;
+	}

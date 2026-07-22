@@ -9,6 +9,7 @@ members = [
     "crates/tsv_ts",
     "crates/tsv_css",
     "crates/tsv_svelte",
+    "crates/tsv_svelte_compile",
     "crates/tsv_cli",
     "crates/tsv_debug",
     "crates/tsv_wasm",
@@ -44,6 +45,9 @@ tsv_discover = { path = "crates/tsv_discover" }
 tsv_ts = { path = "crates/tsv_ts", default-features = false }
 tsv_css = { path = "crates/tsv_css", default-features = false }
 tsv_svelte = { path = "crates/tsv_svelte", default-features = false }
+# Svelte→JS compiler + JS canonicalizer. Dev-tooling consumer only (tsv_debug);
+# no shipped artifact links it yet.
+tsv_svelte_compile = { path = "crates/tsv_svelte_compile" }
 
 # External dependencies
 argh = "0.1"
@@ -174,6 +178,7 @@ serde_json.workspace = true
 [dev-dependencies]
 tsv_debug = { path = "crates/tsv_debug" }
 tsv_cli = { path = "crates/tsv_cli" }
+tsv_svelte_compile.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 futures-util.workspace = true
 bumpalo.workspace = true

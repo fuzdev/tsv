@@ -21,6 +21,19 @@ impl<'a> Printer<'a> {
     /// hardline before the type (`: // c\n T`) so the line comment doesn't
     /// swallow what follows. Union types additionally INDENT the type; other
     /// types are not indented.
+    /// The crate-public seam for [`build_type_annotation_doc`]: `tsv_svelte` needs
+    /// it for a **destructuring** block binding pattern, whose braces it builds on
+    /// its own comment-preserving path and which therefore has to append the `: T`
+    /// tail explicitly.
+    ///
+    /// [`build_type_annotation_doc`]: Self::build_type_annotation_doc
+    pub(crate) fn build_type_annotation_doc_public(
+        &self,
+        annotation: &internal::TSTypeAnnotation<'_>,
+    ) -> DocId {
+        self.build_type_annotation_doc(annotation)
+    }
+
     pub(in crate::printer) fn build_type_annotation_doc(
         &self,
         annotation: &internal::TSTypeAnnotation<'_>,

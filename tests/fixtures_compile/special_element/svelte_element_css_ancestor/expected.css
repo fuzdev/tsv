@@ -1,0 +1,4 @@
+
+	foo.svelte-tsvhash span:where(.svelte-tsvhash) {
+		color: red;
+	}

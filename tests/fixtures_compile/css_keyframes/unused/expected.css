@@ -1,0 +1,12 @@
+
+	@keyframes svelte-tsvhash-unused {
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
+	}
+	.a.svelte-tsvhash {
+		color: red;
+	}

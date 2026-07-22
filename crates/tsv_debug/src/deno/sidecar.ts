@@ -284,6 +284,37 @@ async function dispatch(
 			return parseCss(content);
 		}
 
+		case 'svelte-compile': {
+			// Runes-only, SSR-first compile oracle. A fixed cssHash pins the scoping
+			// class to a constant and filename defaults to a constant, so identical
+			// input yields byte-identical output across calls (the compiled output
+			// embeds no version string at this pin, so no version normalization is
+			// needed). `css: 'external'` keeps CSS out of the JS for a clean diff.
+			const filename = (options?.filename as string | undefined) ?? 'input.svelte';
+			const generate = (options?.generate as 'server' | 'client' | undefined) ?? 'server';
+			const dev = (options?.dev as boolean | undefined) ?? false;
+			const result = svelteCompile(content, {
+				filename,
+				generate,
+				dev,
+				runes: true,
+				css: 'external',
+				cssHash: () => 'svelte-tsvhash',
+			});
+			return {
+				js: result.js.code,
+				css: result.css ? result.css.code : null,
+				// Project each warning to the fields the oracle diff needs; start/end
+				// are { line, column, character } objects, absent for non-positional warnings.
+				warnings: result.warnings.map((w) => ({
+					code: w.code,
+					message: w.message,
+					start: w.start,
+					end: w.end,
+				})),
+			};
+		}
+
 		case 'svelte-render-key': {
 			// The browser-visible render fingerprint (see `svelteRenderKey` above) — the
 			// authoritative render-equivalence oracle behind the fixture render-equivalence

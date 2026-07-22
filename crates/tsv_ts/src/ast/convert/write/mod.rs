@@ -339,9 +339,19 @@ pub(super) struct Ctx<'a> {
     /// bumped `+1` on this line only, reproducing `adjust_read_pattern_columns`.
     pub(super) pattern_line: usize,
     /// Block-pattern quirk: the span of the pattern's **top-level**
-    /// `TSTypeAnnotation`, whose `loc` is omitted (Svelte's `read_context`
-    /// synthesizes that node itself, without `loc`; nested annotations keep
-    /// theirs). The empty span (never a real annotation) when inactive.
+    /// `TSTypeAnnotation`. Two things key on it.
+    ///
+    /// Its own `loc` is omitted — Svelte's `read_context` synthesizes that node
+    /// itself, without `loc` (nested annotations keep theirs).
+    ///
+    /// And it **bounds the `+1` column bump**: Svelte reads the annotation with a
+    /// *second*, separately-padded acorn parse (`read_type_annotation`'s `_ as `
+    /// trick) that inserts no `(`, so the type nodes inside it are NOT shifted the
+    /// way the pattern's own nodes are. The bump therefore stops at this span's
+    /// start (inclusive — the pattern's own `loc.end` lands exactly there).
+    ///
+    /// `Span::new(u32::MAX, u32::MAX)` when inactive: never equal to a real
+    /// annotation's span, and an unreachable upper bound, so both uses are inert.
     pub(super) pattern_ann_span: Span,
     /// This pass's comment role (Svelte comment-attach paths). `Off` for every
     /// ordinary emission, so the hot path pays only a never-taken compare per
@@ -372,7 +382,7 @@ impl<'a> Ctx<'a> {
             source,
             loc,
             pattern_line: 0,
-            pattern_ann_span: Span::new(0, 0),
+            pattern_ann_span: Span::new(u32::MAX, u32::MAX),
             comments: CommentMode::Off,
             vanilla_acorn: false,
             emit_loc: true,
@@ -398,9 +408,17 @@ pub(super) fn close_node(w: &mut JsonWriter, node_type: &'static str, span: Span
 /// Apply the block-pattern `+1`-column adjustment: a node's `loc` column is
 /// bumped by one on `ctx.pattern_line` only (inert when `pattern_line == 0`,
 /// which never equals a real 1-based line).
+///
+/// The bump reproduces the synthetic `(`-wrapper Svelte's `read_pattern` parses
+/// the pattern under — so it applies only to nodes that came from THAT parse. A
+/// trailing `: T` is read by a *second*, separately-padded parse with no inserted
+/// `(` (`read_type_annotation`), so its type nodes keep their true columns:
+/// `offset` past the annotation's start is left alone. The bound is inclusive —
+/// the pattern's own `loc.end` sits exactly on the annotation's start — and inert
+/// without one (`pattern_ann_span.start == u32::MAX`).
 #[inline]
-pub(super) fn adjusted_column(ctx: &Ctx<'_>, line: usize, column: usize) -> usize {
-    if line == ctx.pattern_line {
+pub(super) fn adjusted_column(ctx: &Ctx<'_>, offset: u32, line: usize, column: usize) -> usize {
+    if line == ctx.pattern_line && offset <= ctx.pattern_ann_span.start {
         column + 1
     } else {
         column
@@ -443,6 +461,57 @@ pub(super) fn record_open(node_type: &'static str, span: Span, ctx: &Ctx<'_>) {
 #[inline]
 pub(super) fn node_header(w: &mut JsonWriter, node_type: &'static str, span: Span, ctx: &Ctx<'_>) {
     node_header_impl::<false>(w, node_type, span, ctx);
+}
+
+/// A header whose wire **`end` offset is widened past its `loc`** — the one node
+/// class where a node's byte range and its line/column range genuinely disagree.
+///
+/// A Svelte **block** binding pattern (`{#each xs as { a }: T}`, `{:then { a }: T}`)
+/// is parsed bare by acorn, after which Svelte's `read_pattern`
+/// (`1-parse/read/context.js`) patches `expression.end = typeAnnotation.end` and
+/// never touches `expression.loc`. acorn parsing the same pattern as a real
+/// *signature parameter* extends both — and there the internal span already covers
+/// the annotation, so the `max` below is a no-op. The internal span therefore
+/// records the **bare** pattern (which `loc` derives from) and the widened `end` is
+/// recovered here from the annotation.
+///
+/// Cold by construction: only reached by a destructuring pattern that actually
+/// carries an annotation, so the hot per-node path keeps its branch-free
+/// monomorphized header.
+pub(super) fn node_header_wide_end(
+    w: &mut JsonWriter,
+    node_type: &'static str,
+    span: Span,
+    wire_end: u32,
+    ctx: &Ctx<'_>,
+) {
+    let wire_end = wire_end.max(span.end);
+    record_open(node_type, span, ctx);
+    w.raw("{\"type\":\"");
+    w.raw(node_type);
+    w.raw("\"");
+    if !ctx.emit_loc {
+        w.raw(",\"start\":");
+        w.u32(ctx.loc.pos(span.start));
+        w.raw(",\"end\":");
+        w.u32(ctx.loc.pos(wire_end));
+        return;
+    }
+    let (start_pos, start) = ctx.loc.pos_and_position(span.start);
+    let (_, end) = ctx.loc.pos_and_position(span.end);
+    w.raw(",\"start\":");
+    w.u32(start_pos);
+    w.raw(",\"end\":");
+    w.u32(ctx.loc.pos(wire_end));
+    w.raw(",\"loc\":{\"start\":{\"line\":");
+    w.usize(start.line);
+    w.raw(",\"column\":");
+    w.usize(adjusted_column(ctx, span.start, start.line, start.column));
+    w.raw("},\"end\":{\"line\":");
+    w.usize(end.line);
+    w.raw(",\"column\":");
+    w.usize(adjusted_column(ctx, span.end, end.line, end.column));
+    w.raw("}}");
 }
 
 /// Shared body of `node_header` and the name-first identifier emission;
@@ -495,7 +564,7 @@ fn position_fields<const CHARACTER: bool>(w: &mut JsonWriter, span: Span, ctx: &
     w.raw(",\"loc\":{\"start\":{\"line\":");
     w.usize(start.line);
     w.raw(",\"column\":");
-    w.usize(adjusted_column(ctx, start.line, start.column));
+    w.usize(adjusted_column(ctx, span.start, start.line, start.column));
     if CHARACTER {
         w.raw(",\"character\":");
         w.u32(start_pos);
@@ -503,7 +572,7 @@ fn position_fields<const CHARACTER: bool>(w: &mut JsonWriter, span: Span, ctx: &
     w.raw("},\"end\":{\"line\":");
     w.usize(end.line);
     w.raw(",\"column\":");
-    w.usize(adjusted_column(ctx, end.line, end.column));
+    w.usize(adjusted_column(ctx, span.end, end.line, end.column));
     if CHARACTER {
         w.raw(",\"character\":");
         w.u32(end_pos);
