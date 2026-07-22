@@ -629,14 +629,14 @@ impl<'a> Printer<'a> {
                         // the trailing text wraps to its own line rather than hugging the dropped
                         // element's `>` — see `build_after_element_fold`.
                         let sandwiched = !child_docs.is_empty();
-                        child_docs
-                            .push(self.build_after_element_fold(last_doc, raw, false, sandwiched));
+                        child_docs.push(self.build_after_element_fold(last_doc, raw, sandwiched));
                         return;
                     }
-                    // Non-last (text between two inline elements): keep the existing
-                    // group-wrapped boundary. The fold isn't needed here (a following element
-                    // supplies the next break point) and changing it has no failing fixture —
-                    // revisit fixtures-first if a mid-run wide element ever needs it.
+                    // Non-last (text between two inline elements): keep the group-wrapped boundary.
+                    // The following element supplies the next break point, and folding the middle
+                    // text into the element (packing it onto the dangled `>` line) is non-convergent
+                    // — it shifts where the following element lands, flip-flopping across passes.
+                    // Pinned by `inline_wide_content_text_sibling_long`.
                     let line = d.line();
                     let inner = d.concat(&[last_doc, line]);
                     child_docs.push(d.group(inner));
@@ -1116,12 +1116,14 @@ impl<'a> Printer<'a> {
     }
 
     /// Build the after-element fold doc: one `fill([element, line, word …])` so the element's
-    /// closing `>` stays intact while the words pack greedily after it, plus (when
-    /// `trailing_line` — the next sibling is itself a flowing inline element/component) a
-    /// trailing `line` so the boundary to that next child can break. A wide element whose
+    /// closing `>` stays intact while the words pack greedily after it. A wide element whose
     /// content overflows wraps within print width and dangles its closing `>` on a low column;
     /// the trailing text then packs after it. Used by the inline/trimmed text path
-    /// ([`Self::handle_text_child`]) when an inline element is the last child before trailing text.
+    /// ([`Self::handle_text_child`]) when an inline element is the **last** child before trailing
+    /// text — the only position that folds. A non-terminal text run (one followed by another
+    /// flowing element) is never folded here: packing it onto the dangled `>` line is
+    /// non-convergent, pinned by
+    /// [`inline_wide_content_text_sibling_long`](../../../../../tests/fixtures/svelte/elements/inline_wide_content_text_sibling_long_prettier_divergence/).
     ///
     /// `sandwiched` (the element has a preceding sibling, so a preceding break can push it onto its
     /// own line) sets [`DocContext::break_after_dropped_first`]: when the element actually drops to
@@ -1130,21 +1132,12 @@ impl<'a> Printer<'a> {
     /// the drop came from the element's own content wrapping or from the preceding text being too
     /// long. A first-child element (`!sandwiched`) can't drop via a preceding sibling, so the
     /// trailing text packs after it normally.
-    fn build_after_element_fold(
-        &self,
-        prev: DocId,
-        raw: &str,
-        trailing_line: bool,
-        sandwiched: bool,
-    ) -> DocId {
+    fn build_after_element_fold(&self, prev: DocId, raw: &str, sandwiched: bool) -> DocId {
         let d = self.d();
         let mut parts = d.pooled_docbuf();
         parts.push(prev);
         parts.push(d.line());
         self.extend_with_word_fill(&mut parts, raw);
-        if trailing_line {
-            parts.push(d.line());
-        }
         let fill = d.fill(&parts);
         // `hug_wide_first` is always set: the fold's first item is the inline element, and when it
         // sits mid-line right after a parent element's `>` and is too wide for its own line, it must
@@ -1157,9 +1150,9 @@ impl<'a> Printer<'a> {
             tsv_lang::doc::DocContext {
                 hug_wide_first: true,
                 break_after_dropped_first: sandwiched,
-                // Terminal trailing text after a wide element hugs the dangled `>` (respecting the
-                // author's space boundary); non-terminal text (`trailing_line`) keeps its own line.
-                hug_terminal_after_break: !trailing_line,
+                // The fold only ever runs for terminal trailing text, which hugs the dangled `>`
+                // (respecting the author's space boundary).
+                hug_terminal_after_break: true,
                 ..Default::default()
             },
         )
