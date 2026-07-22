@@ -9,9 +9,6 @@ c:number/* c2 */=1;
 // Static property
 static d/* c3 */=1;
 
-// Definite assignment with type
-e!:number/* c4 */=1;
-
 // Optional with type
 f?:number/* c5 */=1;
 

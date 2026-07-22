@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 650,
+	"end": 644,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -158,19 +158,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 649,
+		"end": 643,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 640,
+			"end": 634,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 49,
+					"line": 48,
 					"column": 9
 				}
 			},
@@ -1404,14 +1404,14 @@
 				{
 					"type": "ClassDeclaration",
 					"start": 615,
-					"end": 639,
+					"end": 633,
 					"loc": {
 						"start": {
 							"line": 45,
 							"column": 1
 						},
 						"end": {
-							"line": 48,
+							"line": 47,
 							"column": 2
 						}
 					},
@@ -1435,14 +1435,14 @@
 					"body": {
 						"type": "ClassBody",
 						"start": 623,
-						"end": 639,
+						"end": 633,
 						"loc": {
 							"start": {
 								"line": 45,
 								"column": 9
 							},
 							"end": {
-								"line": 48,
+								"line": 47,
 								"column": 2
 							}
 						},
@@ -1480,41 +1480,6 @@
 									"name": "a"
 								},
 								"optional": true,
-								"value": null
-							},
-							{
-								"type": "PropertyDefinition",
-								"start": 633,
-								"end": 636,
-								"loc": {
-									"start": {
-										"line": 47,
-										"column": 2
-									},
-									"end": {
-										"line": 47,
-										"column": 5
-									}
-								},
-								"static": false,
-								"computed": false,
-								"key": {
-									"type": "Identifier",
-									"start": 633,
-									"end": 634,
-									"loc": {
-										"start": {
-											"line": 47,
-											"column": 2
-										},
-										"end": {
-											"line": 47,
-											"column": 3
-										}
-									},
-									"name": "b"
-								},
-								"definite": true,
 								"value": null
 							}
 						]
