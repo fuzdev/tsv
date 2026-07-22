@@ -9,6 +9,7 @@
 use crate::ast::internal;
 use crate::printer::ArrowChainContext;
 use crate::printer::calls::arg_predicates::arrow_has_trailing_param_comments;
+use crate::printer::class_common::{ClassHeaderLayout, ClassHeaderOptions};
 use crate::printer::layout::hang_after_operator;
 use crate::printer::needs_parens::leftmost_no_lookahead;
 use crate::printer::types::helpers::is_huggable_type;
@@ -1936,11 +1937,12 @@ impl<'a> Printer<'a> {
             extends_doc,
             implements_doc,
             class_expr.implements,
-            class_expr.body.body.is_empty(),
-            class_expr.body.span.start,
-            group_mode,
-            has_heritage_line_comments,
-            emit_pre_body_comments,
+            ClassHeaderOptions {
+                body_is_empty: class_expr.body.body.is_empty(),
+                body_start: class_expr.body.span.start,
+                layout: ClassHeaderLayout::from_flags(group_mode, has_heritage_line_comments),
+                emit_pre_body_comments,
+            },
         );
 
         d.concat(&[

@@ -141,10 +141,12 @@ pub(crate) fn print_node_inner<'a>(
         } => print_member_access(
             printer,
             *property,
-            *property_start,
+            MemberSpans {
+                name_start: *property_start,
+                object_end: *object_end,
+                property_start: *property_start,
+            },
             *optional,
-            *object_end,
-            *property_start,
             false,
             skip_comments,
         ),
@@ -158,10 +160,12 @@ pub(crate) fn print_node_inner<'a>(
         } => print_member_access(
             printer,
             *property,
-            *name_start,
+            MemberSpans {
+                name_start: *name_start,
+                object_end: *object_end,
+                property_start: *property_start,
+            },
             *optional,
-            *object_end,
-            *property_start,
             true,
             skip_comments,
         ),
@@ -425,21 +429,28 @@ fn computed_lookup_doc(
 ///
 /// The `skip_comments` flag is used by the expanded path where `add_comments_and_break`
 /// already handles comments for the first member of rest groups.
-#[allow(clippy::too_many_arguments)]
+/// Source positions for a member-access chain node.
+struct MemberSpans {
+    /// Start of the property name (a `#`-private name anchors past the `#`).
+    name_start: u32,
+    /// End of the object expression (start of the object→property gap).
+    object_end: u32,
+    /// Start of the property (end of the object→property gap).
+    property_start: u32,
+}
+
 fn print_member_access(
     printer: &Printer<'_>,
     property: internal::IdentName<'_>,
-    name_start: u32,
+    spans: MemberSpans,
     optional: bool,
-    object_end: u32,
-    property_start: u32,
     is_private: bool,
     skip_comments: bool,
 ) -> DocId {
     let d = printer.arena();
     // Build member doc without format! allocation — span-identity source slice
     // (or the escaped name's arena string)
-    let prop_doc = printer.ident_doc(property, name_start);
+    let prop_doc = printer.ident_doc(property, spans.name_start);
     let member_doc = match (optional, is_private) {
         (false, false) => d.concat(&[d.text("."), prop_doc]),
         (true, false) => d.concat(&[d.text("?."), prop_doc]),
@@ -461,7 +472,7 @@ fn print_member_access(
     }
 
     // Classify all comments in the range between object and property
-    let classified = printer.classify_comments(object_end, property_start);
+    let classified = printer.classify_comments(spans.object_end, spans.property_start);
 
     // Trailing block comments: same line as previous element (e.g., `method() /* c */.prop`)
     let trailing_block = printer.build_trailing_block_doc(&classified.trailing_block);

@@ -258,38 +258,35 @@ fn write_program(
 /// `<script>` block's `content` into its own buffer. Shares the host document's
 /// `LocationMapper` (spans are host-file coordinates), threads the
 /// `Schema`, and — unlike a standalone `Program` — emits the node's own `loc`
-/// from `loc_override` rather than deriving it from `program.span`.
+/// from `program_loc` rather than deriving it from `program.span`.
 ///
 /// Svelte reports the `Program` `loc` against the `<script>` **tag** (start line,
 /// column 0) and the tag's closing `</script>`, not the content span; the caller
-/// supplies those two final char-space `Position`s (the offset-translated form of
-/// Svelte's byte-space override). `start`/`end` offsets still come from
-/// `program.span` via `loc.pos`, and the body/`sourceType` are emitted exactly as
-/// the standalone program writer does — so an eligible (comment-free, `lang="ts"`,
-/// no preceding HTML comment) script's `content` matches the standalone
-/// `Program` emission.
-#[allow(clippy::too_many_arguments)]
+/// supplies those two final char-space `Position`s via `ProgramLoc::Emit` (the
+/// offset-translated form of Svelte's byte-space override), or `ProgramLoc::Omit`
+/// for the no-locations wire. `start`/`end` offsets still come from `program.span`
+/// via `loc.pos`, and the body/`sourceType` are emitted exactly as the standalone
+/// program writer does — so an eligible (comment-free, `lang="ts"`, no preceding
+/// HTML comment) script's `content` matches the standalone `Program` emission.
 pub fn write_program_embedded(
     w: &mut JsonWriter,
     program: &internal::Program<'_>,
     source: &str,
     loc: LocationMapper<'_>,
     schema: Schema,
-    loc_override: (Position, Position),
+    program_loc: ProgramLoc,
     comments: CommentMode<'_>,
-    emit_loc: bool,
 ) {
     let mut ctx = Ctx::new(source, loc);
     ctx.vanilla_acorn = schema.is_svelte_script();
     ctx.comments = comments;
-    ctx.emit_loc = emit_loc;
+    ctx.emit_loc = matches!(program_loc, ProgramLoc::Emit(..));
     record_open("Program", program.span, &ctx);
     w.raw("{\"type\":\"Program\",\"start\":");
     w.u32(loc.pos(program.span.start));
     w.raw(",\"end\":");
     w.u32(loc.pos(program.span.end));
-    if emit_loc {
-        let (start_pos, end_pos) = loc_override;
+    if let ProgramLoc::Emit(start_pos, end_pos) = program_loc {
         w.raw(",\"loc\":{\"start\":{\"line\":");
         w.usize(start_pos.line);
         w.raw(",\"column\":");
@@ -321,6 +318,21 @@ pub enum CommentMode<'a> {
     Off,
     Emit(&'a WriterComments),
     Record(&'a SkeletonRecorder),
+}
+
+/// The embedded `Program` node's `loc` source (see `write_program_embedded`).
+///
+/// Fuses the former `loc_override` + `emit_loc` parameters into one value so the
+/// "no `loc` but a meaningful override" state is unrepresentable — the caller no
+/// longer builds a dummy `Position` pair just to satisfy the signature. `Omit`
+/// is the no-locations wire, which drops `loc` from every node globally (it sets
+/// `Ctx::emit_loc`), this `Program` included.
+#[derive(Clone, Copy)]
+pub enum ProgramLoc {
+    /// No-locations wire: omit `loc` on the `Program` (and every node).
+    Omit,
+    /// Emit the `Program`'s `loc` from Svelte's tag-line `(start, end)` positions.
+    Emit(Position, Position),
 }
 
 /// The per-document environment every writer function shares (`source` and the

@@ -35,6 +35,50 @@ pub(in crate::printer) struct ClassHeritagePositions {
     pub header_end: u32,
 }
 
+/// How `build_class_header_doc` lays out the class heritage.
+///
+/// Encodes the real 3-state decision that `(group_mode, has_heritage_line_comments)`
+/// spelled as two booleans — the `(non-group, break)` combination is meaningless
+/// (a non-group header never consults the break flag), so an enum makes it
+/// unrepresentable.
+pub(in crate::printer) enum ClassHeaderLayout {
+    /// Heritage stays inline; type params break independently (no unified group).
+    Independent,
+    /// One unified group — heritage breaks with the header on overflow.
+    Group,
+    /// A unified group forced open (a heritage line comment consumes its line).
+    GroupBreak,
+}
+
+impl ClassHeaderLayout {
+    /// Resolve the layout from the caller's group / heritage-line-comment flags.
+    /// `has_heritage_line_comments` is only meaningful in group mode.
+    pub(in crate::printer) fn from_flags(
+        group_mode: bool,
+        has_heritage_line_comments: bool,
+    ) -> Self {
+        match (group_mode, has_heritage_line_comments) {
+            (false, _) => Self::Independent,
+            (true, false) => Self::Group,
+            (true, true) => Self::GroupBreak,
+        }
+    }
+}
+
+/// Non-content inputs to `build_class_header_doc` — the body's shape/position,
+/// the heritage layout, and whether to emit header→body comments here.
+pub(in crate::printer) struct ClassHeaderOptions {
+    /// The class body is `{}` — keep ` {}` on the heritage line (never `line()`).
+    pub body_is_empty: bool,
+    /// Start of the class body `{` — bounds the header→body comment scan.
+    pub body_start: u32,
+    /// How the heritage clauses lay out (group / independent / forced break).
+    pub layout: ClassHeaderLayout,
+    /// Emit header→body comments here (false when the caller already emitted the
+    /// bare name→body / anonymous→body comments).
+    pub emit_pre_body_comments: bool,
+}
+
 impl<'a> Printer<'a> {
     /// Compute the heritage positions shared by both class printers.
     pub(in crate::printer) fn class_heritage_positions(
@@ -275,7 +319,6 @@ impl<'a> Printer<'a> {
     /// class-expression printer's bare name→body / anonymous→body paths emit
     /// their own comments, so it passes `false` when there is no heritage or
     /// type params (the declaration always passes `true`).
-    #[allow(clippy::too_many_arguments)]
     pub(in crate::printer) fn build_class_header_doc(
         &self,
         mut parts: DocBuf,
@@ -283,16 +326,12 @@ impl<'a> Printer<'a> {
         extends_doc: Option<DocId>,
         implements_doc: Option<DocId>,
         implements: &[internal::TSInterfaceHeritage<'_>],
-        body_is_empty: bool,
-        body_start: u32,
-        group_mode: bool,
-        has_heritage_line_comments: bool,
-        emit_pre_body_comments: bool,
+        options: ClassHeaderOptions,
     ) -> DocId {
         let d = self.d();
         let header_end = positions.header_end;
 
-        if !group_mode {
+        if matches!(options.layout, ClassHeaderLayout::Independent) {
             // Non-group mode: heritage stays inline, type params break independently.
             if let Some(ext) = extends_doc {
                 parts.push(d.text(" "));
@@ -303,9 +342,9 @@ impl<'a> Printer<'a> {
                 parts.push(impl_doc);
             }
             parts.push(self.build_header_pre_body_doc(
-                emit_pre_body_comments,
+                options.emit_pre_body_comments,
                 header_end,
-                body_start,
+                options.body_start,
             ));
             return d.concat(&parts);
         }
@@ -351,23 +390,23 @@ impl<'a> Printer<'a> {
         // Line comments force a hardline (they'd absorb the brace). For a
         // non-empty body, `line()` puts the brace on its own line when the
         // group breaks; an empty body always keeps ` {}` on the heritage line.
-        let has_line_comment =
-            emit_pre_body_comments && self.has_line_comments_between(header_end, body_start);
-        if emit_pre_body_comments
-            && let Some(comments) = self.build_pre_body_comments_doc(header_end, body_start)
+        let has_line_comment = options.emit_pre_body_comments
+            && self.has_line_comments_between(header_end, options.body_start);
+        if options.emit_pre_body_comments
+            && let Some(comments) = self.build_pre_body_comments_doc(header_end, options.body_start)
         {
             parts.push(comments);
         }
         if has_line_comment {
             parts.push(d.hardline());
-        } else if body_is_empty {
+        } else if options.body_is_empty {
             parts.push(d.text(" "));
         } else {
             parts.push(d.line());
         }
 
         let parts_doc = d.concat(&parts);
-        if has_heritage_line_comments {
+        if matches!(options.layout, ClassHeaderLayout::GroupBreak) {
             d.group_break(parts_doc)
         } else {
             d.group(parts_doc)

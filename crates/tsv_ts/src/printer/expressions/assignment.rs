@@ -862,6 +862,24 @@ pub fn is_simple_value(expr: &Expression<'_>) -> bool {
     )
 }
 
+/// The RHS comment / stripped-paren-boundary controls for
+/// `build_assignment_layout_with_line_comment`.
+///
+/// Bundles the three inputs describing comments and grouping-paren boundaries
+/// around the RHS, so the layout entry point takes one value instead of three
+/// loose args.
+pub struct RhsCommentInfo {
+    /// Inline comments between the operator and the RHS (e.g. `x = /** @type {T} */ (e)`);
+    /// `None` when the caller handles comments separately.
+    pub comments: Option<DocId>,
+    /// The operator→RHS gap holds a line comment (or an own-line / multiline block),
+    /// forcing `BreakAfterOperator` so the comment and value indent together.
+    pub has_line_comment: bool,
+    /// When `Some`, scan for trailing comments from stripped grouping parens between
+    /// the RHS end and this boundary, wrapping in parens if found.
+    pub boundary: Option<u32>,
+}
+
 impl<'a> Printer<'a> {
     /// Build a Doc for an assignment (variable declaration or object property)
     ///
@@ -886,9 +904,11 @@ impl<'a> Printer<'a> {
             operator,
             right_expr,
             is_short_key,
-            rhs_comments,
-            false,
-            None,
+            RhsCommentInfo {
+                comments: rhs_comments,
+                has_line_comment: false,
+                boundary: None,
+            },
         )
     }
 
@@ -899,16 +919,13 @@ impl<'a> Printer<'a> {
     ///
     /// When `right_boundary` is `Some`, checks for trailing comments from stripped grouping
     /// parens between `right_expr.span().end` and the boundary. If found, wraps in parens.
-    #[allow(clippy::too_many_arguments)]
     pub fn build_assignment_layout_with_line_comment(
         &self,
         left_doc: DocId,
         operator: &'static str,
         right_expr: &Expression<'_>,
         is_short_key: bool,
-        rhs_comments: Option<DocId>,
-        rhs_has_line_comment: bool,
-        right_boundary: Option<u32>,
+        rhs_info: RhsCommentInfo,
     ) -> DocId {
         let d = self.d();
         let mut layout = choose_layout(
@@ -929,11 +946,11 @@ impl<'a> Printer<'a> {
         // Multiline block comments (e.g., `a = /**\n * comment\n */\n  b`) also
         // force break-after-operator. Detected via will_break on the rhs_comments doc.
         // Prettier ref: hasLeadingOwnLineComment → break-after-operator in chooseLayout
-        if rhs_has_line_comment && layout != AssignmentLayout::BreakAfterOperator {
+        if rhs_info.has_line_comment && layout != AssignmentLayout::BreakAfterOperator {
             layout = AssignmentLayout::BreakAfterOperator;
         }
         if layout != AssignmentLayout::BreakAfterOperator
-            && let Some(comments_doc) = rhs_comments
+            && let Some(comments_doc) = rhs_info.comments
             && d.will_break(comments_doc)
         {
             layout = AssignmentLayout::BreakAfterOperator;
@@ -968,7 +985,7 @@ impl<'a> Printer<'a> {
             ArrowChainContext::None
         };
         let right_doc = self.build_with_arrow_chain_context(chain_context, || {
-            if let Some(boundary) = right_boundary {
+            if let Some(boundary) = rhs_info.boundary {
                 self.build_expression_doc_with_paren_comments(right_expr, boundary)
             } else {
                 self.build_expression_doc(right_expr)
@@ -1022,7 +1039,7 @@ impl<'a> Printer<'a> {
 
         // Build the RHS doc with optional inline comments prepended
         // Comments use Trailing spacing (`/* comment */ `) so no extra space needed
-        let right_doc_with_comments = if let Some(comments_doc) = rhs_comments {
+        let right_doc_with_comments = if let Some(comments_doc) = rhs_info.comments {
             d.concat(&[comments_doc, right_doc])
         } else {
             right_doc
