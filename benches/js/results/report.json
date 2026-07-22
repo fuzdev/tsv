@@ -14,7 +14,7 @@
 			"runtime": "deno",
 			"timestamp": "2026-07-22T09:08:34.891Z",
 			"git_commit": "d063479a",
-			"tsv": "0.1.0",
+			"tsv": "0.2.0",
 			"machine": {
 				"cpu_model": "AMD Ryzen 5 PRO 7530U with Radeon Graphics",
 				"os": "linux",
@@ -26,7 +26,7 @@
 			"runtime": "node",
 			"timestamp": "2026-07-22T09:18:34.995Z",
 			"git_commit": "d063479a",
-			"tsv": "0.1.0",
+			"tsv": "0.2.0",
 			"machine": {
 				"cpu_model": "AMD Ryzen 5 PRO 7530U with Radeon Graphics",
 				"os": "linux",
@@ -38,7 +38,7 @@
 			"runtime": "bun",
 			"timestamp": "2026-07-22T09:27:00.825Z",
 			"git_commit": "d063479a",
-			"tsv": "0.1.0",
+			"tsv": "0.2.0",
 			"machine": {
 				"cpu_model": "AMD Ryzen 5 PRO 7530U with Radeon Graphics",
 				"os": "linux",
