@@ -5,12 +5,19 @@ comment (`fn<{ /* empty */ }>()`, `fn<{ // empty }>()`).
 
 ## Formatting divergence (prettier)
 
-tsv keeps the empty type argument hugged to the opening angle bracket. An inline
-block comment stays inline in both formatters (`const a` — `fn<{ /* empty */ }>()`).
-A line comment forces the body across lines: tsv keeps it hugged
-(`fn<{ \n // empty \n }>()`), while prettier breaks the whole `<…>` list onto its
-own indented lines (`const b`). The comment stays where the author wrote it in
-both formatters — only the angle-bracket layout differs.
+tsv keeps the empty type argument's bracket spacing — `fn<{ /* empty */ }>()` —
+where prettier 3.9.5 tightens the comment-only body to `fn<{/* empty */}>()`
+(`const a`). A line-comment body breaks multiline and hugs in both (`const b`,
+`fn<{ \n // empty \n }>()`) — no divergence there. The comment stays where the
+author wrote it in both formatters; only the bracket padding differs.
+
+This is the same bracket-spacing rule as
+[literal_body_empty](../../../types/comments/literal_body_empty_prettier_divergence/)
+and
+[union_empty_object_member](../../../types/union_empty_object_member_prettier_divergence/),
+pinned in call type-argument position. Prettier ≤3.9.4 additionally broke the
+whole `<…>` list onto its own indented lines for the line-comment body where tsv
+hugged; prettier 3.9.5 converged on the hug, leaving only the bracket spacing.
 
 See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
-§Single curly type-argument hug.
+§Empty-object comment bracket spacing.
