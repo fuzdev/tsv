@@ -13,7 +13,7 @@ use super::render_config::RenderConfig;
 use super::render_config::RenderPurpose;
 #[cfg(feature = "swallow_check")]
 use super::swallow::SwallowTracker;
-use super::types::{CachedWidth, DocContext, GroupId, LineKind, Mode, TextResolver, resolve_text};
+use super::types::{CachedWidth, DocContext, GroupId, LineKind, Mode, resolve_text};
 #[cfg(feature = "comment_check")]
 use crate::comment_ledger;
 
@@ -78,11 +78,11 @@ fn trim_last_line_in_place(s: &mut String) {
 /// pointer would take their address and sink them out of registers in the hot loop. A `&RenderCtx`
 /// has no aliasing writes through it, so its field loads hoist freely — and `render_doc_core`
 /// already hoists the arena borrows into locals for the loop body regardless.
-pub(super) struct RenderCtx<'a, R: TextResolver + ?Sized> {
+pub(super) struct RenderCtx<'a> {
     pub(super) arena: &'a DocArena,
     pub(super) render: &'a RenderConfig,
     pub(super) embed: &'a EmbedContext,
-    pub(super) resolver: Option<&'a R>,
+    pub(super) source: Option<&'a str>,
 }
 
 /// Render text content and update position.
@@ -97,14 +97,14 @@ pub(super) struct RenderCtx<'a, R: TextResolver + ?Sized> {
 /// branch-misses down alongside — a real win, not an icache artifact.
 #[allow(clippy::inline_always)]
 #[inline(always)]
-fn render_text<R: TextResolver + ?Sized>(
+fn render_text(
     text: &super::types::DocText,
     output: &mut String,
     pos: &mut usize,
-    resolver: Option<&R>,
+    source: Option<&str>,
     pool: &str,
 ) {
-    let s = resolve_text(text, resolver, pool);
+    let s = resolve_text(text, source, pool);
     output.push_str(s);
     match text.cached_width() {
         CachedWidth::Width(w) => *pos += w as usize, // Common path: no visual_width call
@@ -116,8 +116,8 @@ fn render_text<R: TextResolver + ?Sized>(
 /// Update position after rendering a text string, accounting for tab expansion.
 ///
 /// The overwhelmingly common input here is short ASCII with no newline — every
-/// interned identifier (`Symbol`) and every span-identity identifier name
-/// (`source_span_ident`) reaches this via `render_text`'s uncached-width arm
+/// span-identity identifier name (`source_span_ident`) reaches this via
+/// `render_text`'s uncached-width arm
 /// (statics carry an amortized cached width and skip it). For those the previous
 /// shape scanned the bytes three times (`rfind('\n')` + `visual_width`'s own
 /// `is_ascii` + tab count). The fast path below folds the newline reset, tab
@@ -231,8 +231,8 @@ fn render_line_break(
 /// there exists only to cancel the stack's LIFO pop, so the net emission order is
 /// FIFO. This renderer drives the suffixes directly, so it must iterate forward:
 /// reversing here would emit two suffixes queued on one line back-to-front.
-fn flush_line_suffix<R: TextResolver + ?Sized>(
-    ctx: &RenderCtx<'_, R>,
+fn flush_line_suffix(
+    ctx: &RenderCtx<'_>,
     line_suffix: &mut LineSuffixBuf,
     output: &mut String,
     pos: &mut usize,
@@ -260,7 +260,6 @@ fn flush_line_suffix<R: TextResolver + ?Sized>(
 fn process_indent_if_break(
     contents: DocId,
     group_id: GroupId,
-    negate: bool,
     group_mode_map: Option<&GroupModeMap>,
     cmd: &ArenaCommand,
 ) -> ArenaCommand {
@@ -268,13 +267,7 @@ fn process_indent_if_break(
         .and_then(|map| map.get(group_id))
         .unwrap_or(Mode::Flat);
 
-    let should_indent = if negate {
-        group_mode == Mode::Flat
-    } else {
-        group_mode == Mode::Break
-    };
-
-    if should_indent {
+    if group_mode == Mode::Break {
         cmd.indented(contents)
     } else {
         cmd.with_doc(contents)
@@ -287,7 +280,7 @@ fn process_indent_if_break(
 
 /// Convert an arena doc tree to a formatted string (starting at column 0).
 pub fn arena_print_doc(arena: &DocArena, doc: DocId, embed: &EmbedContext) -> String {
-    arena_print_doc_at_column(arena, doc, embed, 0)
+    arena_print_doc_with_indent_and_render(arena, doc, embed, 0, 0, &RenderConfig::default())
 }
 
 /// **Measure** a doc's flat-layout width: render at effectively infinite print width, so
@@ -298,11 +291,11 @@ pub fn arena_print_doc(arena: &DocArena, doc: DocId, embed: &EmbedContext) -> St
 /// as emitted. Writing this string into the document would make every comment it covers read
 /// as DROPPED to the ledger (and, if the real render also runs, DOUBLE-PRINTED). Use a
 /// `arena_print_doc_*` entry to produce output.
-pub fn arena_measure_doc_flat_resolved<R: TextResolver + ?Sized>(
+pub fn arena_measure_doc_flat_resolved(
     arena: &DocArena,
     doc: DocId,
     embed: &EmbedContext,
-    resolver: &R,
+    source: &str,
 ) -> String {
     let render = RenderConfig {
         print_width: usize::MAX / 2,
@@ -320,7 +313,7 @@ pub fn arena_measure_doc_flat_resolved<R: TextResolver + ?Sized>(
             arena,
             render: &render,
             embed,
-            resolver: Some(resolver),
+            source: Some(source),
         },
         doc,
         &mut output,
@@ -331,69 +324,19 @@ pub fn arena_measure_doc_flat_resolved<R: TextResolver + ?Sized>(
     trim_last_line(output)
 }
 
-/// Convert an arena doc tree to a formatted string, starting at a specific column.
-pub fn arena_print_doc_at_column(
-    arena: &DocArena,
-    doc: DocId,
-    embed: &EmbedContext,
-    start_column: usize,
-) -> String {
-    arena_print_doc_with_indent(arena, doc, embed, start_column, 0)
-}
-
-/// Convert an arena doc tree to a formatted string with column and indent level.
-pub fn arena_print_doc_with_indent(
-    arena: &DocArena,
-    doc: DocId,
-    embed: &EmbedContext,
-    start_column: usize,
-    start_indent_level: usize,
-) -> String {
-    arena_print_doc_with_indent_and_render(
-        arena,
-        doc,
-        embed,
-        start_column,
-        start_indent_level,
-        &RenderConfig::default(),
-    )
-}
-
-/// Convert an arena doc tree to a formatted string with column, indent, and symbol resolution.
-pub fn arena_print_doc_with_indent_resolved<R: TextResolver + ?Sized>(
-    arena: &DocArena,
-    doc: DocId,
-    embed: &EmbedContext,
-    start_column: usize,
-    start_indent_level: usize,
-    resolver: &R,
-) -> String {
-    let mut output = String::new();
-    arena_print_doc_with_indent_resolved_into(
-        arena,
-        doc,
-        embed,
-        start_column,
-        start_indent_level,
-        resolver,
-        &mut output,
-    );
-    output
-}
-
-/// Like [`arena_print_doc_with_indent_resolved`], rendering into a
-/// caller-provided (empty) buffer — the seam behind the printers' pooled
+/// Render an arena doc tree (with column, indent, and source-span resolution)
+/// into a caller-provided (empty) buffer — the seam behind the printers' pooled
 /// render scratch ([`DocArena::take_render_scratch`]), so the per-statement
 /// output `String` reuses one warm allocation instead of alloc/free per call.
 /// Reserves [`DocArena::estimated_output_capacity`] itself (a no-op once the
 /// pooled buffer is warm).
-pub fn arena_print_doc_with_indent_resolved_into<R: TextResolver + ?Sized>(
+pub fn arena_print_doc_with_indent_resolved_into(
     arena: &DocArena,
     doc: DocId,
     embed: &EmbedContext,
     start_column: usize,
     start_indent_level: usize,
-    resolver: &R,
+    source: &str,
     output: &mut String,
 ) {
     let render = RenderConfig::default();
@@ -405,7 +348,7 @@ pub fn arena_print_doc_with_indent_resolved_into<R: TextResolver + ?Sized>(
             arena,
             render: &render,
             embed,
-            resolver: Some(resolver),
+            source: Some(source),
         },
         doc,
         output,
@@ -416,41 +359,19 @@ pub fn arena_print_doc_with_indent_resolved_into<R: TextResolver + ?Sized>(
     trim_last_line_in_place(output);
 }
 
-/// Convert an arena doc tree, preserving trailing whitespace on the last line
-/// (for HTML `<pre>`, `<textarea>`, etc.). Interior non-literal lines are still
-/// trimmed inline by `render_line_break`; only the final-line trim is skipped.
-pub fn arena_print_doc_with_indent_resolved_preserve_whitespace<R: TextResolver + ?Sized>(
-    arena: &DocArena,
-    doc: DocId,
-    embed: &EmbedContext,
-    start_column: usize,
-    start_indent_level: usize,
-    resolver: &R,
-) -> String {
-    let mut output = String::new();
-    arena_print_doc_with_indent_resolved_preserve_whitespace_into(
-        arena,
-        doc,
-        embed,
-        start_column,
-        start_indent_level,
-        resolver,
-        &mut output,
-    );
-    output
-}
-
-/// Like [`arena_print_doc_with_indent_resolved_preserve_whitespace`],
-/// rendering into a caller-provided (empty) buffer — the pooled-scratch seam
-/// (see [`arena_print_doc_with_indent_resolved_into`]). Reserves
+/// Render an arena doc tree into a caller-provided (empty) buffer, preserving
+/// trailing whitespace on the last line (for HTML `<pre>`, `<textarea>`, etc.).
+/// Interior non-literal lines are still trimmed inline by `render_line_break`;
+/// only the final-line trim is skipped. The pooled-scratch seam (see
+/// [`arena_print_doc_with_indent_resolved_into`]); reserves
 /// [`DocArena::estimated_output_capacity`] itself.
-pub fn arena_print_doc_with_indent_resolved_preserve_whitespace_into<R: TextResolver + ?Sized>(
+pub fn arena_print_doc_with_indent_resolved_preserve_whitespace_into(
     arena: &DocArena,
     doc: DocId,
     embed: &EmbedContext,
     start_column: usize,
     start_indent_level: usize,
-    resolver: &R,
+    source: &str,
     output: &mut String,
 ) {
     let render = RenderConfig::default();
@@ -462,7 +383,7 @@ pub fn arena_print_doc_with_indent_resolved_preserve_whitespace_into<R: TextReso
             arena,
             render: &render,
             embed,
-            resolver: Some(resolver),
+            source: Some(source),
         },
         doc,
         output,
@@ -486,12 +407,12 @@ pub(crate) fn arena_print_doc_with_indent_and_render(
     let mut output = String::with_capacity(arena.estimated_output_capacity());
     let mut pos: usize = start_column;
 
-    render_doc_iterative::<dyn TextResolver>(
+    render_doc_iterative(
         &RenderCtx {
             arena,
             render,
             embed,
-            resolver: None,
+            source: None,
         },
         doc,
         &mut output,
@@ -672,8 +593,8 @@ impl RenderPolicy for SingleDocPolicy {
 /// `line_suffix` content (flushed at line breaks and once at the end), and
 /// (under the `swallow_check` feature) hosts the line-comment swallow
 /// diagnostic. The loop itself is [`render_doc_core`].
-fn render_doc_iterative<R: TextResolver + ?Sized>(
-    ctx: &RenderCtx<'_, R>,
+fn render_doc_iterative(
+    ctx: &RenderCtx<'_>,
     doc: DocId,
     output: &mut String,
     pos: &mut usize,
@@ -732,8 +653,8 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
 // work buffers). Deliberately not bundled: a struct would take their address and sink them out
 // of registers in the hot loop — see `RenderCtx`, which carries only the shared context.
 #[allow(clippy::too_many_arguments)]
-fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
-    ctx: &RenderCtx<'_, R>,
+fn render_doc_core<P: RenderPolicy>(
+    ctx: &RenderCtx<'_>,
     doc: DocId,
     output: &mut String,
     pos: &mut usize,
@@ -748,7 +669,7 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
         arena,
         render,
         embed,
-        resolver,
+        source,
     } = ctx;
     // The loop's termination condition is `commands` draining back to empty,
     // so the caller-provided (pooled or local) stack must start empty.
@@ -785,10 +706,10 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
             DocNode::Text(t) => {
                 #[cfg(feature = "swallow_check")]
                 if policy.swallow_enabled() {
-                    let s = resolve_text(t, resolver, pool);
+                    let s = resolve_text(t, source, pool);
                     policy.swallow_on_text(arena.is_line_comment(cmd.doc), s, output);
                 }
-                render_text(t, output, pos, resolver, pool);
+                render_text(t, output, pos, source, pool);
             }
 
             DocNode::MultilineText { span, .. } => {
@@ -930,7 +851,7 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
                             commands,
                             remaining,
                             embed,
-                            resolver,
+                            source,
                         );
 
                         if contents_fit {
@@ -951,7 +872,7 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
                                     commands,
                                     remaining,
                                     embed,
-                                    resolver,
+                                    source,
                                 );
                                 if state_fits {
                                     *should_remeasure = false;
@@ -985,7 +906,7 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
                         commands,
                         remaining_width(*pos, render, embed),
                         embed,
-                        resolver,
+                        source,
                     );
                     if fits {
                         *should_remeasure = false;
@@ -1021,21 +942,10 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
                 continue;
             }
 
-            DocNode::IndentIfBreak {
-                contents,
-                group_id,
-                negate,
-            } => {
+            DocNode::IndentIfBreak { contents, group_id } => {
                 let contents = *contents;
                 let group_id = *group_id;
-                let negate = *negate;
-                cmd = process_indent_if_break(
-                    contents,
-                    group_id,
-                    negate,
-                    policy.group_mode_map(),
-                    &cmd,
-                );
+                cmd = process_indent_if_break(contents, group_id, policy.group_mode_map(), &cmd);
                 continue;
             }
 
@@ -1123,8 +1033,8 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
 }
 
 /// Render a single doc with specified mode (helper for Fill).
-pub(super) fn render_single_doc<R: TextResolver + ?Sized>(
-    ctx: &RenderCtx<'_, R>,
+pub(super) fn render_single_doc(
+    ctx: &RenderCtx<'_>,
     doc: DocId,
     output: &mut String,
     pos: &mut usize,
@@ -1162,8 +1072,8 @@ pub(super) fn render_single_doc<R: TextResolver + ?Sized>(
 // work buffers). Deliberately not bundled: a struct would take their address and sink them out
 // of registers in the hot loop — see `RenderCtx`, which carries only the shared context.
 #[allow(clippy::too_many_arguments)]
-fn render_single_doc_inner<R: TextResolver + ?Sized>(
-    ctx: &RenderCtx<'_, R>,
+fn render_single_doc_inner(
+    ctx: &RenderCtx<'_>,
     doc: DocId,
     output: &mut String,
     pos: &mut usize,
@@ -1260,6 +1170,8 @@ mod column_arithmetic_tests {
     //! flagged each arm below as an unasserted survivor; corruption-verify any
     //! change here by breaking the arm and watching exactly one assertion fail.
     use super::RenderConfig;
+    #[cfg(feature = "comment_check")]
+    use super::RenderPurpose;
     use super::{
         RenderIndent, effective_suffix_width, indent_str_width, indent_width, line_start_column,
         update_pos_for_text,
@@ -1351,7 +1263,8 @@ mod column_arithmetic_tests {
         RenderConfig {
             print_width: 100,
             indent,
-            ..RenderConfig::default()
+            #[cfg(feature = "comment_check")]
+            purpose: RenderPurpose::Output,
         }
     }
 

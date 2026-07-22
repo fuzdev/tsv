@@ -4,33 +4,11 @@
 // - Linearization: Flatten nested AST into a flat list of ChainNodes
 // - Grouping: Group nodes by natural break points
 // - Merge decisions: Determine if first groups should be merged
-// - SymbolLookup trait for identifier resolution
 
-use super::printing::ChainPrinter;
 use super::types::{ChainGroup, ChainGroupVec, ChainNode, ChainNodeVec};
 use crate::ast::internal::{self, Expression, IdentName};
-use crate::printer::{ParenContext, needs_parens};
+use crate::printer::{ParenContext, Printer, needs_parens};
 use tsv_lang::TAB_WIDTH;
-
-//
-// Symbol Lookup Trait
-//
-
-/// Trait for looking up identifier names (abstraction over source + interner)
-pub trait SymbolLookup {
-    /// Resolve the name channel (span-identity slice at `name_start`, or the
-    /// interned escaped form) and apply `f` without materializing a `String`.
-    ///
-    /// Callback style keeps the interner borrow inside the call, so implementations
-    /// backed by `Rc<RefCell<…>>` don't need an owned copy to outlive the borrow.
-    /// Returns `None` when an escaped symbol is unknown to the interner.
-    fn with_name<R>(
-        &self,
-        name: IdentName,
-        name_start: u32,
-        f: impl FnOnce(&str) -> R,
-    ) -> Option<R>;
-}
 
 //
 // Linearization
@@ -486,10 +464,7 @@ pub fn group_chain_nodes<'a>(nodes: &[ChainNode<'a>]) -> ChainGroupVec<'a> {
 /// Corresponds to prettier's `shouldMerge` logic:
 /// - `Object.keys(items).filter()` → merge "Object" + ".keys()" on first line
 /// - `_.values(obj).map()` → merge "_" + ".values()" on first line
-pub fn should_merge_first_groups<'a, P: ChainPrinter>(
-    groups: &[ChainGroup<'a>],
-    printer: &P,
-) -> bool {
+pub fn should_merge_first_groups<'a>(groups: &[ChainGroup<'a>], printer: &Printer<'_>) -> bool {
     if groups.len() < 2 {
         return false;
     }
@@ -505,7 +480,7 @@ pub fn should_merge_first_groups<'a, P: ChainPrinter>(
 /// Corresponds to prettier's `shouldNotWrap` logic:
 /// - Single base that's `this`, factory identifier, or short name (in expression statement)
 /// - Multiple nodes where last is member with factory property
-pub fn should_not_wrap<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: &P) -> bool {
+pub fn should_not_wrap<'a>(groups: &[ChainGroup<'a>], printer: &Printer<'_>) -> bool {
     if groups.len() < 2 {
         return false;
     }
@@ -553,10 +528,8 @@ pub fn should_not_wrap<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
 ///
 /// Prettier ref: `isShort` in print/member-chain.js:284
 /// Uses `name.length <= options.tabWidth` (JS .length, ASCII-only in practice)
-fn is_short_name(name: IdentName, name_start: u32, interner: &impl SymbolLookup) -> bool {
-    interner
-        .with_name(name, name_start, |name| name.len() <= TAB_WIDTH)
-        .unwrap_or(false)
+fn is_short_name(name: IdentName<'_>, name_start: u32, printer: &Printer<'_>) -> bool {
+    printer.with_ident_name_at(name, name_start, |name| name.len() <= TAB_WIDTH)
 }
 
 /// Check if an identifier name is a factory pattern.
@@ -565,14 +538,12 @@ fn is_short_name(name: IdentName, name_start: u32, interner: &impl SymbolLookup)
 /// Matches Prettier's `isFactory`: `/^[A-Z]|^[$_]+$/u` (member-chain.js:273)
 /// - Starts with uppercase: `Object`, `React`, `Observable`
 /// - Pure `$`/`_` identifiers: `$`, `_`, `$_`, `$__` (lodash-style)
-fn is_factory_name(name: IdentName, name_start: u32, interner: &impl SymbolLookup) -> bool {
-    interner
-        .with_name(
-            name,
-            name_start,
-            crate::printer::expressions::literals::is_factory_identifier_name,
-        )
-        .unwrap_or(false)
+fn is_factory_name(name: IdentName<'_>, name_start: u32, printer: &Printer<'_>) -> bool {
+    printer.with_ident_name_at(
+        name,
+        name_start,
+        crate::printer::expressions::literals::is_factory_identifier_name,
+    )
 }
 
 #[cfg(test)]
@@ -580,34 +551,29 @@ mod tests {
     use super::*;
     use crate::ast::internal::{CallExpression, Identifier, MemberExpression};
     use bumpalo::Bump;
-    use string_interner::DefaultStringInterner;
     use tsv_lang::Span;
 
     /// Helper to create an identifier expression. Tests fabricate spans with no
-    /// backing source, so the name rides the escaped/interned channel (resolved
-    /// through the interner regardless of span).
-    fn make_identifier<'arena>(
-        interner: &mut DefaultStringInterner,
-        name: &str,
-    ) -> Expression<'arena> {
+    /// backing source, so the name rides the escaped channel (an `&'arena str`
+    /// resolved directly, regardless of span).
+    fn make_identifier<'arena>(name: &'arena str) -> Expression<'arena> {
         let len = name.len() as u32;
-        let name = IdentName {
-            escaped: Some(interner.get_or_intern(name)),
+        let ident_name = IdentName {
+            escaped: Some(name),
             raw_len: 0,
         };
-        Expression::Identifier(Identifier::simple(name, Span::new(0, len)))
+        Expression::Identifier(Identifier::simple(ident_name, Span::new(0, len)))
     }
 
     /// Helper to create a member expression: object.property
     fn make_member<'arena>(
         arena: &'arena Bump,
-        interner: &mut DefaultStringInterner,
         object: Expression<'arena>,
-        property_name: &str,
+        property_name: &'arena str,
         object_end: u32,
     ) -> Expression<'arena> {
         let prop_name = IdentName {
-            escaped: Some(interner.get_or_intern(property_name)),
+            escaped: Some(property_name),
             raw_len: 0,
         };
         let property_start = object_end + 1; // after the dot
@@ -641,8 +607,7 @@ mod tests {
 
     #[test]
     fn test_linearize_simple_identifier() {
-        let mut interner = DefaultStringInterner::new();
-        let expr = make_identifier(&mut interner, "foo");
+        let expr = make_identifier("foo");
 
         let nodes = linearize_chain(&expr);
 
@@ -659,11 +624,10 @@ mod tests {
     #[test]
     fn test_linearize_member_chain() {
         let arena = Bump::new();
-        let mut interner = DefaultStringInterner::new();
         // Build: a.b.c
-        let a = make_identifier(&mut interner, "a");
-        let ab = make_member(&arena, &mut interner, a, "b", 1);
-        let abc = make_member(&arena, &mut interner, ab, "c", 3);
+        let a = make_identifier("a");
+        let ab = make_member(&arena, a, "b", 1);
+        let abc = make_member(&arena, ab, "c", 3);
 
         let nodes = linearize_chain(&abc);
 
@@ -677,11 +641,10 @@ mod tests {
     #[test]
     fn test_linearize_call_chain() {
         let arena = Bump::new();
-        let mut interner = DefaultStringInterner::new();
         // Build: a().b()
-        let a = make_identifier(&mut interner, "a");
+        let a = make_identifier("a");
         let a_call = make_call(&arena, a, 1);
-        let ab = make_member(&arena, &mut interner, a_call, "b", 3);
+        let ab = make_member(&arena, a_call, "b", 3);
         let ab_call = make_call(&arena, ab, 5);
 
         let nodes = linearize_chain(&ab_call);
@@ -697,12 +660,11 @@ mod tests {
     #[test]
     fn test_group_member_only_chain() {
         let arena = Bump::new();
-        let mut interner = DefaultStringInterner::new();
         // Build: a.b.c.d
-        let a = make_identifier(&mut interner, "a");
-        let ab = make_member(&arena, &mut interner, a, "b", 1);
-        let abc = make_member(&arena, &mut interner, ab, "c", 3);
-        let abcd = make_member(&arena, &mut interner, abc, "d", 5);
+        let a = make_identifier("a");
+        let ab = make_member(&arena, a, "b", 1);
+        let abc = make_member(&arena, ab, "c", 3);
+        let abcd = make_member(&arena, abc, "d", 5);
 
         let nodes = linearize_chain(&abcd);
         let groups = group_chain_nodes(&nodes);
@@ -723,13 +685,12 @@ mod tests {
     #[test]
     fn test_group_call_chain_breaks_after_call() {
         let arena = Bump::new();
-        let mut interner = DefaultStringInterner::new();
         // Build: a().b().c
-        let a = make_identifier(&mut interner, "a");
+        let a = make_identifier("a");
         let a_call = make_call(&arena, a, 1);
-        let ab = make_member(&arena, &mut interner, a_call, "b", 3);
+        let ab = make_member(&arena, a_call, "b", 3);
         let ab_call = make_call(&arena, ab, 5);
-        let abc = make_member(&arena, &mut interner, ab_call, "c", 7);
+        let abc = make_member(&arena, ab_call, "c", 7);
 
         let nodes = linearize_chain(&abc);
         let groups = group_chain_nodes(&nodes);

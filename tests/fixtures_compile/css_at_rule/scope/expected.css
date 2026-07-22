@@ -1,0 +1,6 @@
+
+	@scope (.a) to (.b) {
+		.a.svelte-tsvhash {
+			color: red;
+		}
+	}

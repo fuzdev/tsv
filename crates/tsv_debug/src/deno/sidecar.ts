@@ -20,7 +20,7 @@
 // NOTE: Requires deno.json with "acorn": "npm:acorn@8.16.0" import map
 // to ensure @sveltejs/acorn-typescript uses the same acorn instance.
 const VERSIONS = {
-	prettier: '3.9.0',
+	prettier: '3.9.6',
 	'prettier-plugin-svelte': '4.1.1',
 	svelte: '5.56.4',
 	acorn: '8.16.0',
@@ -30,7 +30,7 @@ const VERSIONS = {
 // TODO verify there's not a better solution to use deno.json here, see the above NOTE too
 // Imports are like this because these don't have the deno.json when used by the release binary.
 // deno-lint-ignore no-import-prefix
-import * as prettier from 'npm:prettier@3.9.0';
+import * as prettier from 'npm:prettier@3.9.6';
 // deno-lint-ignore no-import-prefix
 import prettierPluginSvelte from 'npm:prettier-plugin-svelte@4.1.1';
 // deno-lint-ignore no-import-prefix
@@ -282,6 +282,37 @@ async function dispatch(
 		case 'css-parse': {
 			// Return AST object directly - Rust will serialize with tabs
 			return parseCss(content);
+		}
+
+		case 'svelte-compile': {
+			// Runes-only, SSR-first compile oracle. A fixed cssHash pins the scoping
+			// class to a constant and filename defaults to a constant, so identical
+			// input yields byte-identical output across calls (the compiled output
+			// embeds no version string at this pin, so no version normalization is
+			// needed). `css: 'external'` keeps CSS out of the JS for a clean diff.
+			const filename = (options?.filename as string | undefined) ?? 'input.svelte';
+			const generate = (options?.generate as 'server' | 'client' | undefined) ?? 'server';
+			const dev = (options?.dev as boolean | undefined) ?? false;
+			const result = svelteCompile(content, {
+				filename,
+				generate,
+				dev,
+				runes: true,
+				css: 'external',
+				cssHash: () => 'svelte-tsvhash',
+			});
+			return {
+				js: result.js.code,
+				css: result.css ? result.css.code : null,
+				// Project each warning to the fields the oracle diff needs; start/end
+				// are { line, column, character } objects, absent for non-positional warnings.
+				warnings: result.warnings.map((w) => ({
+					code: w.code,
+					message: w.message,
+					start: w.start,
+					end: w.end,
+				})),
+			};
 		}
 
 		case 'svelte-render-key': {

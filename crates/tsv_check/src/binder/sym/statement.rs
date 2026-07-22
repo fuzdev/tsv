@@ -491,7 +491,7 @@ impl<'a> SymbolBinder<'a> {
     fn default_decl(&mut self, id: Option<&Identifier<'a>>, node_span: Span) -> DeclInput {
         let display = match id {
             Some(i) => {
-                let name = i.name(self.source, self.interner);
+                let name = i.name(self.source);
                 self.atoms.intern(name)
             }
             None => self.atoms.default_export(),
@@ -762,7 +762,7 @@ impl<'a> SymbolBinder<'a> {
         // An export specifier's *exported* name is the table key in `exports`.
         let (name, span) = self.module_export_name_atom(&spec.exported);
         let is_default = matches!(&spec.exported, ModuleExportName::Identifier(id)
-            if id.name(self.source, self.interner) == "default");
+            if id.name(self.source) == "default");
         let d = DeclInput {
             name,
             display: name,

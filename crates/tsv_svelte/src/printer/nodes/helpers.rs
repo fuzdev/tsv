@@ -407,6 +407,32 @@ impl<'a> Printer<'a> {
     /// numeric form), where prettier-plugin-svelte preserves the author's source
     /// token — a separate deliberate divergence (see conformance_prettier.md §Svelte:
     /// destructuring literal normalization).
+    /// Append a destructuring pattern's `: T` tail (`{#each xs as { a }: T}`).
+    ///
+    /// A binding **identifier** carries its annotation through the TypeScript
+    /// pattern printer, which `build_pattern_doc`'s default arm routes to. A
+    /// destructuring pattern does not: its braces/brackets are built here, on the
+    /// Svelte side's own comment-preserving path, so the tail has to be appended
+    /// explicitly or it prints nowhere — and an annotation that prints nowhere is
+    /// content loss on a format round-trip, not a formatting choice.
+    fn append_pattern_type_annotation(
+        &self,
+        pattern: DocId,
+        type_annotation: Option<&tsv_ts::ast::internal::TSTypeAnnotation<'_>>,
+    ) -> DocId {
+        let Some(annotation) = type_annotation else {
+            return pattern;
+        };
+        let d = self.d();
+        let tail = tsv_ts::build_type_annotation_doc_with_comments(
+            d,
+            annotation,
+            &self.ts_inputs(),
+            &self.embed,
+        );
+        d.concat(&[pattern, tail])
+    }
+
     pub(super) fn build_pattern_doc(&self, expr: &Expression<'_>) -> DocId {
         match expr {
             // Comments thread through every gap so a comment in any pattern position is
@@ -424,7 +450,8 @@ impl<'a> Printer<'a> {
                         (s.start, s.end, self.build_object_pattern_property_doc(p))
                     })
                     .collect();
-                self.build_object_braces(obj.span.start, obj.span.end, &entries)
+                let braces = self.build_object_braces(obj.span.start, obj.span.end, &entries);
+                self.append_pattern_type_annotation(braces, obj.type_annotation.as_ref())
             }
             Expression::ObjectExpression(obj) => {
                 let entries: SmallVec<[(u32, u32, DocId); 8]> = obj
@@ -438,7 +465,9 @@ impl<'a> Printer<'a> {
                 self.build_object_braces(obj.span.start, obj.span.end, &entries)
             }
             Expression::ArrayPattern(arr) => {
-                self.build_array_brackets(arr.elements, arr.span.start, arr.span.end)
+                let brackets =
+                    self.build_array_brackets(arr.elements, arr.span.start, arr.span.end);
+                self.append_pattern_type_annotation(brackets, arr.type_annotation.as_ref())
             }
             Expression::ArrayExpression(arr) => {
                 self.build_array_brackets(arr.elements, arr.span.start, arr.span.end)
@@ -692,6 +721,8 @@ mod tests {
         arena: &'arena bumpalo::Bump,
         src: &str,
     ) -> &'arena [FragmentNode<'arena>] {
+        // The nodes borrow only the arena, so the returned slice is self-contained —
+        // these tests inspect node structure, not name text.
         crate::parse(src, arena)
             .expect("template should parse")
             .fragment

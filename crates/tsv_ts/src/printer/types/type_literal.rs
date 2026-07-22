@@ -628,15 +628,20 @@ impl<'a> Printer<'a> {
         obj: &TSTypeLiteral<'_>,
         comments_present: bool,
     ) -> bool {
-        let source_is_multiline = super::super::is_brace_block_multiline(self.source, obj.span);
+        // Both reads below are newline-derived authoring intent (a source newline
+        // after `{` / before the first member). The canonical reprint erases them
+        // so an object type breaks only by width.
+        let source_is_multiline =
+            !self.canonical && super::super::is_brace_block_multiline(self.source, obj.span);
         // Prettier breaks an object type when its first member starts on a line
         // below the opening brace. `is_brace_block_multiline` only sees a newline
         // *immediately* after `{`, so a block comment on the brace line
         // (`{ /* c */\n a: T }`) defeats it — detect the newline before the first
         // member directly here.
-        let first_member_on_new_line = obj.members.first().is_some_and(|m| {
-            self.source[obj.span.start as usize..m.span().start as usize].contains('\n')
-        });
+        let first_member_on_new_line = !self.canonical
+            && obj.members.first().is_some_and(|m| {
+                self.source[obj.span.start as usize..m.span().start as usize].contains('\n')
+            });
         let has_line_or_multiline_block = comments_present
             && self
                 .comments_on_page_between(obj.span.start, obj.span.end)
@@ -672,7 +677,7 @@ impl<'a> Printer<'a> {
         // preserve any interior comment. The members-only alignment path returns an
         // empty doc for zero members, so the `d.line()` boundary below would render
         // as a spurious space and the comment would be dropped — mirror the plain
-        // type-literal empty path (`build_empty_type_literal_inline_with_comments_doc`),
+        // type-literal empty path (`build_empty_braces_inline_with_comments_doc`),
         // threading this path's (possibly prefixed) `opening`/`closing`.
         if obj.members.is_empty() {
             return self.build_empty_bracketed_with_comments_doc(
@@ -760,7 +765,7 @@ impl<'a> Printer<'a> {
             // Empty type literal - handle comments inside. The helper already
             // returns a self-managing group (a fitting block comment stays
             // inline as `{ /* c */ }`), so it's correct in both modes.
-            return self.build_empty_type_literal_inline_with_comments_doc(t.span);
+            return self.build_empty_braces_inline_with_comments_doc(t.span);
         }
 
         let mut parts: DocBuf = smallvec![d.text("{")];

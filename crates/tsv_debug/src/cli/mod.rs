@@ -13,8 +13,15 @@ use commands::{
     arena_stats::ArenaStatsCommand, ast_diff::AstDiffCommand,
     authoring_audit::AuthoringAuditCommand, binding_audit::BindingAuditCommand,
     buffer_sizes::BufferSizesCommand, build_fanout_audit::BuildFanoutAuditCommand,
-    canonical_parse::CanonicalParseCommand, check::CheckCommand, compare::CompareCommand,
-    conformance_audit::ConformanceAuditCommand, fixture_init::FixtureInitCommand,
+    canonical_compile::CanonicalCompileCommand, canonical_parse::CanonicalParseCommand,
+    canonicalize_audit::CanonicalizeAuditCommand, check::CheckCommand, compare::CompareCommand,
+    compile_compare::CompileCompareCommand,
+    compile_conformance_audit::CompileConformanceAuditCommand,
+    compile_corpus_compare::CompileCorpusCompareCommand,
+    compile_fixture_init::CompileFixtureInitCommand,
+    compile_fixtures_validate::CompileFixturesValidateCommand, compile_fuzz::CompileFuzzCommand,
+    compile_profile::CompileProfileCommand, conformance_audit::ConformanceAuditCommand,
+    erase_comment_census::EraseCommentCensusCommand, fixture_init::FixtureInitCommand,
     fixtures_audit::FixturesAuditCommand, fixtures_update::FixturesUpdateCommand,
     fixtures_update_formatted::FixturesUpdateFormattedCommand,
     fixtures_update_parsed::FixturesUpdateParsedCommand,
@@ -38,10 +45,15 @@ use commands::{
 /// a distinct failure class).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CliError {
-    /// A failure the command already reported — exit code 1.
+    /// A failure the command already reported — exit code 1. Also carries the
+    /// `compile_compare` "real difference found" outcome (a reported non-match).
     Failed,
     /// A spawned task panicked while being joined — exit code 2.
     TaskPanic,
+    /// A hard error distinct from a reported difference — exit code 2. Used by
+    /// `compile_compare` for compile/canonicalize failures and the still-unimplemented
+    /// tsv side, so its `0` parity / `1` diff / `2` error contract stays intact.
+    Errored,
 }
 
 impl CliError {
@@ -50,7 +62,7 @@ impl CliError {
     pub fn exit_code(self) -> u8 {
         match self {
             Self::Failed => 1,
-            Self::TaskPanic => 2,
+            Self::TaskPanic | Self::Errored => 2,
         }
     }
 }
@@ -89,6 +101,16 @@ pub enum Subcommand {
     AstDiff(AstDiffCommand),
     LineWidth(LineWidthCommand),
     CanonicalParse(CanonicalParseCommand),
+    CanonicalCompile(CanonicalCompileCommand),
+    CanonicalizeAudit(CanonicalizeAuditCommand),
+    CompileCompare(CompileCompareCommand),
+    CompileConformanceAudit(CompileConformanceAuditCommand),
+    CompileCorpusCompare(CompileCorpusCompareCommand),
+    CompileFixtureInit(CompileFixtureInitCommand),
+    CompileFuzz(CompileFuzzCommand),
+    CompileFixturesValidate(CompileFixturesValidateCommand),
+    CompileProfile(CompileProfileCommand),
+    EraseCommentCensus(EraseCommentCensusCommand),
     FormatPrettier(FormatPrettierCommand),
     Fuzz(FuzzCommand),
     FixtureInit(FixtureInitCommand),
@@ -141,6 +163,16 @@ impl TopLevel {
             Subcommand::AstDiff(c) => c.run(),
             Subcommand::LineWidth(c) => c.run(),
             Subcommand::CanonicalParse(c) => c.run(),
+            Subcommand::CanonicalCompile(c) => c.run(),
+            Subcommand::CanonicalizeAudit(c) => c.run(),
+            Subcommand::CompileCompare(c) => c.run(),
+            Subcommand::CompileConformanceAudit(c) => c.run(),
+            Subcommand::CompileCorpusCompare(c) => c.run(),
+            Subcommand::CompileFixtureInit(c) => c.run(),
+            Subcommand::CompileFuzz(c) => c.run(),
+            Subcommand::CompileFixturesValidate(c) => c.run(),
+            Subcommand::CompileProfile(c) => c.run(),
+            Subcommand::EraseCommentCensus(c) => c.run(),
             Subcommand::FormatPrettier(c) => c.run(),
             Subcommand::Fuzz(c) => c.run(),
             Subcommand::FixtureInit(c) => c.run(),
@@ -173,8 +205,10 @@ mod tests {
     #[test]
     fn exit_codes_are_stable() {
         // The exit-code contract `main` maps to a process code: 1 for a reported
-        // failure, 2 for a spawned-task panic. Pinned so the refactor can't drift it.
+        // failure/difference, 2 for a spawned-task panic or a hard error. Pinned so
+        // the refactor can't drift it.
         assert_eq!(CliError::Failed.exit_code(), 1);
         assert_eq!(CliError::TaskPanic.exit_code(), 2);
+        assert_eq!(CliError::Errored.exit_code(), 2);
     }
 }

@@ -7,6 +7,7 @@
 // - Assignment expressions: `a = b` with width-based wrapping and chain detection
 // - Rest elements: `...rest`
 
+use super::assignment::RhsCommentInfo;
 use crate::ast::internal::{self, ArrowFunctionBody, Expression, ObjectPatternProperty};
 use crate::printer::{
     CommentVec, ParenContext, PatternContext, Printer, object_pattern_should_expand,
@@ -168,9 +169,11 @@ impl<'a> Printer<'a> {
                     assign.operator.as_str_with_leading_space(),
                     assign.right,
                     false,
-                    rhs_comments,
-                    rhs_has_line_comment,
-                    Some(assign.span.end),
+                    RhsCommentInfo {
+                        comments: rhs_comments,
+                        has_line_comment: rhs_has_line_comment,
+                        boundary: Some(assign.span.end),
+                    },
                 );
             }
         }
@@ -186,9 +189,11 @@ impl<'a> Printer<'a> {
                 assign.operator.as_str_with_leading_space(),
                 assign.right,
                 false,
-                rhs_comments,
-                rhs_has_line_comment,
-                Some(assign.span.end),
+                RhsCommentInfo {
+                    comments: rhs_comments,
+                    has_line_comment: rhs_has_line_comment,
+                    boundary: Some(assign.span.end),
+                },
             );
         }
 
@@ -417,14 +422,25 @@ impl<'a> Printer<'a> {
         let mut parts = DocBuf::new();
         let mut last_pos = prev_end;
         for comment in comments_to_emit_in_range(self.comments, prev_end, boundary) {
-            if self.is_same_line(prev_end, comment.span.start) {
-                continue;
+            if self.is_same_line(last_pos, comment.span.start) {
+                // Same source line as the preceding content — e.g. a line comment
+                // trailing a *multiline* block's closing line (`*/ // c`). The
+                // per-element loop keys its same-line capture on the element's end,
+                // so a comment sitting on the block's *closing* line (a different
+                // line than the element) was never captured there; keep it inline
+                // here rather than dropping it or forcing it onto its own line.
+                // Keying the test on the running `last_pos` (not the original
+                // `prev_end`) also keeps two same-line dangling comments together
+                // (`/* a */ // b`).
+                parts.push(d.text(" "));
+                parts.push(self.build_comment_doc(comment));
+            } else {
+                if self.has_blank_line_between(last_pos, comment.span.start) {
+                    parts.push(d.literalline());
+                }
+                parts.push(d.hardline());
+                parts.push(self.build_comment_doc(comment));
             }
-            if self.has_blank_line_between(last_pos, comment.span.start) {
-                parts.push(d.literalline());
-            }
-            parts.push(d.hardline());
-            parts.push(self.build_comment_doc(comment));
             last_pos = comment.span.end;
         }
         d.concat(&parts)

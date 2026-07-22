@@ -33,39 +33,11 @@ use tsv_lang::{
     CommentPosition, EmbedContext, INDENT, OutputBuffer, Span, TAB_WIDTH, classify_comment_fast,
     comments_to_emit_in_range,
     doc::{
-        self, TextResolver,
+        self,
         arena::{DocArena, DocId},
     },
     is_format_ignore_directive, printing,
 };
-
-/// Render-time text resolver for the CSS printer.
-///
-/// CSS doc trees carry no interned identifiers — the printer emits source slices
-/// directly (`self.write`, `text_pooled`), never `DocText::Symbol`. The only thing
-/// to resolve at render is a [`DocText::SourceSpan`](tsv_lang::doc::DocText::SourceSpan):
-/// a verbatim source slice emitted with no allocation (see
-/// [`values`]'s `build_dimension_doc`). So `resolve` (symbol lookup) is
-/// unreachable; only `resolve_source_span` does work. This is what makes the CSS
-/// render path source-aware, the analogue of the `SourceTextResolver` the TS and
-/// Svelte printers wrap around their interners.
-struct CssSourceResolver<'a> {
-    source: &'a str,
-}
-
-impl TextResolver for CssSourceResolver<'_> {
-    fn resolve(&self, _id: u32) -> &str {
-        // CSS never emits `DocText::Symbol`, so this is never called.
-        #[allow(clippy::unreachable)]
-        {
-            unreachable!("CSS doc trees contain no Symbol nodes")
-        }
-    }
-
-    fn resolve_source_span(&self, span: Span) -> &str {
-        span.extract(self.source)
-    }
-}
 
 /// Printer state for building output
 pub(crate) struct Printer<'a> {
@@ -342,9 +314,7 @@ impl<'a> Printer<'a> {
             &self.embed,
             current_col,
             self.indent_level,
-            &CssSourceResolver {
-                source: self.source,
-            },
+            self.source,
             &mut output,
         );
         self.write(&output);
@@ -375,9 +345,7 @@ impl<'a> Printer<'a> {
             &embed,
             current_col,
             self.indent_level,
-            &CssSourceResolver {
-                source: self.source,
-            },
+            self.source,
             &mut output,
         );
         self.write(&output);

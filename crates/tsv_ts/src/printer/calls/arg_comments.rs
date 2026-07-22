@@ -34,8 +34,12 @@ impl<'a> Printer<'a> {
         arg_end: u32,
         next_arg_start: u32,
     ) -> PartitionedComments<'a> {
-        let mut pc =
-            PartitionedComments::new(self.comments, self.line_breaks, arg_end, next_arg_start);
+        let mut pc = PartitionedComments::new(
+            self.comments,
+            self.comment_line_breaks,
+            arg_end,
+            next_arg_start,
+        );
         pc.route_after_comma_hugging_to_leading(self);
         pc.emit_trailing_comments_around_comma(parts, self);
         pc
@@ -131,9 +135,15 @@ pub(crate) fn find_comma_pos(source: &str, start: u32, end: u32) -> Option<usize
 /// This scans from `from` toward `to` and skips past any opening `(` that's the
 /// first non-whitespace character, returning the position after it.
 ///
-/// Callers must pass `from <= to`.
+/// Tolerates an inverted range (`from > to`): parser-produced argument spans
+/// are always ascending, but a synthetic tree mixing borrowed (host-span) and
+/// minted (appendix-span) arguments can invert a gap — there is no paren to
+/// skip in an empty or inverted gap, so `to` comes back unchanged.
 #[inline]
 pub(crate) fn skip_stripped_open_paren(source: &str, from: u32, to: u32) -> u32 {
+    if from >= to {
+        return to;
+    }
     let slice = &source[from as usize..to as usize];
     for (i, byte) in slice.bytes().enumerate() {
         if byte == b'(' {
@@ -529,7 +539,7 @@ pub(crate) fn emit_first_arg_leading_comments(
     let d = printer.d();
     let pc = PartitionedComments::new(
         printer.comments,
-        printer.line_breaks,
+        printer.comment_line_breaks,
         paren_open,
         first_arg_start,
     );

@@ -599,8 +599,12 @@ impl<'a> Printer<'a> {
 
         let mut inner = smallvec![arg_doc];
         if has_trailing {
-            let pc =
-                PartitionedComments::new(self.comments, self.line_breaks, arg_end, paren_close);
+            let pc = PartitionedComments::new(
+                self.comments,
+                self.comment_line_breaks,
+                arg_end,
+                paren_close,
+            );
             pc.emit_trailing_comments(&mut inner, self);
         }
         let inner = d.concat(&inner);

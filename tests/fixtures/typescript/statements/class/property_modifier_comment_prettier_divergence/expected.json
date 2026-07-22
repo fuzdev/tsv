@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 188,
+	"end": 115,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -41,56 +41,24 @@
 					"column": 13
 				}
 			}
-		},
-		{
-			"type": "Line",
-			"value": " Comment between name and ! (no type annotation)",
-			"start": 105,
-			"end": 155,
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 2
-				},
-				"end": {
-					"line": 6,
-					"column": 52
-				}
-			}
-		},
-		{
-			"type": "Block",
-			"value": " c2 ",
-			"start": 161,
-			"end": 169,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 5
-				},
-				"end": {
-					"line": 7,
-					"column": 13
-				}
-			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 187,
+		"end": 114,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 178,
+			"end": 105,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 9,
+					"line": 6,
 					"column": 9
 				}
 			},
@@ -98,14 +66,14 @@
 				{
 					"type": "ClassDeclaration",
 					"start": 20,
-					"end": 177,
+					"end": 104,
 					"loc": {
 						"start": {
 							"line": 2,
 							"column": 1
 						},
 						"end": {
-							"line": 8,
+							"line": 5,
 							"column": 2
 						}
 					},
@@ -129,14 +97,14 @@
 					"body": {
 						"type": "ClassBody",
 						"start": 28,
-						"end": 177,
+						"end": 104,
 						"loc": {
 							"start": {
 								"line": 2,
 								"column": 9
 							},
 							"end": {
-								"line": 8,
+								"line": 5,
 								"column": 2
 							}
 						},
@@ -205,73 +173,6 @@
 										"value": " Comment between name and ? (no type annotation)",
 										"start": 32,
 										"end": 82
-									}
-								]
-							},
-							{
-								"type": "PropertyDefinition",
-								"start": 158,
-								"end": 174,
-								"loc": {
-									"start": {
-										"line": 7,
-										"column": 2
-									},
-									"end": {
-										"line": 7,
-										"column": 18
-									}
-								},
-								"static": false,
-								"computed": false,
-								"key": {
-									"type": "Identifier",
-									"start": 158,
-									"end": 159,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 2
-										},
-										"end": {
-											"line": 7,
-											"column": 3
-										}
-									},
-									"name": "b"
-								},
-								"definite": true,
-								"value": {
-									"type": "Literal",
-									"start": 172,
-									"end": 173,
-									"loc": {
-										"start": {
-											"line": 7,
-											"column": 16
-										},
-										"end": {
-											"line": 7,
-											"column": 17
-										}
-									},
-									"value": 1,
-									"raw": "1",
-									"leadingComments": [
-										{
-											"type": "Block",
-											"value": " c2 ",
-											"start": 161,
-											"end": 169
-										}
-									]
-								},
-								"leadingComments": [
-									{
-										"type": "Line",
-										"value": " Comment between name and ! (no type annotation)",
-										"start": 105,
-										"end": 155
 									}
 								]
 							}

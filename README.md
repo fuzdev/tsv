@@ -34,7 +34,6 @@ see the [issues](https://github.com/fuzdev/tsv/issues)
 and [discussions](https://github.com/fuzdev/tsv/discussions).
 
 AI disclosure: this codebase is mostly LLM-generated, and the usual caveats apply.
-The first release took 7 months and ~1800 manual commits.
 It's a high-effort project that prioritizes quality.
 
 ## Status
@@ -66,6 +65,7 @@ Future features (unknown order):
   but the lift to support it is small)
 - JS parsing diagnostics (test262 negative cases)
 - CSS error recovery (recover past invalid CSS per the spec)
+- Svelte compiler (partially implemented, not ready for usage)
 - later:
   - TypeScript type checking (`tsv_check`, in development — a from-scratch Rust
     binder/checker graded for exact conformance against TypeScript 7 (the Go
@@ -73,7 +73,6 @@ Future features (unknown order):
     - svelte-check replacement
     - LSP
     - linter - type aware, initially focused on serializable data-only plugins for extensibility
-  - Svelte compiler (exact mirror, maybe out of scope, see [rsvelte](https://github.com/baseballyama/rsvelte))
   - bundling is probably out of scope 
   - [discussion](https://github.com/fuzdev/tsv/discussions) welcome
 

@@ -27,7 +27,6 @@ pub(crate) mod unreachable;
 use crate::diag::Diagnostic;
 use crate::ids::FileId;
 use duplicate_members::MemberCtx;
-use string_interner::DefaultStringInterner;
 use tsv_ts::ast::Program;
 use tsv_ts::ast::internal::{
     ArrowFunctionBody, ClassBody, ClassMember, Decorator, ExportDefaultValue, Expression,
@@ -41,10 +40,8 @@ use tsv_ts::ast::internal::{
 /// diagnostics (unsorted — the program-wide sort/dedup canonicalizes order).
 #[must_use]
 pub fn check_file_members(program: &Program<'_>, source: &str, file: FileId) -> Vec<Diagnostic> {
-    let interner = program.interner.borrow();
     let mut walk = CheckWalk {
         source,
-        interner: &interner,
         file,
         diagnostics: Vec::new(),
     };
@@ -57,19 +54,17 @@ pub fn check_file_members(program: &Program<'_>, source: &str, file: FileId) -> 
 /// The check walk's per-file state.
 struct CheckWalk<'a> {
     source: &'a str,
-    interner: &'a DefaultStringInterner,
     file: FileId,
     diagnostics: Vec<Diagnostic>,
 }
 
 impl<'a> CheckWalk<'a> {
-    /// The derivation context the per-node checks need (source + interner + file).
+    /// The derivation context the per-node checks need (source + file).
     /// Built from disjoint field copies (the references are `Copy`), so it does not
     /// borrow `self` — leaving `self.diagnostics` free to borrow mutably alongside.
     fn member_ctx(&self) -> MemberCtx<'a> {
         MemberCtx {
             source: self.source,
-            interner: self.interner,
             file: self.file,
         }
     }

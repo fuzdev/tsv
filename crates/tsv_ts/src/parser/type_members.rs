@@ -16,7 +16,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_index_signature_body(
         &mut self,
         sig_start: usize,
-        param_name: IdentName,
+        param_name: IdentName<'arena>,
         id_start: usize,
         readonly: bool,
     ) -> Result<TSTypeElement<'arena>, ParseError> {

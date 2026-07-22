@@ -1,0 +1,558 @@
+//! The shared template traversals.
+//!
+//! Several of them, all here for the same reason: an analysis that hand-writes
+//! its own walk drifts from the others, and the drift is silent.
+//! [`each_template_item`] is the whole-fragment walk yielding every
+//! reference-bearing expression; the `each_*_attribute_expression` pair below is
+//! the per-element one it and the other analyses share; and [`each_child_fragment`]
+//! is the pure structural seam — "which sub-fragments does a node contain" — that
+//! the whole-document validator, the snippet-name collector, the `$$index`
+//! allocator and the refusal census ride, so the fragment-recursion shape lives in
+//! exactly one exhaustively-matched place. (The element census descends a different
+//! node set and keeps its own exhaustive match; see [`each_child_fragment`].)
+//!
+//! Both the snippet hoist analysis (`snippet.rs`) and the `needs_context` walk
+//! (`needs_context.rs`) must see every attribute expression the compiled output
+//! can reference. They previously hand-wrote the same iteration and drifted:
+//! the component-spread arm existed in one but not the other, so a top-level
+//! snippet whose only instance-binding reference sat in a `<Foo {...binding} />`
+//! spread was wrongly module-hoisted — a runtime `ReferenceError` the reparse
+//! self-validation cannot catch (a free reference parses fine). This module is
+//! the single definition of "reference-bearing attribute expression"; an
+//! attribute shape that newly reaches emission must be added HERE so every
+//! analysis sees it at once.
+//!
+//! Two traversals share that definition. `each_attribute_expression` is the
+//! **emitted-path** view: it visits everything not refused at emission — plain
+//! attribute values, component spreads, a `class:` / `style:` directive on a
+//! regular element (emitted as `$.attr_class` / `$.attr_style`), a `bind:`
+//! directive's target expression on a regular element (the oracle's analysis
+//! visits every bind expression regardless of SSR emission), and the no-op
+//! drop family (`use:`/`transition:`/`in:`/`out:`/`animate:`/`{@attach}`) on a
+//! regular element, which is dropped-but-analyzed exactly like an event handler.
+//! It skips the positions that *do* refuse (an element spread, legacy
+//! `on:`/`let:`), because the emission refusal is what keeps their
+//! references out of output — and its `each_emitted_directive_name` companion
+//! surfaces the drop-family directive *names* plus a `style:` shorthand name
+//! (which an expression traversal can't reach).
+//! `each_reference_bearing_attribute_expression` is the **dropped-fragment**
+//! view (a `{:catch}` branch the emitter discards without walking): there no
+//! emission refusal fires, so every attribute reference must be counted to match
+//! the oracle. The dropped-fragment view has two more entry points for the same
+//! reason — `each_reference_bearing_directive_name` (a directive whose *name* is a
+//! value binding, the wider set including a `style:` shorthand) and
+//! `special_element_reference_expression` (a `<svelte:element>`/`<svelte:component>`
+//! `this={…}`); every special element is refused at emission elsewhere, so its
+//! references, too, are only reachable through the dropped-fragment path.
+
+use tsv_svelte::ast::internal::{
+    AttributeNode, AttributeValue, Element, ElementKind, Fragment, FragmentNode, SpecialElement,
+    SpecialElementKind, SpecialThis, StyleDirectiveValue,
+};
+use tsv_ts::ast::internal::Expression;
+
+use crate::CompileError;
+
+/// One TypeScript- or rune-bearing item of a template fragment.
+pub(crate) enum TemplateItem<'a, 'arena> {
+    /// A borrowed expression — the overwhelming majority.
+    Expression(&'a Expression<'arena>),
+    /// A `{#snippet}`'s `<T>` clause. TypeScript with no `Expression` to yield,
+    /// so it gets its own item rather than being missed.
+    SnippetTypeParameters,
+}
+
+/// Visit every TypeScript- or rune-bearing item a template fragment holds,
+/// recursing into every child fragment.
+///
+/// This is the **dropped-fragment** view (it uses
+/// [`each_reference_bearing_attribute_expression`], the widest attribute set, and
+/// visits the SSR-dropped `{#each}` key, `{#key}` expression, `{:catch}` binding
+/// and branch): its two consumers ask what a region *contains*, not what it
+/// *emits*, and a dropped region's contents never reach an emission refusal at
+/// all.
+///
+/// - The **document-wide TypeScript gate** (`refuse_template_typescript`): without
+///   `lang="ts"` the oracle's parser rejects TypeScript anywhere in the document,
+///   dropped positions included.
+/// - The **rune guard over a dropped `{:catch}` branch** (`guard_dropped_fragment`):
+///   the oracle rejects a misplaced rune in its *analysis* phase, before it decides
+///   what to emit, so dropping the branch cannot make the component valid.
+///
+/// Both consumers ask about a region's **expressions**. The orthogonal question —
+/// what a dropped node *is*, for the analysis facts the oracle keys on a node's
+/// mere presence — this walk cannot answer, because it yields expressions rather
+/// than nodes; `fragment.rs`'s `guard_dropped_presence` covers it.
+///
+/// The `FragmentNode` match is exhaustive on purpose — a new template shape fails
+/// compilation here instead of slipping silently past both gates.
+pub(crate) fn each_template_item<'a, 'arena>(
+    fragment: &'a Fragment<'arena>,
+    f: &mut impl FnMut(TemplateItem<'a, 'arena>) -> Result<(), CompileError>,
+) -> Result<(), CompileError> {
+    for node in fragment.nodes {
+        each_node_item(node, f)?;
+    }
+    Ok(())
+}
+
+fn each_node_item<'a, 'arena>(
+    node: &'a FragmentNode<'arena>,
+    f: &mut impl FnMut(TemplateItem<'a, 'arena>) -> Result<(), CompileError>,
+) -> Result<(), CompileError> {
+    let mut expr = |e: &'a Expression<'arena>| f(TemplateItem::Expression(e));
+    match node {
+        FragmentNode::Text(_) | FragmentNode::Comment(_) => {}
+        FragmentNode::Element(element) => {
+            each_attribute_item(element.attributes, f)?;
+            each_template_item(&element.fragment, f)?;
+        }
+        FragmentNode::SpecialElement(special) => {
+            if let Some(this) = special_element_reference_expression(special) {
+                expr(this)?;
+            }
+            each_attribute_item(special.attributes, f)?;
+            each_template_item(&special.fragment, f)?;
+        }
+        FragmentNode::ExpressionTag(tag) => expr(&tag.expression)?,
+        FragmentNode::HtmlTag(tag) => expr(&tag.expression)?,
+        FragmentNode::RenderTag(tag) => expr(&tag.expression)?,
+        FragmentNode::DebugTag(tag) => {
+            for identifier in tag.identifiers {
+                expr(identifier)?;
+            }
+        }
+        FragmentNode::ConstTag(tag) => {
+            expr(&tag.id)?;
+            expr(&tag.init)?;
+        }
+        FragmentNode::DeclarationTag(tag) => {
+            for declarator in tag.declaration.declarations {
+                expr(&declarator.id)?;
+                if let Some(init) = &declarator.init {
+                    expr(init)?;
+                }
+            }
+        }
+        FragmentNode::IfBlock(block) => {
+            expr(&block.test)?;
+            each_template_item(&block.consequent, f)?;
+            if let Some(alternate) = &block.alternate {
+                each_template_item(alternate, f)?;
+            }
+        }
+        FragmentNode::EachBlock(block) => {
+            expr(&block.expression)?;
+            for e in block.context.iter().chain(block.key.iter()) {
+                expr(e)?;
+            }
+            each_template_item(&block.body, f)?;
+            if let Some(fallback) = &block.fallback {
+                each_template_item(fallback, f)?;
+            }
+        }
+        FragmentNode::AwaitBlock(block) => {
+            expr(&block.expression)?;
+            for e in block.value.iter().chain(block.error.iter()) {
+                expr(e)?;
+            }
+            for child in [&block.pending, &block.then, &block.catch]
+                .into_iter()
+                .flatten()
+            {
+                each_template_item(child, f)?;
+            }
+        }
+        FragmentNode::KeyBlock(block) => {
+            expr(&block.expression)?;
+            each_template_item(&block.fragment, f)?;
+        }
+        FragmentNode::SnippetBlock(snippet) => {
+            // `type_params_raw` is the raw-text fallback for a `<T>` clause whose
+            // inner parse failed — still TypeScript, still surfaced.
+            if snippet.type_parameters.is_some() || snippet.type_params_raw.is_some() {
+                f(TemplateItem::SnippetTypeParameters)?;
+            }
+            for param in snippet.parameters {
+                f(TemplateItem::Expression(param))?;
+            }
+            each_template_item(&snippet.body, f)?;
+        }
+    }
+    Ok(())
+}
+
+fn each_attribute_item<'a, 'arena>(
+    attributes: &'a [AttributeNode<'arena>],
+    f: &mut impl FnMut(TemplateItem<'a, 'arena>) -> Result<(), CompileError>,
+) -> Result<(), CompileError> {
+    let mut found: Vec<&'a Expression<'arena>> = Vec::new();
+    each_reference_bearing_attribute_expression(attributes, &mut |e| found.push(e));
+    for e in found {
+        f(TemplateItem::Expression(e))?;
+    }
+    Ok(())
+}
+
+/// The single, exhaustively-matched enumeration of a `FragmentNode`'s child
+/// fragments — "which sub-fragments does this node contain".
+///
+/// Every purely-structural recursion that only needs to descend the fragment tree
+/// rides this one match: the whole-document validator (`validate.rs`), the
+/// snippet-name collector (`snippet.rs`), the `$$index` name allocator
+/// (`blocks.rs`), and the sole-blocker refusal census (`refusal_census.rs`). So a new
+/// `FragmentNode` variant — or a new child fragment on an existing variant — fails
+/// compilation HERE instead of silently drifting across hand-written copies.
+///
+/// This is fragment recursion *only*. A block's own condition/key expressions are
+/// not fragments and are out of scope; an expression-bearing walk uses
+/// [`each_template_item`].
+///
+/// Three walks deliberately do **not** ride it, and the reasons differ:
+///
+/// - `needs_context.rs` and `snippet.rs`'s free-variable collector thread per-node
+///   scope bindings and fork on the emission-vs-dropped distinction, which this
+///   uniform enumeration cannot carry without changing behavior;
+/// - `element_census.rs` descends a deliberately *different* node set (wider than
+///   emitted at `<svelte:boundary>` and `{:catch}`, narrower at the fenced special
+///   elements), so it carries its own exhaustive match — no catch-all, since a
+///   variant missed there loses elements silently.
+///
+/// ⚠️ Riding this seam is the default; the three above state their reason in code.
+/// See [the walk inventory](crate#the-walks-and-their-oracle-phases).
+pub(crate) fn each_child_fragment<'a, 'arena>(
+    node: &'a FragmentNode<'arena>,
+    f: &mut impl FnMut(&'a Fragment<'arena>),
+) {
+    match node {
+        FragmentNode::Text(_)
+        | FragmentNode::Comment(_)
+        | FragmentNode::ExpressionTag(_)
+        | FragmentNode::HtmlTag(_)
+        | FragmentNode::RenderTag(_)
+        | FragmentNode::DebugTag(_)
+        | FragmentNode::ConstTag(_)
+        | FragmentNode::DeclarationTag(_) => {}
+        FragmentNode::Element(element) => f(&element.fragment),
+        FragmentNode::SpecialElement(special) => f(&special.fragment),
+        FragmentNode::IfBlock(block) => {
+            f(&block.consequent);
+            if let Some(alternate) = &block.alternate {
+                f(alternate);
+            }
+        }
+        FragmentNode::EachBlock(block) => {
+            f(&block.body);
+            if let Some(fallback) = &block.fallback {
+                f(fallback);
+            }
+        }
+        FragmentNode::AwaitBlock(block) => {
+            for fragment in [&block.pending, &block.then, &block.catch]
+                .into_iter()
+                .flatten()
+            {
+                f(fragment);
+            }
+        }
+        FragmentNode::KeyBlock(block) => f(&block.fragment),
+        FragmentNode::SnippetBlock(snippet) => f(&snippet.body),
+    }
+}
+
+/// Visit every attribute expression of `element` the oracle walks for scope /
+/// `needs_context` on the **emitted** path — everything not refused at emission:
+///
+/// - plain attribute expression values (single-expression and mixed-value
+///   chunks) on any element;
+/// - `{...spread}` expressions on any element — a component's `$.spread_props`
+///   array element and a regular element's fused `$.attributes({ …spread })`
+///   object element both emit the expression, so both are visited;
+/// - a `class:` / `style:` directive's expression-bearing value on a regular HTML
+///   element (fused into the element's `$.attr_class(base, hash, { name: expr, … })`
+///   / `$.attr_style(base, { name: value, … })` call). A `style:` shorthand carries
+///   no expression — its reference rides `each_emitted_directive_name`. On a
+///   component both refuse at emission, so they are skipped there;
+/// - a `bind:` directive's target expression on a regular HTML element. The oracle
+///   counts every bind expression at analysis time regardless of what SSR emits, so
+///   the reference must be seen (a snippet whose only instance-binding reference sits
+///   in a bind must not module-hoist). On a component `bind:` refuses at emission (a
+///   `ComponentBindDirective`), so it is skipped;
+/// - the **no-op drop family** on a regular HTML element (`use:`/`transition:`/
+///   `in:`/`out:`/`animate:` expressions and `{@attach}`). These contribute
+///   nothing to the tag but are dropped-but-analyzed, exactly like an event
+///   handler: the oracle discards their output yet still walks the expression
+///   (its `context.visit`), so a `new`/prop-rooted access inside one must still
+///   fire the `$$renderer.component` wrapper. On a **component** these refuse at
+///   emission (a `ComponentDirective`), so they are skipped there — visiting them
+///   would let an analysis refusal fire first and shift corpus buckets.
+///
+/// Legacy `on:`/`let:` are refused at emission, so their expressions never reach
+/// output and are not visited here.
+///
+/// A drop-family directive's **name** (`use:action`, `transition:fade`) is also a
+/// binding reference the oracle counts, but tsv stores it as a verbatim name span
+/// rather than an `Expression`, so an expression traversal cannot reach it — it is
+/// surfaced separately by [`each_emitted_directive_name`] (needed by the
+/// snippet-hoist analysis; a bare name never fires `needs_context`).
+pub(crate) fn each_attribute_expression<'a, 'arena>(
+    element: &'a Element<'arena>,
+    f: &mut impl FnMut(&'a Expression<'arena>),
+) {
+    let is_html = element.kind == ElementKind::Html;
+    for attr_node in element.attributes {
+        match attr_node {
+            AttributeNode::Attribute(attr) => {
+                if let Some(values) = attr.value {
+                    for value in values {
+                        if let AttributeValue::ExpressionTag(tag) = value {
+                            f(&tag.expression);
+                        }
+                    }
+                }
+            }
+            // A `{...spread}` reaches output on BOTH element kinds — a component's
+            // `$.spread_props([…])` array element and a regular element's fused
+            // `$.attributes({ …spread })` object element — so every analysis must
+            // see its expression (a `new`/prop-rooted access inside one fires the
+            // `$$renderer.component` wrapper; a snippet whose only instance-binding
+            // reference sits in a spread must not module-hoist).
+            AttributeNode::SpreadAttribute(spread) => {
+                f(&spread.expression);
+            }
+            // A `class:` directive on a regular element is emitted (`$.attr_class`),
+            // so its expression reaches output — every analysis must see it. A
+            // shorthand `class:active` carries the auto-generated identifier here;
+            // the class *name* is a CSS token, not a binding reference. On a
+            // component `class:` refuses at emission (a `ComponentDirective`), so it
+            // is skipped there.
+            AttributeNode::ClassDirective(d) if is_html => f(&d.expression),
+            // A `style:` directive on a regular element is emitted (`$.attr_style`),
+            // so its expression-bearing values reach output. The `True` shorthand
+            // (`style:color`) carries NO expression node — its same-name binding
+            // reference rides `each_emitted_directive_name` instead. On a component
+            // `style:` refuses at emission (a `ComponentDirective`), so it is skipped.
+            AttributeNode::StyleDirective(d) if is_html => match &d.value {
+                StyleDirectiveValue::ExpressionTag(tag) => f(&tag.expression),
+                StyleDirectiveValue::Parts(parts) => {
+                    for value in *parts {
+                        if let AttributeValue::ExpressionTag(tag) = value {
+                            f(&tag.expression);
+                        }
+                    }
+                }
+                StyleDirectiveValue::True => {}
+            },
+            // A `bind:` directive on a regular element: the oracle's analysis visits
+            // every bind expression (for reference counting / `needs_context`),
+            // regardless of what SSR emits, so every analysis must see it. The binds
+            // tsv actually compiles (`this` omitted; `value`/`checked`/`group` on
+            // `<input>` emitted) are all $state-rooted here, so this never fires
+            // `needs_context` — but a snippet whose only instance-binding reference
+            // sits in a bind must still not module-hoist. A bind tsv refuses elsewhere
+            // makes the whole component refuse, so visiting it is harmless there. On a
+            // component `bind:` refuses at emission (a `ComponentBindDirective`), so it
+            // is skipped.
+            AttributeNode::BindDirective(d) if is_html => f(&d.expression),
+            // The no-op drop family: dropped-but-analyzed on a regular element.
+            AttributeNode::AttachTag(attach) if is_html => f(&attach.expression),
+            AttributeNode::UseDirective(d) if is_html => {
+                if let Some(expr) = &d.expression {
+                    f(expr);
+                }
+            }
+            AttributeNode::TransitionDirective(d) if is_html => {
+                if let Some(expr) = &d.expression {
+                    f(expr);
+                }
+            }
+            AttributeNode::AnimateDirective(d) if is_html => {
+                if let Some(expr) = &d.expression {
+                    f(expr);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Visit the NAME of every directive that names a value binding on an **emitted**
+/// regular element and whose reference an expression traversal can't reach:
+/// `use:` (action), `transition:`/`in:`/`out:` (transition fn), `animate:`
+/// (animation fn), and a `style:` **shorthand** (`style:color` ≡
+/// `style:color={color}`). The drop-family names are dropped from the tag output;
+/// the `style:` shorthand emits as the object-shorthand value `{ color }`. Either
+/// way the oracle counts the referenced binding — a top-level `{#snippet}` whose
+/// only instance-binding reference is such a name must **not** module-hoist. The
+/// name may be a member path (`use:a.b`); the raw slice is surfaced for the
+/// consumer to reduce to its root identifier.
+///
+/// A `style:` shorthand is the one directive whose shorthand does NOT
+/// auto-generate an `expression` node (`class:` shorthands do, so their reference
+/// flows through [`each_attribute_expression`]); a non-shorthand
+/// `style:color={…}` / `style:color="…"` yields its expression there too — so only
+/// the shorthand contributes a name here.
+///
+/// Components refuse these at emission, so their names are skipped (the refusal
+/// fires). The dropped-`{:catch}` path uses
+/// [`each_reference_bearing_directive_name`], the same set. A bare name never fires
+/// `needs_context`, so only the snippet-hoist analysis consumes this.
+pub(crate) fn each_emitted_directive_name<'s>(
+    element: &Element<'_>,
+    source: &'s str,
+    f: &mut impl FnMut(&'s str),
+) {
+    if element.kind != ElementKind::Html {
+        return;
+    }
+    for attr_node in element.attributes {
+        let name_span = match attr_node {
+            AttributeNode::UseDirective(d) => d.name_span,
+            AttributeNode::TransitionDirective(d) => d.name_span,
+            AttributeNode::AnimateDirective(d) => d.name_span,
+            AttributeNode::StyleDirective(d) if matches!(d.value, StyleDirectiveValue::True) => {
+                d.name_span
+            }
+            _ => continue,
+        };
+        f(name_span.extract(source));
+    }
+}
+
+/// Visit every reference-bearing attribute expression of `element`, **including
+/// the positions `each_attribute_expression` deliberately skips** — element
+/// `{...spread}`, every directive expression, and `{@attach}`.
+///
+/// This is the traversal for a **dropped** fragment (a `{:catch}` branch), whose
+/// contents the emitter discards without walking. There the emission refusal that
+/// `each_attribute_expression`'s exclusions rely on never fires, so the analyses
+/// must count these references themselves to match the oracle, which counts every
+/// reference inside a dropped `{:catch}` (a snippet whose only instance-binding
+/// reference sits in such a position must **not** hoist; a `new`/prop-rooted
+/// access there must still trigger the `$$renderer.component` wrapper). On the
+/// non-dropped (emitted) path these positions still refuse at emission, so the
+/// default `each_attribute_expression` remains correct there.
+///
+/// A directive's **name** (`use:`/`transition:`/`in:`/`out:`/`animate:`) is also a
+/// binding reference the oracle counts, but tsv stores it as a verbatim name span
+/// rather than an `Expression`, so an expression traversal cannot reach it — it is
+/// surfaced separately by `each_reference_bearing_directive_name`.
+///
+/// `LetDirective` binds a name (a slot prop) and contributes no free reference, so
+/// it is excluded.
+///
+/// Takes `&[AttributeNode]` (not `&Element`) so it also serves a special element's
+/// attributes on the dropped path.
+pub(crate) fn each_reference_bearing_attribute_expression<'a, 'arena>(
+    attributes: &'a [AttributeNode<'arena>],
+    f: &mut impl FnMut(&'a Expression<'arena>),
+) {
+    for attr_node in attributes {
+        match attr_node {
+            AttributeNode::Attribute(attr) => {
+                if let Some(values) = attr.value {
+                    for value in values {
+                        if let AttributeValue::ExpressionTag(tag) = value {
+                            f(&tag.expression);
+                        }
+                    }
+                }
+            }
+            AttributeNode::SpreadAttribute(spread) => f(&spread.expression),
+            AttributeNode::AttachTag(attach) => f(&attach.expression),
+            AttributeNode::OnDirective(d) => {
+                if let Some(expr) = &d.expression {
+                    f(expr);
+                }
+            }
+            AttributeNode::BindDirective(d) => f(&d.expression),
+            AttributeNode::ClassDirective(d) => f(&d.expression),
+            AttributeNode::StyleDirective(d) => match &d.value {
+                StyleDirectiveValue::ExpressionTag(tag) => f(&tag.expression),
+                StyleDirectiveValue::Parts(parts) => {
+                    for value in *parts {
+                        if let AttributeValue::ExpressionTag(tag) = value {
+                            f(&tag.expression);
+                        }
+                    }
+                }
+                StyleDirectiveValue::True => {}
+            },
+            AttributeNode::UseDirective(d) => {
+                if let Some(expr) = &d.expression {
+                    f(expr);
+                }
+            }
+            AttributeNode::TransitionDirective(d) => {
+                if let Some(expr) = &d.expression {
+                    f(expr);
+                }
+            }
+            AttributeNode::AnimateDirective(d) => {
+                if let Some(expr) = &d.expression {
+                    f(expr);
+                }
+            }
+            AttributeNode::LetDirective(_) => {}
+        }
+    }
+}
+
+/// Visit the NAME of every directive whose name is a value-binding reference:
+/// `use:` (action), `transition:`/`in:`/`out:` (transition fn), `animate:`
+/// (animation fn), and a `style:` **shorthand** (`style:color` ≡
+/// `style:color={color}` — the name references the same-named binding). These name
+/// a binding the oracle counts; the other directives' names are event /
+/// DOM-property / class / CSS names (not references) and `let:` binds a name. tsv
+/// stores the name as a verbatim `name_span` rather than an `Expression` — and it
+/// may be a member path (`use:a.b`) — so the raw slice is surfaced for the
+/// consumer to reduce to its root identifier.
+///
+/// `style:` is the one directive whose shorthand does NOT auto-generate an
+/// `expression` node (`bind:`/`class:` shorthands do, so their reference already
+/// flows through `each_reference_bearing_attribute_expression`); a non-shorthand
+/// `style:color={…}` / `style:color="a{…}"` names a CSS property (not a reference)
+/// and its expression is handled there too — so only the `True` (shorthand) arm
+/// contributes a name here.
+///
+/// Consumed only by the snippet-hoist analysis on the dropped-`{:catch}` path: a
+/// bare name reference never triggers `needs_context` (which fires on `new` /
+/// member-call roots only). The **emitted**-path counterpart is
+/// [`each_emitted_directive_name`], the same set (a `style:` shorthand now emits as
+/// `$.attr_style`'s `{ color }` shorthand, so its name is counted on both paths);
+/// only `use:`/`transition:`/`animate:` refuse on a component there.
+pub(crate) fn each_reference_bearing_directive_name<'s>(
+    attributes: &[AttributeNode<'_>],
+    source: &'s str,
+    f: &mut impl FnMut(&'s str),
+) {
+    for attr_node in attributes {
+        let name_span = match attr_node {
+            AttributeNode::UseDirective(d) => d.name_span,
+            AttributeNode::TransitionDirective(d) => d.name_span,
+            AttributeNode::AnimateDirective(d) => d.name_span,
+            AttributeNode::StyleDirective(d) if matches!(d.value, StyleDirectiveValue::True) => {
+                d.name_span
+            }
+            _ => continue,
+        };
+        f(name_span.extract(source));
+    }
+}
+
+/// The `this={…}` expression a special element carries as a binding reference:
+/// `<svelte:element this={tag}>` and `<svelte:component this={Component}>`. The
+/// other special-element kinds carry no such expression (their references live in
+/// attributes / children). Used only on the dropped-`{:catch}` path — every
+/// special element is refused at emission elsewhere.
+pub(crate) fn special_element_reference_expression<'a, 'arena>(
+    se: &'a SpecialElement<'arena>,
+) -> Option<&'a Expression<'arena>> {
+    match &se.kind {
+        SpecialElementKind::SvelteElement {
+            tag: SpecialThis::Braced(tag),
+        } => Some(&tag.expression),
+        SpecialElementKind::SvelteComponent { expression } => Some(&expression.expression),
+        _ => None,
+    }
+}

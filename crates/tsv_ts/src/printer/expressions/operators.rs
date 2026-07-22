@@ -588,7 +588,6 @@ impl<'a> Printer<'a> {
 
         for i in 1..operands.len() {
             let operand = &operands[i];
-            let prev_operand = &operands[i - 1];
 
             // shouldInlineLogicalExpression: the last operand (non-empty object/array)
             // uses a space instead of line(), keeping operator and RHS on the same line.
@@ -599,7 +598,6 @@ impl<'a> Printer<'a> {
             self.append_post_operator_parts(
                 &mut continuation_parts,
                 op_pos.end,
-                prev_operand.span.end,
                 operand,
                 allow_breaks,
                 prev_forced_break,
@@ -794,7 +792,7 @@ impl<'a> Printer<'a> {
         for (i, comment) in
             comments_to_emit_in_range(self.comments, operand_end, op_start).enumerate()
         {
-            if i == 0 && !self.has_newline_between(pos, comment.span.start) {
+            if i == 0 && !self.comment_has_newline_between(pos, comment.span.start) {
                 // On the operand's line (`1 // c`): trail via `line_suffix` (zero width)
                 // so a long comment never forces the preceding operand group to break.
                 parts.push(self.build_trailing_comment_doc(comment));
@@ -821,15 +819,10 @@ impl<'a> Printer<'a> {
     ///
     /// Handles multiple consecutive comments by preserving their line structure:
     /// - `a && // comment1\n// comment2\nb` keeps each comment on its own line
-    // the operand plus the four layout flags are all load-bearing here
-    // TODO: fold op_end/operand/allow_breaks/lead_with_space/chain_has_comments into a
-    // small `PostOperatorCtx` struct to retire the allow (byte-identical output)
-    #[allow(clippy::too_many_arguments)]
     fn append_post_operator_parts(
         &self,
         parts: &mut DocBuf,
         op_end: u32,
-        _prev_operand_end: u32,
         operand: &ChainOperand,
         allow_breaks: bool,
         lead_with_space: bool,
@@ -889,7 +882,9 @@ impl<'a> Printer<'a> {
         let mut pos = op_end;
         for (i, comment) in comments.iter().enumerate() {
             let is_first = i == 0;
-            let has_newline_before = self.has_newline_between(pos, comment.span.start);
+            // Comment-adjacency read (real even in canonical mode): decides
+            // line_suffix-vs-own-line emission, so it must see source newlines.
+            let has_newline_before = self.comment_has_newline_between(pos, comment.span.start);
 
             if is_first && !has_newline_before {
                 // First comment on same line as operator: `a && // comment`. A
@@ -908,7 +903,11 @@ impl<'a> Printer<'a> {
 
         // Operand: on its own line when the last comment has a newline after it
         // (preserving an author blank line), else glued inline (`/* c */ operand`).
-        if self.has_newline_between(pos, operand.span.start) {
+        // Comment-adjacency read (real even in canonical mode): a line comment always
+        // has a source newline before the operand, and gluing the operand after its
+        // `line_suffix` would swallow it at flush (inside `${…}` this even makes the
+        // output unparseable).
+        if self.comment_has_newline_between(pos, operand.span.start) {
             self.push_blank_preserving_hardline(parts, pos, operand.span.start);
         } else {
             parts.push(d.text(" "));
@@ -1359,7 +1358,10 @@ impl<'a> Printer<'a> {
         for (i, comment) in comments.iter().enumerate() {
             parts.push(self.build_comment_doc(comment));
             let next = comments.get(i + 1).map_or(operand_start, |c| c.span.start);
-            if self.has_newline_between(comment.span.end, next) {
+            // Comment-adjacency read (real even in canonical mode): a line comment
+            // always has a newline before the next token, and gluing content after
+            // its inline emission would swallow it.
+            if self.comment_has_newline_between(comment.span.end, next) {
                 parts.push(d.hardline());
             } else {
                 parts.push(d.text(" "));
@@ -1410,7 +1412,8 @@ impl<'a> Printer<'a> {
                 let mut pos = prev_end;
                 let mut in_trailing_run = true;
                 for comment in comments_to_emit_in_range(self.comments, prev_end, expr_start) {
-                    let own_line = self.has_newline_between(pos, comment.span.start);
+                    // Comment-adjacency read (real even in canonical mode).
+                    let own_line = self.comment_has_newline_between(pos, comment.span.start);
                     // Once a comment is own-line (or the trailing run already ended),
                     // it and the rest lead the next operand.
                     if !in_trailing_run || own_line {
@@ -1438,7 +1441,10 @@ impl<'a> Printer<'a> {
                 let next_start = seq.expressions[i + 1].span().start;
                 let mut pos = expr_end;
                 for comment in comments_to_emit_in_range(self.comments, expr_end, next_start) {
-                    if self.has_newline_between(pos, comment.span.start) {
+                    // Comment-adjacency read (real even in canonical mode): an
+                    // own-line comment must lead the next operand, not merge into
+                    // the previous operand's `line_suffix` trailing run.
+                    if self.comment_has_newline_between(pos, comment.span.start) {
                         break;
                     }
                     // Same-line trailing comment: block inline before the comma, line
@@ -1491,15 +1497,11 @@ impl<'a> Printer<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::cell::RefCell;
-    use std::rc::Rc;
-    use string_interner::DefaultStringInterner;
 
     /// Run `should_group_binary_continuation` on a parsed binary expression.
     fn group(src: &str) -> bool {
         let arena = bumpalo::Bump::new();
-        let interner = Rc::new(RefCell::new(DefaultStringInterner::new()));
-        let expr = crate::parse_expression_with_comments(src, 0, interner, &arena)
+        let expr = crate::parse_expression_with_comments(src, 0, &arena)
             .expect("expression should parse")
             .0;
         match expr {

@@ -88,12 +88,12 @@
   - `symbols.rs` — `Symbol`, `SymbolFlags` + the `*Excludes` conflict-mask
     const tables (ported bit-for-bit from tsgo's `symbolflags.go`), pooled
     declaration lists, `TableId` symbol tables.
-  - `atoms.rs` — the checker's own **per-file** name interner (a fresh
-    `string-interner` instance per `bind_file` — never the parser's
-    per-document `SharedInterner`), reserved internal-name atoms. Atoms are
-    file-local (bind products stay relocatable); cross-file identity is
-    reconciled at merge via owned name strings, with a merge-time atom-remap
-    as the planned multi-file replacement.
+  - `atoms.rs` — the checker's own **per-file** name interner (a small
+    hand-rolled table over the crate's `FxHashMap`, no external interning
+    crate; the parser is span-identity and holds no interner), reserved
+    internal-name atoms. Atoms are file-local (bind products stay relocatable);
+    cross-file identity is reconciled at merge via owned name strings, with a
+    merge-time atom-remap as the planned multi-file replacement.
   - `flow/` — the **third walk**, a directory-module split by concern:
     `flags.rs` (the `FlowFlags` bitset), `graph.rs` (`FlowGraph`'s SoA
     storage + read API, plus the `FlowSwitchClause`/`FlowReduceLabel`

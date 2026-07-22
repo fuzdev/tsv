@@ -132,7 +132,7 @@ pub(super) fn build_import_expression_doc(
         if printer.has_comments_to_emit_between(source_end, paren_close) {
             let pc = PartitionedComments::new(
                 printer.comments,
-                printer.line_breaks,
+                printer.comment_line_breaks,
                 source_end,
                 paren_close,
             );
@@ -195,7 +195,7 @@ pub(super) fn build_import_expression_doc(
     {
         let mut inter = PartitionedComments::new(
             printer.comments,
-            printer.line_breaks,
+            printer.comment_line_breaks,
             source_end,
             options_start,
         );
@@ -210,7 +210,7 @@ pub(super) fn build_import_expression_doc(
         // don't read as a blank line).
         let inter_blank = inter_blank_no_comments
             || (has_inter_comments
-                && inter.has_blank_line_in_gap(printer.source, printer.line_breaks));
+                && inter.has_blank_line_in_gap(printer.source, printer.layout_line_breaks));
 
         // Leading comments (own-line + hugged after-comma) lead the options arg; its
         // trailing region follows: same-line block/line comments inline, then own-line
@@ -220,7 +220,7 @@ pub(super) fn build_import_expression_doc(
         tail.push(options_doc);
         let trailing = PartitionedComments::new(
             printer.comments,
-            printer.line_breaks,
+            printer.comment_line_breaks,
             options_end,
             paren_close,
         );

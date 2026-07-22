@@ -274,8 +274,7 @@ fn parse_part_args<'arena>(
             return Err(parser.error_msg("::part() requires identifier arguments"));
         }
 
-        let ident_str = parser.current_identifier();
-        let ident = parser.alloc_str_in(ident_str);
+        let ident = parser.current_identifier_in_arena();
         idents.push(ident);
         ident_spans.push(Span {
             start: parser.span_pos(parser.current_start),

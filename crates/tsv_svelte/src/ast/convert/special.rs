@@ -11,14 +11,12 @@
 use crate::ast::internal;
 use std::borrow::Cow;
 use std::collections::VecDeque;
-use string_interner::DefaultStringInterner;
 use tsv_lang::{
-    Comment, InfallibleResolve, JsonWriter, LocationMapper, LocationTracker, Position, Span,
-    estimated_json_capacity,
+    Comment, JsonWriter, LocationMapper, LocationTracker, Position, Span, estimated_json_capacity,
 };
 use tsv_ts::ast::convert::{
-    CommentMode, Schema, SkeletonRecorder, SkeletonTree, WriterComments, write_expression_embedded,
-    write_program_embedded, write_variable_declaration_embedded,
+    CommentMode, ProgramLoc, Schema, SkeletonRecorder, SkeletonTree, WriterComments,
+    write_expression_embedded, write_program_embedded, write_variable_declaration_embedded,
 };
 
 use super::comment_attachment::{
@@ -47,7 +45,6 @@ fn expression_skeleton(
     expr: &tsv_ts::ast::internal::Expression<'_>,
     source: &str,
     tracker: &LocationTracker,
-    interner: &DefaultStringInterner,
 ) -> SkeletonTree {
     let recorder = SkeletonRecorder::new();
     let mut w = skeleton_writer(expr.span());
@@ -56,7 +53,6 @@ fn expression_skeleton(
         expr,
         source,
         LocationMapper::identity(tracker),
-        interner,
         CommentMode::Record(&recorder),
         true, // skeleton pass: bytes discarded, loc irrelevant
     );
@@ -77,11 +73,10 @@ pub(super) fn build_expression_writer_comments(
     template_comments: &[&Comment],
     source: &str,
     tracker: &LocationTracker,
-    interner: &DefaultStringInterner,
     container_start: u32,
     range_end: u32,
 ) -> WriterComments {
-    let tree = expression_skeleton(expr, source, tracker, interner);
+    let tree = expression_skeleton(expr, source, tracker);
     let mut out = WriterComments::default();
     try_attach_comments_to_node(
         &tree,
@@ -111,11 +106,10 @@ pub(super) fn build_const_tag_writer_comments(
     template_comments: &[&Comment],
     source: &str,
     tracker: &LocationTracker,
-    interner: &DefaultStringInterner,
 ) -> WriterComments {
     let id_span = tag.id.span();
     let mut out = WriterComments::default();
-    let id_tree = expression_skeleton(&tag.id, source, tracker, interner);
+    let id_tree = expression_skeleton(&tag.id, source, tracker);
     try_attach_comments_to_node(
         &id_tree,
         id_tree.roots()[0],
@@ -125,7 +119,7 @@ pub(super) fn build_const_tag_writer_comments(
         id_span.end,
         &mut out,
     );
-    let init_tree = expression_skeleton(&tag.init, source, tracker, interner);
+    let init_tree = expression_skeleton(&tag.init, source, tracker);
     try_attach_comments_to_node(
         &init_tree,
         init_tree.roots()[0],
@@ -148,7 +142,6 @@ pub(super) fn build_declaration_tag_writer_comments(
     template_comments: &[&Comment],
     source: &str,
     tracker: &LocationTracker,
-    interner: &DefaultStringInterner,
     tag_start: u32,
     tag_end: u32,
 ) -> WriterComments {
@@ -159,7 +152,6 @@ pub(super) fn build_declaration_tag_writer_comments(
         var_decl,
         source,
         LocationMapper::identity(tracker),
-        interner,
         CommentMode::Record(&recorder),
         true, // skeleton pass: bytes discarded, loc irrelevant
     );
@@ -192,7 +184,6 @@ pub(super) fn build_expression_list_writer_comments(
     template_comments: &[&Comment],
     source: &str,
     tracker: &LocationTracker,
-    interner: &DefaultStringInterner,
     container_start: u32,
     range_end: u32,
     wrapper_end: Option<u32>,
@@ -205,7 +196,6 @@ pub(super) fn build_expression_list_writer_comments(
             item,
             source,
             LocationMapper::identity(tracker),
-            interner,
             CommentMode::Record(&recorder),
             true, // skeleton pass: bytes discarded, loc irrelevant
         );
@@ -239,7 +229,6 @@ pub(super) fn build_script_writer_comments(
     script: &internal::Script<'_>,
     source: &str,
     tracker: &LocationTracker,
-    interner: &DefaultStringInterner,
     html_leading_comment: Option<&internal::HtmlComment>,
     schema: Schema,
 ) -> WriterComments {
@@ -253,11 +242,9 @@ pub(super) fn build_script_writer_comments(
         &script.content,
         source,
         LocationMapper::identity(tracker),
-        interner,
         schema,
-        (dummy, dummy),
+        ProgramLoc::Emit(dummy, dummy), // skeleton pass: bytes discarded, loc irrelevant
         CommentMode::Record(&recorder),
-        true, // skeleton pass: bytes discarded, loc irrelevant
     );
     let tree = recorder.finish();
     let root = tree.roots()[0];
@@ -283,16 +270,12 @@ pub(super) fn build_script_writer_comments(
 /// `importKind`/`exportKind = "value"` and omits `attributes`; the Svelte context (anything else)
 /// omits `importKind`/`exportKind` and always includes `attributes`. But the *choice* is
 /// component-global, not per-script — this only feeds [`component_is_typescript`].
-fn script_lang<'s>(
-    script: &internal::Script<'_>,
-    source: &'s str,
-    interner: &'s DefaultStringInterner,
-) -> Option<&'s str> {
+fn script_lang<'s>(script: &internal::Script<'_>, source: &'s str) -> Option<&'s str> {
     for attr_node in script.attributes {
         let internal::AttributeNode::Attribute(attr) = attr_node else {
             continue;
         };
-        let name = interner.resolve_infallible(attr.name);
+        let name = attr.name(source);
         if name == "lang"
             && let Some(values) = &attr.value
             && let Some(internal::AttributeValue::Text(text)) = values.first()
@@ -314,18 +297,14 @@ fn script_lang<'s>(
 /// (module *and* instance) emits the acorn-typescript wire shape. So a plain `<script>` alongside
 /// a `lang="ts"` sibling still emits `importKind`/`exportKind = "value"` and omits `attributes`.
 /// A `<script>` with no `lang` attribute doesn't decide; nor does `<style lang=…>`.
-pub(super) fn component_is_typescript(
-    root: &internal::Root<'_>,
-    source: &str,
-    interner: &DefaultStringInterner,
-) -> bool {
+pub(super) fn component_is_typescript(root: &internal::Root<'_>, source: &str) -> bool {
     // The two top-level scripts in source order — the first one carrying a `lang` decides.
     let mut scripts = [root.module, root.instance];
     scripts.sort_by_key(|s| s.map_or(u32::MAX, |script| script.span.start));
     scripts
         .into_iter()
         .flatten()
-        .find_map(|script| script_lang(script, source, interner))
+        .find_map(|script| script_lang(script, source))
         .is_some_and(|lang| lang == "ts")
 }
 
@@ -336,11 +315,11 @@ pub(super) fn component_is_typescript(
 pub(super) fn find_option_values<'arena>(
     attrs: &[internal::AttributeNode<'arena>],
     name: &str,
-    interner: &DefaultStringInterner,
+    source: &str,
 ) -> Option<&'arena [internal::AttributeValue<'arena>]> {
     attrs.iter().find_map(|attr| {
         if let internal::AttributeNode::Attribute(attr) = attr
-            && interner.resolve_infallible(attr.name) == name
+            && attr.name(source) == name
         {
             attr.value
         } else {
@@ -371,11 +350,11 @@ pub(super) fn text_value<'src>(
 pub(super) fn bool_option(
     attrs: &[internal::AttributeNode<'_>],
     name: &str,
-    interner: &DefaultStringInterner,
+    source: &str,
 ) -> Option<bool> {
     attrs.iter().find_map(|attr| {
         if let internal::AttributeNode::Attribute(attr) = attr
-            && interner.resolve_infallible(attr.name) == name
+            && attr.name(source) == name
         {
             match &attr.value {
                 None => Some(true),

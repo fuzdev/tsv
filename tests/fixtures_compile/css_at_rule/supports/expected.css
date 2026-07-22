@@ -1,0 +1,6 @@
+
+	@supports (display: grid) {
+		.a.svelte-tsvhash {
+			color: red;
+		}
+	}

@@ -58,7 +58,7 @@ pub enum ChainNode<'a> {
     /// `property_start` is where the property identifier starts (for comment
     /// detection; also the name's span start for span-identity resolution)
     Member {
-        property: IdentName,
+        property: IdentName<'a>,
         optional: bool,
         object_end: u32,
         property_start: u32,
@@ -67,7 +67,7 @@ pub enum ChainNode<'a> {
     /// `property_start` is the `#` (comment detection); `name_start` is the
     /// name token after it (span-identity resolution).
     PrivateMember {
-        property: IdentName,
+        property: IdentName<'a>,
         optional: bool,
         object_end: u32,
         property_start: u32,
@@ -140,7 +140,7 @@ impl<'a> ChainNode<'a> {
 
     /// Create a new member node
     pub fn member(
-        property: IdentName,
+        property: IdentName<'a>,
         optional: bool,
         object_end: u32,
         property_start: u32,
@@ -155,7 +155,7 @@ impl<'a> ChainNode<'a> {
 
     /// Create a new private member node: .#prop
     pub fn private_member(
-        property: IdentName,
+        property: IdentName<'a>,
         optional: bool,
         object_end: u32,
         property_start: u32,
@@ -240,7 +240,7 @@ impl<'a> ChainNode<'a> {
     }
 
     /// Get the property name channel (+ its span start) for Member nodes
-    pub const fn property(&self) -> Option<(IdentName, u32)> {
+    pub const fn property(&self) -> Option<(IdentName<'a>, u32)> {
         match self {
             Self::Member {
                 property,

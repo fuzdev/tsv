@@ -9,6 +9,7 @@ members = [
     "crates/tsv_ts",
     "crates/tsv_css",
     "crates/tsv_svelte",
+    "crates/tsv_svelte_compile",
     "crates/tsv_check",
     "crates/tsv_cli",
     "crates/tsv_debug",
@@ -18,7 +19,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 authors = ["tsv contributors"]
 license = "MIT"
@@ -45,6 +46,9 @@ tsv_discover = { path = "crates/tsv_discover" }
 tsv_ts = { path = "crates/tsv_ts", default-features = false }
 tsv_css = { path = "crates/tsv_css", default-features = false }
 tsv_svelte = { path = "crates/tsv_svelte", default-features = false }
+# Svelte→JS compiler + JS canonicalizer. Dev-tooling consumer only (tsv_debug);
+# no shipped artifact links it yet.
+tsv_svelte_compile = { path = "crates/tsv_svelte_compile" }
 
 # Experimental TypeScript type-checking. A consumer crate of tsv_ts's concrete
 # types; referenced only by the tsv_debug harness so it never touches the
@@ -74,7 +78,6 @@ serde = { version = "1", features = ["derive"] }
 # doubles beyond u64) survive the expected.json round-trip byte-faithfully
 serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
 smallvec = "1.15.2"
-string-interner = "0.20"
 thiserror = "2"
 unicode-ident = "1.0"
 unicode-segmentation = "1.13.3"
@@ -82,7 +85,7 @@ unicode-width = "0.2.2"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
-# Allow missing Debug - some types contain non-Debug fields (Chars, RefCell<Interner>, etc.)
+# Allow missing Debug - some types contain non-Debug fields (Chars, etc.)
 # TODO: Consider adding manual Debug impls for key public types (Lexer, Printer, etc.)
 missing_debug_implementations = "allow"
 trivial_casts = "warn"
@@ -155,10 +158,6 @@ elidable_lifetime_names = "allow"
 
 # Cargo overrides
 cargo_common_metadata = "allow"      # internal crates, not published to crates.io
-# hashbrown 0.16 (string-interner) vs 0.17 (serde_json preserve_order -> indexmap);
-# unresolvable until string-interner bumps upstream. `lint` runs with `-D warnings`,
-# so leaving this at warn would turn the duplicate into a hard CI failure.
-multiple_crate_versions = "allow"
 
 # Restriction lints (panic points need explicit #[allow] with justification)
 clone_on_ref_ptr = "warn"
@@ -185,6 +184,7 @@ serde_json.workspace = true
 [dev-dependencies]
 tsv_debug = { path = "crates/tsv_debug" }
 tsv_cli = { path = "crates/tsv_cli" }
+tsv_svelte_compile.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 futures-util.workspace = true
 bumpalo.workspace = true

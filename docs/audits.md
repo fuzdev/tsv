@@ -1,8 +1,10 @@
 # Audit Gates
 
-> The standing correctness audits over the formatter and parsers — what each proves, what it is blind to, how to run it, and where it gates. The `deno task` entry points are indexed in [CLAUDE.md §Fixtures](../CLAUDE.md#fixtures-rust--deno-based); this doc is the full reference.
+> The standing correctness audits over the formatter, the parsers, and the Svelte compiler's doc/canonicalizer surface — what each proves, what it is blind to, how to run it, and where it gates. The `deno task` entry points are indexed in [CLAUDE.md §Fixtures](../CLAUDE.md#fixtures-rust--deno-based); this doc is the full reference.
 
 Most audits are pure Rust (no Deno sidecar). Those gated in `deno task check` scan `tests/fixtures` — a curated, format-stable tree — so several are cheap tripwires there whose real yield is external corpora (`../prettier/tests/format`, `../svelte/packages/svelte/src`, sibling dev repos): point them at real code after a printer change, or run `deno task audit:corpus`, the standing bundle for exactly that. Audits that need the feature-gated instrumentation (`swallow_check` / `comment_check`) build via the `audits` umbrella feature under `--profile corpus` — the single build world every `deno task check` audit shares (optimized + `panic = "unwind"`, so a formatter panic is caught and reported instead of killing the process; plain `--release` is `panic = "abort"`).
+
+The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, the validation-suite ratchet, the differential compile fuzzer — are not audits in this sense and are not gated here; they live in [compile_tooling.md](compile_tooling.md) and [compile_validation_ratchet.md](compile_validation_ratchet.md).
 
 ## Overview
 
@@ -17,13 +19,15 @@ Most audits are pure Rust (no Deno sidecar). Those gated in `deno task check` sc
 | [Authoring independence](#authoring-independence-audit-authoringaudit) | `authoring:audit` | two render-equivalent authorings settling on two fixed points; non-idempotency | `deno task check` |
 | [Round-trip](#formatreparse-round-trip-audit-roundtripaudit) | `roundtrip:audit` | formatted output the parser rejects (delimiter/structure corruption) | `deno task check` |
 | [Binding](#commenttoken-binding-audit-bindingaudit) | `binding:audit` | a glued comment re-bound to a different subtree by a migrating paren | `deno task check` |
-| [Fuzz](#seeded-mutational-fuzzer-fuzzaudit) | `fuzz:audit` | panic / non-idempotency / structural divergence on arbitrary input | `deno task check` |
 | [Render equivalence](#render-equivalence-audit-renderaudit) | `render:audit` | `tsv format` changing what a Svelte component renders | `deno task conformance` (release) |
 | [Layout neutrality](#layout-neutrality-audit-neutrality_audit) | — | a layout gate reading comment *ownership* instead of page occupancy | dev tool (pre-ownership-change) |
+| [Fuzz](#seeded-mutational-fuzzer-fuzzaudit) | `fuzz:audit` | panic / non-idempotency / structural divergence on arbitrary input | `deno task check` |
 | [F1 sweep](#f1-idempotency-sweep-idempotencysweep) | `idempotency:sweep` | pass-2 reflow on real code | conformance cadence |
 | [Corpus bundle](#the-corpus-bundle-auditcorpus) | `audit:corpus` | the content-loss / robustness bundle over real code | publish Step 3c |
 | [Lexer diff](#differential-lexer-harness-lex_diff) | — | token-stream drift after a lexer change | dev tool |
 | [Conformance audit](#conformance-audit-conformanceaudit) | `conformance:audit` | doc/fixture catalog + link integrity | `deno task check` |
+| [Compiler conformance](#compiler-conformance-audit-conformanceauditcompiler) | `conformance:audit:compiler` | compile-fixture divergence catalog + checklist ↔ `Refusal` drift | `deno task check` |
+| [Canonicalizer](#canonicalizer-audit-canonicalizeaudit) | `canonicalize:audit` | `canonicalize_js` non-idempotence / corrupt output / comment loss | `deno task check` |
 
 ## Line-Comment Swallow Audit (`swallow:audit`)
 
@@ -444,4 +448,46 @@ cargo run -p tsv_debug lex_diff ~/dev/zzz/src --golden /tmp/lex.golden          
 # Pure Rust (no Deno). Exits non-zero on any finding. Gated in `deno task check`.
 cargo run -p tsv_debug conformance_audit
 # Also: --json (machine-readable: {orphans, dead_links, missing_backlinks, stray_readmes})
+```
+
+## Compiler Conformance Audit (`conformance:audit:compiler`)
+
+```bash
+# compile_conformance_audit - the compiler analog of conformance_audit, deliberately minimal:
+# any _compiled_divergence-suffixed compile fixture must be cataloged in
+# docs/conformance_svelte_compiler.md AND carry a README back-linking it. The catalog is expected
+# to stay EMPTY (a safety valve for declining to reproduce a genuine oracle output bug — never a
+# tolerance budget), so those two checks inspect nothing today — a tripwire armed for the first
+# entry, not a standing gate. The third check needs no fixture and is the one that holds now:
+# CHECKLIST ↔ `Refusal` DRIFT. docs/checklist_svelte_compiler.md quotes refusal bucket keys
+# verbatim in its `**Refused**:` bullets and claims it maps onto corpus runs; nothing verified
+# that. The audit extracts each quoted key and compares it against the keys the `Refusal` catalog
+# can actually produce (`Refusal::all_bucket_keys`, one representative per variant; backticks are
+# stripped on both sides, since a key may itself contain one). Only the DOC-QUOTES-A-NONEXISTENT-KEY
+# direction GATES — that is the claim being false where a reader is misled. The reverse (a
+# producible key with no bullet) is REPORT-ONLY: a variant covered by a prose paragraph rather than
+# its own bullet is fine, so gating it would be born red and would push the doc toward a mechanical
+# key dump. ⚠️ `Refusal::every_variant` (the oracle behind that check) is hand-maintained and NOT
+# compiler-enforced — a new variant compiles fine while missing from it, silently narrowing the
+# oracle; a pinned-count unit test is the only backstop. Pure Rust (no Deno). Exits non-zero on any
+# finding. Gated in `deno task check`.
+cargo run -p tsv_debug compile_conformance_audit
+# Also: --json
+```
+
+## Canonicalizer Audit (`canonicalize:audit`)
+
+```bash
+# canonicalize_audit - canonicalize_js (the compile-parity reprint) at corpus scale: run the
+# canonicalizer twice per TS/JS file (.ts/.js/.mts/.cts/.mjs/.cjs, .svelte.ts included) and bucket —
+# input-rejected (informational: invalid fixtures, script-goal files), NON-IDEMPOTENT (failure),
+# CORRUPT-OUTPUT / unreparseable reprint (failure; the canonicalizer self-validates by reparse),
+# COMMENT-LOSS (failure; whitespace-normalized comment text/order before-vs-after — the bucket the
+# other two are structurally blind to: a swallowed comment leaves valid, idempotent JS).
+# Pure Rust (no Deno). Exits 1 on any failure. Gated in `deno task check` over tests/fixtures +
+# tests/fixtures_compile (fast); point it at real corpora for the full sweep.
+cargo run -p tsv_debug canonicalize_audit                              # default scope (tests/fixtures only)
+cargo run -p tsv_debug canonicalize_audit tests/fixtures tests/fixtures_compile  # the check-gate scope
+cargo run -p tsv_debug canonicalize_audit ~/dev/zzz/src ~/dev/gro/src  # real-corpus sweep
+# Also: --json
 ```

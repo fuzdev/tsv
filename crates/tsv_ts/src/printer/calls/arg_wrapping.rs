@@ -494,7 +494,12 @@ pub(crate) fn build_args_split_last(
             if let Some(cpos) = comma_pos {
                 for comment in comments_to_emit_in_range(printer.comments, arg_end, next_arg_start)
                 {
-                    if is_inline_block_before_comma(comment, cpos, printer.line_breaks, arg_end) {
+                    if is_inline_block_before_comma(
+                        comment,
+                        cpos,
+                        printer.comment_line_breaks,
+                        arg_end,
+                    ) {
                         head_parts.push(d.text(" "));
                         head_parts.push(printer.build_comment_doc(comment));
                     }
@@ -506,7 +511,12 @@ pub(crate) fn build_args_split_last(
             if let Some(cpos) = comma_pos {
                 for comment in comments_to_emit_in_range(printer.comments, arg_end, next_arg_start)
                 {
-                    if is_inline_block_after_comma(comment, cpos, printer.line_breaks, arg_end) {
+                    if is_inline_block_after_comma(
+                        comment,
+                        cpos,
+                        printer.comment_line_breaks,
+                        arg_end,
+                    ) {
                         head_parts.push(printer.build_comment_doc(comment));
                         head_parts.push(d.text(" "));
                     }
@@ -541,7 +551,12 @@ pub(crate) fn build_args_split_last(
             if let Some(cpos) = comma_pos {
                 for comment in comments_to_emit_in_range(printer.comments, arg_end, next_arg_start)
                 {
-                    if is_inline_block_before_comma(comment, cpos, printer.line_breaks, arg_end) {
+                    if is_inline_block_before_comma(
+                        comment,
+                        cpos,
+                        printer.comment_line_breaks,
+                        arg_end,
+                    ) {
                         all_args_parts.push(d.text(" "));
                         all_args_parts.push(printer.build_comment_doc(comment));
                     }
@@ -968,7 +983,8 @@ pub(super) fn build_args_with_blank_lines(
             if printer.has_comments_to_emit_between(arg_end, next_start) {
                 let pc = printer.open_inter_arg_gap(&mut arg_parts, arg_end, next_start);
 
-                let next_has_blank = pc.has_blank_line_in_gap(printer.source, printer.line_breaks);
+                let next_has_blank =
+                    pc.has_blank_line_in_gap(printer.source, printer.layout_line_breaks);
                 if next_has_blank {
                     arg_parts.push(d.literalline());
                 }

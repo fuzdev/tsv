@@ -13,13 +13,12 @@
 //! so its thread-local is effectively a module static; the reuse is sound there
 //! for the same reason (the per-file work is consumed before the next `reset()`).
 //!
-//! Two arenas, gated to match the bindings' `format` / `parse` split:
+//! Two reusables, gated to match the bindings' `format` / `parse` split:
 //!
 //! - [`with_ast_arena`] — the parse-time `bumpalo::Bump`. Always available;
 //!   parse and format both need it.
 //! - [`with_doc_arena`] — the format-time doc IR arena (`DocArena`). Behind the
-//!   `format` feature, which pulls `tsv_lang` for the type, so a parse-only
-//!   build doesn't link it.
+//!   `format` feature.
 //!
 //! # Soundness
 //!

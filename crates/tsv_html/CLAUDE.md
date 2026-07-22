@@ -13,7 +13,7 @@ Zero dependencies on other `tsv_*` crates (only `phf` at runtime;
 `serde_json` at build time — see `Cargo.toml`).
 Current consumer: `tsv_svelte`'s printer.
 
-The printer-adapter layer — methods that resolve interned symbols and
+The printer-adapter layer — methods that resolve span-identity names and
 call into this crate — lives in `tsv_svelte/src/printer/classification/`,
 not here. This crate stays AST-agnostic.
 
@@ -45,5 +45,5 @@ not here. This crate stays AST-agnostic.
   `$OUT_DIR/entities_map.rs`, `include!`d by `entities.rs`. ~2,231
   entries, zero runtime init cost.
 - **Pure `&str` API**: classification predicates take tag names, not
-  AST nodes or interned symbols. Keeps this crate independent of any
-  particular parser's representation.
+  AST nodes or a parser's name representation. Keeps this crate
+  independent of any particular parser's representation.

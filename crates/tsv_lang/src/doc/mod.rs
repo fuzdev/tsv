@@ -30,10 +30,7 @@ pub mod swallow;
 mod types;
 
 // Types
-pub use types::{
-    CachedWidth, DocContext, DocText, GroupId, LineKind, Mode, PoolSpan, SourceTextResolver,
-    TextResolver,
-};
+pub use types::{CachedWidth, DocContext, DocText, GroupId, LineKind, Mode, PoolSpan};
 
 /// Stack buffer for assembling a node's doc parts before handing them to
 /// `DocArena::concat` / `fill`. Language printers build one such `Vec<DocId>` per
@@ -49,41 +46,20 @@ pub use swallow::{SwallowReport, set_swallow_check, swallow_check_enabled, take_
 
 // Arena render
 pub use arena_render::{
-    arena_measure_doc_flat_resolved, arena_print_doc, arena_print_doc_at_column,
-    arena_print_doc_with_indent, arena_print_doc_with_indent_resolved,
-    arena_print_doc_with_indent_resolved_into,
-    arena_print_doc_with_indent_resolved_preserve_whitespace,
+    arena_measure_doc_flat_resolved, arena_print_doc, arena_print_doc_with_indent_resolved_into,
     arena_print_doc_with_indent_resolved_preserve_whitespace_into,
 };
 
 // Arena fits
 pub use arena_fits::arena_fits;
 
-use crate::{PRINT_WIDTH, TAB_WIDTH};
-
-/// Calculate available width for fitting check
-///
-/// This centralizes the width calculation logic used across TypeScript, CSS, and Svelte
-/// formatters. It accounts for indentation and any trailing characters that will follow
-/// the content being checked.
-///
-/// Uses the hardcoded [`PRINT_WIDTH`] and [`TAB_WIDTH`].
-///
-/// # Arguments
-/// * `indent_level` - Current indentation level
-/// * `current_column` - Position on current line (0 if start of line)
-/// * `trailing_chars` - Space to reserve for trailing punctuation (e.g., 1 for ";")
-pub fn available_width(indent_level: usize, current_column: usize, trailing_chars: usize) -> usize {
-    let indent_width = indent_level * TAB_WIDTH;
-    let used = indent_width.max(current_column) + trailing_chars;
-    PRINT_WIDTH.saturating_sub(used)
-}
-
 #[cfg(test)]
 mod arena_tests {
     use super::arena::{DocArena, DocId};
     use super::arena_render::arena_print_doc_with_indent_and_render;
     use super::render_config::RenderConfig;
+    #[cfg(feature = "comment_check")]
+    use super::render_config::RenderPurpose;
     use super::*;
     use crate::EmbedContext;
 
@@ -123,7 +99,8 @@ mod arena_tests {
         let render = RenderConfig {
             print_width,
             indent: "  ",
-            ..RenderConfig::default()
+            #[cfg(feature = "comment_check")]
+            purpose: RenderPurpose::Output,
         };
         render_test(arena, doc, &render, 0)
     }
@@ -133,21 +110,10 @@ mod arena_tests {
         let render = RenderConfig {
             print_width,
             indent: "\t",
-            ..RenderConfig::default()
+            #[cfg(feature = "comment_check")]
+            purpose: RenderPurpose::Output,
         };
         render_test(arena, doc, &render, 0)
-    }
-
-    #[test]
-    fn test_available_width() {
-        // PRINT_WIDTH = 100, TAB_WIDTH = 2.
-        assert_eq!(available_width(0, 0, 0), 100);
-        // indent 2 levels (2*2=4) + 1 trailing char reserved.
-        assert_eq!(available_width(2, 0, 1), 100 - 4 - 1);
-        // current_column (50) dominates the indent width (1*2=2).
-        assert_eq!(available_width(1, 50, 0), 50);
-        // saturating floor: never underflows below 0.
-        assert_eq!(available_width(0, 200, 0), 0);
     }
 
     #[test]
@@ -323,29 +289,6 @@ mod arena_tests {
         assert_eq!(a.line(), normal_2);
         assert_eq!(a.line_suffix_boundary(), lsb_2);
         assert_eq!(a.break_parent(), bp_2);
-    }
-
-    #[test]
-    fn test_symbol_node_interned_per_document() {
-        let mut a = DocArena::new();
-
-        // Repeated symbol ids within one document share one node; distinct
-        // ids stay distinct (including sparse ids beyond the table's growth).
-        let sym_5 = a.symbol(5);
-        assert_eq!(a.symbol(5), sym_5);
-        let sym_0 = a.symbol(0);
-        assert_ne!(sym_5, sym_0);
-        assert_eq!(a.symbol(0), sym_0);
-        assert_eq!(a.borrow_nodes().len(), 2); // ids 5 and 0
-
-        // reset() invalidates every interned symbol node (ids restart at 0):
-        // the next document re-allocs rather than returning a prior
-        // document's id, and interning resumes within it.
-        a.reset();
-        let sym_5_2 = a.symbol(5);
-        assert_eq!(sym_5_2.index(), 0);
-        assert_eq!(a.symbol(5), sym_5_2);
-        assert_ne!(a.symbol(9), sym_5_2);
     }
 
     #[test]
@@ -709,7 +652,8 @@ mod arena_tests {
         let render = RenderConfig {
             print_width: 12,
             indent: "\t",
-            ..RenderConfig::default()
+            #[cfg(feature = "comment_check")]
+            purpose: RenderPurpose::Output,
         };
         assert_eq!(
             render_test(&a, doc, &render, 0),
@@ -843,7 +787,8 @@ mod arena_tests {
         let render = RenderConfig {
             print_width: 100,
             indent: "\t",
-            ..RenderConfig::default()
+            #[cfg(feature = "comment_check")]
+            purpose: RenderPurpose::Output,
         };
         let embed = EmbedContext {
             base_indent_offset: 1,
@@ -1094,10 +1039,10 @@ mod arena_tests {
     // that shortcuts a subtree that actually breaks) flips one of these assertions
     // rather than silently producing wrong layout.
 
-    /// Fit `doc` in `width` columns in Flat mode, with no resolver (the docs here
-    /// use only `Static`/`Pooled` text, never `Symbol`).
+    /// Fit `doc` in `width` columns in Flat mode, with no source (the docs here
+    /// use only `Static`/`Pooled` text, never `SourceSpan`).
     fn fits_flat(a: &DocArena, doc: DocId, width: usize) -> bool {
-        arena_fits(a, doc, width, Mode::Flat, None::<&dyn TextResolver>)
+        arena_fits(a, doc, width, Mode::Flat, None)
     }
 
     /// Assert the memoized flat width of `doc` is exactly `w`: it fits in `w` but

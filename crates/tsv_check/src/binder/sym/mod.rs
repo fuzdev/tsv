@@ -71,7 +71,6 @@ use crate::diag::Diagnostic;
 use crate::hash::FxHashMap;
 use crate::ids::{FileId, NodeId};
 use crate::merge::{FileMerge, MergeDecl, MergeSymbol, ModuleAug};
-use string_interner::DefaultStringInterner;
 use tsv_lang::Span;
 use tsv_ts::ast::Program;
 use tsv_ts::ast::internal::{
@@ -141,7 +140,6 @@ struct DeclMods {
 /// The symbol bind for one file.
 pub(super) struct SymbolBinder<'a> {
     source: &'a str,
-    interner: &'a DefaultStringInterner,
     address_map: &'a FxHashMap<(usize, NodeKind), NodeId>,
     file: FileId,
     is_external: bool,
@@ -166,7 +164,6 @@ impl<'a> SymbolBinder<'a> {
     /// Build a binder for one file, seeding the source-file scope.
     pub(super) fn new(
         source: &'a str,
-        interner: &'a DefaultStringInterner,
         address_map: &'a FxHashMap<(usize, NodeKind), NodeId>,
         file: FileId,
         facts: FileFacts,
@@ -174,7 +171,6 @@ impl<'a> SymbolBinder<'a> {
         let is_external_module = matches!(facts.module_ness, super::ModuleNess::Module);
         let mut binder = SymbolBinder {
             source,
-            interner,
             address_map,
             file,
             is_external: is_external_module,
@@ -390,7 +386,7 @@ impl<'a> SymbolBinder<'a> {
     // --- name resolution -----------------------------------------------------
 
     fn ident_atom(&mut self, id: &Identifier<'_>) -> Atom {
-        let name = id.name(self.source, self.interner);
+        let name = id.name(self.source);
         self.atoms.intern(name)
     }
 
@@ -467,7 +463,7 @@ impl<'a> SymbolBinder<'a> {
                 })
             }
             Expression::PrivateIdentifier(pid) => {
-                let raw = pid.name(self.source, self.interner);
+                let raw = pid.name(self.source);
                 // The display carries the leading `#`, matching the `#name` span and
                 // the check-side form (`duplicate_members.rs`'s `member_key`) — a
                 // duplicate reported by BOTH the bind cascade and the check pass shares

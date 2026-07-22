@@ -13,10 +13,9 @@ tsv_ts = { workspace = true }
 # The per-file parse arena the caller owns (caller-owns-arena, the tsv_ts
 # contract). Already a workspace dependency.
 bumpalo = { workspace = true }
-# The binder's program-scoped name interner (its own instance, not the parser's
-# per-document SharedInterner) and the per-symbol declaration list. Both vetted
-# workspace deps.
-string-interner = { workspace = true }
+# The per-symbol pooled declaration list. A vetted workspace dep. (The binder's
+# own name interner is a hand-rolled table over the crate's FxHashMap — no
+# external interning crate.)
 smallvec = { workspace = true }
 
 [lints]

@@ -1,0 +1,6 @@
+
+	@container (min-width: 200px) {
+		.b.svelte-tsvhash {
+			color: red;
+		}
+	}

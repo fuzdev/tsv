@@ -192,7 +192,7 @@ grep fits_with_lookahead stacks.txt | head
 `perf annotate -s` matches the **exact demangled name** as shown in
 `perf report` — a substring silently annotates nothing. It also comes up
 empty for functions with multiple monomorphizations sharing one demangled
-name (e.g. `arena_fits_with_lookahead`, instantiated per `TextResolver`).
+name (e.g. `render_doc_core`, instantiated per `RenderPolicy`).
 For those, dump everything and search by source line instead:
 
 ```bash
@@ -391,7 +391,7 @@ memory shape of the doc IR: **nodes/byte** (actual vs the `with_source_size_hint
 safe hint must clear), **capacity fill %** (used vs reserved node slots), the **DocNode
 variant histogram** (which node kind dominates the `Vec` the render/`fits`/build
 loops linearly scan), and the **DocText sub-histogram** (`Static` / `Pooled` /
-`SourceSpan` / `Symbol` share of `Text`). `--reuse` instead reports the
+`SourceSpan` share of `Text`). `--reuse` instead reports the
 **`reset()`-reuse high-water** — the peak retained node/children capacity across one
 shared arena (as the CLI/FFI/WASM batch drivers use), the number that shows a lower
 pre-size hint doesn't grow the batch footprint (it's bounded by actual max-file usage,
@@ -441,6 +441,34 @@ cargo run -p tsv_debug buffer_sizes ~/dev/zzz/src ~/dev/gro/src
 cargo run -p tsv_debug --features buffer_stats buffer_sizes <paths>  # + chain/comment histograms
 cargo run -p tsv_debug buffer_sizes <paths> --json
 ```
+
+### 9. `tsv_debug compile_profile` — Svelte compile against the format wall
+
+Times the Svelte compiler (`tsv_svelte_compile::compile`) per file and reports it
+as a **ratio** against parsing plus formatting the same file. The ratio is the
+point: it says how many times the format wall a compile costs, which is the cheap
+tripwire for super-linear or rebuilt work in the compile pipeline. The design
+frame is ~2–3× for an all-linear pipeline.
+
+The two rows deliberately keep different shapes, so the number means what it says:
+`compile` is the whole **cold per-call** cost (the compiler has no warm arena-reuse
+entry point, so that *is* its production shape), while `parse + format` uses warm
+`reset()`-reuse arenas (the `tsv_cli` shape). **Compare ratios only against ratios
+from this same command** — never against a raw timing from `profile`.
+
+Refusals and parse failures are counted, not timed. A `CorruptOutput` or a
+`TypeErasureLeak` is a compiler bug and fails the run. Pure Rust, no Deno; run with
+`--release` for anchors.
+
+```bash
+cargo run --release -p tsv_debug -- compile_profile tests/fixtures_compile
+cargo run --release -p tsv_debug -- compile_profile ../svelte/packages/svelte/tests/runtime-runes
+cargo run --release -p tsv_debug -- compile_profile <paths> --iterations 20 --json
+```
+
+Because the ratio is relative to the corpus it ran on, a compiled corpus that
+*grows* (a refusal class getting unlocked) reshapes the denominator — so an anchor
+is only comparable to another anchor over the same corpus.
 
 ## Measurement Process
 

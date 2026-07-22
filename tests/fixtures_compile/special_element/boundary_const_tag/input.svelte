@@ -1,0 +1,4 @@
+<svelte:boundary>
+	{@const x = 1}
+	<p>{x}</p>
+</svelte:boundary>

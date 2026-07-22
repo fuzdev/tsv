@@ -16,30 +16,32 @@
 //! is the planned replacement when multi-file volume makes the string bridge
 //! measurable.
 //!
-//! This is the checker's **own** interner (a fresh `string-interner` instance),
-//! not the parser's per-document `SharedInterner` — their tenant lifecycles stay
-//! decoupled. The reserved internal names tsgo mangles (`"default"`, `"export="`,
-//! `"__constructor"`, ambient-module `"name"`, private `\xFE#…`) intern through
-//! the same table on demand; the hot reserved ones are pre-interned so their
-//! [`Atom`]s are `const`-cheap to compare.
+//! This is the checker's **own** interner — a small hand-rolled table over the
+//! crate's `FxHashMap` (no external interning crate; the parser is span-identity
+//! and holds no interner). The reserved internal names tsgo mangles (`"default"`,
+//! `"export="`, `"__constructor"`, ambient-module `"name"`, private `\xFE#…`)
+//! intern through the same table on demand; the hot reserved ones are pre-interned
+//! so their [`Atom`]s are `const`-cheap to compare.
 //
 // tsgo: internal/ast/symbol.go InternalSymbolName* (the mangled reserved names)
 
-use string_interner::backend::StringBackend;
-use string_interner::symbol::SymbolU32;
-use string_interner::{StringInterner, Symbol};
+use crate::hash::FxHashMap;
 
 /// A dense interned name identity, valid within one file's bind.
 ///
-/// Equal atoms mean equal names — the symbol-table key. Wraps the interner's
-/// `u32` symbol so distinct-name lookups are integer compares. Atoms from
-/// different files never compare (each `bind_file` has its own interner).
+/// Equal atoms mean equal names — the symbol-table key. Wraps a `u32` index so
+/// distinct-name lookups are integer compares. Atoms from different files never
+/// compare (each `bind_file` has its own interner).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Atom(u32);
 
-/// The binder's per-file name interner (its own `string-interner` instance).
+/// The binder's per-file name interner (its own hand-rolled table).
 pub struct Atoms {
-    interner: StringInterner<StringBackend<SymbolU32>>,
+    /// `Atom` index → owned name (the resolve channel). Owned rather than
+    /// source-borrowed so bind products stay relocatable across programs/folds.
+    names: Vec<Box<str>>,
+    /// name → `Atom` (the get-or-intern channel).
+    lookup: FxHashMap<Box<str>, Atom>,
     /// tsgo's `InternalSymbolNameDefault` — the forced name of every default
     /// export, so multiple default exports collide under one table key.
     default: Atom,
@@ -51,28 +53,34 @@ impl Atoms {
     /// Build the interner and pre-intern the hot reserved names.
     #[must_use]
     pub fn new() -> Atoms {
-        let mut interner = StringInterner::<StringBackend<SymbolU32>>::new();
-        let default = Atom(interner.get_or_intern("default").to_usize() as u32);
-        let export_equals = Atom(interner.get_or_intern("export=").to_usize() as u32);
-        Atoms {
-            interner,
-            default,
-            export_equals,
-        }
+        let mut atoms = Atoms {
+            names: Vec::new(),
+            lookup: FxHashMap::default(),
+            default: Atom(0),
+            export_equals: Atom(0),
+        };
+        atoms.default = atoms.intern("default");
+        atoms.export_equals = atoms.intern("export=");
+        atoms
     }
 
-    /// Intern a name to its [`Atom`].
+    /// Intern a name to its [`Atom`] — one string hash, then integer identity.
     pub fn intern(&mut self, name: &str) -> Atom {
-        Atom(self.interner.get_or_intern(name).to_usize() as u32)
+        if let Some(&atom) = self.lookup.get(name) {
+            return atom;
+        }
+        let atom = Atom(self.names.len() as u32);
+        let owned: Box<str> = name.into();
+        self.names.push(owned.clone());
+        self.lookup.insert(owned, atom);
+        atom
     }
 
     /// Resolve an [`Atom`] back to its name (for diagnostic display).
     #[must_use]
     pub fn resolve(&self, atom: Atom) -> &str {
-        // Sound: every `Atom` was minted by this interner's `get_or_intern`.
-        SymbolU32::try_from_usize(atom.0 as usize)
-            .and_then(|sym| self.interner.resolve(sym))
-            .unwrap_or("")
+        // Sound: every `Atom` was minted by this interner's `intern`.
+        self.names.get(atom.0 as usize).map_or("", |name| &**name)
     }
 
     /// The forced-default-export name atom (`"default"`).

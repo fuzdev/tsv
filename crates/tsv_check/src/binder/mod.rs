@@ -340,8 +340,8 @@ fn node_id_miss(address: usize, kind: NodeKind) -> ! {
 /// count, and an `import =` with an entity-name reference (`import x = A.B`) does
 /// not.
 ///
-/// `source` and the program's interner are unused here (the indicators are all
-/// structural); they are accepted for signature symmetry with the binder.
+/// The module indicators are all structural — no name resolution (and so no
+/// `source`) is needed here.
 #[must_use]
 pub fn module_ness(program: &Program<'_>) -> ModuleNess {
     for stmt in program.body {
@@ -502,8 +502,7 @@ pub fn bind_file<'arena>(
 
     // Pass 2: the symbol bind (functions-first, container-threaded).
     let (diagnostics, merge) = {
-        let interner = program.interner.borrow();
-        let mut binder = sym::SymbolBinder::new(source, &interner, &walk.address_map, file, facts);
+        let mut binder = sym::SymbolBinder::new(source, &walk.address_map, file, facts);
         binder.bind_program(program);
         binder.finish()
     };

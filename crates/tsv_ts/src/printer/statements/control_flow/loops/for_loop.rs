@@ -26,6 +26,38 @@ struct ForHeaderSpans {
     close_paren: Option<u32>,
 }
 
+/// Source positions for a for-in/for-of header
+///
+/// Groups the resolved header positions to avoid passing many `u32` parameters
+/// to the structural-comment check and the two layout builders. Mirrors
+/// `ForHeaderSpans` (the C-style `for` header). Built once by
+/// `Printer::for_in_of_spans`.
+struct ForInOfSpans {
+    open_paren: Option<u32>,
+    close_paren: Option<u32>,
+    left_start: u32,
+    /// Start of the binding *target*, skipping the declaration keyword (the
+    /// first declarator's pattern for a `VariableDeclaration` left, the pattern
+    /// itself for a bare `Pattern` left) — so the keyword→binding gap
+    /// (`const // c⏎x`) reads as header-structural while the binding pattern's
+    /// own interior does not. See `get_for_in_of_binding_start`.
+    binding_start: u32,
+    left_end: u32,
+    keyword_pos: u32,
+    keyword_end: u32,
+    right_start: u32,
+    right_end: u32,
+}
+
+impl ForInOfSpans {
+    /// The closing-paren anchor for the iterable→`)` gap scan, falling back to
+    /// just past the iterable when no `)` is locatable. Kept in one place so
+    /// every caller derives it identically.
+    fn close(&self) -> u32 {
+        self.close_paren.unwrap_or(self.right_end + 1)
+    }
+}
+
 /// Mutable cursor state while laying out an empty `for (;;)` header's comments.
 struct EmptyForCursor {
     /// A `//` line comment was just emitted: it runs to end-of-line, so the next
@@ -896,10 +928,7 @@ impl<'a> Printer<'a> {
         is_await: bool, // for-of `for await`; always false for for-in
     ) -> DocId {
         let d = self.d();
-        let left_start = self.get_for_in_of_left_start(left);
-        let left_end = self.get_for_in_of_left_end(left);
-        let right_start = right.span().start;
-        let right_end = right.span().end;
+        let spans = self.for_in_of_spans(left, right, keyword, stmt_start);
 
         // The keyword as a static literal (`d.text` needs `&'static str`), with
         // and without the leading space.
@@ -909,19 +938,12 @@ impl<'a> Printer<'a> {
             ("in", " in")
         };
 
-        // Find the keyword position (search with or without spaces)
-        let keyword_pos = self
-            .find_keyword_position(left_end, right_start, keyword)
-            .unwrap_or(left_end);
-
         // Preserve comments between keywords and `(`
         // for await: two gaps — for-to-await and await-to-paren
         // for (non-await): one gap — for-to-paren
         let for_keyword_end = stmt_start + "for".len() as u32;
-        let open_paren = self.find_open_paren_after(stmt_start);
-        let close_paren = open_paren.and_then(|o| self.matching_close_paren(o));
         let (for_await_comments, await_paren_comments) = if is_await {
-            let await_pos = self.find_keyword_in_range(for_keyword_end, left_start, "await");
+            let await_pos = self.find_keyword_in_range(for_keyword_end, spans.left_start, "await");
             // Same line-safe builder as the `await`→`(` gap below: a line comment in
             // the `for`→`await` gap breaks `await` onto the next line so the `//`
             // can't swallow it; a block comment keeps its glue space.
@@ -929,7 +951,7 @@ impl<'a> Printer<'a> {
                 .and_then(|ap| self.build_keyword_paren_comments(for_keyword_end, Some(ap)));
             let await_paren_c = await_pos
                 .map(|ap| ap + "await".len() as u32)
-                .and_then(|ae| self.build_keyword_paren_comments(ae, open_paren));
+                .and_then(|ae| self.build_keyword_paren_comments(ae, spans.open_paren));
             (for_await_c, await_paren_c)
         } else {
             (None, None)
@@ -937,17 +959,16 @@ impl<'a> Printer<'a> {
         let keyword_comments = if is_await {
             None
         } else {
-            self.build_keyword_paren_comments(for_keyword_end, open_paren)
+            self.build_keyword_paren_comments(for_keyword_end, spans.open_paren)
         };
 
-        // Check for line comments in the header - if present, use breaking layout
-        // We check from open paren to close paren
-        let close = close_paren.unwrap_or(right_end + 1);
-        let has_line_comments = if let Some(open) = open_paren {
-            self.has_line_comments_between(open + 1, close)
-        } else {
-            self.has_line_comments_between(left_start, close)
-        };
+        // Check for line comments in the header's *structural gaps* — if present,
+        // use the breaking layout that preserves them where the author placed them.
+        // Only gap comments count: a `//` *inside* the binding or the iterable
+        // expression is that expression's own content (printed by its doc) and must
+        // NOT force the header open — prettier keeps the head inline and only the
+        // iterable breaks. See `in_of_iterable_line_comment`.
+        let has_line_comments = self.for_in_of_header_has_structural_line_comments(&spans);
 
         // Build the `for ... (` opening once — shared by both the inline and the
         // breaking (line-comment) layouts, so each preserves any `for`-to-`(`
@@ -964,22 +985,15 @@ impl<'a> Printer<'a> {
         let async_lhs_paren = self.for_lhs_needs_async_paren(left, keyword, is_await);
 
         if has_line_comments {
+            let left_doc = self.build_for_in_of_left_doc(left, async_lhs_paren);
             return self.build_for_in_of_with_line_comments(
-                left,
-                right,
-                body,
-                keyword,
-                keyword_pos,
-                open_paren,
-                close_paren,
-                async_lhs_paren,
-                &mut parts,
+                right, body, keyword, &spans, left_doc, &mut parts,
             );
         }
 
         // Comments between ( and left
-        if let Some(open) = open_paren {
-            for comment in comments_to_emit_in_range(self.comments, open + 1, left_start) {
+        if let Some(open) = spans.open_paren {
+            for comment in comments_to_emit_in_range(self.comments, open + 1, spans.left_start) {
                 if comment.is_block {
                     parts.push(self.build_comment_doc(comment));
                     parts.push(d.text(" "));
@@ -991,7 +1005,7 @@ impl<'a> Printer<'a> {
 
         // Comments after left, before the keyword
         let has_left_comment =
-            self.append_for_in_of_block_comments(&mut parts, left_end, keyword_pos);
+            self.append_for_in_of_block_comments(&mut parts, spans.left_end, spans.keyword_pos);
 
         if has_left_comment {
             parts.push(d.text(kw));
@@ -1000,9 +1014,8 @@ impl<'a> Printer<'a> {
         }
 
         // Comments after the keyword, before right
-        let keyword_end = keyword_pos + keyword.len() as u32;
         let has_comment =
-            self.append_for_in_of_block_comments(&mut parts, keyword_end, right_start);
+            self.append_for_in_of_block_comments(&mut parts, spans.keyword_end, spans.right_start);
         if !has_comment {
             parts.push(d.text(" "));
         }
@@ -1010,54 +1023,112 @@ impl<'a> Printer<'a> {
         parts.push(self.build_expression_doc(right));
 
         // Comments after right, before close paren (no trailing space needed)
-        if let Some(close) = close_paren {
-            self.append_for_in_of_trailing_comments(&mut parts, right_end, close);
+        if let Some(close) = spans.close_paren {
+            self.append_for_in_of_trailing_comments(&mut parts, spans.right_end, close);
         }
 
         // `)` + comments + body (shared with the breaking layout)
-        self.push_for_close_paren_and_body(&mut parts, body, right_end, close_paren);
+        self.push_for_close_paren_and_body(&mut parts, body, spans.right_end, spans.close_paren);
 
         // Group so a non-block body's `adjustClause` line breaks on overflow
         // (matches Prettier's `printForXStatement`).
         d.group(d.concat(&parts))
     }
 
+    /// Resolve the for-in/for-of header's source positions into a `ForInOfSpans`,
+    /// computed once and shared by the structural-line-comment check and both the
+    /// inline and breaking layouts. Preserves each getter's semantics — notably
+    /// `keyword_pos` falls back to `left_end` when the `in`/`of` keyword can't be
+    /// located, and `close_paren` follows the depth-tracked open paren.
+    fn for_in_of_spans(
+        &self,
+        left: &internal::ForInOfLeft<'_>,
+        right: &Expression<'_>,
+        keyword: &str,
+        stmt_start: u32,
+    ) -> ForInOfSpans {
+        let left_end = self.get_for_in_of_left_end(left);
+        let right_start = right.span().start;
+        // Find the keyword position (search with or without spaces).
+        let keyword_pos = self
+            .find_keyword_position(left_end, right_start, keyword)
+            .unwrap_or(left_end);
+        let open_paren = self.find_open_paren_after(stmt_start);
+        ForInOfSpans {
+            open_paren,
+            close_paren: open_paren.and_then(|o| self.matching_close_paren(o)),
+            left_start: self.get_for_in_of_left_start(left),
+            binding_start: self.get_for_in_of_binding_start(left),
+            left_end,
+            keyword_pos,
+            keyword_end: keyword_pos + keyword.len() as u32,
+            right_start,
+            right_end: right.span().end,
+        }
+    }
+
+    /// Whether a `//` line comment sits in one of the for-in/for-of header's
+    /// *structural gaps* — after `(` up to the binding target (covering the
+    /// declaration keyword→binding gap, `const // c⏎x`), between the binding and
+    /// the `in`/`of` keyword, between the keyword and the iterable, or between the
+    /// iterable and `)`.
+    ///
+    /// Deliberately excludes the interiors of the binding *pattern*
+    /// (`[binding_start, left_end)`) and the iterable (`[right_start, right_end)`): a
+    /// line comment *inside* the iterable (`for (const x of [\n\t'a' // c\n])`) — or
+    /// inside a destructuring binding — is that expression's own content, printed by
+    /// its doc, and must not force the header-breaking layout
+    /// (`build_for_in_of_with_line_comments`). Prettier keeps the head inline and
+    /// only that expression breaks. A gap comment, by contrast, has no other line
+    /// break to ride, so inline the `//` would swallow the following header tokens —
+    /// tsv breaks the header and preserves it in place. See the
+    /// `in_of_iterable_line_comment` (excluded) and
+    /// `of_in_keyword_binding_line_comment_prettier_divergence` (keyword→binding gap,
+    /// included) fixtures.
+    fn for_in_of_header_has_structural_line_comments(&self, spans: &ForInOfSpans) -> bool {
+        // `(` → binding target (spans the declaration keyword + its keyword→binding
+        // gap). Absent open paren (degenerate header) has no locatable gap.
+        spans
+            .open_paren
+            .is_some_and(|open| self.has_line_comments_between(open + 1, spans.binding_start))
+            // binding → keyword
+            || self.has_line_comments_between(spans.left_end, spans.keyword_pos)
+            // keyword → iterable
+            || self.has_line_comments_between(spans.keyword_end, spans.right_start)
+            // iterable → `)`
+            || self.has_line_comments_between(spans.right_end, spans.close())
+    }
+
     /// Build for-in/for-of statement with line comments preserved in their positions
     ///
     /// This is our divergence from Prettier - we preserve line comments where
     /// the user wrote them rather than relocating them.
-    #[allow(clippy::too_many_arguments)]
     fn build_for_in_of_with_line_comments(
         &self,
-        left: &internal::ForInOfLeft<'_>,
         right: &Expression<'_>,
         body: &Statement<'_>,
         keyword: &str, // "in" or "of"
-        keyword_pos: u32,
-        open_paren: Option<u32>,
-        close_paren: Option<u32>,
-        // Whether the LHS is a bare `async` identifier needing parens (see
-        // `for_lhs_needs_async_paren`); precomputed by the caller, which has the
-        // `is_await` flag this method doesn't carry.
-        wrap_async_paren: bool,
+        // Resolved header positions, computed once by the caller (see
+        // `for_in_of_spans`) — shared with the structural-comment check and the
+        // inline layout.
+        spans: &ForInOfSpans,
+        // The LHS doc (`const y`, `(async)`, …), prebuilt by the caller so the
+        // bare-`async` paren decision (`for_lhs_needs_async_paren`, which needs the
+        // `is_await` flag this method doesn't carry) stays on the caller's side.
+        left_doc: DocId,
         // The `for ... (` opening, prebuilt by the caller (comments preserved,
         // `await` from the AST) — shared with the inline layout. Filled in place
         // (a pooled buffer owned by the caller) rather than taken by value.
         parts: &mut DocBuf,
     ) -> DocId {
         let d = self.d();
-        let left_start = self.get_for_in_of_left_start(left);
-        let left_end = self.get_for_in_of_left_end(left);
-        let right_start = right.span().start;
-        let right_end = right.span().end;
-        let keyword_end = keyword_pos + keyword.len() as u32;
 
         // Inner content with hardline breaks
         let mut inner = DocBuf::new();
 
         // Comments before left (after open paren)
-        if let Some(open) = open_paren {
-            for comment in comments_to_emit_in_range(self.comments, open + 1, left_start) {
+        if let Some(open) = spans.open_paren {
+            for comment in comments_to_emit_in_range(self.comments, open + 1, spans.left_start) {
                 inner.push(d.hardline());
                 inner.push(self.build_comment_doc(comment));
             }
@@ -1065,10 +1136,10 @@ impl<'a> Printer<'a> {
 
         // Left side (const y)
         inner.push(d.hardline());
-        inner.push(self.build_for_in_of_left_doc(left, wrap_async_paren));
+        inner.push(left_doc);
 
         // Comments after left, before keyword — emit all (own-line comments normalize to inline)
-        for comment in comments_to_emit_in_range(self.comments, left_end, keyword_pos) {
+        for comment in comments_to_emit_in_range(self.comments, spans.left_end, spans.keyword_pos) {
             inner.push(d.text(" "));
             inner.push(self.build_comment_doc(comment));
         }
@@ -1082,7 +1153,9 @@ impl<'a> Printer<'a> {
         let mut keyword_parts: DocBuf = smallvec![d.hardline(), keyword_doc];
 
         // Comments after keyword, before right — emit all (own-line comments normalize to inline)
-        for comment in comments_to_emit_in_range(self.comments, keyword_end, right_start) {
+        for comment in
+            comments_to_emit_in_range(self.comments, spans.keyword_end, spans.right_start)
+        {
             keyword_parts.push(d.text(" "));
             keyword_parts.push(self.build_comment_doc(comment));
         }
@@ -1092,8 +1165,8 @@ impl<'a> Printer<'a> {
         keyword_parts.push(self.build_expression_doc(right));
 
         // Comments after right, before close paren
-        if let Some(close) = close_paren {
-            for comment in comments_to_emit_in_range(self.comments, right_end, close) {
+        if let Some(close) = spans.close_paren {
+            for comment in comments_to_emit_in_range(self.comments, spans.right_end, close) {
                 keyword_parts.push(d.text(" "));
                 keyword_parts.push(self.build_comment_doc(comment));
             }
@@ -1105,7 +1178,7 @@ impl<'a> Printer<'a> {
         parts.push(d.hardline());
 
         // `)` + comments + body (shared with the inline layout)
-        self.push_for_close_paren_and_body(parts, body, right_end, close_paren);
+        self.push_for_close_paren_and_body(parts, body, spans.right_end, spans.close_paren);
 
         // Group so the non-block body's `adjustClause` line breaks (the
         // hardline-broken header forces this group open via `will_break`).
@@ -1189,6 +1262,23 @@ impl<'a> Printer<'a> {
     fn get_for_in_of_left_start(&self, left: &internal::ForInOfLeft<'_>) -> u32 {
         match left {
             internal::ForInOfLeft::VariableDeclaration(decl) => decl.span.start,
+            internal::ForInOfLeft::Pattern(expr) => expr.span().start,
+        }
+    }
+
+    /// Get the start position of the for-in/for-of binding *target* — the first
+    /// declarator's pattern for a `VariableDeclaration` left (`const [a, b]` → the
+    /// `[`), or the pattern itself for a bare `Pattern` left. Unlike
+    /// `get_for_in_of_left_start` (which points at the `const`/`let` keyword), this
+    /// skips the declaration kind so the keyword→binding gap (`const // c⏎x`) reads
+    /// as a header-structural position while the binding pattern's own interior does
+    /// not — see `for_in_of_header_has_structural_line_comments`.
+    fn get_for_in_of_binding_start(&self, left: &internal::ForInOfLeft<'_>) -> u32 {
+        match left {
+            internal::ForInOfLeft::VariableDeclaration(decl) => decl
+                .declarations
+                .first()
+                .map_or(decl.span.start, |declarator| declarator.id.span().start),
             internal::ForInOfLeft::Pattern(expr) => expr.span().start,
         }
     }

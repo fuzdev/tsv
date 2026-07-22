@@ -296,9 +296,24 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	svelte: 6,
-	typescript: 130,
+	typescript: 129,
 	css: 22,
 };
+// typescript 130→129 (2026-07-22, tsv benchmark tip 0ded51fb — post #533–#536 + the
+// prettier@3.9.6 npm-oracle bump (#548); suite/framework checkout INPUTS unchanged — svelte
+// b4d1583ae, kit da5b08ea7, svelte.dev c21c2d0f0, prettier 1dcd0b05d, prettier-plugin-svelte
+// 7809486, oracle acorn-typescript 1.0.11; svelte 6 + css 22 unchanged, SAFETY 0). A composite
+// of two offsetting forces, proven by a per-file bucket diff (the #527 pin-commit binary
+// 5c39e49a vs this tip, BOTH under the current oracle): the #533–#536 formatter fixes resolved
+// 11 reproducible TS unknowns (the #534 union sub-tab-alignment cluster — union/with-type-params,
+// consistent-with-flow/{single-type,within-tuple}, comments/issues; kit exports/public.d.ts +
+// types/internal.d.ts + core/config; two svelte compiler visitors; svelte.dev), a clean −9
+// tsv-code move (138→129 at constant oracle); the prettier@3.9.6 bump raised the old-binary
+// baseline +8 (130→138). Net −1. The 2 files that ENTERED unknown,
+// typescript/union/{comments/18389,inlining}.ts, moved partial→unknown — #534 resolved their
+// comment_position-explained hunk, leaving a residual union break-count hunk (uncataloged; the
+// known-open union-comment-layout class — SAFETY 0, reparse-safe), consciously absorbed since
+// the net is a drop.
 // typescript 133→130 (2026-07-20, checkouts unchanged; svelte 6 + css 22 unchanged, SAFETY 0).
 // The list blank-line predicate converged onto prettier's `isNextLineEmpty` (params, call
 // arguments, object properties): the break gate and the blank emitter had measured different
@@ -497,9 +512,18 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
  */
 export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	svelte: 1,
-	typescript: 51,
+	typescript: 45,
 	css: 9,
 };
+// typescript 51→45 (2026-07-22, same tip 0ded51fb / checkouts / oracle + prettier@3.9.6 as the
+// CORPUS_FORMAT_UNKNOWN_PIN 130→129 note above; svelte 1 + css 9 unchanged, SAFETY 0). Same
+// composite, same per-file diff vs the #527 pin binary (5c39e49a): the #533–#536 fixes resolved
+// 9 reproducible TS partials (a clean −9 tsv-code move, 54→45 at constant oracle; ZERO entered
+// partial), while the prettier@3.9.6 bump raised the old-binary baseline +3 (51→54). Net −6. The
+// 9 that left partial: kit/utils/css.js; prettier js/comments/if, js/if/if_comments, ts
+// comments/16121, union/5849, union/comments/{18389,18787}, union/consistent-with-flow/
+// union-last-comment, union/inlining (18389 + inlining continued partial→unknown — see the
+// unknown note; the other 7 to known/match).
 // typescript 52→51 (2026-07-20, checkouts unchanged; svelte 1 + css 9 unchanged, SAFETY 0).
 // Same `isNextLineEmpty` convergence as the CORPUS_FORMAT_UNKNOWN_PIN 133→130 note above; one
 // file's remaining blank-line hunk resolved with it. Same caveat: attributed by mechanism, not

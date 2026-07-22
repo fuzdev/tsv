@@ -59,14 +59,13 @@
 //! the shape the canonical Svelte parser's `expected.json` records.
 
 use crate::ast::internal;
-use string_interner::DefaultStringInterner;
 use tsv_css::ast::convert::write_css_node;
 use tsv_lang::{
-    Comment, InfallibleResolve, JsonWriter, LocationMapper, LocationTracker, Position, Span,
-    estimated_json_capacity, write_array, write_or_null,
+    Comment, JsonWriter, LocationMapper, LocationTracker, Position, Span, estimated_json_capacity,
+    write_array, write_or_null,
 };
 use tsv_ts::ast::convert::{
-    CommentMode, Schema, translate_column, write_expression_embedded,
+    CommentMode, ProgramLoc, Schema, translate_column, write_expression_embedded,
     write_identifier_expression_with_character, write_pattern_embedded, write_program_embedded,
     write_variable_declaration_embedded,
 };
@@ -106,7 +105,6 @@ fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: b
     } else {
         LocationTracker::new_map_only(source)
     };
-    let interner = root.interner.borrow();
 
     // Template comments (outside `<script>` content spans) are the only comments
     // the template attach passes move; everything else stays where it is.
@@ -123,11 +121,10 @@ fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: b
             tracker: &tracker,
             map: &map,
         },
-        interner: &interner,
         comments: &template_comments,
         // Component-global: `lang="ts"` on any script makes *every* script emit the
         // acorn-typescript wire shape (Svelte's single `this.ts` flag).
-        component_is_ts: component_is_typescript(root, source, &interner),
+        component_is_ts: component_is_typescript(root, source),
         emit_loc,
     };
 
@@ -146,7 +143,6 @@ struct Ctx<'a> {
     /// and the `<script>` tag-line lookups); its `map`, the `<style>` CSS
     /// children.
     loc: LocationMapper<'a>,
-    interner: &'a DefaultStringInterner,
     /// Template comments, sorted by position (empty on the common no-comment
     /// template — the whole spine then fuses).
     comments: &'a [&'a Comment],
@@ -366,7 +362,6 @@ fn write_generic_island(
             ctx.comments,
             ctx.source,
             ctx.loc.tracker,
-            ctx.interner,
             container_start,
             range_end,
         );
@@ -375,21 +370,12 @@ fn write_generic_island(
             expr,
             ctx.source,
             ctx.loc,
-            ctx.interner,
             CommentMode::Emit(&wc),
             ctx.emit_loc,
         );
         wc.debug_assert_consumed();
     } else {
-        write_expression_embedded(
-            w,
-            expr,
-            ctx.source,
-            ctx.loc,
-            ctx.interner,
-            CommentMode::Off,
-            ctx.emit_loc,
-        );
+        write_expression_embedded(w, expr, ctx.source, ctx.loc, CommentMode::Off, ctx.emit_loc);
     }
 }
 
@@ -426,7 +412,7 @@ fn write_element(w: &mut JsonWriter, elem: &internal::Element<'_>, ctx: &Ctx<'_>
     w.raw(",\"end\":");
     w.u32(ctx.pos(elem.span.end));
     w.raw(",\"name\":");
-    w.string(ctx.interner.resolve_infallible(elem.name));
+    w.string(elem.name(ctx.source));
     if ctx.emit_loc {
         w.raw(",\"name_loc\":");
         write_name_loc(w, elem.name_span, ctx);
@@ -437,7 +423,7 @@ fn write_element(w: &mut JsonWriter, elem: &internal::Element<'_>, ctx: &Ctx<'_>
     // A `<textarea>`'s content is read with the attribute-value sequence
     // machinery in the canonical parser, whose `Text` literal leads with the
     // positions (`{start, end, type, raw, data}`).
-    if ctx.interner.resolve_infallible(elem.name) == "textarea" {
+    if elem.name(ctx.source) == "textarea" {
         w.raw("{\"type\":\"Fragment\",\"nodes\":");
         write_array(w, elem.fragment.nodes, |w, n| match n {
             internal::FragmentNode::Text(text) => write_text_sequence(w, text, ctx),
@@ -550,7 +536,6 @@ fn write_shorthand_expression_tag(
         &tag.expression,
         ctx.source,
         ctx.loc,
-        ctx.interner,
         CommentMode::Off,
         ctx.emit_loc,
     );
@@ -776,7 +761,6 @@ fn write_snippet_name(
             ctx.comments,
             ctx.source,
             ctx.loc.tracker,
-            ctx.interner,
             container_start,
             range_end,
         );
@@ -785,7 +769,6 @@ fn write_snippet_name(
             expr,
             ctx.source,
             ctx.loc,
-            ctx.interner,
             CommentMode::Emit(&wc),
             ctx.emit_loc,
         );
@@ -796,7 +779,6 @@ fn write_snippet_name(
             expr,
             ctx.source,
             ctx.loc,
-            ctx.interner,
             CommentMode::Off,
             ctx.emit_loc,
         );
@@ -822,7 +804,6 @@ fn write_snippet_parameters(
             ctx.comments,
             ctx.source,
             ctx.loc.tracker,
-            ctx.interner,
             container_start,
             range_end,
             None,
@@ -833,7 +814,6 @@ fn write_snippet_parameters(
                 p,
                 ctx.source,
                 ctx.loc,
-                ctx.interner,
                 CommentMode::Emit(&wc),
                 ctx.emit_loc,
             );
@@ -841,15 +821,7 @@ fn write_snippet_parameters(
         wc.debug_assert_consumed();
     } else {
         write_array(w, parameters, |w, p| {
-            write_expression_embedded(
-                w,
-                p,
-                ctx.source,
-                ctx.loc,
-                ctx.interner,
-                CommentMode::Off,
-                ctx.emit_loc,
-            );
+            write_expression_embedded(w, p, ctx.source, ctx.loc, CommentMode::Off, ctx.emit_loc);
         });
     }
 }
@@ -899,7 +871,6 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'
             ctx.comments,
             ctx.source,
             ctx.loc.tracker,
-            ctx.interner,
             tag.span.start,
             tag.span.end,
             tag.identifiers.last().map(|id| id.span().end),
@@ -910,7 +881,6 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'
                 id,
                 ctx.source,
                 ctx.loc,
-                ctx.interner,
                 CommentMode::Emit(&wc),
                 ctx.emit_loc,
             );
@@ -953,13 +923,7 @@ fn write_const_tag(w: &mut JsonWriter, tag: &internal::ConstTag<'_>, ctx: &Ctx<'
     } else {
         // The document has template comments: precompute the init-subtree
         // attach map (comments attach to the init only).
-        let wc = build_const_tag_writer_comments(
-            tag,
-            ctx.comments,
-            ctx.source,
-            ctx.loc.tracker,
-            ctx.interner,
-        );
+        let wc = build_const_tag_writer_comments(tag, ctx.comments, ctx.source, ctx.loc.tracker);
         write_const_declaration(
             w,
             tag,
@@ -1031,25 +995,9 @@ fn write_const_declaration(
     w.raw(
         "{\"type\":\"VariableDeclaration\",\"kind\":\"const\",\"declarations\":[{\"type\":\"VariableDeclarator\",\"id\":",
     );
-    write_pattern_embedded(
-        w,
-        &tag.id,
-        ctx.source,
-        ctx.loc,
-        ctx.interner,
-        mode,
-        ctx.emit_loc,
-    );
+    write_pattern_embedded(w, &tag.id, ctx.source, ctx.loc, mode, ctx.emit_loc);
     w.raw(",\"init\":");
-    write_expression_embedded(
-        w,
-        &tag.init,
-        ctx.source,
-        ctx.loc,
-        ctx.interner,
-        mode,
-        ctx.emit_loc,
-    );
+    write_expression_embedded(w, &tag.init, ctx.source, ctx.loc, mode, ctx.emit_loc);
     w.raw(",\"start\":");
     w.u32(ctx.pos(tag.id.span().start));
     w.raw(",\"end\":");
@@ -1083,7 +1031,6 @@ fn write_declaration_tag(w: &mut JsonWriter, tag: &internal::DeclarationTag<'_>,
             &tag.declaration,
             ctx.source,
             ctx.loc,
-            ctx.interner,
             CommentMode::Off,
             ctx.emit_loc,
         );
@@ -1093,7 +1040,6 @@ fn write_declaration_tag(w: &mut JsonWriter, tag: &internal::DeclarationTag<'_>,
             ctx.comments,
             ctx.source,
             ctx.loc.tracker,
-            ctx.interner,
             tag.span.start,
             tag.span.end,
         );
@@ -1102,7 +1048,6 @@ fn write_declaration_tag(w: &mut JsonWriter, tag: &internal::DeclarationTag<'_>,
             &tag.declaration,
             ctx.source,
             ctx.loc,
-            ctx.interner,
             CommentMode::Emit(&wc),
             ctx.emit_loc,
         );
@@ -1140,7 +1085,7 @@ fn write_attribute(w: &mut JsonWriter, attr: &internal::Attribute<'_>, ctx: &Ctx
     w.raw(",\"end\":");
     w.u32(ctx.pos(attr.span.end));
     w.raw(",\"name\":");
-    w.string(ctx.interner.resolve_infallible(attr.name));
+    w.string(attr.name(ctx.source));
     if ctx.emit_loc {
         w.raw(",\"name_loc\":");
         write_name_loc(w, attr.name_span, ctx);
@@ -1356,7 +1301,7 @@ fn write_directive_value_expression(
         w.raw(",\"end\":");
         w.u32(ctx.pos(id.span.end));
         w.raw(",\"type\":\"Identifier\",\"name\":");
-        w.string(id.name(ctx.source, ctx.interner));
+        w.string(id.name(ctx.source));
         w.raw("}");
     }
 }
@@ -1498,7 +1443,6 @@ fn write_script(
             script,
             ctx.source,
             ctx.loc.tracker,
-            ctx.interner,
             html_leading_comment,
             schema,
         ))
@@ -1552,28 +1496,25 @@ fn write_script_program_fused(
             ) as usize,
         }
     };
-    // The override is only consumed when `loc` is emitted; on the no-locations
-    // path it's discarded, so skip the two `get_line_column` line-table lookups
-    // (which would only hit the stub `[0]` table anyway — see `new_map_only`).
-    let loc_override = if ctx.emit_loc {
-        (
+    // The override is only consumed when `loc` is emitted; `ProgramLoc::Omit` is
+    // the no-locations path, which skips the two `get_line_column` line-table
+    // lookups (which would only hit the stub `[0]` table anyway — see `new_map_only`).
+    let program_loc = if ctx.emit_loc {
+        ProgramLoc::Emit(
             position_at(script.span.start, program.span.start),
             position_at(script.span.end, program.span.end),
         )
     } else {
-        let dummy = Position { line: 1, column: 0 };
-        (dummy, dummy)
+        ProgramLoc::Omit
     };
     write_program_embedded(
         w,
         program,
         ctx.source,
         ctx.loc,
-        ctx.interner,
         schema,
-        loc_override,
+        program_loc,
         comments,
-        ctx.emit_loc,
     );
 }
 
@@ -1582,37 +1523,36 @@ fn write_script_program_fused(
 /// preserveWhitespace, namespace, customElement` (no `type`).
 fn write_svelte_options(w: &mut JsonWriter, options: &internal::SvelteOptions<'_>, ctx: &Ctx<'_>) {
     let attrs = options.attributes;
-    let interner = ctx.interner;
     w.raw("{\"start\":");
     w.u32(ctx.pos(options.span.start));
     w.raw(",\"end\":");
     w.u32(ctx.pos(options.span.end));
     w.raw(",\"attributes\":");
     write_value_attributes(w, attrs, ctx);
-    if let Some(runes) = bool_option(attrs, "runes", interner) {
+    if let Some(runes) = bool_option(attrs, "runes", ctx.source) {
         w.raw(",\"runes\":");
         w.bool(runes);
     }
-    if let Some(immutable) = bool_option(attrs, "immutable", interner) {
+    if let Some(immutable) = bool_option(attrs, "immutable", ctx.source) {
         w.raw(",\"immutable\":");
         w.bool(immutable);
     }
     if let Some(css) =
-        find_option_values(attrs, "css", interner).and_then(|v| text_value(v, ctx.source))
+        find_option_values(attrs, "css", ctx.source).and_then(|v| text_value(v, ctx.source))
     {
         w.raw(",\"css\":");
         w.string(&css);
     }
-    if let Some(accessors) = bool_option(attrs, "accessors", interner) {
+    if let Some(accessors) = bool_option(attrs, "accessors", ctx.source) {
         w.raw(",\"accessors\":");
         w.bool(accessors);
     }
-    if let Some(preserve_whitespace) = bool_option(attrs, "preserveWhitespace", interner) {
+    if let Some(preserve_whitespace) = bool_option(attrs, "preserveWhitespace", ctx.source) {
         w.raw(",\"preserveWhitespace\":");
         w.bool(preserve_whitespace);
     }
     if let Some(namespace) =
-        find_option_values(attrs, "namespace", interner).and_then(|v| text_value(v, ctx.source))
+        find_option_values(attrs, "namespace", ctx.source).and_then(|v| text_value(v, ctx.source))
     {
         w.raw(",\"namespace\":");
         w.string(&namespace);
@@ -1652,7 +1592,7 @@ fn write_custom_element_props(
             continue;
         };
         json_comma(w, &mut first_prop);
-        w.string(key.name(ctx.source, ctx.interner));
+        w.string(key.name(ctx.source));
         w.raw(":{");
         let mut first_attr = true;
         for inner_prop in inner.properties {
@@ -1663,7 +1603,7 @@ fn write_custom_element_props(
             else {
                 continue;
             };
-            let key_name = ikey.name(ctx.source, ctx.interner);
+            let key_name = ikey.name(ctx.source);
             match &lit.value {
                 LiteralValue::String(cooked) => {
                     json_comma(w, &mut first_attr);
@@ -1700,7 +1640,7 @@ fn write_custom_element_field(
     ctx: &Ctx<'_>,
 ) {
     use tsv_ts::ast::internal::{Expression, LiteralValue, ObjectProperty};
-    let Some(values) = find_option_values(attrs, "customElement", ctx.interner) else {
+    let Some(values) = find_option_values(attrs, "customElement", ctx.source) else {
         return;
     };
     for v in values {
@@ -1716,7 +1656,7 @@ fn write_custom_element_field(
                 if let ObjectProperty::Property(p) = prop
                     && let Expression::Identifier(key) = &p.key
                 {
-                    let slot = match key.name(ctx.source, ctx.interner) {
+                    let slot = match key.name(ctx.source) {
                         "tag" => &mut tag,
                         "props" => &mut props,
                         "shadow" => &mut shadow,
@@ -1762,7 +1702,6 @@ fn write_custom_element_field(
                         shadow_expr,
                         ctx.source,
                         ctx.loc,
-                        ctx.interner,
                         CommentMode::Off,
                         ctx.emit_loc,
                     );
@@ -1778,7 +1717,6 @@ fn write_custom_element_field(
                     extend_expr,
                     ctx.source,
                     ctx.loc,
-                    ctx.interner,
                     CommentMode::Off,
                     ctx.emit_loc,
                 );
@@ -1832,15 +1770,7 @@ fn write_pattern_island(
     expr: &tsv_ts::ast::internal::Expression<'_>,
     ctx: &Ctx<'_>,
 ) {
-    write_pattern_embedded(
-        w,
-        expr,
-        ctx.source,
-        ctx.loc,
-        ctx.interner,
-        CommentMode::Off,
-        ctx.emit_loc,
-    );
+    write_pattern_embedded(w, expr, ctx.source, ctx.loc, CommentMode::Off, ctx.emit_loc);
 }
 
 /// A fragment or `null` (the `AwaitBlock` branch fields and `IfBlock`'s

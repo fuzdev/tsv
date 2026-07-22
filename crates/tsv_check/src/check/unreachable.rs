@@ -259,7 +259,7 @@ pub fn build_candidates(
     };
     walk.visit_list(program.body);
     let unused_labels = collect_unused_labels(bound, flow);
-    let suppressed_ranges = compute_suppressed_ranges(source, &program.comments);
+    let suppressed_ranges = compute_suppressed_ranges(source, program.comments);
     UnreachableCandidates {
         runs: walk.runs,
         unused_labels,

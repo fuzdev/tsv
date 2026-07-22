@@ -34,17 +34,15 @@ use crate::diag::{Category, Diagnostic};
 use crate::hash::FxHashMap;
 use crate::ids::FileId;
 use crate::span_scan::{bracket_end, bracket_start};
-use string_interner::DefaultStringInterner;
 use tsv_lang::Span;
 use tsv_ts::ast::internal::{
     ClassMember, Expression, Literal, LiteralValue, MethodKind, TSTypeElement,
     TSTypeParameterDeclaration,
 };
 
-/// The per-body derivation context (source + interner for names, file for spans).
+/// The per-body derivation context (source for names, file for spans).
 pub(super) struct MemberCtx<'a> {
     pub source: &'a str,
-    pub interner: &'a DefaultStringInterner,
     pub file: FileId,
 }
 
@@ -311,9 +309,9 @@ pub(super) fn check_type_parameters(
     out: &mut Vec<Diagnostic>,
 ) {
     for (i, param) in decl.params.iter().enumerate() {
-        let name = param.name.name(ctx.source, ctx.interner);
+        let name = param.name.name(ctx.source);
         for prior in &decl.params[..i] {
-            if prior.name.name(ctx.source, ctx.interner) == name {
+            if prior.name.name(ctx.source) == name {
                 out.push(make_2300(ctx.file, param.name.name_span(), name));
             }
         }
@@ -353,14 +351,14 @@ fn member_key(
     }
     match key {
         Expression::Identifier(id) => {
-            let name = id.name(ctx.source, ctx.interner).to_string();
+            let name = id.name(ctx.source).to_string();
             Some((name.clone(), name, id.name_span()))
         }
         Expression::Literal(lit) => literal_key(ctx, lit).map(|k| (k.clone(), k, lit.span)),
         Expression::PrivateIdentifier(pid) => {
             // A `#name` — key it with the `#` so it never collides with the public
             // `name`; the diagnostic covers the whole `#name` node.
-            let name = pid.name(ctx.source, ctx.interner);
+            let name = pid.name(ctx.source);
             let keyed = format!("#{name}");
             Some((keyed.clone(), keyed, pid.span))
         }
@@ -377,10 +375,7 @@ fn param_property_key(ctx: &MemberCtx<'_>, parameter: &Expression<'_>) -> Option
         other => other,
     };
     match inner {
-        Expression::Identifier(id) => Some((
-            id.name(ctx.source, ctx.interner).to_string(),
-            id.name_span(),
-        )),
+        Expression::Identifier(id) => Some((id.name(ctx.source).to_string(), id.name_span())),
         _ => None,
     }
 }

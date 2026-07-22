@@ -243,8 +243,7 @@ pub fn debug_token_stream(source: &str) -> String {
                 let _ = write!(out, "{:?} {}..{}", token.kind, token.start, token.end);
                 if matches!(token.kind, TokenKind::Identifier) {
                     let slice = &source[token.start as usize..token.end as usize];
-                    let decoded = lexer.take_decoded();
-                    let text = decoded.as_deref().map_or(slice, String::as_str);
+                    let text = lexer.decoded_str().unwrap_or(slice);
                     let _ = write!(out, " text={text:?}");
                 }
                 out.push('\n');

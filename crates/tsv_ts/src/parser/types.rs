@@ -1250,7 +1250,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         start: usize,
         param_start: usize,
-        param_name: IdentName,
+        param_name: IdentName<'arena>,
         readonly: Option<TSMappedTypeModifier>,
     ) -> Result<TSType<'arena>, ParseError> {
         let arena = self.arena;

@@ -97,7 +97,7 @@ impl ChildRange {
 /// Stores children as `DocId` indices and child lists as `ChildRange` ranges.
 #[derive(Debug, Clone)]
 pub enum DocNode {
-    /// Text content to output (static, pooled, source-span, or symbol)
+    /// Text content to output (static, pooled, or source-span)
     Text(DocText),
 
     /// Multi-line text rendered with per-line context indent.
@@ -168,11 +168,7 @@ pub enum DocNode {
     },
 
     /// Conditionally indent based on whether a specific group broke
-    IndentIfBreak {
-        contents: DocId,
-        group_id: GroupId,
-        negate: bool,
-    },
+    IndentIfBreak { contents: DocId, group_id: GroupId },
 
     /// Sequence of docs - rendered one after another
     Concat(ChildRange),
@@ -473,8 +469,8 @@ const FUSED_WIDTH_SCAN_MAX: usize = 32;
 /// node) **always** cache a real width or the newline sentinel at build — so
 /// every width query (the fits walk, `render_text`'s column advance) answers
 /// from the node alone, the fits path never borrows the pool, and render's
-/// per-text byte scan is skipped. The one exception is identifier names
-/// ([`DocArena::source_span_ident`]) and interner `Symbol`s: high-frequency,
+/// per-text byte scan is skipped. The one exception is the name slices
+/// ([`DocArena::source_span_ident`]): high-frequency,
 /// newline-free, and rarely fits-measured, so for them a per-node build-time
 /// scan costs more than it saves (measured both ways — eager per-ident width
 /// was ~+1.1% on identifier-dense corpora; eager everything-else was
@@ -640,7 +636,7 @@ pub struct DocArena {
     will_break_cache: RefCell<Vec<Option<bool>>>,
     /// Memoized flat-mode subtree widths for the `arena_fits` fast-path, indexed
     /// by `DocId`. Lazily extended like `will_break_cache`; valid per-format
-    /// (depends only on the fixed `TAB_WIDTH` + the interner, both fixed for a
+    /// (depends only on the fixed `TAB_WIDTH` + the source, both fixed for a
     /// render).
     flat_width_cache: RefCell<Vec<u32>>,
     /// Direct-mapped cache for [`Self::text`] statics, carrying two halves per
@@ -672,9 +668,9 @@ pub struct DocArena {
     /// indirection.
     static_cache: [Cell<StaticSlot>; STATIC_CACHE_SLOTS],
     /// The current document's format generation, keying the validity of the
-    /// interned node halves in `static_cache`, the singleton cells
+    /// interned node halves in `static_cache` and the singleton cells
     /// (`empty_node`, `line_nodes`, `line_suffix_boundary_node`,
-    /// `break_parent_node`), and the `symbol_nodes` table. Starts
+    /// `break_parent_node`). Starts
     /// at 1 (0 marks a never-stamped slot) and is bumped by `reset()`, so a
     /// prior document's `node_id`s — invalidated by the reset — can never be
     /// returned for the new document.
@@ -701,17 +697,6 @@ pub struct DocArena {
     /// (generation, id) — stateless like `Line`, same dedicated-cell
     /// interning. Valid iff the generation matches `format_gen`.
     break_parent_node: Cell<(u32, DocId)>,
-    /// Per-document interned [`DocText::Symbol`] nodes, direct-indexed by the
-    /// symbol id — the Symbol analog of the static cache's node half. A Symbol
-    /// node is position-free at render (the id fully determines the resolved
-    /// text) and carries no per-use state, so every `symbol(id)` within one
-    /// document can return one shared node. Ids are small dense integers from
-    /// the per-document interner (vocabulary = element/attribute names,
-    /// typically tens), so a direct-indexed table needs no hash probe. Each
-    /// entry is `(generation, id)`, valid iff the generation matches
-    /// [`Self::format_gen`]; lazily grown to the document's max id + 1, with
-    /// capacity retained across `reset()` (the gen bump invalidates in O(1)).
-    symbol_nodes: RefCell<Vec<(u32, DocId)>>,
     /// Diagnostic side-set: indices of text nodes that are line comments,
     /// recorded by `line_comment_text_pooled` only while the swallow check is
     /// enabled (empty and untouched otherwise). Appended in `alloc` order, so
@@ -799,7 +784,6 @@ impl DocArena {
             line_nodes: [const { Cell::new((0, DocId(0))) }; 4],
             line_suffix_boundary_node: Cell::new((0, DocId(0))),
             break_parent_node: Cell::new((0, DocId(0))),
-            symbol_nodes: RefCell::new(Vec::new()),
             #[cfg(feature = "swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
             #[cfg(feature = "comment_check")]
@@ -854,7 +838,6 @@ impl DocArena {
             line_nodes: [const { Cell::new((0, DocId(0))) }; 4],
             line_suffix_boundary_node: Cell::new((0, DocId(0))),
             break_parent_node: Cell::new((0, DocId(0))),
-            symbol_nodes: RefCell::new(Vec::new()),
             #[cfg(feature = "swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
             #[cfg(feature = "comment_check")]
@@ -908,7 +891,6 @@ impl DocArena {
             }
             self.line_suffix_boundary_node.set((0, DocId(0)));
             self.break_parent_node.set((0, DocId(0)));
-            self.symbol_nodes.get_mut().clear();
             self.format_gen.set(1);
         } else {
             self.format_gen.set(next);
@@ -1110,7 +1092,8 @@ impl DocArena {
     /// (the eager [`pooled_text_width`] policy: a real width or the newline
     /// sentinel, so fits and render never re-scan the text) and is **not**
     /// retained — the span lives in the lifetime-less arena and is re-resolved
-    /// at render via a [`super::SourceTextResolver`]. Identifier names use
+    /// at render against the document source threaded through the render entry
+    /// points (`resolve_text`). Identifier names use
     /// [`Self::source_span_ident`] instead (deferred width — the opposite
     /// tradeoff).
     #[inline]
@@ -1122,7 +1105,7 @@ impl DocArena {
     /// [`Self::source_span`] for a slice the caller guarantees is newline-free
     /// (identifier names): skips the width precompute entirely — no source read
     /// at build. Width is measured on demand at the first `fits()` touch
-    /// (memoized) — the deferral kept only for identifier names and `Symbol`s
+    /// (memoized) — the deferral kept only for identifier names
     /// (high-frequency, rarely fits-measured); a non-ASCII name measures the
     /// same value lazily as eagerly, so output is unaffected. Do NOT use for
     /// text that can contain `\n` — the newline sentinel would be missed.
@@ -1333,42 +1316,6 @@ impl DocArena {
         self.interned_singleton(&self.empty_node, || DocNode::Text(DocText::Static("", 0)))
     }
 
-    /// Create a text doc from a symbol ID (deferred resolution), interned per
-    /// document — repeated `symbol(id)` calls within one format return one
-    /// shared node instead of allocating per call (Symbol nodes are
-    /// position-free at render and carry no per-use state, like `Static` text
-    /// and the `Line` singletons; measured ~65–80% of calls dedup on Svelte
-    /// corpora — Symbol is Svelte-only in practice).
-    #[inline]
-    pub fn symbol(&self, id: u32) -> DocId {
-        let format_gen = self.format_gen.get();
-        {
-            let slots = self.symbol_nodes.borrow();
-            if let Some(&(node_gen, node_id)) = slots.get(id as usize)
-                && node_gen == format_gen
-            {
-                return node_id;
-            }
-        }
-        self.symbol_miss(id, format_gen)
-    }
-
-    /// The cold half of [`Self::symbol`]: alloc this document's node for `id`,
-    /// grow the table to cover the id, and stamp the slot (once per distinct
-    /// symbol per document).
-    #[cold]
-    #[inline(never)]
-    fn symbol_miss(&self, id: u32, format_gen: u32) -> DocId {
-        let node_id = self.alloc(DocNode::Text(DocText::Symbol(id)));
-        let mut slots = self.symbol_nodes.borrow_mut();
-        let i = id as usize;
-        if i >= slots.len() {
-            slots.resize(i + 1, (0, DocId(0)));
-        }
-        slots[i] = (format_gen, node_id);
-        node_id
-    }
-
     /// Create a normal line break (space if fits, newline if doesn't),
     /// interned per document.
     #[inline]
@@ -1507,11 +1454,10 @@ impl DocArena {
     }
 
     /// Conditionally indent based on whether a specific group broke.
-    pub fn indent_if_break(&self, doc: DocId, group_id: GroupId, negate: bool) -> DocId {
+    pub fn indent_if_break(&self, doc: DocId, group_id: GroupId) -> DocId {
         self.alloc(DocNode::IndentIfBreak {
             contents: doc,
             group_id,
-            negate,
         })
     }
 
